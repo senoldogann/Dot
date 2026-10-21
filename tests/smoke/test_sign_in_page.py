@@ -1,8 +1,8 @@
 """The page the browser is sent back to after a sign-in (item 437), in a real Chrome on a real server: drawn with
-the interface's own sheets under the server's content security policy (no console error, which a refused inline style
-or script would be), in the system's light or dark, wide and on a phone, with the account's mark and the way back to
-Plugins in view. The outcomes are the real ones of the accounts: a no with a provider's words, a return that waited too
-long, and a state nobody waits for. No provider is reached."""
+the interface's own sheets, which it carries, under the policy of its own (no console error, which a refused style or
+script would be), asking the server for nothing but its faces (item 448), in the system's light or dark, wide and on a
+phone, with the account's mark. The outcomes are the real ones of the accounts: a no with a provider's words, a return
+that waited too long, and a state nobody waits for. No provider is reached."""
 
 import asyncio
 import time
@@ -107,8 +107,9 @@ async def _address(runtime: Runtime, served: str, outcome: str) -> str:
 
 async def _checked(page: Page, address: str, title: str, tmp_path: Path, name: str) -> None:
     """Open ``address`` and check the page is drawn as Dot is: the sheets applied, nothing refused, nothing wider than
-    the window, the way back in view."""
+    the window, and nothing asked of the server but the page and its faces."""
     problems: list[str] = []
+    asked: list[str] = []
 
     def noted(message: ConsoleMessage) -> None:
         # The page's own 400 (a return that waited too long, a state nobody waits for) is logged by Chrome as an error
@@ -118,6 +119,7 @@ async def _checked(page: Page, address: str, title: str, tmp_path: Path, name: s
 
     page.on("console", noted)
     page.on("requestfailed", lambda request: problems.append(f"{request.url} failed"))
+    page.on("request", lambda request: asked.append(request.url))
     await page.goto(address)
     await expect(page.locator("h1")).to_have_text(title)
     await expect(page).to_have_title(f"{title} - Dot")
@@ -126,9 +128,8 @@ async def _checked(page: Page, address: str, title: str, tmp_path: Path, name: s
     assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
     font: str = await page.evaluate("getComputedStyle(document.querySelector('h1')).fontFamily")
     assert "Inter" in font, f"the page is drawn without the interface's sheets: {font}"
-    way_back = page.get_by_role("link", name="Back to Plugins")
-    await expect(way_back).to_be_in_viewport()
-    assert await way_back.get_attribute("href") == "/#/customize/plugins"
+    files: list[str] = [urlsplit(url).path for url in asked if url != address and not url.startswith("data:")]
+    assert all(path.startswith("/fonts/") for path in files) and files, asked
     await page.screenshot(path=str(tmp_path / f"{name}.png"), full_page=True)
 
 

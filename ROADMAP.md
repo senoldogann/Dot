@@ -16143,6 +16143,39 @@ for the owner; while a run works in Dot's Chrome the Dock still brings it forwar
 `tests/smoke/test_chat_scroll.py` (the window falls from 789 px to 0 on the code before; a finished chat's answer is
 there with its page) and `tests/smoke/test_browser.py`.
 
+### 448. A sign-in that opens in Dot's own Chrome comes back
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21, with two screenshots: the Google and the Microsoft
+sign-ins of Customize › Plugins ended on Chrome's `ERR_BLOCKED_BY_CLIENT` at `127.0.0.1:8765/oauth/callback` and
+`localhost:8765/oauth/callback`. The daemon's log had `browser_request_refused` for both, "it is Dot's own interface":
+macOS handed the provider's page to the Chrome that ran, Dot's own, whose guard (item 135) refuses every address of the
+interface. **As built.** `browser.safety.sign_in_return` names the way back: the path `/oauth/callback` exactly, as
+Chrome read it, on a loopback address at `[server] port`; `request_verdict` lets it through as a navigation only, so a
+script, a picture or a fetch to it is still refused, and `check_browser_url` (what a tool opens, the landing check)
+still refuses it, so a run whose tab lands there has the tab reset and reads nothing of it. The names of
+`[server] reach` stay refused: a sign-in starts from a page on this Mac and comes back to its loopback address. A run
+gains nothing by the page: the daemon takes only a state it handed out itself, once, for ten minutes, and the page
+carries no token. Tests: `tests/unit/test_own_interface.py` (the way back, and the spellings that are not it: a slash
+more, another case, a dot segment, the path in the query, the tailnet's name, a backslash a browser reads as `/`, a
+request that is not a page) and
+`tests/smoke/test_browser_boundary.py` (a link whose redirect ends there reaches the daemon as one navigation and the
+tab is reset; on the code before this change it is refused). Docs: `docs/browser-and-computer-use.md`.
+
+The pre-push review's pass found the page that opens there half drawn: it linked `/css/app.css`, `/css/themes.css`,
+`/favicon.svg` and the provider's mark, files of the interface which that Chrome refuses, and its **Back to Plugins**
+(item 437) led into the interface, to the very error page of the owner's screenshots. The page carries its look now
+(`server/callback_page.py`): the two sheets one after the other in its one `<style>`, which the policy of
+`guard.callback_headers` lets apply by its SHA-256 hash and nothing else inline (`style-src 'sha256-…'`, no script,
+`img-src data:`, `font-src 'self'`, `no-store`), and the favicon and the mark as `data:` addresses; it asks the daemon
+for nothing but its faces, which Dot's own Chrome refuses and the system's stand in for. A mark is the name of an SVG
+file of `icons/plugins` and nothing else. The button and its line about the access token are gone: the page says that
+Dot on this Mac already shows the account, and that the tab can be closed. Tests: `tests/unit/test_callback_page.py`
+(the one style is the two sheets and its hash is the policy's, every address of the page is a `data:` one, no link, no
+script), `tests/smoke/test_sign_in_page.py` (in a plain Chrome against the real daemon the page asks for its faces and
+nothing else) and `tests/smoke/test_browser_boundary.py` (a tab of Dot's own Chrome that no run drives, as macOS opens
+one, draws the real page with its mark, and nothing but the way back reaches the stand-in daemon). Docs:
+`docs/extending.md`.
+
 ### 449. The rules move with arrows, and a rule that never decides says so
 
 **Status: done (2026-10-21).** The first of the nine ideas the owner took from the comparison with OpenBot
@@ -17228,6 +17261,8 @@ with one event, switching it on again; a one-time schedule and one without a lim
 - 2026-10-21 (Opus 5.5): item 446 on `item-446-chat-foot-always-a-way` from `main`: a chat reached from
   the side menu opens at its foot, a run that ended while another chat was open and a live one included;
   every run is told that there is always a way, within the rules of trust and safety.
+- 2026-10-21 (Opus 5.5): item 448: the way back of a sign-in (`/oauth/callback` on this Mac at the daemon's port) opens in
+  Dot's own Chrome as a page, and nothing else of the interface does.
 - 2026-10-21 (Opus 5.5): item 447: `@` offers the MCP servers and the plugins alone — the skills are `/`'s — each with
   the logo of its Customize tile, and on a phone the menu takes the room the keyboard leaves and scrolls.
 - 2026-10-21 (Opus 5.5): item 449 on `item-449-rule-order` from `main`: a rule's arrows move it up or down the order, a

@@ -1,7 +1,10 @@
 """The page the browser is sent back to after a sign-in (item 437): every outcome of an account's sign-in and of an MCP
-server's has a title, an h1, the sheets of the interface and a way back to Plugins, and carries no inline style or
-script, which the server's content security policy forbids. What a provider said is escaped."""
+server's has a title, an h1 and the sheets of the interface, which it carries in its one style under the hash its
+policy names, and asks the server for nothing but its faces (item 448): no link, no script, its pictures ``data:``
+addresses. What a provider said is escaped."""
 
+import base64
+import hashlib
 import re
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -13,17 +16,18 @@ from dotagent.config import McpServerConfig
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService
 from dotagent.oauth.accounts import CameBack, CameBackKind, denial_reason
 from dotagent.server.callback_page import (
-    PLUGINS_LINK,
     PROVIDER_MARKS,
     WORDMARK,
     Callback,
     Outcome,
     Subject,
     account_callback,
+    page_style,
     render,
     status_of,
     words_of,
 )
+from dotagent.server.guard import response_headers
 from dotagent.server.routes_mcp import mcp_subject
 
 _STATIC: Path = Path(__file__).resolve().parents[2] / "src" / "dotagent" / "server" / "static"
@@ -41,23 +45,44 @@ _OUTCOMES: tuple[Callback, ...] = (
 )
 
 
+def _body(page: str) -> str:
+    """The page without its style, which names every class of the interface."""
+    return re.sub(r"<style>.*?</style>", "", page, flags=re.DOTALL)
+
+
+def _data_address(relative: str) -> str:
+    return f"data:image/svg+xml;base64,{base64.b64encode((_STATIC / relative).read_bytes()).decode('ascii')}"
+
+
 @pytest.mark.parametrize("callback", _OUTCOMES, ids=lambda one: f"{one.outcome}-{one.reason is not None}")
-def test_every_outcome_is_a_titled_page_in_dots_own_look_with_a_way_back(callback: Callback) -> None:
+def test_every_outcome_is_a_titled_page_in_dots_own_look_that_asks_the_server_for_nothing(callback: Callback) -> None:
     page: str = render(callback)
     title: str = words_of(callback).title
     assert f"<title>{title} - Dot</title>" in page
     assert re.findall(r"<h1[^>]*>(.*?)</h1>", page) == [title]
-    # Absolute addresses of this server's own files: the page lives at /oauth/callback and may set no base.
-    assert (
-        '<link rel="stylesheet" href="/css/app.css">' in page
-        and '<link rel="stylesheet" href="/css/themes.css">' in page
-    )
-    assert '<link rel="icon" href="/favicon.svg" type="image/svg+xml">' in page
+    sheets: str = "\n".join((_STATIC / "css" / name).read_text(encoding="utf-8") for name in ("app.css", "themes.css"))
+    assert re.findall(r"<style>(.*?)</style>", page, re.DOTALL) == [sheets]
+    assert f'<link rel="icon" href="{_data_address("favicon.svg")}" type="image/svg+xml">' in page
     assert '<meta name="color-scheme" content="light dark">' in page
-    assert f'<a class="btn primary" href="{PLUGINS_LINK}">Back to Plugins</a>' in page
     assert WORDMARK in page
-    # The policy lets the page load its own sheets and nothing inline.
-    assert not re.search(r"<style|<script|\sstyle=|\son[a-z]+=", page)
+    # Nothing it shows is fetched (Dot's own Chrome refuses every file of the interface), and nothing leads into the
+    # interface, which that Chrome never opens.
+    assert all(address.startswith("data:") for address in re.findall(r'\s(?:src|href)="([^"]*)"', page))
+    assert not re.search(r"<a\s|<script|\sstyle=|\son[a-z]+=", page)
+
+
+def test_the_policy_of_the_page_lets_its_one_style_apply_and_nothing_else_inline() -> None:
+    policy: str = dict(response_headers("/oauth/callback"))["Content-Security-Policy"]
+    digest: str = base64.b64encode(hashlib.sha256(page_style().text.encode("utf-8")).digest()).decode("ascii")
+    assert f"style-src 'sha256-{digest}';" in policy and "'unsafe-inline'" not in policy
+    assert "default-src 'none'" in policy and "script-src" not in policy and "img-src data:;" in policy
+    assert dict(response_headers("/oauth/callback"))["Cache-Control"] == "no-store"
+
+
+def test_a_mark_is_the_name_of_an_svg_file_of_the_logos() -> None:
+    for mark in ("../../config.toml", "icons/plugins/google-icon.svg", "google-icon.png"):
+        with pytest.raises(ValidationError, match="a mark is the name of an SVG file"):
+            Subject(name="Google", detail=None, mark=mark)
 
 
 def test_the_status_of_a_page_says_whether_the_sign_in_went_on() -> None:
@@ -73,15 +98,15 @@ def test_the_status_of_a_page_says_whether_the_sign_in_went_on() -> None:
 
 
 def test_a_page_names_the_account_with_its_address_and_the_service_with_its_host() -> None:
-    signed_in: str = render(_OUTCOMES[0])
+    signed_in: str = _body(render(_OUTCOMES[0]))
     assert '<h1 class="page-title">Signed in to Google</h1>' in signed_in
-    assert 'src="/icons/plugins/google-icon.svg"' in signed_in and "ada@example.com" in signed_in
+    assert f'src="{_data_address("icons/plugins/google-icon.svg")}"' in signed_in and "ada@example.com" in signed_in
     assert "Dot on this Mac already shows it" in signed_in
     # A provider with no mark of its own shows its initial.
-    declined: str = render(_OUTCOMES[2])
+    declined: str = _body(render(_OUTCOMES[2]))
     assert '<span class="callback-mark" aria-hidden="true">M</span>' in declined and "callback-reason" not in declined
     # An MCP server's trade of its code happens after the page: the page does not say it signed in.
-    back: str = render(_OUTCOMES[1])
+    back: str = _body(render(_OUTCOMES[1]))
     assert "Back from Notion</h1>" in back and "mcp.notion.com" in back and "Signed in" not in back
 
 

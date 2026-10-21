@@ -110,3 +110,37 @@ def test_an_address_a_browser_reads_otherwise_is_refused_or_read_as_the_browser_
     where a browser goes to 127.0.0.1, and a blocked host written as one number passed the block list."""
     verdict: UrlVerdict = check_browser_url(url, (), ("169.254.169.254",), SERVER)
     assert not verdict.allowed and reason in verdict.reason, verdict
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1:8765/oauth/callback?state=abc&code=4/0AX&scope=email",
+        "http://localhost:8765/oauth/callback?code=M.C518&state=abc",
+        "http://[::1]:8765/oauth/callback?state=abc",
+    ],
+)
+def test_the_way_back_of_a_sign_in_opens_as_a_page_and_as_nothing_else(url: str) -> None:
+    """Item 448: a sign-in that opened in Dot's own Chrome comes back to the daemon; the guard lets that page through,
+    and the same address loaded by a page (a fetch, an image) stays refused."""
+    assert request_verdict(url, True, (), (), SERVER).allowed
+    assert not request_verdict(url, False, (), (), SERVER).allowed
+    # The model's own open of the address is judged as before.
+    assert not check_browser_url(url, (), (), SERVER).allowed
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1:8765/oauth/callback/",
+        "http://127.0.0.1:8765/oauth/callbackx?state=abc",
+        "http://127.0.0.1:8765/OAUTH/callback?state=abc",
+        "http://127.0.0.1:8765/oauth/callback/../../api/approvals",
+        "http://127.0.0.1:8765/api/approvals?next=/oauth/callback",
+        "https://mac.tail1234.ts.net/oauth/callback?state=abc",
+        # A browser reads the backslash as /: this is evil.example, which Python's parser takes for the loopback host.
+        "http://evil.example\\@127.0.0.1:8765/oauth/callback?state=abc",
+    ],
+)
+def test_nothing_else_of_dots_interface_opens_with_the_way_back(url: str) -> None:
+    assert not request_verdict(url, True, (), (), SERVER).allowed

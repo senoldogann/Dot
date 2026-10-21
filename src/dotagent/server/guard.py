@@ -26,6 +26,7 @@ from dotagent.core.errors import ConfigError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.mcp.signin import CALLBACK_PATH
+from dotagent.server.callback_page import page_style
 
 API_ROOT: str = "/api"
 API_PREFIX: str = f"{API_ROOT}/"
@@ -106,6 +107,20 @@ LOOK_HEADERS: tuple[tuple[str, str], ...] = (
     ("Referrer-Policy", "no-referrer"),
     ("X-DNS-Prefetch-Control", "off"),
 )
+
+
+def callback_headers() -> tuple[tuple[str, str], ...]:
+    """The headers of the page a sign-in comes back to (:mod:`dotagent.server.callback_page`): those of the UI, but for
+    a policy that lets its one style apply by its hash, its pictures as ``data:`` addresses and its faces from this
+    server, and nothing else."""
+    policy: str = (
+        f"default-src 'none'; style-src {page_style().source}; font-src 'self'; img-src data:; "
+        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    )
+    return (
+        ("Content-Security-Policy", policy),
+        *(header for header in SECURITY_HEADERS if header[0] != "Content-Security-Policy"),
+    )
 
 
 class Refusal(FrozenModel):
@@ -217,12 +232,14 @@ def is_look_path(path: str) -> bool:
 
 
 def response_headers(path: str) -> tuple[tuple[str, str], ...]:
-    """The security headers of the response to ``path``, with how long it may be cached: the API's answers and the
-    pages runs showed never, the files of the UI once checked again."""
+    """The security headers of the response to ``path``, with how long it may be cached: the API's answers, the pages
+    runs showed and the page a sign-in comes back to never, the files of the UI once checked again."""
     if is_page_path(path):
         return (*PAGE_HEADERS, ("Cache-Control", "no-store"))
     if is_look_path(path):
         return (*LOOK_HEADERS, ("Cache-Control", "no-store"))
+    if path == CALLBACK_PATH:
+        return (*callback_headers(), ("Cache-Control", "no-store"))
     if is_launcher_path(path):
         # Public files that hold nothing of the owner's: a launcher's process may read them from any origin.
         return (

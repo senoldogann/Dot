@@ -197,22 +197,24 @@ Both modes share what follows.
   Chrome in the Dock brings Dot's forward instead of opening yours. Once Dot's has closed, the Dock opens yours again;
   while a run works in its browser, the mode `attach` lets Dot work in your own Chrome instead.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
-  matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the
-  cloud-metadata hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any
-  spelling (`localhost`, `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be
-  signed in there. A server of this Mac on another port opens as any site. In Dot's own Chrome every request is
-  checked as Chrome sends it, not only the address a tool opens: a page (in a tab or a popup, and each hop of a
-  redirect) must pass both lists, and anything a page loads (a script, a picture, a fetch, a worker) must be neither a
-  blocked host nor Dot's interface, so a page of an allowed site still loads its parts from wherever it keeps them; what
-  a page makes itself (`blob:` and `data:` addresses) reaches no server and passes. In your Chrome (`mode = "attach"`)
-  Dot holds none of its requests, so as not to slow or stall your own tabs; a tab of Dot's that lands on a refused
-  address is reset. Whatever the browser, the daemon itself refuses a navigation to its interface that a page of
-  another site started (`Sec-Fetch-Site: cross-site`), save to the page a sign-in comes back to and to the pages runs
-  showed. A host is read the way Chrome reads it (international names, the numeric spellings of an IPv4 address, a
-  trailing dot), and an address with a backslash before its query is refused. A new tab's first page waits until
-  Dot checks each hop of its redirects. A page that cancels a request while Dot is judging it makes Chrome refuse
-  the verdict ("Invalid InterceptionId"); that is logged only at debug level, and any other refusal as
-  `browser_hop_unanswered`.
+  matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the cloud-metadata
+  hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any spelling
+  (`localhost`, `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be signed in
+  there. One page of it passes: the one a sign-in comes back to (`/oauth/callback` on this Mac at `[server] port`),
+  which macOS may open in Dot's own Chrome when you sign in from Customize; Chrome opens it as a page and nothing else
+  of the interface, and a run whose tab lands there still has the tab reset (item 448). A server of this Mac on another
+  port opens as any site. In Dot's own Chrome every request is checked as Chrome sends it, not only the address a tool
+  opens: a page (in a tab or a popup, and each hop of a redirect) must pass both lists, and anything a page loads (a
+  script, a picture, a fetch, a worker) must be neither a blocked host nor Dot's interface, so a page of an allowed site
+  still loads its parts from wherever it keeps them; what a page makes itself (`blob:` and `data:` addresses) reaches no
+  server and passes. In your Chrome (`mode = "attach"`) Dot holds none of its requests, so as not to slow or stall your
+  own tabs; a tab of Dot's that lands on a refused address is reset. Whatever the browser, the daemon itself refuses a
+  navigation to its interface that a page of another site started (`Sec-Fetch-Site: cross-site`), save to the page a
+  sign-in comes back to and to the pages runs showed. A host is read the way Chrome reads it (international names, the
+  numeric spellings of an IPv4 address, a trailing dot), and an address with a backslash before its query is refused. A
+  new tab's first page waits until Dot checks each hop of its redirects. A page that cancels a request while Dot is
+  judging it makes Chrome refuse the verdict ("Invalid InterceptionId"); that is logged only at debug level, and any
+  other refusal as `browser_hop_unanswered`.
 - `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
   the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and

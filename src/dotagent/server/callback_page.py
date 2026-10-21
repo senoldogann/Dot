@@ -1,12 +1,18 @@
 """The page the browser is sent back to after a sign-in (``/oauth/callback``, item 437): the sign-in card of
 ``offline.html`` (Dot's wordmark, the title with a disc that says how it went, the account or service the sign-in was
-for with its mark, what the provider said, and a button back to Plugins), in light or dark as the system is. The page
-has no script and no inline style, which the content security policy of the server forbids, so it links the sheets of
-the interface by their addresses on this server and its colours are classes of ``app.css``. Every outcome of an
-account's sign-in (:class:`~dotagent.oauth.accounts.CameBack`) and of an MCP server's has its own words here, and
-nothing the address of the way back carried is shown for a state nobody waits for."""
+for with its mark, and what the provider said), in light or dark as the system is. The page asks the server for nothing
+but its faces: it carries the sheets of the interface in its one style, which the policy of
+:func:`~dotagent.server.guard.callback_headers` lets apply by its hash, and its pictures as ``data:`` addresses. A
+sign-in may open in Dot's own Chrome, whose guard refuses every other file of the interface (item 448), and the page is
+drawn there as anywhere, in the system's faces. It has no script and no link into the interface, which that Chrome
+never opens. Every outcome of an account's sign-in (:class:`~dotagent.oauth.accounts.CameBack`) and of an MCP server's
+has its own words here, and nothing the address of the way back carried is shown for a state nobody waits for."""
 
+import base64
+import hashlib
 import html
+from functools import cache
+from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import model_validator
@@ -21,7 +27,11 @@ type Outcome = Literal["signed_in", "back", "declined", "expired", "failed", "un
 # The disc of the title: a tick, a cross, or a plain mark for what is neither done nor a fault.
 type Tone = Literal["ok", "bad", "neutral"]
 
-PLUGINS_LINK: str = "/#/customize/plugins"
+_STATIC: Path = Path(__file__).resolve().parent / "static"
+# The sheets of the interface, in the order its pages link them.
+_SHEETS: tuple[str, ...] = ("css/app.css", "css/themes.css")
+_FAVICON: str = "favicon.svg"
+_MARKS: str = "icons/plugins"
 # The marks of the providers, files of ``static/icons/plugins`` (the Accounts card's, accounts.js).
 PROVIDER_MARKS: dict[ProviderId, str] = {"google": "google-icon.svg", "microsoft": "microsoft-icon.svg"}
 _STATUS_OK: int = 200
@@ -43,10 +53,31 @@ _ICONS: dict[Tone, str] = {
     "neutral": '<path d="M12 10.5v6.5M12 6.5v.01"/>',
 }
 _THEME_COLOURS: tuple[tuple[str, str], ...] = (("#f8f7f4", "light"), ("#1b1a18", "dark"))
-_HINT: str = (
-    "If this tab opened in your default browser and Dot has not been opened there, Plugins asks for the access token "
-    "first."
-)
+
+
+class PageStyle(FrozenModel):
+    """The one style of the page, the sheets of the interface one after the other, and the source of the content
+    security policy that lets it apply: its hash."""
+
+    text: str
+    source: str
+
+
+@cache
+def page_style() -> PageStyle:
+    """The sheets as they are in the package, read once. A sheet that would end the style element is refused."""
+    text: str = "\n".join((_STATIC / sheet).read_text(encoding="utf-8") for sheet in _SHEETS)
+    if "</style" in text.lower():
+        raise ValueError("a sheet of the interface holds '</style', which would end the page's style")
+    digest: str = base64.b64encode(hashlib.sha256(text.encode("utf-8")).digest()).decode("ascii")
+    return PageStyle(text=text, source=f"'sha256-{digest}'")
+
+
+@cache
+def _picture(relative: str) -> str:
+    """An SVG file of ``static`` as a ``data:`` address, which the page shows without asking the server for it."""
+    body: bytes = (_STATIC / relative).read_bytes()
+    return f"data:image/svg+xml;base64,{base64.b64encode(body).decode('ascii')}"
 
 
 class Subject(FrozenModel):
@@ -56,6 +87,12 @@ class Subject(FrozenModel):
     name: str
     detail: str | None
     mark: str | None
+
+    @model_validator(mode="after")
+    def _a_mark_is_a_file_name(self) -> Self:
+        if self.mark is not None and (Path(self.mark).name != self.mark or not self.mark.endswith(".svg")):
+            raise ValueError(f"a mark is the name of an SVG file of {_MARKS}: {self.mark!r}")
+        return self
 
 
 class Callback(FrozenModel):
@@ -153,7 +190,7 @@ def _mark_of(subject: Subject) -> str:
     inside: str = (
         _escaped(subject.name[:1])
         if subject.mark is None
-        else f'<img src="/icons/plugins/{_escaped(subject.mark)}" alt="" width="24" height="24">'
+        else f'<img src="{_picture(f"{_MARKS}/{subject.mark}")}" alt="" width="24" height="24">'
     )
     return f'<span class="callback-mark" aria-hidden="true">{inside}</span>'
 
@@ -183,14 +220,13 @@ def render(callback: Callback) -> str:
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
         '<meta name="color-scheme" content="light dark">\n<meta name="referrer" content="no-referrer">\n'
         f"{themes}\n<title>{title} - Dot</title>\n"
-        '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-        '<link rel="stylesheet" href="/css/app.css">\n<link rel="stylesheet" href="/css/themes.css">\n'
+        f'<link rel="icon" href="{_picture(_FAVICON)}" type="image/svg+xml">\n'
+        f"<style>{page_style().text}</style>\n"
         '</head>\n<body>\n<main class="signin"><div class="card"><div class="stack">\n'
         f'<div class="signin-mark">{WORDMARK}</div>\n'
         f'<div class="callback-head"><span class="callback-status {words.tone}" aria-hidden="true">'
         f'<svg viewBox="0 0 24 24" focusable="false">{_ICONS[words.tone]}</svg></span>'
         f'<h1 class="page-title">{title}</h1></div>\n'
         f'{subject}\n<p class="muted">{_escaped(words.lead)}</p>\n{reason}\n'
-        f'<div class="cluster"><a class="btn primary" href="{PLUGINS_LINK}">Back to Plugins</a></div>\n'
-        f'<p class="muted small">{_escaped(_HINT)}</p>\n</div></div></main>\n</body>\n</html>\n'
+        "</div></div></main>\n</body>\n</html>\n"
     )

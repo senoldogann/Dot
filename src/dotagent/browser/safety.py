@@ -16,6 +16,7 @@ from dotagent.browser.types import SecretField, SecretKind, Step, StepAction
 from dotagent.config import ServerConfig
 from dotagent.core.errors import BrowserError
 from dotagent.core.types import FrozenModel
+from dotagent.mcp.signin import CALLBACK_PATH
 from dotagent.policy.elements import (
     Element,
     StepAssessment,
@@ -118,13 +119,19 @@ def browser_host(host: str) -> str | None:
         return name
 
 
+def _backslashed(url: str) -> bool:
+    """Whether ``url`` has a backslash before its query, which a browser takes for ``/`` where Python's parser does
+    not."""
+    return "\\" in url.partition("#")[0].partition("?")[0]
+
+
 def check_url(url: str, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str]) -> UrlVerdict:
     """Whether the browser may open ``url``: web pages only, never a blocked host, only allowed hosts when set. The host
     is judged as a browser reads it (:func:`browser_host`), and an address a browser reads otherwise than this check is
-    refused: one with a backslash before its query, which a browser takes for ``/`` where Python's parser does not."""
+    refused: one with a backslash before its query (:func:`_backslashed`)."""
     if url == "about:blank":
         return UrlVerdict(allowed=True, reason="blank page")
-    if "\\" in url.partition("#")[0].partition("?")[0]:
+    if _backslashed(url):
         return UrlVerdict(allowed=False, reason="the URL holds a backslash, which a browser reads as /")
     try:
         parts = urlsplit(url)
@@ -199,15 +206,39 @@ def check_browser_url(
     return verdict
 
 
+def sign_in_return(url: str, server: ServerConfig) -> bool:
+    """Whether ``url`` is the way back of a sign-in to Dot (item 448): the daemon's ``/oauth/callback`` (exactly, as
+    Chrome read it) on this Mac at the daemon's port, where Google, Microsoft and the MCP services send the browser with
+    the code of a sign-in the owner started. The sign-in may open in Dot's own Chrome (macOS hands an address to the
+    Chrome that runs), whose guard refuses Dot's interface; the way back is let through as a page, and nothing else of
+    the interface. :func:`check_browser_url` still refuses it, so a run whose tab lands there has the tab reset. A run
+    gains nothing by it: the daemon takes only a state it handed out itself, once, for ten minutes, and the page
+    carries no token. An address a browser reads otherwise than Python (:func:`_backslashed`) is not it."""
+    if _backslashed(url):
+        return False
+    try:
+        parts = urlsplit(url)
+        port: int | None = parts.port
+    except ValueError:
+        return False
+    if parts.scheme not in _ALLOWED_SCHEMES or parts.path != CALLBACK_PATH:
+        return False
+    host: str = (browser_host(parts.hostname or "") or "").removesuffix(".")
+    reached: int = port if port is not None else _DEFAULT_PORTS[parts.scheme]
+    return reached == server.port and _is_loopback(host)
+
+
 def request_verdict(
     url: str, navigation: bool, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str], server: ServerConfig
 ) -> UrlVerdict:
     """Whether Chrome may send one request it is about to send, judged on the address as Chrome read it (so a spelling
     that reads differently here cannot slip by): a navigation of a frame is a page and must pass
-    :func:`check_browser_url`; any other request (a script, an image, a fetch, a worker) must not be a
-    :func:`forbidden_target`. What a page made itself (a ``blob:`` or ``data:`` address) reaches no server and is let
-    through."""
+    :func:`check_browser_url`, but for the way back of a sign-in (:func:`sign_in_return`), which opens as a page alone;
+    any other request (a script, an image, a fetch, a worker) must not be a :func:`forbidden_target`. What a page made
+    itself (a ``blob:`` or ``data:`` address) reaches no server and is let through."""
     if navigation:
+        if sign_in_return(url, server):
+            return UrlVerdict(allowed=True, reason="the way back of a sign-in to Dot")
         return check_browser_url(url, allowed_hosts, blocked_hosts, server)
     try:
         scheme: str = urlsplit(url).scheme
