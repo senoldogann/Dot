@@ -49,6 +49,13 @@ The gate leaves out the tests that need a browser or a service. Run those of the
 headless against a local server. A few drive WebKit, the engine of Safari on the phone, which Playwright installs with
 `uv run playwright install webkit`. [Development](docs/development.md) says what each test marker needs.
 
+A change under `.github/` is audited by zizmor too (item 487); the same check on your Mac, with `GH_TOKEN` set for the
+audits that ask GitHub (`--offline` without it):
+
+```bash
+uvx zizmor@1.31.1 --min-severity low .
+```
+
 ## Tests
 
 - A test calls no model and reaches nothing outside this Mac. A scripted model plays the model, and a stand-in service on

@@ -58,7 +58,13 @@ tests run spread over the cores with `-n auto` (pytest-xdist). When something un
 workflows use is pinned by the commit its tag named, so a tag moved later cannot change what runs. The tests marked
 above stay on your Mac. Once a week, and when asked, `.github/workflows/audit.yml` checks the dependencies as locked
 against the public advisories (pip-audit for `uv.lock`, cargo audit for the desktop shell's `Cargo.lock`) and fails on a
-known vulnerability (item 217).
+known vulnerability (item 217). When something under `.github/` changes, every week and when asked,
+`.github/workflows/zizmor.yml` audits the workflows and Dependabot's file with [zizmor](https://docs.zizmor.sh/audits/)
+(item 487): an event's text run as a script, a checkout that keeps its token, an action pinned by a commit its
+repository does not have, a known vulnerable action, a cache read by a release, Dependabot taking a release the day it
+is out (it waits a week, `cooldown` in `dependabot.yml`). Any finding fails the job; one accepted is in
+`.github/zizmor.yml` with its reason. zizmor is pinned by its version in the workflow, as pip-audit is; raise it by hand
+when a release brings an audit worth having (`uvx zizmor@<version> --min-severity low .` first, on your Mac).
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](../ROADMAP.md) and, from item 459 on, in [roadmap/](../roadmap/); read them before

@@ -1,0 +1,43 @@
+# zizmor (item 487) reads the workflows and Dependabot's file for unsafe patterns: an event's text run as a script, a
+# token left in a checkout, an action pinned by a commit its repository does not have, a known vulnerable action, a
+# release that reads a cache, Dependabot taking a release the day it is out, and more (docs.zizmor.sh/audits). It runs
+# when something under .github/ changes, every week, since an advisory or an impostor commit appears without any change
+# here, and on demand. Any finding fails the job; one that is accepted is in .github/zizmor.yml with its reason. The
+# same check on a Mac: `uvx zizmor@1.31.1 --min-severity low .` (CONTRIBUTING.md).
+name: zizmor
+
+on:
+  pull_request:
+    paths: [".github/**"]
+  push:
+    branches: [main]
+    paths: [".github/**"]
+  schedule:
+    - cron: "29 6 * * 1"
+  workflow_dispatch:
+
+# The job only reads the code and asks GitHub's API about the actions: the token it is handed can do nothing more.
+permissions:
+  contents: read
+
+# Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml); zizmor by
+# its version, raised by hand when a release adds an audit worth having (docs/development.md).
+
+concurrency:
+  group: zizmor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: zizmor
+        # The audits that ask GitHub (an impostor commit, a known vulnerable action) read with the job's own token.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uvx zizmor@1.31.1 --min-severity low .
