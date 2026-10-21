@@ -67,9 +67,11 @@ def jpeg_of_size(data: bytes, width: int, height: int, quality: int) -> bytes:
         with Image.open(io.BytesIO(data)) as opened:
             if opened.size == (width, height):
                 return data
-            picture: Image.Image = _flatten(opened).resize((width, height), Image.Resampling.LANCZOS)
+            flat: Image.Image = _flatten(opened)
     except UNREADABLE_IMAGE as exc:
         raise ToolExecutionError("the data is not a readable image", {"bytes": len(data), "error": str(exc)}) from exc
+    # Out of the reading: a size the caller got wrong is its own error, not unreadable data.
+    picture: Image.Image = flat.resize((width, height), Image.Resampling.LANCZOS)
     buffer: io.BytesIO = io.BytesIO()
     picture.save(buffer, format="JPEG", quality=quality, optimize=True)
     return buffer.getvalue()
