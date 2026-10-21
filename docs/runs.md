@@ -338,7 +338,8 @@ that refuses the browser too is left out with both answers. `robots.txt` is read
 the addresses it disallows are named in the index but fetched, with `"obey"` they are left out. The crawl goes through
 the same client as `web_fetch`, so the address rules and the browser's host lists hold for every page. When the pages do
 not fit one result, each becomes a Markdown file under `<workspace>/crawl/<host>-<time>/` with an `index.md`, and the
-result says so: the run reads the ones it needs with `read_file` or hands them to `web_extract`.
+result says so: the run reads the ones it needs with `read_file` or hands them to `web_extract`, and reading them back
+counts as untrusted content as the crawl did (item 494).
 
 **Notes of a run.** `write_notes(content, append)` keeps the notes of a run in one Markdown file,
 `<home>/workspace/notes/<run id>.md`: a long research run writes what it found there as it goes, with sources, instead

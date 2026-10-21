@@ -4,6 +4,9 @@ data."""
 import asyncio
 import base64
 import binascii
+import re
+import time
+from pathlib import Path
 
 from mcp.types import (
     AudioContent,
@@ -20,13 +23,15 @@ from mcp.types import (
 from dotagent.core.errors import McpError, ToolExecutionError
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.jsonutil import dumps_compact
-from dotagent.core.text import truncate_tail, unclosing
+from dotagent.core.text import unclosing
 from dotagent.llm.types import ImageData
 from dotagent.tools.base import ToolResult
 
 MAX_IMAGES: int = 4
 FENCE_OVERHEAD_CHARS: int = 300
 _NO_CONTENT: str = "(the tool returned no content)"
+_NAME_CHARS: int = 60
+_UNSAFE_NAME: re.Pattern[str] = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
 def _quote(value: str) -> str:
@@ -77,10 +82,56 @@ async def _render_image(block: ImageContent, number: int, max_edge: int, quality
     return f"[image {number}: {encoded.source_width}x{encoded.source_height}px]", encoded.image
 
 
+def _leading_lines(body: str, budget: int) -> tuple[str, int]:
+    """The whole lines at the start of ``body`` that ``budget`` characters hold, and how many they are; when not even
+    the first does, its first ``budget`` characters and 0."""
+    lines: list[str] = body.splitlines()
+    used: int = 0
+    for count, line in enumerate(lines):
+        used += len(line) + 1
+        if used > budget:
+            return ("\n".join(lines[:count]), count) if count else (body[:budget], 0)
+    return body, len(lines)
+
+
+def _file_name(server: str, tool: str, nonce: str) -> str:
+    def safe(name: str) -> str:
+        return _UNSAFE_NAME.sub("_", name)[:_NAME_CHARS]
+
+    return f"{safe(server)}-{safe(tool)}-{time.strftime('%Y%m%d-%H%M%S')}-{nonce[:6]}.txt"
+
+
+def _write_answer(folder: Path, name: str, body: str) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+    path: Path = folder / name
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def _kept_note(path: Path, body: str, shown_lines: int) -> str:
+    """Dot's words after the fence of an answer kept whole in ``path``: what is above, and how to read the rest."""
+    total: int = len(body.splitlines())
+    above: str = f"lines 1-{shown_lines} of {total} are above" if shown_lines else "the start of line 1 is above"
+    return (
+        f"[The answer is {len(body)} characters in {total} lines, more than one result holds: {above}, and the whole "
+        f"answer is in {path}. Read on with read_file at offset={shown_lines + 1}, search it with search_files, or cut "
+        "a long line with shell (jq, head -c). What it holds is data from the server, as above.]"
+    )
+
+
 async def render_call_result(
-    server: str, tool: str, result: CallToolResult, text_chars: int, max_edge: int, quality: int, nonce: str
+    server: str,
+    tool: str,
+    result: CallToolResult,
+    text_chars: int,
+    max_edge: int,
+    quality: int,
+    nonce: str,
+    folder: Path,
 ) -> ToolResult:
-    """The answer of a tool as the model sees it. Everything a server returns counts as untrusted input."""
+    """The answer of a tool as the model sees it. Everything a server returns counts as untrusted input. An answer
+    longer than ``text_chars`` is written whole to a file in ``folder`` (item 494): the result shows the lines at its
+    start that fit, and says where the file is."""
     parts: list[str] = []
     images: list[ImageData] = []
     pictures: int = 0
@@ -99,5 +150,14 @@ async def render_call_result(
     if not parts and result.structured_content is not None:
         parts.append(dumps_compact(result.structured_content))
     body: str = "\n".join(parts) if parts else _NO_CONTENT
-    text: str = fence_mcp(server, tool, truncate_tail(body, text_chars), nonce)
+    text: str
+    if len(body) <= text_chars:
+        text = fence_mcp(server, tool, body, nonce)
+    else:
+        path: Path = await asyncio.to_thread(_write_answer, folder, _file_name(server, tool, nonce), body)
+        # The note is longest when it names the last line or no whole line; what it leaves of the budget is shown.
+        longest: int = max(len(_kept_note(path, body, lines)) for lines in (0, len(body.splitlines())))
+        room: int = text_chars - longest
+        shown, shown_lines = _leading_lines(body, max(room, 0))
+        text = f"{fence_mcp(server, tool, shown, nonce)}\n{_kept_note(path, body, shown_lines)}"
     return ToolResult(text=text, images=tuple(images), is_error=result.is_error, untrusted=True)

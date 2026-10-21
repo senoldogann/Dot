@@ -28,10 +28,12 @@ from dotagent.tools.base import (
     ToolArgs,
     ToolResult,
     make_path_tool,
+    mark_untrusted,
     ok,
     ok_with_images,
 )
 from dotagent.tools.context import ToolContext, run_sandbox
+from dotagent.tools.third_party import holds_third_party, matches_third_party
 from dotagent.undo.journal import JournalTarget, note_change, run_journal
 
 _IMAGE_SUFFIXES: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".heic"})
@@ -196,15 +198,18 @@ def _read_file_tool() -> RegisteredTool:
 
     async def run(args: ReadFileArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         desktop = ctx.runtime.config.desktop
-        return await asyncio.to_thread(
+        path: Path = resolve_path(args.path, ctx)
+        read: ToolResult = await asyncio.to_thread(
             _read_blocking,
-            resolve_path(args.path, ctx),
+            path,
             args.offset or 1,
             args.limit or _DEFAULT_LINE_LIMIT,
             ctx.output_chars - _HEADROOM_CHARS,
             desktop.screenshot_max_edge,
             desktop.jpeg_quality,
         )
+        # A page a crawl kept or an MCP answer kept whole was written by third parties (item 494).
+        return mark_untrusted(read) if holds_third_party(path, ctx.workspace) else read
 
     return make_path_tool(
         name="read_file",
@@ -308,10 +313,12 @@ def _with_crlf(snippet: str) -> str:
     return snippet.replace("\r\n", "\n").replace("\n", "\r\n")
 
 
-def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: JournalTarget) -> str:
+def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: JournalTarget, workspace: Path) -> str:
     """Replace ``old`` with ``new`` in the file and leave every other byte as it was: a file that breaks its lines with
     CRLF keeps them, and the old and the new text are taken with CRLF too (``read_file`` shows lines without it). Only
-    UTF-8 text is edited; a file in another encoding is refused, saying so, rather than guessed at."""
+    UTF-8 text is edited; a file in another encoding is refused, saying so, rather than guessed at. When ``old`` is not
+    found, the error names the file's closest lines, but for a file third parties wrote (item 494): an error does not
+    mark the run untrusted."""
     if not path.is_file():
         raise ToolExecutionError("file does not exist", {"path": str(path)})
     try:
@@ -325,9 +332,11 @@ def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: J
         old, new = _with_crlf(old), _with_crlf(new)
     occurrences: int = text.count(old)
     if occurrences == 0:
+        closest: dict[str, str] = (
+            {} if holds_third_party(path, workspace) else {"closest_lines": _closest_lines(text, old)}
+        )
         raise ToolExecutionError(
-            "the text to replace was not found; re-read the file and copy it exactly",
-            {"path": str(path), "closest_lines": _closest_lines(text, old)},
+            "the text to replace was not found; re-read the file and copy it exactly", {"path": str(path), **closest}
         )
     if occurrences > 1 and not replace_all:
         raise ToolExecutionError(
@@ -350,6 +359,7 @@ def _edit_file_tool() -> RegisteredTool:
             args.new,
             args.replace_all,
             journal_for(ctx, "edit_file"),
+            ctx.workspace,
         )
         return ok(message)
 
@@ -510,13 +520,17 @@ def _search_files_tool() -> RegisteredTool:
         )
         if code == 1:
             return ok("No matches.")
+        lines: list[str] = stdout.splitlines()
         unread: list[str] | None = _unread(stderr) if code == _RG_ERROR else None
+        found: ToolResult
         if unread is not None:
-            found: str = _capped(stdout.splitlines(), "matches") if stdout.strip() != "" else "No matches."
-            return ok(_with_unread(found, unread))
-        if code != 0:
+            found = ok(_with_unread(_capped(lines, "matches") if stdout.strip() != "" else "No matches.", unread))
+        elif code != 0:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "pattern": args.pattern})
-        return ok(_capped(stdout.splitlines(), "matches"))
+        else:
+            found = ok(_capped(lines, "matches"))
+        # A match in a page a crawl kept or an MCP answer kept whole was written by third parties (item 494).
+        return mark_untrusted(found) if matches_third_party(lines, target_of(args, ctx), ctx.workspace) else found
 
     return make_path_tool(
         name="search_files",
