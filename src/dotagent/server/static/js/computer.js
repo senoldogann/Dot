@@ -157,7 +157,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
       const detail = await api.post(`/runs/${encodeURIComponent(runId)}/${isHeld ? "handback" : "takeover"}`, {});
       isHeld = detail.held;
       if (!isHeld) {
-        stopControl();
+        endUse();
       }
     } catch (error) {
       toast("error", error.message);
@@ -181,6 +181,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
       }
       if (isHeld) {
         openFull();
+        full.forUse = true;
         startControl();
       }
     } catch (error) {
@@ -211,6 +212,15 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     paint();
   }
 
+  // The run given back, or over: the page is used here no more, and the view Use it here opened over the whole page
+  // closes with it, back to the run's page.
+  function endUse() {
+    stopControl();
+    if (full !== null && full.forUse) {
+      full.dialog.close();
+    }
+  }
+
   /** What the daemon said when it refused the input: a step the run was taking when it was held keeps the page a
    * moment, and a run given back from elsewhere is used here no more. */
   function refused(error) {
@@ -238,7 +248,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
       icon("x"),
     );
     const dialog = el("dialog", { class: "computer-full", "aria-label": "Dot's computer" }, closeButton);
-    full = { dialog, home: element.parentNode, next: element.nextSibling };
+    full = { dialog, home: element.parentNode, next: element.nextSibling, forUse: false };
     dialog.append(element);
     dialog.addEventListener("close", closeFull);
     document.body.append(dialog);
@@ -272,7 +282,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     setHeld(flag) {
       isHeld = flag;
       if (!flag) {
-        stopControl();
+        endUse();
       }
       paint();
     },
@@ -280,7 +290,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
       isActive = flag;
       if (!flag) {
         isElsewhere = false;
-        stopControl();
+        endUse();
         stop();
       }
       paint();
