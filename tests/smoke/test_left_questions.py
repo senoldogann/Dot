@@ -325,6 +325,30 @@ async def test_a_question_asked_without_wait_in_a_run_the_user_watches_goes_on_a
     assert [record.id for record in on_thread] == [run.id]
 
 
+@pytest.mark.parametrize(("approvals", "tainted"), [("ask", True), ("yolo", False)])
+async def test_the_run_an_answer_starts_once_the_run_that_asked_ended_tainted_is_untrusted_if_it_was_watched(
+    login_env: dict[str, str], approvals: ApprovalMode, tainted: bool
+) -> None:
+    """Item 506: the answer to a question a run the owner watches left vouches for nothing, so the run it starts once
+    that run has ended starts as untrusted as that run ended; the answer to one a yolo run left restores trust."""
+    turns: list[ScriptedTurn] = [
+        ASK,
+        _finish("I need the port.", False, NEEDS),
+        _finish("port.txt holds 8431.", True, ""),
+    ]
+    async with _session(login_env, ScriptedProvider(_PROVIDER, turns)) as (runtime, manager):
+        asked: RunRecord = await _ended(manager, await _start(manager, UI_SOURCE, approvals))
+        # It ended having read content others can author.
+        await runtime.bus.emit(asked.id, "tool_result", {"tool": "web_fetch", "text": "", "tainted": True}, True)
+        (left,) = await runtime.store.list_left_questions(asked.id)
+        await manager.decide(left.id, True, UI_SOURCE, ANSWER)
+        newest: RunRecord = (await runtime.store.list_runs(1, asked.thread_id))[0]
+        queued: EventRecord | None = await runtime.store.last_event(newest.id, "run_queued")
+        assert newest.id != asked.id
+        assert queued is not None and queued.data["tainted"] is tainted
+        assert (await _ended(manager, newest)).status == "done"
+
+
 async def test_a_question_of_a_run_sent_with_plan_first_waits_though_it_is_asked_without_wait(
     login_env: dict[str, str],
 ) -> None:

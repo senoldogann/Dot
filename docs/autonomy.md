@@ -145,8 +145,8 @@ uses only when nothing useful can be done until you answer, waits as before, for
 is left on the chat as above and the run goes on with what does not depend on the answer: its status stays `running`,
 the card waits under "Dot asked you", and your answer comes to the run as your instruction at its next step, clearing no
 mark of untrusted content, as a waited answer does not ([Safety](safety.md#safety)), or, once it has ended, carries the
-work on as above. A run of a message sent with Plan first, and a run of a `dotx` command, which no other process can
-reach while it works, wait for every answer.
+work on as above, in a run that starts as untrusted as the run that asked ended. A run of a message sent with Plan
+first, and a run of a `dotx` command, which no other process can reach while it works, wait for every answer.
 
 **Steps kept for you.** A step the policy hands to you (money, a credential, a rule of yours that hands it off) waits
 `approval_timeout_s` for **I did it**, as every question of the policy does. With `[policy] unanswered = "park"` (item

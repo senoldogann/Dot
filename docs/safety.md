@@ -189,7 +189,8 @@ or a note, and a shell line that sends data out: an upload or a form, a push, a 
 code host, inline code that reaches the network or runs a command of it) ask even when the preset or an `allow` rule
 would let them through; only a `preapproved` rule skips the question. A message you send to the run clears the mark;
 your answer to a question of a run you watch does not, whether the run waited for it or went on (item 506), as it
-answers what the run asked rather than sending it on its way. A delegated run starts as untrusted as its parent, a
+answers what the run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts
+once that run has ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a
 resumed run as the run it resumes was when it was cut off, and the run that tells a chat that its command in the
 background ended as the chat's last run ended: that message is Dot's, not yours, and so is the note that tells a run at
 work of such an end, which clears nothing. A message you send starts a run unmarked. A note a run saved while it was
