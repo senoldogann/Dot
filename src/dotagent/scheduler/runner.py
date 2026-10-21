@@ -80,7 +80,8 @@ class Scheduler:
 
     Every firing advances the schedule's next run before the run starts, so a crash can lose a firing but never repeat
     one. Firings that were missed collapse into one, and into none when they are overdue by more than the grace period.
-    A schedule whose previous run is still going skips the firing. The store is the only persistent state; the
+    A repeating schedule whose previous run is still going skips the firing; a one-time one waits for that run, still
+    due. The store is the only persistent state; the
     instance remembers which schedules have a run in flight.
 
     The nightly reflection (item 70) fires here too, at ``[agent] reflection_time``: once its daily time has passed
@@ -345,13 +346,12 @@ class Scheduler:
         return record
 
     async def _fire(self, record: ScheduleRecord, now: float) -> None:
-        """Start the run of a due schedule; a firing the emergency stop, a run still going or a long absence of the
-        daemon keeps from starting is skipped to the schedule's next time, with the reason as its status. A one-time
-        schedule has no next time and is never dropped: while the emergency stop is engaged, or a run of it started by
-        hand works, it waits, still due, and one overdue fires late, its opening saying when it was due
-        (:func:`late_goal`). An emergency
-        stop engaged while the run was being started ends it as one. A firing missed where nobody saw it, one overdue
-        or one whose run could not start, is told (:meth:`_tell_missed`)."""
+        """Start the run of a due schedule; a firing the emergency stop, a run still going or a long absence of the daemon
+        keeps from starting is skipped to the schedule's next time, with the reason as its status. A one-time schedule
+        has no next time and is never dropped: while the emergency stop is engaged, or a run of it started by hand
+        works, it waits, still due, and one overdue fires late, its opening saying when it was due (:func:`late_goal`).
+        An emergency stop engaged while the run was being started ends it as one. A firing missed where nobody saw it,
+        one overdue or one whose run could not start, is told (:meth:`_tell_missed`)."""
         store: Store = self._runtime.store
         if record.next_run_at is None:
             raise StoreError("a due schedule has no next run", {"schedule_id": record.id})
