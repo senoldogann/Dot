@@ -1231,10 +1231,9 @@ class RunManager:
             if record.kept_until is not None:
                 decided: ApprovalRecord = await self._decide_kept(record, approve, source, note)
                 # A step a session kept, or a run it delegated (item 485), answered while no session of the campaign
-                # works (item 484): the campaign's next session comes forward, once the session at the top of the run
-                # that kept it planned it, and its brief says what the owner answered; a session at work was told, and
-                # plans its next one itself.
-                asked = await self._root_of(record.run_id)
+                # works (item 484): the campaign's next session comes forward, once the session recording its end
+                # planned it, and its brief says what the owner answered; a session at work was told (:meth:`_carry_kept`
+                # finds it), and plans its next one itself.
                 ended: bool = record.scope_campaign_id is not None and not await self._campaign_works(
                     record.scope_campaign_id
                 )

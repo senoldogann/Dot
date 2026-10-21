@@ -174,8 +174,8 @@ with no card, until you write there again (a message of yours, or a run you star
 refusal when nobody answers, and nothing is kept in `yolo`, which asks nothing, or in an eval. A delegated run keeps its
 steps where the run that delegated it does (item 485): the card is on the delegated run's page and in the Activity list,
 the step is the chat's of the run at the top, and your answer reaches that run, while it works, or else a run that goes
-on from its goal in its chat (tainted as either ended), which may do an allowed step itself or delegate it again. A
-session of a campaign keeps its steps for the campaign, shared by its sessions (item 484,
+on from its goal in its chat (tainted as any of the runs it goes on from ended), which may do an allowed step itself or
+delegate it again. A session of a campaign keeps its steps for the campaign, shared by its sessions (item 484,
 [Campaigns](agents-and-campaigns.md#campaigns)).
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
