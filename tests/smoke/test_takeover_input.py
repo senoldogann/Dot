@@ -490,3 +490,53 @@ async def test_the_cast_and_the_input_of_a_campaign_come_from_its_own_browser(
         manager.cancel(campaign.id)
         async with asyncio.timeout(_RUN_WAIT_S):
             await manager.wait(campaign.id)
+
+
+async def test_a_hand_back_waits_for_input_under_way_and_counts_it(
+    runtime: Runtime, manager: RunManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Return control while a batch of input is still being done: the batch ends first and is counted, a button it left
+    down is let go, and the next hold starts from nothing. The page is stood in for: no Chrome is started."""
+    going: asyncio.Event = asyncio.Event()
+    let_go: list[frozenset[str]] = []
+
+    async def slow_input(thread_id: str, events: list[InputEvent], still_held: object) -> InputResult:
+        await going.wait()
+        return InputResult(accepted=len(events), url="https://example.test/", width=1280, height=860)
+
+    async def letting_go(thread_id: str, buttons: frozenset[str]) -> None:
+        let_go.append(buttons)
+
+    monkeypatch.setattr(runtime.browser, "send_input", slow_input)
+    monkeypatch.setattr(runtime.browser, "let_go_of_buttons", letting_go)
+    MODEL.script = ScriptedProvider(_PROVIDER, [_call("shell", {"command": "sleep 5"}), _FINISH, _FINISH])
+    run: RunRecord = await manager.start(
+        "Wait", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    try:
+        await manager.take_over_on_screen(run.id, "test", False)
+        pressed: InputBatch = InputBatch.model_validate(
+            {"events": [{"kind": "down", "x": 0.5, "y": 0.5, "button": "left", "clicks": 1}]}
+        )
+        sending: asyncio.Task[InputResult] = asyncio.create_task(manager.send_input(run.id, pressed))
+        await asyncio.sleep(0.2)
+        handing: asyncio.Task[float] = asyncio.create_task(manager.hand_back(run.id, "test"))
+        await asyncio.sleep(0.2)
+        assert not handing.done() and manager.held(run.id)
+        going.set()
+        assert (await sending).accepted == 1
+        await handing
+        assert let_go == [frozenset({"left"})]
+        with pytest.raises(RunConflict, match="not taken over"):
+            await manager.send_input(run.id, pressed)
+        await manager.take_over_on_screen(run.id, "test", False)
+        await manager.hand_back(run.id, "test")
+        handbacks: list[EventRecord] = await runtime.store.events_of_kind(run.id, HANDBACK_EVENT, 5)
+        assert [event.data["inputs"] for event in handbacks] == [
+            {"clicks": 1, "scrolls": 0, "typed": False},
+            {"clicks": 0, "scrolls": 0, "typed": False},
+        ]
+    finally:
+        manager.cancel(run.id)
+        async with asyncio.timeout(_RUN_WAIT_S):
+            await manager.wait(run.id)

@@ -55,7 +55,7 @@ from dotagent.agent.resume import (
 )
 from dotagent.agent.review import reviewer_for, shorten_reason
 from dotagent.browser.attach import read_debug_endpoint
-from dotagent.browser.remote_input import NO_INPUT, InputBatch, InputResult, InputTally, tally_after
+from dotagent.browser.remote_input import NO_INPUT, InputBatch, InputEvent, InputResult, InputTally, tally_after
 from dotagent.browser.session import BrowserSession
 from dotagent.config import ResumeMode
 from dotagent.core.errors import (
@@ -280,8 +280,10 @@ class RunManager:
         self._runtime: Runtime = runtime
         self._slots: asyncio.Semaphore = asyncio.Semaphore(runtime.config.agent.max_concurrent_runs)
         self._handles: dict[str, RunHandle] = {}
-        # What the owner did from the screen on the page of each run they hold (item 470), counts only.
+        # What the owner did from the screen on the page of each run they hold (item 470), counts only, and the lock
+        # that orders a batch of their input with the run's hand-back: a batch under way ends before it.
         self._screen_input: dict[str, InputTally] = {}
+        self._input_locks: dict[str, asyncio.Lock] = {}
         # Threads that a run is being launched on and whose handle is not registered yet.
         self._claimed: set[str] = set()
         self._stopping: bool = False
@@ -1387,29 +1389,40 @@ class RunManager:
         held, its browser has no page, a step of it is still going after a moment, or ``[browser] remote_input`` is
         off."""
         handle: RunHandle = self._handle(run_id)
-        if not handle.gate.held:
-            raise RunConflict("the run is not taken over", {"run_id": run_id})
-        browser: BrowserSession = await browser_of(self._runtime, await self._runtime.store.get_run(run_id))
-        result: InputResult = await browser.send_input(handle.thread_id, batch.events, lambda: handle.gate.held)
-        self._screen_input[run_id] = tally_after(self._screen_input.get(run_id, NO_INPUT), batch.events)
-        return result
+        async with self._input_locks.setdefault(run_id, asyncio.Lock()):
+            if not handle.gate.held:
+                raise RunConflict("the run is not taken over", {"run_id": run_id})
+            browser: BrowserSession = await browser_of(self._runtime, await self._runtime.store.get_run(run_id))
+            try:
+                result: InputResult = await browser.send_input(handle.thread_id, batch.events, lambda: handle.gate.held)
+            except BrowserError:
+                # The page failed part way: what was sent may have been done, a press among it too.
+                self._count_input(run_id, batch.events)
+                raise
+            self._count_input(run_id, batch.events)
+            return result
+
+    def _count_input(self, run_id: str, events: Sequence[InputEvent]) -> None:
+        self._screen_input[run_id] = tally_after(self._screen_input.get(run_id, NO_INPUT), events)
 
     async def hand_back(self, run_id: str, source: str) -> float:
         """Let the run go on after a takeover; returns how long it was held. Refused when it is not held. A hold the
         owner used the page in from the screen lets go of a button their input left down first, and its event counts
         what they did there (item 470), never what they typed."""
         handle: RunHandle = self._handle(run_id)
-        if not handle.gate.held:
-            raise RunConflict("the run is not taken over", {"run_id": run_id})
-        used: InputTally | None = self._screen_input.pop(run_id, None)
-        if used is not None and used.buttons_down:
-            browser: BrowserSession = await browser_of(self._runtime, await self._runtime.store.get_run(run_id))
-            try:
-                await browser.let_go_of_buttons(handle.thread_id, used.buttons_down)
-            except BrowserError as error:
-                # The page went away with the button: the run is handed back all the same.
-                log.warning("screen_input_release_failed", run_id=run_id, error=error.message)
-        held_s: float = handle.gate.release()
+        # A batch of the owner's input under way ends first, counted, and none starts after.
+        async with self._input_locks.setdefault(run_id, asyncio.Lock()):
+            if not handle.gate.held:
+                raise RunConflict("the run is not taken over", {"run_id": run_id})
+            used: InputTally | None = self._screen_input.pop(run_id, None)
+            if used is not None and used.buttons_down:
+                browser: BrowserSession = await browser_of(self._runtime, await self._runtime.store.get_run(run_id))
+                try:
+                    await browser.let_go_of_buttons(handle.thread_id, used.buttons_down)
+                except BrowserError as error:
+                    # The page went away with the button: the run is handed back all the same.
+                    log.warning("screen_input_release_failed", run_id=run_id, error=error.message)
+            held_s: float = handle.gate.release()
         data: JsonObject = {"source": source, "held_s": round(held_s, 1)}
         if used is not None:
             data["inputs"] = {"clicks": used.clicks, "scrolls": used.scrolls, "typed": used.typed}
@@ -2175,6 +2188,7 @@ class RunManager:
         finally:
             self._handles.pop(run.id, None)
             self._screen_input.pop(run.id, None)
+            self._input_locks.pop(run.id, None)
             self._emergency.discard(run.id)
             self._cutting.discard(run.id)
             finished.set()
