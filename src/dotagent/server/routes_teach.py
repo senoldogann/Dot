@@ -102,7 +102,8 @@ def teach_router(ctx: ServerContext) -> APIRouter:
         kind of work, when it fits, its steps and parameters, and the steps they showed. Nothing is saved yet."""
         recording: Recording = _stopped(thread_id)
         skill: TaughtSkill = await draft_taught_skill(ctx.runtime, recording, request.words)
-        return skill.model_dump()
+        # In JSON's own shapes: the skill's tuples are lists there, and the response refused them as they were.
+        return skill.model_dump(mode="json")
 
     @router.post("/teach/{thread_id}/save", status_code=201)
     async def save_skill(thread_id: str, request: SaveRequest) -> JsonValue:

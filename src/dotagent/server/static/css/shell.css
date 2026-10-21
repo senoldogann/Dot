@@ -782,12 +782,16 @@
   font-weight: var(--weight-label);
 }
 
-/* The chat's last line: its words, ellipsized, and the faces of what it delegated at their end (item 507). */
+/* The chat's last line: its words, ellipsized, and the faces of what it delegated at their end (item 507). It is one
+   line whatever it holds (item 510): words put in it bare, as a page of an earlier build put them, wrapped to as many
+   lines as they took and made the row tall. */
 .side-chat-last {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   color: var(--muted);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);

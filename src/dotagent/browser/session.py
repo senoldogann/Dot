@@ -150,6 +150,8 @@ _TAB_OPENING: str = (
     "browser_switch_tab to work in it"
 )
 _BLANK_URLS: frozenset[str] = frozenset({"about:blank", "chrome://newtab/", "chrome://new-tab-page/"})
+# Where a task shown on a blank tab starts (item 510): a page to search from, rather than an empty one.
+_TEACH_START_PAGE: str = "https://www.google.com/"
 _TAB_MARK_BYTES: int = 6
 # Dot's own Chrome at this zoom draws a page at the size it was given, which the page need not be asked for (item 358).
 _UNZOOMED: int = 100
@@ -1985,6 +1987,8 @@ class BrowserSession:
                 raise RunConflict("a task is being recorded already", {"thread_id": self._teaching.thread_id})
             async with self._locked(thread_id) as thread:
                 tab: Tab = await self._current_tab(thread)
+                if tab.page.url in _BLANK_URLS or tab.page.url.startswith("about:blank"):
+                    await tab.page.goto(_TEACH_START_PAGE, wait_until="commit")
                 recording: Recording = Recording(thread_id=thread_id, page=tab.page, tab_index=thread.active + 1)
                 # In place before the script goes in: the page it is put into reports itself at once, and a step that
                 # comes before the recording would be dropped.

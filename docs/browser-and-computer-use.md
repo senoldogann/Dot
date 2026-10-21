@@ -237,11 +237,13 @@ Both modes share what follows.
 ## Teaching a task
 
 The composer's "+" offers **Teach a task** (item 423). The owner shows the task once in the chat's tab: the tab comes to
-the front on the Mac, and the panel shows it as Chrome paints it and lists the steps as they come: a page opened, a click
-on a named control, a field filled, a choice made, Enter pressed. The script that reports them goes into the page and runs
-again in every document the tab loads, so a task that moves from page to page is one recording. It reports no value of
-any field, and for a password, one-time-code or card field (a `password` input, or an `autocomplete` of
-`one-time-code`, `cc-number`, `cc-exp` or `cc-csc`) not the field's name either: the step says a secret field was filled.
+the front on the Mac, and the panel shows it as Chrome paints it and lists the steps as they come: a page of the web
+opened, a click on a named control, a field filled, a choice made, Enter pressed. A tab still blank goes to Google first
+(item 510), and a blank tab or a page of Chrome's own is no step. The script that reports them goes into the page and
+runs again in every document the tab loads, so a task that moves from page to page is one recording. It reports no value
+of any field, and for a password, one-time-code or card field (a `password` input, or an `autocomplete` of
+`one-time-code`, `cc-number`, `cc-exp` or `cc-csc`) not the field's name either: the step says a secret field was
+filled.
 
 **Stop** ends it, and **Write the skill** has the review model write what the owner showed: the kind of work, one line
 of what it does, when it fits, the steps and their parameters, and the lines the owner's own steps made. The owner reads
