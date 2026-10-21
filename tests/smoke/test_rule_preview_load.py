@@ -31,12 +31,16 @@ pytestmark = [pytest.mark.asyncio(loop_scope="module")]
 TOKEN: str = "rule-preview-load-token"
 OPUS: str = "anthropic:claude-opus-5-5"
 STEPS: int = 20_000
-# The try-out's budget of time (server/rule_replay.py, _BUDGET_S) and what a slow machine may add to it.
+# The try-out's budget of time (server/rule_replay.py, _BUDGET_S) and what a slow machine may add to it: a try-out that
+# did not stop at its budget would read the 20,000 steps of the slow pattern for a minute and more, so a few seconds
+# keep that apart from a loaded test runner (CI's three cores, with other tests at work, took 3.3 s).
 BUDGET_S: float = 2.0
-SLACK_S: float = 1.0
+SLACK_S: float = 3.0
 # The longest the daemon may take to answer a request while a try-out counts in its worker thread, which lets the event
-# loop take its turn between two matches.
-ANSWER_S: float = 0.5
+# loop take its turn between two matches. A loop the try-out held would answer only when the try-out ends, near
+# BUDGET_S (1.97 s when the steps were counted on the loop); a loaded test runner answers within a second (CI took
+# 0.94 s), here at once.
+ANSWER_S: float = 1.5
 # A match that takes a few milliseconds and keeps the interpreter while it runs, as a rule's pattern does in the regex
 # module: a pattern slow on every step, well within the daemon's limit for one.
 _BACKTRACKS: str = r"(a|aa)+$"
