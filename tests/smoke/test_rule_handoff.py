@@ -341,6 +341,15 @@ async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_
         run.thread_id,
         None,
     )
+    report: ApprovalRecord = await runtime.store.create_kept_approval(
+        run.id,
+        "shell",
+        "Run: ./report.sh (writes a file) — a rule of yours asks",
+        "medium",
+        {"tool": "shell", "kind": "shell", "risk": "medium", "target": "./report.sh", "amount": None, "flags": []},
+        "digest-report",
+        time.time() + 72 * 3600,
+    )
     activity: httpx.Response = await client.get("/api/activity")
     assert activity.status_code == 200, activity.text
     rows: list[dict[str, object]] = [row for row in activity.json()["waiting"] if row["id"] == kept.id]
