@@ -249,7 +249,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
                 if plugin.root.is_dir() or running.get(config.name) == config:
                     servers.setdefault(config.name, (config, "plugin"))
         recorded: frozenset[str] = frozenset(config.name for config in record.servers)
-        for name, config in hub.configs().items():
+        for name, config in running.items():
             servers.setdefault(name, (config, "connected" if name in recorded else "elsewhere"))
         for config in record.servers:
             servers.setdefault(config.name, (config, "connected"))
@@ -524,7 +524,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
     async def remove_plugin(name: str) -> McpServersView:
         """Take the plugin ``name`` out of Dot (item 497): its MCP servers stop now and its skills leave the runs that
         start after, and its folder goes to the Trash, from which it can be put back. A plugin read from a folder of
-        ``[plugins] dirs`` is refused: the owner takes that folder out of the config."""
+        ``[plugins] dirs`` is refused: the owner takes that folder out of the config. A plugin whose folder went
+        without Dot, of either place, has only its servers left to stop: those the hub runs as it set them up."""
         plugin: Plugin | None = next((one for one in ctx.runtime.plugins.plugins if one.name == name), None)
         running: dict[str, McpServerConfig] = hub.configs()
         # The servers the hub runs as the plugin set them up: one of the same name added since is the owner's.

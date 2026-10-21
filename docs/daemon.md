@@ -320,12 +320,12 @@ a phone's page that the browser loads again opens; what was typed there and not 
 run of the chat (opened from the sidebar's Activity, a link or its address) stays where it is, and so does a page while
 a question its run left is open on it, until none is (item 451). In a campaign's chat the message steers the
 session. The box wears the home's pills too: the mode (none on Auto, which a chat keeps for its next messages,
-each settled by its own words), the model with its reasoning and the Options (approvals and goal mode) of the chat, and a follow-up or a queued message starts its run with them on the same thread, for the same
-agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
+each settled by its own words), the model with its reasoning and the Options (approvals and goal mode) of the chat,
+and a follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
 for every browser, so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a
 chat from before has the open run's until its next run starts; a Task kept before Auto, item 495, reads as Auto, which
-settles a task unless a message's words ask only to look). They are not kept in the browser as the home's are, and Keep going stays a
-new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
+settles a task unless a message's words ask only to look). They are not kept in the browser as the home's are, and
+Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
 next follow-up. Beside the send, a ring shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
 window, item 396); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows

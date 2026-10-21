@@ -97,8 +97,9 @@ The ways a service connects:
   agent keeps it). A server of a plugin goes with its plugin: **Remove plugin** stops the plugin's servers now, its
   skills leave the runs that start after, and its folder in Dot's plugins goes to the Trash, from which it can be put
   back (`DELETE /api/installed-plugins/{name}`); a plugin read from a folder of `[plugins] dirs` is taken out of the
-  config instead. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts again,
-  and Remove plugin then stops them; a server of the same name added since is yours, not the plugin's. A server of Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
+  config instead. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts
+  again, and Remove plugin then stops them; a server of the same name added since is the owner's, not the plugin's. A
+  server of Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
 
 **Choose tools** (item 426): a server added here that offers more tools than a model gets at once (30) is left out, and
 its row says so; its **Choose tools** opens the list of every tool it offers with what each says it does, of which you
