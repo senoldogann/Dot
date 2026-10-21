@@ -84,7 +84,7 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    each decision tied to an observation; or it keeps the current harness. The composed version is played on the scoring
    set in its turn and survives, as `probed`, when it did better than the base, with the decisions and the evidence in
    its notes; else the best candidate does.
-4. **Adopt.** You adopt it, or not, on the harness page or with `dotx harness adopt`. `[harness] adopt = "auto"` (off by
+4. **Adopt.** You adopt it, or not, on the Self-improvement page or with `dotx harness adopt`. `[harness] adopt = "auto"` (off by
    default) adopts on its own only a version its own probe showed better on a task and worse on none, with two repeats,
    and never one written from a run that had read content third parties can author: that decision is yours.
 
@@ -162,17 +162,25 @@ the lesson writer: its words cannot pass into a clean run's candidate unmarked.
 
 ## The page
 
-Settings › Harness is where you read and decide. *In use* shows the adopted version's texts, or that Dot's own text
-alone is in use. *Write a version* takes habits and tool guidance (prefilled from the adopted version) and a summary,
-and says what each takes (item 412): that writing one is optional since the nightly step proposes versions, what a habit
-and a line of tool guidance are, the bounds a version keeps and what each button does, with examples in the empty fields
-and **Start from an example**, which puts them in, and saves them as a candidate or adopts them at once; what cannot be
-a component is refused with why. *Versions* lists every version, the newest first, with its state, who made it and when,
-its texts and notes (the scope and the moments of a proposal, the contrast of a probe, the decisions of a composition)
-under *Texts and notes*, and Adopt and Retire; retiring the version in use asks first. *Steps of the loop* and
-*Experiences* list the newest of each, a step with the run it learned from and what it decided. *The nightly step* says
-when the step runs (or that it is off, and which setting turns it on), the scoring and final sets, who adopts, and the
-bounds. On a phone the page is a row of the settings list under *How Dot works*.
+Settings › *Self-improvement* is the harness's page, in plain words (item 502): it opens by saying that Dot learns
+from its own runs how to work better on this Mac, that every run follows two short texts besides Dot's built-in
+instructions, that each night Dot can propose a new version and try it on test tasks first, and that you choose the
+version it follows and never have to write one. Its words for the states are *new* (`candidate`), *tried* (`probed`),
+*in use* (`adopted`) and *set aside* (`retired`); **Use** adopts and **Set aside** retires.
+
+*What Dot follows now* shows the adopted version's texts, or that Dot's built-in instructions alone are in use. *Write
+your own (optional)* takes habits and tool guidance (prefilled from the adopted version) and a summary, and says what
+each takes (item 412): that writing one is optional since the nightly learning proposes versions, what a habit and a
+line of tool guidance are, the limits a version keeps and what each button does, with examples in the empty fields and
+**Start from an example**, which puts them in; **Save for later** keeps it as a candidate and **Save and use** adopts
+it at once; what cannot be a component is refused with why. *Versions* lists every version, the newest first, with its
+state, who made it (you, or Dot's proposer or composer) and when, its texts and notes (what a proposal is about and the
+moments of the run it answers, the trial's contrast, the decisions of a composition) under *Texts and notes*, and Use
+and Set aside; setting aside the version in use asks first. *Nightly learning* and *Lessons learned* list the newest
+steps and experiences, a step with the run it learned from and what it decided. *How it learns* says when the step
+runs (or that it is off, and which setting turns it on), the test tasks (the scoring set) and the final check (the
+final set), who chooses, and the limits. On a phone the page is a row of the settings list under *How Dot works*, which
+says *built-in* or *changed*.
 
 ## What is built so far
 

@@ -1,6 +1,6 @@
-"""Settings › Harness in a real browser (item 393): with no version the page says Dot's own text is in use; a version
-written on the page and adopted shows in use and in the list; retiring it leaves Dot's own text again; on a phone the
-settings list has the row."""
+"""Settings › Self-improvement (the harness) in a real browser (item 393, its words item 502): with no version the page
+says Dot's built-in instructions alone are in use; a version written on the page and put in use shows in use and in
+the list; setting it aside leaves the built-in instructions again; on a phone the settings list has the row."""
 
 import asyncio
 import re
@@ -101,41 +101,47 @@ async def _open(browser: Browser, client: httpx.AsyncClient, width: int) -> Page
     return page
 
 
-async def test_a_version_written_on_the_page_is_in_use_until_it_is_retired(
+async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
     browser: Browser, client: httpx.AsyncClient
 ) -> None:
     page: Page = await _open(browser, client, 1280)
     try:
-        await expect(page.get_by_text("Dot's own text alone: no version is adopted.")).to_be_visible()
+        # The page says what it is in plain words (item 502).
+        await expect(
+            page.get_by_text("Dot learns from its own runs how to work better on this Mac.", exact=False)
+        ).to_be_visible()
+        await expect(page.get_by_text("Dot's built-in instructions alone: no version is in use.")).to_be_visible()
         await expect(page.get_by_text("No version yet")).to_be_visible()
-        await expect(page.get_by_text("No step yet")).to_be_visible()
+        await expect(page.get_by_text("Nothing learned yet")).to_be_visible()
         # The form says what goes in it (item 412): that it is optional, what each field takes, with examples.
-        write = page.locator("section.memory-panel", has_text="Write a version")
+        write = page.locator("section.memory-panel", has_text="Write your own (optional)")
         await expect(write.locator(".harness-intro")).to_contain_text("Optional: you need not write anything here.")
-        await expect(write.locator(".harness-intro")).to_contain_text("Once a time of day is set for the nightly step")
+        await expect(write.locator(".harness-intro")).to_contain_text(
+            "Once a time of day is set for the nightly learning"
+        )
         assert "For example:" in (await page.get_by_role("textbox", name="Habits").get_attribute("placeholder") or "")
         await write.get_by_role("button", name="Start from an example").click()
         await expect(page.get_by_role("textbox", name="Habits")).to_have_value(re.compile(r"^- Read a file whole"))
         await expect(page.get_by_role("textbox", name="Summary")).not_to_have_value("")
         await page.get_by_role("textbox", name="Habits").fill(HABIT)
         await page.get_by_role("textbox", name="Summary").fill("Read first")
-        await page.get_by_role("button", name="Save and adopt").click()
-        in_use = page.locator("section.memory-panel", has_text="In use")
+        await page.get_by_role("button", name="Save and use").click()
+        in_use = page.locator("section.memory-panel", has_text="What Dot follows now")
         await expect(in_use.get_by_text(HABIT)).to_be_visible()
-        await expect(in_use.locator(".badge", has_text="adopted")).to_be_visible()
+        await expect(in_use.locator(".badge", has_text="in use")).to_be_visible()
         row = page.locator(".list-row[data-version]")
         await expect(row).to_have_count(1)
-        await expect(row.locator(".badge")).to_have_text("adopted")
+        await expect(row.locator(".badge")).to_have_text("in use")
         await expect(row.get_by_text("Read first")).to_be_visible()
         # The API says the same.
         view: dict[str, object] = (await client.get("/api/harness")).json()
         assert view["adopted"] is not None
-        # Retiring the version in use leaves Dot's own text, after the question is answered.
-        await row.get_by_role("button", name="Retire").click()
-        await page.get_by_role("dialog").get_by_role("button", name="Retire").click()
-        await expect(page.get_by_text("Dot's own text alone: no version is adopted.")).to_be_visible()
-        await expect(row.locator(".badge")).to_have_text("retired")
-        await row.get_by_role("button", name="Adopt").click()
+        # Setting the version in use aside leaves the built-in instructions, after the question is answered.
+        await row.get_by_role("button", name="Set aside").click()
+        await page.get_by_role("dialog").get_by_role("button", name="Set aside").click()
+        await expect(page.get_by_text("Dot's built-in instructions alone: no version is in use.")).to_be_visible()
+        await expect(row.locator(".badge")).to_have_text("set aside")
+        await row.get_by_role("button", name="Use", exact=True).click()
         await expect(in_use.get_by_text(HABIT)).to_be_visible()
         await expect(page.get_by_text("every night at", exact=False)).to_have_count(0)
         await expect(page.get_by_text("off: set a time of day in the config file", exact=False)).to_be_visible()
@@ -143,7 +149,9 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_retired(
         await page.close()
 
 
-async def test_the_phone_lists_the_harness_among_how_dot_works(browser: Browser, client: httpx.AsyncClient) -> None:
+async def test_the_phone_lists_self_improvement_among_how_dot_works(
+    browser: Browser, client: httpx.AsyncClient
+) -> None:
     page: Page = await browser.new_page(
         viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, device_scale_factor=2
     )
@@ -152,10 +160,10 @@ async def test_the_phone_lists_the_harness_among_how_dot_works(browser: Browser,
         host, port = _address(client)
         await page.goto(ui_url(host, port, TOKEN))
         await page.goto(f"http://{host}:{port}/#/settings")
-        row = page.get_by_role("link", name="Harness", exact=False)
+        row = page.get_by_role("link", name="Self-improvement", exact=False)
         await expect(row).to_be_visible()
         await row.click()
-        await expect(page.get_by_role("heading", name="Harness", exact=True)).to_be_visible()
-        await expect(page.locator("section.memory-panel", has_text="In use")).to_be_visible()
+        await expect(page.get_by_role("heading", name="Self-improvement", exact=True)).to_be_visible()
+        await expect(page.locator("section.memory-panel", has_text="What Dot follows now")).to_be_visible()
     finally:
         await page.close()
