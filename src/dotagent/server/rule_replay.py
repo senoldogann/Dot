@@ -324,12 +324,28 @@ def _count_ruled(kept: RuleTally, step: StepRow, behavior: Behavior) -> None:
     kept.decides += 1
 
 
+def _slow_rule(number: int, step: StepRow, error: ConfigError, reached: bool) -> str:
+    """What stops a count of the rules' use: rule ``number``'s pattern took too long on ``step``, or could not be read.
+    ``reached`` says whether the policy would have come to that rule, no earlier one fitting the step: the daemon then
+    refuses the step, and else it decided it by the earlier rule."""
+    said: str = (
+        f"The pattern of rule #{number} takes longer than the daemon allows on a past step ({step.tool}: "
+        f"{plain_line(redact_secrets(step.summary), _EXAMPLE_CHARS)}), or cannot be read: {error.message}."
+    )
+    if reached:
+        return f"{said} The daemon refuses such a step."
+    return f"{said} An earlier rule decided this step, but the daemon refuses one that reaches rule #{number}."
+
+
 def tally_usage(tally: UsageTally, rules: Sequence[RuleRecord], steps: Sequence[StepRow], deadline: float) -> int:
     """Count ``steps`` (newest first) for each enabled rule of ``rules`` until the monotonic ``deadline`` passes, and
     say how many were counted (one at least): which rules a step fits, the first of them in their order deciding it, as
     the policy picks it. A pattern that takes too long on one stops the count there, with the problem said, as the
     daemon refuses such a step."""
-    ordered: list[RuleRecord] = sorted((rule for rule in rules if rule.enabled), key=lambda rule: rule.position)
+    ordered: list[RuleRecord] = sorted(rules, key=lambda rule: rule.position)
+    # A rule's number as the page shows it: its place among all the rules, those switched off too.
+    numbers: dict[str, int] = {rule.id: index + 1 for index, rule in enumerate(ordered)}
+    enabled: list[RuleRecord] = [rule for rule in ordered if rule.enabled]
     counted: int = 0
     for step in steps:
         if counted > 0 and time.monotonic() > deadline:
@@ -340,15 +356,15 @@ def tally_usage(tally: UsageTally, rules: Sequence[RuleRecord], steps: Sequence[
         action: ActionInfo | None = _action(step)
         if action is None:
             continue
-        try:
-            fitting: list[RuleRecord] = [rule for rule in ordered if match_rule(action, [rule]) is not None]
-        except ConfigError as error:
-            tally.problem = (
-                f"A rule's pattern takes longer than the daemon allows on a past step ({step.tool}: "
-                f"{plain_line(redact_secrets(step.summary), _EXAMPLE_CHARS)}), or cannot be read: {error.message}. "
-                "The daemon refuses such a step."
-            )
-            return counted
+        fitting: list[RuleRecord] = []
+        for rule in enabled:
+            try:
+                fits: bool = match_rule(action, [rule]) is not None
+            except ConfigError as error:
+                tally.problem = _slow_rule(numbers[rule.id], step, error, fitting == [])
+                return counted
+            if fits:
+                fitting.append(rule)
         if not fitting:
             continue
         first: RuleRecord = fitting[0]

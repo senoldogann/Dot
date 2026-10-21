@@ -308,4 +308,13 @@ def test_a_stored_pattern_that_takes_too_long_stops_the_count_and_says_so(monkey
         _step(1, "Run: aaa", None, False, False),
     ]
     assert tally_usage(tally, rules, steps, _NO_DEADLINE) == 1
-    assert tally.problem is not None and "The daemon refuses such a step" in tally.problem
+    assert (
+        tally.problem is not None and "rule #1" in tally.problem and "The daemon refuses such a step" in tally.problem
+    )
+    # A slow pattern behind a rule that fits first: the daemon never came to it on this step, and the count says so.
+    first: RuleRecord = _rule(1, "allow", "shell", r"\ba+b\b", "Fine")
+    behind: RuleRecord = rules[0].model_copy(update={"id": "rul_2", "position": 2})
+    tally = UsageTally([first, behind])
+    assert tally_usage(tally, [first, behind], steps, _NO_DEADLINE) == 1
+    assert tally.problem is not None and "An earlier rule decided this step" in tally.problem
+    assert "rule #2" in tally.problem

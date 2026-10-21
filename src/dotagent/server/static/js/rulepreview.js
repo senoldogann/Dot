@@ -1,5 +1,5 @@
-// The words of a rule's try-out on past steps (item 469), pure functions of `POST /rules/preview`'s answer, so they
-// can be read alone (tests/js/rulepreview.test.js).
+// The words of a rule's try-out on past steps (item 469) and of each rule's use (item 473), pure functions of the
+// answers of `POST /rules/preview` and `GET /rules/usage`, so they can be read alone (tests/js/rulepreview.test.js).
 
 import { plural } from "./dom.js";
 
