@@ -415,7 +415,9 @@ function agentForm({ record, onSaved, onCancel }) {
       model: model.value,
       effort: chosenLevel(models, model.value, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
       approvals: approvals.value === "" ? null : approvals.value,
-      // Every tool ticked is every tool, said as null: an empty list keeps the tools an agent has (the code review's Y5).
+      // Every tool, said as null, when the boxes widen the agent (toolPicks): every box ticked, unless they are the tools
+      // it names, unchanged, and All tools was not ticked. An empty list keeps the tools an agent has (the code review's
+      // Y5).
       tools: picks.widens() ? null : picked,
       look: look.value(),
     };
