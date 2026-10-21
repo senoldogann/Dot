@@ -996,8 +996,12 @@ class PaletteTool(FrozenModel):
 
 
 class PaletteServer(FrozenModel):
+    """An MCP server of the palette: its name, the tools it lists, and its own logo among the plugins' as the Customize
+    page draws it (item 408), or ``None`` for a server added by hand with no service behind it."""
+
     name: str
     tools: tuple[PaletteTool, ...]
+    logo: str | None = None
 
 
 class PaletteView(FrozenModel):

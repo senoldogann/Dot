@@ -913,7 +913,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     const working = steers(false)
       ? narrowOr("Steer this run (or /btw)", "Steer this run, or /btw to ask on the side")
       : narrowOr("Queue a message (or /btw)", "Queue a message, or /btw to ask on the side");
-    input.placeholder = active ? working : narrowOr("Follow up (@ or /)", "Follow up (@ for skills, / for commands, or /btw to ask on the side)");
+    input.placeholder = active ? working : narrowOr("Follow up (@ or /)", "Follow up (@ for servers, / for skills and commands, or /btw to ask on the side)");
     keepLook();
     const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);
