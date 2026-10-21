@@ -241,11 +241,12 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         for config in ctx.runtime.config.mcp:
             servers.setdefault(config.name, (config, "config"))
         # A plugin taken out (item 497) is gone from its folder: its servers are not Dot's any more, but for one the
-        # hub still runs, as when the folder went without Dot, which Remove plugin then stops.
+        # hub still runs as the plugin set it up, as when the folder went without Dot, which Remove plugin then stops.
+        # A server of the same name the owner added since is theirs, not the plugin's.
         running: dict[str, McpServerConfig] = hub.configs()
         for plugin in ctx.runtime.plugins.plugins:
             for config in plugin.servers:
-                if plugin.root.is_dir() or config.name in running:
+                if plugin.root.is_dir() or running.get(config.name) == config:
                     servers.setdefault(config.name, (config, "plugin"))
         recorded: frozenset[str] = frozenset(config.name for config in record.servers)
         for name, config in hub.configs().items():
@@ -525,12 +526,16 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         start after, and its folder goes to the Trash, from which it can be put back. A plugin read from a folder of
         ``[plugins] dirs`` is refused: the owner takes that folder out of the config."""
         plugin: Plugin | None = next((one for one in ctx.runtime.plugins.plugins if one.name == name), None)
-        running: frozenset[str] = frozenset(hub.configs())
-        if plugin is None or (not plugin.root.is_dir() and not any(one.name in running for one in plugin.servers)):
+        running: dict[str, McpServerConfig] = hub.configs()
+        # The servers the hub runs as the plugin set them up: one of the same name added since is the owner's.
+        still: list[McpServerConfig] = (
+            [] if plugin is None else [one for one in plugin.servers if running.get(one.name) == one]
+        )
+        if plugin is None or (not plugin.root.is_dir() and not still):
             raise NotFoundError("Dot has no plugin of this name", {"plugin": name})
         if not plugin.root.is_dir():
             # Its folder went without Dot: only its servers are left to stop.
-            for server in plugin.servers:
+            for server in still:
                 await hub.disconnect(server.name)
             refresh_mcp_tools(ctx.runtime.registry, hub)
             log.info("plugin_servers_stopped", plugin=name)
@@ -541,7 +546,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
                 "out of the config to remove it",
                 {"plugin": name, "folder": str(plugin.root.parent)},
             )
-        for server in plugin.servers:
+        for server in still:
             await hub.disconnect(server.name)
         refresh_mcp_tools(ctx.runtime.registry, hub)
         moved = await asyncio.to_thread(move_to_trash, plugin.root, trash_folder())
