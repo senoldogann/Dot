@@ -574,7 +574,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
           section.firstChild,
           ...group.chats.map((chat) => {
             if (selecting) {
-              const pick = chatPick(chat, selected.has(chat.id), toggle, faceOf(chat));
+              const pick = chatPick(chat, selected.has(chat.id), toggle, pickFaceOf(chat));
               rowNodes.set(chat.id, pick);
               return pick;
             }
@@ -661,6 +661,13 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const face = actorFace(id, state, look);
     faces.set(chat.id, { key, face });
     return face;
+  }
+
+  // The creature of a chat's row while chats are chosen: one of its own, as the kept one stays in the chat's kept link,
+  // which comes back when the choosing ends.
+  function pickFaceOf(chat) {
+    const { id, state, look } = chatFaceOf(chat);
+    return actorFace(id, state, look);
   }
 
   // A chat's entry: its row and, while its latest run works (`family`, that run's row and the runs it delegated; null

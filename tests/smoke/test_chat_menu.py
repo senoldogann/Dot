@@ -323,6 +323,8 @@ async def test_a_chats_menu_pins_names_copies_chooses_and_deletes_it(
         await page.keyboard.press("Escape")
         await expect(page.locator("input.side-check")).to_have_count(0)
         await expect(titles).to_have_text(["Garden plan", "Books to read", "Trip notes"])
+        # Each chat keeps its creature once the choosing ends.
+        await expect(page.locator("a.side-run:has(.avatar)")).to_have_count(3)
 
         # Delete asks first, with the focus on Cancel, which keeps the chat; Delete takes it and, as it was the chat
         # open, the page goes home.
