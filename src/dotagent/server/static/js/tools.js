@@ -240,7 +240,8 @@ export function toolRow({ tool, args }) {
   function buildBody() {
     built = true;
     const argsText = JSON.stringify(args, null, 2);
-    body.replaceChildren(
+    // replaceChildren writes a null as the word "null": a section that is not there is left out before (item 472).
+    const parts = [
       section("Arguments", el("pre", { class: "out" }, argsText), argsText),
       result === null
         ? el("div", { class: "small muted" }, cut ? "Cut off: the run ended before this call reported back." : "Still running…")
@@ -250,7 +251,8 @@ export function toolRow({ tool, args }) {
             result.text === "" ? null : result.text,
           ),
       result === null || !showsWhy(result.decision, result.kind) ? null : section("Why it ran", whyLine(result.decision, result.flags ?? []), null),
-    );
+    ];
+    body.replaceChildren(...parts.filter((part) => part !== null));
   }
 
   details.addEventListener("toggle", () => {

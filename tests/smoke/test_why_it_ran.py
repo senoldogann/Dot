@@ -39,6 +39,7 @@ def _script() -> list[ScriptedTurn]:
         ScriptedTurn(
             text="", calls=(ScriptedCall(tool="write_file", arguments={"path": "notes.md", "content": "hi\n"}),)
         ),
+        ScriptedTurn(text="", calls=(ScriptedCall(tool="read_file", arguments={"path": "notes.md"}),)),
         ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)),
     ]
 
@@ -131,6 +132,14 @@ async def test_an_opened_step_says_the_owners_rule_let_it_run(
                 why: Locator = row.locator(".why-line")
                 await expect(why).to_contain_text("Allowed by your rule “Notes are fine”.")
                 await expect(why.locator("a.why-rules")).to_have_attribute("href", "#/settings/rules")
+                # A read the preset let through says no why, and no "null" either (item 472).
+                read: Locator = page.locator(
+                    ".run-main details.tool", has=page.locator(".tool-head[title*='Read']")
+                ).first
+                await read.locator(".tool-head").click()
+                await expect(read.locator(".tool-body")).to_contain_text("Result")
+                await expect(read.locator(".tool-body")).not_to_contain_text("null")
+                await expect(read.locator(".why-line")).to_have_count(0)
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"why-{width}-{scheme}.png"), full_page=True)
                 await context.close()
