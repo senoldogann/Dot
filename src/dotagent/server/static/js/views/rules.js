@@ -3,7 +3,8 @@
 // said in your own words (item 110): the review model drafts its parts, the daemon writes the pattern from them, and
 // the draft fills the form, its description the sentence the rule reads back as, to be checked and added;
 // `#/settings/rules?sentence=…` (an approval card's "Make a rule of this") puts a sentence in the box. A rule's arrows
-// move it up or down the order, and a rule that an earlier one fits wherever it fits says it never decides (item 449).
+// move it up or down the order, and a rule that another one decides in place of wherever it fits says it never decides
+// (item 449): an earlier one, or one that hands the step to you, which decides wherever it stands (item 481).
 // Above the rules, the switch of the macOS sandbox of a run's commands (item 262).
 
 import { api } from "../api.js";
@@ -84,25 +85,24 @@ function moveButton(record, index, total, direction, onMove) {
   );
 }
 
-/** The note on a rule that an earlier rule fits wherever it fits (`never_decided_by`, item 449), or null. */
-function neverDecides(record, numberOf) {
+/** The note on a rule that another rule decides in place of wherever it fits (`never_decided_by`, item 449), or null:
+ * an earlier rule, which moving this one above it undoes, or a rule that hands the step to you, which decides wherever
+ * it stands (item 481), so that only narrowing or deleting one of them does. `behaviorOf(id)` is a rule's answer. */
+function neverDecides(record, numberOf, behaviorOf) {
   if (record.never_decided_by === null) {
     return null;
   }
   const first = numberOf(record.never_decided_by);
-  return el(
-    "span",
-    {
-      class: "badge b-warn",
-      title: `Rule #${first} fits every action this rule fits and is checked first, so this rule never decides. Move it above rule #${first}, or delete one of them.`,
-    },
-    "Never decides",
-  );
+  const title =
+    behaviorOf(record.never_decided_by) === "handoff" && record.behavior !== "handoff"
+      ? `Rule #${first} hands you every action this rule fits, and a rule that hands the step to you decides wherever it stands, so this rule never decides. Narrow one of them, or delete one.`
+      : `Rule #${first} fits every action this rule fits and is checked first, so this rule never decides. Move it above rule #${first}, or delete one of them.`;
+  return el("span", { class: "badge b-warn", title }, "Never decides");
 }
 
 /** A rule's row; `used` is the line of how it was used on the last days (item 473), or null until that is read and for a
  * rule switched off. */
-function ruleRow(record, index, total, numberOf, handlers, used) {
+function ruleRow(record, index, total, numberOf, behaviorOf, handlers, used) {
   const answer = answerOf(record.behavior);
   const toggle = el("button", {
     class: "switch",
@@ -137,7 +137,7 @@ function ruleRow(record, index, total, numberOf, handlers, used) {
         el("span", { class: "chip", title: "Rules are checked in this order" }, `#${index + 1}`),
         el("span", null, ...sentence(record.tool_glob, record.match_regex)),
         el("span", { class: `badge ${answer.tone}`, title: answer.text }, answer.label),
-        neverDecides(record, numberOf),
+        neverDecides(record, numberOf, behaviorOf),
       ),
       record.description === "" ? null : el("div", { class: "row-text muted" }, record.description),
       used === null ? null : el("div", { class: "rule-usage faint small" }, used),
@@ -510,6 +510,7 @@ export function mount(root, _ctx) {
       onMove: (record, direction) => attempt(() => move(record, direction)),
     };
     const numberOf = (id) => rules.findIndex((record) => record.id === id) + 1;
+    const behaviorOf = (id) => rules.find((record) => record.id === id)?.behavior ?? null;
     const usedBy = new Map((usage?.rules ?? []).map((used) => [used.rule_id, used]));
     const lineOf = (record) => {
       const used = usedBy.get(record.id);
@@ -521,7 +522,7 @@ export function mount(root, _ctx) {
     const focused = active instanceof HTMLElement && holder.contains(active) ? active.dataset : null;
     // replaceChildren writes a null as the word: what is not there is left out first.
     holder.replaceChildren(
-      ...[problem, el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, rules.length, numberOf, handlers, lineOf(record))))].filter(
+      ...[problem, el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, rules.length, numberOf, behaviorOf, handlers, lineOf(record))))].filter(
         (part) => part !== null,
       ),
     );
@@ -664,7 +665,7 @@ export function mount(root, _ctx) {
       el(
         "div",
         { class: "panel-note" },
-        "The first enabled rule that fits an action decides it; a new rule goes to the end, and a rule's arrows move it up or down.",
+        "The first enabled rule that fits an action decides it, except that a rule that hands the step to you decides wherever it stands; a new rule goes to the end, and a rule's arrows move it up or down.",
       ),
       holder,
     ),

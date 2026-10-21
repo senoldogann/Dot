@@ -189,7 +189,7 @@ def test_the_rule_that_decides_and_its_answer_are_what_the_policy_gives() -> Non
     flag_sets: tuple[tuple[Flag, ...], ...] = ((), ("external_send",))
     for behavior in ("allow", "preapproved", "ask", "handoff"):
         candidate: RuleRecord = candidate_rule(behavior, "shell", r"\bgit\b", existing)
-        for summary in ("Run: git status", "Run: git push --force", _PUSH, "Run: ls"):
+        for summary in ("Run: git status", "Run: git push --force", "Run: git status --force", _PUSH, "Run: ls"):
             for flags in flag_sets:
                 for tainted in (False, True):
                     step: StepRow = _step(1, summary, _decision("ask", "preset", "user"), True, False).model_copy(
@@ -290,7 +290,7 @@ def test_the_rule_that_decides_a_step_is_the_one_the_policy_picks() -> None:
         _rule(2, "handoff", "shell", r"--force", "Forcing is mine"),
         _rule(3, "ask", "*", "", "Ask about everything"),
     ]
-    for summary in ("Run: git status", "Run: git push --force", _PUSH, "Run: ls"):
+    for summary in ("Run: git status", "Run: git push --force", "Run: git status --force", _PUSH, "Run: ls"):
         used: dict[str, RuleUsage] = _used(rules, [_step(1, summary, None, False, False)])
         info: ActionInfo = ActionInfo(
             tool="shell", kind="shell", risk="medium", summary=summary, target=summary, flags=()
@@ -316,3 +316,25 @@ def test_a_stored_pattern_that_takes_too_long_stops_the_count_and_says_so(monkey
     assert tally_usage(tally, [first, behind], steps, _NO_DEADLINE) == 1
     assert tally.problem is not None and "An earlier rule fits this step first" in tally.problem
     assert "reaches rule #2" in tally.problem
+    # Behind it a rule that hands off: the daemon reads it after the first fit (item 481), and refuses the step.
+    handing_off: RuleRecord = behind.model_copy(update={"behavior": "handoff"})
+    tally = UsageTally([first, handing_off])
+    assert tally_usage(tally, [first, handing_off], steps, _NO_DEADLINE) == 1
+    assert tally.problem is not None and "The daemon refuses a step that reaches rule #2" in tally.problem
+
+
+def test_a_hand_off_tried_after_a_rule_that_fits_decides_its_steps() -> None:
+    """Item 481: a rule that hands off decides wherever it stands, so tried after an earlier rule that fits the same
+    steps it decides them, and the earlier rule decides nothing of them; an earlier hand-off still decides first."""
+    allowing: list[RuleRecord] = [_rule(1, "allow", "shell", r"\bgit\b", "Git is fine")]
+    steps: list[StepRow] = [_step(1, "Run: git push origin main", _decision("allow", "rule", "policy"), True, False)]
+    preview: RulePreview = _tried("handoff", allowing, steps)
+    assert (preview.fits, preview.would_decide, preview.shadowed_by) == (1, 1, [])
+    assert (preview.stricter, preview.looser, preview.same) == (1, 0, 0)
+    handing_off: list[RuleRecord] = [_rule(1, "handoff", "shell", r"\bgit\b", "Git is mine")]
+    first: RulePreview = _tried("handoff", handing_off, steps)
+    assert (first.would_decide, [shadow.rule_id for shadow in first.shadowed_by]) == (0, ["rul_1"])
+    # The usage of today's rules says the same: the hand-off decides, and the allow rule is told why it does not.
+    used: dict[str, RuleUsage] = _used([*allowing, _rule(2, "handoff", "shell", r"\bpush\b", "Pushes are mine")], steps)
+    assert (used["rul_2"].decides, used["rul_1"].decides) == (1, 0)
+    assert [(shadow.rule_id, shadow.steps) for shadow in used["rul_1"].shadowed_by] == [("rul_2", 1)]

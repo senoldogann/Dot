@@ -355,14 +355,14 @@ async def test_a_card_the_guard_raised_offers_no_rule_and_says_why(
 
 
 async def _fresh_rules(client: httpx.AsyncClient) -> list[str]:
-    """The rules this test reads, alone in the list: everything the shell does, then a hand-off of ``git push`` that
+    """The rules this test reads, alone in the list: everything the shell does, then a question about ``git push`` that
     the first one keeps from ever deciding, then a question about writing files."""
     for rule in (await client.get("/api/rules")).json():
         assert (await client.delete(f"/api/rules/{rule['id']}")).status_code == 200
     made: list[str] = []
     for behavior, glob, pattern in (
         ("allow", "shell", ""),
-        ("handoff", "shell", r"\bgit push\b"),
+        ("ask", "shell", r"\bgit push\b"),
         ("ask", "write_file", ""),
     ):
         created: httpx.Response = await client.post(
@@ -376,9 +376,11 @@ async def _fresh_rules(client: httpx.AsyncClient) -> list[str]:
 async def test_a_rule_moves_with_its_arrows_and_one_that_never_decides_says_so(
     runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
-    """Item 449, on a wide window and a phone, in light and dark: the hand-off under a rule that fits all it fits says
+    """Item 449, on a wide window and a phone, in light and dark: the question under a rule that fits all it fits says
     it never decides, and which rule decides in its place; its up arrow moves it above that rule, the note goes, the
-    arrow keeps the focus (the other arrow once the rule is first), and the ends' arrows are off."""
+    arrow keeps the focus (the other arrow once the rule is first), and the ends' arrows are off. A hand-off of every
+    step added last keeps every other rule from deciding wherever it stands, and their notes say that moving does not
+    help (item 481)."""
     host, port = _address(client)
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
@@ -415,10 +417,20 @@ async def test_a_rule_moves_with_its_arrows_and_one_that_never_decides_says_so(
                 await expect(page.get_by_role("button", name="Move rule 2 up")).to_be_visible()
                 await page.screenshot(path=str(tmp_path / f"rules-{width}-{scheme}.png"), full_page=True)
                 await page.get_by_role("button", name="Move rule 2 up").click()
-                await expect(rows.nth(0).locator(".badge", has_text="Hand it to me")).to_be_visible()
+                await expect(rows.nth(0).locator(".badge", has_text="Ask me first")).to_be_visible()
                 await expect(page.locator(".rule-list .badge", has_text="Never decides")).to_have_count(0)
                 # The moved rule is first now, so its up arrow is off and its down arrow holds the focus.
                 await expect(page.get_by_role("button", name="Move rule 1 down")).to_be_focused()
+                everything: httpx.Response = await client.post(
+                    "/api/rules", json={"behavior": "handoff", "tool_glob": "*", "match_regex": "", "description": ""}
+                )
+                assert everything.status_code == 201, everything.text
+                await page.reload()
+                await expect(rows).to_have_count(4)
+                handed: Locator = page.locator(".rule-list .badge", has_text="Never decides")
+                await expect(handed).to_have_count(3)
+                await expect(handed.first).to_have_attribute("title", re.compile(r"^Rule #4 hands you every action"))
+                await expect(rows.nth(3).locator(".badge", has_text="Never decides")).to_have_count(0)
                 await page.close()
         finally:
             await browser.close()

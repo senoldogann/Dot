@@ -257,3 +257,42 @@ async def test_a_hand_off_of_a_browser_step_offers_the_takeover(
         async with asyncio.timeout(_RUN_WAIT_S):
             ended: RunRecord = await manager.wait(run.id)
     assert ended.status == "done", ended
+
+
+async def test_an_earlier_rule_that_allows_the_write_does_not_keep_the_hand_off_from_deciding(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 481: with a rule that allows writes first and one that hands them to the owner after it, an "ask" run's
+    write is handed over and not done: a rule that hands off decides wherever it stands."""
+    for record in await runtime.store.list_rules():
+        await runtime.store.delete_rule(record.id)
+    for behavior, description in (("allow", "Notes are fine"), ("handoff", _WHY)):
+        added: httpx.Response = await client.post(
+            "/api/rules",
+            json={"behavior": behavior, "tool_glob": "write_file", "match_regex": "", "description": description},
+        )
+        assert added.status_code == 201, added.text
+    assert [record.behavior for record in await runtime.store.list_rules()] == ["allow", "handoff"]
+    notes: Path = tmp_path / "list.txt"
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            _turn("write_file", {"path": str(notes), "content": "milk, bread"}),
+            _turn(FINISH_TOOL, {"answer": "The owner writes the list.", "success": True}),
+        ],
+    )
+    run: RunRecord = await manager.start(
+        "Write the shopping list", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
+    )
+    try:
+        asked: ApprovalRecord = await _pending(runtime, run.id)
+        assert (asked.severity, asked.tool) == ("handoff", "write_file") and _WHY in asked.summary
+        assert not await asyncio.to_thread(notes.exists), "Dot wrote the file the hand-off was for"
+        await manager.decide(asked.id, True, "test", "")
+    finally:
+        async with asyncio.timeout(_RUN_WAIT_S):
+            ended: RunRecord = await manager.wait(run.id)
+        for record in await runtime.store.list_rules():
+            await runtime.store.delete_rule(record.id)
+    assert ended.status == "done", ended
+    assert not await asyncio.to_thread(notes.exists)

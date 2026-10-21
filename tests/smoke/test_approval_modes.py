@@ -379,11 +379,9 @@ async def test_no_rule_of_the_user_lets_a_message_go_without_their_yes(room: Roo
     assert "whatever your rules say" in question.record.summary
     await room.broker.resolve(question.record.id, True, "user", "send it")
     assert await asyncio.wait_for(question.answer, WAIT_S) == "send it"
-    # A rule that hands the message to the user is stricter, and it holds where the modes ask.
+    # A rule that hands the message to the user is stricter, and it holds where the modes ask, the earlier rule that
+    # allows mail still there: a hand-off decides wherever it stands (item 481).
     await room.store.add_rule("handoff", "apple_script", "reply", "Replies are mine")
-    for rule in await room.store.list_rules():
-        if rule.description == "Mail is fine":
-            await room.store.delete_rule(rule.id)
     handed: Question = await _ask(room, _gate(room, "task", "aggressive", "ask", _nobody), MESSAGE)
     assert handed.record.severity == "handoff" and handed.record.summary.endswith("Replies are mine")
     await room.broker.resolve(handed.record.id, True, "user", "sent it myself")

@@ -469,8 +469,9 @@ class RuleMoveRequest(FrozenModel):
 
 
 class RuleView(RuleRecord):
-    """A rule as the Rules page lists it (item 449): the rule, and the id of the earlier rule that fits every action it
-    fits, so that it never decides (:func:`dotagent.server.rule_shadow.shadowing_rule`); None when it can decide."""
+    """A rule as the Rules page lists it (item 449): the rule, and the id of the rule that decides every action it fits
+    in its place, so that it never decides (:func:`dotagent.server.rule_shadow.shadowing_rule`): an earlier rule, or a
+    rule that hands the step off wherever it stands (item 481); None when it can decide."""
 
     never_decided_by: str | None
 
@@ -1566,9 +1567,9 @@ class RulePreview(FrozenModel):
 
 class RuleUsage(FrozenModel):
     """What one enabled rule did on the steps of the last days, with today's rules (item 473): how many steps it fits
-    and when the newest was; of those it is the first rule to fit, how many it decides, how many ran in yolo, which asks
-    nothing whatever the rules say, and how many were settled before any rule; and the earlier rules that decide the
-    others."""
+    and when the newest was; of those it is the rule that decides (item 481: a hand-off wherever it stands, else the
+    first rule to fit), how many it decides, how many ran in yolo, which asks nothing whatever the rules say, and how
+    many were settled before any rule; and the rules that decide the others."""
 
     rule_id: str
     fits: int

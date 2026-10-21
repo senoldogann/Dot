@@ -156,7 +156,8 @@ class Tally:
 
 
 def _count_first(tally: Tally, step: StepRow, behavior: Behavior) -> None:
-    """Count a step whose first rule to fit is the one tried: a yolo run's, which asks nothing whatever the rules say;
+    """Count a step the rule tried decides (a hand-off wherever it stands, else as the first rule to fit, item 481): a
+    yolo run's, which asks nothing whatever the rules say;
     one settled before any rule; or one it would decide, against what was decided then. Of those, a step that did not
     run and whose record does not say why is ``stopped``: another run held what it needed, the review model refused it,
     or the gate stopped an OpenCode agent's call, whose policy event comes before its ``tool_call``. One with no
@@ -312,8 +313,8 @@ class UsageTally:
 
 
 def _count_ruled(kept: RuleTally, step: StepRow, behavior: Behavior) -> None:
-    """Count a step that a rule decides as the first to fit it: a yolo run's, which asks nothing whatever the rules say;
-    one settled before any rule; or one it decides."""
+    """Count a step that a rule decides (a hand-off wherever it stands, else as the first rule to fit it, item 481): a
+    yolo run's, which asks nothing whatever the rules say; one settled before any rule; or one it decides."""
     if step.yolo:
         kept.in_yolo += 1
         return
@@ -326,8 +327,9 @@ def _count_ruled(kept: RuleTally, step: StepRow, behavior: Behavior) -> None:
 
 def _slow_rule(number: int, step: StepRow, error: ConfigError, reached: bool) -> str:
     """What stops a count of the rules' use: rule ``number``'s pattern took too long on ``step``, or could not be read.
-    The daemon refuses a step that reaches that rule; ``reached`` says whether this one would, no earlier rule fitting
-    it (a check before every rule may still have settled it)."""
+    The daemon refuses a step that reaches that rule; ``reached`` says whether this one would
+    (:func:`_read_by_the_daemon`: no earlier rule fitting it, or, for a rule that hands off, no earlier one that hands
+    off; a check before every rule may still have settled it)."""
     said: str = (
         f"The pattern of rule #{number} takes longer than the daemon allows on a past step ({step.tool}: "
         f"{plain_line(redact_secrets(step.summary), _EXAMPLE_CHARS)}), or cannot be read: {error.message}."
@@ -337,11 +339,20 @@ def _slow_rule(number: int, step: StepRow, error: ConfigError, reached: bool) ->
     return f"{said} An earlier rule fits this step first, but the daemon refuses a step that reaches rule #{number}."
 
 
+def _read_by_the_daemon(rule: RuleRecord, earlier: Sequence[RuleRecord]) -> bool:
+    """Whether the policy reads ``rule`` for a step the rules ``earlier`` fit (item 481): when none does, and, for a
+    rule that hands off, when none of them hands off, since a hand-off decides wherever it stands."""
+    if not earlier:
+        return True
+    return rule.behavior == "handoff" and not any(other.behavior == "handoff" for other in earlier)
+
+
 def tally_usage(tally: UsageTally, rules: Sequence[RuleRecord], steps: Sequence[StepRow], deadline: float) -> int:
     """Count ``steps`` (newest first) for each enabled rule of ``rules`` until the monotonic ``deadline`` passes, and
-    say how many were counted (one at least): which rules a step fits, the first of them in their order deciding it, as
-    the policy picks it. A pattern that takes too long on one stops the count there, with the problem said, as the
-    daemon refuses such a step."""
+    say how many were counted (one at least): which rules a step fits, and the one of them that decides it, as the
+    policy picks it (:func:`dotagent.policy.engine.ruling_rule`: the first that hands off, else the first in their
+    order, item 481). A pattern that takes too long on one stops the count there, with the problem said, as the daemon
+    refuses a step whose rules it has to read that far."""
     ordered: list[RuleRecord] = sorted(rules, key=lambda rule: rule.position)
     # A rule's number as the page shows it: its place among all the rules, those switched off too.
     numbers: dict[str, int] = {rule.id: index + 1 for index, rule in enumerate(ordered)}
@@ -361,21 +372,21 @@ def tally_usage(tally: UsageTally, rules: Sequence[RuleRecord], steps: Sequence[
             try:
                 fits: bool = match_rule(action, [rule]) is not None
             except ConfigError as error:
-                tally.problem = _slow_rule(numbers[rule.id], step, error, fitting == [])
+                tally.problem = _slow_rule(numbers[rule.id], step, error, _read_by_the_daemon(rule, fitting))
                 return counted
             if fits:
                 fitting.append(rule)
         if not fitting:
             continue
-        first: RuleRecord = fitting[0]
+        decider: RuleRecord = next((rule for rule in fitting if rule.behavior == "handoff"), fitting[0])
         for rule in fitting:
             kept: RuleTally = tally.rules[rule.id]
             kept.fits += 1
             if kept.last_fit_at is None:
                 kept.last_fit_at = step.at
-            if rule.id != first.id:
-                kept.shadowed_by[first.id] += 1
-        _count_ruled(tally.rules[first.id], step, first.behavior)
+            if rule.id != decider.id:
+                kept.shadowed_by[decider.id] += 1
+        _count_ruled(tally.rules[decider.id], step, decider.behavior)
     return counted
 
 
