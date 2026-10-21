@@ -242,6 +242,10 @@ export function serviceParts(catalogue, plugin) {
 export function mount(root, ctx) {
   const pluginId = ctx.params[1];
   let disposed = false;
+  // The list is drawn once the Accounts card above it has read the accounts (item 511): the rows the card gets then
+  // would push the tiles down under a finger on its way to one, and the tap would land between two. A service's page
+  // has no card to wait for.
+  let accountsRead = pluginId !== undefined;
   let shown = "all";
   let words = "";
   const holder = el("div", { class: "stack" }, loadingPanel());
@@ -454,7 +458,7 @@ export function mount(root, ctx) {
   }
 
   function paint() {
-    if (disposed || catalogue.plugins === null) {
+    if (disposed || catalogue.plugins === null || !accountsRead) {
       return;
     }
     if (pluginId === undefined) {
@@ -481,6 +485,10 @@ export function mount(root, ctx) {
 
   // The official sign-ins of Google and Microsoft (item 422) head the list of the plugins, not a service's own page.
   const accounts = pluginId === undefined ? accountsCard() : null;
+  accounts?.read.then(() => {
+    accountsRead = true;
+    paint();
+  });
   root.append(bar, ...(accounts === null ? [] : [accounts.element]), holder);
   attempt(load);
   return () => {

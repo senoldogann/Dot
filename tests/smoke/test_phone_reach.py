@@ -304,7 +304,8 @@ async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins:
                     await expect(steps).to_contain_text("Dot takes the name up when it starts again.")
                     download: Locator = page.get_by_role("img", name="A QR code of Tailscale's download page")
                     await expect(download).to_be_visible()
-                    assert await download.evaluate("picture => picture.naturalWidth") > 0
+                    # A picture that is shown may still be loading: it is read once it is decoded.
+                    assert await download.evaluate("picture => picture.decode().then(() => picture.naturalWidth)") > 0
                     assert await _card_gap(page) >= 8
                     awake: Locator = page.get_by_role("switch", name="Keep this Mac awake while it charges")
                     await awake.click()

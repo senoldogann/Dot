@@ -500,10 +500,10 @@ async def test_a_photo_in_the_box_shows_its_picture_beside_the_files_it_came_wit
             await expect(first).to_have_attribute("title", "sunset.png")
             assert (await first.text_content() or "").strip() == ""
             drawn: dict[str, object] = await first.locator("img.attach-thumb").evaluate(
-                "(image) => { const r = image.getBoundingClientRect();"
+                "async (image) => { await image.decode(); const r = image.getBoundingClientRect();"
                 " const style = getComputedStyle(image);"
                 " return { width: Math.round(r.width), height: Math.round(r.height), radius: style.borderRadius,"
-                " loaded: image.complete && image.naturalWidth > 0 }; }"
+                " loaded: image.naturalWidth > 0 }; }"
             )
             assert (drawn["width"], drawn["height"]) == (56, 56), drawn
             assert drawn["radius"] not in ("", "0px"), drawn
