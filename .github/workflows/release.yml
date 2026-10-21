@@ -2,7 +2,9 @@
 # uploads them through PyPI's trusted publishing, which needs no token. The project's publisher on pypi.org names this
 # repository, this workflow (release.yml) and the environment "pypi"; the tag must say the version pyproject.toml has.
 # Before anything is published (item 457), the tagged commit must be a commit of main and the whole gate must pass on it
-# again: a version is accepted by PyPI once, so the publish is the one step that cannot be taken back.
+# again: a version is accepted by PyPI once, so the publish is the one step that cannot be taken back. These checks stop
+# a mistake (a tag on a branch, a wrong version), not someone who can push tags: the workflow that runs is the tagged
+# commit's own. What stops that is a setting of the repository, docs/development.md (Releasing) says which.
 name: release
 
 on:
@@ -28,8 +30,9 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: The tagged commit is a commit of main
+        # The remote-tracking branch by its full name: a tag called origin/main would otherwise stand for it.
         run: |
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main ||
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main ||
             { echo "::error::$GITHUB_SHA is not a commit of main: a release is made from main"; exit 1; }
       - name: The tag says the version, as pyproject.toml and the package do
         run: |

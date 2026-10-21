@@ -164,9 +164,11 @@ commit of `main` and that the tag and the version agree, the whole gate then run
 and the wheel with `uv build` and upload them with `uv publish`; a failed or cancelled job before it skips it, and
 nothing reaches PyPI. A tag to publish is about eight minutes from PyPI; the GitHub release made with it, which the
 desktop shell's updater reads, is out at once. When the run is red, fix it on `main` and make the release again with
-the next version: PyPI takes a version once, and the tag that failed published nothing. Two settings of the repository
-close the rest, and are yours to set (Settings › Environments › pypi): a deployment policy that lets only tags `v*` use
-the environment, and, if you want a click before every publish, yourself as its required reviewer. Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`,
+the next version: PyPI takes a version once, and the tag that failed published nothing. These checks stop a mistake,
+not someone who holds a token that can push tags (a leaked one, or an agent working under your login): the workflow
+that runs is the tagged commit's own, which such a token can write too. Two settings of the repository, yours to set,
+close that: yourself as the required reviewer of the environment `pypi` (Settings › Environments › pypi), so that
+every publish waits for your click, and a ruleset that lets only you create tags `v*` (Settings › Rules › Rulesets). Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`,
 then `dotx setup`.
 
 ## Measuring the agent

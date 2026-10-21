@@ -16154,14 +16154,19 @@ commit is an ancestor of `origin/main`, and the tag says the version, moved unch
 a push or a pull request skips), and `publish`, which needs both: a failed, cancelled or skipped job before it skips it,
 and it keeps its environment `pypi` and the only identity token, so the publisher registered on pypi.org needs no
 change. `gate.yml` gains `workflow_call` and nothing else, so a pull request or a push runs as before.
-`desktop/release.sh` says the tag publishes once the gate passes again, about eight minutes later. Left to the owner, as
-settings of the repository and not files of it: a deployment policy on the environment `pypi` that lets only tags `v*`
-use it, and, if wanted, the owner as its required reviewer. Not done here: the browser tests in CI and the audit of the
-workflows with zizmor, the other two parts of the idea, each its own item. Tests: `tests/unit/test_release_workflow.py`
-reads the two files (publish needs the tag's job and the gate's, keeps `pypi`, is the only job with an identity token;
-the tag's job asks for an ancestor of main; the gate can be called) and fails when the gate is dropped from the
-publish's needs (tried on a copy); `actionlint` passes on every workflow. Docs: `docs/development.md` (Releasing, the
-gate).
+`desktop/release.sh` says the tag publishes once the gate passes again, about eight minutes later. The
+`/security-review` found no regression and one control that does not hold: the workflow that runs is the tagged commit's
+own, so the checks stop a mistake, not a holder of a token that can push tags, and a tag called `origin/main` could
+stand for the branch in the ancestry check (reproduced in a scratch repository). The check names
+`refs/remotes/origin/main`, the comments and the docs say what the checks stop, and the test reads the workflow's own
+permissions and refuses a job's `write-all`. Left to the owner, as settings of the repository and not files of it, which
+close the rest: the owner as the required reviewer of the environment `pypi`, and a ruleset that lets only the owner
+create tags `v*` (a deployment policy by tag name would not: an attacker's tag is a `v*` too). Not done here: the
+browser tests in CI and the audit of the workflows with zizmor, the other two parts of the idea, each its own item.
+Tests: `tests/unit/test_release_workflow.py` reads the two files (publish needs the tag's job and the gate's, keeps
+`pypi`, is the only job with an identity token; the tag's job asks for an ancestor of main; the gate can be called) and
+fails when the gate is dropped from the publish's needs (tried on a copy); `actionlint` passes on every workflow. Docs:
+`docs/development.md` (Releasing, the gate).
 
 ## Log
 
