@@ -16131,13 +16131,14 @@ scratch profile (Chrome 155, Playwright 1.63, Dot's switches): a normal restart 
 back, headless and with a window, after each of five restarts in a row, and no page of the last run was opened. **As
 built.** `browser.profiles.keep_session_cookies` writes that word into the preferences of the profile (`exit_type`
 `Crashed`, `exited_cleanly` false; the other preferences kept, written only when they say otherwise, and not for
-Incognito nor a profile Chrome has not started on) before Dot's own Chrome starts (after the zoom, item 358) and before
-Sign in… and `dotx browser login` open their window (`browser.login`), so a session cookie set in either survives the
-other; both start Chrome with the switch. No copy of a cookie leaves Chrome's own store, which keeps them under the key
-it always used, so an imported profile keeps them too. **Clear** still deletes them. Item 447 of another session (Dot's
-Chrome closed once unused) ships with that close off; with this item in, the close loses no sign-in and its default can
-be 300 s, the owner's call. Yolo and every approval mode are untouched. Tests: `tests/unit/test_browser_profiles.py`
-(the word written, the rest kept, Incognito and a fresh profile left alone, a state Dot does not know refused),
+Incognito nor a profile whose preferences hold nothing yet; a new profile whose zoom was just written gets it too, with
+nothing to give back) before Dot's own Chrome starts (after the zoom, item 358) and before Sign in… and `dotx browser
+login` open their window (`browser.login`), so a session cookie set in either survives the other; both start Chrome with
+the switch. No copy of a cookie leaves Chrome's own store, which keeps them under the key it always used, so an imported
+profile keeps them too. **Clear** still deletes them. Item 447 of another session (Dot's Chrome closed once unused)
+ships with that close off; with this item in, the close loses no sign-in and its default can be 300 s, the owner's call.
+Yolo and every approval mode are untouched. Tests: `tests/unit/test_browser_profiles.py` (the word written, the rest
+kept, Incognito and a fresh profile left alone, a state Dot does not know refused),
 `tests/smoke/test_browser_session_cookies.py` (a real Chrome on a throwaway profile: a cookie without an expiry is still
 sent after Dot's Chrome starts again, and without the word it is not, while a dated one is in both). Docs:
 `docs/browser-and-computer-use.md`.

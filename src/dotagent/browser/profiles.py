@@ -163,8 +163,9 @@ def keep_session_cookies(folder: Path) -> None:
     then it gives them back. So the profile's preferences say the last run crashed, and Chrome starts with
     :data:`HIDE_CRASH_BUBBLE`; it opens no page of that run (measured 2026-10-21 with Chrome 155, headless and with a
     window: a session cookie came back after each of five restarts, and no tab did). Incognito keeps nothing (item
-    355) and a profile Chrome has not started on yet has nothing to keep: neither is written. Blocking, and while no
-    Chrome holds the profile; the other preferences stay as they are."""
+    355), and a profile whose preferences hold nothing yet has nothing to keep: neither is written. A new profile whose
+    zoom was just written (:func:`write_default_zoom`) gets the word too, and Chrome has nothing to give back on it.
+    Blocking, and while no Chrome holds the profile; the other preferences stay as they are."""
     if folder == browser_incognito_dir():
         return
     preferences: Path = folder / _PROFILE_DIR / _PREFERENCES
