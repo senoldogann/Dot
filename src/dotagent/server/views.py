@@ -601,6 +601,12 @@ class BrowserRaiseRequest(FrozenModel):
     raise_window: bool
 
 
+class BrowserRemoteInputRequest(FrozenModel):
+    """Whether the owner may use a held run's page from the screen that shows it (item 470)."""
+
+    remote_input: bool
+
+
 class BrowserDebugPortRequest(FrozenModel):
     """The port of this Mac on which Dot's own Chrome takes DevTools connections (item 265); 0 for none."""
 
@@ -1133,7 +1139,7 @@ class BrowserView(FrozenModel):
     while Dot's own profile is open in a plain Chrome window that Settings › Browser opened for the owner to sign in to
     sites (item 344), until the owner quits it. ``enabled`` says whether runs are offered the browser tools, and
     ``look`` how pages look (item 354). ``profile`` is the profile Dot's own Chrome works on, of ``profiles`` (item
-    355)."""
+    355). ``remote_input`` says whether a held run's page can be used from the screen that shows it (item 470)."""
 
     mode: BrowserMode
     connected: bool
@@ -1146,6 +1152,7 @@ class BrowserView(FrozenModel):
     inspect_page: str
     attach_timeout_s: float
     raise_window: bool
+    remote_input: bool
     debug_port: int
     devtools_address: str | None
     enabled: bool

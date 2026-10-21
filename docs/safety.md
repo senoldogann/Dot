@@ -203,9 +203,13 @@ a note that it was saved while reading outside content.
   changed after a step, and a screenshot covers the field in every frame, a payment provider's too. The fields are the
   ones Dot refuses to fill, by the page's marking (a `password` input, an `autocomplete` that names a secret); the
   field's name and ref stay, so it can still be found and filled. A value you type during a takeover, or one a page
-  fills in, stays out of the model's conversation that way. In `yolo` nothing is masked (item 443): the run reads all
-  it is shown. A page script (`browser_eval`) can still read a field's value, and that step is judged as any other;
-  the live Screen view you watch is not masked.
+  fills in, stays out of the model's conversation that way; typed from the screen that shows the page (item 470), it
+  goes to the page and nowhere else: the daemon keeps how many clicks and scrolls there were and whether anything was
+  typed, and a failure of the page is told without what you typed. You act there, not Dot: nothing passes the policy,
+  and in Dot's own Chrome the URL rules judge where your taps lead as they judge a run's; in your own Chrome (`attach`)
+  they do not, as for a run's clicks. In `yolo` nothing is masked (item 443): the run reads all it is shown. A page
+  script (`browser_eval`) can still read a field's value, and that step is judged as any other; the live Screen view you
+  watch is not masked.
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).

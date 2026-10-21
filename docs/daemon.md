@@ -379,19 +379,30 @@ with a mark and a title (no page yet, waiting for the page, the view closed, the
 command, item 220). A Screen tab that has had no page at all says instead, in the empty panel the other tabs use, that
 Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the setting under
 Settings › Browser that opens it when a run starts its browser (item 401). **Watch** and **Close the view** open and
-close it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the agent's name). Since that
-view shows the page, Dot's own Chrome stays in the background while a run works (`[browser] raise_window`, off by
-default, items 97 and 118): the tabs Dot opens are opened behind, the app you were in gets the focus back right after
-Chrome starts and after a page opens a tab of its own, and switching tabs does not raise the window; Settings › Browser
-has the switch "Bring Chrome to the front while working" for the other way round. **Take over** holds the run at its
-next tool call, brings its tab to the front either way, in the Chrome the run works in (a campaign's session, in the
-campaign's), and the pill reads "You have control" (when the tab cannot be brought up, the run is not held): the Chrome
-window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control** lets the run go on, and the
-result of the tool call that waited tells the model how long you had the browser and that the page may have changed, so
-it takes a snapshot first, which shows `[hidden]` for what you typed in a password, one-time-code or card field outside
-`yolo` (item 467). The timeline keeps both moments (`takeover`, `handback`), and `dotx run` prints them. A
-takeover is refused while `[browser] headless = true` (there is no window to use), and the run page keeps the last frame
-once the run has ended.
+close it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the
+browser ("Dot has control", or the agent's name). Since that view shows the page, Dot's own Chrome stays in the
+background while a run works (`[browser] raise_window`, off by default, items 97 and 118): the tabs Dot opens are opened
+behind, the app you were in gets the focus back right after Chrome starts and after a page opens a tab of its own, and
+switching tabs does not raise the window; Settings › Browser has the switch "Bring Chrome to the front while working"
+for the other way round. **Take over** holds the run at its next tool call, brings its tab to the front either way, in
+the Chrome the run works in (a campaign's session, in the campaign's), and the pill reads "You have control" (when the
+tab cannot be brought up, the run is not held): the Chrome window is on your Mac, so sign in, pass a CAPTCHA or do a
+step yourself; **Return control** lets the run go on, and the result of the tool call that waited tells the model how
+long you had the browser and that the page may have changed, so it takes a snapshot first, which shows `[hidden]` for
+what you typed in a password, one-time-code or card field outside `yolo` (item 467). The timeline keeps both moments
+(`takeover`, `handback`), and `dotx run` prints them. A takeover is refused while `[browser] headless = true` (there is
+no window to use), and the run page keeps the last frame once the run has ended. The page can also be used from the
+screen that shows it, a phone's too (`POST /api/runs/{id}/takeover/screen`, then `POST /api/runs/{id}/input`, item 470):
+the run is held the same way, but nothing comes to the front of the Mac, so a browser without a window is held as well.
+Your taps, scrolls and keys reach the page as fractions of its picture, which the page's own size turns into points, so
+Chrome's zoom and the scaling of the picture do not move them; they wait a moment for a step that was under way and land
+only while the run is held, so input sent before **Return control** never comes after it. The picture and the input come
+from the browser the run works in, a campaign's Chrome too. The `takeover` event then says `by: "screen"` and whether
+the request came by a name of `[server] reach` rather than this Mac's own address (`via_reach_name`, a hint, never a
+decision), and the `handback` event counts the clicks and scrolls and says whether anything was typed, never what; a
+button left down is let go first. A tab a tap opens (a link to a new tab, a sign-in popup) is not the one the picture
+shows: the run finds it at its next look at the page. `[browser] remote_input` switches it (Settings › Browser, on by
+default).
 
 What a run did and what can be undone is `GET /api/runs/{id}/actions`, which the run's page no longer shows (item 364):
 every acting step (a tool call that changed something: a file written, a command run, a click, a message sent; reads are
@@ -710,6 +721,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule) |
 | `POST /schedules/{id}/run`, `GET /schedules/{id}/firings?limit=` | a run of the schedule started by hand, 201 (409 while the emergency stop is engaged, while one of its runs is at work, or in a daemon that runs no scheduler); its last runs, at its time and by hand, newest first (item 455) |
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
+| `POST /runs/{id}/takeover/screen`, `POST /runs/{id}/input` (`{"events": [...]}`) | hold the run for its page to be used from the screen, which needs no window; your taps, scrolls and keys as fractions of the picture (409 when the run is not held, has no page, a step of it is still going, or `remote_input` is off); nothing typed is kept (item 470) |
+| `POST /browser/remote-input` (`{"remote_input": true\|false}`)                | whether a held run's page can be used from the screen (item 470), kept in the config file |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
 | `GET /connections`, `GET /connections/{id}/icon`, `POST /connections/{id}`      | the applications of Customize › Plugins, where each stands (`state`), its step (`step`) and whether the installed application has an icon (`icon`); the icon of an application of the Mac or of OneDrive as a PNG read from its bundle (404 for one of the web, one not installed and one whose bundle holds no icon file); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |

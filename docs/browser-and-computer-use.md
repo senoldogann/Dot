@@ -220,6 +220,10 @@ Both modes share what follows.
   had the focus is brought back right after, as long as the program that runs Dot has Accessibility. Switching tabs
   does not raise the window. With `true` the window comes to the front at the start, with each new tab and on each tab
   switch. Take over brings the tab to the front either way.
+- `remote_input = true` (the default) lets you use the page of a run you hold from the screen that shows it, a phone's
+  too (item 470): the run is held as for Take over, nothing comes to the front of the Mac, and your taps, scrolls and
+  keys go to the page while the run waits. Nothing of what you type is kept. A tab a tap opens is not the one the
+  picture shows. Settings › Browser switches it.
 - `headless = true` hides the window. Starting Chrome and loading the first page took about 2 seconds with it on an
   Apple-silicon Mac; later calls take well under a second. When Chrome crashes or the connection to it is lost, the
   next call starts it again.

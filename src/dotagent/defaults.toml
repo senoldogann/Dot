@@ -515,6 +515,10 @@ headless = false
 # focus gets it back when Chrome starts, and switching tabs does not raise the window); the run's page shows the page
 # under "Dot's computer" either way, and Take over always brings the tab to the front. Settings › Browser switches it.
 raise_window = false
+# Whether you may use the page of a run you hold from the screen that shows it ("Use it here", a phone's too): your taps,
+# scrolls and keys go to the page while the run waits, and nothing of what you type is kept. It needs the daemon's token,
+# like every page of Dot, and works only for a run you took over. Settings › Browser switches it.
+remote_input = true
 # A port of this Mac (127.0.0.1), from 1024 up, on which Dot's own Chrome also takes DevTools connections, so that a
 # run's scripts can drive it with the Chrome DevTools Protocol (Playwright's connect_over_cdp, Puppeteer); 0 for none.
 # Dot's Chrome does not start while another program holds the port. The port asks for no token: any program on this
