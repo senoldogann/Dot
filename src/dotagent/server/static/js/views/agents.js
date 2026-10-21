@@ -252,17 +252,23 @@ function select(label, entries, value) {
 }
 
 /** The checkboxes of the tools under one that ticks them all (item 511): an agent with every tool (`chosen` empty)
-    opens with every box ticked, and every box ticked saves as every tool. */
+    opens with every box ticked, and every box ticked saves as every tool (`widens`), unless the boxes are the tools the
+    agent names, unchanged: those stay named, so a save that changed nothing never lifts its bounds. */
 function toolPicks(names, chosen) {
   const picked = new Set(chosen.length === 0 ? names : chosen);
   const boxes = names.map((name) => el("input", { type: "checkbox", value: name, checked: picked.has(name) }));
   const all = el("input", { type: "checkbox", "aria-label": "All tools" });
   const count = el("span", { class: "muted tool-picks-count" });
+  const named = new Set(chosen);
+  function widens() {
+    const ticked = boxes.filter((box) => box.checked);
+    return ticked.length === boxes.length && (named.size === 0 || ticked.some((box) => !named.has(box.value)));
+  }
   function paint() {
     const ticked = boxes.filter((box) => box.checked).length;
     all.checked = ticked === boxes.length;
     all.indeterminate = ticked > 0 && ticked < boxes.length;
-    count.textContent = ticked === boxes.length ? "every tool, and any added later" : `${ticked} of ${boxes.length}`;
+    count.textContent = widens() ? "every tool, and any added later" : `${ticked} of ${boxes.length}`;
   }
   all.addEventListener("change", () => {
     for (const box of boxes) {
@@ -274,7 +280,7 @@ function toolPicks(names, chosen) {
     box.addEventListener("change", paint);
   }
   paint();
-  return el(
+  const element = el(
     "div",
     { class: "stack tight" },
     el("label", { class: "tool-pick tool-pick-all" }, all, el("span", null, "All tools"), count),
@@ -284,6 +290,7 @@ function toolPicks(names, chosen) {
       boxes.map((box) => el("label", { class: "tool-pick" }, box, el("span", null, box.value))),
     ),
   );
+  return { element, widens, picked: () => boxes.filter((box) => box.checked).map((box) => box.value) };
 }
 
 /**
@@ -360,10 +367,12 @@ function agentForm({ record, onSaved, onCancel }) {
     });
   // Saved only once the tools are listed: without them the form cannot say which tools the agent may use.
   let toolsListed = false;
+  let picks = null;
   const toolsLoaded = api
     .get("/tools")
     .then((names) => {
-      tools.replaceChildren(toolPicks(names, record === null ? [] : record.tools));
+      picks = toolPicks(names, record === null ? [] : record.tools);
+      tools.replaceChildren(picks.element);
       toolsListed = true;
     })
     .catch((error) => {
@@ -386,8 +395,7 @@ function agentForm({ record, onSaved, onCancel }) {
       name.focus();
       return;
     }
-    const boxes = [...tools.querySelectorAll(".tool-picks input")];
-    const picked = boxes.filter((input) => input.checked).map((input) => input.value);
+    const picked = picks.picked();
     if (picked.length === 0) {
       toast("error", "Pick the tools it may use, or All tools for every one.");
       tools.querySelector(".tool-pick-all input")?.focus();
@@ -401,7 +409,7 @@ function agentForm({ record, onSaved, onCancel }) {
       effort: chosenLevel(models, model.value, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
       approvals: approvals.value === "" ? null : approvals.value,
       // Every tool ticked is every tool, said as null: an empty list keeps the tools an agent has (the code review's Y5).
-      tools: picked.length === boxes.length ? null : picked,
+      tools: picks.widens() ? null : picked,
       look: look.value(),
     };
     save.disabled = true;
@@ -475,7 +483,12 @@ function mountList(root, ctx) {
           (names) => ({ names, problem: null }),
           (error) => ({ names: null, problem: error }),
         ),
-        api.get("/agents"),
+        // Only the marks of a team's card need them: a list that failed leaves the cards unmarked, and the list of the
+        // agents above says why.
+        api.get("/agents").catch((error) => {
+          console.warn("the agents could not be listed for the marks of the teams", error);
+          return [];
+        }),
       ]);
       // The agents the owner has, by name as Use team reads them, for the marks of a team's card.
       const owned = new Set(summaries.map(({ record }) => record.name.trim().toLowerCase()));

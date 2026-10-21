@@ -507,7 +507,8 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
     runtime: Runtime, client: httpx.AsyncClient
 ) -> None:
     """Item 511: the editor's tools have All tools, which ticks every box; all ticked saves the agent with every tool,
-    such an agent opens with every box ticked, and a form with none ticked saves nothing."""
+    such an agent opens with every box ticked, and a form with none ticked saves nothing. An agent that names every
+    tool listed keeps them named through a save that changed nothing: no save lifts its bounds by itself."""
     made = await client.post("/api/agents", json=_agent(["shell"]))
     assert made.status_code == 201, made.text
     agent_id: str = made.json()["id"]
@@ -538,6 +539,16 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             await page.get_by_role("button", name="Save changes").click()
             await expect(page.get_by_text("Pick the tools it may use, or All tools for every one.")).to_be_visible()
             assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == []
+            listed: list[str] = (await client.get("/api/tools")).json()
+            named = await client.put(f"/api/agents/{agent_id}", json=_agent(listed))
+            assert named.status_code == 200, named.text
+            await page.reload()
+            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await expect(every).to_be_checked()
+            await expect(page.locator(".tool-picks-count")).to_have_text(f"{len(listed)} of {len(listed)}")
+            await page.get_by_role("button", name="Save changes").click()
+            await expect(page.get_by_text("Agent saved.")).to_be_visible()
+            assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == listed
         finally:
             await browser.close()
     assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204
