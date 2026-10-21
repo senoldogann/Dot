@@ -385,6 +385,19 @@ async def test_a_question_nobody_answers_is_kept_and_allow_once_lets_that_step_t
         ]
 
 
+async def test_rewinding_the_chat_takes_back_a_yes_not_used_yet(login_env: dict[str, str]) -> None:
+    model: ScriptedProvider = ScriptedProvider(_PROVIDER, [_report(), _finish("The report waits for your yes.")])
+    async with _session(login_env, model, "park") as (runtime, manager):
+        run: RunRecord = await _start(manager, UI_SOURCE, "ask")
+        await _ended(manager, run.id)
+        kept: ApprovalRecord = next(record for record in await _approvals(runtime, run.id) if record.status == "left")
+        assert kept.digest is not None
+        await runtime.store.grant_permit(kept.id, UI_SOURCE, "", time.time() + 3600.0)
+        await runtime.store.rewind_chat(run.id, [found.id for found in await runtime.store.runs_from(run.id)])
+        assert (await runtime.store.get_approval(kept.id)).permit_until is None
+        assert await runtime.store.take_permit(kept.digest, run.thread_id, None, time.time()) is None
+
+
 async def test_what_the_policy_decides_now_beats_a_yes_given_earlier(login_env: dict[str, str]) -> None:
     model: _HeldModel = _HeldModel([_report(), _finish("It waits."), _report(), _finish("Handed over.")], held=3)
     async with _session(login_env, model, "park") as (runtime, manager):

@@ -105,6 +105,13 @@ def test_a_question_whose_card_shows_all_of_a_step_that_reaches_nobody_may_wait_
     source: DecisionSource,
 ) -> None:
     assert permit_parkable(_REPORT, _asked("ask", source))
+    for tool, kind in (
+        ("read_file", "read"),
+        ("list_dir", "read"),
+        ("web_fetch", "network"),
+        ("web_search", "network"),
+    ):
+        assert permit_parkable(_REPORT.model_copy(update={"tool": tool, "kind": kind}), _asked("ask", source)), tool
 
 
 @pytest.mark.parametrize(
@@ -119,6 +126,15 @@ def test_a_question_whose_card_shows_all_of_a_step_that_reaches_nobody_may_wait_
         ({"kind": "browser_click"}, _asked("ask", "rule")),
         ({"kind": "message"}, _asked("ask", "rule")),
         ({"kind": "mcp"}, _asked("ask", "rule")),
+        # A key pressed in a terminal's window, a terminal session, an extract of many sources, a search's pattern,
+        # a schedule, a note: their cards show less than the step does.
+        ({"tool": "desktop_act"}, _asked("ask", "rule")),
+        ({"tool": "terminal_open"}, _asked("ask", "rule")),
+        ({"tool": "terminal_send"}, _asked("ask", "rule")),
+        ({"tool": "web_extract", "kind": "network"}, _asked("ask", "rule")),
+        ({"tool": "search_files", "kind": "read"}, _asked("ask", "rule")),
+        ({"tool": "schedule_create", "kind": "schedule"}, _asked("ask", "rule")),
+        ({"tool": "memory_save", "kind": "memory_write"}, _asked("ask", "rule")),
         ({"flags": ("external_send",)}, _asked("ask", "rule")),
         ({"flags": ("upload",)}, _asked("ask", "rule")),
         ({"summary": "Run: ./report.sh --to …"}, _asked("ask", "rule")),
