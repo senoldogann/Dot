@@ -11,6 +11,7 @@ from typing import Literal, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+from dotagent.agent.declined import CLI_DECIDER
 from dotagent.agent.gate import YOLO_DECIDER
 from dotagent.agent.helpers import Unavailable, unavailable_text
 from dotagent.agent.lessons import LessonView, RunLessons
@@ -698,6 +699,6 @@ class TerminalUi:
         """Store the decision made at this terminal, unless one made elsewhere came first: the run goes on with that
         one, which is said instead."""
         try:
-            await self._runtime.approvals.resolve(request.approval_id, approve, "cli", note)
+            await self._runtime.approvals.resolve(request.approval_id, approve, CLI_DECIDER, note)
         except RunConflict:
             self._say_decided(await self._runtime.store.get_approval(request.approval_id))

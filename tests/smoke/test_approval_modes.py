@@ -21,6 +21,7 @@ from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.events import EventBus
 from dotagent.policy.paths import CHANGES_DOT
 from dotagent.policy.types import ActionInfo, Amount, ApprovalMode, Preset
+from dotagent.server import UI_SOURCE
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, EventRecord, RunMode, RunRecord, ThreadRecord
 
@@ -281,7 +282,7 @@ async def test_a_no_is_not_asked_again_in_the_run_until_the_owner_writes(room: R
     no record, until the owner writes again; another action asks as before."""
     gate: RunGate = _gate(room, "task", "cautious", "ask", _nobody)
     first: Question = await _ask(room, gate, COMMAND)
-    await room.broker.resolve(first.record.id, False, "user", "not that")
+    await room.broker.resolve(first.record.id, False, UI_SOURCE, "not that")
     with pytest.raises(ApprovalRejected):
         await asyncio.wait_for(first.answer, WAIT_S)
     asked: int = len(await room.store.list_approvals(None, 50))
@@ -293,18 +294,18 @@ async def test_a_no_is_not_asked_again_in_the_run_until_the_owner_writes(room: R
     assert (await _kinds(room)).count("approval_requested") == requested
     assert (await room.store.get_run(room.run.id)).status != "blocked"
     other: Question = await _ask(room, gate, COMMAND.model_copy(update={"summary": "npm ci", "target": "npm ci"}))
-    await room.broker.resolve(other.record.id, True, "user", "")
+    await room.broker.resolve(other.record.id, True, UI_SOURCE, "")
     assert await asyncio.wait_for(other.answer, WAIT_S) == ""
     # The owner writes: the same action is theirs to answer again.
     gate.add_instruction("use the lock file this time")
     reopened: Question = await _ask(room, gate, COMMAND)
-    await room.broker.resolve(reopened.record.id, True, "user", "go")
+    await room.broker.resolve(reopened.record.id, True, UI_SOURCE, "go")
     assert await asyncio.wait_for(reopened.answer, WAIT_S) == "go"
 
 
 async def test_only_the_owners_no_is_kept(room: Room) -> None:
-    """A question nobody answered in time is no answer, and the review model's no is not the owner's: either is put
-    again."""
+    """A question nobody answered in time is no answer, and the no of the eval harness or of the review model is not
+    the owner's: each is put again."""
     quick: RunGate = RunGate(
         room.store,
         room.bus,
@@ -323,6 +324,12 @@ async def test_only_the_owners_no_is_kept(room: Room) -> None:
         with pytest.raises(ApprovalRejected):
             await asyncio.wait_for(quick.authorize(COMMAND), WAIT_S)
     assert (await _kinds(room)).count("approval_requested") == 2
+    harness: RunGate = _gate(room, "task", "cautious", "ask", _nobody)
+    for _ in range(2):
+        refused: Question = await _ask(room, harness, COMMAND)
+        await room.broker.resolve(refused.record.id, False, "eval", "nobody is there")
+        with pytest.raises(ApprovalRejected):
+            await asyncio.wait_for(refused.answer, WAIT_S)
     reviewed: list[ReviewRequest] = []
     refusing: RunGate = _gate(room, "task", "cautious", "auto", _answering("deny", reviewed))
     for _ in range(2):
@@ -341,7 +348,7 @@ async def test_in_auto_the_review_model_is_not_asked_about_what_the_owner_refuse
 
     gate: RunGate = _gate(room, "task", "cautious", "auto", passing_then_allowing)
     first: Question = await _ask(room, gate, COMMAND)
-    await room.broker.resolve(first.record.id, False, "user", "not that")
+    await room.broker.resolve(first.record.id, False, UI_SOURCE, "not that")
     with pytest.raises(ApprovalRejected):
         await asyncio.wait_for(first.answer, WAIT_S)
     with pytest.raises(ApprovalRejected, match="declined this exact action"):
@@ -353,7 +360,7 @@ async def test_a_no_given_in_another_mode_does_not_carry_into_yolo(room: Room) -
     """Yolo asks nothing (item 443), and a no given to a run that asked stays with that run's gate."""
     asking: RunGate = _gate(room, "task", "cautious", "ask", _nobody)
     first: Question = await _ask(room, asking, COMMAND)
-    await room.broker.resolve(first.record.id, False, "user", "not that")
+    await room.broker.resolve(first.record.id, False, UI_SOURCE, "not that")
     with pytest.raises(ApprovalRejected):
         await asyncio.wait_for(first.answer, WAIT_S)
     yolo: RunGate = _gate(room, "task", "cautious", "yolo", _nobody)

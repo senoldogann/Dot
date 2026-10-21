@@ -9,6 +9,13 @@ from collections.abc import Mapping
 from dotagent.core.types import FrozenModel
 from dotagent.policy.spend import render_amount
 from dotagent.policy.types import ActionInfo, ActionKind
+from dotagent.server import UI_SOURCE
+
+# Who answers a question for the owner: the terminal (``dotx run``, ``dotx ui``), and the web UI, the Mac's and the
+# phone's (``UI_SOURCE``). A no from anyone else, the deadline, the eval harness or a run that stopped waiting, is not
+# theirs, and is not kept: a run nobody watches asks again, as it did.
+CLI_DECIDER: str = "cli"
+OWNER_DECIDERS: frozenset[str] = frozenset({UI_SOURCE, CLI_DECIDER})
 
 # Kinds whose summary says where something is written or typed but not what (a path, a field and the length of the
 # text): a no to one text there is no answer about another, so they are never kept.

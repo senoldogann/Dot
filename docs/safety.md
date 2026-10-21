@@ -323,15 +323,15 @@ automated likes and bulk or aggressive following, and warn that scripting its we
 
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
-counts as a refusal. The note you write with your answer reaches the model. Your no stands for the rest of the run
-(item 456): the same action, as its card showed it, is refused at once, with no new card, nor a question to the review
-model in `auto`, until you write to the run again (a steer, the answer to its question); a refusal of the review model
-and an approval nobody answered are not kept, and a kind of action whose card says not what it writes or types (a
-file's text, a field's) is asked again. This is the default approval mode, `ask`,
-and `supervised` asks before every change as well; in `auto` the questions of the policy are answered for you, and a
-`yolo` run asks nothing at all (item 443). What is yours in every mode that asks (item 429) — money, credentials,
-messages and posts in your name — is a card in the chat there. A question of the agent itself (`ask_user`) waits the
-same way, except in a run nobody can answer during it (see
+counts as a refusal. The note you write with your answer reaches the model. Your no stands for the rest of the run (item
+456): the same action, as its card showed it, is refused at once, with no new card, nor a question to the review model
+in `auto`, until you write to the run again (a steer, the answer to its question); only your no is kept, given in the
+web UI or the terminal: a refusal of the review model, of the eval harness and an approval nobody answered are not, and
+a kind of action whose card says not what it writes or types (a file's text, a field's) is asked again. This is the
+default approval mode, `ask`, and `supervised` asks before every change as well; in `auto` the questions of the policy
+are answered for you, and a `yolo` run asks nothing at all (item 443). What is yours in every mode that asks (item 429)
+— money, credentials, messages and posts in your name — is a card in the chat there. A question of the agent itself
+(`ask_user`) waits the same way, except in a run nobody can answer during it (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
 what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
 ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by
