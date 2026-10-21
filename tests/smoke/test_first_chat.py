@@ -249,7 +249,8 @@ async def test_the_first_conversation_fits_a_phone_and_a_message_sent_ends_it(tm
             wide: bool = await page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
             assert not wide, "the first conversation is wider than the phone"
             await page.get_by_role("textbox", name="Goal").fill("Say hello.")
-            await page.get_by_role("textbox", name="Goal").press("Enter")
+            # On a touch screen Return breaks the line (item 440): the round send button sends.
+            await page.locator(".composer button.send").tap()
             await page.wait_for_url("**/#/runs/run_*")
             assert "introduced = true" in _written()
         finally:

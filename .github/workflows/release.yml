@@ -1,10 +1,11 @@
 # Publishes Dot to PyPI as dotagent-macos (item 348): a tag v<version> builds the source distribution and the wheel and
 # uploads them through PyPI's trusted publishing, which needs no token. The project's publisher on pypi.org names this
 # repository, this workflow (release.yml) and the environment "pypi"; the tag must say the version pyproject.toml has.
-# Before anything is published (item 457), the tagged commit must be a commit of main and the whole gate must pass on it
-# again: a version is accepted by PyPI once, so the publish is the one step that cannot be taken back. These checks stop
-# a mistake (a tag on a branch, a wrong version), not someone who can push tags: the workflow that runs is the tagged
-# commit's own. What stops that is a setting of the repository, docs/development.md (Releasing) says which.
+# Before anything is published (item 457), the tagged commit must be a commit of main and the whole gate, with the core
+# of the browser tests (item 486), must pass on it again: a version is accepted by PyPI once, so the publish is the one
+# step that cannot be taken back. These checks stop a mistake (a tag on a branch, a wrong version), not someone who can
+# push tags: the workflow that runs is the tagged commit's own. What stops that is a setting of the repository,
+# docs/development.md (Releasing) says which.
 name: release
 
 on:
