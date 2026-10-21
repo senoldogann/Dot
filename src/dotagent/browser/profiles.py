@@ -3,7 +3,7 @@
 nothing, as its folder is emptied before Chrome starts on it and after it closes; the ones the owner adds live under
 ``browser-profiles``, a folder each, named as the profile. The Chrome of the user has its own profiles, so these apply
 to Dot's own Chrome only. The zoom Dot's own Chrome draws pages at (item 358) is written into the preferences of the
-profile in use before Chrome starts on it.
+profile in use before Chrome starts on it, and so is the word that keeps its session cookies (item 453).
 """
 
 import math
@@ -30,6 +30,15 @@ _PROFILE_DIR: str = "Default"
 # zoom level is kept (``partition.default_zoom_level.x``, as Chrome's own settings page writes it).
 _PREFERENCES: str = "Preferences"
 _DEFAULT_PARTITION: str = "x"
+# Where a profile's preferences say how Chrome's last run on it ended (``profile.exit_type``, with
+# ``profile.exited_cleanly``), and the ending after which Chrome gives the cookies of that run without an expiry back.
+_PROFILE_KEY: str = "profile"
+_EXIT_TYPE: str = "exit_type"
+_EXITED_CLEANLY: str = "exited_cleanly"
+_CRASHED: str = "Crashed"
+# Chrome's switch that keeps the bubble offering to restore the pages of a run that crashed away: a profile marked so
+# opens no page of its last run either way (measured 2026-10-21), and the bubble would ask the owner for nothing.
+HIDE_CRASH_BUBBLE: str = "--hide-crash-restore-bubble"
 _PROFILE_FOLDER_MODE: int = 0o700
 _JSON_OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject)
 _COOKIES: tuple[str, ...] = ("Cookies", "Cookies-journal", "Cookies-wal", "Cookies-shm")
@@ -143,6 +152,38 @@ def write_default_zoom(folder: Path, percent: int) -> None:
     except OSError as error:
         raise BrowserError(
             "the zoom could not be written into Chrome's preferences of the profile",
+            {"path": str(preferences), "error": str(error)},
+        ) from error
+
+
+def keep_session_cookies(folder: Path) -> None:
+    """Have the Chrome that starts on the profile in ``folder`` keep the cookies of its last run that have no expiry,
+    as a real browser keeps a sign-in (item 453, the owner's word of 2026-10-21: "silmesin"). Chrome writes such
+    session cookies into the profile while it runs and deletes them as it starts again, unless its last run crashed:
+    then it gives them back. So the profile's preferences say the last run crashed, and Chrome starts with
+    :data:`HIDE_CRASH_BUBBLE`; it opens no page of that run (measured 2026-10-21 with Chrome 155, headless and with a
+    window: a session cookie came back after each of five restarts, and no tab did). Incognito keeps nothing (item
+    355) and a profile Chrome has not started on yet has nothing to keep: neither is written. Blocking, and while no
+    Chrome holds the profile; the other preferences stay as they are."""
+    if folder == browser_incognito_dir():
+        return
+    preferences: Path = folder / _PROFILE_DIR / _PREFERENCES
+    kept: JsonObject = _preferences(preferences)
+    if not kept:
+        return
+    ending: JsonValue = kept.get(_PROFILE_KEY, {})
+    if not isinstance(ending, dict):
+        raise BrowserError(
+            "Chrome's preferences of the profile keep its state in a way Dot does not know", {"path": str(preferences)}
+        )
+    if ending.get(_EXIT_TYPE) == _CRASHED and ending.get(_EXITED_CLEANLY) is False:
+        return
+    changed: JsonObject = {**kept, _PROFILE_KEY: {**ending, _EXIT_TYPE: _CRASHED, _EXITED_CLEANLY: False}}
+    try:
+        write_whole(preferences, _JSON_OBJECT.dump_json(changed).decode("utf-8"))
+    except OSError as error:
+        raise BrowserError(
+            "the session cookies could not be kept in Chrome's preferences of the profile",
             {"path": str(preferences), "error": str(error)},
         ) from error
 

@@ -64,7 +64,14 @@ from dotagent.browser.keychain import KeychainMode, keychain_switches, playwrigh
 from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers, taken_in, watch_births
 from dotagent.browser.profile_lock import profile_holder_pid
-from dotagent.browser.profiles import INCOGNITO_PROFILE, empty_incognito, profile_dir, write_default_zoom
+from dotagent.browser.profiles import (
+    HIDE_CRASH_BUBBLE,
+    INCOGNITO_PROFILE,
+    empty_incognito,
+    keep_session_cookies,
+    profile_dir,
+    write_default_zoom,
+)
 from dotagent.browser.render import describe_step
 from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdict
 from dotagent.browser.snapshot import (
@@ -146,6 +153,7 @@ _LAUNCH_ARGS: list[str] = [
     "--disable-blink-features=AutomationControlled",
     "--no-first-run",
     "--no-default-browser-check",
+    HIDE_CRASH_BUBBLE,
 ]
 # Playwright's own switches that Dot's Chrome starts without: the bar that says software controls it, and
 # --disable-extensions, which would keep the extensions installed in its profile from loading (item 264).
@@ -530,8 +538,10 @@ class BrowserSession:
         # Incognito starts with nothing, however its last Chrome ended (item 355).
         if config.profile == INCOGNITO_PROFILE:
             await asyncio.to_thread(empty_incognito)
-        # Chrome reads the zoom it draws pages at from the profile when it starts (item 358).
+        # Chrome reads the zoom it draws pages at from the profile when it starts (item 358), and whether it gives the
+        # cookies of its last run without an expiry back (item 453).
         await asyncio.to_thread(write_default_zoom, self._profile, config.zoom)
+        await asyncio.to_thread(keep_session_cookies, self._profile)
         keychain: KeychainMode = await asyncio.to_thread(read_keychain_mode, self._profile)
         playwright: Playwright = await self._driver()
         # With the window kept in the background (item 97), whoever has the focus now gets it back after the launch.
