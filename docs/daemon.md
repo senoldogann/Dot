@@ -244,7 +244,9 @@ box would be, which stays at the window's foot as the conversation scrolls (item
 ("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own" once not), "Open parent"
 and, while it works, **Stop**. The tool calls of one stretch of work fold into a single line that says what they did,
 "Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it while it runs,
-"Worked for 12 s" for a stretch with no call; item 374). A folded group at work names the command that runs right
+"Worked for 12 s" for a stretch with no call; item 374). The line is one line at any width (item 512): what it did
+gives way with an ellipsis, and its time, the badge of failed calls and the chevron keep their place. A folded group at
+work names the command that runs right
 after "Working…", in place of how much it did so far, which the open group keeps (item 430). Open, it shows every call, result and screenshot, each call one
 line in line with the group's head (item 402): its mark (a spinner while it runs, then the mark of its kind, in the
 failure's colour when it failed; item 403), what it did (a command is the command itself, the policy's words its
@@ -394,7 +396,8 @@ command, item 220). A Screen tab that has had no page at all says instead, in th
 Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the setting under
 Settings › Browser that opens it when a run starts its browser (item 401). **Watch** and **Close the view** open and
 close it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the
-browser ("Dot has control", or the agent's name). Since that view shows the page, Dot's own Chrome stays in the
+browser ("Dot has control", or the agent's name), on one line, beside Take over and Use it here; a panel too narrow for
+the three puts the words on top and the buttons under them (item 512). Since that view shows the page, Dot's own Chrome stays in the
 background while a run works (`[browser] raise_window`, off by default, items 97 and 118): the tabs Dot opens are opened
 behind, the app you were in gets the focus back right after Chrome starts and after a page opens a tab of its own, and
 switching tabs does not raise the window; Settings › Browser has the switch "Bring Chrome to the front while working"

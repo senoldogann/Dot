@@ -82,7 +82,18 @@ _BROWSER: tuple[str, ...] = (
 )
 _FILES: tuple[str, ...] = ("read_file", "write_file", "edit_file", "list_dir", "search_files", "find_files")
 _KEEP: tuple[str, ...] = ("write_notes", "memory_save", "memory_search", "memory_update", "memory_forget")
-_WORK: tuple[str, ...] = ("update_plan", "mark_plan_step", "delegate", "consult", "show_page", "notify", "skill")
+# Every template hands parts of the work on: to a helper with its own tools (delegate), or to the agent whose role fits
+# the part (message_agent), a teammate of its team first (item 512).
+_WORK: tuple[str, ...] = (
+    "update_plan",
+    "mark_plan_step",
+    "delegate",
+    "message_agent",
+    "consult",
+    "show_page",
+    "notify",
+    "skill",
+)
 _RESEARCH: tuple[str, ...] = (*_WEB, *_BROWSER, *_FILES, *_KEEP, *_WORK, "draft_message")
 # An agent that reads and writes words and files and nothing else: no web, no browser, no terminal.
 _TEXT: tuple[str, ...] = (*_FILES, *_KEEP, *_WORK, "draft_message")
@@ -501,9 +512,10 @@ def find_template(template_id: str) -> AgentTemplate:
 
 
 class AgentTeam(FrozenModel):
-    """A team to start from (item 504): templates whose agents work side by side, made in one click. Dot hands each
-    the part of a goal its role fits (``message_agent``) and puts their answers together, so a team is its agents and
-    nothing besides: ``members`` names their templates, in the order its card shows them."""
+    """A team to start from (item 504): templates whose agents work side by side, made in one click. Dot, or any of
+    them, hands each the part of a goal its role fits (``message_agent``) and puts their answers together, so a team is
+    its agents and nothing besides: ``members`` names their templates, in the order its card shows them, and an agent
+    with a member's name is in the team (:func:`team_of`, item 512)."""
 
     id: str
     name: str
@@ -544,6 +556,16 @@ def find_team(team_id: str) -> AgentTeam:
     if found is None:
         raise NotFoundError("agent team not found", {"team_id": team_id})
     return found
+
+
+def team_of(name: str) -> AgentTeam | None:
+    """The team one of whose members is called ``name``, read without regard to case as Use team reads it (item 512):
+    an agent of that name is in that team, whoever made it. ``None`` for a name no team's member has."""
+    wanted: str = name.strip().casefold()
+    return next(
+        (team for team in TEAMS if any(find_template(member).name.casefold() == wanted for member in team.members)),
+        None,
+    )
 
 
 def agent_file(record: AgentRecord, known: Sequence[str]) -> AgentFile:

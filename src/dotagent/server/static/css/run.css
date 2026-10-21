@@ -441,15 +441,6 @@
     top: var(--space-2);
   }
 
-  /* The count of what a group did stays on the head's one line (item 401): it gives way with an ellipsis instead of
-     pushing the state onto a row of its own. */
-  .steps-count {
-    flex: 1 1 0;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   /* The bar's parts are a phone's width together (item 401): the three counters and the way down fit one row. */
   .status-bar .capsule-part {
     padding-inline: var(--space-1);
@@ -923,12 +914,12 @@
   min-width: 0;
 }
 
+/* A group's head is one line whatever its width (item 512, the owner's word): the summary of what it did gives way
+   with an ellipsis, and its time, the badge of failed calls and the chevron keep their place at its end. */
 .steps-head {
   display: flex;
   align-items: center;
-  /* On a phone a long title, the count and the badge of failed calls go on to a second line instead of out of view. */
-  flex-wrap: wrap;
-  gap: var(--space-half) 12px;
+  gap: 12px;
   padding: 4px 8px 4px 4px;
   border-radius: var(--radius-sm);
   color: var(--text-2);
@@ -955,13 +946,36 @@
 }
 
 .steps-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: var(--weight-title);
   white-space: nowrap;
 }
 
+/* The time a group took keeps its width; what it did so far, which the count says while it works, gives way too. */
 .steps-count {
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* At work the title is "Working…", which keeps its width, and what was done so far gives way instead. */
+.steps.working .steps-title {
+  flex: none;
+}
+
+.steps.working .steps-count {
+  flex: 0 1 auto;
+}
+
+.steps-head > .badge,
+.steps-head > .chev {
+  flex: none;
 }
 
 .steps-latest {
@@ -1897,11 +1911,64 @@
   align-items: center;
   gap: 8px;
   align-self: center;
+  max-width: 100%;
+  min-width: 0;
   padding: 4px 4px 4px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface);
   box-shadow: var(--shadow-raised);
+}
+
+.computer-pill > .icon {
+  flex: none;
+}
+
+/* Who holds the browser is one line (item 512): a name too long gives way with an ellipsis, not two more lines. */
+.computer-who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.computer-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.computer-actions > .btn {
+  white-space: nowrap;
+}
+
+/* A panel too narrow for the words and both buttons on one line stacks them (item 512): the words on top, the buttons
+   under them sharing the width, in a card rather than a pill. */
+.computer-body {
+  container: computer-body / inline-size;
+}
+
+@container computer-body (max-width: 440px) {
+  .computer-pill {
+    flex-wrap: wrap;
+    justify-content: center;
+    align-self: stretch;
+    padding: 8px;
+    border-radius: var(--radius);
+  }
+
+  .computer-actions {
+    flex: 1 1 100%;
+  }
+
+  .computer-actions > .btn {
+    flex: 1;
+  }
+
+  .computer-control-note {
+    flex: 1 1 100%;
+    text-align: center;
+  }
 }
 
 .computer-pill[data-held="true"] {

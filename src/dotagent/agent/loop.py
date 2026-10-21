@@ -157,6 +157,7 @@ from dotagent.agent.stepmodel import (
     routed_event,
     step_state,
 )
+from dotagent.agent.templates import AgentTeam, team_of
 from dotagent.agent.verify import (
     RunFacts,
     answer_paths,
@@ -921,6 +922,12 @@ def _new_memories_note(live: LiveNotes) -> str:
         f"account:\n{lines}"
         f"{more}"
     )
+
+
+def _team_name(name: str) -> str:
+    """The name of the ready team an agent called ``name`` is in (item 512), empty for none."""
+    found: AgentTeam | None = team_of(name)
+    return "" if found is None else found.name
 
 
 def _new_teammates_note(agents: Sequence[AgentRecord]) -> str:
@@ -1774,10 +1781,15 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     role=agent_record.role,
                     instructions=agent_record.instructions,
                     made_by_dot=agent_record.made_by is not None,
+                    team=_team_name(agent_record.name),
                 ),
                 [
                     AgentBrief(
-                        name=member.name, role=member.role, instructions="", made_by_dot=member.made_by is not None
+                        name=member.name,
+                        role=member.role,
+                        instructions="",
+                        made_by_dot=member.made_by is not None,
+                        team=_team_name(member.name),
                     )
                     for member in team
                 ],

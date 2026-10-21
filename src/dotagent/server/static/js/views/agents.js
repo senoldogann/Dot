@@ -144,10 +144,11 @@ function templateCard(template, onUse, known) {
   );
 }
 
-/** A team's card (item 504): its name and what it does, the faces and names of its agents, and Use team, which makes
-    the ones the owner lacks. A team one of whose agents suggests a schedule offers to add the schedules of the agents
-    it makes, switched off as a template's (item 464); `onUse(team, members, alsoSchedules)` makes them. */
-function teamCard(team, templates, onUse) {
+/** A team's card (item 504): its name and what it does, the faces and names of its agents, those the owner has
+    already marked Yours (`owned`, their names in lower case, item 512), and Use team, which makes the ones the owner
+    lacks. A team one of whose agents suggests a schedule offers to add the schedules of the agents it makes, switched
+    off as a template's (item 464); `onUse(team, members, alsoSchedules)` makes them. */
+function teamCard(team, templates, onUse, owned) {
   const members = team.members.map((id) => templates.get(id));
   const alsoWords = "Also add their schedules, switched off until you read their goals";
   const also = members.some((template) => template.cron !== "")
@@ -181,7 +182,15 @@ function teamCard(team, templates, onUse) {
     el(
       "ul",
       { class: "team-members", "aria-label": `The agents of the ${team.name}` },
-      members.map((template) => el("li", null, actorFace(`template-${template.id}`, "idle", template.look), el("span", null, template.name))),
+      members.map((template) =>
+        el(
+          "li",
+          null,
+          actorFace(`template-${template.id}`, "idle", template.look),
+          el("span", null, template.name),
+          owned.has(template.name.trim().toLowerCase()) ? el("span", { class: "badge b-muted team-yours", title: "You have this agent: Use team keeps it as it is" }, "Yours") : null,
+        ),
+      ),
     ),
     alsoRow,
     use,
@@ -242,21 +251,53 @@ function select(label, entries, value) {
   return element;
 }
 
-/** The checkboxes of the tools; none checked means every tool. */
+/** The checkboxes of the tools under one that ticks them all (item 512): an agent with every tool (`chosen` empty)
+    opens with every box ticked, and every box ticked saves as every tool (`widens`), unless the boxes are the tools the
+    agent names, unchanged, and All tools was not ticked: those stay named, so a save that changed nothing never lifts
+    its bounds, and ticking All tools always does. */
 function toolPicks(names, chosen) {
-  const picked = new Set(chosen);
-  return el(
+  const picked = new Set(chosen.length === 0 ? names : chosen);
+  const boxes = names.map((name) => el("input", { type: "checkbox", value: name, checked: picked.has(name) }));
+  const all = el("input", { type: "checkbox", "aria-label": "All tools" });
+  const count = el("span", { class: "muted tool-picks-count" });
+  const named = new Set(chosen);
+  // Whether the owner ticked All tools since a box was last unticked: every tool, whatever the agent named.
+  let allTicked = false;
+  function widens() {
+    const ticked = boxes.filter((box) => box.checked);
+    return ticked.length === boxes.length && (named.size === 0 || allTicked || ticked.some((box) => !named.has(box.value)));
+  }
+  function paint() {
+    const ticked = boxes.filter((box) => box.checked).length;
+    all.checked = ticked === boxes.length;
+    all.indeterminate = ticked > 0 && ticked < boxes.length;
+    count.textContent = widens() ? "every tool, and any added later" : `${ticked} of ${boxes.length}`;
+  }
+  all.addEventListener("change", () => {
+    allTicked = all.checked;
+    for (const box of boxes) {
+      box.checked = all.checked;
+    }
+    paint();
+  });
+  for (const box of boxes) {
+    box.addEventListener("change", () => {
+      allTicked = allTicked && box.checked;
+      paint();
+    });
+  }
+  paint();
+  const element = el(
     "div",
-    { class: "tool-picks" },
-    names.map((name) =>
-      el(
-        "label",
-        { class: "tool-pick" },
-        el("input", { type: "checkbox", value: name, checked: picked.has(name) }),
-        el("span", null, name),
-      ),
+    { class: "stack tight" },
+    el("label", { class: "tool-pick tool-pick-all" }, all, el("span", null, "All tools"), count),
+    el(
+      "div",
+      { class: "tool-picks" },
+      boxes.map((box) => el("label", { class: "tool-pick" }, box, el("span", null, box.value))),
     ),
   );
+  return { element, widens, picked: () => boxes.filter((box) => box.checked).map((box) => box.value) };
 }
 
 /**
@@ -293,7 +334,7 @@ function agentForm({ record, onSaved, onCancel }) {
   const lookField = field("Look", look.element, "The face this agent wears everywhere; it moves on its own page and beside its chats.");
   lookField.classList.add("wide");
   const tools = el("div", null, el("span", { class: "muted" }, "Loading the tools"));
-  const toolsField = field("Tools", tools, "None picked: every tool. Finishing, asking you and turning tool groups on stay in any case.");
+  const toolsField = field("Tools", tools, "All tools: every tool, and any added later. Finishing, asking you and turning tool groups on stay in any case.");
   toolsField.classList.add("wide");
   let models = [];
 
@@ -333,10 +374,12 @@ function agentForm({ record, onSaved, onCancel }) {
     });
   // Saved only once the tools are listed: without them the form cannot say which tools the agent may use.
   let toolsListed = false;
+  let picks = null;
   const toolsLoaded = api
     .get("/tools")
     .then((names) => {
-      tools.replaceChildren(toolPicks(names, record === null ? [] : record.tools));
+      picks = toolPicks(names, record === null ? [] : record.tools);
+      tools.replaceChildren(picks.element);
       toolsListed = true;
     })
     .catch((error) => {
@@ -359,7 +402,12 @@ function agentForm({ record, onSaved, onCancel }) {
       name.focus();
       return;
     }
-    const picked = [...tools.querySelectorAll("input:checked")].map((input) => input.value);
+    const picked = picks.picked();
+    if (picked.length === 0) {
+      toast("error", "Pick the tools it may use, or All tools for every one.");
+      tools.querySelector(".tool-pick-all input")?.focus();
+      return;
+    }
     const body = {
       name: nameText,
       role: role.value.trim(),
@@ -367,8 +415,10 @@ function agentForm({ record, onSaved, onCancel }) {
       model: model.value,
       effort: chosenLevel(models, model.value, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
       approvals: approvals.value === "" ? null : approvals.value,
-      // None picked is every tool, said as null: an empty list keeps the tools an agent has (the code review's Y5).
-      tools: picked.length === 0 ? null : picked,
+      // Every tool, said as null, when the boxes widen the agent (toolPicks): every box ticked, unless they are the tools
+      // it names, unchanged, and All tools was not ticked. An empty list keeps the tools an agent has (the code review's
+      // Y5).
+      tools: picks.widens() ? null : picked,
       look: look.value(),
     };
     save.disabled = true;
@@ -435,14 +485,21 @@ function mountList(root, ctx) {
     try {
       // The tools this home has, so that a card marks one it lacks. A home that cannot list them still shows the
       // templates, their tools unmarked, and says above them that it could not tell which are missing.
-      const [listed, teams, named] = await Promise.all([
+      const [listed, teams, named, summaries] = await Promise.all([
         api.get("/agent-templates"),
         api.get("/agent-teams"),
         api.get("/tools").then(
           (names) => ({ names, problem: null }),
           (error) => ({ names: null, problem: error }),
         ),
+        // Only the marks of a team's card need them: a list that failed leaves the cards unmarked, and says so above them.
+        api.get("/agents").then(
+          (records) => ({ records, problem: null }),
+          (error) => ({ records: [], problem: error }),
+        ),
       ]);
+      // The agents the owner has, by name as Use team reads them, for the marks of a team's card.
+      const owned = new Set(summaries.records.map(({ record }) => record.name.trim().toLowerCase()));
       const known = named.names === null ? null : new Set(named.names);
       const listingProblem = named.problem;
       const byId = new Map(listed.map((template) => [template.id, template]));
@@ -452,8 +509,21 @@ function mountList(root, ctx) {
           teams: el(
             "div",
             { class: "stack tight", dataset: { pane: "teams" } },
-            el("p", { class: "hint" }, "A few agents that work together, made in one click. An agent of that name you have already is kept as it is."),
-            el("div", { class: "template-grid" }, teams.map((team) => teamCard(team, byId, useTeam))),
+            el(
+              "p",
+              { class: "hint" },
+              "A few agents that work together, made in one click: ask Dot or any of them, and they hand each other the parts their roles fit. An agent of that name you have already is kept, and joins the team.",
+            ),
+            ...(summaries.problem === null
+              ? []
+              : [
+                  el(
+                    "p",
+                    { class: "hint", dataset: { teamsAgentsUnknown: "" } },
+                    `Your agents could not be listed: ${summaries.problem.message}. The cards mark none of them Yours, and Use team still keeps an agent you have.`,
+                  ),
+                ]),
+            el("div", { class: "template-grid" }, teams.map((team) => teamCard(team, byId, useTeam, owned))),
           ),
           single: el(
             "div",
@@ -543,15 +613,18 @@ function mountList(root, ctx) {
     }
     const made = AND_LIST.format(used.made.map((record) => record.name));
     const had = used.kept.length === 0 ? "" : ` Already yours and kept as they were: ${AND_LIST.format(used.kept.map((record) => record.name))}.`;
+    // A kept agent that named its tools was given message_agent, to hand its teammates their parts (item 512).
+    const joined = used.joined.length === 0 ? "" : ` ${AND_LIST.format(used.joined)} can message ${used.joined.length === 1 ? "its" : "their"} teammates now.`;
     if (used.made.length === 0) {
-      toast("ok", `You have every agent of the ${team.name} already.`);
+      toast("ok", `You have every agent of the ${team.name} already.${joined}`);
     } else if (missed.length > 0) {
-      toast("error", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not every schedule was added: ${missed.join("; ")}.${had}`);
+      toast("error", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not every schedule was added: ${missed.join("; ")}.${had}${joined}`);
     } else {
       const off = scheduled.length === 0 ? "" : " Their schedules are switched off: read their goals, then switch them on.";
-      toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${off}`);
+      toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${joined}${off}`);
     }
-    await reload();
+    // The list shows the agents, and the cards mark them Yours.
+    await Promise.all([reload(), loadTemplates()]);
   }
 
   async function reload() {

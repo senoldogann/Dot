@@ -47,7 +47,11 @@ def _prompt(agent: AgentBrief | None) -> str:
 
 def test_the_prompt_opens_in_the_agents_voice_and_carries_the_owners_instructions() -> None:
     agent: AgentBrief = AgentBrief(
-        name="Scout", role="Finds and checks sources", instructions="Prefer primary sources.", made_by_dot=False
+        name="Scout",
+        role="Finds and checks sources",
+        instructions="Prefer primary sources.",
+        made_by_dot=False,
+        team="",
     )
     prompt: str = _prompt(agent)
     assert prompt.startswith("You are Scout, an agent the owner made: Finds and checks sources.")

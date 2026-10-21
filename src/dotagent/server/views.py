@@ -709,11 +709,13 @@ class TeamView(FrozenModel):
 
 
 class TeamUse(FrozenModel):
-    """``POST /api/agent-teams/{id}/use`` (item 504): the agents it made, in the team's order, and the owner's agents
-    it kept, each with the name of one of the team's members."""
+    """``POST /api/agent-teams/{id}/use`` (item 504): the agents it made, in the team's order, the owner's agents it
+    kept, each with the name of one of the team's members, as they are now, and the names of those of them it gave
+    ``message_agent`` to (item 512)."""
 
     made: list[AgentRecord]
     kept: list[AgentRecord]
+    joined: list[str]
 
 
 class LearnedSkillView(FrozenModel):

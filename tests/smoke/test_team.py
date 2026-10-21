@@ -360,3 +360,58 @@ async def test_dot_builds_a_team_within_its_bounds_and_a_run_of_another_chat_sen
     assert (written.agent_id, written.status, written.result) == (made["Writer"]["id"], "done", "Line one. Line two.")
     for record in made.values():
         assert (await client.delete(f"/api/agents/{record['id']}")).status_code == 204
+
+
+async def test_an_agent_of_a_ready_team_hands_its_teammate_a_part_from_its_own_chat(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """Item 512: Competitor Watch's chat delegated the Growth team's work to helpers, as its tools named delegate and
+    not message_agent. A team's agents can message one another now, and a member's run is told its team, its
+    teammates first: Competitor Watch sends Paid Media a part from its own chat."""
+    used = await client.post("/api/agent-teams/growth/use")
+    assert used.status_code == 201, used.text
+    members: dict[str, str] = {record["name"]: record["id"] for record in used.json()["made"]}
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            _turn(MESSAGE_AGENT_TOOL, {"agent": "paid media", "message": "Say how last week's ads did."}),
+            _turn(FINISH_TOOL, {"answer": "The ads did well.", "success": True}),
+            ScriptedTurn(text="Paid Media says the ads did well.", calls=()),
+        ],
+    )
+    asked: int = len(MODEL.requests)
+    started = await client.post(
+        "/api/runs",
+        json={
+            "goal": "How did the ads do?",
+            "approvals": "yolo",
+            "mode": "chat",
+            "agent_id": members["Competitor Watch"],
+        },
+    )
+    assert started.status_code == 201, started.text
+    run_id: str = started.json()["id"]
+    async with asyncio.timeout(_RUN_WAIT_S):
+        await manager.wait(run_id)
+    first: ChatRequest = MODEL.requests[asked]
+    assert MESSAGE_AGENT_TOOL in {spec.name for spec in first.tools}
+    system: str = _system(first)
+    assert "- You are in the Growth team: your teammates come first" in system
+    listed: list[str] = [line for line in system.splitlines() if line.startswith("  - ")]
+    assert listed[:3] == [
+        f"  - {name} (Growth team): {role}"
+        for name, role in (
+            ("Paid Media", "Reads the ad results and says what to change"),
+            ("Product Performance", "Watches the product's numbers and reports what moved"),
+            ("Sales Outbound", "Finds prospects that fit and drafts a first email to each"),
+        )
+    ], listed
+    (child,) = await runtime.store.list_child_runs(run_id)
+    assert (child.source, child.agent_id, child.status, child.result) == (
+        TEAM_SOURCE,
+        members["Paid Media"],
+        "done",
+        "The ads did well.",
+    )
+    for agent_id in members.values():
+        assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204
