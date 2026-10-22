@@ -23,21 +23,87 @@ pr_body = _load("pr_body")
 
 
 def test_the_next_item_is_one_more_than_the_highest_taken_on_main_in_a_pull_request_or_on_a_branch() -> None:
-    files = ["roadmap/536.md", "changes/536.md", "roadmap/539.md", "changes/539.md"]
-    assert next_item.next_item(files, [], []) == 540
+    files = ("main", ["roadmap/536.md", "changes/536.md", "roadmap/539.md", "changes/539.md"])
+    assert next_item.next_item(files) == 540
     # A pull request and a pushed branch hold a number main does not have yet.
-    assert next_item.next_item(files, ["Item 541: something", "Docs: a step stays on one line"], []) == 542
-    assert next_item.next_item(files, [], ["item-543-faster-flow", "main", "item-12-x"]) == 544
-    assert next_item.next_item([], [], []) == 1
+    assert (
+        next_item.next_item(files, ("pull request", ["Item 541: something", "Docs: a step stays on one line"])) == 542
+    )
+    assert next_item.next_item(files, ("branch", ["item-543-faster-flow", "main", "item-12-x"])) == 544
+    assert next_item.next_item() == 1
 
 
 def test_where_a_number_was_seen_is_told() -> None:
-    found = next_item.taken(["roadmap/539.md"], ["Item 540: x"], ["item-541-y", "item-539-z"])
+    found = next_item.taken(
+        ("main", ["roadmap/539.md"]), ("pull request", ["Item 540: x"]), ("branch", ["item-541-y", "item-539-z"])
+    )
     assert found == {539: "main", 540: "pull request", 541: "branch"}
 
 
+def test_a_batch_pull_request_holds_every_number_of_its_title_and_its_entries() -> None:
+    """The review of item 541: a title of ``Items 541, 542 and 543: ...`` and the entries a pull request adds are read,
+    so that a second session is not given 542."""
+    found = next_item.taken(("pull request", ["Items 541, 542 and 543: a, b; c", "Items 12 and 13: older"]))
+    assert found == {
+        541: "pull request",
+        542: "pull request",
+        543: "pull request",
+        12: "pull request",
+        13: "pull request",
+    }
+    added = ("pull request", ["roadmap/541.md", "changes/542.md", "src/dotagent/x.py"])
+    assert next_item.next_item(("main", ["roadmap/540.md"]), added) == 543
+
+
 def test_a_number_with_a_leading_zero_or_in_another_place_is_no_item() -> None:
-    assert next_item.taken(["docs/539.md", "roadmap/0539.md", "roadmap/README.md"], ["Items 12 and 13"], []) == {}
+    texts = ["docs/539.md", "roadmap/0539.md", "roadmap/README.md", "Itemised 7", "Step 3 of 4"]
+    assert next_item.taken(("anywhere", texts)) == {}
+
+
+def _fake_sources(monkeypatch: pytest.MonkeyPatch, *, pulls: str = "[]", failing: str | None = None) -> None:
+    """The commands the script runs, answered from here: main holds up to 540, a branch without a pull request 544."""
+
+    def lines(*command: str) -> list[str]:
+        if failing is not None and failing in command:
+            raise next_item.SourceError(f"`{' '.join(command)}` failed: no network")
+        if command[:2] == ("git", "fetch"):
+            return []
+        if command[:2] == ("git", "ls-tree"):
+            return ["roadmap/539.md", "changes/539.md", "roadmap/540.md"]
+        if command[:2] == ("git", "ls-remote"):
+            return ["abc\trefs/heads/main", "def\trefs/heads/item-544-ahead", "123\trefs/heads/item-12-old"]
+        if command[:2] == ("git", "diff"):
+            assert command[3] == "origin/main...origin/item-544-ahead"
+            return ["roadmap/544.md", "roadmap/545.md"]
+        assert command[:3] == ("gh", "pr", "list")
+        return [pulls]
+
+    monkeypatch.setattr(next_item, "_lines", lines)
+
+
+def test_the_script_gives_the_numbers_of_a_batch_after_every_place_it_looked(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pulls: str = (
+        '[{"title": "Items 541 and 542: a; b", "headRefName": "item-541-batch", "files": [{"path": "roadmap/542.md"}]}]'
+    )
+    _fake_sources(monkeypatch, pulls=pulls)
+    assert next_item.main(["3"]) == 0
+    printed = capsys.readouterr()
+    # 545 is the highest taken: an entry a branch ahead of main adds, which its name does not say.
+    assert printed.out == "546 547 548\n" and "545 is the highest taken, in branch" in printed.err
+    assert next_item.main([]) == 0 and capsys.readouterr().out == "546\n"
+
+
+def test_the_script_refuses_a_count_that_is_no_number_and_gives_none_when_a_source_fails(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert next_item.main(["0"]) == 2 and next_item.main(["two"]) == 2 and next_item.main(["1", "2"]) == 2
+    capsys.readouterr()
+    _fake_sources(monkeypatch, failing="gh")
+    assert next_item.main(["2"]) == 1
+    printed = capsys.readouterr()
+    assert printed.out == "" and "no number is given" in printed.err
 
 
 _ENTRY: str = """### 540. A change takes fewer pushes and reruns
@@ -100,9 +166,3 @@ def test_a_batch_has_a_section_for_each_item_and_one_attribution() -> None:
     assert "Checked by a test." in text and "Log:" not in text and "a log line" not in text
     assert text.count("Generated with [Claude Code]") == 1 and text.endswith("\n")
     assert pr_body.batch_body([_ENTRY]) == pr_body.body(_ENTRY)
-
-
-def test_the_numbers_of_a_batch_follow_the_highest_taken() -> None:
-    files = ["roadmap/540.md"]
-    first: int = next_item.next_item(files, [], [])
-    assert [first + step for step in range(3)] == [541, 542, 543]
