@@ -211,12 +211,16 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   run as yolo runs it. A follow or a like is left to the pace of its site. A review model that cannot answer fails the
   step with its error. `[policy] yolo_taint_check = false` turns the check off.
 - *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, a run marked untrusted
-  sends no secret Dot holds out of the Mac: a key read in this process (saved with `dotx auth set` or in Settings), a
+  has a step refused whose words would send a secret Dot holds out of the Mac: a key read in this process (saved with
+  `dotx auth set` or in Settings), a
   value of `<home>/.env`, or text in the form of a key or a private key. A request, a page's address or field, a
   message, the arguments of an MCP tool, a step that uploads, posts or sends, and what runs code or types into an
   application (a command line, an AppleScript, keystrokes), which may reach the network without saying so, are what it
-  looks at (`policy/egress.py`). The step is refused before it runs, and its `policy` event says why. A run you start
-  with your own message is not marked, so it can still send a key where you tell it to.
+  looks at (`policy/egress.py`), in the step's target, its summary and every string of its arguments, on every way a
+  run acts (Dot's own loop, OpenCode, a batch of the browser or the desktop). The step is refused before it runs,
+  and its `policy` event says why, with the secret masked. A command that reads a secret from a file or a variable
+  as it runs (`curl -d @file`) carries none in its words, and is not seen here: the shell guard's flags (an upload, a
+  read of a secret), the questions they raise or the taint check in yolo, and the sandbox are what stand there. A run you start with your own message is not marked, so it can still send a key where you tell it to.
 
 **Secrets.**
 

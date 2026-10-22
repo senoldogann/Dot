@@ -55,11 +55,13 @@ def _texts(value: JsonValue) -> Iterator[str]:
 
 
 def carries_secret(info: ActionInfo, arguments: JsonObject, known: Sequence[str]) -> bool:
-    """Whether a step that sends out (:func:`sends_out`) carries a secret: one of ``known``, the secrets Dot holds
-    (:func:`dotagent.secrets.known_secrets`), word for word, or text in the form of a key or a private key."""
+    """Whether a step that sends out (:func:`sends_out`) carries a secret in its words (its target, its summary and
+    every string of the call's ``arguments``): one of ``known``, the secrets Dot holds
+    (:func:`dotagent.secrets.known_secrets`), word for word, or text in the form of a key or a private key. A command
+    that reads a secret from a file or a variable as it runs carries none in its words."""
     if not sends_out(info):
         return False
-    text: str = "\n".join((info.target, *_texts(arguments)))
+    text: str = "\n".join((info.target, info.summary, *_texts(arguments)))
     if looks_like_key(text):
         return True
     return any(value in text for value in known if len(value) >= KNOWN_SECRET_MIN_CHARS)

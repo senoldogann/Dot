@@ -23,7 +23,6 @@ from dotagent.core.text import redact_json, redact_secrets, strip_blobs_keep_tex
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolCall, invalid_arguments_text
 from dotagent.policy.types import ActionInfo
-from dotagent.secrets import known_secrets
 from dotagent.tools.apple import APPLE_SCRIPT_TOOL, script_apps
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult, fail, ok
 from dotagent.tools.channels import channel_of
@@ -159,16 +158,14 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     try:
         prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
         action = prepared.action
-        # A run that read outside content sends no secret Dot holds out of the Mac, whatever its mode (item 525).
-        if gate.tainted:
-            await gate.refuse_carried_secret(action, call.arguments, await asyncio.to_thread(known_secrets))
         # A call that would step on another run at work does not run, and is not asked about (item 301).
         held: str | None = ctx.runtime.peers.conflict(ctx.run_id, call.name, action)
         if held is not None:
             return _Checked(result=fail(held), action=action, waited_s=0.0, decision=None)
         asked_at: float = time.monotonic()
         try:
-            authorized: Authorization = await gate.authorize_recorded(action)
+            # The call's arguments go with it: a run that read outside content sends no secret out in them (item 525).
+            authorized: Authorization = await gate.authorize_recorded(action, call.arguments)
             note, decision = authorized.note, authorized.decision
             # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock.
             held_s: float = await gate.wait_free()

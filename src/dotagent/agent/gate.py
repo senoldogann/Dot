@@ -21,6 +21,7 @@ from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorte
 from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import ApprovalParked, ApprovalRejected, HandedOff, PolicyDenied, RunConflict
 from dotagent.core.logs import get_logger
+from dotagent.core.text import redact_known
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
 from dotagent.policy.egress import carries_secret
@@ -36,6 +37,7 @@ from dotagent.policy.engine import (
 from dotagent.policy.pace import DAY_S, PacedAction, pace_refusal, paced_action, spacing_wait
 from dotagent.policy.spend import SpendState, render_amount, spend_allowance, spend_host, spend_state
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
+from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, EventRecord, RuleRecord, RunMode
 
@@ -252,10 +254,14 @@ class RunGate:
         """Let the action through or raise. Returns the note the user wrote when approving it, or an empty string."""
         return (await self.authorize_recorded(info)).note
 
-    async def authorize_recorded(self, info: ActionInfo) -> Authorization:
+    async def authorize_recorded(self, info: ActionInfo, arguments: JsonObject | None = None) -> Authorization:
         """Let the action through or raise, as :meth:`authorize`, with what decided it for the step's record (item
-        468). A public or social browser action keeps the pace of its site first, whatever the approval mode, and
-        counts once it is let through (:mod:`dotagent.policy.pace`), all under the site's pace lock."""
+        468). A run marked untrusted first refuses a step that would send a secret out of the Mac, read in the call's
+        ``arguments`` when the caller has them and in the step's target and summary (item 525), in every approval mode:
+        every way a run acts comes through here. A public or social browser action keeps the pace of its site first,
+        whatever the approval mode, and counts once it is let through (:mod:`dotagent.policy.pace`), all under the
+        site's pace lock."""
+        await self._refuse_carried_secret(info, {} if arguments is None else arguments)
         paced: PacedAction | None = paced_action(info)
         if paced is None:
             return await self._decide(info)
@@ -497,6 +503,17 @@ class RunGate:
             log.info("taint_check_passed", run_id=self._run_id, tool=info.tool, decision=verdict.decision)
             return
         reason: str = shorten_reason(verdict.reason)
+        # A step that does not go through keeps its policy event as its record (item 474).
+        await self._emit_policy(
+            info,
+            Decision(
+                verdict="deny",
+                source="taint",
+                reason=f"this run read outside content, and the review model found the step not asked for: {reason}",
+                rule_id=None,
+            ),
+            True,
+        )
         await self._approvals.record_automatic(
             self._run_id,
             info.tool,
@@ -513,21 +530,27 @@ class RunGate:
             {"action": _describe(info), "note": reason},
         )
 
-    async def refuse_carried_secret(self, info: ActionInfo, arguments: JsonObject, known: Sequence[str]) -> None:
-        """Refuse a step of a run that read outside content when it would send a secret Dot holds (``known``), or text
-        in the form of a key, out of the Mac (item 525): in every approval mode, yolo too, whatever the preset or the
-        owner's rules say. Called before the step is authorised."""
-        if not self.tainted or not carries_secret(info, arguments, known):
+    async def _refuse_carried_secret(self, info: ActionInfo, arguments: JsonObject) -> None:
+        """Refuse a step of a run that read outside content when its words would send a secret Dot holds, or text in
+        the form of a key, out of the Mac (item 525): in every approval mode, yolo too, whatever the preset or the
+        owner's rules say. Its record and its error mask the secrets, as they hold the one refused."""
+        if not self.tainted:
             return
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        if not carries_secret(info, arguments, known):
+            return
+        masked: ActionInfo = info.model_copy(
+            update={"summary": redact_known(info.summary, known), "target": redact_known(info.target, known)}
+        )
         decision: Decision = Decision(
             verdict="deny",
             source="taint",
             reason="this run read outside content, and the step would send a secret out of the Mac",
             rule_id=None,
         )
-        await self._emit_policy(info, decision, True)
+        await self._emit_policy(masked, decision, True)
         log.warning("secret_egress_refused", run_id=self._run_id, tool=info.tool)
-        raise PolicyDenied(decision.reason, {"action": _describe(info), "source": decision.source})
+        raise PolicyDenied(decision.reason, {"action": _describe(masked), "source": decision.source})
 
     async def _review(self, info: ActionInfo, decision: Decision, tainted: bool) -> tuple[str, Answerer]:
         """Auto: the review model answers from the user's instructions; what it cannot tell goes to the user, who then

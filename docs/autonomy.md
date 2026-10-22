@@ -42,7 +42,8 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   run commands without asking you. Two things hold for a yolo run that has read outside content (item 525, see
   [Safety](safety.md#safety)): the review model checks, without asking you, a step a planted instruction would be
   after (a message, a post, an upload, a payment, a credential, a read of your secrets, an install, a note it saves),
-  and refuses what your instructions do not call for; and it sends no secret Dot holds out of the Mac. A refusal is
+  and refuses what your instructions do not call for; and a step whose words would send a secret Dot holds out of the
+  Mac is refused. A refusal is
   not a question: a `research` run's limit
   stands, and no rule of yours can refuse — its behaviours are allow, preapproved, ask and hand off.
 
@@ -69,7 +70,8 @@ looked (item 466; see [The daemon](daemon.md)).
 the preset's and your `ask` rules', money and credentials', a message or a post in your name, a pre-approved spend, and
 the refusal of a read of your secrets or of data sent out (items 429 and 433). **What no mode waives** (item 429): a
 `research` run changes nothing but its notes file and memory — a refusal is not a question, so yolo does not waive it
-either — and a run that read outside content sends no secret Dot holds out of the Mac (item 525). A yolo run that read
+either — and a run that read outside content has a step refused whose words would send a secret Dot holds out of the
+Mac (item 525). A yolo run that read
 such content also has the review model's refusal of a step it checks (`[policy] yolo_taint_check`, on by default).
 (A rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off, and a yolo run waives the
 last two with every other question.) The modes that ask keep their guard: in `supervised`, `ask` and
