@@ -223,7 +223,7 @@ async def test_a_block_of_code_wraps_its_lines_when_asked_and_copies_what_it_hol
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
     long_line: str = "word " * 80
-    answer: str = f"```text\n{long_line.strip()}\n```\n\n```text\nshort\n```"
+    answer: str = f"```text\n{long_line.strip()}\n```\n\n```text\nshort\n```\n\n```text\nthird\n```"
     with scratch_home() as home, eval_environment(home, {}):
         async with (
             _daemon(login_env, [_finish(answer) for _ in range(2)]) as (runtime, manager, address),
@@ -267,9 +267,16 @@ async def test_a_block_of_code_wraps_its_lines_when_asked_and_copies_what_it_hol
                     await second.click()
                     assert await other.evaluate("node => getComputedStyle(node).whiteSpace") == "pre"
                     assert await second.get_attribute("aria-pressed") == "false"
+                    # A third block, never switched, follows Settings on and off; the two that were switched keep what
+                    # they said.
+                    third: Locator = (
+                        page.locator(".answer .code-block").nth(2).get_by_role("button", name="Wrap long lines")
+                    )
+                    await expect(third).to_have_attribute("aria-pressed", "true")
                     await page.evaluate("document.documentElement.removeAttribute('data-wrap-code')")
-                    # A block that was switched keeps what it said, and the one that was not follows Settings again.
+                    await expect(third).to_have_attribute("aria-pressed", "false")
                     assert await wrap.get_attribute("aria-pressed") == "false"
+                    assert await second.get_attribute("aria-pressed") == "false"
                     # The buttons of the head are as large as a thumb needs on a phone, and in sight.
                     sizes = await block.locator(".code-head .btn").evaluate_all(_SIZES)
                     assert len(sizes) == 2 and all(width >= 28 and height >= 28 for width, height in sizes), sizes
