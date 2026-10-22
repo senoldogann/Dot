@@ -399,13 +399,15 @@ approval_timeout_s = 900.0
 unanswered = "refuse"
 parked_hours = 72.0
 permit_hours = 24.0
+# The locations a run may not read: the shell guard refuses a line that names one, and the search tools may not read
+# them. The credentials that programs read there (ssh and git their keys, a cloud CLI its own) stay open to the commands
+# themselves, so these are the guard's to keep, which it does by reading the line (best-effort, see docs/safety.md).
 protected_paths = [
   "~/.ssh",
   "~/.gnupg",
   "~/Library/Keychains",
   "~/.aws",
   "~/.config/gcloud",
-  "~/Library/Application Support/Google/Chrome",
   # The tokens and passwords that command lines keep for their hosts and registries.
   "~/.netrc",
   "~/.git-credentials",
@@ -422,19 +424,46 @@ protected_paths = [
   "~/.azure",
   "~/.config/op",
   "~/.password-store",
+  # What the password managers keep on this Mac (1Password's app group has its own team id; the 1Password agent's socket
+  # lies in it, which a command may use, so it is not sealed).
+  "~/Library/Group Containers/2BUA8C4S2C.com.1password",
+  "~/Library/Application Support/1Password",
+  "~/Library/Application Support/Bitwarden",
+  "~/Library/Application Support/Dashlane",
   # The shell's history, which can hold a secret typed on a command line.
   "~/.zsh_history",
   "~/.bash_history",
-  # Messages, mail, cookies and the data of the other browsers.
+]
+# The stores no program a run starts has any use for: Mail and Messages, the cookies, and the data and caches of the
+# browsers (item 531). The sandbox closes them to a command as well, whatever path, variable or substitution names
+# them, as it does Dot's own files, and the guard refuses a line that names one, as it does protected_paths. A list of
+# your own replaces this one; add a browser you use that is not here.
+sealed_paths = [
   "~/Library/Messages",
   "~/Library/Mail",
   "~/Library/Cookies",
   "~/Library/Safari",
   "~/Library/Containers/com.apple.Safari",
+  "~/Library/Caches/com.apple.Safari",
+  "~/Library/Application Support/Google/Chrome",
+  "~/Library/Application Support/Google/Chrome Beta",
+  "~/Library/Application Support/Google/Chrome Dev",
+  "~/Library/Application Support/Google/Chrome Canary",
+  "~/Library/Application Support/Chromium",
+  "~/Library/Caches/Google/Chrome",
   "~/Library/Application Support/Firefox",
+  "~/Library/Caches/Firefox",
   "~/Library/Application Support/BraveSoftware",
+  "~/Library/Caches/BraveSoftware",
   "~/Library/Application Support/Microsoft Edge",
+  "~/Library/Application Support/Microsoft Edge Beta",
+  "~/Library/Application Support/Microsoft Edge Dev",
+  "~/Library/Application Support/Microsoft Edge Canary",
+  "~/Library/Caches/Microsoft Edge",
   "~/Library/Application Support/Arc",
+  "~/Library/Application Support/Vivaldi",
+  "~/Library/Application Support/com.operasoftware.Opera",
+  "~/Library/Application Support/com.operasoftware.OperaGX",
 ]
 # The applications code_fetch may read a one-time code from: "mail" (Mail.app, through AppleScript) and "messages"
 # (Messages.app, its database read-only; needs Full Disk Access for the program that runs Dot). Only the code of the

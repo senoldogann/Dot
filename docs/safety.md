@@ -310,12 +310,15 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
 - Outside a `yolo` run (which may, without asking, item 433) the agent can neither read nor change `~/.ssh`,
   `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
-  `~/.config/gcloud`, the data of your browsers (Chrome, Safari, Firefox, Brave, Edge and Arc) and their cookies, the
-  tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`,
-  `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`,
-  `~/.password-store`), the keys that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them), the shell's
-  history, Messages and Mail (`[policy] protected_paths`; a list of your own replaces
-  this one), nor Dot's own key file, token, what signing in to an MCP server gave it, browser profiles, configuration,
+  `~/.config/gcloud`, the tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`,
+  `~/.config/gh`, `~/.npmrc`, `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`,
+  `~/.azure`, `~/.config/op`, `~/.password-store`), what 1Password, Bitwarden and Dashlane keep on this Mac, the keys
+  that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them) and the shell's history
+  (`[policy] protected_paths`; a list of your own replaces this one), the data and caches of your browsers (Chrome and
+  its Beta, Dev and Canary, Chromium, Safari, Firefox, Brave, Edge, Arc, Vivaldi and Opera), their cookies, Messages and
+  Mail (`[policy] sealed_paths`, which the sandbox below closes to a command as well, item 531; a list of your own
+  replaces this one too), nor Dot's own key file, token, what signing in to an MCP server gave it, browser profiles,
+  configuration,
   database, the copies of the database (`[store] backup_dir`, and `<home>/backups-partial` while one is made, item
   526) and journals of file changes. The configuration holds the policy and the MCP servers, the database the rules,
   a copy all of the database and what you go back to, the journals what `dotx undo` writes back.
@@ -342,12 +345,13 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   daemon and are given keys from the key store: put a plugin or a skill in place yourself.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
-  files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals,
-  and the data
-  directory of your Chrome), nor change what Dot loads and runs, nor rename a folder above any of them, whatever program
-  does it: a script the run wrote, code that builds the path, a link, another letter case. macOS answers
-  `Operation not permitted`. The search tools may not read your protected locations either; a command still may (ssh and
-  git read their keys there), and for those the guard reads its line. A search that meets a place it may not read shows
+  files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals)
+  and the stores no program has any use for (`[policy] sealed_paths`: the data and caches of your browsers, their
+  cookies, Messages and Mail, item 531), nor change what Dot loads and runs, nor rename a folder above any of them,
+  whatever program does it: a script the run wrote, code that builds the path, a link, another letter case. macOS
+  answers `Operation not permitted`. The search tools may not read your protected locations either; a command still may
+  (ssh and git read their keys there), and for those the guard reads its line. A search that meets a place it may not
+  read shows
   what it found elsewhere and names the places it did not read, as a search of any run does with a folder whose reading
   macOS broke off (it does now and then under `~/Library/Containers` when the home folder is searched). macOS starts no
   program that runs as root inside the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo`
@@ -511,8 +515,14 @@ event and approval.
 > as `python3`, also after a `cp`, an `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh | bash`) is judged
 > as piping the download into a shell; a file named after an at sign (`curl --data-binary @file`) as that file; a script
 > handed to a terminal app (`open -a Terminal`, a `.command` file) as a step outside Dot's sandbox, which every preset
-> asks about (item 385), and outside yolo the sandbox refuses the opening itself (item 418). It does not follow what a
-> recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps those out of
-> Dot's own files, not out of yours, and a shell can do more than any analysis can foresee. Treat Dot as a user of your
+> asks about (item 385), and outside yolo the sandbox refuses the opening itself (item 418). A word with a part only the
+> running line knows (`~/.s$(echo sh)/id_rsa`, `~/Library/${X:-Safari}/History.db`, a variable filled with what a
+> command prints) that begins as a protected location's path, and a command that reads every file under a folder that
+> holds one (`grep -r secret ~`, `rg token ~/Library`, `find ~ -exec cat {} \;`, `cp -R`, `ditto`, `rsync -a`, `tar`
+> creating an archive, `zip -r`) are asked about in every preset (item 531), as is a command run in another folder by
+> `env -C`, whose words are judged from there. It does not follow what a recursive command does inside the other
+> folders it walks, nor the code of a script it runs; the sandbox keeps those out of Dot's own files and of the sealed
+> stores (the data of your browsers, Mail and Messages), not out of the rest of yours, and a shell can do more than any
+> analysis can foresee. Treat Dot as a user of your
 > account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
 > `cautious` on a machine where a mistake would be expensive.
