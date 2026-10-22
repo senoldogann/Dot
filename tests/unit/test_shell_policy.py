@@ -715,6 +715,11 @@ _NAMED_BY_PIECES: list[str] = [
     'cat "$X/../.ssh/id_rsa"',
     "cat ~/Documents/$(echo ..)/x/../.ssh/id_rsa",
     'cat "$(echo ~/Library)/Safari/History.db"',
+    # A move is judged by where it lands: the beginning and the end of the path it names count, only the climb does not.
+    "cd ~/.s$(echo sh) && cat id_rsa",
+    "cd ~/Documents/$(echo ..)/.ssh && cat id_rsa",
+    'cd "$(pwd)/../.ssh" && cat id_rsa',
+    'pushd "$(pwd)/../.ssh" && cat id_rsa',
 ]
 _WALKING_THEM: list[str] = [
     "find ~/Library -name History.db -exec cat {} \\;",
