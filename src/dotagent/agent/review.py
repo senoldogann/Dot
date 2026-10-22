@@ -543,7 +543,7 @@ def _list_from_text(value: object, least: int) -> object:
     if not isinstance(value, str):
         return value
     text: str = value.strip()
-    if text.startswith(("[", "{", "`")):
+    if text.startswith(("[", "{", "```")):
         try:
             parsed: object = json.loads(text)
         except (ValueError, RecursionError):

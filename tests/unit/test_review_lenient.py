@@ -73,6 +73,8 @@ async def _writer(provider: ScriptedProvider) -> PlaybookWriter:
         ('["Open the page", "Click Search"]', ["Open the page", "Click Search"]),
         ("  Open the page\n\n Click Search \n", ["Open the page", "Click Search"]),
         ('["Open the page"]', ["Open the page"]),
+        # Inline code is no code fence.
+        ("`git clone` the repo\nRun the tests", ["`git clone` the repo", "Run the tests"]),
     ],
 )
 def test_steps_written_as_text_are_read_as_the_list_they_mean(text: str, steps: list[str]) -> None:
