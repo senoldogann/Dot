@@ -17,6 +17,7 @@ from PIL import Image
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import FindResult, PageView, Screenshot, ScriptRun
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
+from dotagent.core.errors import BrowserError
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -44,6 +45,11 @@ def _form(frame_origin: str) -> str:
         f'<iframe id="frame" title="Card frame" src="{frame_origin}/card" width="320" height="80"></iframe>'
         '<textarea aria-label="Notes">Some notes</textarea><a href="/next">Next</a>'
     )
+
+
+def _frame_only(frame_origin: str) -> str:
+    """A page whose only secret field is in a frame of another origin, as a payment provider's is."""
+    return f'<!doctype html><title>Frame only</title><iframe title="Card frame" src="{frame_origin}/card"></iframe>'
 
 
 _MANY: str = "<!doctype html><title>Many</title>" + "".join(
@@ -79,7 +85,7 @@ def frame_site() -> Iterator[str]:
 
 @pytest.fixture(scope="module")
 def site(frame_site: str) -> Iterator[str]:
-    yield from _serve({"/form": _form(frame_site), "/many": _MANY})
+    yield from _serve({"/form": _form(frame_site), "/many": _MANY, "/frame-only": _frame_only(frame_site)})
 
 
 @pytest.fixture(scope="module")
@@ -120,6 +126,7 @@ async def test_no_view_a_run_reads_shows_a_secret_fields_value(browser: BrowserS
         "document.querySelector('#pass').value = 'typed-in-a-takeover';"
         " document.querySelector('#name').value = 'Grace'; true",
         5.0,
+        False,
     )
     assert changed.end == "value", changed
     after: PageView = await browser.scroll("hidden", "down", 5, None, True)
@@ -147,6 +154,7 @@ async def _boxes(browser: BrowserSession, thread: str) -> dict[str, dict[str, fl
         " const r = document.getElementById(id).getBoundingClientRect();"
         " return [id, {x: r.x, y: r.y, w: r.width, h: r.height}]; }))",
         5.0,
+        False,
     )
     assert ran.end == "value", ran
     boxes: dict[str, dict[str, float]] = json.loads(ran.text)
@@ -179,3 +187,41 @@ async def test_a_page_of_sixty_filled_fields_keeps_their_values(browser: Browser
     shown: str = view.body + "\n".join(found.hits)
     assert all(f"Item {number}" in shown for number in range(1, 61)), shown
     assert "[hidden]" not in shown
+
+
+@pytest.mark.parametrize("page", ["form", "frame-only"])
+async def test_a_script_stays_off_a_page_that_holds_a_secret_field_in_any_frame_and_yolo_runs_it(
+    browser: BrowserSession, site: str, page: str
+) -> None:
+    """A script reads a field's value whole, a value Chrome filled in too (item 533): outside yolo it is refused on a
+    page that holds a password, a code or a card field, the one in a frame of another origin included."""
+    await browser.open_url(f"script-{page}", f"{site}/{page}", True)
+    with pytest.raises(BrowserError, match="a script stays off a page that holds a password"):
+        await browser.run_script(f"script-{page}", "document.title", 5.0, True)
+    # Yolo hides nothing: the same script runs.
+    ran: ScriptRun = await browser.run_script(f"script-{page}", "document.title", 5.0, False)
+    assert ran.end == "value", ran
+
+
+async def test_a_script_is_run_on_a_page_without_one_and_what_it_gives_back_hides_the_cookies(
+    browser: BrowserSession, site: str
+) -> None:
+    await browser.open_url("cookies", f"{site}/many", True)
+    ran: ScriptRun = await browser.run_script(
+        "cookies",
+        "() => { document.cookie = 'session=abcdef0123456789; path=/'; document.cookie = 'lang=en; path=/';"
+        " return document.cookie; }",
+        5.0,
+        True,
+    )
+    # The value of the session is no part of what the model reads; a short value that is no session stays.
+    assert (ran.end, json.loads(ran.text)) == ("value", "session=[hidden]; lang=en"), ran
+    assert "abcdef0123456789" not in ran.text
+    # JSON writes it as the value is when it is a string inside an object, too.
+    nested: ScriptRun = await browser.run_script(
+        "cookies", "() => ({ all: document.cookie, parts: document.cookie.split('; ') })", 5.0, True
+    )
+    assert "abcdef0123456789" not in nested.text and "session=[hidden]" in nested.text, nested
+    # Yolo sees all it reads (item 443).
+    shown: ScriptRun = await browser.run_script("cookies", "document.cookie", 5.0, False)
+    assert json.loads(shown.text) == "session=abcdef0123456789; lang=en"

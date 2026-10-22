@@ -47,6 +47,7 @@ from dotagent.browser.driver import (
     capture_lines,
     fill_login_field,
     go_back,
+    holds_secret_field,
     install_consent_handler,
     keep_focused,
     let_page_turn,
@@ -61,6 +62,7 @@ from dotagent.browser.driver import (
     visible_text,
     wait_dom_quiet,
     wait_for_text,
+    without_cookie_values,
 )
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
 from dotagent.browser.look import PageLook, color_scheme
@@ -2307,13 +2309,16 @@ class BrowserSession:
         browser tools shows."""
         return frozenset(self._vault_values.get(thread_id, ()))
 
-    async def run_script(self, thread_id: str, script: str, timeout_s: float) -> ScriptRun:
+    async def run_script(self, thread_id: str, script: str, timeout_s: float, hide_secrets: bool) -> ScriptRun:
         """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
         263). What the script led to is waited for as after a step (a tab it opened, a dialog), and the page is settled
         after every script as after a step (item 270), so that a navigation it started is let load, also one that
         commits after its value came back; the address rules then hold as after a step: a tab that ended on an address
         they forbid is reset to a blank page and the call fails. After a script still running when the wait ended, only
-        a navigation under way is let commit: the page cannot tell its DOM is quiet while the script holds it."""
+        a navigation under way is let commit: the page cannot tell its DOM is quiet while the script holds it. With
+        ``hide_secrets`` (every mode but yolo, item 533) it is refused on a page that holds a password, one-time-code or
+        card field, which a script reads whole, an autofilled value too, and what it gives back shows the cookies of the
+        site as ``[hidden]``."""
         async with self._locked(thread_id) as thread:
             # A script can read a field a login was filled into, and send it anywhere; a tab of the same thread can
             # reach that page as its opener does (item 493).
@@ -2325,10 +2330,19 @@ class BrowserSession:
                     {"tabs": len([one for one in thread.tabs if one.vault_held])},
                 )
             tab: Tab = await self._current_tab(thread)
+            if hide_secrets and await holds_secret_field(tab.page):
+                raise BrowserError(
+                    "a script stays off a page that holds a password, one-time-code or card field: it could read what "
+                    "the field holds, a value Chrome filled in too. Use the other browser tools, which hide such "
+                    "values, or ask the user to take over the browser",
+                    {"url": tab.page.url},
+                )
             thread.scripted = True
             before: _Watch = self._watch(thread, tab)
             started: float = time.monotonic()
             end, text = await run_script(tab.page, script, timeout_s)
+            if hide_secrets and end == "value":
+                text = await without_cookie_values(tab.page, text)
             seconds: float = time.monotonic() - started
             current: Tab
             opening: bool

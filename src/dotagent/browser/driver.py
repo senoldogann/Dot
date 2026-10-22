@@ -6,12 +6,13 @@ import re
 from collections.abc import Awaitable, Callable
 from typing import Literal
 
-from playwright.async_api import CDPSession, ElementHandle, Frame, JSHandle, Locator, Page
+from playwright.async_api import CDPSession, Cookie, ElementHandle, Frame, JSHandle, Locator, Page
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from dotagent.browser.safety import key_enters_text, secret_kind, secret_selector
 from dotagent.browser.snapshot import (
+    HIDDEN_VALUE,
     SnapshotLine,
     closest_first,
     entries_of,
@@ -44,6 +45,8 @@ _FIELD_PROBE_TIMEOUT_MS: int = 1500
 # How long a page may take to count the elements a locator names (item 471): Playwright's count takes no timeout, and
 # a frame whose script holds its main thread never answers.
 _COUNT_TIMEOUT_S: float = 2.0
+# The shortest cookie value that the value of a script is searched for (item 533).
+_MIN_HIDDEN_VALUE_CHARS: int = 8
 # What a screenshot shows over a secret field (item 467).
 _MASK_COLOUR: str = "#333333"
 # Playwright's text for a ref whose frame generation died with a navigation.
@@ -872,6 +875,39 @@ async def run_script(page: Page, script: str, timeout_s: float) -> tuple[ScriptE
             return "navigated", ""
         return "error", _script_error(str(error))
     return "value", json.dumps(value, ensure_ascii=False, default=str)
+
+
+async def holds_secret_field(page: Page) -> bool:
+    """Whether ``page`` holds, in any of its frames, a field that the page marks as taking a secret (item 533): a
+    password, a one-time code, a card (:func:`secret_selector`). A page that does not say in time holds one, as a field
+    that cannot be asked counts as secret."""
+    selector: str = secret_selector()
+    try:
+        counts: list[int] = await asyncio.gather(
+            *(_count(frame.locator(selector)) for frame in page.frames if not frame.is_detached())
+        )
+    except (TimeoutError, PlaywrightError):
+        return True
+    return any(counts)
+
+
+async def without_cookie_values(page: Page, text: str) -> str:
+    """``text``, the JSON a script gave, with each value of the cookies of the page's site shown as ``[hidden]``, as it
+    is written and as JSON writes it (item 533): a script that reads ``document.cookie`` hands the model a session. A
+    value shorter than :data:`_MIN_HIDDEN_VALUE_CHARS` is no session (``en``, ``1``) and stays."""
+    try:
+        cookies: list[Cookie] = await page.context.cookies([page.url])
+    except PlaywrightError as error:
+        raise _failure(
+            "reading the cookies, to hide them from the value of the script, failed", page, {}, error
+        ) from error
+    shown: str = text
+    for cookie in cookies:
+        value: str = cookie["value"]
+        if len(value) >= _MIN_HIDDEN_VALUE_CHARS:
+            for form in dict.fromkeys((value, json.dumps(value, ensure_ascii=False)[1:-1])):
+                shown = shown.replace(form, HIDDEN_VALUE)
+    return shown
 
 
 async def measure_viewport(page: Page) -> Viewport:

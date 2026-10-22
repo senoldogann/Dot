@@ -14,6 +14,7 @@ import json
 import threading
 import time
 from collections.abc import AsyncIterator, Iterator
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -50,6 +51,7 @@ _PAGES: dict[str, str] = {
     "/next": "<!doctype html><title>Next page</title><h1>Arrived</h1>",
     "/other": "<!doctype html><title>Other page</title><p>Elsewhere</p>",
     "/mine": "<!doctype html><title>The user's page</title>",
+    "/login": '<!doctype html><title>Sign in</title><input type="password" aria-label="Password" value="hunter2">',
     "/slow": "<!doctype html><title>Slow page</title><h1>Late</h1>",
 }
 # How long /slow takes to answer: far longer than a script's value takes to come back.
@@ -111,15 +113,15 @@ async def test_a_script_gives_the_value_of_an_expression_a_function_and_a_promis
     browser: BrowserSession, site: str
 ) -> None:
     await browser.open_url("values", f"{site}/", True)
-    title: ScriptRun = await browser.run_script("values", "document.title", 10.0)
+    title: ScriptRun = await browser.run_script("values", "document.title", 10.0, False)
     assert (title.end, json.loads(title.text), title.url, title.surprise) == ("value", "Eval page", f"{site}/", None)
-    names: ScriptRun = await browser.run_script("values", _LIST, 10.0)
+    names: ScriptRun = await browser.run_script("values", _LIST, 10.0, False)
     assert json.loads(names.text) == ["Ada", "Grace", "Linus"]
     later: ScriptRun = await browser.run_script(
-        "values", "async () => { await new Promise((done) => setTimeout(done, 50)); return { n: 7 }; }", 10.0
+        "values", "async () => { await new Promise((done) => setTimeout(done, 50)); return { n: 7 }; }", 10.0, False
     )
     assert (later.end, json.loads(later.text)) == ("value", {"n": 7})
-    nothing: ScriptRun = await browser.run_script("values", "() => undefined", 10.0)
+    nothing: ScriptRun = await browser.run_script("values", "() => undefined", 10.0, False)
     assert (nothing.end, nothing.text) == ("value", "null")
 
 
@@ -127,25 +129,26 @@ async def test_each_thread_runs_its_script_in_its_own_tab(browser: BrowserSessio
     await browser.open_url("one", f"{site}/", True)
     await browser.open_url("two", f"{site}/other", True)
     first, second = await asyncio.gather(
-        browser.run_script("one", "document.title", 10.0), browser.run_script("two", "document.title", 10.0)
+        browser.run_script("one", "document.title", 10.0, False),
+        browser.run_script("two", "document.title", 10.0, False),
     )
     assert (json.loads(first.text), json.loads(second.text)) == ("Eval page", "Other page")
 
 
 async def test_an_error_and_a_wait_that_ends_first_are_told_apart(browser: BrowserSession, site: str) -> None:
     await browser.open_url("ends", f"{site}/", True)
-    thrown: ScriptRun = await browser.run_script("ends", "() => { throw new Error('boom'); }", 10.0)
+    thrown: ScriptRun = await browser.run_script("ends", "() => { throw new Error('boom'); }", 10.0, False)
     assert (thrown.end, thrown.text) == ("error", "Error: boom")
-    waited: ScriptRun = await browser.run_script("ends", "() => new Promise(() => {})", 1.0)
+    waited: ScriptRun = await browser.run_script("ends", "() => new Promise(() => {})", 1.0, False)
     assert (waited.end, waited.text) == ("timeout", "")
     assert 1.0 <= waited.seconds < 3.0
     # A script that keeps the page busy past the wait comes back when the wait ends, not when it lets the page go.
     started: float = time.monotonic()
-    busy: ScriptRun = await browser.run_script("ends", _BUSY, 1.0)
+    busy: ScriptRun = await browser.run_script("ends", _BUSY, 1.0, False)
     assert busy.end == "timeout"
     assert time.monotonic() - started < _BUSY_S - 1.0
     # The page goes on after all three: the scripts left running hold nothing once done.
-    again: ScriptRun = await browser.run_script("ends", "document.title", 10.0)
+    again: ScriptRun = await browser.run_script("ends", "document.title", 10.0, False)
     assert (again.end, json.loads(again.text)) == ("value", "Eval page")
 
 
@@ -153,11 +156,13 @@ async def test_a_script_that_leads_the_tab_elsewhere_lets_it_land_and_says_so(
     browser: BrowserSession, site: str
 ) -> None:
     await browser.open_url("away", f"{site}/", True)
-    clicked: ScriptRun = await browser.run_script("away", "() => { document.getElementById('next').click(); }", 10.0)
+    clicked: ScriptRun = await browser.run_script(
+        "away", "() => { document.getElementById('next').click(); }", 10.0, False
+    )
     assert clicked.end in ("value", "navigated")
     assert clicked.url == f"{site}/next"
     assert clicked.surprise == f"the page navigated to {site}/next"
-    landed: ScriptRun = await browser.run_script("away", "document.querySelector('h1').textContent", 10.0)
+    landed: ScriptRun = await browser.run_script("away", "document.querySelector('h1').textContent", 10.0, False)
     assert json.loads(landed.text) == "Arrived"
 
 
@@ -167,7 +172,7 @@ async def test_a_script_that_leads_to_an_address_the_rules_forbid_has_the_tab_re
     await browser.open_url("blocked", f"{site}/", True)
     forbidden: str = site.replace("127.0.0.1", "localhost") + "/next"
     with pytest.raises(BrowserError, match="may not be opened"):
-        await browser.run_script("blocked", f"() => {{ location.href = {json.dumps(forbidden)}; }}", 10.0)
+        await browser.run_script("blocked", f"() => {{ location.href = {json.dumps(forbidden)}; }}", 10.0, False)
     assert browser.current_url("blocked") == "about:blank"
 
 
@@ -177,7 +182,7 @@ async def test_a_forbidden_address_that_answers_after_the_value_came_back_has_th
     await browser.open_url("slow", f"{site}/", True)
     forbidden: str = site.replace("127.0.0.1", "localhost") + "/slow"
     with pytest.raises(BrowserError, match="may not be opened"):
-        await browser.run_script("slow", f"() => {{ location.href = {json.dumps(forbidden)}; return 1; }}", 10.0)
+        await browser.run_script("slow", f"() => {{ location.href = {json.dumps(forbidden)}; return 1; }}", 10.0, False)
     assert browser.current_url("slow") == "about:blank"
 
 
@@ -202,7 +207,7 @@ async def test_a_script_runs_in_the_agents_own_tab_of_the_chrome_of_the_user(
     session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads", no_runs_at_work)
     try:
         await session.open_url("agent", f"{site}/", True)
-        run: ScriptRun = await session.run_script("agent", _LIST, 10.0)
+        run: ScriptRun = await session.run_script("agent", _LIST, 10.0, False)
         assert (run.end, json.loads(run.text), run.url) == ("value", ["Ada", "Grace", "Linus"], f"{site}/")
     finally:
         await session.aclose()
@@ -304,3 +309,28 @@ async def test_the_tool_is_a_click_of_medium_risk_and_what_it_gives_back_is_untr
     failed: ToolResult = await thrown.run(ctx)
     assert (failed.is_error, failed.untrusted) == (True, True)
     assert failed.text.startswith("The script threw an error") and "Error: boom" in failed.text
+
+
+async def test_the_tool_keeps_a_script_off_a_page_with_a_secret_field_and_hides_the_cookies_outside_yolo(
+    runtime: Runtime, site: str
+) -> None:
+    """The tool hands the run's approval mode to the session (item 533): outside yolo a script is refused on a page that
+    holds a password field, a value Chrome filled in too, and what it gives back shows no cookie value; a yolo run reads
+    all it is shown (item 443)."""
+    ctx: ToolContext = await _run_context(runtime)
+    eval_tool = runtime.registry.tools["browser_eval"]
+    await ctx.browser.open_url(ctx.thread_id, f"{site}/login", True)
+    refused: PreparedCall = await eval_tool.prepare({"script": "document.querySelector('input').value"}, ctx)
+    with pytest.raises(BrowserError, match="a script stays off a page that holds a password"):
+        await refused.run(ctx)
+    yolo: ToolContext = replace(ctx, approvals="yolo")
+    shown: ToolResult = await (await eval_tool.prepare({"script": "document.querySelector('input').value"}, yolo)).run(
+        yolo
+    )
+    assert (shown.is_error, "hunter2" in shown.text) == (False, True)
+    await ctx.browser.open_url(ctx.thread_id, f"{site}/", True)
+    script: str = "() => { document.cookie = 'session=abcdef0123456789; path=/'; return document.cookie; }"
+    hidden: ToolResult = await (await eval_tool.prepare({"script": script}, ctx)).run(ctx)
+    assert "abcdef0123456789" not in hidden.text and "session=[hidden]" in hidden.text, hidden.text
+    visible: ToolResult = await (await eval_tool.prepare({"script": "document.cookie"}, yolo)).run(yolo)
+    assert "session=abcdef0123456789" in visible.text, visible.text

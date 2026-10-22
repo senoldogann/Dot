@@ -303,8 +303,12 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   typed, and a failure of the page is told without what you typed. You act there, not Dot: nothing passes the policy,
   and in Dot's own Chrome the URL rules judge where your taps lead as they judge a run's; in your own Chrome (`attach`)
   they do not, as for a run's clicks. In `yolo` nothing is masked (item 443): the run reads all it is shown. A page
-  script (`browser_eval`) can still read a field's value, and that step is judged as any other; the live Screen view you
-  watch is not masked.
+  script (`browser_eval`) reads a field's value whole, a value Chrome filled in from its password manager too, so
+  outside `yolo` it is refused on a page that holds such a field, in any frame (item 533: use the other browser tools,
+  which hide it, or take over), and what it gives back shows each value of the site's cookies, long enough to be a
+  session, as `[hidden]`. A script can still encode what it reads, and read what the page keeps in local storage; the
+  live Screen view you watch is not masked. A key that pastes (`Control+V`, `Meta+V`, `Shift+Insert`) is refused in
+  such a field as typed text is.
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).

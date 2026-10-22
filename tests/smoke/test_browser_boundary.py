@@ -318,7 +318,7 @@ async def test_a_popup_a_page_opens_to_the_interface_never_reaches_it(
     await act(browser, "popup", [Step(action="click", ref=ref_of(view.body, 'link "Open inside"'))], False)
     await _settled()
     assert _InsideHandler.arrivals.items == []
-    await browser.run_script("popup", f"window.open('{inside}/opened'); 'opened'", 5.0)
+    await browser.run_script("popup", f"window.open('{inside}/opened'); 'opened'", 5.0, False)
     await _settled()
     assert _InsideHandler.arrivals.items == []
 
@@ -330,7 +330,10 @@ async def test_a_resource_a_fetch_and_a_script_of_the_page_are_refused(
     await _settled()
     assert _InsideHandler.arrivals.of("/pixel.png") == []
     fetched: ScriptRun = await browser.run_script(
-        "resource", f"fetch('{inside}/api/status').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)", 10.0
+        "resource",
+        f"fetch('{inside}/api/status').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)",
+        10.0,
+        False,
     )
     assert "failed" in fetched.text, fetched
     # The owner's input to a held run's page (item 470): a page cannot post it either.
@@ -340,11 +343,12 @@ async def test_a_resource_a_fetch_and_a_script_of_the_page_are_refused(
         "body: JSON.stringify({events: [{kind: 'text', text: 'from the page'}]})})"
         ".then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)",
         10.0,
+        False,
     )
     assert "failed" in posted.text, posted
     # A script that sends the tab there: the request is refused, and the tab is reset as after a redirect there.
     with pytest.raises(ForbiddenUrlError) as refused:
-        await browser.run_script("resource", f"() => {{ location.href = '{inside}/script'; }}", 10.0)
+        await browser.run_script("resource", f"() => {{ location.href = '{inside}/script'; }}", 10.0, False)
     assert refused.value.url == f"{inside}/script" and "Dot's own interface" in refused.value.reason, refused.value
     assert browser.current_url("resource") == "about:blank"
     assert _InsideHandler.arrivals.items == []
@@ -356,9 +360,10 @@ async def test_a_service_worker_fetches_nothing_for_the_page(browser: BrowserSes
         "worker",
         "navigator.serviceWorker.register('/sw.js').then(() => 'registered', (e) => 'refused: ' + e.name)",
         10.0,
+        False,
     )
     through: ScriptRun = await browser.run_script(
-        "worker", "fetch('/through-worker').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)", 10.0
+        "worker", "fetch('/through-worker').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)", 10.0, False
     )
     assert _InsideHandler.arrivals.items == [], (registered, through)
 
@@ -456,7 +461,7 @@ async def test_the_pages_and_resources_of_other_servers_load_as_before(browser: 
     view: PageView = await browser.open_url("plain", f"{site}/", True)
     assert view.title == "Outside" and view.status == 200
     own: ScriptRun = await browser.run_script(
-        "plain", "fetch('/own.png').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)", 10.0
+        "plain", "fetch('/own.png').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)", 10.0, False
     )
     assert "status 200" in own.text, own
 

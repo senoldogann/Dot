@@ -175,7 +175,7 @@ def _ended() -> ScreenHold:
 
 async def _read(browser: BrowserSession, thread: str, script: str) -> object:
     """What ``script`` gives back in the thread's page (its value comes as JSON)."""
-    ran: ScriptRun = await browser.run_script(thread, script, _SCRIPT_S)
+    ran: ScriptRun = await browser.run_script(thread, script, _SCRIPT_S, False)
     value: object = json.loads(ran.text)
     return value
 

@@ -117,7 +117,7 @@ async def test_dots_chrome_takes_devtools_connections_on_the_port(site: str, pro
             assert await mine.title() == "Other"
             await mine.close()
         # The script is gone and the run's tab is the session's still.
-        title: ScriptRun = await session.run_script("run", "document.title", 10.0)
+        title: ScriptRun = await session.run_script("run", "document.title", 10.0, False)
         assert (title.end, json.loads(title.text)) == ("value", "Home")
     finally:
         await session.aclose()

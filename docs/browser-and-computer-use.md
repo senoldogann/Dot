@@ -177,8 +177,11 @@ Both modes share what follows.
   fenced as the page's text and makes the run untrusted. As an action it is a click of medium risk on the tab's page:
   the aggressive and balanced presets allow it, the cautious preset asks, a research run does not have it and a `yolo`
   run does it without asking. What the script does inside the page is not checked or paced action by action, as
-  `browser_act`'s steps are. It takes the place of AppleScript's `execute javascript`, which lands in the front window
-  of whichever Chrome macOS picks when several run (item 263).
+  `browser_act`'s steps are. Outside `yolo` it is refused on a page that holds a password, one-time-code or card field,
+  in any frame (a script reads a field's value whole, one Chrome filled in too), and what it gives back shows the
+  values of the site's cookies, the ones long enough to be a session, as `[hidden]` (item 533). It takes the place of
+  AppleScript's `execute javascript`, which lands in the front window of whichever Chrome macOS picks when several run
+  (item 263).
 - `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
   call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",

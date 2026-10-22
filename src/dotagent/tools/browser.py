@@ -510,7 +510,9 @@ def _eval_tool() -> RegisteredTool:
 
     async def run(args: EvalArgs, ctx: ToolContext) -> ToolResult:
         waited_s: float = args.timeout_s or _DEFAULT_SCRIPT_S
-        script_run: ScriptRun = await ctx.browser.run_script(ctx.thread_id, args.script, waited_s)
+        script_run: ScriptRun = await ctx.browser.run_script(
+            ctx.thread_id, args.script, waited_s, hides_secrets(ctx.approvals)
+        )
         rendered: str = render_script_run(script_run, waited_s, _nonce(), _body_budget(ctx))
         # The value is the page's: the run reads it as untrusted, whatever it says.
         return mark_untrusted(fail(rendered) if script_run.end in ("error", "timeout") else ok(rendered))
@@ -519,7 +521,8 @@ def _eval_tool() -> RegisteredTool:
         name="browser_eval",
         description=(
             "Run JavaScript in your tab's page, with its session, and get the value as JSON: read a whole list or the "
-            "data behind the page, or do many like actions in one call. A thrown error fails the call."
+            "data behind the page, or do many like actions in one call. A thrown error fails the call. It is refused "
+            "on a page that holds a password, code or card field, and cookie values come back as [hidden]."
         ),
         args_model=EvalArgs,
         modes=ACTING_MODES,

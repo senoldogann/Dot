@@ -50,6 +50,11 @@ def test_a_card_field_is_about_money_and_every_other_secret_is_a_credential(
         ("Space", True),
         ("Control+V", True),
         ("Meta+v", True),
+        # Shift+Insert pastes as Control+V does; Insert alone and Control+Insert (copy) put nothing in.
+        ("Shift+Insert", True),
+        ("shift+insert", True),
+        ("Insert", False),
+        ("Control+Insert", False),
         ("Enter", False),
         ("Tab", False),
         ("Backspace", False),
