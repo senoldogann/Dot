@@ -278,8 +278,9 @@ and Settings › Memory and `dotx memory list` say of such a note that it was sa
   `~/.password-store`), the keys that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them), the shell's
   history, Messages and Mail (`[policy] protected_paths`; a list of your own replaces
   this one), nor Dot's own key file, token, what signing in to an MCP server gave it, browser profiles, configuration,
-  database and journals of file changes. The
-  configuration holds the policy and the MCP servers, the database the rules, the journals what `dotx undo` writes back.
+  database, the copies of the database (`[store] backup_dir`, and `<home>/backups-partial` while one is made, item
+  526) and journals of file changes. The configuration holds the policy and the MCP servers, the database the rules,
+  a copy all of the database and what you go back to, the journals what `dotx undo` writes back.
   In any mode, a tool that names files (the file tools, `web_extract`, `browser_upload`) looks at them again as it
   starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
   and called again it is decided for where the path leads now. A path is judged by the place it names (item 399):

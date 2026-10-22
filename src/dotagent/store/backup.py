@@ -29,8 +29,9 @@ log = get_logger(__name__)
 BACKUP_SUFFIX: str = ".sqlite3.gz"
 _NAME: re.Pattern[str] = re.compile(r"dot-(\d{8}-\d{6})\.sqlite3\.gz")
 # What a copy under way writes before it is whole, by the time it was begun and the process that makes it: the
-# uncompressed copy in Dot's home, and the compressed one in the copies' folder. Only these names are ever cleared.
-_RAW_PARTIAL: re.Pattern[str] = re.compile(r"\.backup-\d{8}-\d{6}-\d+\.sqlite3\.partial")
+# uncompressed copy (and the journal SQLite keeps beside it) in a folder of Dot's home that runs may not reach, and
+# the compressed one in the copies' folder. Only these names are ever cleared.
+_RAW_PARTIAL: re.Pattern[str] = re.compile(r"\.backup-\d{8}-\d{6}-\d+\.sqlite3\.partial(?:-journal|-wal|-shm)?")
 _PACKED_PARTIAL: re.Pattern[str] = re.compile(r"\.dot-\d{8}-\d{6}-\d+\.sqlite3\.gz\.partial")
 # A partial file older than this was left by a copy that was cut off: no copy takes that long.
 _LEFTOVER_S: float = 3600.0
@@ -51,6 +52,12 @@ class Backup(FrozenModel):
     path: str
     made_at: float
     size: int
+
+
+def partial_folder() -> Path:
+    """Where a copy under way writes its uncompressed file: a folder of Dot's home, guarded from runs as the database
+    is (``runtime._guarded_files``)."""
+    return dot_home() / "backups-partial"
 
 
 def backup_folder(config: StoreConfig) -> Path:
@@ -114,15 +121,16 @@ def _clear_leftovers(directory: Path, pattern: re.Pattern[str], now: float) -> N
 
 
 def make_backup(database: Path, folder: Path, now: float) -> Backup:
-    """Copy ``database`` into ``folder`` as it stands at ``now``: SQLite's online backup into a hidden file of Dot's
-    home (0600), checked with ``quick_check``, compressed into ``folder`` under a hidden name and renamed when it is
-    whole. Both hidden names hold the process's id, so two copies at once never share one, and what a copy cut off
-    left is cleared by the next. Raises StoreError for a database that is not there and for a copy that is
-    damaged."""
+    """Copy ``database`` into ``folder`` as it stands at ``now``: SQLite's online backup into a hidden file of
+    :func:`partial_folder` (0600), checked with ``quick_check``, compressed into ``folder`` under a hidden name and
+    linked to its own name when it is whole. Both hidden names hold the process's id, so two copies at once never share
+    one, and what a copy cut off left is cleared by the next. Raises StoreError for a database that is not there and for
+    a copy that is damaged."""
     if not database.is_file():
         raise StoreError("there is no database to copy", {"database": str(database)})
     folder.mkdir(mode=_FOLDER_MODE, parents=True, exist_ok=True)
-    home: Path = dot_home()
+    home: Path = partial_folder()
+    home.mkdir(mode=_FOLDER_MODE, parents=True, exist_ok=True)
     _clear_leftovers(home, _RAW_PARTIAL, now)
     _clear_leftovers(folder, _PACKED_PARTIAL, now)
     stamp: str = datetime.fromtimestamp(now, UTC).strftime(_STAMP_FORMAT)
@@ -189,7 +197,8 @@ async def keep_backups(config: StoreConfig, database: Path) -> None:
             copies: list[Backup] = await asyncio.to_thread(list_backups, folder)
             last: float | None = copies[0].made_at if copies else None
             if last is not None:
-                await asyncio.sleep(max(0.0, last + every_s - time.time()))
+                # Never longer than an interval: a copy named from a clock ahead must not hold the next one back.
+                await asyncio.sleep(min(every_s, max(0.0, last + every_s - time.time())))
                 if not await asyncio.to_thread(changed_since, database, last):
                     # Nothing to copy: look again soon, so that a write after a quiet spell is copied soon too.
                     await asyncio.sleep(min(every_s, _QUIET_POLL_S))

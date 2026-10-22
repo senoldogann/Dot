@@ -199,19 +199,22 @@ def test_a_copy_clears_what_a_copy_cut_off_left_and_nothing_else(tmp_path: Path,
     folder: Path = tmp_path / "copies"
     folder.mkdir()
     old: float = time.time() - 7200.0
-    left_raw: Path = home / ".backup-20270101-000000-4242.sqlite3.partial"
+    partials: Path = home / "backups-partial"
+    partials.mkdir()
+    left_raw: Path = partials / ".backup-20270101-000000-4242.sqlite3.partial"
+    left_journal: Path = partials / ".backup-20270101-000000-4242.sqlite3.partial-journal"
     left_packed: Path = folder / ".dot-20270101-000000-4242.sqlite3.gz.partial"
     young: Path = folder / ".dot-20270101-000001-4243.sqlite3.gz.partial"
-    others: list[Path] = [home / ".backup-notes.partial", folder / ".hidden", home / "dot.sqlite3.partial"]
-    for path in (left_raw, left_packed, young, *others):
+    others: list[Path] = [partials / ".backup-notes.partial", folder / ".hidden", home / "dot.sqlite3.partial"]
+    for path in (left_raw, left_journal, left_packed, young, *others):
         path.write_text("left", encoding="utf-8")
-    for path in (left_raw, left_packed, *others):
+    for path in (left_raw, left_journal, left_packed, *others):
         os.utime(path, (old, old))
     make_backup(database, folder, time.time())
-    assert not left_raw.exists() and not left_packed.exists()
+    assert not left_raw.exists() and not left_journal.exists() and not left_packed.exists()
     assert young.exists() and all(path.exists() for path in others)
     # The copy's own uncompressed file is gone once it is whole.
-    assert not any(path.name.startswith(".backup-2") for path in home.iterdir())
+    assert not any(path.name.startswith(".backup-2") for path in partials.iterdir())
 
 
 async def test_the_daemon_s_loop_copies_at_once_when_no_copy_is_there(tmp_path: Path) -> None:
