@@ -5,7 +5,7 @@
 // comes on the run's stream as a `recap` event. Its button writes one at once.
 
 import { api } from "./api.js";
-import { el, modelName } from "./dom.js";
+import { el, hourMinute, modelName } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 
@@ -46,7 +46,7 @@ export function recapSection({ runId, signal }) {
     }
     text.replaceChildren(...view.recap.text.split("\n").map((line) => el("p", null, line)));
     const behind = view.steps > view.recap.steps ? ` of ${view.steps}` : "";
-    meta.textContent = `As of step ${view.recap.steps}${behind} · ${modelName(view.recap.model)}`;
+    meta.textContent = `As of step ${view.recap.steps}${behind} · ${modelName(view.recap.model)} · Updated ${hourMinute(view.recap.written_at)}`;
   }
 
   function failed(error) {

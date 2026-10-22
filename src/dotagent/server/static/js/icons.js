@@ -223,6 +223,12 @@ const SHAPES = {
     ["circle", { cx: 6, cy: 18, r: 3 }],
     ["path", { d: "M18 9a9 9 0 0 1-9 9" }],
   ],
+  // A hammer, its head upright with the eye at its right: what a run's skills are (item 539).
+  hammer: [
+    ["path", { d: "M5.8 8.7 16.9 6.1a2.1 2.1 0 0 1 2.5 1.6l.4 1.8a1.5 1.5 0 0 1-1.5 1.8l-3 .2" }],
+    ["path", { d: "M10.4 11V20a1.6 1.6 0 0 0 3.2 0v-8.8" }],
+    ["circle", { cx: "17.6", cy: "8.5", r: "1.4" }],
+  ],
   sparkle: [
     [
       "path",

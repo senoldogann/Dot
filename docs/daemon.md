@@ -318,14 +318,21 @@ what waits for you, written by the fast model (`[models] fast`; the run's own mo
 run's record (its task, status, plan, the questions that wait for you and its conversation), with no tools and the
 record taken for data, never for instructions. The run never sees it, the secrets Dot holds are masked in it, and it
 is kept as a `recap` event of the run, its model call counted with the purpose `recap`. Under it stand the step it is
-as of and its model; its button writes it again. One is due once the run took `[recap] first_after_steps` steps (4),
-then every `every_steps` steps more (8), and once more when the run ended after the last; a page asks for one only
+as of, its model and the time it was written (`Updated 17:27`); its button writes it again. One is due once the run
+took `[recap] first_after_steps` steps (4), then every `every_steps` steps more (8), and once more when the run ended
+after the last; a page asks for one only
 while the section is in sight, and as the run takes steps at most every 20 seconds, never two at once for one run, and
 after a write that failed it shows why and asks no more until its button is pressed or a recap arrives;
-`[recap] enabled = false` writes none and hides the section. In the side panel (Run details),
-under More on the Run tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the
-minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the input tokens with the
-share the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps), the runs
+`[recap] enabled = false` writes none and hides the section. Under the recap stand what the run is made of, each
+section only when it has a row (item 539): **Skills & MCP** (the skills and servers the palette names, each opening
+Customize), **Artifacts** (the files the chat wrote with their added and removed lines, each opening the Changes tab
+where the diff is), **Web reading** (the pages it fetched and the searches it made, a page opening in a new tab; a
+fetch that failed is not a page it read) and **Memory updated** (the notes it saved, corrected or forgot, each opening
+its note in Settings › Memory). Each row wears its mark on a tile, a file the letters of its kind. In the side panel
+(Run details), under More on the Run tab, **Cost** lists the bill of the run, each value beside its label as in
+Details: where the minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the
+input tokens with the share the provider served from its cache, the output tokens, the compactions (with their rate per
+100 steps), the runs
 it delegated and the web searches by engine, and a figure of none has no line (item 452). It is
 `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run
 ID`), read again every ten seconds while the run works and once at its end. A strip under the head links the other runs
@@ -396,14 +403,14 @@ written in again (item 447).
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
-at the head of the conversation. The panel is one card on the composer's corner, in five tabs
-(item 203): **Run** (Details, the conversation's Files, and under More the run's mode, start and id, how it was Set
-up and its Cost; item 452), **Changes** (the files the
+at the head of the conversation. The panel is one surface on the composer's corner, in five tabs
+(item 203): **Run** (the Recap and the four sections under it (item 539), Details, the conversation's Files, and under
+More the run's mode, start and id, how it was Set up and its Cost; item 452), **Changes** (the files the
 chat's runs wrote or created with `write_file` and `edit_file`, up to this run, which the tab counts: each with what
 became of it and the lines added and removed, opening on its unified diff from before the chat's first change to it;
 `GET /api/runs/{id}/changes`, item 368), **Plan** (its steps; the tab says how many are done), **Agents** (the agents
 of the chat) and **Screen** (Dot's computer and the screenshots, which the tab counts). A tab shows its sections open,
-on hairlines, except Screenshots on the Screen tab, which folds away from its title and stays folded in this browser
+except Screenshots on the Screen tab, which folds away from its title and stays folded in this browser
 (`dot.fold.panel.run-screen`, item 426); the arrow keys, Home and End move between the tabs, and the tab chosen last is kept in the browser
 (`dot.panelTab`). Beside the conversation the panel slides in as it is shown and out before it hides, the conversation
 taking its room back once the slide is over, at once under reduced motion (item 220). It stands at the window's right

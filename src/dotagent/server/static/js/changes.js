@@ -54,9 +54,9 @@ function fileRow(file, open) {
 
 /**
  * The Changes section of the run `runId`'s chat: `refresh()` reads them again, a file opened staying open; `onCount(n)`
- * gets the number of files each time.
+ * gets the number of files each time, `onFiles(files)` the files themselves.
  */
-export function changesSection({ runId, onCount }) {
+export function changesSection({ runId, onCount, onFiles }) {
   const body = el("div", { class: "changes" });
   const section = panelSection({ id: "run-changes", title: "Changes", actions: null, body });
 
@@ -78,6 +78,7 @@ export function changesSection({ runId, onCount }) {
         : view.files.map((file) => fileRow(file, opened.has(file.path)))),
     );
     onCount(view.files.length);
+    onFiles(view.files);
   }
 
   return { element: section.element, refresh };
