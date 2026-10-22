@@ -14,23 +14,42 @@ function toolName(tool) {
   return cut === -1 ? tool : tool.slice(cut + 2);
 }
 
+const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+const HOST_AND_PORT = /^[\w-]+(\.[\w-]+)*:\d+/;
+const HOST_LIKE = /^(localhost|[\w-]+(\.[\w-]+)+|\d{1,3}(\.\d{1,3}){3})(:\d+)?([/?#].*)?$/;
+
+/** `address` as the browser's tools read it (browser/safety.py's `normalize_url`): a bare host, or a host and port,
+ * gets `https://`, and a loopback one `http://`. */
+function absoluteAddress(address) {
+  const text = address.trim();
+  if (SCHEME.test(text) && !HOST_AND_PORT.test(text)) {
+    return text;
+  }
+  if (HOST_LIKE.test(text)) {
+    const scheme = text.startsWith("localhost") || text.startsWith("127.0.0.1") ? "http" : "https";
+    return `${scheme}://${text}`;
+  }
+  return text;
+}
+
 /** A page a run read, as a line (the host, without its `www.`, and the path, without a query or a fragment) and the
  * address it points at; null for anything a browser does not open: another protocol, a local file, a malformed
- * address. */
-function pageReading(address) {
+ * address. `bareHost` reads an address with no scheme as the browser's tools do. */
+function pageReading(address, bareHost = false) {
   if (typeof address !== "string") {
     return null;
   }
+  const text = bareHost ? absoluteAddress(address) : address;
   let url;
   try {
-    url = new URL(address);
+    url = new URL(text);
   } catch {
     return null;
   }
   if ((url.protocol !== "http:" && url.protocol !== "https:") || url.host === "") {
     return null;
   }
-  return { kind: "page", text: `${url.host.replace(/^www\./, "")}${url.pathname}`, url: address };
+  return { kind: "page", text: `${url.host.replace(/^www\./, "")}${url.pathname}`, url: text };
 }
 
 /**
@@ -45,10 +64,12 @@ export function readingsOf(tool, args) {
     return query === "" ? [] : [{ kind: "search", text: query }];
   }
   if (name === "web_extract") {
-    return (Array.isArray(args.sources) ? args.sources : []).map(pageReading).filter((reading) => reading !== null);
+    return (Array.isArray(args.sources) ? args.sources : [])
+      .map((source) => pageReading(source))
+      .filter((reading) => reading !== null);
   }
   if (PAGE_TOOLS.has(name)) {
-    const reading = pageReading(args.url);
+    const reading = pageReading(args.url, true);
     return reading === null ? [] : [reading];
   }
   return [];

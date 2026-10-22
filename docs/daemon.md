@@ -403,14 +403,14 @@ written in again (item 447).
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
-at the head of the conversation. The panel is one card on the composer's corner, in five tabs
-(item 203): **Run** (Details, the conversation's Files, and under More the run's mode, start and id, how it was Set
-up and its Cost; item 452), **Changes** (the files the
+at the head of the conversation. The panel is one surface on the composer's corner, in five tabs
+(item 203): **Run** (the Recap and the four sections under it (item 539), Details, the conversation's Files, and under
+More the run's mode, start and id, how it was Set up and its Cost; item 452), **Changes** (the files the
 chat's runs wrote or created with `write_file` and `edit_file`, up to this run, which the tab counts: each with what
 became of it and the lines added and removed, opening on its unified diff from before the chat's first change to it;
 `GET /api/runs/{id}/changes`, item 368), **Plan** (its steps; the tab says how many are done), **Agents** (the agents
 of the chat) and **Screen** (Dot's computer and the screenshots, which the tab counts). A tab shows its sections open,
-on hairlines, except Screenshots on the Screen tab, which folds away from its title and stays folded in this browser
+except Screenshots on the Screen tab, which folds away from its title and stays folded in this browser
 (`dot.fold.panel.run-screen`, item 426); the arrow keys, Home and End move between the tabs, and the tab chosen last is kept in the browser
 (`dot.panelTab`). Beside the conversation the panel slides in as it is shown and out before it hides, the conversation
 taking its room back once the slide is over, at once under reduced motion (item 220). It stands at the window's right

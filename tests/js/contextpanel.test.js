@@ -21,6 +21,13 @@ test("a page a tool opened or read, as a line and the address it points at", () 
   assert.deepEqual(readingsOf("browser_open", { url: "http://example.com/guide" }), [
     { kind: "page", text: "example.com/guide", url: "http://example.com/guide" },
   ]);
+  // A bare host gets https://, as the browser's tools give it; a loopback one http://.
+  assert.deepEqual(readingsOf("browser_open", { url: "example.com/guide" }), [
+    { kind: "page", text: "example.com/guide", url: "https://example.com/guide" },
+  ]);
+  assert.deepEqual(readingsOf("web_fetch", { url: "localhost:8080/notes" }), [
+    { kind: "page", text: "localhost:8080/notes", url: "http://localhost:8080/notes" },
+  ]);
   // A crawl reads its root; each page of it is the same site.
   assert.deepEqual(readingsOf("web_crawl", { url: "https://example.com/docs/" }), [
     { kind: "page", text: "example.com/docs/", url: "https://example.com/docs/" },
