@@ -9,7 +9,9 @@ from dotagent.mcp.catalogue import MCP_SERVICES, McpService
 from dotagent.mcp.launch import referenced_secrets
 from dotagent.mcp.signin import checked_link
 from dotagent.server.routes_mcp import (
+    FIRST_START_S,
     chosen_tools,
+    first_try,
     kept_secret_names,
     requested_server,
     secret_entries,
@@ -58,10 +60,29 @@ def test_each_service_of_the_catalogue_is_a_server_dot_can_have() -> None:
         if service.kind == "remote":
             assert config.url is not None and config.url.startswith("https://") and config.command is None
         else:
-            assert config.command in ("npx", "uvx") and config.url is None and not service.signs_in
+            # Started on this Mac: a package of its registry (npx, uvx), or a tool of Xcode's own (xcrun, item 535).
+            assert config.command in ("npx", "uvx", "xcrun") and config.url is None and not service.signs_in
         # Its secrets are referred to by the names Dot keeps them under, nothing else is.
         kept: set[str] = set(kept_secret_names(service).values())
         assert set(referenced_secrets(config)) == kept, service.id
+
+
+def test_the_try_that_adds_a_server_of_this_mac_waits_for_its_package_and_the_server_kept_does_not() -> None:
+    """Item 535: npx and uvx fetch a server's package on its first start, which took from 52 seconds to more than five
+    minutes on a cold cache; the try that adds it is given FIRST_START_S, the server kept keeps its own limit, which a
+    daemon start waits for."""
+    local: McpServerConfig = service_config(next(service for service in MCP_SERVICES if service.id == "firebase"))
+    assert local.startup_timeout_s == 60.0
+    tried: McpServerConfig = first_try(local)
+    assert tried.startup_timeout_s == FIRST_START_S == 300.0
+    assert tried.model_copy(update={"startup_timeout_s": local.startup_timeout_s}) == local
+    by_hand: McpServerConfig = requested_server(_asked(None, "notes", "npx -y notes-server"))
+    assert first_try(by_hand).startup_timeout_s == FIRST_START_S
+    # A limit longer already, and a server at a URL, whose try waits for the sign-in instead, are left as they are.
+    patient: McpServerConfig = local.model_copy(update={"startup_timeout_s": 900.0})
+    assert first_try(patient) == patient
+    remote: McpServerConfig = service_config(next(service for service in MCP_SERVICES if service.id == "notion"))
+    assert first_try(remote) == remote
 
 
 def test_a_service_s_secrets_are_asked_for_by_name_and_kept_under_dot_s_own_names() -> None:
