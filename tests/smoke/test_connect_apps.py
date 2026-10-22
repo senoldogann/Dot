@@ -186,10 +186,15 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await expect(page.locator(".plugin-section[data-section='code'] .plugin-tile")).to_have_count(
                 members["code"]
             )
+            # A chip and a search that find nothing together say so, rather than leave the page empty.
+            search: Locator = page.get_by_role("searchbox", name="Search connectors")
+            await search.fill("linear")
+            await expect(page.locator(".plugin-section[data-section]")).to_have_count(0)
+            await expect(page.locator(".empty-state")).to_contain_text("No connector matches the search")
+            await search.fill("")
             await chips.locator(".customize-chip[data-chip='all']").click()
             await expect(titles).to_have_text([_TITLES[section] for section in shown_sections])
             # The search keeps its focus while the cards are drawn anew, and a card says its step in words.
-            search: Locator = page.get_by_role("searchbox", name="Search connectors")
             await search.press_sequentially("linear")
             await expect(search).to_be_focused()
             await expect(page.locator(".plugin-tile[data-plugin]")).to_have_count(1)
@@ -197,6 +202,11 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await search.fill("")
             wide: int = await page.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
             assert wide <= 0, wide
+            # Back from Customize the button reads the servers that are ready again: here, the same one.
+            async with page.expect_response(lambda response: response.url.endswith("/api/mcp/servers")):
+                await page.get_by_role("link", name="Agents").click()
+            await expect(button).not_to_have_attribute("data-current", "")
+            await expect(marks).to_have_count(1)
             assert errors == []
 
             # On a phone: a round button at the foot of the list of chats, which opens the same page.

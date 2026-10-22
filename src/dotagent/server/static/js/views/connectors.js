@@ -453,7 +453,8 @@ export function mount(root, ctx) {
     const showing = catalogue.plugins.filter((plugin) => (shown === "all" || catalogue.connected(plugin)) && matches(plugin));
     const others = catalogue.servers.servers.filter((server) => server.service === null && (words === "" || foldSearch(`${server.name} ${server.address}`).includes(words)));
     const parts = sections(showing);
-    if (others.length > 0 && (shown === "connected" || words !== "")) {
+    // The servers of no service belong to no section: a chip that shows one section alone leaves them out.
+    if (others.length > 0 && chosen === "all" && (shown === "connected" || words !== "")) {
       parts.push(
         el(
           "section",
@@ -463,11 +464,13 @@ export function mount(root, ctx) {
         ),
       );
     }
-    if (showing.length === 0 && (others.length === 0 || shown === "all")) {
+    // Nothing drawn, whatever left it out (the search, Connected, a chip): the page says so rather than stand empty.
+    if (parts.every((part) => part === null)) {
+      const everywhere = chosen === "all" ? "" : "The chip All looks in every section.";
       parts.push(
         words !== ""
-          ? emptyPanel("search", "No connector matches the search", "")
-          : emptyPanel("plug", "Dot is connected to nothing yet", "All lists what it works with."),
+          ? emptyPanel("search", "No connector matches the search", everywhere)
+          : emptyPanel("plug", chosen === "all" ? "Dot is connected to nothing yet" : "Dot is connected to nothing in this section", "All lists what it works with."),
       );
     }
     parts.push(

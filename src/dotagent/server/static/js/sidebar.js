@@ -1247,8 +1247,13 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       mark(campaignsLink, tab === "campaigns");
       mark(schedulesLink, tab === "schedules");
       mark(settingsLink, tab === "settings");
-      // Customize is reached from Connect apps (item 545), which stands for it while it is open.
+      // Customize is reached from Connect apps (item 545), which stands for it while it is open; on the way back from
+      // it, where a server may have been connected or removed, the marks of the servers that are ready are read again.
+      const leavingCustomize = connectButton.hasAttribute("data-current") && tab !== "customize";
       connectButton.toggleAttribute("data-current", tab === "customize");
+      if (leavingCustomize) {
+        paintConnected();
+      }
       routeRunId = runId;
       routeThreadId = null;
       keptUnread = null;

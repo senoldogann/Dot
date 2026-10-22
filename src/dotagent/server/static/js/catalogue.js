@@ -1,9 +1,9 @@
 // The services Dot works with and where each stands (item 316), for Customize › Connectors (views/connectors.js), where
 // Connect apps leads (item 545): the listings of `GET /plugins`, the applications of `GET /connections` and the MCP
-// servers of `GET /mcp/servers`, the first step each service offers and the steps under way. The steps are Connect apps' (items 278 and 279): macOS's question for an application of the Mac, and after a no
-// the Automation pane of System Settings; OneDrive itself, to sign in; the sign-in page in Dot's browser for an
-// application of the web; an MCP server that Dot tries first, and signs in to in this browser on the service's own page
-// when it asks.
+// servers of `GET /mcp/servers`, the first step each service offers and the steps under way. The steps (items 278 and
+// 279) are macOS's question for an application of the Mac, and after a no the Automation pane of System Settings;
+// OneDrive itself, to sign in; the sign-in page in Dot's browser for an application of the web; an MCP server that Dot
+// tries first, and signs in to in this browser on the service's own page when it asks.
 
 import { api, blobUrl } from "./api.js";
 import { clip, el, plural } from "./dom.js";
@@ -37,8 +37,8 @@ const MCP_POLL_MS = 2000;
 
 /**
  * A service's mark on its tile: its logo in its own colours on a tile that is light in both colour schemes, else the
- * interface's icon or the plug on a tile of the listing's colour (item 542). `appIcon` is the pending `blob:` URL of the
- * icon of the application of this Mac the service stands for, as the owner has it installed
+ * interface's icon or the plug on a tile of the listing's colour (item 542). `appIcon` is the pending `blob:` URL of
+ * the icon of the application of this Mac the service stands for, as the owner has it installed
  * (`GET /connections/{id}/icon`), or null; the icon takes the tile's place once it is read, and the mark is as drawn
  * meanwhile, and as it stays when the icon cannot be read (the one that asked says why).
  */
