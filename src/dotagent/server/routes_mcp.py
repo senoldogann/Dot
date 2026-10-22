@@ -301,9 +301,10 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             error=error,
             link=attempt.link if attempt is not None and attempt.running() else None,
             signs_in=config.oauth,
-            # A server that runs may have its tools cut down, and one left out with an allow list may have the list
-            # chosen again (it names a tool the server no longer offers, or one whose schema Dot cannot use).
-            picks_tools=state == "ready" or (state == "left_out" and bool(config.allow)),
+            # A server added on the page that runs may have its tools cut down, and one left out with an allow list may
+            # have the list chosen again (it names a tool the server no longer offers, or one whose schema Dot cannot
+            # use). The others keep their tools where they were set up.
+            picks_tools=origin == "connected" and (state == "ready" or (state == "left_out" and bool(config.allow))),
         )
 
     async def listing() -> McpServersView:
@@ -472,7 +473,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         await hub.connect(kept)
         await asyncio.to_thread(keep_connected, connected_servers_path(), kept)
         refresh_mcp_tools(ctx.runtime.registry, hub)
-        # The try that failed for too many tools is over: the server is kept now, with its choice.
+        # A try of the server that failed or is under way is over: the server is kept now, with its choice.
         tries.pop(name, None)
         log.info("mcp_tools_chosen", server=name, tools=len(kept.allow))
         return view(kept, "connected")

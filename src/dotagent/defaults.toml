@@ -8,7 +8,7 @@
 #   command = "npx"                     # started with the PATH of your login shell
 #   args = ["-y", "some-mcp-server"]
 #   env = { NOTES_TOKEN = "${NOTES_TOKEN}" }   # ${NAME} is looked up like an API key (environment, .env, Keychain)
-#   allow = ["search", "read_note"]     # offer only these tools; empty = all of them (at most 30)
+#   allow = ["search", "read_note"]     # offer only these tools; empty = all of them, however many
 #   enabled = true
 #   startup_timeout_s = 60.0
 #   call_timeout_s = 120.0
@@ -281,7 +281,8 @@ steer_single_actions = true
 # search and saving, delegation, skills, the plan and finish) and the groups the thread already used. The other groups
 # (browser, desktop, schedule, memory_admin, one per MCP server) are listed in the prompt; a group is turned on when the
 # model calls use_tools or one of its tools, and stays on for the rest of the run. "auto": grouped for a model of the
-# weak tier or whose window cut the context budget, full otherwise. "full" until evals show that groups help.
+# weak tier or whose window cut the context budget, full otherwise. "full" until evals show that groups help. A run of
+# more than 128 tools starts grouped whatever this says, as some providers take no more in one request (item 524).
 tool_surface = "full"
 # How much the system prompt says (item 280). "full": how to work, each kind of tool at length, trust and safety.
 # "lean": the same rules of trust and safety, of hesitating and of how a run ends, and how to work and each kind of
