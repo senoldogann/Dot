@@ -3067,7 +3067,7 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
         ran: list[Finding] | None = _assess_runner(command, args, scope, given)
         if ran is not None:
             return ran
-    if command.casefold() == "pbpaste":
+    if command == "pbpaste":
         return [_reads_the_clipboard()]
     if command == "xargs":
         return _assess_xargs(args, scope, given)
