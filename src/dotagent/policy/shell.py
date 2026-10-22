@@ -2457,14 +2457,13 @@ _RECURSE_COPY: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*[rRa][A-Za-z0-9]*")
 _TAR_CREATES: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*c[A-Za-z0-9]*|c[A-Za-z0-9]*")
 
 
-def _searched(operands: list[str], *, pattern: bool) -> list[str]:
-    """The folders a search may read, as its operands give them. Which operand is a folder is not told without each
-    tool's options (the pattern and the value of an option such as ``-A 30`` stand among them), so every one may be; and
-    the directory the line is in is read too, unless an operand after the pattern plainly is a folder: a path, ``~``,
-    a variable (``grep -r -A 30 'PRIVATE KEY'`` reads the whole directory, whatever its first operand is)."""
-    given: list[str] = operands[1:] if pattern else operands
-    plain: bool = any("/" in word or word in (".", "..") or word.startswith(("~", "$")) for word in given)
-    return operands if plain else [*operands, "."]
+def _searched(operands: list[str]) -> list[str]:
+    """The folders a search may read, as its operands give them, and the directory the line is in. Which operand is a
+    folder is not told without each tool's options (the pattern and the value of an option such as ``-A 30`` or
+    ``--ignore-file /dev/null`` stand among them, and one can look like a path), and a search given no folder reads the
+    directory the line is in; so every operand may be one, and that directory is always counted, which costs a question
+    from the home folder, not a miss."""
+    return [*operands, "."]
 
 
 def _walked_roots(command: str, args: list[str]) -> list[str]:
@@ -2480,31 +2479,41 @@ def _walked_roots(command: str, args: list[str]) -> list[str]:
             or bool(long & {"--recursive", "--dereference-recursive"})
             or "recurse" in _option_values(args, "-d", "--directories")
         )
-        return _searched(operands, pattern=True) if recursive else []
+        return _searched(operands) if recursive else []
     if command in _RECURSIVE_SEARCHES:
         # ``rg --files`` lists the names of the files and reads none of them.
-        return [] if "--files" in long else _searched(operands, pattern=True)
+        return [] if "--files" in long else _searched(operands)
     if command == "git":
         # ``git grep --no-index`` searches the files of a folder as any recursive grep does.
         sub, rest = _git_subcommand(args)
-        return _searched(_positional(rest), pattern=True) if sub == "grep" and "--no-index" in rest else []
+        return _searched(_positional(rest)) if sub == "grep" and "--no-index" in rest else []
     if command in _RECURSIVE_COPIES:
+        # Every operand: the folder a copy goes into may stand anywhere (``cp -R -t dest src``).
         recursive = any(_RECURSE_COPY.fullmatch(word) for word in short) or bool(long & {"--recursive", "--archive"})
-        return operands[:-1] if recursive else []
+        return operands if recursive else []
     if command == "ditto":
-        return operands[:-1]
+        return operands
     if command in _TARS:
         creates: bool = any(_TAR_CREATES.fullmatch(word) for word in [*short, *operands[:1]]) or "--create" in long
         return [*operands, *_option_values(args, "-C", "--directory")] if creates else []
     if command == "zip":
-        return operands[1:] if any(_RECURSE.fullmatch(word) for word in short) else []
+        return operands if any(_RECURSE.fullmatch(word) for word in short) else []
     if command == "find":
         roots, expression = _find_parts(args)
-        return roots if any(word in _FIND_EXEC for word in expression) else []
+        return roots if _runs_a_reader(expression, _FIND_EXEC) else []
     if command == "fd":
         start: int | None = next((index for index, word in enumerate(args) if word in _FD_EXEC), None)
-        return [] if start is None else _searched(_positional(args[:start]), pattern=True)
+        return _searched(_positional(args[:start])) if start is not None and _runs_a_reader(args, _FD_EXEC) else []
     return []
+
+
+def _runs_a_reader(words: list[str], flags: frozenset[str]) -> bool:
+    """Whether ``words`` (the expression of a ``find``, the words of an ``fd``) run a command, by one of ``flags``, that
+    may read the files it is given: one that only prints their names or sizes (:data:`_NAMES_ONLY`) does not."""
+    return any(
+        word in flags and (index + 1 == len(words) or Path(words[index + 1]).name not in _NAMES_ONLY)
+        for index, word in enumerate(words)
+    )
 
 
 def _listed_folders(command: str, args: list[str]) -> list[str]:
@@ -2512,10 +2521,8 @@ def _listed_folders(command: str, args: list[str]) -> list[str]:
     ``fd`` and of ``rg --files`` (:func:`_searched`). Other listings name files the line shows."""
     if command == "find":
         return _find_parts(args)[0]
-    if command == "fd":
-        return _searched(_positional(args), pattern=True)
-    if command in _RECURSIVE_SEARCHES and "--files" in args:
-        return _searched(_positional(args), pattern=False)
+    if command == "fd" or (command in _RECURSIVE_SEARCHES and "--files" in args):
+        return _searched(_positional(args))
     return []
 
 
@@ -2528,6 +2535,23 @@ def _holds_protected(folders: Sequence[str], scope: ShellScope) -> bool:
         for place in _places(folder, scope)
         for location in scope.protected
     )
+
+
+def _substituted_listing(inner: str, scope: ShellScope) -> list[Finding]:
+    """A finding when what the command ``inner``, substituted into the line, prints is a listing of the files under a
+    folder that holds a protected location (item 531): ``cat $(find ~ -name id_rsa)``, the substituted twin of ``find ~
+    -name id_rsa | xargs cat``. The line hands those files to a command the guard cannot follow, which may read them; a
+    listing that goes through ``wc`` or the like prints only a count."""
+    reading: _Reading = _read(inner)
+    tokens: list[str] | None = _tokenize(reading.text)
+    if tokens is None:
+        return []
+    stages: list[list[str]] = []
+    for operator, segment in _commands(_without_patterns(tokens)):
+        stages = [*stages, segment] if operator in ("|", "|&") else [segment]
+    if _holds_protected(_piped(stages, reading.documents).walked, scope):
+        return [_maybe_protected("hands the files a search lists under a folder that holds a protected location on")]
+    return []
 
 
 def _walks_over_protected(command: str, args: list[str], scope: ShellScope) -> list[Finding]:
@@ -3160,6 +3184,7 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
         findings.extend(_fed_a_decode(stages, state))
     for inner in reading.substituted:
         findings.extend(_assess_all(inner, state))
+        findings.extend(_substituted_listing(inner, state))
     return findings
 
 

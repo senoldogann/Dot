@@ -732,7 +732,9 @@ _WALKING_THEM: list[str] = [
     "zip -r9 out.zip ~",
     "git -C ~ grep --no-index -e token",
     "git grep --no-index token ~/Library",
-    # No folder given: the search reads the folder the line is in, whatever an option's value does to its operands.
+    # A search reads the folder the line is in when it is given no folder, and which operand is a folder is not told
+    # without each tool's options: an option's value is an operand (``-A 30``), and can look like a path
+    # (``-f /tmp/p``, ``--ignore-file /dev/null``), so from the home folder a search asks whatever it is given.
     "cd ~ && grep -r 'PRIVATE KEY'",
     "cd ~ && grep -r -A 30 'PRIVATE KEY'",
     "cd ~ && grep -r -m 1 token",
@@ -742,6 +744,25 @@ _WALKING_THEM: list[str] = [
     "cd ~ && fd -H id_rsa -x cat",
     "cd ~ && fd -H -t f id_rsa | xargs cat",
     "cd ~ && rg --files --hidden -g '*id_rsa*' | xargs cat",
+    "cd ~ && grep -r -m 1 -f /tmp/p",
+    "cd ~ && grep -r 'PRIVATE KEY' --exclude-dir /dev/null",
+    "cd ~ && rg 'PRIVATE KEY' --ignore-file /dev/null",
+    "cd ~ && rg --files --ignore-file /dev/null | xargs cat",
+    "cd ~ && fd -H -t f id_rsa --ignore-file /dev/null | xargs cat",
+    "cd ~ && fd -H id_rsa --ignore-file /dev/null -x cat",
+    "cd ~ && git grep --no-index -f /tmp/p",
+    "cd ~ && grep -rn -A 3 TODO ./projects/x",
+    "cd ~ && rg -m 1 TODO ./projects/x",
+    "cd ~ && fd -e py main ./projects -x wc -l",
+    # A copy reads what it copies wherever the operand stands, the folder it copies into too.
+    "cp -R -t ./c ~/Library",
+    # The listing a substitution hands to a command is the twin of the one a pipe hands to xargs.
+    "cat $(find ~ -name id_rsa)",
+    'cat "$(find ~ -name id_rsa | head -1)"',
+    "cat `find ~ -name id_rsa`",
+    'X=$(find ~ -name id_rsa); cat "$X"',
+    "for f in $(find ~/Library -name History.db); do cp $f ./c; done",
+    "cat $(rg --files ~ | grep id_rsa)",
 ]
 _NOT_AFTER_THEM: list[str] = [
     "cat ~/Documents/$(date +%Y)/notes.md",
@@ -758,6 +779,11 @@ _NOT_AFTER_THEM: list[str] = [
     "rsync -a ./src/ ./copy/",
     "find ~ -name '*.pdf' | xargs ls -l",
     "find ~ -name '*.pdf' | xargs echo",
+    "find ~ -type f -exec ls -l {} +",
+    "cd ~ && fd -H id_rsa -x stat",
+    "echo $(find ./src -name '*.py')",
+    "cat $(find ./src -name '*.py')",
+    "n=$(find ~ -name '*.pdf' | wc -l); echo $n",
     "find ./src -name '*.py' | xargs cat",
     "rg --files ./src | xargs cat",
     "rg -e TODO ./src",
@@ -767,11 +793,6 @@ _NOT_AFTER_THEM: list[str] = [
     "git -C ./sub log -1",
     "tar -C ./out -xf a.tar",
     "grep -C 3 token ./notes.md",
-    # From the home folder, a search that is given a folder reads that one.
-    "cd ~ && grep -rn -A 3 TODO ./projects/x",
-    "cd ~ && rg -m 1 TODO ./projects/x",
-    "cd ~ && fd -e py main ./projects -x wc -l",
-    "cd ~ && rg --files ./projects/x | xargs cat",
 ]
 
 # Commands that move into another folder to read the names they are given: those names are the protected locations'.
