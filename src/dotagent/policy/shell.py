@@ -298,7 +298,7 @@ _NETWORK_CODE: re.Pattern[str] = re.compile(
 )
 # Code that runs a command of the network (os.system("scp ..."), `ssh ...`, system("curl ...")).
 _NETWORK_COMMAND_CODE: re.Pattern[str] = re.compile(
-    r"\b(?:curl|wget|scp|sftp|rsync|ssh|ncat|socat|telnet)\b|\bnc\s+-?[\w.]"
+    r"\b(?:curl|wget|scp|sftp|rsync|ssh|ncat|socat|telnet)\b|\bnc\s+-?[\w.]", re.IGNORECASE
 )
 _NETWORK_FETCHERS: frozenset[str] = frozenset({"curl", "wget", "http", "https", "xh", "aria2c"})
 _REMOTE_COPY: frozenset[str] = frozenset({"scp", "sftp", "rsync", "nc", "ncat", "socat", "telnet", "ftp", "ssh"})
@@ -1567,7 +1567,8 @@ def _piped(stages: list[list[str]], documents: tuple[str, ...]) -> _Input:
     given: _Input = _NO_INPUT
     for stage in stages:
         words: list[str] = _plain(_split_redirects(stage, documents)[0])
-        command: str = _GNU_NAMES.get(_program(words[0]), _program(words[0])) if words else ""
+        program: str = _program(words[0]) if words else ""
+        command: str = _GNU_NAMES.get(program, program)
         operands: list[str] = _positional(words[1:])
         if command in _PRINTERS:
             given = _given_text(" ".join(operands))
@@ -3254,7 +3255,8 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
         return [found for name in names for found in _assess_simple([*name.split(), *plain[1:]], scope, given)]
     if head not in _TEST_COMMANDS and any(char in head for char in _GLOB_CHARS):
         return [_unknown("runs a command whose name is a pattern the shell matches against file names")]
-    command: str = head if head == "." else _GNU_NAMES.get(_program(head), _program(head))
+    program: str = _program(head)
+    command: str = head if head == "." else _GNU_NAMES.get(program, program)
     named: list[Finding] = [
         *_assess_named(command, plain, scope, given),
         *_walks_over_protected(command, plain[1:], scope),
