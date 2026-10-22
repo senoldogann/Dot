@@ -9,7 +9,7 @@ import re
 from collections.abc import Collection, Sequence
 
 from dotagent.core.types import FrozenModel
-from dotagent.policy.spend import find_amounts, starts_with_amount
+from dotagent.policy.spend import find_amounts
 from dotagent.policy.types import Flag, Risk
 
 _KEY_LIKE: re.Pattern[str] = re.compile(
@@ -41,16 +41,14 @@ _FINANCIAL_ACTION: re.Pattern[str] = re.compile(
 _PRICED_ACTION: re.Pattern[str] = re.compile(
     rf"(?i){_SENTENCE_START}(?:rent|subscribe|upgrade|renew|unlock|tilaa|vuokraa)\b"
 )
-# "Order", "Book" or "Reserve", then only words that say when or what (`_BOOKING_WORDS`: "now", "this room", "a
-# table"), then the amount: "Order · €23.50", "Book now · $199", "Reserve a table — €10". A row of past orders, an
-# order's summary or a book's title has other words or a number there, and is no payment ("Order 4521 · $45.00 ·
-# Delivered", "Order summary · $45.00", "Book: Dune · $9.99", "Order 20261010").
-_BOOKING_WORDS: str = (
-    r"now|today|it|this|a|the|your|my|online|for|room|rooms|seat|seats|table|ticket|tickets|flight|flights|stay|tour"
-    r"|trip|car|hotel"
-)
+# "Order", "Book" or "Reserve" with an amount in the label is an offer too ("Book 2 tickets · $40", "Reserve for 2
+# guests — €50"), unless what follows the word makes the label a record rather than an offer: an order's number, a
+# colon, or a word that names a record ("Order 4521 · $45.00 · Delivered", "Order #4521", "Book: Dune · $9.99", "Order
+# summary · $45.00", "Reserve price $500"). Only those shapes are left out, so a label nobody foresaw errs towards the
+# hand-off.
 _BOOKING: re.Pattern[str] = re.compile(
-    rf"(?i){_SENTENCE_START}(?:order|book|reserve)(?:\s+(?:{_BOOKING_WORDS})\b)*\s*(?:[·•|—–:-]\s*)?"
+    rf"(?i){_SENTENCE_START}(?:order|book|reserve)\b"
+    r"(?!\s*#|\s+\d{4,}|\s*:|\s+(?:summary|history|details|status|number|total|price)\b)"
 )
 _DESTRUCTIVE_ACTION: re.Pattern[str] = re.compile(
     r"(?i)\b(?:delete|remove|erase|discard|destroy|wipe|deactivate|terminate|permanently|empty (?:the )?trash"
@@ -119,9 +117,8 @@ def asks_to_pay(text: str) -> bool:
     $199")."""
     if _FINANCIAL_ACTION.search(text) is not None:
         return True
-    if _PRICED_ACTION.search(text) is not None and find_amounts(text):
-        return True
-    return any(starts_with_amount(text[booking.end() :]) for booking in _BOOKING.finditer(text))
+    offers: bool = _PRICED_ACTION.search(text) is not None or _BOOKING.search(text) is not None
+    return offers and bool(find_amounts(text))
 
 
 def typing_reasons(element: Element | None, text: str | None) -> list[str]:
