@@ -317,19 +317,21 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   A key that pastes (`Control+V`, `Meta+V`, `Shift+Insert`) is refused in such a field as typed text is.
 - The clipboard can hold a password you have just copied from your password manager. Outside a `yolo` run the sandbox
   refuses the clipboard's service to every process of a run (below), so no command, terminal session or AppleScript of a
-  run can read it, whatever the line says; and a run's tries are asked about in every preset (item 534), by the names
-  the guard can read: `desktop_clipboard_read`; a shell line that names `pbpaste` (in any letter case, in any word of a
-  wrapper's arguments such as `time -l pbpaste`, with the quotes the shell takes out: `grep pbpaste notes` asks as
-  well); a line that runs `osascript` and names the clipboard anywhere (its `-e`, a pipe, a here-document, a variable);
-  a line that names a pasteboard (inline code in another language: `python3 -c` with `NSPasteboard`); and any
-  AppleScript or JXA script given to the tool that names the clipboard (`the clipboard`, `clipboard info`, their raw
-  events, `theClipboard`, `clipboardInfo`, `pbpaste`, a pasteboard), whether it reads it or puts text on it: telling the
-  two apart takes a reading of the script that a pattern gets wrong, and a string or a comment that names it asks too.
-  `desktop_clipboard_write` hands nothing over and asks nothing more than before; a `yolo` run asks nothing and has no
+  run can read it itself, whatever the line says; what another application does for a run is outside the sandbox (Apple
+  Events, as below): Terminal's `do script`, a System Events keystroke that pastes into an application the run then
+  reads back, a script in a file that does so; the Automation and Accessibility permissions you granted and the guard's
+  names stand in the way of those. A run's tries are asked about in every preset (item 534), by the names the guard can
+  read: `desktop_clipboard_read`; a shell line that names `pbpaste` (in any letter case, in any word of a wrapper's
+  arguments such as `time -l pbpaste`, with the quotes the shell takes out: `grep pbpaste notes` asks as well); a line
+  that runs `osascript` and names the clipboard anywhere (its `-e`, a pipe, a here-document, a variable); a line that
+  names a pasteboard (inline code in another language: `python3 -c` with `NSPasteboard`); and any AppleScript or JXA
+  script given to the tool that names the clipboard (`the clipboard`, `clipboard info`, their raw events,
+  `theClipboard`, `clipboardInfo`, `pbpaste`, a pasteboard), whether it reads it or puts text on it: telling the two
+  apart takes a reading of the script that a pattern gets wrong, and a string or a comment that names it asks too.
+  `desktop_clipboard_write` hands nothing over and asks nothing more than before. A `yolo` run asks nothing and has no
   sandbox (item 443), and neither has a run with `[shell] sandbox = false`: there the guard's names are all there is,
-  and what it does not read gets through (a name the line builds as it runs or a quote the shell takes out twice, `sh -c
-  "pb''paste"`; a script in a file, `osascript r.applescript`; a script typed into a session, `osascript -i`; a paste of
-  the clipboard into an application that the run then reads back, `⌘V`, `keystroke "v"`).
+  and what it does not read gets through (a name the line builds as it runs, a quote the shell takes out twice, `sh -c
+  "pb''paste"`, a script in a file, `osascript r.applescript`, a script typed into a session, `osascript -i`).
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).

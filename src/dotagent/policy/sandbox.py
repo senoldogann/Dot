@@ -28,8 +28,11 @@ The clipboard is closed too (item 534): the profile refuses a lookup of the past
 password manager) or puts text there, whatever the line that started it says: ``pbpaste`` and ``pbcopy``, an
 AppleScript's ``the clipboard``, a program's own ``NSPasteboard``. The shell guard asks before a run tries it
 (:mod:`dotagent.policy.shell`), by the names it can read; the sandbox is what holds when it cannot read them (a name
-spelt by a quote the shell takes out twice, a script in a file). The tools ``desktop_clipboard_write`` and
-``desktop_clipboard_read`` run in Dot's own process, outside the sandbox, and ask as the policy says.
+spelt by a quote the shell takes out twice, a script in a file). What another application does for a process of a run
+is outside it (Apple Events, as below: Terminal's ``do script``, a keystroke that pastes into an application the run
+then reads back): the guard's names and the Automation permission stand in the way of that. The tools
+``desktop_clipboard_write`` and ``desktop_clipboard_read`` run in Dot's own process, outside the sandbox, and ask as
+the policy says.
 
 Apple Events are the exception, and the profile cannot refuse them: ``(deny appleevent-send …)`` compiles and holds
 nothing (measured on macOS 26: with the rule over the terminal apps, Script Editor, Automator, Shortcuts, System
