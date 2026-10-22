@@ -122,8 +122,10 @@ sign-ins. **Default** is the profile Dot always had (`browser-profile` in its ho
 is emptied before Chrome starts on it and after it closes, so it keeps nothing; **Add profile** makes another
 (`browser-profiles/<name>`, up to 24, a name of up to 48 letters, digits, spaces, `-` and `_`). **Use** makes runs work
 on a profile from Chrome's next start (`[browser] profile`, `POST /api/browser/profile`, refused while runs are active);
-**Clear** deletes its cookies and caches and keeps its settings (`POST /api/browser/profiles/<name>/clear`; Dot's own
-Chrome is let go of when it works on it); **Delete** removes an added profile that is not in use (`DELETE
+**Clear** signs every site out of it (item 532): it deletes the cookies, what the sites stored (local and session
+storage, IndexedDB, service workers and their caches), the logins and autofill Chrome saved, and the caches, and keeps
+its history, settings and extensions (`POST /api/browser/profiles/<name>/clear`; Dot's own Chrome is let go of when it
+works on it); **Delete** removes an added profile that is not in use (`DELETE
 /api/browser/profiles/<name>`). A profile that a Chrome window has open (Sign in… opens one) is not changed. Sign in…,
 `dotx browser login`, `dotx browser import-chrome` and `dotx doctor` work on the profile in use. Every profile is
 guarded as Default is: a run neither reads nor changes it. In My Chrome mode the profiles are your Chrome's own.

@@ -41,8 +41,39 @@ _CRASHED: str = "Crashed"
 HIDE_CRASH_BUBBLE: str = "--hide-crash-restore-bubble"
 _PROFILE_FOLDER_MODE: int = 0o700
 _JSON_OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject)
-_COOKIES: tuple[str, ...] = ("Cookies", "Cookies-journal", "Cookies-wal", "Cookies-shm")
+_SQLITE_COMPANIONS: tuple[str, ...] = ("", "-journal", "-wal", "-shm")
+
+
+def _databases(*names: str) -> tuple[str, ...]:
+    """The files of the SQLite databases ``names``: each with the journal and the write-ahead log Chrome keeps beside
+    it."""
+    return tuple(f"{name}{companion}" for name in names for companion in _SQLITE_COMPANIONS)
+
+
+_COOKIES: tuple[str, ...] = _databases("Cookies")
 _CACHES: tuple[str, ...] = ("Cache", "Code Cache", "GPUCache", "DawnGraphiteCache", "DawnWebGPUCache")
+# What else a site keeps in the profile, as Chrome 155 writes it (measured 2026-10-22 on a profile a page had filled
+# with every kind of storage): local and session storage, IndexedDB, service workers with their caches, shared
+# dictionaries, the quota database that counts all of them, the older file-system and WebSQL stores, the private-state
+# tokens a site handed out, the network error reports it asked for, and the sessions it bound to the device. Many sites
+# keep a sign-in here rather than in a cookie.
+_SITE_STORAGE: tuple[str, ...] = (
+    "Local Storage",
+    "Session Storage",
+    "IndexedDB",
+    "Service Worker",
+    "Shared Dictionary",
+    "WebStorage",
+    "File System",
+    "databases",
+    "blob_storage",
+    *_databases("Trust Tokens", "Reporting and NEL", "Device Bound Sessions"),
+)
+# What Chrome's own password manager and autofill keep: the saved logins (and those of the Google account), the
+# addresses and cards, and the table that tells which sites share a login.
+_SAVED_SIGN_INS: tuple[str, ...] = _databases(
+    "Login Data", "Login Data For Account", "Web Data", "Account Web Data", "Affiliation Database"
+)
 
 type ProfileKind = Literal["default", "incognito", "added"]
 
@@ -106,16 +137,22 @@ def delete_profile(name: str) -> None:
     shutil.rmtree(browser_profiles_dir() / name)
 
 
+def _remove(path: Path) -> None:
+    """Delete the file or the folder at ``path``, a link as the link; nothing there is nothing to delete."""
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    else:
+        path.unlink(missing_ok=True)
+
+
 def clear_site_data(folder: Path) -> None:
-    """Delete the cookies and the caches the profile in ``folder`` keeps, while no Chrome holds it (blocking); its
-    settings, extensions and history stay."""
+    """Delete what the sites left in the profile in ``folder`` and what Chrome saved for them, while no Chrome holds it
+    (blocking): their cookies, their storage (local and session storage, IndexedDB, service workers), the logins and
+    the autofill Chrome saved, and the caches, so that every site is signed out (item 532). Its settings, extensions
+    and history stay."""
     profile: Path = folder / _PROFILE_DIR
-    for name in _COOKIES:
-        (profile / name).unlink(missing_ok=True)
-    for name in _CACHES:
-        cache: Path = profile / name
-        if cache.is_dir():
-            shutil.rmtree(cache)
+    for name in (*_COOKIES, *_SITE_STORAGE, *_SAVED_SIGN_INS, *_CACHES):
+        _remove(profile / name)
 
 
 def empty_incognito() -> None:
