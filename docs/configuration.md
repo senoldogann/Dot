@@ -53,21 +53,22 @@ hours (1), and as it starts when no copy is younger, whenever the database chang
 unchanged is looked at again every ten minutes, so a write after a quiet spell is copied soon. SQLite's online backup
 makes the copy in one read of the database, which in its write-ahead mode holds back none of the daemon's writes, so
 runs go on while it is made; the copy is checked (`quick_check`), compressed and kept as `dot-<UTC time>.sqlite3.gz`
-(mode 0600) in `[store] backup_dir`, written under a hidden name and renamed once whole. The newest `backup_keep_hourly`
-(24) copies are kept, and the newest copy of each of the last `backup_keep_days` (14) days; only files named as copies
-are ever removed from the folder. An empty `backup_dir` is `<home>/backups`, which goes with the home folder if that is
-lost: point it at an external disk, or at iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs/Dot Backups`),
-to keep the copies off this Mac, and give each Mac a folder of its own there, as Dot takes every copy in the folder for
-its own. A run reads and changes neither the copies nor that folder, as it does not the database. While a copy is made,
-its uncompressed file is in `<home>/backups-partial` (0600), removed once compressed; what a copy cut off left is
-cleared by the next. `backup_every_hours = 0` makes none. `dotx backup now` makes one at once and `dotx backup list`
-lists them; `dotx doctor` says how old the newest is, calls it late only when the database changed since, and says so
-when the folder cannot be read. Two copies made in the same second keep the first, and a copy named after now (a clock
-that was ahead, another Mac's) is left out of when the next is due. A copy that fails is logged (`backup_failed`) and
-tried again ten minutes later. To go back to a copy, stop the daemon (`dotx service uninstall`), move `dot.sqlite3` and
-its `dot.sqlite3-wal` and `dot.sqlite3-shm` aside (an old write-ahead log left beside the copy would be applied to it),
-unpack the copy in its place (`gunzip -c <copy> > "<home>/dot.sqlite3"`), and start the daemon again (`dotx service
-install`).
+(mode 0600) in `[store] backup_dir`, written under a hidden name and linked to its own name once whole (renamed on a
+disk without links, such as iCloud Drive or exFAT). The newest `backup_keep_hourly` (24) copies are kept, and the newest
+copy of each of the last `backup_keep_days` (14) days; only files named as copies are ever removed from the folder. An
+empty `backup_dir` is `<home>/backups` (a folder of your own is absolute or starts with `~`), which goes with the home
+folder if that is lost: point it at an external disk, or at iCloud Drive (`~/Library/Mobile
+Documents/com~apple~CloudDocs/Dot Backups`), to keep the copies off this Mac, and give each Mac a folder of its own
+there, as Dot takes every copy in the folder for its own. A run reads and changes neither the copies nor that folder, as
+it does not the database. While a copy is made, its uncompressed file is in `<home>/backups-partial` (0600), removed
+once compressed; what a copy cut off left is cleared by the next. `backup_every_hours = 0` makes none. `dotx backup now`
+makes one at once and `dotx backup list` lists them; `dotx doctor` says how old the newest is, calls it late only when
+the database changed since, and says so when the folder cannot be read. Two copies made in the same second keep the
+first, and a copy named after now (a clock that was ahead, another Mac's) is left out of when the next is due. A copy
+that fails is logged (`backup_failed`) and tried again ten minutes later. To go back to a copy, stop the daemon (`dotx
+service uninstall`), move `dot.sqlite3` and its `dot.sqlite3-wal` and `dot.sqlite3-shm` aside (an old write-ahead log
+left beside the copy would be applied to it), unpack the copy in its place (`gunzip -c <copy> > "<home>/dot.sqlite3"`),
+and start the daemon again (`dotx service install`).
 
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log` (another folder with `DOT_LOG_DIR`: `dotx service status`
 names the one in use, and the sign-in screen of a daemon that could not answer points to it); at 10 MB it is moved to

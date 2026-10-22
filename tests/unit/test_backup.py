@@ -3,6 +3,7 @@ folder, thinned to the newest hourly ones and one of each recent day, and none m
 Every database and folder here is the test's own."""
 
 import asyncio
+import errno
 import gzip
 import os
 import sqlite3
@@ -12,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from dotagent.config import StoreConfig, load_default_config
 from dotagent.core.errors import StoreError
@@ -116,6 +118,33 @@ def test_a_copy_made_in_the_same_second_leaves_the_first_as_it_is(tmp_path: Path
     second: Backup = make_backup(database, folder, NOW)
     assert second.path == first.path and Path(first.path).stat().st_ino == kept
     assert [child.name for child in folder.iterdir()] == [Path(first.path).name]
+
+
+def test_a_copy_on_a_disk_without_links_is_renamed_unless_its_second_is_taken(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """iCloud Drive and an exFAT disk make no hard links: the copy is renamed into place there, and a copy made in the
+    same second is kept as it is."""
+    database: Path = _database(tmp_path / "dot.sqlite3", 3)
+    folder: Path = tmp_path / "copies"
+
+    def no_links(source: object, target: object) -> None:
+        raise OSError(errno.ENOTSUP, "Operation not supported")
+
+    monkeypatch.setattr(os, "link", no_links)
+    first: Backup = make_backup(database, folder, NOW)
+    kept: int = Path(first.path).stat().st_ino
+    again: Backup = make_backup(database, folder, NOW)
+    assert again.path == first.path and Path(first.path).stat().st_ino == kept
+    assert [child.name for child in folder.iterdir()] == [Path(first.path).name]
+
+
+def test_a_relative_folder_for_the_copies_is_refused() -> None:
+    store: StoreConfig = load_default_config().store
+    for folder in ("", "/Volumes/Disk/Dot", "~/Library/Mobile Documents/com~apple~CloudDocs/Dot Backups"):
+        StoreConfig.model_validate({**store.model_dump(), "backup_dir": folder})
+    with pytest.raises(ValidationError, match="backup_dir must be empty, absolute or start with ~"):
+        StoreConfig.model_validate({**store.model_dump(), "backup_dir": "Dot Backups"})
 
 
 def test_there_is_no_copy_of_a_database_that_is_not_there(tmp_path: Path) -> None:

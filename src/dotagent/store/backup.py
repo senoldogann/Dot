@@ -2,9 +2,9 @@
 is made, checked, compressed and kept in a folder of the owner's choice (``[store] backup_dir``), and thinned to the
 newest hourly ones and one of each recent day.
 
-A copy is written under a name that starts with a dot and renamed when it is whole, so a copy cut off never stands for
-one. Thinning only ever looks at files named as this module names its copies (``dot-<UTC time>.sqlite3.gz``); nothing
-else in the folder is read or touched.
+A copy is written under a name that starts with a dot and linked to its own name when it is whole (renamed on a disk
+without links), so a copy cut off never stands for one. Thinning only ever looks at files named as this module names its
+copies (``dot-<UTC time>.sqlite3.gz``); nothing else in the folder is read or touched.
 """
 
 import asyncio
@@ -172,6 +172,11 @@ def make_backup(database: Path, folder: Path, now: float) -> Backup:
             os.link(packing, final)
         except FileExistsError:
             log.info("backup_same_second", path=str(final))
+        except OSError as error:
+            # A disk without hard links (iCloud Drive, exFAT): renamed instead, unless a copy of that second is there.
+            log.info("backup_renamed", path=str(final), error=str(error))
+            if not final.exists():
+                packing.replace(final)
     finally:
         raw.unlink(missing_ok=True)
         packing.unlink(missing_ok=True)

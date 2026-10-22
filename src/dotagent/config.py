@@ -125,6 +125,14 @@ class StoreConfig(FrozenModel):
     backup_keep_hourly: int = Field(ge=1, le=24 * 14)
     backup_keep_days: int = Field(ge=0, le=365)
 
+    @field_validator("backup_dir")
+    @classmethod
+    def _absolute_backup_dir(cls, value: str) -> str:
+        # A relative folder would be under the daemon's working directory, / for a launchd job.
+        if value and not Path(value).expanduser().is_absolute():
+            raise ValueError(f"backup_dir must be empty, absolute or start with ~: {value!r}")
+        return value
+
 
 class OllamaConfig(FrozenModel):
     base_url: ServiceAddress
