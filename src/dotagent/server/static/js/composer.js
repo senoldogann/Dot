@@ -8,7 +8,6 @@
 // 318, picks.js); a draft keeps the text, the ready files and the picks in this browser until they are sent. The
 // markdown in the box shows as it reads, its marks quiet (mirror.js, item 207).
 
-import { api } from "./api.js";
 import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
@@ -17,6 +16,7 @@ import { markContent, markInk, skillMark } from "./marks.js";
 import { touchFirst, trackHeight } from "./layout.js";
 import { openMenu } from "./menu.js";
 import { markdownMirror } from "./mirror.js";
+import { loadPalette } from "./palette.js";
 import { arePicks, createPicks, pickColour } from "./picks.js";
 import { clearPref, readPref, writePref } from "./prefs.js";
 import { takesSnapshots } from "./snapshots.js";
@@ -63,19 +63,6 @@ export function moveDraft(fromKey, toKey) {
   }
   keepDraft(toKey, draft);
   clearPref(`${DRAFT_PREFIX}${fromKey}`);
-}
-
-// The skills and the MCP tools, asked for once per page and kept; a failure is kept too, so the menu says so.
-let paletteLoad = null;
-
-function loadPalette() {
-  if (paletteLoad === null) {
-    paletteLoad = api.get("/palette").catch((error) => {
-      paletteLoad = null;
-      throw error;
-    });
-  }
-  return paletteLoad;
 }
 
 /** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`; never plain Return on a touch screen), autosize up to `maxPx`, the slash

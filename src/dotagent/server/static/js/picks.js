@@ -1,11 +1,14 @@
 // What the owner picks in the composer for one message (item 318, after Codex's composer): MCP servers whose tools the
 // run starts with, accounts signed in whose mail and calendar it starts with (item 496) and skills whose instructions
-// it starts with, as chips under the box, each in a colour of its own and taken away by its ×, and Plan first, by which
-// the run writes its plan and asks before it changes anything. They go
+// it starts with, as chips under the box, each in a colour of its own and taken away by its × (a server's chip wears
+// its service's mark, as the at menu does, item 530), and Plan first, by which the run writes its plan and asks before
+// it changes anything. They go
 // with the message that starts a run and are put away once it went (`sent()`); a steer leaves them for the next one.
 
 import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
+import { markContent, markInk } from "./marks.js";
+import { onServerMarks, serverMark, wantServerMarks } from "./palette.js";
 import { toast } from "./ui.js";
 
 // The daemon's limits (server/views.py).
@@ -40,8 +43,48 @@ function tint(node, name) {
   return node;
 }
 
-/** The mark of a pick of `kind` ("plugin", "skill" or "plan") named `name`: its icon in its colour. */
+/** Draw the mark of the chip of the MCP server `name` into `holder` (its `.pick-mark`): its service's mark as the at menu
+ * draws it, on the tile's ground, light in both colour schemes (item 530); the plug in the chip's colour for a server of
+ * no service, and for one the palette has not named yet. */
+function paintServerMark(holder, name) {
+  const mark = serverMark(name);
+  holder.replaceChildren(markContent(mark));
+  if (mark === null) {
+    delete holder.dataset.mark;
+    holder.style.removeProperty("--plugin-ink");
+    tint(holder, name);
+    return;
+  }
+  holder.dataset.mark = "service";
+  const ink = markInk(mark.colour);
+  if (ink === null) {
+    holder.style.removeProperty("--plugin-ink");
+  } else {
+    holder.style.setProperty("--plugin-ink", ink);
+  }
+}
+
+// A chip drawn before the palette arrived wears the plug: each chip that names a server is drawn again as the palette
+// gives the marks, the chips under a sent message too.
+onServerMarks(() => {
+  for (const chip of document.querySelectorAll(".pick-chip[data-kind='plugin']")) {
+    const holder = chip.querySelector(".pick-mark");
+    const name = chip.getAttribute("data-name");
+    if (holder !== null && name !== null) {
+      paintServerMark(holder, name);
+    }
+  }
+});
+
+/** The mark of a pick of `kind` ("plugin", "skill" or "plan") named `name`: its icon in its colour; a server wears its
+ * service's mark. */
 function pickMark(kind, name) {
+  if (kind === "plugin") {
+    const holder = el("span", { class: "pick-mark", dataset: { kind } });
+    paintServerMark(holder, name);
+    wantServerMarks();
+    return holder;
+  }
   const mark = el("span", { class: "pick-mark", dataset: { kind } }, icon(kind === "plan" ? "listOrdered" : KINDS[kind].icon));
   return kind === "plan" ? mark : tint(mark, name);
 }

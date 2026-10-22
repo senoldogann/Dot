@@ -7053,6 +7053,36 @@ dialog.lightbox img {
   height: 14px;
 }
 
+/* A server's chip wears its service's mark as the at menu does (item 530): on the tile's ground, light in both colour
+   schemes, a logo in its own colours, an icon or letters in --plugin-ink. */
+.pick-mark[data-mark="service"] {
+  --plugin-ink: var(--mark-ink);
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-xs);
+  color: var(--plugin-ink);
+  background: var(--mark-ground);
+  box-shadow: inset 0 0 0 1px var(--mark-ring);
+}
+
+.pick-mark[data-mark="service"] .icon,
+.pick-mark[data-mark="service"] .plugin-logo {
+  width: 12px;
+  height: 12px;
+}
+
+.pick-mark[data-mark="service"] .plugin-letters {
+  font-size: calc(10px * var(--type-scale));
+  font-weight: var(--weight-title);
+  line-height: var(--leading-xs);
+}
+
+.pick-chip:has(> .pick-mark[data-mark="service"]) {
+  padding-left: 4px;
+}
+
 .pick-name {
   min-width: 0;
   overflow: hidden;
