@@ -611,11 +611,11 @@ _AS_SHELL: re.Pattern[str] = re.compile(
     r"\bwriteText\s*\(|\.write\s*\(\s*\{\s*text\s*:",
     re.IGNORECASE,
 )
-# What names the clipboard in an AppleScript or a JXA script: ``the clipboard`` (to read it, and to put text on it too:
-# which of the two a script does takes a reading of the script that a pattern gets wrong, and three reviews each found
-# a line that hid a read behind a write), ``clipboard info``, their raw events (``«event JonsgClp»``, or with ``<<``
-# and ``>>``), JXA's
-# ``theClipboard`` and ``clipboardInfo`` however they are called, and the pasteboard of the Objective-C bridge.
+# What names the clipboard in an AppleScript or a JXA script: ``the clipboard`` (to read it, and to put text on it
+# too: which of the two a script does takes a reading of the script that a pattern gets wrong, and three reviews each
+# found a line that hid a read behind a write), ``clipboard info``, their raw events (``«event JonsgClp»``, or with
+# ``<<`` and ``>>``), JXA's ``theClipboard`` and ``clipboardInfo`` however they are called, and the pasteboard of the
+# Objective-C bridge.
 _AS_CLIPBOARD: re.Pattern[str] = re.compile(
     r"\bthe[\s¬]+clipboard\b|\bclipboard[\s¬]+info\b|theClipboard|clipboardInfo|\bNSPasteboard\b|"
     r"(?:«|<<)event\s+Jons\wClp(?:»|>>)",
