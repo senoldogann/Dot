@@ -180,6 +180,7 @@ _WRAPPERS: frozenset[str] = frozenset(
         "ionice",
         "caffeinate",
         "timeout",
+        "time",
         "stdbuf",
         "builtin",
         "arch",
@@ -236,6 +237,7 @@ _PRIVILEGE_WRAPPERS: frozenset[str] = frozenset({"sudo", "doas", "su", "pkexec"}
 _WRAPPER_VALUES: dict[str, frozenset[str]] = {
     "env": frozenset({"-u", "-C", "-S", "-P", "--unset", "--chdir", "--split-string"}),
     "timeout": frozenset({"-s", "-k", "--signal", "--kill-after"}),
+    "time": frozenset({"-o"}),
     "nice": frozenset({"-n", "--adjustment"}),
     "ionice": frozenset({"-c", "-n", "-p", "--class", "--classdata", "--pid"}),
     "stdbuf": frozenset({"-i", "-o", "-e", "--input", "--output", "--error"}),
@@ -284,7 +286,7 @@ _SHELLS: frozenset[str] = frozenset({"bash", "sh", "zsh", "dash", "ksh", "fish"}
 _STDIN_FILES: frozenset[str] = frozenset({"/dev/stdin", "/dev/fd/0"})
 _SHELL_VALUES: frozenset[str] = frozenset({"-o", "+o", "-O", "+O", "--rcfile", "--init-file"})
 _INTERPRETERS: frozenset[str] = frozenset(
-    {"python", "python3", "node", "ruby", "perl", "php", "swift", "deno", "bun", "lua", "Rscript", "julia"}
+    {"python", "python3", "node", "ruby", "perl", "php", "swift", "deno", "bun", "lua", "rscript", "julia"}
 )
 _INLINE_CODE: frozenset[str] = frozenset({"-c", "-e", "-E", "--eval", "-p"})
 # node's long spellings of its inline code, as the word before the code or with "=code" attached.
@@ -579,7 +581,7 @@ _PIPE_TO_SHELL: re.Pattern[str] = re.compile(
     re.IGNORECASE,
 )
 _FORK_BOMB: re.Pattern[str] = re.compile(r":\(\)\s*\{")
-_DEVICE_WRITE: re.Pattern[str] = re.compile(r"(>\s*|of=)/dev/(r?disk|sd|nvme)")
+_DEVICE_WRITE: re.Pattern[str] = re.compile(r"(>\s*|of=)/dev/(r?disk|sd|nvme)", re.IGNORECASE)
 # The long options of curl and wget that send a body, a form or a file, as the word or with "=value" attached
 # (--data-raw, --form-string and --post-file among them).
 _SEND_OPTIONS: tuple[str, ...] = (
@@ -2142,7 +2144,16 @@ def _names_one(raw: str, places: tuple[Path, ...], scope: ShellScope, *, under: 
     paths: list[Path] = [
         _located(value, cwd, scope) for value in _expansions(raw, scope) or [raw] for cwd in scope.cwds
     ]
-    return any(path == place or (under and place in path.parents) for path in paths for place in places)
+    return any(
+        _same_file(path, place) or (under and any(_same_file(parent, place) for parent in path.parents))
+        for path in paths
+        for place in places
+    )
+
+
+def _same_file(path: Path, place: Path) -> bool:
+    """Whether ``path`` and ``place`` are one path as this Mac's file system reads them, letter case aside."""
+    return path == place or str(path).casefold() == str(place).casefold()
 
 
 def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
