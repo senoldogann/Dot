@@ -70,8 +70,9 @@ the preset's and your `ask` rules', money and credentials', a message or a post 
 the refusal of a read of your secrets or of data sent out (items 429 and 433). **What no mode waives** (item 429): a
 `research` run changes nothing but its notes file and memory — a refusal is not a question, so yolo does not waive it
 either — and a run that read outside content sends no secret Dot holds out of the Mac (item 525). A yolo run that read
-such content also has the review model's refusal of a step it checks (`[policy] yolo_taint_check`, on by default). (A rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off, and a yolo run waives
-the last two with every other question.) The modes that ask keep their guard: in `supervised`, `ask` and
+such content also has the review model's refusal of a step it checks (`[policy] yolo_taint_check`, on by default).
+(A rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off, and a yolo run waives the
+last two with every other question.) The modes that ask keep their guard: in `supervised`, `ask` and
 `auto` money and credentials are still yours (Dot stops and asks you to do that step yourself; the review model is
 never asked about them, and a payment under its pre-approved caps asks you, or the review model in `auto`), and a message
 sent for you or a post in your name still waits for your yes (the review model answers it in `auto`; a rule that allows

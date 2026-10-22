@@ -15,9 +15,21 @@ from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, ActionKind, Flag
 
 # The kinds of step that hand their words to someone beyond the Mac: a request, a page's address or field, a message,
-# and an MCP server's tool, whose server may be anywhere.
+# an MCP server's tool, whose server may be anywhere, and what runs code or types into an application (a command line,
+# an AppleScript, keystrokes), which may reach the network whatever flags its words raised: a plain `curl` of an
+# address that holds a secret raises none.
 _SENDING_KINDS: frozenset[ActionKind] = frozenset(
-    {"network", "browser_navigate", "browser_input", "message", "mcp", "mcp_read"}
+    {
+        "network",
+        "browser_navigate",
+        "browser_input",
+        "message",
+        "mcp",
+        "mcp_read",
+        "shell",
+        "app_control",
+        "desktop_input",
+    }
 )
 _SENDING_FLAGS: frozenset[Flag] = frozenset(
     {"external_send", "message_send", "upload", "public_post", "social", "exfiltration"}
