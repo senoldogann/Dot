@@ -232,7 +232,7 @@ def test_a_staging_folder_that_cannot_be_removed_is_said_so(tmp_path: Path, monk
     """The staging folder holds a plain copy of the local storage of the owner's Chrome: a removal that fails is not
     silent, after an import that was made and after one that failed."""
     data_dir: Path = make_chrome(tmp_path / "Chrome")
-    dot_profile: Path = tmp_path / "dot"
+    dot_profile: Path = _dot_profile_with_sign_ins(tmp_path / "dot")
     staging: Path = dot_profile / "import-staging"
     real_rmtree: Callable[[Path], None] = shutil.rmtree
 
@@ -241,18 +241,24 @@ def test_a_staging_folder_that_cannot_be_removed_is_said_so(tmp_path: Path, monk
             raise OSError("busy")
         real_rmtree(path)
 
-    monkeypatch.setattr(shutil, "rmtree", stubborn)
-    report: ImportReport = import_chrome_profile(data_dir, "Default", dot_profile)
+    with monkeypatch.context() as stuck:
+        stuck.setattr(shutil, "rmtree", stubborn)
+        report: ImportReport = import_chrome_profile(data_dir, "Default", dot_profile)
     assert report.staging_left == str(staging)
     assert read_keychain_mode(dot_profile) == "system"
-    real_rmtree(staging)
+    # What the profile held went first: the folder that stays holds nothing of it, and a later import is not refused
+    # for it as if a failed one had kept it.
+    assert not (staging / "previous").exists()
+    assert import_chrome_profile(data_dir, "Default", dot_profile).staging_left is None
 
     def no_room(source: Path, staged: Path) -> int:
         raise OSError("no room")
 
-    monkeypatch.setattr(chrome_import, "_stage_local_storage", no_room)
-    with pytest.raises(BrowserError, match=r"staging folder.*could not be removed") as failure:
-        import_chrome_profile(data_dir, "Default", dot_profile)
+    with monkeypatch.context() as stuck:
+        stuck.setattr(shutil, "rmtree", stubborn)
+        stuck.setattr(chrome_import, "_stage_local_storage", no_room)
+        with pytest.raises(BrowserError, match=r"staging folder.*could not be removed") as failure:
+            import_chrome_profile(data_dir, "Default", dot_profile)
     assert isinstance(failure.value.__cause__, OSError)
 
 

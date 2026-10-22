@@ -65,8 +65,8 @@ async def cmd_browser_import_chrome(command: BrowserImportChromeCommand) -> int:
     )
     if report.staging_left is not None:
         sys.stdout.write(
-            f"Warning: {report.staging_left} could not be removed and holds a plain copy of the local storage of your "
-            "Chrome: delete it.\n"
+            f"Warning: {report.staging_left} could not be removed. It holds sign-ins and local storage (what Dot's "
+            "profile held before, or a plain copy of your Chrome's): delete it.\n"
         )
     readable: int = await _readable_cookies(settings.browser, settings.server, dot_profile)
     if readable == 0:

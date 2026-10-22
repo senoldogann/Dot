@@ -228,7 +228,10 @@ def _swap_in(staging: Path, dot_profile: Path) -> Path | None:
         if not stranded:
             _remove_staging_after(error, staging)
         raise
-    return _remove_staging(staging)
+    # What the profile held is no use now: it goes first, so that a staging folder that stays after a made import
+    # holds nothing a later import could take for what a failed one kept.
+    left: Path | None = _remove_staging(aside)
+    return left if left is not None else _remove_staging(staging)
 
 
 def import_chrome_profile(data_dir: Path, profile_name: str, dot_profile: Path) -> ImportReport:
@@ -254,8 +257,9 @@ def import_chrome_profile(data_dir: Path, profile_name: str, dot_profile: Path) 
     dot_profile.mkdir(mode=0o700, parents=True, exist_ok=True)
     if (staging / _ASIDE).is_dir() and any((staging / _ASIDE).iterdir()):
         raise BrowserError(
-            "an earlier import could not put the profile back as it was, and kept what the profile held in its staging "
-            "folder: move those files back by hand (or delete the folder), then import again",
+            "an earlier import left files of this profile in its staging folder: if that import failed and could not "
+            "put the profile back, move them back by hand; if it was made, they are what the profile held before it "
+            "and the folder can be deleted; then import again",
             {"staging": str(staging)},
         )
     if staging.exists():
