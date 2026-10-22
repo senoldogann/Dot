@@ -670,10 +670,12 @@ class _Reading:
 class _Input:
     """What a command reads on its standard input, as far as the line shows it: the text (a here-document, a
     here-string, what an ``echo`` pipes in) and the paths it names (``find ... |``); an unknown path is
-    ``_SUBSTITUTED``."""
+    ``_SUBSTITUTED``. ``walked`` are the folders a listing searched, as the line gives them (item 531): the files a
+    command reads there are every file under them."""
 
     text: str | None
     paths: tuple[str, ...]
+    walked: tuple[str, ...] = ()
 
 
 _NO_INPUT: _Input = _Input(text=None, paths=(_SUBSTITUTED,))
@@ -1537,7 +1539,9 @@ def _piped(stages: list[list[str]], documents: tuple[str, ...]) -> _Input:
         if command in _PRINTERS:
             given = _given_text(" ".join(operands))
         elif command in _LISTERS or (command in _SEARCHERS and any(_LIST_SWITCH.fullmatch(w) for w in words[1:])):
-            given = _Input(text=None, paths=tuple(operands) or (".",))
+            given = _Input(
+                text=None, paths=tuple(operands) or (".",), walked=tuple(_listed_folders(command, words[1:]))
+            )
         elif command not in _FILTERS:
             given = _NO_INPUT
     return given
@@ -1712,9 +1716,9 @@ def _protected_words(words: list[str], scope: ShellScope) -> list[Finding]:
 
 
 def _maybe_protected(reason: str) -> Finding:
-    """A step that may reach a protected location, which the line does not show: asked about in every preset, as a step
-    the guard cannot read is (:func:`_unknown`), but one that fetches nothing (item 531)."""
-    return _finding("high", ("destructive", "outside_workspace"), reason)
+    """A step that may reach a protected location, which the line does not show: asked about in every preset (item
+    531), as a step the guard cannot read is (:func:`_unknown`), but one that fetches nothing and destroys nothing."""
+    return _finding("high", ("protected_read", "outside_workspace"), reason)
 
 
 def _first_unknown(text: str, scope: ShellScope) -> re.Match[str] | None:
@@ -2407,7 +2411,15 @@ def _assess_xargs(args: list[str], scope: ShellScope, given: _Input) -> list[Fin
         if placeholder
         else [[*command, *given.paths]]
     )
-    return [found for run in runs for found in _assess_simple(run, scope, _NO_INPUT)]
+    findings: list[Finding] = [found for run in runs for found in _assess_simple(run, scope, _NO_INPUT)]
+    if Path(command[0]).name not in _NAMES_ONLY and _holds_protected(given.walked, scope):
+        # The piped twin of ``find ~ -exec cat {} +`` (item 531): every file the listing walked may be one it reads.
+        findings.append(
+            _maybe_protected(
+                "runs a command on the files a search lists under a folder that holds a protected location"
+            )
+        )
+    return findings
 
 
 def _runs_with(command: list[str], roots: list[str], scope: ShellScope, placeholder: re.Pattern[str]) -> list[Finding]:
@@ -2440,9 +2452,22 @@ def _find_parts(args: list[str]) -> tuple[list[str], list[str]]:
 _RECURSIVE_GREPS: frozenset[str] = frozenset({"grep", "egrep", "fgrep"})
 _RECURSIVE_SEARCHES: frozenset[str] = frozenset({"rg", "ag", "ack"})
 _RECURSIVE_COPIES: frozenset[str] = frozenset({"cp", "rsync"})
-_RECURSE: re.Pattern[str] = re.compile(r"-[A-Za-z]*[rR][A-Za-z]*")
-_RECURSE_COPY: re.Pattern[str] = re.compile(r"-[A-Za-z]*[rRa][A-Za-z]*")
-_TAR_CREATES: re.Pattern[str] = re.compile(r"-[A-Za-z]*c[A-Za-z]*|c[A-Za-z]*")
+_RECURSE: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*[rR][A-Za-z0-9]*")
+_RECURSE_COPY: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*[rRa][A-Za-z0-9]*")
+_TAR_CREATES: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*c[A-Za-z0-9]*|c[A-Za-z0-9]*")
+
+
+def _search_paths(args: list[str], operands: list[str]) -> list[str]:
+    """The paths a grep or a search is given: its operands but the pattern, which is the first of them unless an option
+    gave it (``-e``, ``-f``, ``--regexp``, ``--file``), and then its value is no path."""
+    given: list[str] = [*_option_values(args, "-e", "--regexp"), *_option_values(args, "-f", "--file")]
+    if not given:
+        return operands[1:]
+    paths: list[str] = list(operands)
+    for value in given:
+        if value in paths:
+            paths.remove(value)
+    return paths
 
 
 def _walked_roots(command: str, args: list[str]) -> list[str]:
@@ -2458,10 +2483,16 @@ def _walked_roots(command: str, args: list[str]) -> list[str]:
             or bool(long & {"--recursive", "--dereference-recursive"})
             or "recurse" in _option_values(args, "-d", "--directories")
         )
-        return (operands or ["."]) if recursive else []
+        return (_search_paths(args, operands) or ["."]) if recursive else []
     if command in _RECURSIVE_SEARCHES:
         # ``rg --files`` lists the names of the files and reads none of them.
-        return [] if "--files" in long else [*operands, "."]
+        return [] if "--files" in long else (_search_paths(args, operands) or ["."])
+    if command == "git":
+        # ``git grep --no-index`` searches the files of a folder as any recursive grep does.
+        sub, rest = _git_subcommand(args)
+        if sub == "grep" and "--no-index" in rest:
+            return _search_paths(rest, _positional(rest)) or ["."]
+        return []
     if command in _RECURSIVE_COPIES:
         recursive = any(_RECURSE_COPY.fullmatch(word) for word in short) or bool(long & {"--recursive", "--archive"})
         return operands[:-1] if recursive else []
@@ -2481,15 +2512,41 @@ def _walked_roots(command: str, args: list[str]) -> list[str]:
     return []
 
 
+def _listed_folders(command: str, args: list[str]) -> list[str]:
+    """The folders a listing is made from, as the line gives them (item 531): the roots of a ``find``, the paths of
+    ``fd`` and of ``rg --files`` (the directory the line is in when it is given none). Other listings name files the
+    line shows."""
+    if command == "find":
+        return _find_parts(args)[0]
+    if command in ("fd", "fdfind") or (command in _RECURSIVE_SEARCHES and "--files" in args):
+        return _positional(args) or ["."]
+    return []
+
+
+def _holds_protected(folders: Sequence[str], scope: ShellScope) -> bool:
+    """Whether one of ``folders``, as the line gives them, is or holds a protected location. A folder only the running
+    line knows stands for the home folder, as in :func:`_places`."""
+    return any(
+        within(location, place)
+        for folder in folders
+        for place in _places(folder, scope)
+        for location in scope.protected
+    )
+
+
 def _walks_over_protected(command: str, args: list[str], scope: ShellScope) -> list[Finding]:
     """A finding when ``command`` reads every file under a folder that holds a protected location (item 531):
     ``grep -r secret ~``, ``find ~/Library -exec cat {} \\;``, ``cp -R ~/Library copy``. The guard reads the line, not
-    what the program finds in the folders it walks, so a folder above a protected location is asked about. A folder
-    only the running line knows stands for the home folder, as in :func:`_places`."""
-    for root in _walked_roots(command, args):
-        if any(within(location, place) for place in _places(root, scope) for location in scope.protected):
-            return [_maybe_protected("reads every file under a folder that holds a protected location")]
+    what the program finds in the folders it walks, so a folder above a protected location is asked about."""
+    if _holds_protected(_walked_roots(command, args), scope):
+        return [_maybe_protected("reads every file under a folder that holds a protected location")]
     return []
+
+
+# The commands that print or count what they are given without reading it, so that ``find ~ | xargs ls`` is no walk.
+_NAMES_ONLY: frozenset[str] = frozenset(
+    {"echo", "printf", "ls", "stat", "basename", "dirname", "realpath", "readlink", "du", "file", "true"}
+)
 
 
 def _assess_find(args: list[str], scope: ShellScope) -> list[Finding]:
@@ -2881,6 +2938,34 @@ def _assess_privileged(command: str, args: list[str], scope: ShellScope, given: 
     return [elevated, *_assess_simple(rest, scope, given)]
 
 
+# The options that move a command into another folder before it reads the names it is given: ``-C`` of git, make, tar
+# and env, and the long ones of uv, yarn, npm and the like (item 531).
+_CHDIR_OPTIONS: frozenset[str] = frozenset(
+    {"-C", "--directory", "--cwd", "--chdir", "--working-directory", "--workdir", "--prefix"}
+)
+
+
+def _moved_scopes(words: list[str], scope: ShellScope) -> list[ShellScope]:
+    """``scope`` in each folder the options of ``words`` move their command to, one after the other, so that a relative
+    name is read from there: ``git -C ~ diff --no-index .ssh/id_rsa`` reads the key of ``~/.ssh``. A word that is no
+    folder (``grep -C 3``) moves the scope to a place that holds nothing."""
+    moved: list[ShellScope] = []
+    where: ShellScope = scope
+    for index, word in enumerate(words):
+        name, glued, value = word.partition("=")
+        if word in _CHDIR_OPTIONS and index + 1 < len(words):
+            folder: str = words[index + 1]
+        elif glued and name in _CHDIR_OPTIONS and name.startswith("--"):
+            folder = value
+        elif word.startswith("-C") and not word.startswith("--") and len(word) > 2:
+            folder = word[2:]
+        else:
+            continue
+        where = _with_places(where, _places(folder, where))
+        moved.append(where)
+    return moved
+
+
 def _assess_wrapped(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
     """A wrapper judged by the command it runs, its options and their values passed over: ``env`` in the directory of
     its ``-C`` and with the words of its ``-S``, ``timeout`` past its duration, ``watch`` on the line it repeats."""
@@ -2890,15 +2975,12 @@ def _assess_wrapped(command: str, args: list[str], scope: ShellScope, given: _In
         here: ShellScope = _with_places(scope, _places(places[-1], scope)) if places else scope
         words: list[str] = rest[1:] if rest[:1] == ["-"] else rest
         split: list[str] = [value for name, value in options if name in ("-S", "--split-string")]
-        # What the command names is read from the folder ``-C`` moves it to (item 531: ``env -C ~/Library cat
-        # Safari/History.db``), which the words of the line, judged from where the line is, do not show.
-        moved: list[Finding] = _protected_words(words, here) if places else []
         if not split:
-            return [*moved, *_assess_simple(words, here, given)]
+            return _assess_simple(words, here, given)
         parts: list[str] | None = _split_words(split[-1])
         if parts is None:
             return [_unknown("env -S is given a string that cannot be parsed")]
-        return [*moved, *_assess_simple([*parts, *words], here, given)]
+        return _assess_simple([*parts, *words], here, given)
     if command in _WRAPPER_SKIPS:
         return _assess_simple(rest[_WRAPPER_SKIPS[command] :], scope, given)
     if command == "watch":
@@ -2997,6 +3079,11 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
         *_assess_named(command, plain, scope, given),
         *_walks_over_protected(command, plain[1:], scope),
     ]
+    for moved in _moved_scopes(plain[1:], scope):
+        # The words it names are read from the folder its option moves it to (item 531: ``env -C ~/Library cat
+        # Safari/History.db``, ``git -C ~ diff --no-index .ssh/id_rsa /dev/null``), where the line, judged from the
+        # folder it is in, does not show them.
+        named.extend((*_protected_words(plain[1:], moved), *_walks_over_protected(command, plain[1:], moved)))
     if "/" in head and head != command:
         # A program named by its path runs as itself: one the line downloaded or decoded counts as that run (items 385,
         # 528). What the program is is still read: a wrapper or a privilege command at that path still runs its command.

@@ -719,6 +719,19 @@ _WALKING_THEM: list[str] = [
     "zip -r out.zip ~/Library",
     "ditto ~/Library ./c",
     "env -C ~ grep -r secret .",
+    # A listing piped into xargs is the twin of a find that runs the command itself.
+    "find ~ -name id_rsa | xargs cat",
+    "find ~ -print0 | xargs -0 cat",
+    "find ~/Library -name History.db | xargs -I{} cp {} ./c",
+    "find ~ -type f | sort | xargs grep token",
+    "rg --files ~ | xargs cat",
+    "fd -t f . ~ | xargs cat",
+    # Options bundled with a digit, and a recursive grep that is git's.
+    "grep -rC3 password ~",
+    "grep -rm1 token ~/Library",
+    "zip -r9 out.zip ~",
+    "git -C ~ grep --no-index -e token",
+    "git grep --no-index token ~/Library",
 ]
 _NOT_AFTER_THEM: list[str] = [
     "cat ~/Documents/$(date +%Y)/notes.md",
@@ -733,6 +746,32 @@ _NOT_AFTER_THEM: list[str] = [
     "cp -r ./a ./b",
     "tar -czf out.tgz ./src",
     "rsync -a ./src/ ./copy/",
+    "find ~ -name '*.pdf' | xargs ls -l",
+    "find ~ -name '*.pdf' | xargs echo",
+    "find ./src -name '*.py' | xargs cat",
+    "rg --files ./src | xargs cat",
+    # The pattern is no folder to walk, and a path given to a search is the only one it reads.
+    "grep -r ~ ./notes",
+    "rg -e TODO ./src",
+    "grep -rC3 password ./src",
+    "zip -r9 out.zip ./src",
+    "git -C ~/projects/x status",
+    "git -C ./sub log -1",
+    "tar -C ./out -xf a.tar",
+    "grep -C 3 token ./notes.md",
+]
+
+# Commands that move into another folder to read the names they are given: those names are the protected locations'.
+_MOVED_INTO_THEM: list[str] = [
+    "env -C ~/Library cat Safari/History.db",
+    "cd ~/Library && cat Safari/History.db",
+    "git -C ~ diff --no-index .ssh/id_rsa /dev/null",
+    "git -C ~/Library diff --no-index Safari/History.db /dev/null",
+    "tar -C ~ -cf - .ssh",
+    "uv --directory ~ run cat .ssh/id_rsa",
+    "make -C ~ -f .ssh/id_rsa",
+    "yarn --cwd ~ exec cat .ssh/id_rsa",
+    "sudo git -C ~ diff --no-index .aws/credentials /dev/null",
 ]
 
 
@@ -758,11 +797,25 @@ def test_a_path_built_from_pieces_or_a_walk_over_a_folder_that_holds_a_protected
     assert _under_the_defaults(command, tmp_path) == ("ask", "ask", "ask"), command
 
 
-def test_a_command_run_in_a_folder_that_holds_a_protected_location_names_it_by_where_it_runs(tmp_path: Path) -> None:
-    """``env -C`` runs its command in another folder: ``Safari/History.db`` from ``~/Library`` is ``~/Library/Safari``'s
-    file, as it is after a ``cd`` (``cd ~/Library && cat Safari/History.db``)."""
-    assert _under_the_defaults("env -C ~/Library cat Safari/History.db", tmp_path) == ("deny", "deny", "deny")
-    assert _under_the_defaults("cd ~/Library && cat Safari/History.db", tmp_path) == ("deny", "deny", "deny")
+@pytest.mark.parametrize("command", _MOVED_INTO_THEM)
+def test_a_command_run_in_a_folder_that_holds_a_protected_location_names_it_by_where_it_runs(
+    command: str, tmp_path: Path
+) -> None:
+    """``env -C`` and the options like it (git's, tar's, make's, uv's ``--directory``, yarn's ``--cwd``) run their
+    command in another folder: ``Safari/History.db`` from ``~/Library`` is ``~/Library/Safari``'s file, as it is after a
+    ``cd`` (``cd ~/Library && cat Safari/History.db``)."""
+    assert _under_the_defaults(command, tmp_path) == ("deny", "deny", "deny"), command
+
+
+@pytest.mark.parametrize(
+    "command", ["grep -r secret ~", "find ~ -name id_rsa | xargs cat", "cat ~/.s$(echo sh)/id_rsa"]
+)
+def test_a_step_that_may_reach_a_protected_location_says_so_and_is_not_called_destructive(
+    command: str, tmp_path: Path
+) -> None:
+    protected: tuple[Path, ...] = expand_protected(load_default_config().policy.refused_paths, ())
+    assessment: ShellAssessment = assess_shell(command, tmp_path, tmp_path, protected, ())
+    assert "protected_read" in assessment.flags and "destructive" not in assessment.flags, assessment
 
 
 @pytest.mark.parametrize("command", _NOT_AFTER_THEM)

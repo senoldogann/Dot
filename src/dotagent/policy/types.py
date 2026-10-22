@@ -43,6 +43,10 @@ Flag = Literal[
     "social",
     "install",
     "secret_access",
+    # A read the guard cannot tell from one of a protected location: a path with a part only the running line knows
+    # that begins as one, or a command that reads every file under a folder that holds one (item 531). It is asked
+    # about in every preset; a read the guard sees reach one is ``secret_access``, which is refused.
+    "protected_read",
     "exfiltration",
     "outside_workspace",
     "persistence",

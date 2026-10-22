@@ -48,7 +48,9 @@ _VAULT_FLAGS: frozenset[Flag] = frozenset({"vault_fill"})
 _VAULT_REASON: str = "Dot asks before it fills a login from your password manager, whatever your rules say"
 # The sources of a question that only the owner answers, whatever the approval mode.
 _OWNERS_SOURCES: frozenset[str] = frozenset({"own_files", "vault"})
-_AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset({"privilege", "system_settings", "public_post", "external_send"})
+_AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset(
+    {"privilege", "system_settings", "public_post", "external_send", "protected_read"}
+)
 _BALANCED_ASK_FLAGS: frozenset[Flag] = frozenset(
     {"destructive", "external_send", "public_post", "privilege", "system_settings", "install"}
 )
@@ -245,6 +247,7 @@ _TAINT_CHECKED_FLAGS: frozenset[Flag] = (
         "install",
         "self_change",
         "vault_fill",
+        "protected_read",
     }
 )
 
