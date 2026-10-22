@@ -247,7 +247,6 @@ _TAINT_CHECKED_FLAGS: frozenset[Flag] = (
         "install",
         "self_change",
         "vault_fill",
-        "protected_read",
     }
 )
 

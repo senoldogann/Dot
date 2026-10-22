@@ -464,6 +464,22 @@ sealed_paths = [
   "~/Library/Application Support/Vivaldi",
   "~/Library/Application Support/com.operasoftware.Opera",
   "~/Library/Application Support/com.operasoftware.OperaGX",
+  "~/Library/Application Support/com.operasoftware.OperaDeveloper",
+  "~/Library/Application Support/com.operasoftware.OperaNext",
+  "~/Library/Application Support/Vivaldi Snapshot",
+  "~/Library/Application Support/Google/Chrome for Testing",
+  "~/Library/Application Support/Orion",
+  "~/Library/Application Support/zen",
+  "~/Library/Application Support/TorBrowser-Data",
+  "~/Library/SafariTechnologyPreview",
+  "~/Library/Containers/com.apple.SafariTechnologyPreview",
+  "~/Library/Containers/com.apple.mail",
+  "~/Library/Containers/com.duckduckgo.macos.browser",
+  "~/Library/Caches/Chromium",
+  "~/Library/Caches/company.thebrowser.Browser",
+  "~/Library/Caches/Vivaldi",
+  "~/Library/Caches/com.operasoftware.Opera",
+  "~/Library/Caches/com.operasoftware.OperaGX",
 ]
 # The applications code_fetch may read a one-time code from: "mail" (Mail.app, through AppleScript) and "messages"
 # (Messages.app, its database read-only; needs Full Disk Access for the program that runs Dot). Only the code of the

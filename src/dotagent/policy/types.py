@@ -137,6 +137,9 @@ TAINT_ESCALATION_FLAGS: frozenset[Flag] = frozenset(
         "system_settings",
         "persistence",
         "install",
+        # A read that may reach a protected location (item 531): a rule of the owner's that allows it still asks once
+        # the run has read untrusted content.
+        "protected_read",
     }
 )
 
