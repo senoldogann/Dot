@@ -16,8 +16,9 @@ _KEY_LIKE: re.Pattern[str] = re.compile(
     r"sk-[A-Za-z0-9_\-]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}"
     r"|-----BEGIN [A-Z ]*PRIVATE KEY-----"
 )
-# Where a label's own sentence starts: at its start, or after a stop or a separator ("Total 9 €. Pay", "Lamp · Buy").
-_SENTENCE_START: str = r"(?:^\s*|[.!?·•|]\s+)"
+# Where a label's own sentence starts: at its start, on a new line, or after a stop or a separator ("Total 9 €. Pay",
+# "Lamp · Buy", "Lamp — $9.90 — Buy", "Total: €9.90").
+_SENTENCE_START: str = r"(?:^\s*|\n\s*|[.!?·•|:—–]\s+|\s-\s+)"
 # A call to pay. The control that takes the money is the one that counts, so a way to the payment page ("Checkout",
 # "Proceed to checkout", "Continue to payment") stays a plain click: the run fills the order and the button that pays
 # ("Place order", "Pay €19.90", "Complete checkout") is the one handed to the owner.
@@ -36,9 +37,12 @@ _FINANCIAL_ACTION: re.Pattern[str] = re.compile(
     r"|^\s*[öo]de\s*$"
 )
 # A verb that offers something for the amount of money its label names: "Rent HD $3.99", "Subscribe for €4.99/month",
-# "Upgrade · 99 TL". Without an amount, "Subscribe" stays a follow and "Order 20261010" a plain click.
+# "Upgrade · 99 TL", and "Order", "Book" or "Reserve" with the amount right after them ("Order · €23.50", "Book for
+# $199"), as a row of past orders or a book's title is not ("Order #4521 · $45.00 · Delivered", "Book: Dune · $9.99").
+# Without an amount, "Subscribe" stays a follow and "Order 20261010" a plain click.
 _PRICED_ACTION: re.Pattern[str] = re.compile(
-    rf"(?i){_SENTENCE_START}(?:rent|subscribe|upgrade|renew|unlock|order|book|reserve|tilaa|vuokraa)\b"
+    rf"(?i){_SENTENCE_START}(?:(?:rent|subscribe|upgrade|renew|unlock|tilaa|vuokraa)\b"
+    r"|(?:order|book|reserve)\s*(?:for\s+|[·•|—–:-]\s*)?(?=[$€£₺¥\d]))"
 )
 _DESTRUCTIVE_ACTION: re.Pattern[str] = re.compile(
     r"(?i)\b(?:delete|remove|erase|discard|destroy|wipe|deactivate|terminate|permanently|empty (?:the )?trash"
