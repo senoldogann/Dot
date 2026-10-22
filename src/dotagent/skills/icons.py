@@ -13,6 +13,7 @@ ICON_NAMES: frozenset[str] = frozenset(
         "arrowLeft",
         "arrowRight",
         "arrowUp",
+        "arrowUpDown",
         "bell",
         "bolt",
         "brain",
@@ -80,6 +81,7 @@ ICON_NAMES: frozenset[str] = frozenset(
         "sparkles",
         "squareCheck",
         "squarePen",
+        "squareTerminal",
         "star",
         "stop",
         "sun",
@@ -90,6 +92,7 @@ ICON_NAMES: frozenset[str] = frozenset(
         "upload",
         "user",
         "users",
+        "wrapText",
         "wrench",
         "x",
     )

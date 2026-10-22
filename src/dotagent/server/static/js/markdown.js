@@ -1,16 +1,46 @@
-// A small Markdown reader for what the agent writes: code, lists, headings, quotes, tables, bold, italics and links.
-// It only produces plain data (no HTML); prose.js turns that into DOM nodes, and mirror.js the composer's text as it
-// reads (`sourceLines`).
+// A small Markdown reader for what the agent writes: code, lists (nested, numbered from any number, with tasks),
+// headings, quotes, tables (with their alignment), bold, italics, strikethrough and links. It only produces plain data
+// (no HTML); prose.js turns that into DOM nodes, and mirror.js the composer's text as it reads (`sourceLines`).
 
-const FENCE = /^\s*(`{3,}|~{3,})\s*([\w+#.-]*)\s*$/;
-const HEADING = /^(#{1,4})\s+(.*)$/;
-const BULLET = /^\s*[-*+]\s+(.*)$/;
-const NUMBERED = /^\s*\d+[.)]\s+(.*)$/;
+const HEADING = /^(#{1,6})\s+(.*)$/;
+// The first line of a list item: its indent, its mark (a bullet, or a number and its dot or bracket), the space after
+// it and the rest of the line.
+const ITEM = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(.*)$/;
+const TASK = /^\[([ xX])\]\s+(.*)$/;
 const QUOTE = /^\s*>\s?(.*)$/;
 const RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
-const TABLE_SEPARATOR = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
-const BARE_URL = /https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"\]]/g;
+// The line under a table's head: a dash in each cell at least, with a colon at an end of it to align the column.
+const TABLE_SEPARATOR = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+// A bare address, or one between angle brackets (its brackets are no part of it).
+const BARE_URL = /<(https?:\/\/[^\s<>]+)>|https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"\]]/g;
 const SAFE_URL = /^https?:\/\/[^\s]+$/;
+// How deep lists and quotes nest in what is read: a text of nothing but nested marks cannot take the page down.
+const MOST_NESTING = 6;
+
+/**
+ * What a line that opens a block of code says (``` or ~~~, then what the writer called the code): the width of its
+ * indent, its mark, the language (the first word of what follows the mark read as letters, digits and `+#.-`:
+ * `python title="x.py"`, `js {1,3}` and `python:x.py` all say theirs) and the title (`title="x.py"`, or what follows a
+ * colon after the language), "" when it has none; null when the line opens no block: a line that holds backticks after
+ * a backtick mark is code in a line.
+ */
+export function openFence(line) {
+  const match = /^(\s*)(`{3,}|~{3,})(.*)$/.exec(line);
+  if (match === null || (match[2][0] === "`" && match[3].includes("`"))) {
+    return null;
+  }
+  const info = match[3].trim();
+  const language = /^[\w+#.-]*/.exec(info)[0];
+  const named = /title\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/.exec(info);
+  const colon = info.startsWith(`${language}:`) ? /^[^\s{]*/.exec(info.slice(language.length + 1))[0] : "";
+  return { indent: match[1].length, marker: match[2], language, title: named === null ? colon : (named[1] ?? named[2] ?? named[3]) };
+}
+
+/** Whether `line` closes the block of code that `marker` opened: marks of the same kind, at least as many, alone. */
+function closesFence(line, marker) {
+  const trimmed = line.trim();
+  return trimmed.length >= marker.length && [...trimmed].every((char) => char === marker[0]);
+}
 
 function splitCells(line) {
   const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
@@ -24,7 +54,8 @@ function linkParts(text) {
     if (match.index > last) {
       parts.push({ type: "text", value: text.slice(last, match.index) });
     }
-    parts.push({ type: "link", value: match[0], href: match[0] });
+    const address = match[1] ?? match[0];
+    parts.push({ type: "link", value: address, href: address });
     last = match.index + match[0].length;
   }
   if (last < text.length) {
@@ -33,7 +64,10 @@ function linkParts(text) {
   return parts;
 }
 
-const EMPHASIS = /\*\*(?=\S)([^*]+?)(?<=\S)\*\*|(?<![\w*])\*(?=[^\s*])([^*\n]+?)(?<=[^\s*])\*(?![\w*])/g;
+// Bold (`**` or `__`), italics (`*` or `_`, an underscore only between words' edges, so `snake_case` stays whole) and
+// strikethrough (`~~`), in this order of groups.
+const EMPHASIS =
+  /\*\*(?=\S)([^*]+?)(?<=\S)\*\*|(?<![\w*])\*(?=[^\s*])([^*\n]+?)(?<=[^\s*])\*(?![\w*])|~~(?=\S)([^~\n]+?)(?<=\S)~~|(?<![\w_])__(?=\S)([^_\n]+?)(?<=\S)__(?![\w_])|(?<![\w_])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w_])/g;
 const LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
 
 function emphasisParts(text) {
@@ -43,11 +77,13 @@ function emphasisParts(text) {
     if (match.index > last) {
       parts.push(...linkParts(text.slice(last, match.index)));
     }
-    parts.push(
-      match[1] === undefined
-        ? { type: "italic", value: match[2] }
-        : { type: "bold", value: match[1] },
-    );
+    if (match[1] !== undefined || match[4] !== undefined) {
+      parts.push({ type: "bold", value: match[1] ?? match[4] });
+    } else if (match[3] !== undefined) {
+      parts.push({ type: "strike", value: match[3] });
+    } else {
+      parts.push({ type: "italic", value: match[2] ?? match[5] });
+    }
     last = match.index + match[0].length;
   }
   if (last < text.length) {
@@ -56,10 +92,14 @@ function emphasisParts(text) {
   return parts;
 }
 
+// A link, or a picture written as one (`![words](address)`): the picture is not drawn (nothing is fetched for a
+// message), its words are the link.
+const MARKDOWN_LINK = /!?\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
 function markdownLinkParts(text) {
   const parts = [];
   let last = 0;
-  for (const match of text.matchAll(LINK)) {
+  for (const match of text.matchAll(MARKDOWN_LINK)) {
     if (match.index > last) {
       parts.push(...emphasisParts(text.slice(last, match.index)));
     }
@@ -76,83 +116,178 @@ function markdownLinkParts(text) {
   return parts;
 }
 
-/** The inline pieces of one line of text: `{type: "text" | "code" | "bold" | "italic" | "link", value, href?}`. */
-export function parseInline(text) {
+// A backslash before a mark makes the mark a letter (item 537): while a line is read its marks stand as private
+// characters, so that no reader takes them for marks, and each is given back as itself (in code with its backslash).
+const ESCAPABLE = /\\([\\`*_{}[\]()#+\-.!|~<>])/g;
+const HIDDEN_FROM = 0xe000;
+const HIDDEN = /[\ue000-\ue07f]/g;
+const ENTITIES = { "&lt;": "<", "&gt;": ">", "&amp;": "&", "&quot;": '"', "&#39;": "'", "&nbsp;": "\u00a0" };
+const BREAK = /<br\s*\/?>/i;
+
+function hideEscapes(text) {
+  return text.replace(ESCAPABLE, (_, mark) => String.fromCharCode(HIDDEN_FROM + mark.charCodeAt(0)));
+}
+
+function showEscapes(text, keepBackslash) {
+  return text.replace(HIDDEN, (char) => `${keepBackslash ? "\\" : ""}${String.fromCharCode(char.charCodeAt(0) - HIDDEN_FROM)}`);
+}
+
+// The words of a line as they read: the escapes given back and the few entities a writer uses spelled out; a `<br>` is a
+// break of its own.
+function wordsOf(part) {
+  const value = showEscapes(part.value, false).replace(/&(?:lt|gt|amp|quot|#39|nbsp);/g, (entity) => ENTITIES[entity]);
+  if (part.type !== "text" || !BREAK.test(value)) {
+    return [{ ...part, value }];
+  }
+  return value.split(/<br\s*\/?>/i).flatMap((piece, index) => [...(index === 0 ? [] : [{ type: "break", value: "" }]), ...(piece === "" ? [] : [{ type: "text", value: piece }])]);
+}
+
+/** The inline pieces of one line of text: `{type: "text" | "code" | "bold" | "italic" | "strike" | "link" | "break", value, href?}`. */
+export function parseInline(line) {
   const parts = [];
-  const segments = text.split(/(`+)/);
+  const segments = hideEscapes(line).split(/(`+)/);
   // An odd split index holds the backtick run that opens or closes a code span.
   for (let index = 0; index < segments.length; index += 1) {
     if (index % 2 === 0) {
       if (segments[index] !== "") {
-        parts.push(...markdownLinkParts(segments[index]));
+        parts.push(...markdownLinkParts(segments[index]).flatMap(wordsOf));
       }
       continue;
     }
     const fence = segments[index];
     const closing = segments.indexOf(fence, index + 1);
     if (closing === -1 || closing % 2 === 0) {
-      parts.push({ type: "text", value: fence });
+      parts.push({ type: "text", value: showEscapes(fence, false) });
       continue;
     }
-    parts.push({ type: "code", value: segments.slice(index + 1, closing).join("").trim() });
+    parts.push({ type: "code", value: showEscapes(segments.slice(index + 1, closing).join(""), true).trim() });
     index = closing;
   }
-  return parts;
+  return parts.map((part) => (part.href === undefined ? part : { ...part, href: showEscapes(part.href, false) }));
+}
+
+// Whether the line under `line` makes it the head of a table.
+function startsTable(line, next) {
+  return line.includes("|") && next !== undefined && TABLE_SEPARATOR.test(next) && (next.includes("|") || /-{3,}/.test(next));
 }
 
 function startsBlock(line, next) {
   return (
-    FENCE.test(line) ||
+    openFence(line) !== null ||
     HEADING.test(line) ||
-    BULLET.test(line) ||
-    NUMBERED.test(line) ||
+    ITEM.test(line) ||
     QUOTE.test(line) ||
     RULE.test(line) ||
-    (line.includes("|") && next !== undefined && TABLE_SEPARATOR.test(next) && next.includes("-"))
+    startsTable(line, next)
   );
 }
 
 function readFence(lines, start) {
-  const open = FENCE.exec(lines[start]);
-  const marker = open[1];
+  const open = openFence(lines[start]);
   const body = [];
   let index = start + 1;
-  while (index < lines.length && !(lines[index].trim().startsWith(marker) && lines[index].trim().replace(/[`~]/g, "") === "")) {
-    body.push(lines[index]);
+  while (index < lines.length && !closesFence(lines[index], open.marker)) {
+    // The lines of code stand as far in from the fence as the fence stands in from the margin (a fence under a list item).
+    body.push(lines[index].replace(new RegExp(`^ {0,${open.indent}}`), ""));
     index += 1;
   }
-  return { block: { type: "code", language: open[2], text: body.join("\n") }, next: index + 1 };
+  return { block: { type: "code", language: open.language, title: open.title, text: body.join("\n") }, next: index + 1 };
 }
 
-function readList(lines, start, pattern, ordered) {
+function indentOf(line) {
+  return /^ */.exec(line)[0].length;
+}
+
+// The lines of the list item that begins at `lines[start]` (marked as `match` reads it), as the text of the item with
+// the lines under it set out to its margin: those indented under it, and blank lines between them. `next` is the line
+// after them.
+function readItemLines(lines, start, match, base) {
+  const offset = match[1].length + match[2].length + match[3].length;
+  const own = [match[4]];
+  let index = start + 1;
+  let end = index;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (line.trim() === "") {
+      index += 1;
+      continue;
+    }
+    if (indentOf(line) < base + 2) {
+      break;
+    }
+    // Blank lines inside the item are part of it only when more of it follows them.
+    while (end < index) {
+      own.push("");
+      end += 1;
+    }
+    own.push(line.slice(Math.min(indentOf(line), offset)));
+    index += 1;
+    end = index;
+  }
+  return { text: own.join("\n"), next: end };
+}
+
+function readList(lines, start, depth) {
+  const first = ITEM.exec(lines[start]);
+  const base = first[1].length;
+  const ordered = /^\d/.test(first[2]);
   const items = [];
   let index = start;
-  while (index < lines.length && pattern.test(lines[index])) {
-    items.push(parseInline(pattern.exec(lines[index])[1]));
-    index += 1;
+  while (index < lines.length) {
+    // A list goes on past blank lines when its next item follows them.
+    let probe = index;
+    while (probe < lines.length && lines[probe].trim() === "") {
+      probe += 1;
+    }
+    const match = probe < lines.length ? ITEM.exec(lines[probe]) : null;
+    if (match === null || match[1].length < base || match[1].length >= base + 2 || /^\d/.test(match[2]) !== ordered) {
+      break;
+    }
+    const read = readItemLines(lines, probe, match, base);
+    let own = read.text;
+    let checked = null;
+    const task = TASK.exec(own.split("\n")[0]);
+    if (task !== null) {
+      checked = task[1] !== " ";
+      own = [task[2], ...own.split("\n").slice(1)].join("\n");
+    }
+    const blocks = parseSourcedBlocks(own, depth + 1).map((sourced) => sourced.block);
+    const head = blocks[0]?.type === "paragraph" ? blocks[0].inline : [];
+    items.push({ inline: head, blocks: head === blocks[0]?.inline ? blocks.slice(1) : blocks, checked });
+    index = read.next;
   }
-  return { block: { type: "list", ordered, items }, next: index };
+  return { block: { type: "list", ordered, start: ordered ? Number.parseInt(first[2], 10) : 1, items }, next: index };
+}
+
+// The alignment each cell of a table's rule line asks for: "left", "center", "right" or null.
+function tableAlignments(line) {
+  return splitCells(line).map((cell) => {
+    const left = cell.startsWith(":");
+    const right = cell.endsWith(":");
+    return left && right ? "center" : right ? "right" : left ? "left" : null;
+  });
 }
 
 function readTable(lines, start) {
   const header = splitCells(lines[start]).map(parseInline);
+  const aligns = tableAlignments(lines[start + 1]);
   const rows = [];
   let index = start + 2;
   while (index < lines.length && lines[index].includes("|") && lines[index].trim() !== "") {
     rows.push(splitCells(lines[index]).map(parseInline));
     index += 1;
   }
-  return { block: { type: "table", header, rows }, next: index };
+  return { block: { type: "table", header, aligns, rows }, next: index };
 }
 
-function readQuote(lines, start) {
+function readQuote(lines, start, depth) {
   const body = [];
   let index = start;
   while (index < lines.length && QUOTE.test(lines[index])) {
     body.push(QUOTE.exec(lines[index])[1]);
     index += 1;
   }
-  return { block: { type: "quote", inline: parseInline(body.join("\n")) }, next: index };
+  return { block: { type: "quote", blocks: parseSourcedBlocks(body.join("\n"), depth + 1).map((sourced) => sourced.block) }, next: index };
 }
 
 function readParagraph(lines, start) {
@@ -172,9 +307,12 @@ export function parseBlocks(text) {
 
 /**
  * The blocks of a text, each with the lines it was read from as its `source` (item 274). A block is read from its own
- * lines alone, so two texts whose first blocks were read from the same lines have the same first blocks.
+ * lines alone, so two texts whose first blocks were read from the same lines have the same first blocks. A `list` has
+ * `ordered`, `start` (the number its first item bears) and `items`, each `{ inline, blocks, checked }`: the words of
+ * the item, the blocks under them (a list inside it, code, more paragraphs) and whether a task is done (null: no task).
+ * A `table` has `aligns`, one for each column; a `quote` has the `blocks` it holds.
  */
-export function parseSourcedBlocks(text) {
+export function parseSourcedBlocks(text, depth = 0) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const blocks = [];
   let index = 0;
@@ -185,20 +323,21 @@ export function parseSourcedBlocks(text) {
       continue;
     }
     let read;
-    if (FENCE.test(line)) {
+    if (openFence(line) !== null) {
       read = readFence(lines, index);
     } else if (HEADING.test(line)) {
       const match = HEADING.exec(line);
-      read = { block: { type: "heading", level: match[1].length, inline: parseInline(match[2]) }, next: index + 1 };
+      read = {
+        block: { type: "heading", level: match[1].length, inline: parseInline(match[2].replace(/\s+#+\s*$/, "")) },
+        next: index + 1,
+      };
     } else if (RULE.test(line)) {
       read = { block: { type: "rule" }, next: index + 1 };
-    } else if (BULLET.test(line)) {
-      read = readList(lines, index, BULLET, false);
-    } else if (NUMBERED.test(line)) {
-      read = readList(lines, index, NUMBERED, true);
-    } else if (QUOTE.test(line)) {
-      read = readQuote(lines, index);
-    } else if (line.includes("|") && lines[index + 1] !== undefined && TABLE_SEPARATOR.test(lines[index + 1]) && lines[index + 1].includes("-")) {
+    } else if (ITEM.test(line) && depth < MOST_NESTING) {
+      read = readList(lines, index, depth);
+    } else if (QUOTE.test(line) && depth < MOST_NESTING) {
+      read = readQuote(lines, index, depth);
+    } else if (startsTable(line, lines[index + 1])) {
       read = readTable(lines, index);
     } else {
       read = readParagraph(lines, index);
@@ -234,8 +373,15 @@ function sourceEmphasis(text) {
   let last = 0;
   for (const match of text.matchAll(EMPHASIS)) {
     pieces.push(...sourceAddresses(text.slice(last, match.index)));
-    const mark = match[1] === undefined ? "*" : "**";
-    pieces.push(piece("mark", mark), piece(match[1] === undefined ? "em" : "strong", match[1] ?? match[2]), piece("mark", mark));
+    if (match[1] !== undefined || match[4] !== undefined) {
+      const mark = match[1] !== undefined ? "**" : "__";
+      pieces.push(piece("mark", mark), piece("strong", match[1] ?? match[4]), piece("mark", mark));
+    } else if (match[3] !== undefined) {
+      pieces.push(piece("mark", "~~"), piece("text", match[3]), piece("mark", "~~"));
+    } else {
+      const mark = match[2] !== undefined ? "*" : "_";
+      pieces.push(piece("mark", mark), piece("em", match[2] ?? match[5]), piece("mark", mark));
+    }
     last = match.index + match[0].length;
   }
   pieces.push(...sourceAddresses(text.slice(last)));
@@ -291,7 +437,7 @@ function sourceMarked(match) {
   return [piece("text", match[1]), piece("mark", match[2]), piece("text", match[3]), ...sourceInline(match[4])].filter((part) => part.text !== "");
 }
 
-const SOURCE_HEADING = /^()(#{1,4})(\s+)(.*)$/;
+const SOURCE_HEADING = /^()(#{1,6})(\s+)(.*)$/;
 const SOURCE_BULLET = /^(\s*)([-*+])(\s+)(.*)$/;
 const SOURCE_NUMBERED = /^(\s*)(\d+[.)])(\s+)(.*)$/;
 const SOURCE_QUOTE = /^(\s*)(>)(\s?)(.*)$/;
@@ -314,7 +460,7 @@ export function sourceLines(text) {
     const line = lines[index];
     const next = lines[index + 1];
     if (fence !== null) {
-      const closes = line.trim().startsWith(fence) && line.trim().replace(/[`~]/g, "") === "";
+      const closes = closesFence(line, fence);
       shown.push(closes ? { kind: "fence", pieces: [piece("mark", line)] } : { kind: "block", pieces: [piece("text", line)] });
       fence = closes ? null : fence;
       continue;
@@ -322,8 +468,8 @@ export function sourceLines(text) {
     table = table && line.includes("|") && line.trim() !== "";
     if (table) {
       shown.push({ kind: "table", pieces: sourceRow(line) });
-    } else if (FENCE.test(line)) {
-      fence = FENCE.exec(line)[1];
+    } else if (openFence(line) !== null) {
+      fence = openFence(line).marker;
       shown.push({ kind: "fence", pieces: [piece("mark", line)] });
     } else if (SOURCE_HEADING.test(line)) {
       shown.push({ kind: "heading", pieces: sourceMarked(SOURCE_HEADING.exec(line)) });
@@ -335,7 +481,7 @@ export function sourceLines(text) {
       shown.push({ kind: "list", pieces: sourceMarked(SOURCE_NUMBERED.exec(line)) });
     } else if (SOURCE_QUOTE.test(line)) {
       shown.push({ kind: "quote", pieces: sourceMarked(SOURCE_QUOTE.exec(line)) });
-    } else if (line.includes("|") && next !== undefined && TABLE_SEPARATOR.test(next) && next.includes("-")) {
+    } else if (startsTable(line, next)) {
       shown.push({ kind: "table-head", pieces: sourceRow(line) }, { kind: "table-rule", pieces: [piece("mark", next)] });
       index += 1;
       table = true;

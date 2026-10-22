@@ -160,15 +160,20 @@ key of its own, and the daemon answers the same message sent again with what its
 a word opens the slash menu over the box: the commands of the composer (`/auto`, `/task`, `/chat`, `/research` and
 `/loop` here; `/btw`, the modes and `/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools,
 read from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and
-Escape closes. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the
+Escape closes. The menu stands in sections with a hairline between them and no title on the page (a screen reader
+hears each by name: Commands, Skills, MCP tools): a row is a line icon, the name and under it its words, cut by an
+ellipsis rather than wrapped (item 537, after Qoder's menu: a terminal in a box for a command, the arrows of a loop for
+`/loop`, a puzzle piece for a skill), and under the list stands what the keys do (a touch screen has none, so it has
+no such line). A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the
 slash word goes; a command does its work. `@` at the start of a word opens the menu of the servers and plugins alone
 (item 367, and the owner's word of 2026-10-21, item 447) — the group the menu titles **MCP servers**, the plugins: each
 one by its name and the number of its tools, filtered by the letters after it — the skills and the servers' tools,
 which the slash menu carries, are not there; a pick is a chip and the at word goes. In both menus a server, and each of
 its tools, wears the mark its service's Customize tile wears, on that tile's light ground: the service's logo, else its
 icon or its letters (DeepWiki's magnifier, Context7's C7), the plug for a server of no service; and a skill wears the
-mark of its Customize card: an imported one the download arrow, a learned one the brain, any other its own icon (item
-477; the daemon's palette says which server is of which service and which skill is a copy). An `@` inside a
+puzzle piece, here and as a chip and as the row of a call to the `skill` tool, plain in the ink of the text (item 537;
+the Customize cards keep the marks of item 477: the download arrow of an imported skill, the brain of a learned one; the
+daemon's palette says which server is of which service). An `@` inside a
 word, as in an address, opens nothing. On a phone either menu takes the room the keyboard leaves above the composer and
 scrolls inside it. A run that waits
 for your approval is listed under Waits for you, below the composer, and leads to its chat: the card stands there alone
@@ -213,7 +218,10 @@ failed (with reduced motion the tick simply shows). The panel button sits on the
 agent, model, approval mode, goal mode and campaign) are in the panel's Details, on its Run tab, its start under More
 (item 452). Your goal is the
 first message, in the bubble of your messages on the raised surface. What you write reads there as markdown, as an
-answer does: its headings, lists, tables, code, quotes and emphasis (item 206). Under each of your messages, once its
+answer does: its headings, lists (nested as far as their items are indented, with a block of code or a quote under an
+item, numbered on from the number they begin at, and task lists with their boxes), tables (their columns aligned as
+the rule line says), code (whatever follows the fence's language, `title="x.py"` or `python:x.py`, is read, so the
+blocks after it stand as blocks), quotes, strikethrough, line breaks and emphasis (items 206 and 537). Under each of your messages, once its
 turn has its answer, stand the time it was sent (the day too when it was not today, the full date where the pointer
 rests) and a copy of it as you wrote it (item 205); the files a message came with stand between it and that line, in the
 earlier turns of the chat as under the latest message (item 403), the pictures among them as small squares side by side
@@ -288,8 +296,14 @@ reply is told to call finish, thinks once more and finishes with the same words.
 keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as the markdown
 it was written in, a list as a list, a table as a table and code in its fence, with the formatted copy alongside for the
 applications that read it; the line under a message or an answer stays out, and a copy within a block of code is its
-code. A table in a message or an answer has a copy of its own over its right edge, which takes it as markdown (item
-403), and so has a block of code, which takes its text as it was written (item 439).
+code. A block of code, in an answer, in a message of yours, in a step's row or on an approval card, is a dark rounded box with a head
+(item 537): at its left the language it was written for (the title its fence gave it, ` ```python title="x.py" `, in
+its place; `text` when it named none; a step's boxes say Command, Arguments, Result or Error, an approval's Command or Target), at its right a switch
+that wraps the long lines of this block (Settings › Appearance › Type › long lines of code wrapped says how every block
+begins; a step's boxes begin wrapped) and the copy of its text as it was written (item 439), which, for a step's result
+the page shows only the first part of, is all of it; Show all puts all of it in the box. A table has its head too, with
+its name and a copy that takes the table as markdown (item 403). Code shows its letters as they are: no font turns `->`
+or `!=` into one glyph.
 The box stands at the foot of the window from the first message, the conversation filling the space above it from
 the top, and is the same frame as the home's, with the attach button and the send in its bar; what you typed there and
 did not send waits for you. While the end of the conversation, or its answer, is below the window, a round arrow just
@@ -543,7 +557,8 @@ families typed, which go before Inter so that no glyph goes missing); the answer
 in Paper, the interface's, or a serif); the composer's font (the interface's, a serif, the code's, or families typed)
 and size (12 to 20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed) and the size of
 an answer's code blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on) and long lines of
-code wrapped (off). The choices are kept in the browser only, and `boot.js` puts each of them on the page before the
+code wrapped (off: how a block of code begins, its own switch wraps just that block). The choices are kept in the
+browser only, and `boot.js` puts each of them on the page before the
 first paint. The palettes, the colour arithmetic, the orbs, the contrast's mixing, the families typed, the theme
 generator, the theme file with its checks and the VS Code import are a port of an MIT-licensed project to plain ES
 modules; its notice is `static/js/appearance/LICENSE`, and Dot is not affiliated with that project. The looks are one

@@ -32,7 +32,8 @@ function sentence(decision) {
         return `Allowed by your rule “${reason}”.`;
       }
       if (decision.source === "preset") {
-        return `Allowed by the ${decision.preset} preset: ${reason}.`;
+        // The aggressive preset's reason is its own name: said once, not as "the aggressive preset: aggressive preset".
+        return reason.toLowerCase() === `${decision.preset} preset` ? `Allowed by the ${decision.preset} preset.` : `Allowed by the ${decision.preset} preset: ${reason}.`;
       }
       return `Allowed: ${reason}.`;
   }

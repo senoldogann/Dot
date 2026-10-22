@@ -341,7 +341,7 @@ async def test_on_a_phone_the_conversation_never_scrolls_sideways(login_env: dic
                     assert wide <= seen, f"the conversation is {wide - seen} px wider than its box"
                     assert await thread.evaluate("(box) => { box.scrollLeft = 120; return box.scrollLeft; }") == 0
                     # The table and the block of code are wider than the phone, and each scrolls in its own box.
-                    for own in (page.locator(".answer .prose table"), page.locator(".answer .prose pre")):
+                    for own in (page.locator(".answer .prose .prose-table-scroll"), page.locator(".answer .prose pre")):
                         assert await own.evaluate("(box) => box.scrollWidth > box.clientWidth + 40")
                     await page.screenshot(path=tmp_path / f"phone-width-{scheme}.png")
                     await context.close()

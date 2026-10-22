@@ -21,14 +21,14 @@ const PLAN_FIRST_HINT = "Dot writes its plan and asks you before it changes anyt
 const KINDS = {
   plugin: { icon: "plug", noun: "MCP server", many: "MCP servers", most: MAX_PLUGINS },
   account: { icon: "mail", noun: "account", many: "accounts", most: MAX_ACCOUNTS },
-  skill: { icon: "sparkles", noun: "skill", many: "skills", most: MAX_SKILLS },
+  skill: { icon: "puzzle", noun: "skill", many: "skills", most: MAX_SKILLS },
 };
 
 // The colours a server's or a skill's chip takes, by its name: the characters' (themes.css), without amber, Dot's own.
 const PICK_COLOURS = ["blue", "green", "violet", "orange", "teal", "pink", "red", "brown"];
 
 /** The colour of the pick `name`, the same wherever its chip shows: one of `PICK_COLOURS`. */
-export function pickColour(name) {
+function pickColour(name) {
   let hash = 0;
   for (const char of name) {
     hash = (hash * 31 + char.codePointAt(0)) >>> 0;
