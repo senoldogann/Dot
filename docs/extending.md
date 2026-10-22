@@ -129,19 +129,19 @@ The ways a service connects:
   server offers by default, are that page's words and code, and stay out of a run's tools; a server added before keeps
   the arguments it was added with.
 
-**Choose tools** (items 426 and 524): a server offers a run every tool it lists, however many. With the default
-`[agent] tool_surface = "full"` each step of a run carries the definition of every one of them, so a server of many
-tools makes every request longer; `tool_surface = "grouped"` keeps a server's tools out of a run until it turns the
-server's group on. A run of more than 128 tools starts grouped whatever the setting, as some providers refuse more in
-one request ([runs](runs.md)); a single server whose group alone brings a request past what its provider takes still
-fails there, with the provider's error, so cut such a server down here. **Choose tools**, on the row of a server added
-here that runs, opens the list of every tool it offers
-with what each says it does, all of them ticked until you choose, and **All tools** ticks or unticks them at once.
-**Save** connects the server with the ticked ones and keeps the choice with it, so a restart offers the same ones; with
-every one ticked it keeps no list, and the tools the server adds later are offered too. A server left out with a list
-of tools keeps the button, to choose the list again (it may name a tool the server no longer offers). A server that
-does not answer leaves the choice unwritten and the button stays. A server you signed in to (Linear, Postman) lists and connects its tools with
-that sign-in, so the choice asks for none again (item 499).
+**Choose tools** (items 426 and 524): a server offers a run every tool it lists, however many. With the default `[agent]
+tool_surface = "full"` each step of a run carries the definition of every one of them, so a server of many tools makes
+every request longer; `tool_surface = "grouped"` keeps a server's tools out of a run until it turns the server's group
+on. A run of more than 128 tools starts grouped whatever the setting, as some providers refuse more in one request
+([runs](runs.md)). The groups a grouped run has on (those its chat used before, the servers picked for its message, and
+those it turns on) may still bring a request past what its provider takes, and the request then fails with the
+provider's error, so cut a big server down here. **Choose tools**, on the row of a server added here that runs, opens
+the list of every tool it offers with what each says it does, all of them ticked until you choose, and **All tools**
+ticks or unticks them at once. **Save** connects the server with the ticked ones and keeps the choice with it, so a
+restart offers the same ones; with every one ticked it keeps no list, and the tools the server adds later are offered
+too. A server left out with a list of tools keeps the button, to choose the list again (it may name a tool the server no
+longer offers). A server that does not answer leaves the choice unwritten and the button stays. A server you signed in
+to (Linear, Postman) lists and connects its tools with that sign-in, so the choice asks for none again (item 499).
 
 **Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
 command that starts it on this Mac, added as the services are. Connected lists, besides the services, every server Dot
