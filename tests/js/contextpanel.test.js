@@ -1,0 +1,73 @@
+// What the run's Context sections say of a tool call and of a memory change (contextpanel.js): the pages and searches
+// a run read, and the notes it saved, each once and newest first.
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { addMemory, addReadings, readingsOf } from "../../src/dotagent/server/static/js/contextpanel.js";
+
+test("a page a tool opened or read, as a line and the address it points at", () => {
+  assert.deepEqual(readingsOf("web_fetch", { url: "https://docs.python.org/3/library/asyncio.html?x=1#top" }), [
+    {
+      kind: "page",
+      text: "docs.python.org/3/library/asyncio.html",
+      url: "https://docs.python.org/3/library/asyncio.html?x=1#top",
+    },
+  ]);
+  // An MCP tool reads by its own name, after the server's.
+  assert.deepEqual(readingsOf("mcp__web-research__web_fetch", { url: "https://www.example.com/" }), [
+    { kind: "page", text: "example.com/", url: "https://www.example.com/" },
+  ]);
+  assert.deepEqual(readingsOf("browser_open", { url: "http://example.com/guide" }), [
+    { kind: "page", text: "example.com/guide", url: "http://example.com/guide" },
+  ]);
+  // A crawl reads its root; each page of it is the same site.
+  assert.deepEqual(readingsOf("web_crawl", { url: "https://example.com/docs/" }), [
+    { kind: "page", text: "example.com/docs/", url: "https://example.com/docs/" },
+  ]);
+});
+
+test("a search is its query, and an extract is each page it read", () => {
+  assert.deepEqual(readingsOf("web_search", { query: "  rust tokio select  " }), [{ kind: "search", text: "rust tokio select" }]);
+  assert.deepEqual(readingsOf("mcp__web-research__web_search", { query: "sqlite fts5" }), [{ kind: "search", text: "sqlite fts5" }]);
+  assert.deepEqual(readingsOf("web_extract", { sources: ["https://example.com/a", "notes.md", "https://example.com/b"] }), [
+    { kind: "page", text: "example.com/a", url: "https://example.com/a" },
+    { kind: "page", text: "example.com/b", url: "https://example.com/b" },
+  ]);
+});
+
+test("only a page the browser can open is a reading", () => {
+  assert.deepEqual(readingsOf("web_fetch", { url: "javascript:alert(1)" }), []);
+  assert.deepEqual(readingsOf("web_fetch", { url: "file:///etc/passwd" }), []);
+  assert.deepEqual(readingsOf("web_fetch", { url: "not an address" }), []);
+  assert.deepEqual(readingsOf("web_fetch", {}), []);
+  assert.deepEqual(readingsOf("web_search", { query: "   " }), []);
+  assert.deepEqual(readingsOf("shell", { command: "curl https://example.com" }), []);
+  assert.deepEqual(readingsOf("read_file", { path: "/tmp/page.html" }), []);
+});
+
+test("the readings keep the newest first, each once, and never grow past their limit", () => {
+  const first = readingsOf("web_search", { query: "one" });
+  const second = readingsOf("web_fetch", { url: "https://example.com/a" });
+  const again = readingsOf("web_search", { query: "one" });
+  const list = addReadings(addReadings([], first), second);
+  assert.deepEqual(addReadings(list, again), [
+    { kind: "search", text: "one" },
+    { kind: "page", text: "example.com/a", url: "https://example.com/a" },
+  ]);
+  const many = Array.from({ length: 12 }, (_, index) => ({ kind: "search", text: `query ${index}` }));
+  assert.equal(addReadings([], many, 8).length, 8);
+  assert.equal(addReadings([], many, 8)[0].text, "query 0");
+});
+
+test("a note changed again is told once, as it stands now, newest first", () => {
+  const saved = { id: "mem_1", change: "Saved", words: "The user prefers short answers." };
+  const changed = { id: "mem_1", change: "Updated", words: "The user prefers short answers, in Turkish." };
+  const other = { id: "mem_2", change: "Saved", words: "The office is closed on Friday." };
+  const list = addMemory(addMemory([], saved), other);
+  assert.deepEqual(addMemory(list, changed), [changed, other]);
+  const many = Array.from({ length: 8 }, (_, index) => ({ id: `mem_${index}`, change: "Saved", words: `${index}` }));
+  assert.equal(addMemory([], many[0], 6).length, 1);
+  assert.equal(addMemory(many, { id: "mem_new", change: "Saved", words: "new" }, 6).length, 6);
+  assert.equal(addMemory(many, { id: "mem_new", change: "Saved", words: "new" }, 6)[0].id, "mem_new");
+});

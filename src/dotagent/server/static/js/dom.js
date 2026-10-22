@@ -205,6 +205,11 @@ export function clock(ts) {
   return CLOCK.format(new Date(ts * 1000));
 }
 
+/** "14:03" */
+export function hourMinute(ts) {
+  return HOUR_MINUTE.format(new Date(ts * 1000));
+}
+
 /** The start of the local day of `date`, in milliseconds. */
 function dayStart(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();

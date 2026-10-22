@@ -244,25 +244,32 @@ function compactionLine(data) {
 }
 
 /**
- * The line a change of the memory leaves in the conversation (item 313, after Grok's "Updated memory"): what changed and
- * the first words of the note, for a save and a change from the call's arguments, for a removal from the action's
- * summary, which holds the words the note had. The line of a saved or changed note opens it in Settings › Memory; a
- * removed note is gone. Null for a result that changed nothing: a failed call, a note saved again.
+ * The note a result of a memory tool changed, as `{ id, change, words }`: for a save and a change from the call's
+ * arguments, for a removal from the action's summary, which holds the words the note had. Null for a result that changed
+ * nothing: a failed call, a note saved again.
  */
-function memoryLine(data, args) {
+function memoryChange(data, args) {
   const found = data.kind === "memory_write" && data.ok ? MEMORY_RESULT.exec(data.text) : null;
   if (found === null) {
     return null;
   }
   const [, change, id] = found;
   const words = change === "Forgot" ? data.summary.replace(/^Forget: /, "") : typeof args.content === "string" ? args.content : "";
-  const parts = [icon("database"), el("span", { class: "memory-change" }, MEMORY_CHANGES[change])];
-  if (words.trim() !== "") {
-    parts.push(el("span", { class: "memory-words" }, `“${clip(words, MEMORY_WORDS_CHARS)}”`));
+  return { id, change, words };
+}
+
+/**
+ * The line a change of the memory leaves in the conversation (item 313, after Grok's "Updated memory"): what changed and
+ * the first words of the note. The line of a saved or changed note opens it in Settings › Memory; a removed note is gone.
+ */
+function memoryLine(note) {
+  const parts = [icon("database"), el("span", { class: "memory-change" }, MEMORY_CHANGES[note.change])];
+  if (note.words.trim() !== "") {
+    parts.push(el("span", { class: "memory-words" }, `“${clip(note.words, MEMORY_WORDS_CHARS)}”`));
   }
-  return change === "Forgot"
+  return note.change === "Forgot"
     ? el("div", { class: "note memory-line" }, ...parts)
-    : el("a", { class: "note memory-line", href: `#/settings/memory?note=${encodeURIComponent(id)}` }, ...parts);
+    : el("a", { class: "note memory-line", href: `#/settings/memory?note=${encodeURIComponent(note.id)}` }, ...parts);
 }
 
 /** An empty group of tool steps that starts at `ts` (seconds); it is "working" until something ends it. Its fold is the
@@ -357,7 +364,7 @@ function buildFlock() {
  * with the run's goal, to show them under it, and `onGoalPicks(picks)` what the owner picked for it in the composer
  * (item 318); null where the page shows no goal, and they stand in the timeline.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere }) {
+export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere }) {
   const element = el("div", { class: "timeline" });
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
@@ -852,6 +859,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     if (scope.runId === rootRunId) {
       totals.calls += 1;
       onCalls({ calls: totals.calls, failed: totals.failed });
+      // What the call read goes into the Run tab's context (item 539): a search's words, a page's address.
+      onTool(call);
     }
     paintGroup(group);
     return entry;
@@ -1031,9 +1040,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       for (const name of data.images) {
         onImage(name);
       }
-      const remembered = memoryLine(data, args);
+      const remembered = memoryChange(data, args);
       if (remembered !== null) {
-        place(scope, remembered, record.ts);
+        if (scope.runId === rootRunId) {
+          onMemory(remembered);
+        }
+        place(scope, memoryLine(remembered), record.ts);
       }
     },
 
