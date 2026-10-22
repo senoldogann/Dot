@@ -36,6 +36,7 @@ from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolE
 from dotagent.core.paths import (
     chrome_data_dir,
     config_path,
+    db_path,
     dot_home,
     env_file_path,
     plugins_dir,
@@ -757,7 +758,7 @@ def _office_checks() -> list[CheckResult]:
 
 def _backup_row(config: AppConfig) -> CheckResult:
     """How fresh the copies of the database are (item 526); never required, as Dot runs without them."""
-    fresh, detail = backup_state(config.store, time.time())
+    fresh, detail = backup_state(config.store, db_path(), time.time())
     return _result("backups", fresh, False, detail)
 
 

@@ -14,7 +14,6 @@ import os
 import re
 import shutil
 import sqlite3
-import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -29,6 +28,12 @@ log = get_logger(__name__)
 
 BACKUP_SUFFIX: str = ".sqlite3.gz"
 _NAME: re.Pattern[str] = re.compile(r"dot-(\d{8}-\d{6})\.sqlite3\.gz")
+# What a copy under way writes before it is whole, by the time it was begun and the process that makes it: the
+# uncompressed copy in Dot's home, and the compressed one in the copies' folder. Only these names are ever cleared.
+_RAW_PARTIAL: re.Pattern[str] = re.compile(r"\.backup-\d{8}-\d{6}-\d+\.sqlite3\.partial")
+_PACKED_PARTIAL: re.Pattern[str] = re.compile(r"\.dot-\d{8}-\d{6}-\d+\.sqlite3\.gz\.partial")
+# A partial file older than this was left by a copy that was cut off: no copy takes that long.
+_LEFTOVER_S: float = 3600.0
 _STAMP_FORMAT: str = "%Y%m%d-%H%M%S"
 # How long a copy waits for a write that holds the database before it gives up.
 _BUSY_TIMEOUT_S: float = 30.0
@@ -90,19 +95,39 @@ def changed_since(database: Path, moment: float) -> bool:
     return not written or max(written) > moment
 
 
+def _clear_leftovers(directory: Path, pattern: re.Pattern[str], now: float) -> None:
+    """Remove the partial files of ``pattern`` in ``directory`` that a copy cut off left behind (older than
+    ``_LEFTOVER_S``); nothing else is looked at."""
+    if not directory.is_dir():
+        return
+    for path in directory.iterdir():
+        if pattern.fullmatch(path.name) is None:
+            continue
+        try:
+            if path.stat().st_mtime < now - _LEFTOVER_S:
+                path.unlink()
+                log.info("backup_leftover_cleared", path=str(path))
+        except FileNotFoundError:
+            continue
+
+
 def make_backup(database: Path, folder: Path, now: float) -> Backup:
-    """Copy ``database`` into ``folder`` as it stands at ``now``: SQLite's online backup into a file of the system's
-    temporary folder, checked with ``quick_check``, compressed into ``folder`` under a hidden name and renamed when it
-    is whole. Raises StoreError for a database that is not there and for a copy that is damaged."""
+    """Copy ``database`` into ``folder`` as it stands at ``now``: SQLite's online backup into a hidden file of Dot's
+    home (0600), checked with ``quick_check``, compressed into ``folder`` under a hidden name and renamed when it is
+    whole. Both hidden names hold the process's id, so two copies at once never share one, and what a copy cut off
+    left is cleared by the next. Raises StoreError for a database that is not there and for a copy that is
+    damaged."""
     if not database.is_file():
         raise StoreError("there is no database to copy", {"database": str(database)})
     folder.mkdir(mode=_FOLDER_MODE, parents=True, exist_ok=True)
+    home: Path = dot_home()
+    _clear_leftovers(home, _RAW_PARTIAL, now)
+    _clear_leftovers(folder, _PACKED_PARTIAL, now)
     stamp: str = datetime.fromtimestamp(now, UTC).strftime(_STAMP_FORMAT)
     final: Path = folder / f"dot-{stamp}{BACKUP_SUFFIX}"
-    handle, raw_name = tempfile.mkstemp(prefix="dot-backup-", suffix=".sqlite3")
-    os.close(handle)
-    raw: Path = Path(raw_name)
-    packing: Path = folder / f".dot-{stamp}{BACKUP_SUFFIX}.partial"
+    raw: Path = home / f".backup-{stamp}-{os.getpid()}.sqlite3.partial"
+    os.close(os.open(raw, os.O_CREAT | os.O_EXCL | os.O_WRONLY, _FILE_MODE))
+    packing: Path = folder / f".dot-{stamp}-{os.getpid()}{BACKUP_SUFFIX}.partial"
     try:
         source: sqlite3.Connection = sqlite3.connect(database, timeout=_BUSY_TIMEOUT_S)
         try:
@@ -174,9 +199,10 @@ async def keep_backups(config: StoreConfig, database: Path) -> None:
         log.info("backup_made", path=made.path, size=made.size, thinned=len(gone))
 
 
-def backup_state(config: StoreConfig, now: float) -> tuple[bool, str]:
+def backup_state(config: StoreConfig, database: Path, now: float) -> tuple[bool, str]:
     """Whether the copies are as fresh as ``[store]`` asks, and what to say of them, for ``dotx doctor``: a copy is due
-    every ``backup_every_hours`` hours (twice that is late, as a database that did not change is not copied)."""
+    every ``backup_every_hours`` hours, and late past twice that only when ``database`` changed since the newest, as
+    a database that did not change is not copied."""
     folder: Path = backup_folder(config)
     if config.backup_every_hours == 0:
         # The owner's choice, not a fault.
@@ -185,6 +211,6 @@ def backup_state(config: StoreConfig, now: float) -> tuple[bool, str]:
     if not copies:
         return False, f"no copy yet in {folder} (the daemon makes one as it starts)"
     hours: float = (now - copies[0].made_at) / 3600.0
-    late: bool = hours > 2 * config.backup_every_hours + 1
+    late: bool = hours > 2 * config.backup_every_hours + 1 and changed_since(database, copies[0].made_at)
     said: str = f"the newest of {len(copies)} copies is {hours:.1f} h old, in {folder}"
     return not late, said if not late else f"{said}: older than [store] backup_every_hours asks"

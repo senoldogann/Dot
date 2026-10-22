@@ -29,6 +29,15 @@ NOW: float = 1_800_000_000.0
 WAIT_S: float = 10.0
 
 
+@pytest.fixture(autouse=True)
+def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A Dot home of the test's own: a copy under way writes its uncompressed file there."""
+    home: Path = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("DOT_HOME", str(home))
+    return home
+
+
 def _database(path: Path, rows: int) -> Path:
     connection: sqlite3.Connection = sqlite3.connect(path)
     try:
@@ -142,19 +151,45 @@ def test_a_database_is_copied_again_only_when_it_changed(tmp_path: Path) -> None
 
 
 def test_the_doctor_says_whether_the_copies_are_fresh(tmp_path: Path) -> None:
+    database: Path = _database(tmp_path / "dot.sqlite3", 3)
     folder: Path = tmp_path / "copies"
     # Copies turned off are the owner's choice, not a fault.
-    assert backup_state(_store(folder, every_hours=0), NOW) == (
+    assert backup_state(_store(folder, every_hours=0), database, NOW) == (
         True,
         f"off ([store] backup_every_hours = 0); {folder} keeps the older copies",
     )
-    fresh, said = backup_state(_store(folder), NOW)
+    fresh, said = backup_state(_store(folder), database, NOW)
     assert (fresh, "no copy yet" in said) == (False, True)
     folder.mkdir()
     _copy_at(folder, NOW - 1800.0)
-    assert backup_state(_store(folder), NOW) == (True, f"the newest of 1 copies is 0.5 h old, in {folder}")
-    fresh, said = backup_state(_store(folder), NOW + 6 * 3600.0)
+    os.utime(database, (NOW - 3600.0, NOW - 3600.0))
+    assert backup_state(_store(folder), database, NOW) == (True, f"the newest of 1 copies is 0.5 h old, in {folder}")
+    # A quiet night: nothing changed, so no copy was due, and the old one is not late.
+    assert backup_state(_store(folder), database, NOW + 8 * 3600.0)[0] is True
+    # Written after the newest copy, and no copy for hours: late.
+    os.utime(database, (NOW + 3600.0, NOW + 3600.0))
+    fresh, said = backup_state(_store(folder), database, NOW + 8 * 3600.0)
     assert fresh is False and "older than [store] backup_every_hours asks" in said
+
+
+def test_a_copy_clears_what_a_copy_cut_off_left_and_nothing_else(tmp_path: Path, home: Path) -> None:
+    database: Path = _database(tmp_path / "dot.sqlite3", 3)
+    folder: Path = tmp_path / "copies"
+    folder.mkdir()
+    old: float = time.time() - 7200.0
+    left_raw: Path = home / ".backup-20270101-000000-4242.sqlite3.partial"
+    left_packed: Path = folder / ".dot-20270101-000000-4242.sqlite3.gz.partial"
+    young: Path = folder / ".dot-20270101-000001-4243.sqlite3.gz.partial"
+    others: list[Path] = [home / ".backup-notes.partial", folder / ".hidden", home / "dot.sqlite3.partial"]
+    for path in (left_raw, left_packed, young, *others):
+        path.write_text("left", encoding="utf-8")
+    for path in (left_raw, left_packed, *others):
+        os.utime(path, (old, old))
+    make_backup(database, folder, time.time())
+    assert not left_raw.exists() and not left_packed.exists()
+    assert young.exists() and all(path.exists() for path in others)
+    # The copy's own uncompressed file is gone once it is whole.
+    assert not any(path.name.startswith(".backup-2") for path in home.iterdir())
 
 
 async def test_the_daemon_s_loop_copies_at_once_when_no_copy_is_there(tmp_path: Path) -> None:
