@@ -1,8 +1,8 @@
 """The context under the recap of a run's Run tab (item 539), in a real browser: an ended run shows the files its chat
-wrote under Artifacts, the page it fetched under Web reading and the note it saved under Memory updated, with the
-recap first and the time it was written; a row of Artifacts opens the Changes tab where the diff is. Each row wears
-its mark on a tile, and a file the letters of its kind. At 1280 beside the conversation and at 390 in the phone's
-sheet, the panel no wider than the screen."""
+wrote under Artifacts, the page it fetched under Web reading (and not the one it did not get) and the note it saved
+under Memory updated, with the recap first and the time it was written; a row of Artifacts opens the Changes tab where
+the diff is. Each row wears its mark on a tile, and a file the letters of its kind. At 1280 beside the conversation and
+at 390 in the phone's sheet, the panel no wider than the screen."""
 
 import asyncio
 import time
@@ -67,6 +67,10 @@ def _turns(workspace: Path, tags: list[str], site: str) -> list[ScriptedTurn]:
         )
         turns.append(
             ScriptedTurn(text="", calls=(ScriptedCall(tool="web_fetch", arguments={"url": f"{site}/about/"}),))
+        )
+        # A page the run asked for and did not get: not one it read.
+        turns.append(
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="web_fetch", arguments={"url": f"{site}/missing/"}),))
         )
         turns.append(
             ScriptedTurn(
@@ -195,12 +199,16 @@ async def _one_size(
         await expect(
             details.locator(".panel-section", has=page.locator("#panel-run-artifacts")).locator(".panel-summary")
         ).to_have_text("4 files")
-        # The page it fetched, under the host and path it read.
+        # The page it fetched, under the host and path it read; the one it did not get is no reading.
         reading: Locator = details.locator("#panel-run-reading")
         await expect(reading).to_be_visible()
+        await expect(reading.locator(".context-row")).to_have_count(1)
         await expect(reading.locator(".context-tile .icon[data-icon='globe']")).to_have_count(1)
         await expect(reading.locator(".context-name")).to_have_text(f"{site.removeprefix('http://')}/about/")
         await expect(reading.locator("a.context-row")).to_have_attribute("href", f"{site}/about/")
+        await expect(
+            details.locator(".panel-section", has=page.locator("#panel-run-reading")).locator(".panel-summary")
+        ).to_have_text("1 page")
         # The note it saved.
         memory: Locator = details.locator("#panel-run-memory")
         await expect(memory).to_be_visible()

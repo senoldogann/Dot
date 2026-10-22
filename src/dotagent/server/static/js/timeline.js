@@ -871,8 +871,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     if (scope.runId === rootRunId) {
       totals.calls += 1;
       onCalls({ calls: totals.calls, failed: totals.failed });
-      // What the call read goes into the Run tab's context (item 539): a search's words, a page's address.
-      onTool(call);
     }
     paintGroup(group);
     return entry;
@@ -1047,6 +1045,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
           totals.failed += 1;
           onCalls({ calls: totals.calls, failed: totals.failed });
         }
+      }
+      // What the call read goes into the Run tab's context (item 539): a search's words, a page's address. Only a call
+      // that succeeded, so a page the policy refused or the network could not reach is not a page the run read.
+      if (data.ok && scope.runId === rootRunId) {
+        onTool({ tool: data.tool, args });
       }
       paintGroup(group);
       for (const name of data.images) {
