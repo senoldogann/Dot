@@ -32,6 +32,8 @@ _LOCAL_STORAGE: Path = Path("Local Storage")
 _STAGING: str = "import-staging"
 # Where, in the staging folder, what the profile held goes while an import replaces it.
 _ASIDE: str = "previous"
+# What it is called once the import was made and the profile no longer needs it.
+_REPLACED: str = "replaced"
 # Chrome stores times as microseconds since 1601-01-01.
 _CHROME_EPOCH_OFFSET_S: int = 11_644_473_600
 _MICROSECONDS: int = 1_000_000
@@ -40,7 +42,8 @@ _MICROSECONDS: int = 1_000_000
 class ImportReport(FrozenModel):
     """``cookies`` last past a restart and have not expired; ``loadable`` adds the ones with no expiry, which Chrome
     gives back (:func:`keep_session_cookies`): what it can be expected to read. ``staging_left`` names the staging
-    folder when it could not be removed, and it holds a plain copy of the local storage."""
+    folder, or the folder in it that holds what the profile held before, when it could not be removed after an import
+    that was made: sign-ins and local storage that are the owner's to delete."""
 
     source: str
     cookies: int
@@ -187,10 +190,11 @@ def _swap_in(staging: Path, dot_profile: Path) -> Path | None:
     """Put the staged cookies and local storage into Dot's profile and mark the profile as written with the system
     keychain, all or nothing (item 529). What the profile held goes aside into the staging folder first and comes back
     when a step fails: cookies written with the real key under a marker that says mock are cookies Chrome cannot
-    decrypt, and it deletes them as it starts. The staging folder, which holds a plain copy of the local storage, is
-    removed at the end (the folder is the answer when it could not be); when a failure could not be put right it is
-    kept, with what the profile held, and the error names what stays. The preferences are given the word that keeps
-    the session cookies (:func:`keep_session_cookies`) last, so that a failed import leaves them as they were."""
+    decrypt, and it deletes them as it starts. The staging folder, which holds a plain copy of the local storage until
+    it is moved in, and then what the profile held, is removed at the end (what could not be removed is the answer);
+    when a failure could not be put right it is kept, with what the profile held in ``previous``, and the error names
+    what stays. The preferences are given the word that keeps the session cookies (:func:`keep_session_cookies`)
+    last, so that a failed import leaves them as they were."""
     target: Path = dot_profile / _PROFILE_DIR
     aside: Path = staging / _ASIDE
     aside.mkdir(parents=True)
@@ -228,9 +232,16 @@ def _swap_in(staging: Path, dot_profile: Path) -> Path | None:
         if not stranded:
             _remove_staging_after(error, staging)
         raise
-    # What the profile held is no use now: it goes first, so that a staging folder that stays after a made import
-    # holds nothing a later import could take for what a failed one kept.
-    left: Path | None = _remove_staging(aside)
+    # What the profile held is no use now. It is renamed first, so that ``previous`` is only ever what a failed import
+    # could not put back: a staging folder that stays after a made import holds ``replaced``, which a later import does
+    # not take for that.
+    left: Path | None = None
+    try:
+        os.replace(aside, staging / _REPLACED)
+    except OSError:
+        left = aside
+    if left is None:
+        left = _remove_staging(staging / _REPLACED)
     return left if left is not None else _remove_staging(staging)
 
 

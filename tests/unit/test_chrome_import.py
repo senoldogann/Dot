@@ -236,26 +236,30 @@ def test_a_staging_folder_that_cannot_be_removed_is_said_so(tmp_path: Path, monk
     staging: Path = dot_profile / "import-staging"
     real_rmtree: Callable[[Path], None] = shutil.rmtree
 
-    def stubborn(path: Path, *args: object, **named: object) -> None:
-        if Path(path) == staging:
-            raise OSError("busy")
-        real_rmtree(path)
+    def stubborn(*refused: Path) -> Callable[..., None]:
+        def remove(path: Path, *args: object, **named: object) -> None:
+            if Path(path) in refused:
+                raise OSError("busy")
+            real_rmtree(path)
 
-    with monkeypatch.context() as stuck:
-        stuck.setattr(shutil, "rmtree", stubborn)
-        report: ImportReport = import_chrome_profile(data_dir, "Default", dot_profile)
-    assert report.staging_left == str(staging)
-    assert read_keychain_mode(dot_profile) == "system"
-    # What the profile held went first: the folder that stays holds nothing of it, and a later import is not refused
-    # for it as if a failed one had kept it.
-    assert not (staging / "previous").exists()
-    assert import_chrome_profile(data_dir, "Default", dot_profile).staging_left is None
+        return remove
+
+    # The profile's old files are renamed `replaced` once the import is made, then removed: one folder is left,
+    # whichever removal fails, and it never reads as what a failed import kept (`previous`): the next import goes on.
+    for refused, left in (((staging,), staging), ((staging, staging / "replaced"), staging / "replaced")):
+        with monkeypatch.context() as stuck:
+            stuck.setattr(shutil, "rmtree", stubborn(*refused))
+            report: ImportReport = import_chrome_profile(data_dir, "Default", dot_profile)
+        assert report.staging_left == str(left)
+        assert read_keychain_mode(dot_profile) == "system"
+        assert not (staging / "previous").exists()
+        assert import_chrome_profile(data_dir, "Default", dot_profile).staging_left is None
 
     def no_room(source: Path, staged: Path) -> int:
         raise OSError("no room")
 
     with monkeypatch.context() as stuck:
-        stuck.setattr(shutil, "rmtree", stubborn)
+        stuck.setattr(shutil, "rmtree", stubborn(staging))
         stuck.setattr(chrome_import, "_stage_local_storage", no_room)
         with pytest.raises(BrowserError, match=r"staging folder.*could not be removed") as failure:
             import_chrome_profile(data_dir, "Default", dot_profile)
