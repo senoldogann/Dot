@@ -70,3 +70,39 @@ def test_the_body_is_the_entry_without_its_heading_and_its_log_and_ends_with_the
 def test_an_entry_without_its_heading_is_refused() -> None:
     with pytest.raises(pr_body.EntryError):
         pr_body.body("**Status: done.**\n")
+
+
+_SECOND: str = """### 541. Pull requests carry batches
+
+**Status: done (2026-10-22).** Why.
+
+Log:
+
+- a log line.
+"""
+
+
+def test_a_batch_has_all_its_numbers_and_headings_in_its_title() -> None:
+    assert pr_body.batch_title([_ENTRY]) == "Item 540: a change takes fewer pushes and reruns"
+    assert pr_body.batch_title([_ENTRY, _SECOND]) == (
+        "Items 540 and 541: a change takes fewer pushes and reruns; pull requests carry batches"
+    )
+    third: str = "### 542. UI of the chat\n"
+    assert pr_body.batch_title([_ENTRY, _SECOND, third]).startswith("Items 540, 541 and 542: ")
+    assert pr_body.batch_title([_ENTRY, _SECOND, third]).endswith("; UI of the chat")
+
+
+def test_a_batch_has_a_section_for_each_item_and_one_attribution() -> None:
+    text: str = pr_body.batch_body([_ENTRY, _SECOND])
+    assert text.index("## Item 540: a change takes fewer pushes and reruns") < text.index(
+        "## Item 541: pull requests carry batches"
+    )
+    assert "Checked by a test." in text and "Log:" not in text and "a log line" not in text
+    assert text.count("Generated with [Claude Code]") == 1 and text.endswith("\n")
+    assert pr_body.batch_body([_ENTRY]) == pr_body.body(_ENTRY)
+
+
+def test_the_numbers_of_a_batch_follow_the_highest_taken() -> None:
+    files = ["roadmap/540.md"]
+    first: int = next_item.next_item(files, [], [])
+    assert [first + step for step in range(3)] == [541, 542, 543]

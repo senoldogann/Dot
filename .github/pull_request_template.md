@@ -1,5 +1,7 @@
 **What this changes**
 
+<!-- A batch: one line for each item, `Item N: ...`, in the order of its commits. -->
+
 **Why**
 
 <!-- The issue it closes, if there is one: "Closes #123". -->

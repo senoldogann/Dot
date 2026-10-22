@@ -31,6 +31,8 @@ by what it lets a run do as much as by how it reads.
 - At most 3 nits; skip what `ruff format`, `ruff check`, `mypy`, `cargo fmt` and `clippy` already enforce
 - When a bug has siblings, name the bug class and list every instance
 - Start the summary with the finding count, e.g. "2 Important, 1 Nit"; with nothing to fix, say "No issues found"
+- A pull request that carries several items (a commit `Item N: ...` each): name the item of every finding, and check
+  each item's entry in `roadmap/` and `changes/` against its own commit
 
 ## Re-reviews
 

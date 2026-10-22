@@ -4,7 +4,9 @@
 Several sessions take "the highest plus one" at once, and the second to push renumbers its files, its references and
 its log; asking all three places at the moment of the first push avoids that.
 
-Usage: uv run python scripts/next_item.py
+A batch takes its numbers together (item 541): `scripts/next_item.py 3` prints three consecutive ones.
+
+Usage: uv run python scripts/next_item.py [count]
 """
 
 import json
@@ -48,7 +50,11 @@ def _lines(*command: str) -> list[str]:
     return done.stdout.splitlines()
 
 
-def main() -> int:
+def main(arguments: list[str]) -> int:
+    if arguments and not (len(arguments) == 1 and arguments[0].isdigit() and int(arguments[0]) > 0):
+        print(__doc__, file=sys.stderr)
+        return 2
+    count: int = int(arguments[0]) if arguments else 1
     try:
         _lines("git", "fetch", "--quiet", "origin")
         files: list[str] = _lines("git", "ls-tree", "-r", "--name-only", "origin/main", "roadmap", "changes")
@@ -61,7 +67,8 @@ def main() -> int:
         print(f"next_item: {error}; no number is given, as it could collide with one it did not see", file=sys.stderr)
         return 1
     found: dict[int, str] = taken(files, titles, branches)
-    print(next_item(files, titles, branches))
+    first: int = next_item(files, titles, branches)
+    print(" ".join(str(number) for number in range(first, first + count)))
     if found:
         highest: int = max(found)
         print(f"({highest} is the highest taken, on {found[highest]})", file=sys.stderr)
@@ -69,4 +76,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
