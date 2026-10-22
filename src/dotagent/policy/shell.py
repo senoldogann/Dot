@@ -634,7 +634,9 @@ class ShellScope:
     ``cd`` can fail or run in a subshell, so the earlier ones stay). ``links`` are the symbolic links the line made,
     ``(link, target)``, so that a path through one is judged where it lands; ``variables`` hold every value the line
     gave each variable; ``depth`` counts the command strings the command is nested in (``bash -c``, ``$(...)``);
-    ``downloaded`` are the files a fetcher saved and the folders ``git clone`` made earlier in the line (item 385)."""
+    ``downloaded`` are the files a fetcher saved and the folders ``git clone`` made earlier in the line (item 385);
+    ``decoded`` are the files a decoder wrote earlier in the line, opaque code the guard never read, like a download
+    (item 528)."""
 
     cwds: tuple[Path, ...]
     workspace: Path
@@ -644,6 +646,7 @@ class ShellScope:
     variables: Mapping[str, tuple[str, ...]]
     depth: int
     downloaded: tuple[Path, ...]
+    decoded: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
@@ -1919,36 +1922,126 @@ def _carried_download(command: str, args: list[str], scope: ShellScope) -> list[
     words, folders = _target_folders(args) if command in _TARGET_FOLDER_COMMANDS else (args, [])
     operands: list[str] = _positional(words)
     sources, destinations = (operands, folders) if folders else (operands[:-1], operands[-1:])
-    if any(_runs_download(source, scope) for source in sources):
+    if any(_names_one(source, scope.downloaded, scope, under=True) for source in sources):
         return destinations
     return []
 
 
+def _names_one(raw: str, places: tuple[Path, ...], scope: ShellScope, *, under: bool) -> bool:
+    """Whether ``raw``, a path the line runs or feeds a shell, is one of ``places`` or, with ``under``, lies under one
+    (the folder ``git clone`` made holds the scripts in it). The files a decoder named are matched as written: a decoder
+    that names ``/`` as an input makes every path under it no decoded code."""
+    if not places:
+        return False
+    paths: list[Path] = [
+        _located(value, cwd, scope) for value in _expansions(raw, scope) or [raw] for cwd in scope.cwds
+    ]
+    return any(path == place or (under and place in path.parents) for path in paths for place in places)
+
+
 def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
     """A finding when the last of ``stages`` (one pipeline's commands so far) is a shell or an interpreter and a file
-    the line downloaded reaches its standard input: by ``<`` (``sh < y.sh``) or as an operand of a command before it in
-    the pipe (``cat y.sh | bash``). That runs the download as naming it does (item 385)."""
+    the line downloaded or decoded reaches its standard input: by ``<`` (``sh < y.sh``) or as an operand of a command
+    before it in the pipe (``cat y.sh | bash``). That runs the file as naming it does (item 385, item 528). A download
+    reached the network and marks the run; a decode did not."""
     words, _, _, _ = _split_redirects(stages[-1], ())
     run, _ = _run_by_wrappers(_plain(words), scope)
     if not run or Path(run[0]).name not in (_SHELLS | _INTERPRETERS):
         return []
     redirected: list[str] = [stages[-1][index + 1] for index, token in enumerate(stages[-1][:-1]) if token == "<"]
     piped: list[str] = [word for stage in stages[:-1] for word in _positional(_plain(stage)[1:])]
-    if any(_runs_download(word, scope) for word in (*redirected, *piped)):
+    fed: tuple[str, ...] = (*redirected, *piped)
+    if any(_names_one(word, scope.downloaded, scope, under=True) for word in fed):
         return [_fetching("high", ("install",), "runs a script the line downloaded, from its standard input")]
+    if any(_names_one(word, scope.decoded, scope, under=False) for word in fed):
+        return [_finding("high", ("install",), "runs code the line decoded, from its standard input")]
     return []
 
 
 def _runs_download(raw: str, scope: ShellScope) -> list[Finding]:
-    """A finding when ``raw``, a script the line runs, is a file the line fetched or lies in a folder it cloned:
-    downloading a script and running it is piping it into a shell in two steps (item 385)."""
-    if not scope.downloaded:
-        return []
-    paths: list[Path] = [
-        _located(value, cwd, scope) for value in _expansions(raw, scope) or [raw] for cwd in scope.cwds
-    ]
-    if any(path == place or place in path.parents for path in paths for place in scope.downloaded):
+    """A finding when ``raw``, a script the line runs, is a file the line fetched (or lies in a folder it cloned) or a
+    file a decoder wrote: fetching or decoding a script and then running it is piping it into a shell in two steps
+    (item 385, item 528). A download reached the network, so it marks the run; a decode did not."""
+    if _names_one(raw, scope.downloaded, scope, under=True):
         return [_fetching("high", ("install",), "runs a script the line downloaded")]
+    if _names_one(raw, scope.decoded, scope, under=False):
+        return [_finding("high", ("install",), "runs code the line decoded")]
+    return []
+
+
+# base64, base32, basenc, xxd and gpg fold their short switches into one word, with any value glued to the end
+# (``-rp``, ``-dox.sh``), so a decode switch is read among a word's leading letters, where a value cannot reach; the
+# ``d`` of gpg's ``-d`` is its decrypt and no other of its switches. openssl spells each switch on its own and reuses
+# letters (``-md`` is a digest, not decode), so only its own ``-d``/``-decrypt`` word counts; uudecode and b64decode
+# only ever decode.
+_DECODE_LETTERS: dict[str, str] = {
+    "base64": "dD",
+    "gbase64": "dD",
+    "base32": "d",
+    "gbase32": "d",
+    "basenc": "d",
+    "xxd": "r",
+    "gpg": "d",
+    "gpg2": "d",
+}
+_DECODE_LONG: frozenset[str] = frozenset({"--decode", "--decrypt"})
+_ALWAYS_DECODE: frozenset[str] = frozenset({"uudecode", "b64decode"})
+_LEADING_FLAGS: re.Pattern[str] = re.compile(r"-([A-Za-z]+)")
+
+
+def _decodes(run: list[str]) -> bool:
+    """Whether ``run`` -- a command and its arguments, its wrappers already looked through -- turns an encoded or
+    encrypted blob back into the bytes it stood for: ``base64 -d`` (and ``gbase64``, ``base32``, ``basenc``), ``xxd
+    -r``, ``gpg -d`` or ``openssl`` given a decrypt switch, or ``uudecode``/``b64decode``, whose only work is to
+    decode. ``base64 blob`` without ``-d`` encodes, so what it prints is not code; it does not count."""
+    if not run:
+        return False
+    command: str = Path(run[0]).name
+    if command in _ALWAYS_DECODE:
+        return True
+    if command == "openssl":
+        return "-d" in run[1:] or "-decrypt" in run[1:]
+    letters: str | None = _DECODE_LETTERS.get(command)
+    if letters is None:
+        return False
+    wanted: set[str] = set(letters)
+    for word in run[1:]:
+        if word in _DECODE_LONG:
+            return True
+        lead: re.Match[str] | None = _LEADING_FLAGS.match(word) if not word.startswith("--") else None
+        if lead is not None and wanted & set(lead.group(1)):
+            return True
+    return False
+
+
+def _decoded_writes(words: list[str], targets: list[str], scope: ShellScope) -> tuple[Path, ...]:
+    """Where a decoder on this line may have written what it decoded, located. Which word is a decoder's output file
+    differs by tool and by option spelling (``base64 -o``/``--output=``/``-ox``, ``openssl -out``, ``xxd``'s second
+    operand), too many to read one by one, so the guard takes every file the decoder names -- the words that are not
+    options (:func:`_positional`: its operands and space-separated option values), the value of ``-o``/``--output`` in
+    any spelling, the value glued after ``=`` in a long option, and its ``>`` redirects -- as code it may have written.
+    The file is opaque code on disk, judged like a download when a later line runs it; taking an input file too costs
+    only a question if that file is run, the safe side (item 528)."""
+    run, _ = _run_by_wrappers(_plain(words), scope)
+    if not _decodes(run):
+        return ()
+    args: list[str] = run[1:]
+    glued: list[str] = [word.split("=", 1)[1] for word in args if word.startswith("-") and "=" in word]
+    written: list[str] = [*_positional(args), *_option_values(args, "-o", "--output"), *glued, *targets]
+    return tuple(_located_all(written, scope))
+
+
+def _fed_a_decode(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
+    """A finding when the last of ``stages`` (one pipeline's commands so far) is a shell or an interpreter and an
+    earlier command in the pipe decodes its standard input (``base64 -d blob | sh``, ``cat blob | base64 -d | bash``).
+    Decoding a blob and running it hides the code from the guard as a download does, and runs it with the owner's
+    rights the same way, so it is judged as ``curl | sh`` is (item 528)."""
+    words, _, _, _ = _split_redirects(stages[-1], ())
+    run, _ = _run_by_wrappers(_plain(words), scope)
+    if not run or Path(run[0]).name not in (_SHELLS | _INTERPRETERS):
+        return []
+    if any(_decodes(_run_by_wrappers(_plain(stage), scope)[0]) for stage in stages[:-1]):
+        return [_finding("high", ("install",), "runs code it decoded from its standard input")]
     return []
 
 
@@ -2774,11 +2867,17 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
     if head not in _TEST_COMMANDS and any(char in head for char in _GLOB_CHARS):
         return [_unknown("runs a command whose name is a pattern the shell matches against file names")]
     command: str = head if head == "." else Path(head).name
+    named: list[Finding] = _assess_named(command, plain, scope, given)
     if "/" in head and head != command:
-        # A program named by its path runs as itself: one the line downloaded counts as that download run (item 385).
-        ran: list[Finding] = _runs_download(head, scope)
-        if ran:
-            return [*ran, *_assess_command(command, plain[1:], scope, given)]
+        # A program named by its path runs as itself: one the line downloaded or decoded counts as that run (items 385,
+        # 528). What the program is is still read: a wrapper or a privilege command at that path still runs its command.
+        return [*_runs_download(head, scope), *named]
+    return named
+
+
+def _assess_named(command: str, plain: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
+    """The command ``plain`` runs, named ``command``: a declarer, a privilege command, a wrapper (all looked through to
+    what they run) or any other."""
     if command in _DECLARERS:
         declared: list[Finding] = [found for word in plain[1:] for found in _assignment_findings(word, scope)]
         return [*declared, *_assess_command(command, plain[1:], scope, given)]
@@ -2802,7 +2901,11 @@ def _assess_segment(
         *_replacing(emptied, [], scope),
         *_changing(_known_paths(targets, scope)),
     ]
-    return findings, _next_scope(words, scope)
+    after: ShellScope = _next_scope(words, scope)
+    decoded: tuple[Path, ...] = _decoded_writes(words, targets, scope)
+    if decoded:
+        after = replace(after, decoded=(*after.decoded, *decoded))
+    return findings, after
 
 
 def _universal_findings(command: str, scope: ShellScope) -> list[Finding]:
@@ -2842,6 +2945,7 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
         found, state = _assess_segment(segment, state, _piped(stages[:-1], reading.documents), reading.documents)
         findings.extend(found)
         findings.extend(_fed_a_download(stages, state))
+        findings.extend(_fed_a_decode(stages, state))
     for inner in reading.substituted:
         findings.extend(_assess_all(inner, state))
     return findings
@@ -2876,6 +2980,7 @@ def _scope(cwd: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: t
         variables={},
         depth=0,
         downloaded=(),
+        decoded=(),
     )
 
 
