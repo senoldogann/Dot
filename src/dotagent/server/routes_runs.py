@@ -17,6 +17,7 @@ from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import run_lessons
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.playbooks import save_playbook
+from dotagent.agent.recap import RecapView, recap_view, write_recap
 from dotagent.agent.resume import cut_off_by
 from dotagent.agent.rewind import (
     NOTHING_TO_TAKE_BACK,
@@ -54,6 +55,7 @@ from dotagent.server.views import (
     DecisionRequest,
     EventsQuery,
     LoopRequest,
+    RecapRequest,
     RewindRequest,
     RewindView,
     RunActions,
@@ -357,6 +359,16 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def ask_aside(run_id: str, request: AsideRequest) -> AsideAnswer:
         """A side question about the run, answered without the run seeing it (see ``agent.aside``)."""
         return await answer_aside(ctx.runtime, run_id, request.text)
+
+    @router.get("/runs/{run_id}/recap")
+    async def get_recap(run_id: str) -> RecapView:
+        """The run's newest recap and whether a new one is due (item 536, ``agent.recap``)."""
+        return await recap_view(ctx.runtime, run_id)
+
+    @router.post("/runs/{run_id}/recap")
+    async def post_recap(run_id: str, request: RecapRequest) -> RecapView:
+        """Write a recap of the run when one is due, or with ``force``; one being written is waited for."""
+        return await write_recap(ctx.runtime, run_id, request.force)
 
     async def make_loop(run_id: str, every: str, text: str) -> ScheduleRecord:
         """Make the chat of the run ask ``text`` again on the rhythm ``every`` (item 281): one of the chat's schedules,

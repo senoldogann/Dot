@@ -5,8 +5,9 @@ import json
 import re
 from collections.abc import Awaitable, Callable
 from typing import Literal
+from urllib.parse import urlsplit
 
-from playwright.async_api import CDPSession, ElementHandle, Frame, JSHandle, Locator, Page
+from playwright.async_api import CDPSession, Cookie, ElementHandle, Frame, JSHandle, Locator, Page
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
@@ -44,6 +45,10 @@ _FIELD_PROBE_TIMEOUT_MS: int = 1500
 # How long a page may take to count the elements a locator names (item 471): Playwright's count takes no timeout, and
 # a frame whose script holds its main thread never answers.
 _COUNT_TIMEOUT_S: float = 2.0
+# The shortest cookie value that the value of a script is searched for (item 533).
+_MIN_HIDDEN_VALUE_CHARS: int = 8
+# A cookie value that is a word of lower case letters (a consent: ``dismissed``) is no session.
+_PLAIN_WORD: re.Pattern[str] = re.compile(r"[a-z][a-z_-]*")
 # What a screenshot shows over a secret field (item 467).
 _MASK_COLOUR: str = "#333333"
 # Playwright's text for a ref whose frame generation died with a navigation.
@@ -872,6 +877,47 @@ async def run_script(page: Page, script: str, timeout_s: float) -> tuple[ScriptE
             return "navigated", ""
         return "error", _script_error(str(error))
     return "value", json.dumps(value, ensure_ascii=False, default=str)
+
+
+async def holds_secret_field(page: Page) -> bool:
+    """Whether ``page`` holds, in any of its frames, a field that the page marks as taking a secret (item 533): a
+    password, a one-time code, a card (:func:`secret_selector`). A page that does not say in time holds one, as a field
+    that cannot be asked counts as secret."""
+    selector: str = secret_selector()
+    try:
+        counts: list[int] = await asyncio.gather(
+            *(_count(frame.locator(selector)) for frame in page.frames if not frame.is_detached())
+        )
+    except (TimeoutError, PlaywrightError):
+        return True
+    return any(counts)
+
+
+def _applies_to(domain: str, host: str) -> bool:
+    """Whether a cookie of ``domain`` (``.example.com`` or ``example.com``) is sent to ``host``, on any path: a script
+    of a page can read the ones of a narrower path through a frame of that path."""
+    kept: str = domain.lstrip(".").casefold()
+    return host.casefold() == kept or host.casefold().endswith(f".{kept}")
+
+
+async def cookie_secrets(page: Page, url: str) -> tuple[str, ...]:
+    """The values of the cookies of ``url``'s site, on any of its paths, that a script may read and that are long enough
+    to be a session (item 533): a script that reads ``document.cookie`` hands the model a session. A value shorter than
+    :data:`_MIN_HIDDEN_VALUE_CHARS` (``en``, ``1``) is no session, and neither is a plain word (``dismissed``,
+    ``accepted``: a cookie of consent), which would be hidden wherever it stands in the chat."""
+    host: str = urlsplit(url).hostname or ""
+    try:
+        cookies: list[Cookie] = await page.context.cookies()
+    except PlaywrightError as error:
+        raise _failure(
+            "reading the cookies, to hide them from what the script gave, failed", page, {}, error
+        ) from error
+    values: list[str] = [cookie["value"] for cookie in cookies if _applies_to(cookie["domain"], host)]
+    return tuple(
+        dict.fromkeys(
+            value for value in values if len(value) >= _MIN_HIDDEN_VALUE_CHARS and _PLAIN_WORD.fullmatch(value) is None
+        )
+    )
 
 
 async def measure_viewport(page: Page) -> Viewport:

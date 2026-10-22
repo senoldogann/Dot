@@ -304,8 +304,17 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   typed, and a failure of the page is told without what you typed. You act there, not Dot: nothing passes the policy,
   and in Dot's own Chrome the URL rules judge where your taps lead as they judge a run's; in your own Chrome (`attach`)
   they do not, as for a run's clicks. In `yolo` nothing is masked (item 443): the run reads all it is shown. A page
-  script (`browser_eval`) can still read a field's value, and that step is judged as any other; the live Screen view you
-  watch is not masked.
+  script (`browser_eval`) reads a field's value whole, a value Chrome filled in from its password manager too, so
+  outside `yolo` it is refused on a page that holds such a field, in any frame (item 533: use the other browser tools,
+  which hide it, or take over), and from then on no text a browser tool of that chat gives back, no page text a judge
+  reads and no line of Dot's log that names a refused address shows a value of the site's cookies (of the site, on any
+  path), long enough to be a session and no plain word such as `dismissed`: it reads `[hidden]` in the script's value,
+  in the error it threw, in the address it led the tab to, and in what a later tool reads of a page or an address a
+  script wrote one into (also from a slice of the text, which is masked whole before it is cut). A script can still
+  encode what it reads, and read what the page keeps in local storage; a screenshot shows the page as pixels, and a
+  cookie a script wrote into the text of a page shows in it; the other lines of Dot's log that write an address write it
+  as it is, a login's values among them; the live Screen view you watch is not masked.
+  A key that pastes (`Control+V`, `Meta+V`, `Shift+Insert`) is refused in such a field as typed text is.
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).

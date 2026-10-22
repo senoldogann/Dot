@@ -333,11 +333,14 @@ def secret_field_label(kind: SecretKind) -> str:
 
 def key_enters_text(key: str) -> bool:
     """Whether pressing ``key`` (Playwright's syntax: ``1``, ``Shift+A``, ``Digit1``, ``Control+V``) can put text into
-    the focused field: a character key without Control or Meta, or a paste."""
+    the focused field: a character key without Control or Meta, or a paste (Control+V, Meta+V, Shift+Insert)."""
     *modifiers, name = key.lower().split("+")
     held: set[str] = set(modifiers)
     if held & _SHORTCUT_MODIFIERS:
         return name == "v"
+    # Shift+Insert pastes, as Control+V does (item 533).
+    if name == "insert" and "shift" in held:
+        return True
     return name not in _KEYS_WITHOUT_TEXT and _FUNCTION_KEY.match(name) is None
 
 

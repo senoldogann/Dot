@@ -29,6 +29,8 @@ type CallPurpose = Literal[
     "vision",
     "attachment",
     "aside",
+    # The recap of a run for its page (item 536), written by the fast model from the run's record.
+    "recap",
     "consult",
     "memory",
     # The roles of the harness (item 390, docs/harness.md): the proposer, the composer, the blind selector and the
