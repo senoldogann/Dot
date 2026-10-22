@@ -9,7 +9,9 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
 
 Settings › Phone › **Reach Dot from anywhere** (items 271 and 421) guides you there a step at a time, each step saying
 where it stands and offering what does it, and it reads Tailscale again every few seconds while a step is left, so that
-it follows an install or a sign-in. **Tailscale on this Mac**: while it is not installed, **Get Tailscale** opens its
+it follows an install or a sign-in. A bar above the steps counts those done on this Mac (*2 of 3 steps done*); a step
+done has a tick and a green line down to the next, and the one to do now has its number marked (item 527).
+**Tailscale on this Mac**: while it is not installed, **Get Tailscale** opens its
 page in the Mac App Store, where a click installs it; while it is installed but not running signed in, **Open
 Tailscale** opens its app, which shows its sign-in (`POST /api/phone/tailscale`); when Tailscale cannot be asked, its
 app closed or a call that failed, the step says what it said. **Dot on your tailnet**: **Set up** has `tailscale serve
@@ -17,10 +19,10 @@ app closed or a call that failed, the step says what it said. **Dot on your tail
 why when Tailscale is missing or not signed in); when the tailnet has HTTPS off, Tailscale names the page that turns it
 on, and the step offers it as **Turn on HTTPS for your tailnet**, then Set up again. **Dot answers to the name**: the
 daemon answers to it from its next start, and **Restart Dot** starts it again once you say yes, and says when runs
-going on would stop with it (`GET /api/phone` reads the state). Under
-them, **Dot on your phone** has a QR code of Tailscale's download page for the phone, then, once Dot answers to its
-name, a QR code of its address, both made by macOS's own generator (`GET /api/phone/qr/tailscale` and `/dot`), Add to
-Home Screen, and the pairing code. Its switch **Keep this Mac awake while it charges** (`[server] keep_awake`, `POST
+going on would stop with it (`GET /api/phone` reads the state). Under them, **Dot on your phone** has, as numbered
+steps, a QR code of Tailscale's download page for the phone, then, once Dot answers to its name, a QR code of its
+address, both made by macOS's own generator (`GET /api/phone/qr/tailscale` and `/dot`), Add to Home Screen, and the
+pairing code. Its switch **Keep this Mac awake while it charges** (`[server] keep_awake`, `POST
 /api/phone/awake`) has the daemon hold macOS's `/usr/bin/caffeinate -s`, which keeps the Mac from sleeping on power
 while the daemon runs; a closed lid still puts a MacBook to sleep. The same by hand:
 

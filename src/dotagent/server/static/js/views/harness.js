@@ -14,6 +14,10 @@ const STATE_TONE = { adopted: "b-ok", probed: "b-warn", candidate: "b-info", ret
 const STATE_WORDS = { adopted: "in use", probed: "tried", candidate: "new", retired: "set aside" };
 const STEP_TONE = { done: "b-ok", keep: "b-muted", skipped: "b-muted", failed: "b-bad" };
 const STEP_WORDS = { done: "done", keep: "no change", skipped: "skipped", failed: "failed" };
+// The nights the strip of the overview shows, newest at its right end.
+const STRIP_NIGHTS = 14;
+// A night's cell in the strip, by its outcome: a change made, none, or a failure; each is named in the legend too.
+const STRIP_KIND = { done: "done", keep: "quiet", skipped: "quiet", failed: "failed" };
 const MADE_BY = { owner: "written by you", proposer: "proposed by Dot", composer: "combined by Dot" };
 const SUMMARY_CHARS = 200;
 // The keys of a version's notes the page reads out, in this order, each with its words.
@@ -170,6 +174,68 @@ function experienceRow(experience) {
   );
 }
 
+/** A tile of the overview: what it counts, the number or word, and a line under it, whole on a hover past two lines. */
+function statTile(label, value, sub, ...extra) {
+  return el(
+    "div",
+    { class: "stat-tile" },
+    el("div", { class: "stat-label" }, label),
+    el("div", { class: "stat-value" }, value),
+    sub === "" ? null : el("div", { class: "stat-sub", title: sub }, sub),
+    ...extra,
+  );
+}
+
+/** The nights of learning as a strip of cells, oldest at the left, each named on a hover and in the legend. */
+function nightStrip(steps) {
+  const nights = steps.slice(0, STRIP_NIGHTS).reverse();
+  const cells = nights.map((step) =>
+    el("span", {
+      class: `night-cell ${STRIP_KIND[step.state] ?? "quiet"}`,
+      title: `${dateTime(step.started_at)}: ${STEP_WORDS[step.state] ?? step.state}`,
+      role: "img",
+      "aria-label": `${dateTime(step.started_at)}: ${STEP_WORDS[step.state] ?? step.state}`,
+    }),
+  );
+  const key = (kind, words) => el("span", { class: "night-key" }, el("span", { class: `night-cell ${kind}`, "aria-hidden": "true" }), words);
+  return el(
+    "div",
+    { class: "night-strip-box" },
+    el("div", { class: "night-strip", "aria-label": `The last ${plural(nights.length, "night", "nights")} of learning` }, cells),
+    el("div", { class: "night-legend" }, key("done", "a change"), key("quiet", "no change"), key("failed", "failed")),
+  );
+}
+
+/** The overview above the sections: the version in use, the versions, the nights of learning and the lessons. */
+function overview(view, steps, experiences) {
+  const counts = {};
+  for (const version of view.versions) {
+    counts[version.state] = (counts[version.state] ?? 0) + 1;
+  }
+  const breakdown = ["adopted", "candidate", "probed", "retired"]
+    .filter((state) => counts[state] > 0)
+    .map((state) => `${counts[state]} ${STATE_WORDS[state]}`)
+    .join(" · ");
+  const lastNight = steps[0];
+  return el(
+    "div",
+    { class: "stat-row", role: "group", "aria-label": "Overview" },
+    statTile(
+      "In use",
+      view.adopted === null ? "Built-in" : "A version",
+      view.adopted === null ? "Dot's own instructions alone" : view.adopted.summary,
+    ),
+    statTile("Versions", String(view.versions.length), breakdown === "" ? "none yet" : breakdown),
+    statTile(
+      "Nights of learning",
+      String(steps.length),
+      lastNight === undefined ? (view.step_time === "off" ? "the nightly learning is off" : `next at ${view.step_time}`) : `last: ${STEP_WORDS[lastNight.state] ?? lastNight.state}, ${dateTime(lastNight.started_at)}`,
+      steps.length === 0 ? null : nightStrip(steps),
+    ),
+    statTile("Lessons kept", String(experiences.length), experiences.length === 0 ? "kept when a change clearly helped or hurt" : "from the trials of the nights"),
+  );
+}
+
 function fact(term, words) {
   return [el("dt", null, term), el("dd", null, words)];
 }
@@ -254,10 +320,10 @@ function buildForm(onWritten) {
   }
   save.addEventListener("click", () => attempt(() => submit(false)));
   adopt.addEventListener("click", () => attempt(() => submit(true)));
-  const element = el(
+  // The fields stay folded until the owner asks for them: writing a version is optional (item 412).
+  const fields = el(
     "div",
-    { class: "harness-form" },
-    intro,
+    { class: "harness-form-fields", hidden: true },
     field("Habits", habits, "How Dot should work, as you would brief a new colleague: one rule a line. Every run reads them after Dot's own way of working."),
     field("Tool guidance", guidance, "What the commands, applications and sites of this Mac want: one line each. Every run reads it after the list of its tools."),
     field("Summary", summary, "One line for the list of versions: what this version changes."),
@@ -265,6 +331,17 @@ function buildForm(onWritten) {
     el("p", { class: "hint" }, "Save for later keeps it under Versions without using it; Save and use puts it into every run that starts from now on. Set aside, on a version, stops using it, and Dot follows its built-in instructions alone again."),
     el("div", { class: "panel-foot" }, example, el("span", { class: "spacer" }), save, adopt),
   );
+  const openWords = el("span", null, "Write a version");
+  const open = el("button", { class: "btn sm", type: "button", "aria-expanded": "false" }, icon("pencil"), openWords);
+  open.addEventListener("click", () => {
+    fields.hidden = !fields.hidden;
+    open.setAttribute("aria-expanded", String(!fields.hidden));
+    openWords.textContent = fields.hidden ? "Write a version" : "Fold the form";
+    if (!fields.hidden) {
+      habits.focus();
+    }
+  });
+  const element = el("div", { class: "harness-form" }, intro, el("div", { class: "row" }, open), fields);
   return {
     element,
     fill: (text) => {
@@ -289,6 +366,7 @@ export function mount(root, _ctx) {
   let steps = [];
   let experiences = [];
   const inUse = el("div", null, loadingPanel());
+  const overviewHolder = el("div");
   const versionsHolder = el("div");
   const versionsCount = el("span", { class: "hint" });
   const stepsHolder = el("div");
@@ -317,10 +395,12 @@ export function mount(root, _ctx) {
     } else {
       inUse.replaceChildren(
         el("div", { class: "row" }, badge(STATE_TONE, STATE_WORDS, "adopted"), el("span", { class: "row-title" }, view.adopted.summary)),
-        el("div", { class: "row-text" }, "Habits"),
-        textBlock(view.adopted.habits),
-        el("div", { class: "row-text" }, "Tool guidance"),
-        textBlock(view.adopted.tool_guidance),
+        el(
+          "div",
+          { class: "harness-columns" },
+          el("div", { class: "stack tight" }, el("div", { class: "row-text muted" }, "Habits"), textBlock(view.adopted.habits)),
+          el("div", { class: "stack tight" }, el("div", { class: "row-text muted" }, "Tool guidance"), textBlock(view.adopted.tool_guidance)),
+        ),
       );
       if (fillForm) {
         form.fill(view.adopted);
@@ -345,8 +425,9 @@ export function mount(root, _ctx) {
     experiencesHolder.replaceChildren(
       experiences.length === 0
         ? emptyPanel("sparkle", "No lesson yet", "A night of learning keeps one when a change clearly helped or hurt in its trial.")
-        : el("div", { class: "rule-list" }, experiences.map(experienceRow)),
+        : el("div", { class: "rule-list lesson-grid" }, experiences.map(experienceRow)),
     );
+    overviewHolder.replaceChildren(overview(view, steps, experiences));
     facts.replaceChildren(...loopFacts(view));
     form.describe(view);
   }
@@ -421,10 +502,11 @@ export function mount(root, _ctx) {
       "Dot learns from its own runs how to work better on this Mac. Besides its built-in instructions, every run follows two short texts: habits (how to work) and tool guidance (what the commands, apps and sites of this Mac want). Each night Dot can propose a new version of them and try it on test tasks first; you choose the version it follows. You never have to write one yourself.",
       null,
     ),
+    overviewHolder,
     section("What Dot follows now", [], inUse),
     section("Write your own (optional)", [], form.element),
-    section("Versions", [versionsCount], versionsHolder),
-    section("Nightly learning", [], stepsHolder),
+    // The versions and the nights side by side where the page is wide enough, one under the other on a phone.
+    el("div", { class: "harness-grid" }, section("Versions", [versionsCount], versionsHolder), section("Nightly learning", [], stepsHolder)),
     section("Lessons learned", [], experiencesHolder),
     section("How it learns", [], facts),
   );

@@ -169,16 +169,23 @@ instructions, that each night Dot can propose a new version and try it on test t
 version it follows and never have to write one. Its words for the states are *new* (`candidate`), *tried* (`probed`),
 *in use* (`adopted`) and *set aside* (`retired`); **Use** adopts and **Set aside** retires.
 
-*What Dot follows now* shows the adopted version's texts, or that Dot's built-in instructions alone are in use. *Write
-your own (optional)* takes habits and tool guidance (prefilled from the adopted version) and a summary, and says what
+A row of four tiles comes first (item 527): what is in use (*Built-in*, or *A version* with its summary), the number of
+versions with how many are in each state, the nights of learning with the last night's outcome (or when the next is,
+or that the learning is off) over a strip of the last 14 nights (green a change, grey none, red a failure, named in a
+legend and each night on a hover), and the lessons kept. On a phone they go two to a row.
+
+*What Dot follows now* shows the adopted version's texts side by side where the page is wide enough, or that Dot's
+built-in instructions alone are in use. *Write your own (optional)* keeps its fields folded until **Write a version**
+opens them; it takes habits and tool guidance (prefilled from the adopted version) and a summary, and says what
 each takes (item 412): that writing one is optional since the nightly learning proposes versions, what a habit and a
 line of tool guidance are, the limits a version keeps and what each button does, with examples in the empty fields and
 **Start from an example**, which puts them in; **Save for later** keeps it as a candidate and **Save and use** adopts
 it at once; what cannot be a component is refused with why. *Versions* lists every version, the newest first, with its
 state, who made it (you, or Dot's proposer or composer) and when, its texts and notes (what a proposal is about and the
 moments of the run it answers, the trial's contrast, the decisions of a composition) under *Texts and notes*, and Use
-and Set aside; setting aside the version in use asks first. *Nightly learning* and *Lessons learned* list the newest
-steps and experiences, a step with the run it learned from and what it decided. *How it learns* says when the step
+and Set aside; setting aside the version in use asks first. *Nightly learning*, beside *Versions* where the page is
+wide enough, and *Lessons learned* list the newest steps and experiences, a step with the run it learned from and what
+it decided. *How it learns* says when the step
 runs (or that it is off, and which setting turns it on), the test tasks (the scoring set) and the final check (the
 final set), who chooses, and the limits. On a phone the page is a row of the settings list under *How Dot works*, which
 says *built-in* or *changed*.
