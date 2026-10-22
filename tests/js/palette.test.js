@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 import { createPalette } from "../../src/dotagent/server/static/js/palette.js";
 
-const EXA = { logo: "exa-icon.svg", glyph: null, monogram: null, colour: null };
+const EXA = { logo: "exa-icon.svg", glyph: null, colour: null };
 const PALETTE = {
   skills: [],
   accounts: [],

@@ -689,10 +689,6 @@
   height: 13px;
 }
 
-.side-connect-mark .plugin-letters {
-  font-size: var(--text-xs);
-}
-
 /* With the sidebar next to the page, the way back to the list of chats is in sight, so a chat's page shows no link back
    of its own. A page under another (an agent's or a campaign's page, Team, a service's page, Diagnostics, Open source
    licences) keeps its link back: the sidebar names the list it is under, not the page itself (item 380). */

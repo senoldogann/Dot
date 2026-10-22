@@ -7,6 +7,16 @@ import { svg } from "./dom.js";
 const SHAPES = {
   paperclip: [["path", { d: "m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" }]],
   check: [["path", { d: "M20 6 9 17l-5-5" }]],
+  // The check of a plugin from its own maker (item 542): a rosette, which the page fills, around a check.
+  badgeCheck: [
+    [
+      "path",
+      {
+        d: "M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z",
+      },
+    ],
+    ["path", { d: "m9 12 2 2 4-4" }],
+  ],
   x: [["path", { d: "M18 6 6 18" }], ["path", { d: "m6 6 12 12" }]],
   // For the queue of a chat (item 148): a handle to drag, a numbered list, a turn up and on.
   grip: [

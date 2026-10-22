@@ -315,8 +315,10 @@ async def test_every_page_on_a_phone_reads_at_a_phones_size_and_takes_a_finger(
             ("campaigns", "#/campaigns"),
             ("schedules", "#/schedules"),
             ("plugins", "#/customize/plugins"),
-            ("plugin", "#/customize/plugins/notion"),
+            ("plugin", "#/customize/plugins/superpowers"),
             ("skills", "#/customize/skills"),
+            ("connectors", "#/customize/connectors"),
+            ("connector", "#/customize/connectors/notion"),
             ("settings", "#/settings"),
             *[(f"settings {tab}", f"#/settings/{tab}") for tab in _SETTINGS],
         ]

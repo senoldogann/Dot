@@ -1,5 +1,5 @@
 """Every configured MCP server, connected: the tools they offer, the way to call them, and those that could not start.
-A server added on Customize › Plugins joins while Dot runs, and one removed there leaves (item 279)."""
+A server added on Customize › Connectors joins while Dot runs, and one removed there leaves (item 279)."""
 
 import asyncio
 from collections.abc import Mapping, Sequence

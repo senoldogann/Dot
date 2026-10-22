@@ -1225,7 +1225,7 @@ class BrowserView(FrozenModel):
 
 
 class ConnectionView(FrozenModel):
-    """One application of Customize › Plugins (items 278 and 316). ``kind`` says how Dot reaches it: ``mac``, it
+    """One application of Customize › Connectors (items 278 and 316). ``kind`` says how Dot reaches it: ``mac``, it
     drives it with AppleScript; ``web``, it uses it in its own browser; ``folder``, it reads and writes the folder it
     keeps in sync. ``state`` is where it stands and ``step`` what sets it up (``connections/states.py``), ``None``
     when there is none to take; ``waiting`` is true while macOS asks the owner about it on the Mac; ``icon`` is true
@@ -1254,9 +1254,53 @@ class ConnectionsView(FrozenModel):
 
 
 class PluginsView(FrozenModel):
-    """``GET /plugins``: the listings of Customize's Plugins page (item 316), in its order."""
+    """``GET /plugins``: the listings of Customize's Connectors page (items 316 and 542), in its order."""
 
     plugins: tuple[PluginView, ...]
+
+
+type GalleryState = Literal["available", "installed", "taken"]
+
+
+class GalleryPluginView(FrozenModel):
+    """A plugin of the gallery as Customize › Plugins shows it (item 542): ``skills`` are the names of its skill
+    folders, ``logo`` a file of ``static/icons/plugins`` (else the page draws its plugin mark), ``repository`` and
+    ``commit`` the GitHub repository and the commit Install downloads, ``homepage`` that commit's page, and ``state``
+    whether Dot installed it, has another plugin of its name (``taken``), or can install it."""
+
+    id: str
+    name: str
+    publisher: str
+    official: bool
+    category: str
+    does: str
+    skills: tuple[str, ...]
+    licence: str
+    featured: bool
+    stars: int
+    added: str
+    logo: str | None
+    repository: str
+    commit: str
+    homepage: str
+    state: GalleryState
+
+
+class InstalledPluginView(FrozenModel):
+    """A plugin Dot reads that did not come from the gallery: one put in Dot's plugins folder by hand (``own``, which
+    Remove takes out), or one of a folder of ``[plugins] dirs``, which the owner takes out of the config."""
+
+    name: str
+    description: str | None
+    servers: int
+    own: bool
+
+
+class GalleryView(FrozenModel):
+    """``GET /plugin-gallery``: the plugins of the gallery in its order, and the other plugins Dot reads."""
+
+    plugins: tuple[GalleryPluginView, ...]
+    others: tuple[InstalledPluginView, ...]
 
 
 type McpOrigin = Literal["config", "plugin", "elsewhere", "connected"]
@@ -1264,10 +1308,10 @@ type McpServerState = Literal["ready", "left_out", "disabled", "trying", "signin
 
 
 class McpServerView(FrozenModel):
-    """One MCP server Dot has, as Customize › Plugins shows it (item 279). ``origin`` is where it is set up: Dot's
+    """One MCP server Dot has, as Customize › Connectors shows it (item 279). ``origin`` is where it is set up: Dot's
     config, a plugin (``plugin`` names it), another agent of the Mac (Customize › Skills › Found on this Mac), or the
-    Plugins page itself. Remove takes out one added on the page or from another agent (item 497); one of a plugin goes
-    with its plugin, and one of the config is the owner's to take out of it. ``address`` is its URL or its command.
+    Connectors page itself. Remove takes out one added on the page or from another agent (item 497); one of a plugin
+    goes with its plugin, and one of the config is the owner's to take out of it. ``address`` is its URL or its command.
     ``state``: its tools are offered to runs (``ready``, with ``tools``, their names on the server), it was left out
     (``error`` says why), it is switched off in the config, or Dot tries it now, waiting for the owner to sign in on
     ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the owner's account, and Sign in again renews

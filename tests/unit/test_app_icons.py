@@ -1,4 +1,4 @@
-"""The icon of an application of this Mac (Customize › Plugins), read from its bundle: the ``.icns`` file its
+"""The icon of an application of this Mac (Customize › Connectors), read from its bundle: the ``.icns`` file its
 ``Info.plist`` names, drawn as a PNG, once for each version of the file. Bundles are made here; Launch Services is asked
 for real about Calendar, which every Mac has."""
 

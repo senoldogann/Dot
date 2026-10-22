@@ -1,6 +1,6 @@
-"""The services whose own MCP servers Customize › Plugins adds in one step (items 279, 316 and 408): each reached at its
-address over streamable HTTP, or started on this Mac by a command (``npx``, ``uvx``) and talked to over standard input
-and output. Those that sign in do so in the owner's browser, as MCP's authorization asks: OAuth with PKCE, Dot
+"""The services whose own MCP servers Customize › Connectors adds in one step (items 279, 316 and 408): each reached at
+its address over streamable HTTP, or started on this Mac by a command (``npx``, ``uvx``) and talked to over standard
+input and output. Those that sign in do so in the owner's browser, as MCP's authorization asks: OAuth with PKCE, Dot
 registering itself with the service's authorization server as a client without a secret. Those that take a key ask
 the owner for it on the page (``secrets``): Dot keeps each in its ``.env`` under ``MCP_<service>_<name>`` and the
 server's headers or environment refer to it as ``${...}``, so the value never sits in a record.

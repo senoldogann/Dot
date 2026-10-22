@@ -55,7 +55,7 @@ def picks_problems(
         if server not in connected:
             problems.append(
                 f"the MCP server {server} is not connected (the servers connected now: "
-                f"{', '.join(sorted(connected)) or 'none'}); Customize › Plugins says why"
+                f"{', '.join(sorted(connected)) or 'none'}); Customize › Connectors says why"
             )
         elif plugin_group(server) not in groups:
             problems.append(
@@ -66,7 +66,7 @@ def picks_problems(
         if address not in signed_in:
             problems.append(
                 f"no account {address} is signed in (the accounts signed in now: "
-                f"{', '.join(sorted(signed_in)) or 'none'}); Customize › Plugins › Accounts signs one in"
+                f"{', '.join(sorted(signed_in)) or 'none'}); Customize › Connectors › Accounts signs one in"
             )
     if picks.accounts and ACCOUNTS_GROUP not in groups:
         problems.append(f"a {mode} run of this agent has no mail or calendar tool for the accounts picked")

@@ -4,7 +4,7 @@ OpenCode point it back at the real one. Tailscale's command line and ``caffeinat
 exist too, so that no test reads or changes the owner's tailnet or keeps the Mac awake, and so is the ``open`` that
 Settings › Phone opens the App Store or Tailscale with (item 421); the tests of Settings › Phone point them at
 stand-ins. The tests of the accounts signed in (items 422 and 424) keep their tokens in a keychain of their own
-(``keychain_file``). A test that opens the Plugins page for its layout alone has macOS answer at once
+(``keychain_file``). A test that opens the Connectors page for its layout alone has macOS answer at once
 (``mac_at_rest``): the page waits for ``GET /api/connections``, which asks macOS's permission service about each
 application that runs, and that service takes seconds when the Mac is busy."""
 
@@ -93,7 +93,7 @@ def _dot_app() -> Path:
 
 @pytest.fixture
 def mac_at_rest(monkeypatch: pytest.MonkeyPatch) -> None:
-    """macOS as a Mac at rest answers the Plugins page: every application installed and none running, Dot.app the
+    """macOS as a Mac at rest answers the Connectors page: every application installed and none running, Dot.app the
     program responsible. The page reads these once and at once, whatever else the Mac is doing."""
     monkeypatch.setattr(mac, "automation_state", _not_running)
     monkeypatch.setattr(mac, "installed_app", _installed)

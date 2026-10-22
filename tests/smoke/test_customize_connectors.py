@@ -1,16 +1,16 @@
-"""Customize › Plugins (items 278 and 316) end to end: the sidebar's link under Campaigns (item 289) opens the page,
+"""Customize › Connectors (items 278, 316 and 542) end to end: Connect apps' Customize (item 492) opens the page,
 wide and light and on a phone and dark. Every service in its section, 25 or more, each with its mark, what Dot does
 with it and how it connects; a search, and Connected next to All. With macOS's answers given by the test (an
 application allowed, one not asked, one refused, one not installed), Mail is connected and offers no step, Outlook is
 not installed, OneDrive syncs a folder, GitHub's cookie in the profile of Dot's browser signs it in and Slack is not,
-with no Sign in in a browser without a window; a service not tried yet says so and offers none. A service's own page
+with no Sign in in a browser without a window; a service Dot cannot reach is not listed. A service's own page
 says how it connects, where it stands and where its data goes: Notes' Open System Settings shows the Automation pane
 under a line that names Dot, the program to open there, and goes under that line on a phone. The "+" of Calendar asks
 macOS and its tile says Allowed, and still does once the application is closed and macOS tells nothing about it (item
 288). The old address of Connect apps leads to the page. Every mark is a picture or an icon on a tile that is white in
 both colour schemes: a logo in its own colours, Calendar's the icon of the application itself, read from its bundle (the
-Mac's own here), Mail's and Outlook's their glyph and letters (no bundle to read, not installed); the Accounts card
-heads the list and no service's own page, and the "+" of a tile keeps its width.
+Mac's own here), Mail's its glyph and Outlook's the plug (no bundle to read, not installed), each on a tile of its
+colour (item 542); the Accounts card heads the list and no service's own page, and the "+" of a tile keeps its width.
 
 macOS is never asked here and System Settings never opens: the test answers for them (``_Mac``). The sign-ins are read
 for real, from a cookie file in the profile of Dot's browser.
@@ -45,7 +45,7 @@ from dotagent.server.links import ui_url
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
-TOKEN: str = "customize-plugins-token"
+TOKEN: str = "customize-connectors-token"
 _MAIL: str = "com.apple.mail"
 _CALENDAR: str = "com.apple.iCal"
 _NOTES: str = "com.apple.Notes"
@@ -191,14 +191,18 @@ async def _check_marks(page: Page) -> None:
     await expect(github.locator("img.plugin-logo")).to_have_attribute("src", "/icons/plugins/github-icon.svg")
     assert await github.locator("img").evaluate(_LOADED)
     assert await github.evaluate("(mark) => getComputedStyle(mark).backgroundColor") == "rgb(255, 255, 255)"
-    # Calendar wears its application's icon, read from its bundle; Mail and Outlook keep their glyph and letters.
+    # Calendar wears its application's icon, read from its bundle; Mail keeps its glyph and Outlook, with no mark of
+    # its own, wears the plug, each on a tile of its colour (item 542).
     calendar: Locator = _tile(page, "calendar").locator(".plugin-mark")
     await expect(calendar).to_have_attribute("data-icon", "app")
     await expect(calendar.locator("img")).to_have_attribute("src", re.compile(r"^blob:"))
     assert await calendar.locator("img").evaluate(_LOADED)
     await expect(_tile(page, "mail").locator(".plugin-mark .icon")).to_have_count(1)
     await expect(_tile(page, "mail").locator(".plugin-mark[data-icon]")).to_have_count(0)
-    await expect(_tile(page, "outlook").locator(".plugin-letters")).to_have_text("O")
+    outlook: Locator = _tile(page, "outlook").locator(".plugin-mark")
+    await expect(outlook.locator("svg.icon")).to_have_attribute("data-icon", "plug")
+    await expect(outlook).to_have_attribute("data-tint", "")
+    assert await outlook.evaluate("(mark) => getComputedStyle(mark).backgroundImage.startsWith('linear-gradient')")
     # The tile's "+" keeps its width beside long words, on a phone too.
     widths: list[float] = await page.locator("button.plugin-add").evaluate_all(
         "(buttons) => buttons.map((button) => button.getBoundingClientRect().width)"
@@ -215,7 +219,7 @@ async def _check_marks(page: Page) -> None:
     assert apart
 
 
-async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
+async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
     runtime: Runtime, address: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     macos: _Mac = _Mac()
@@ -250,8 +254,8 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 assert link_box["y"] + link_box["height"] <= 860, link_box
                 await connect.click()
                 await page.get_by_role("dialog", name="Connect apps").get_by_role("link", name="Customize").click()
-                await expect(page).to_have_url(f"{address}/#/customize/plugins")
-                await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Plugins")
+                await expect(page).to_have_url(f"{address}/#/customize/connectors")
+                await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Connectors")
                 # Every service in its section, each with its mark, what Dot does with it and how it connects.
                 tiles: Locator = page.locator(".plugin-tile[data-plugin]")
                 await expect(tiles.first).to_be_visible()
@@ -289,19 +293,17 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 slack: Locator = _tile(page, "slack")
                 await expect(slack.locator(".badge")).to_have_text("Not signed in")
                 await expect(slack.get_by_role("button")).to_have_count(0)
-                # A service not tried yet says so and offers no step; Vercel, untried until item 535, signs in now.
-                canva: Locator = _tile(page, "canva")
-                await expect(canva.locator(".chip")).to_have_text("Not tried yet")
-                await expect(canva.get_by_role("button")).to_have_count(0)
+                # A service Dot cannot reach is not listed (item 542); Vercel, untried until item 535, signs in now.
+                await expect(_tile(page, "canva")).to_have_count(0)
                 await expect(_tile(page, "vercel").locator(".chip")).to_have_text("MCP · Sign in")
                 await expect(_tile(page, "linear").locator(".chip")).to_have_text("MCP · Sign in")
                 await expect(_tile(page, "linear").get_by_role("button", name="Add Linear")).to_be_visible()
                 # Nothing is wider than the screen.
                 wide: int = await page.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
                 assert wide <= 0, wide
-                await page.screenshot(path=str(tmp_path / f"plugins-{width}-{scheme}.png"), full_page=True)
+                await page.screenshot(path=str(tmp_path / f"connectors-{width}-{scheme}.png"), full_page=True)
                 # The search, and Connected next to All.
-                search: Locator = page.get_by_role("searchbox", name="Search plugins")
+                search: Locator = page.get_by_role("searchbox", name="Search connectors")
                 # Typed a key at a time, the search keeps its focus while the tiles are drawn anew.
                 await search.press_sequentially("linked")
                 await expect(search).to_be_focused()
@@ -322,7 +324,7 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 await page.get_by_role("button", name=re.compile(r"^All \d+$")).click()
                 # Notes' own page: how it connects, where it stands, where its data goes, and its step.
                 await _tile(page, "notes").locator(".plugin-name").click()
-                await expect(page).to_have_url(f"{address}/#/customize/plugins/notes")
+                await expect(page).to_have_url(f"{address}/#/customize/connectors/notes")
                 # A service's own page has no Accounts card over it, and its mark is the same tile, larger.
                 await expect(page.locator("section[aria-label='Accounts']")).to_have_count(0)
                 await expect(page.locator(".plugin-hero .plugin-mark")).to_have_count(1)
@@ -340,7 +342,7 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 button_box: FloatRect = await _box(settings)
                 under: bool = button_box["y"] >= text_box["y"] + text_box["height"]
                 assert under == (width < _PHONE_PX), (width, text_box, button_box)
-                await page.screenshot(path=str(tmp_path / f"plugin-notes-{width}-{scheme}.png"), full_page=True)
+                await page.screenshot(path=str(tmp_path / f"connector-notes-{width}-{scheme}.png"), full_page=True)
                 async with page.expect_response(
                     lambda response: response.request.method == "POST" and response.url.endswith("/connections/notes")
                 ) as answered:
@@ -354,7 +356,7 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
             await calendar_page.goto(ui_url("127.0.0.1", port, TOKEN))
             # The old address of Connect apps leads to the page.
             await calendar_page.goto(f"{address}/#/connect")
-            await expect(calendar_page).to_have_url(f"{address}/#/customize/plugins")
+            await expect(calendar_page).to_have_url(f"{address}/#/customize/connectors")
             calendar: Locator = _tile(calendar_page, "calendar")
             await expect(calendar.locator(".badge")).to_have_text("Not asked yet")
             await calendar.get_by_role("button", name="Allow Calendar").click()
@@ -379,7 +381,7 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
             )
             await small.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await small.goto(ui_url("127.0.0.1", port, TOKEN))
-            await small.goto(f"{address}/#/customize/plugins")
+            await small.goto(f"{address}/#/customize/connectors")
             server: Locator = small.locator(".plugin-server[data-server='long-command']")
             await expect(server.locator(".badge")).to_have_text("Left out")
             await expect(server.locator(".plugin-address")).to_contain_text(_LONG_COMMAND)
@@ -396,12 +398,12 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
             assert not covered
             wide: int = await small.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
             assert wide <= 0, wide
-            await small.screenshot(path=str(tmp_path / f"plugins-{_SMALLEST_PX}-dark.png"), full_page=True)
+            await small.screenshot(path=str(tmp_path / f"connectors-{_SMALLEST_PX}-dark.png"), full_page=True)
         finally:
             await browser.close()
 
 
-async def test_the_list_of_plugins_stands_still_when_the_accounts_card_has_read_the_accounts(
+async def test_the_list_of_connectors_stands_still_when_the_accounts_card_has_read_the_accounts(
     address: str, mac_at_rest: None
 ) -> None:
     """Item 511: the Accounts card at the head of the list gets its providers' rows once it has read the accounts; the
@@ -423,7 +425,7 @@ async def test_the_list_of_plugins_stands_still_when_the_accounts_card_has_read_
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.route("**/api/accounts", late)
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
-            await page.goto(f"{address}/#/customize/plugins")
+            await page.goto(f"{address}/#/customize/connectors")
             linear: Locator = _tile(page, "linear")
             await expect(linear).to_be_visible()
             first: FloatRect = await _box(linear)

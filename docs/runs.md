@@ -457,7 +457,7 @@ it was handed.
 ### Mail and calendars
 
 `mail_search`, `mail_read` and `calendar_events` (item 424) read your mail and calendars in the Google and Microsoft
-accounts you signed in on Customize › Plugins ([Accounts](extending.md#accounts-googles-and-microsofts-own-sign-in)),
+accounts you signed in on Customize › Connectors ([Accounts](extending.md#accounts-googles-and-microsofts-own-sign-in)),
 through Gmail's, Google Calendar's and Microsoft Graph's own APIs, so that neither Mail, Outlook nor a browser has to be
 open. They are a run's only once an account is signed in: until then neither they nor their part of the prompt are in
 it. `account` is the address of one of the accounts: the run's prompt names them, and an address no account has is

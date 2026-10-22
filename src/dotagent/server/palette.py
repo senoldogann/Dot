@@ -48,7 +48,7 @@ def palette_view(
                 address=account.address,
                 provider=account.provider,
                 reads=account_reads(account.provider),
-                mark=ServiceMark(logo=PROVIDER_MARKS[account.provider], glyph=None, monogram=None, colour=None),
+                mark=ServiceMark(logo=PROVIDER_MARKS[account.provider], glyph=None, colour=None),
             )
             for account in accounts
         ),

@@ -1,5 +1,5 @@
 """The tools of an MCP server that offers many (items 426 and 524), for real: a server of 32 tools, served in this
-process over streamable HTTP and added from the Plugins page. It is ready with every one of them; the page lists
+process over streamable HTTP and added from the Connectors page. It is ready with every one of them; the page lists
 what it offers, all of it ticked, and the server comes back with just the tools the owner ticks for the runs that
 start next, or with all of them and no list when every one is ticked. A server set up in Dot's config, or one that
 is not there, is refused."""
@@ -263,7 +263,7 @@ async def test_the_plugins_page_lists_the_tools_all_ticked_and_connects_the_chos
                 )
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
-                await page.goto(f"{world.dot}/#/customize/plugins")
+                await page.goto(f"{world.dot}/#/customize/connectors")
                 row: Locator = _row(page, "many")
                 await expect(row.locator(".badge")).to_have_text("Ready")
                 await expect(row).to_contain_text(f"{_TOOLS} tools: tool_00")

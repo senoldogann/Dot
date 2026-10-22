@@ -254,7 +254,7 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   title is refused as well). Desktop screenshots black out the password managers' windows; their secure fields are not
   masked.
 - A login of your 1Password is filled by Dot, never by the run's model (item 493). Once you connect 1Password
-  (Customize › Plugins › 1Password: a vault "Shared with Dot" and a service account that only reads it, or a service
+  (Customize › Connectors › 1Password: a vault "Shared with Dot" and a service account that only reads it, or a service
   account token of yours), a run sees the logins' titles and websites (`browser_logins`) and names one with the refs
   of its fields (`browser_fill_login`); the daemon reads the values with `op`, 1Password's command line, and types them
   itself:
@@ -360,7 +360,7 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   agree: its own code (the folder its package is imported from, the Python environment it runs in and the Python under
   that, and the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the
   `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's records
-  of the MCP servers you added from other agents and on Customize › Plugins, the home of the OpenCode server it starts,
+  of the MCP servers you added from other agents and on Customize › Connectors, the home of the OpenCode server it starts,
   the playbooks it learned and the file of its emergency stop. The file tools ask you before they write there
   (`self_change`, item 398), in every approval mode but `yolo`, and neither the review model nor a rule of yours answers
   in your place; OpenCode's own agent, which writes past the journal `dotx undo` reads, is refused, and so is a line
@@ -369,7 +369,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   clone, an unpacked archive, git run in one of those folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`)
   or inline code that names the place (in a word of switches such as `-pe` too). The guard reads the line, not what a
   program does; the sandbox below holds what it cannot read. A plugin's MCP servers, and those you added, start with the
-  daemon and are given keys from the key store: put a plugin or a skill in place yourself.
+  daemon and are given keys from the key store: put a plugin or a skill in place yourself, or install one from
+  Customize › Plugins, which takes a gallery plugin's skills alone, as its commit pins them (item 542).
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
   files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals)

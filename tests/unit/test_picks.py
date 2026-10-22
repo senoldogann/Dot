@@ -14,7 +14,7 @@ def test_a_picked_server_is_refused_for_what_keeps_it_out_not_always_as_not_conn
     groups: frozenset[str] = frozenset({"core", "mcp__notes"})
     assert picks_problems(_picks("notes"), "task", groups, ("notes",), (), (), True) == []
     assert picks_problems(_picks("gone"), "task", groups, ("notes",), (), (), True) == [
-        "the MCP server gone is not connected (the servers connected now: notes); Customize › Plugins says why"
+        "the MCP server gone is not connected (the servers connected now: notes); Customize › Connectors says why"
     ]
     # Connected, but a chat may use none of its tools (they all act): the message goes as a task.
     assert picks_problems(_picks("writer"), "chat", groups, ("notes", "writer"), (), (), True) == [
@@ -38,7 +38,7 @@ def test_an_account_picked_must_be_signed_in_and_opens_the_mail_and_calendar_too
     groups = frozenset({ACCOUNTS_GROUP})
     assert picks_problems(picked, "task", groups, (), ("me@example.com",), (), True) == []
     assert picks_problems(picked, "task", groups, (), ("other@example.com",), (), True) == [
-        "no account me@example.com is signed in (the accounts signed in now: other@example.com); Customize › Plugins "
-        "› Accounts signs one in"
+        "no account me@example.com is signed in (the accounts signed in now: other@example.com); Customize › "
+        "Connectors › Accounts signs one in"
     ]
     assert "me@example.com" in with_picks("Read my mail", picked, ())

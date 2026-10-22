@@ -1,4 +1,4 @@
-"""Where an application of Customize › Plugins stands, and the step that sets it up (item 278)."""
+"""Where an application of Customize › Connectors stands, and the step that sets it up (item 278)."""
 
 from typing import Literal
 

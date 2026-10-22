@@ -1280,7 +1280,7 @@ a.pill:hover {
 }
 
 /* On a phone a card's name stands over the card, out of its surface, as a group's name over its rows: in the
-   settings' tabs (item 330), on Customize › Plugins and the agent's editor (item 332). Each such card has one body,
+   settings' tabs (item 330), on Customize's pages and the agent's editor (item 332). Each such card has one body,
    whose ground the card's is. */
 @media (max-width: 720px) {
   :is(.settings-pane .card, .connect-section, .agent-editor):has(> .card-head) {
@@ -1547,7 +1547,7 @@ a.pill:hover {
   white-space: nowrap;
 }
 
-/* The accounts of the official sign-ins (item 422), at the head of Customize › Plugins: a provider a block, its mark
+/* The accounts of the official sign-ins (item 422), at the head of Customize › Connectors: a provider a block, its mark
    and name over its accounts, each a row with its Sign out. */
 .accounts-list {
   display: grid;
@@ -1568,7 +1568,7 @@ a.pill:hover {
   margin: 0;
 }
 
-/* A provider's mark, as a service's on the Plugins list: its colours on a tile that is light in both colour schemes. */
+/* A provider's mark, as a service's on the Connectors list: its colours on a tile that is light in both colour schemes. */
 .account-mark {
   display: inline-grid;
   flex: none;
@@ -1598,7 +1598,7 @@ a.pill:hover {
   overflow-wrap: anywhere;
 }
 
-/* The cards of Customize › Plugins (item 316): a card's lines stand clear of the line under its head and of its first
+/* The cards of Customize › Connectors (item 316): a card's lines stand clear of the line under its head and of its first
    row, as far from them as a row's text is from its own lines (item 287); a second line follows the first closely. The
    form that adds an MCP server by its address (item 279) sits under the servers, its fields side by side when they fit. */
 .connect-hint {
@@ -1640,11 +1640,9 @@ a.pill:hover {
   }
 }
 
-/* Customize (items 316 and 317): its two tabs, links drawn as a segmented control; a bar of a search, its tabs and its
-   actions; the services and the skills as tiles of a grid, two a row and one on a phone. A
-   service's tile is a link to its own page through its name, whose link covers the tile under its "+". A mark is a tile
-   tinted with the service's colour; its logo (a mask) and its letters take the colour where it reads on both grounds,
-   else the ink. */
+/* Customize (items 316, 317 and 542): its three tabs, links drawn as a segmented control; a bar of a search, its tabs
+   and its actions; the services and the skills as tiles of a grid, two a row and one on a phone. A service's tile is a
+   link to its own page through its name, whose link covers the tile under its "+". */
 .customize-tabs a {
   display: inline-flex;
   align-items: center;
@@ -1664,6 +1662,13 @@ a.pill:hover {
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-seg);
+}
+
+/* On the narrowest phones the three tabs keep their words and leave their icons, so that they fit the width. */
+@media (max-width: 360px) {
+  .customize-tabs a .icon {
+    display: none;
+  }
 }
 
 .customize-body {
@@ -1813,10 +1818,6 @@ a.pill:hover {
   margin-top: var(--space-2);
 }
 
-.plugin-untried {
-  color: var(--muted);
-}
-
 .plugin-guide {
   color: var(--text-2);
   font-size: var(--text-sm);
@@ -1854,9 +1855,8 @@ a.pill:hover {
 }
 
 /* The mark of a service (item 437): a tile that is light in both colour schemes, so that a dark logo (GitHub, X,
-   Vercel) reads in the dark scheme too. A logo is a picture in its own colours; the interface's icon and letters are
-   drawn in --plugin-ink, the listing's colour where it reads on the tile, else the ink. An application of this Mac
-   wears its own icon, which is its own tile: it takes none. */
+   Vercel) reads in the dark scheme too. A logo is a picture in its own colours; an icon stands on a tile of its own
+   colour (below). An application of this Mac wears its own icon, which is its own tile: it takes none. */
 .plugin-mark {
   --plugin-ink: var(--mark-ink);
   display: grid;
@@ -1895,11 +1895,25 @@ a.pill:hover {
   max-width: none;
 }
 
-.plugin-letters {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-title);
-  letter-spacing: var(--tracking-title);
-  line-height: var(--leading-xs);
+/* A mark that is no logo (item 542): a connector's icon, the plug of one with no mark of its own and a gallery plugin's
+   puzzle piece, light on a tile of its colour lit from its top left, as an application's icon is (a mark with no colour
+   of its own takes one of six by its id, marks.js). On a colour too light for a light icon the icon takes the ink. */
+.plugin-mark[data-tint] {
+  --plugin-hue: var(--mark-blue);
+  background: linear-gradient(
+    150deg,
+    color-mix(in oklab, var(--plugin-hue) 78%, var(--mark-ground)),
+    var(--plugin-hue) 55%,
+    color-mix(in oklab, var(--plugin-hue) 84%, var(--mark-shade))
+  );
+  box-shadow:
+    inset 0 0 0 1px var(--mark-ring),
+    inset 0 1px 0 var(--mark-gloss);
+  color: var(--mark-on-hue);
+}
+
+.plugin-mark[data-tint][data-light] {
+  color: var(--mark-ink);
 }
 
 .plugin-hero {
@@ -1918,11 +1932,6 @@ a.pill:hover {
 .plugin-hero .plugin-mark .icon {
   width: 38px;
   height: 38px;
-}
-
-.plugin-hero .plugin-letters {
-  font-size: var(--text-2xl);
-  line-height: var(--leading-2xl);
 }
 
 .plugin-title {
@@ -1972,6 +1981,496 @@ a.pill:hover {
 
 .plugin-own .plugin-tile {
   margin: 0 16px 8px;
+}
+
+/* Customize › Plugins (item 542): the gallery, after Qoder's page. Its head is a card lit by the theme's accent, its
+   words and the search on one side and a few of the gallery's marks scattered on the other, which a phone leaves out.
+   New & noteworthy shows its cards three a row (two in a narrow window; on a phone a row that scrolls sideways), All
+   plugins two, a phone one. A card's name is a link to the plugin's page that covers the card under its buttons. */
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.gallery-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.gallery-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  overflow: hidden;
+  padding: 28px 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(75% 150% at 100% 0%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 70%),
+    radial-gradient(60% 120% at 0% 100%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 70%),
+    var(--surface);
+}
+
+.gallery-head-main {
+  display: grid;
+  flex: 1 1 auto;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 560px;
+}
+
+.gallery-head-title {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-title);
+  line-height: var(--leading-2xl);
+}
+
+.gallery-head-line {
+  margin: 0;
+  color: var(--text-2);
+}
+
+.gallery-find {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: var(--space-2);
+}
+
+.gallery-find > .icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* The search stands out of the lit card: the card's own ground in the light scheme, a step up from it in the dark. */
+.gallery-search.input {
+  height: 40px;
+  padding-left: 36px;
+  background: light-dark(var(--surface), var(--surface-2));
+}
+
+.gallery-head-marks {
+  position: relative;
+  flex: none;
+  width: 236px;
+  height: 148px;
+  margin-right: var(--space-2);
+}
+
+.gallery-head-mark {
+  position: absolute;
+  filter: drop-shadow(0 6px 14px var(--shadow-ink-deep));
+}
+
+.gallery-head-mark > .plugin-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius);
+}
+
+.gallery-head-mark .plugin-logo {
+  width: 34px;
+  height: 34px;
+}
+
+.gallery-head-mark .plugin-mark .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.gallery-head-mark:nth-child(1) {
+  top: 46px;
+  left: 0;
+  transform: rotate(-10deg);
+}
+
+.gallery-head-mark:nth-child(2) {
+  top: 4px;
+  left: 64px;
+  transform: rotate(6deg) scale(1.08);
+}
+
+.gallery-head-mark:nth-child(3) {
+  top: 80px;
+  left: 92px;
+  transform: rotate(-4deg) scale(1.15);
+}
+
+.gallery-head-mark:nth-child(4) {
+  top: 18px;
+  left: 152px;
+  transform: rotate(9deg);
+}
+
+.gallery-head-mark:nth-child(5) {
+  top: 90px;
+  left: 176px;
+  transform: rotate(-7deg) scale(0.9);
+}
+
+.gallery-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.section-label.gallery-section-title {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-title);
+  line-height: var(--leading-md);
+}
+
+.gallery-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.gallery-featured {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.gallery-grid > .empty-state,
+.gallery-grid > .gallery-others-title {
+  grid-column: 1 / -1;
+}
+
+.section-label.gallery-others-title {
+  margin: var(--space-4) 0 0;
+}
+
+.gallery-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition:
+    border-color var(--motion-base) var(--ease),
+    box-shadow var(--motion-base) var(--ease);
+}
+
+.gallery-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-raised);
+}
+
+/* A featured card stands up: its mark over its words, its button at its top right, three lines of what it does. */
+.gallery-featured .gallery-card {
+  flex-direction: column;
+  padding: var(--space-4);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 6%, var(--surface)), var(--surface) 70%);
+}
+
+.gallery-featured .plugin-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius);
+}
+
+.gallery-featured .plugin-mark .icon {
+  width: 24px;
+  height: 24px;
+}
+
+.gallery-featured .gallery-action {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+}
+
+.gallery-featured .gallery-card-does {
+  -webkit-line-clamp: 3;
+}
+
+/* A card of the list keeps its button on the line of its name, so that what it says has the card's width under it. */
+.gallery-grid .gallery-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 var(--space-3);
+}
+
+.gallery-grid .gallery-card > .plugin-mark {
+  grid-row: 1 / span 3;
+  align-self: start;
+}
+
+.gallery-grid .gallery-card-main {
+  display: contents;
+}
+
+.gallery-grid .gallery-card-head {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.gallery-grid .gallery-card-by,
+.gallery-grid .gallery-card-does {
+  grid-column: 2 / -1;
+}
+
+.gallery-grid .gallery-card-by {
+  margin-top: calc(-1 * var(--space-1));
+}
+
+.gallery-grid .gallery-action {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.gallery-card-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1 1 auto;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.gallery-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.gallery-card-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: var(--weight-title);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-card a.gallery-card-name::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+
+.gallery-card a.gallery-card-name:focus-visible {
+  outline: 0;
+}
+
+.gallery-card a.gallery-card-name:focus-visible::after {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.gallery-card-by {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.gallery-card-does {
+  display: -webkit-box;
+  margin: var(--space-1) 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+/* The check of a plugin from its maker: a rosette in the accent with the check cut out of it. */
+.gallery-verified {
+  display: inline-flex;
+  flex: none;
+  color: var(--accent);
+}
+
+.gallery-verified .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.gallery-verified .icon path:first-child {
+  fill: currentColor;
+}
+
+.gallery-verified .icon path:last-child {
+  stroke: var(--on-accent);
+}
+
+.gallery-action {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.gallery-installed .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.gallery-install .spinner {
+  width: 12px;
+  height: 12px;
+}
+
+/* A plugin's own page: its mark, name and words over the cards of its skills and of where it comes from. */
+.gallery-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.gallery-page-head > .plugin-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius);
+}
+
+.gallery-page-head > .plugin-mark .icon {
+  width: 32px;
+  height: 32px;
+}
+
+.gallery-page-head .plugin-logo {
+  width: 40px;
+  height: 40px;
+}
+
+.gallery-page-head > .gallery-card-main {
+  flex: 1 1 260px;
+}
+
+.gallery-page-does {
+  margin: var(--space-2) 0 0;
+  color: var(--text-2);
+}
+
+.gallery-skills {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: var(--pad-row);
+  list-style: none;
+}
+
+.gallery-skills li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.gallery-skills .icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+
+.gallery-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: var(--pad-row);
+}
+
+.gallery-facts dt {
+  color: var(--muted);
+}
+
+.gallery-facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.gallery-facts a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.gallery-facts a .icon {
+  width: 13px;
+  height: 13px;
+}
+
+@media (max-width: 960px) {
+  .gallery-featured {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .gallery-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gallery-featured {
+    grid-template-columns: none;
+    grid-auto-columns: 82%;
+    grid-auto-flow: column;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .gallery-featured > .gallery-card {
+    scroll-snap-align: start;
+  }
+
+  .gallery-head {
+    padding: var(--space-5);
+  }
+
+  .gallery-head-marks {
+    display: none;
+  }
+
+  .gallery-head-title {
+    font-size: var(--text-xl);
+    line-height: var(--leading-xl);
+  }
+
+  /* Who publishes a plugin reads at the size of what it does (item 329). */
+  .gallery-card-by {
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
 }
 
 /* Connect apps (item 492, connectapps.js): the services in a dialog over the page, as wide as a page's column and as
@@ -2359,14 +2858,16 @@ dialog.modal.connect-apps[open] {
   }
 
   /* The name's link covers its tile; its own box is a finger's height too, without moving the tile's lines. */
-  .plugin-tile .plugin-name {
+  .plugin-tile .plugin-name,
+  .gallery-card .gallery-card-name {
     padding-block: 12px;
     margin-block: -12px;
   }
 
   /* Every tile has a chip and most a state: on a phone they read at the size of the tile's words (item 329). */
   .plugin-meta .chip,
-  .plugin-meta .badge {
+  .plugin-meta .badge,
+  .gallery-action .badge {
     font-size: var(--text-sm);
     line-height: var(--leading-sm);
   }
@@ -2702,7 +3203,7 @@ dialog.modal.connect-apps[open] {
   gap: var(--space-3);
 }
 
-/* The same tile as the provider's mark of Customize › Plugins. */
+/* The same tile as the provider's mark of Customize › Connectors. */
 .first-connect-mark {
   flex: none;
   box-sizing: border-box;
@@ -3939,7 +4440,7 @@ dialog.modal.connect-apps[open] {
 }
 
 /* A server and its tools wear their service's mark as its Customize tile does (item 477): on the tile's ground, light
-   in both colour schemes, its icon or letters in --plugin-ink. */
+   in both colour schemes, its icon in --plugin-ink. */
 .slash-mark[data-mark="service"] {
   --plugin-ink: var(--mark-ink);
   color: var(--plugin-ink);
@@ -3951,10 +4452,6 @@ dialog.modal.connect-apps[open] {
 .slash-mark[data-mark="service"] .plugin-logo {
   width: 14px;
   height: 14px;
-}
-
-.slash-mark .plugin-letters {
-  font-size: var(--text-xs);
 }
 
 .slash-option[aria-selected="true"],
@@ -7185,7 +7682,7 @@ dialog.lightbox img {
 }
 
 /* A server's chip wears its service's mark as the at menu does (item 530): on the tile's ground, light in both colour
-   schemes, a logo in its own colours, an icon or letters in --plugin-ink. */
+   schemes, a logo in its own colours, an icon in --plugin-ink. */
 .pick-mark[data-mark="service"] {
   --plugin-ink: var(--mark-ink);
   align-items: center;
@@ -7202,12 +7699,6 @@ dialog.lightbox img {
 .pick-mark[data-mark="service"] .plugin-logo {
   width: 12px;
   height: 12px;
-}
-
-.pick-mark[data-mark="service"] .plugin-letters {
-  font-size: calc(10px * var(--type-scale));
-  font-weight: var(--weight-title);
-  line-height: var(--leading-xs);
 }
 
 .pick-chip:has(> .pick-mark[data-mark="service"]) {

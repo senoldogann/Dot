@@ -53,7 +53,7 @@ function skillsSection() {
         ...servers.map((server) =>
           el(
             "a",
-            { class: "context-row", href: "#/customize/plugins", title: server.tools.map((tool) => tool.name).join(", ") },
+            { class: "context-row", href: "#/customize/connectors", title: server.tools.map((tool) => tool.name).join(", ") },
             row("plug", server.name, plural(server.tools.length, "tool", "tools")),
           ),
         ),
@@ -62,7 +62,7 @@ function skillsSection() {
       body.replaceChildren(...shown);
       if (rows.length > shown.length) {
         // The skills stand before the servers, so the link goes where the first row it hides lives.
-        const href = skills.length > SECTION_ROWS ? "#/customize/skills" : "#/customize/plugins";
+        const href = skills.length > SECTION_ROWS ? "#/customize/skills" : "#/customize/connectors";
         body.append(el("a", { class: "context-more", href }, `${rows.length - shown.length} more in Customize`));
       }
       const counts = [];

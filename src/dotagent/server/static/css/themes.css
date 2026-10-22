@@ -86,10 +86,22 @@
   /* The page of a document as Quick Look draws it (item 268): white in both schemes, as the Mac draws it. */
   --paper: #ffffff;
   /* The tile a service's mark sits on (item 437): light in both schemes, so that a dark logo (GitHub, X, Vercel)
-     reads in the dark scheme too; an icon of the interface and letters on it are drawn in the tile's ink. */
+     reads in the dark scheme too; an icon of the interface on it is drawn in the tile's ink. */
   --mark-ground: #ffffff;
   --mark-ink: #2b2a27;
   --mark-ring: rgb(0 0 0 / 10%);
+  /* A mark that is no logo (item 542): its icon in white on a tile of its colour, lit from its top left. A mark with
+     no colour of its own takes one of these six by its id, and a kind of the gallery's plugins one of them too: each is
+     dark enough for the white icon in every look and scheme. */
+  --mark-on-hue: #ffffff;
+  --mark-shade: #000000;
+  --mark-gloss: rgb(255 255 255 / 22%);
+  --mark-blue: #2f6fdb;
+  --mark-pink: #c4378f;
+  --mark-violet: #7a4fe0;
+  --mark-teal: #0f8a78;
+  --mark-orange: #c95b14;
+  --mark-green: #2a8d5c;
   /* The kind of a file on its tile in the Run tab (item 539): the blue of a mark rather than a theme's accent, so a
      file reads as a file in every look. */
   --file-kind: light-dark(#3a6fc4, #7fabf0);

@@ -1,5 +1,5 @@
-"""Routes of the MCP servers on Customize › Plugins (items 279 and 316): every server Dot has with where it stands, the
-catalogue's services, adding one, connecting one again (signing in again) and removing one, and the page an
+"""Routes of the MCP servers on Customize › Connectors (items 279 and 316): every server Dot has with where it stands,
+the catalogue's services, adding one, connecting one again (signing in again) and removing one, and the page an
 authorization server sends the browser back to after a sign-in (``/oauth/callback``, outside ``/api``, so that it needs
 no token; its page is :mod:`dotagent.server.callback_page`).
 
@@ -34,6 +34,7 @@ from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
 from dotagent.mcp.types import McpFailure
 from dotagent.oauth.accounts import CameBack, denial_reason
+from dotagent.plugins.catalog import read_again
 from dotagent.plugins.removal import is_dots_own, move_to_trash, trash_folder
 from dotagent.plugins.types import Plugin
 from dotagent.secrets import remove_env_value, write_env_value
@@ -247,7 +248,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     def known(record: ConnectedServers) -> dict[str, tuple[McpServerConfig, McpOrigin]]:
         """Every server Dot has, by name, with where it is set up: its config's first, then the plugins', the other
-        agents', those added on the Plugins page (``record``), and the tries of servers it does not have yet."""
+        agents', those added on the Connectors page (``record``), and the tries of servers it does not have yet."""
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = {}
         for config in ctx.runtime.config.mcp:
             servers.setdefault(config.name, (config, "config"))
@@ -436,7 +437,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
     @router.post("/api/mcp/servers/{name}/connect")
     async def connect_again(name: str, body: McpReconnect) -> McpServerView:
         """Connect the server ``name`` again: tried once more, and signed in to again when it asks. One added on the
-        Plugins page, or one of Dot's config that signs in (``oauth = true``)."""
+        Connectors page, or one of Dot's config that signs in (``oauth = true``)."""
         page: str = page_origin(body.origin)
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(name)
@@ -492,7 +493,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     @router.delete("/api/mcp/servers/{name}")
     async def remove_server(name: str) -> McpServersView:
-        """Remove a server added on the Plugins page, or let go of a try: its tools leave the runs that start after,
+        """Remove a server added on the Connectors page, or let go of a try: its tools leave the runs that start after,
         and Dot forgets its address and its sign-in. One added from another agent of this Mac is taken back as
         Customize › Skills › Found on this Mac takes it back, and stopped now (item 497). A server of Dot's config is
         the owner's to take out of ``config.toml``, and one of a plugin goes with its plugin
@@ -553,6 +554,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             for server in still:
                 await hub.disconnect(server.name)
             refresh_mcp_tools(ctx.runtime.registry, hub)
+            ctx.runtime.plugins.forget(name)
+            await read_again(ctx.runtime.plugins, ctx.runtime.config.plugins, ctx.runtime.config.mcp)
             log.info("plugin_servers_stopped", plugin=name)
             return await listing()
         if not is_dots_own(plugin, plugins_dir()):
@@ -565,6 +568,10 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             await hub.disconnect(server.name)
         refresh_mcp_tools(ctx.runtime.registry, hub)
         moved = await asyncio.to_thread(move_to_trash, plugin.root, trash_folder())
+        # The plugins are read again, so that its skills leave the runs that start after and Customize lists it no more;
+        # a plugin of its name installed later starts none of the servers stopped here.
+        ctx.runtime.plugins.forget(name)
+        await read_again(ctx.runtime.plugins, ctx.runtime.config.plugins, ctx.runtime.config.mcp)
         log.info("plugin_removed", plugin=name, trash=str(moved))
         return await listing()
 

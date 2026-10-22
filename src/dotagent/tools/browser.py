@@ -780,8 +780,8 @@ FILL_LOGIN_TOOL: str = "browser_fill_login"
 VAULT_TOOLS: frozenset[str] = frozenset({"browser_logins", FILL_LOGIN_TOOL})
 # What a run is told when 1Password is not connected (item 493).
 _NOT_CONNECTED: str = (
-    "1Password is not connected: the owner connects it on Customize › Plugins › 1Password, and until then the logins "
-    "are theirs to type"
+    "1Password is not connected: the owner connects it on Customize › Connectors › 1Password, and until then the "
+    "logins are theirs to type"
 )
 
 

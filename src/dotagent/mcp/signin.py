@@ -2,13 +2,13 @@
 registered with the server's authorization server on the first sign-in (dynamic client registration), the code brought
 back to Dot's own page, ``/oauth/callback``, by the browser that signed in. The flow itself is the MCP library's
 (:class:`mcp.client.auth.oauth2.OAuthClientProvider`); Dot keeps what it gives and answers its two questions: where to
-send the owner (the link the Plugins page shows) and what came back (the code the callback hands over).
+send the owner (the link the Connectors page shows) and what came back (the code the callback hands over).
 
 What a sign-in gave is kept in Dot's home, one file per server readable by the owner alone (:func:`sign_in_path`): the
 tokens, the client the authorization server registered, the redirect address it was registered with, and when the access
 token runs out. The library renews an access token with the refresh token before it runs out; that time is kept with the
 tokens, so that a token is renewed after a restart of the daemon too. A run never signs in: when a server asks for a new
-sign-in while Dot works, the server is left out with a message that sends the owner to Customize › Plugins
+sign-in while Dot works, the server is left out with a message that sends the owner to Customize › Connectors
 (:func:`kept_sign_in`).
 """
 
@@ -39,8 +39,8 @@ CALLBACK_PATH: str = "/oauth/callback"
 SIGN_IN_WAIT_S: float = 600.0
 _DIR_MODE: int = 0o700
 _CLIENT_NAME: str = "Dot"
-NOT_SIGNED_IN: str = "the MCP server needs you to sign in first: Customize › Plugins › Sign in again"
-SIGN_IN_AGAIN: str = "the MCP server asks you to sign in again: Customize › Plugins › Sign in again"
+NOT_SIGNED_IN: str = "the MCP server needs you to sign in first: Customize › Connectors › Sign in again"
+SIGN_IN_AGAIN: str = "the MCP server asks you to sign in again: Customize › Connectors › Sign in again"
 # One change of a server's file at a time in this process: each reads it, changes it and replaces it.
 _FILE_LOCK: threading.Lock = threading.Lock()
 

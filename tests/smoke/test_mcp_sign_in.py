@@ -1,13 +1,13 @@
-"""MCP servers on Customize › Plugins (items 279 and 316), for real: an MCP server that is its own authorization server,
-served in this process (the MCP library's own, with a provider that says yes to every sign-in), and Dot's own server in
-front of a runtime. Added by its address, the server asks for a sign-in: the page the add answers with is followed as a
-browser would, to Dot's ``/oauth/callback``, and the server is then offered to runs with its tool, kept with its sign-in
-(readable by the owner alone) and connected again at the next start, its token renewed once it ran out. A server whose
-sign-in is gone is left out with words that send the owner to Customize › Plugins; Remove forgets the server and its
-sign-in. A server open to all is added without a sign-in, and a bad name, a page of another address and a stray callback
-are refused. The Plugins page itself, in a real headless Chrome, wide and light and on a phone and dark: the server of
-Dot's config with its tools and where it is set up, one added by its address, signed in to on the page that opens, and
-removed.
+"""MCP servers on Customize › Connectors (items 279 and 316), for real: an MCP server that is its own authorization
+server, served in this process (the MCP library's own, with a provider that says yes to every sign-in), and Dot's own
+server in front of a runtime. Added by its address, the server asks for a sign-in: the page the add answers with is
+followed as a browser would, to Dot's ``/oauth/callback``, and the server is then offered to runs with its tool, kept
+with its sign-in (readable by the owner alone) and connected again at the next start, its token renewed once it ran out.
+A server whose sign-in is gone is left out with words that send the owner to Customize › Connectors; Remove forgets the
+server and its sign-in. A server open to all is added without a sign-in, and a bad name, a page of another address and a
+stray callback are refused. The Connectors page itself, in a real headless Chrome, wide and light and on a phone and
+dark: the server of Dot's config with its tools and where it is set up, one added by its address, signed in to on the
+page that opens, and removed.
 
 Nothing is mocked but macOS's answers on the page's other sections: real HTTP servers on free ports and the real client
 library.
@@ -569,7 +569,7 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             )
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
-            await page.goto(f"{world.dot}/#/customize/plugins")
+            await page.goto(f"{world.dot}/#/customize/connectors")
             fixture: Locator = _server_row(page, "fixture")
             await expect(fixture.locator(".badge")).to_have_text("Ready")
             await expect(fixture).to_contain_text(
@@ -577,7 +577,7 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             )
             await expect(fixture).to_contain_text("10 tools: ")
             await expect(fixture.get_by_role("button")).to_have_count(0)
-            # The server added by the API before is the Plugins page's own: it can be removed.
+            # The server added by the API before is the Connectors page's own: it can be removed.
             await expect(_server_row(page, "open").get_by_role("button", name="Remove")).to_be_visible()
             await expect(page.locator(".plugin-tile[data-plugin='notion'] .chip")).to_have_text("MCP · Sign in")
             await expect(page.locator(".plugin-tile[data-plugin='deepwiki'] .chip")).to_have_text("MCP · Open to all")
@@ -617,7 +617,7 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             )
             await phone.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await phone.goto(ui_url("127.0.0.1", port, TOKEN))
-            await phone.goto(f"{world.dot}/#/customize/plugins")
+            await phone.goto(f"{world.dot}/#/customize/connectors")
             await expect(_server_row(phone, "signed").locator(".badge")).to_have_text("Ready")
             wide: bool = await phone.evaluate("document.documentElement.scrollWidth > window.innerWidth")
             assert not wide

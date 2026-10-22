@@ -1,5 +1,5 @@
-"""Routes of the applications of Customize › Plugins (item 278): where each one stands, and the step that sets it up;
-the listings of the Plugins page (item 316), which takes those steps; and the icon of an application of the Mac, read
+"""Routes of the applications of Customize › Connectors (item 278): where each one stands, and the step that sets it up;
+the listings of the Connectors page (item 316), which takes those steps; and the icon of an application of the Mac, read
 from its bundle."""
 
 import asyncio
@@ -172,7 +172,7 @@ def connections_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/plugins")
     async def list_plugins() -> PluginsView:
-        """The listings of the Plugins page, each with the ways Dot reaches its service; where each way stands is
+        """The listings of the Connectors page, each with the ways Dot reaches its service; where each way stands is
         read from ``GET /connections`` and ``GET /mcp/servers``, and its step taken there."""
         return PluginsView(plugins=plugin_views())
 

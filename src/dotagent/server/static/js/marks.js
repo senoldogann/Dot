@@ -1,12 +1,14 @@
 // The marks things wear wherever they are listed (item 477): a service's mark on its Customize tile and on a server of
-// it in the composer's menus, the plug on a server of no service, and a skill's on its Customize card and in the slash
-// menu. The pages draw them from here, so that a mark is the same in both places.
+// it in the composer's menus, the plug on a server of no service and on a service with no mark of its own (item 542),
+// and a skill's on its Customize card and in the slash menu. The pages draw them from here, so that a mark is the same
+// in both places.
 
 import { el } from "./dom.js";
+import { hashId } from "./hues.js";
 import { icon } from "./icons.js";
 
 // A colour lighter than this (its relative luminance, a contrast of 3 to 1 with the tile's white) does not read on the
-// tile: the icon or letters drawn in it take the ink.
+// tile: an icon drawn in it takes the ink.
 const LIGHTEST_INK = 0.3;
 
 /** The mark of an imported skill, Dot's copy of another agent's (item 165), and of a skill Dot learned. */
@@ -29,14 +31,15 @@ function logoPicture(file) {
   return el("img", { class: "plugin-logo", src: `/icons/plugins/${file}`, alt: "" });
 }
 
-/** The colour the icon or the letters of the mark of `colour` (six hex digits, or null) are drawn in on the light
- * tile: `#` and the colour where it reads there, else null, for the ink. */
+/** The colour the icon of the mark of `colour` (six hex digits, or null) is drawn in on the light tile: `#` and the
+ * colour where it reads there, else null, for the ink. */
 export function markInk(colour) {
   return colour !== null && luminance(colour) <= LIGHTEST_INK ? `#${colour}` : null;
 }
 
-/** What a tile shows of a service's mark (`{ logo, glyph, monogram }`, a listing's or a server's `mark`): its logo,
- * else the interface's icon, else its letters; a server of no service (`null`) wears the plug. */
+/** What a tile shows of a service's mark (`{ logo, glyph }`, a listing's or a server's `mark`): its logo, else the
+ * interface's icon, else the plug, which every connector without a mark of its own wears (item 542), and a server of
+ * no service (`null`) too. */
 export function markContent(mark) {
   if (mark === null) {
     return icon("plug");
@@ -44,10 +47,29 @@ export function markContent(mark) {
   if (mark.logo !== null) {
     return logoPicture(mark.logo);
   }
-  if (mark.glyph !== null) {
-    return icon(mark.glyph);
+  return icon(mark.glyph ?? "plug");
+}
+
+/** The colours of themes.css (`--mark-<name>`) a mark with no colour of its own takes one of, by its id (item 542). */
+const MARK_HUES = ["blue", "pink", "violet", "teal", "orange", "green"];
+
+/** Put the icon of a mark that is no logo (`{ logo, colour }`, or null for a server of no service) on a tile `node` of
+ * its colour (item 542), as a logo stands on its own artwork: the icon is white, or the ink on a colour too light for
+ * white (`data-light`). A mark with no colour takes one of `MARK_HUES` by `id`, the same wherever it shows. A logo's
+ * tile stays light. */
+export function tintMark(node, mark, id) {
+  if (mark !== null && mark.logo !== null) {
+    return;
   }
-  return el("span", { class: "plugin-letters" }, mark.monogram);
+  node.dataset.tint = "";
+  if (mark !== null && mark.colour !== null) {
+    node.style.setProperty("--plugin-hue", `#${mark.colour}`);
+    if (markInk(mark.colour) === null) {
+      node.dataset.light = "";
+    }
+    return;
+  }
+  node.style.setProperty("--plugin-hue", `var(--mark-${MARK_HUES[hashId(id) % MARK_HUES.length]})`);
 }
 
 /** The icon a skill of the palette wears, as its Customize card does: a learned one's, an imported one's, else its own
