@@ -813,6 +813,8 @@ _WALKING_THEM: list[str] = [
     # What reads the names of a listing from its standard input.
     "find ~ | cpio -o",
     "find ~ | tar -T - -cf x.tar",
+    "find ~ | tar -cT - -f x.tar",
+    "find ~ | tar cfT x.tar -",
     "find ~ | zip x.zip -@",
     "find ~ | rsync --files-from=- ~ host:",
     # The GNU tools Homebrew installs under a name of their own.
@@ -821,6 +823,10 @@ _WALKING_THEM: list[str] = [
     "gcp -R ~/Library ./c",
     "gdiff -r /tmp/empty ~",
     "find ~ -name id_rsa | gxargs cat",
+    "gfind ~ -name id_rsa | xargs cat",
+    "cat $(gfind ~ -name id_rsa)",
+    "ggrep -rl BEGIN ~ | xargs cat",
+    "gfind ~ | cpio -o",
     # A copy reads what it copies wherever the operand stands, the folder it copies into too.
     "cp -R -t ./c ~/Library",
     # The listing a substitution hands to a command is the twin of the one a pipe hands to xargs.
@@ -854,6 +860,11 @@ _NOT_AFTER_THEM: list[str] = [
     "find ~ -name '*.pdf' | xargs ls -l",
     "find ~ -name '*.pdf' | xargs echo",
     "grep -r x ./src/*.py",
+    # A lone dollar sign (the end of a line in a pattern) is no spelling to be read.
+    "grep -n 'TODO$' src/x.py",
+    "grep -E '^\\s*$' f",
+    "sed -i 's/ *$//' f",
+    "perl -pe 's/\\r$//' f",
     "diff -r ./a ./b",
     "git diff --no-index ./a ./b",
     "tar -rf out.tar ./src",

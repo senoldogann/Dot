@@ -1265,16 +1265,15 @@ def _unbraced(values: list[str]) -> list[str] | None:
     return done
 
 
-def _expansions(raw: str, scope: ShellScope) -> list[str] | None:
-    """The values the word ``raw`` can take when it runs: its variables put in (every value each may hold, see
-    :func:`_held`), its braces spelled out and a leading ``~`` expanded; None when part of it is only known then (a
-    substitution, a variable nothing set, ``$1``, ``${x:-y}``)."""
+def _spellings(raw: str, scope: ShellScope) -> tuple[list[str] | None, bool]:
+    """:func:`_expansions` and whether it gave up for want of room: more spellings (variables, braces) than
+    :data:`_MOST_VALUES`, as against a part only the running line knows."""
     pieces: list[tuple[str, ...]] = []
     last: int = 0
     for match in _VARIABLE.finditer(raw):
         held: tuple[str, ...] | None = _held(match.group(1) or match.group(2) or match.group(3), scope)
         if held is None:
-            return None
+            return None, False
         pieces.extend([(raw[last : match.start()],), held])
         last = match.end()
     pieces.append((raw[last:],))
@@ -1282,12 +1281,19 @@ def _expansions(raw: str, scope: ShellScope) -> list[str] | None:
     for choices in pieces:
         values = [value + choice for value in values for choice in choices]
         if len(values) > _MOST_VALUES:
-            return None
+            return None, True
     spelled: list[str] | None = _unbraced(values)
     if spelled is None:
-        return None
+        return None, True
     expanded: list[str] = [os.path.expanduser(value) for value in spelled]
-    return None if any("$" in value for value in expanded) else expanded
+    return (None if any("$" in value for value in expanded) else expanded), False
+
+
+def _expansions(raw: str, scope: ShellScope) -> list[str] | None:
+    """The values the word ``raw`` can take when it runs: its variables put in (every value each may hold, see
+    :func:`_held`), its braces spelled out and a leading ``~`` expanded; None when part of it is only known then (a
+    substitution, a variable nothing set, ``$1``, ``${x:-y}``) or there are too many to judge."""
+    return _spellings(raw, scope)[0]
 
 
 def _through_links(path: Path, links: tuple[tuple[Path, Path], ...]) -> Path:
@@ -1547,7 +1553,7 @@ def _piped(stages: list[list[str]], documents: tuple[str, ...]) -> _Input:
     given: _Input = _NO_INPUT
     for stage in stages:
         words: list[str] = _plain(_split_redirects(stage, documents)[0])
-        command: str = Path(words[0]).name if words else ""
+        command: str = _GNU_NAMES.get(Path(words[0]).name, Path(words[0]).name) if words else ""
         operands: list[str] = _positional(words[1:])
         if command in _PRINTERS:
             given = _given_text(" ".join(operands))
@@ -1741,9 +1747,9 @@ def _protected_words(words: list[str], scope: ShellScope, *, climbs: bool = True
 
 
 def _has_too_many_spellings(raw: str, scope: ShellScope) -> bool:
-    """Whether ``raw``, a word with no part only the running line knows, has more spellings (variables, braces) than
-    :data:`_MOST_VALUES`: the guard reads none of them, and a protected location may be one."""
-    return _expansions(raw, scope) is None and not _unknown_parts(raw, scope)
+    """Whether ``raw`` has more spellings (variables, braces) than :data:`_MOST_VALUES`: the guard reads none of them,
+    and a protected location may be one."""
+    return _spellings(raw, scope)[1]
 
 
 def _maybe_protected(reason: str) -> Finding:
@@ -2677,7 +2683,12 @@ def _reads_a_name_list(command: str, args: list[str]) -> bool:
     if command in ("cpio", "pax"):
         return True
     if command in _TARS:
-        return any(word.startswith(("-T", "--files-from")) for word in args)
+        return any(
+            word.startswith("--files-from")
+            or (word.startswith("-") and not word.startswith("--") and "T" in word)
+            or (index == 0 and word.isalnum() and "T" in word)
+            for index, word in enumerate(args)
+        )
     if command == "zip":
         return any(
             word == "-@" or (word.startswith("-") and not word.startswith("--") and "@" in word) for word in args
