@@ -109,7 +109,8 @@ a decision with its evidence for each change, or the base kept), the **selector*
 anonymous answers to one goal, judged on delivery, conformance, fidelity, consistency, fitness and finish, never on
 length) and the **experience writer** (`write_experience`: what each edit did, and an experience only when an edit
 helped or hurt with evidence). An answer that breaks its rules (a text past the bounds, a change with no moment, an
-experience with no effect behind it) is asked once more with what was wrong, then the step fails and says so.
+experience with no effect behind it) is asked once more with what was wrong (the fields and their problems, as the step
+says them when it fails), then the step fails and says so.
 `[harness] proposer`, `composer`, `selector` and `experience` name a model for each; "" is `[models] review`.
 `dotx harness propose RUN_ID [--scope invariant|domain]` asks the proposer about one run by hand and writes its
 candidate, whose notes keep the scope and the moments; `keep` writes nothing.
