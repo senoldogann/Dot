@@ -1952,6 +1952,46 @@ def _runs_download(raw: str, scope: ShellScope) -> list[Finding]:
     return []
 
 
+# base64, base32 and xxd fold their short switches into one word (``-rp``), so a decode switch is read letter by
+# letter; openssl spells each on its own and reuses letters (``-md`` is a digest, not decode), so only its own ``-d``
+# counts.
+_DECODE_LETTERS: dict[str, str] = {"base64": "dD", "base32": "d", "xxd": "r"}
+_DECODE_LONG: frozenset[str] = frozenset({"--decode"})
+
+
+def _decodes(run: list[str]) -> bool:
+    """Whether ``run`` -- a command and its arguments, its wrappers already looked through -- turns an encoded blob
+    back into the bytes it stood for: ``base64 -d``, ``base32 -d``, ``xxd -r``, ``openssl`` given ``-d``, or
+    ``uudecode``, whose only work is to decode. ``base64 blob`` without ``-d`` encodes, so what it prints is not code;
+    it does not count."""
+    if not run:
+        return False
+    command: str = Path(run[0]).name
+    if command == "uudecode":
+        return True
+    if command == "openssl":
+        return "-d" in run[1:]
+    letters: str | None = _DECODE_LETTERS.get(command)
+    if letters is None:
+        return False
+    switch: re.Pattern[str] = re.compile(rf"-[A-Za-z]*[{letters}][A-Za-z]*")
+    return any(word in _DECODE_LONG or switch.fullmatch(word) is not None for word in run[1:])
+
+
+def _fed_a_decode(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
+    """A finding when the last of ``stages`` (one pipeline's commands so far) is a shell or an interpreter and an
+    earlier command in the pipe decodes its standard input (``base64 -d blob | sh``, ``cat blob | base64 -d | bash``).
+    Decoding a blob and running it hides the code from the guard as a download does, and runs it with the owner's
+    rights the same way, so it is judged as ``curl | sh`` is (item 523 / K1)."""
+    words, _, _, _ = _split_redirects(stages[-1], ())
+    run, _ = _run_by_wrappers(_plain(words), scope)
+    if not run or Path(run[0]).name not in (_SHELLS | _INTERPRETERS):
+        return []
+    if any(_decodes(_run_by_wrappers(_plain(stage), scope)[0]) for stage in stages[:-1]):
+        return [_finding("high", ("install",), "runs code it decoded from its standard input")]
+    return []
+
+
 def _assess_network_fetcher(command: str, args: list[str]) -> Finding:
     if _fetcher_sends(command, args):
         return _fetching("medium", ("upload",), f"{command} sends data to a remote server")
@@ -2842,6 +2882,7 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
         found, state = _assess_segment(segment, state, _piped(stages[:-1], reading.documents), reading.documents)
         findings.extend(found)
         findings.extend(_fed_a_download(stages, state))
+        findings.extend(_fed_a_decode(stages, state))
     for inner in reading.substituted:
         findings.extend(_assess_all(inner, state))
     return findings

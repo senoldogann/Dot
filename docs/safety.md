@@ -197,7 +197,8 @@ line are read, so a line that reaches them otherwise, by a variable or a search 
 failed `edit_file` of one names none of its lines. A run that has seen such content is marked untrusted, and from then
 on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
 or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
-running a script the line downloaded (item 523), and a shell line that sends data out: an upload or a form, a push, a
+running opaque code — a script the line downloaded, or a blob it decoded and piped into a shell (`base64 -d x | sh`)
+(item 523), and a shell line that sends data out: an upload or a form, a push, a
 copy to another machine, a change on a code host, inline code that reaches the network or runs a command of it) ask
 even when the preset or an `allow` rule would let them through; only a `preapproved` rule skips the question. A
 project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. A message you send to the run clears the mark;

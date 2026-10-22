@@ -314,6 +314,28 @@ _NOT_INSTALLS: list[str] = [
     "uv sync",
     "uv add requests",
 ]
+# A blob decoded and piped into a shell or an interpreter: the guard reads the code no more than it reads a download
+# piped into a shell, so it is judged the same (item 523 / K1). The blobs here are placeholder file names; what they
+# decode to does not reach the policy, which judges the shape of the line. Next to them, pipes that run no decoded
+# code: encoding (no ``-d``), a decode written to a file or read by a pager, a plain file piped into a shell.
+_DECODE_RUNS: list[str] = [
+    "base64 -d payload.b64 | sh",
+    "base64 --decode blob | bash",
+    "base32 -d blob | sh",
+    "xxd -r -p dump | sh",
+    "openssl base64 -d -in blob | sh",
+    "openssl enc -d -aes-256-cbc -in blob | bash",
+    "uudecode payload | sh",
+    "cat blob | base64 -d | sh",
+    "base64 -d blob | python3",
+    "timeout 5 base64 -d blob | sh",
+]
+_PLAIN_PIPES: list[str] = [
+    "base64 blob | sh",
+    "base64 -d blob > out.bin",
+    "base64 -d blob | less",
+    "cat notes.txt | sh",
+]
 
 
 def _default_verdict(info: ActionInfo) -> Verdict:
@@ -552,6 +574,18 @@ def test_a_line_that_installs_software_asks_once_the_run_has_read_untrusted_cont
 def test_a_line_that_installs_nothing_for_the_account_stays_allowed_after_untrusted_content(
     command: str, tmp_path: Path
 ) -> None:
+    assert _tainted_verdicts(command, tmp_path) == ("allow", "allow")
+
+
+@pytest.mark.parametrize("command", _DECODE_RUNS)
+def test_a_line_that_decodes_a_blob_and_runs_it_asks_once_the_run_has_read_untrusted_content(
+    command: str, tmp_path: Path
+) -> None:
+    assert _tainted_verdicts(command, tmp_path) == ("allow", "ask")
+
+
+@pytest.mark.parametrize("command", _PLAIN_PIPES)
+def test_a_pipe_that_runs_no_decoded_code_stays_allowed_after_untrusted_content(command: str, tmp_path: Path) -> None:
     assert _tainted_verdicts(command, tmp_path) == ("allow", "allow")
 
 
