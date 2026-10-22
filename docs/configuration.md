@@ -54,10 +54,11 @@ unchanged is looked at again every ten minutes, so a write after a quiet spell i
 makes the copy in one read of the database, which in its write-ahead mode holds back none of the daemon's writes, so
 runs go on while it is made; the copy is checked (`quick_check`), compressed and kept as `dot-<UTC time>.sqlite3.gz`
 (mode 0600) in `[store] backup_dir`, written under a hidden name and linked to its own name once whole (renamed on a
-disk without links, such as iCloud Drive or exFAT). The newest `backup_keep_hourly` (24) copies are kept, and the newest
-copy of each of the last `backup_keep_days` (14) days; only files named as copies are ever removed from the folder. An
-empty `backup_dir` is `<home>/backups` (a folder of your own is absolute or starts with `~`), which goes with the home
-folder if that is lost: point it at an external disk, or at iCloud Drive (`~/Library/Mobile
+disk without links, such as iCloud Drive or exFAT). The newest `backup_keep_hourly` (24) copies named before now are
+kept, the newest copy of each of the last `backup_keep_days` (14) days, and a copy named after now (a clock that was
+ahead, another Mac's) until its name is past, taking no place of these; only files named as copies are ever removed from
+the folder. An empty `backup_dir` is `<home>/backups` (a folder of your own is absolute or starts with `~`), which goes
+with the home folder if that is lost: point it at an external disk, or at iCloud Drive (`~/Library/Mobile
 Documents/com~apple~CloudDocs/Dot Backups`), to keep the copies off this Mac, and give each Mac a folder of its own
 there, as Dot takes every copy in the folder for its own. A run reads and changes neither the copies nor that folder, as
 it does not the database. While a copy is made, its uncompressed file is in `<home>/backups-partial` (0600), removed
