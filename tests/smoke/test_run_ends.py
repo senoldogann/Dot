@@ -249,7 +249,7 @@ def _refuse_closing(database: Path) -> None:
         connection.close()
 
 
-def _gate_refused(*args: object) -> RunGate:
+def _gate_refused(*args: object, **kwargs: object) -> RunGate:
     raise StoreError("the gate of the run could not be made", {})
 
 

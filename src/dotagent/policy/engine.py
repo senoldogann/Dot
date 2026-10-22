@@ -234,6 +234,28 @@ def _escalates_on_taint(info: ActionInfo) -> bool:
     return bool(_intersect(info, TAINT_ESCALATION_FLAGS))
 
 
+# What a yolo run that read outside content has the review model check before it does it (item 525): what an
+# instruction planted in a page, a mail or a tool's answer is after. It reaches beyond the Mac or the run, reads a
+# secret, installs, changes Dot's own files or fills a login. A follow or a like (``social``) is left to the pace of
+# its site, as it is small and a feed's run makes many.
+_TAINT_CHECKED_FLAGS: frozenset[Flag] = (
+    (TAINT_ESCALATION_FLAGS - {"social"})
+    | _DENY_FLAGS
+    | {
+        "install",
+        "self_change",
+        "vault_fill",
+    }
+)
+
+
+def checked_when_tainted(info: ActionInfo) -> bool:
+    """Whether a yolo run that read outside content has the review model check ``info`` before it does it (item 525):
+    a step of :data:`_TAINT_CHECKED_FLAGS`, or one that deletes outside the workspace."""
+    destructive_outside: bool = "destructive" in info.flags and "outside_workspace" in info.flags
+    return destructive_outside or bool(_intersect(info, _TAINT_CHECKED_FLAGS))
+
+
 def decide(
     info: ActionInfo,
     mode: RunMode,

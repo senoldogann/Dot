@@ -179,7 +179,8 @@ Who answers what the policy asks depends on the approval mode of the run: you, a
 with the rest (item 443). What a `yolo` run waives is every question and every hand-off below it (item 443): the
 refusal of the first step, the questions of the third step, of your `ask` rules, of the preset and of untrusted
 content, the hand-offs of the fourth step and the questions of the fifth, and it records each with the reason it would
-have asked for. Without the first step, a `yolo` run can also
+have asked for; a run marked untrusted keeps two checks of its own (item 525, *Outside content in yolo* below). Without
+the first step, a `yolo` run can also
 read Dot's own key (`api-token` in Dot's home) and with it do what the web UI does, answer a question of the policy
 among it: in `yolo` the guard stops the steps of the work, not a run set on getting around it.
 
@@ -197,8 +198,8 @@ line are read, so a line that reaches them otherwise, by a variable or a search 
 failed `edit_file` of one names none of its lines. A run that has seen such content is marked untrusted, and from then
 on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
 or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
-running opaque code — a script the line downloaded, or a blob it decoded and ran (`base64 -d x | sh`, or a decode to a
-file the line then runs) (item 523), and a shell line that sends data out: an upload or a form, a push, a
+running a script the line downloaded (item 523), or a blob it decoded and ran (`base64 -d x | sh`, or a decode to a
+file the line then runs; item 527), and a shell line that sends data out: an upload or a form, a push, a
 copy to another machine, a change on a code host, inline code that reaches the network or runs a command of it) ask
 even when the preset or an `allow` rule would let them through; only a `preapproved` rule skips the question. A
 project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. A message you send to the run clears the mark;
@@ -211,6 +212,29 @@ work of such an end, which clears nothing. A message you send starts a run unmar
 marked keeps that origin (`tainted`): it is never among the notes a run starts with, is handed while it works or as a
 site's lessons (item 384), a `memory_search` that returns one marks the run that read it, so its next save asks again,
 and Settings › Memory and `dotx memory list` say of such a note that it was saved while reading outside content.
+
+**Outside content in yolo** (item 525). A `yolo` run asks nothing, and a run marked untrusted may be steered by what a
+stranger wrote. Two checks hold for such a run, and neither asks you:
+
+- *The taint check.* Before a yolo run marked untrusted does a step an instruction planted in what it read would be
+  after (a message, a post, an upload or data sent out, a payment, a credential, a login filled from your password
+  manager, privilege or system settings, a schedule or a note it saves, an install, a change of Dot's own files, a read
+  of your secrets, a deletion outside the workspace), the review model (`[models] review`) judges it against your own
+  instructions, as it does in `auto`, with the run marked untrusted. A step it refuses is refused: the run is told why
+  and goes on with the rest, and the record names the review model. Any other answer, `escalate` too, lets the step run
+  as yolo runs it. A follow or a like is left to the pace of its site. A review model that cannot answer fails the step
+  with its error. `[policy] yolo_taint_check = false` turns the check off.
+- *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, a run marked untrusted has
+  a step refused whose words would send a secret Dot holds out of the Mac: a key read in this process (saved with `dotx
+  auth set` or in Settings), a value of `<home>/.env`, or text in the form of a key or a private key. A request, a
+  page's address or field, a message, the arguments of an MCP tool, a step that uploads, posts or sends, and what runs
+  code or types into an application (a command line, an AppleScript, keystrokes), which may reach the network without
+  saying so, are what it looks at (`policy/egress.py`), in the step's target, its summary and every string of its
+  arguments, on every way a run acts (Dot's own loop, OpenCode, a batch of the browser or the desktop). The step is
+  refused before it runs, and its `policy` event says why, with the secret masked. A command that reads a secret from a
+  file or a variable as it runs (`curl -d @file`) carries none in its words, and is not seen here: the shell guard's
+  flags (an upload, a read of a secret), the questions they raise or the taint check in yolo, and the sandbox are what
+  stand there. A run you start with your own message is not marked, so it can still send a key where you tell it to.
 
 **Secrets.**
 
