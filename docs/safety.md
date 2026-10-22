@@ -162,11 +162,11 @@ currency, so list sites that bill in one currency. Empty by default.
 7. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
    when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 
-| Preset                 | Asks before                                                                                                                 |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Preset                 | Asks before                                                                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `aggressive` (default) | privilege, system settings, public posts, messages sent for you, destructive actions outside the workspace, and a read that may reach a protected location |
-| `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace |
-| `cautious`             | everything that is not read-only                                                                                            |
+| `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace                           |
+| `cautious`             | everything that is not read-only                                                                                                                           |
 
 A shell line is destructive outside the workspace when it removes, cuts or moves away a file there (item 385: `mv` takes
 its sources from where they were), and when it replaces one that is there: a redirect that empties it (`>`, `>|`, `&>`),
@@ -517,17 +517,18 @@ event and approval.
 > handed to a terminal app (`open -a Terminal`, a `.command` file) as a step outside Dot's sandbox, which every preset
 > asks about (item 385), and outside yolo the sandbox refuses the opening itself (item 418). A word with a part only the
 > running line knows (`~/.s$(echo sh)/id_rsa`, `~/Library/${X:-Safari}/History.db`, a variable filled with what a
-> command prints) that begins as a protected location's path, and a command that reads every file under a folder that
-> holds one (`grep -r secret ~`, `rg token ~/Library`, `find ~ -exec cat {} \;`, `find ~ | xargs cat` or `cat $(find ~
-> -name id_rsa)`, `cp -R`, `ditto`, `rsync -a`, `tar` creating an archive, `zip -r`, `git grep --no-index`) are asked
-> about in every preset (item 531), as a read that may reach a protected location. A command that runs in another folder
-> by an option of its own (`env -C`, `git -C`, `tar -C`, `make -C`, `uv --directory`, `yarn --cwd`) has its words judged
-> from there too: `git -C ~ diff --no-index .ssh/id_rsa /dev/null` names the key of `~/.ssh`. A recursive search reads
-> the folder the line is in when it is given none, and which of its words is a folder is not told without each tool's
-> options, so from a folder that holds a protected location (the home folder) it asks whatever folder it is given. It
-> does not follow what a recursive command does inside the other folders it walks, nor the code of a script it runs, nor
-> a loop that reads what a search lists (`find ~ | while read f; do cat "$f"; done`); the sandbox keeps those out of
-> Dot's own files and of the sealed stores (the data of your browsers, Mail and Messages), not out of the rest of yours,
-> and a shell can do more than any analysis can foresee. Treat Dot as a user of your account with the rights of your
-> account: keep backups, keep the workspace for scratch work, and use `balanced` or `cautious` on a machine where a
-> mistake would be expensive.
+> command prints) that begins as a protected location's path, or ends with the last names of one (`~/Documents/$(echo
+> ..)/.ssh/id_rsa`), and a command that reads every file under a folder that holds one (`grep -r secret ~`, `rg token
+> ~/Library`, `find ~ -exec cat {} \;`, `find ~ | xargs cat` or `cat $(find ~ -name id_rsa)`, `cp -R`, `ditto`, `rsync
+> -a`, `tar` creating an archive, `zip -r`, `git grep --no-index`) are asked about in every preset (item 531), as a read
+> that may reach a protected location. A command that runs in another folder by an option of its own (`env -C`, `git
+> -C`, `tar -C`, `make -C`, `uv --directory`, `yarn --cwd`) has its words judged from there too: `git -C ~ diff
+> --no-index .ssh/id_rsa /dev/null` names the key of `~/.ssh`. A recursive search reads the folder the line is in when
+> it is given none, and which of its words is a folder is not told without each tool's options, so from a folder that
+> holds a protected location (the home folder) it asks whatever folder it is given. It does not follow what a recursive
+> command does inside the other folders it walks, nor the code of a script it runs, nor a loop that reads what a search
+> lists (`find ~ | while read f; do cat "$f"; done`), nor a path whose unknown part holds the protected folder's own
+> name (`~/Documents/$(echo ../.ssh)/id_rsa`); the sandbox keeps those out of Dot's own files and of the sealed stores
+> (the data of your browsers, Mail and Messages), not out of the rest of yours, and a shell can do more than any
+> analysis can foresee. Treat Dot as a user of your account with the rights of your account: keep backups, keep the
+> workspace for scratch work, and use `balanced` or `cautious` on a machine where a mistake would be expensive.

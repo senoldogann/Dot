@@ -483,6 +483,8 @@ _LISTERS: frozenset[str] = frozenset({"find", "fd", "ls", "git"})
 _PRINTERS: frozenset[str] = frozenset({"echo", "printf"})
 _SEARCHERS: frozenset[str] = frozenset({"grep", "egrep", "fgrep", "rg"})
 _FILTERS: frozenset[str] = frozenset({"sort", "uniq", "head", "tail", "grep", "egrep", "fgrep", "rg"})
+# The commands that print a count or a digest of what they read, so that a listing piped into one is no list of names.
+_COUNTERS: frozenset[str] = frozenset({"wc", "md5", "md5sum", "shasum", "sha1sum", "sha256sum", "cksum"})
 _LIST_SWITCH: re.Pattern[str] = re.compile(r"-[A-Za-z]*l[A-Za-z]*|--files|--files-with-matches|--files-without-match")
 
 _XARGS_VALUES: frozenset[str] = frozenset(
@@ -1543,7 +1545,9 @@ def _piped(stages: list[list[str]], documents: tuple[str, ...]) -> _Input:
                 text=None, paths=tuple(operands) or (".",), walked=tuple(_listed_folders(command, words[1:]))
             )
         elif command not in _FILTERS:
-            given = _NO_INPUT
+            # A stage it does not know (``cat``, ``awk``, ``tr``) passes on names it cannot read, still those of the
+            # listing it follows; a count or a digest passes none (item 531).
+            given = _NO_INPUT if command in _COUNTERS else _Input(text=None, paths=(_SUBSTITUTED,), walked=given.walked)
     return given
 
 
@@ -1721,39 +1725,61 @@ def _maybe_protected(reason: str) -> Finding:
     return _finding("high", ("protected_read", "outside_workspace"), reason)
 
 
-def _first_unknown(text: str, scope: ShellScope) -> re.Match[str] | None:
-    """The first expansion of ``text`` that only the running line knows: a substitution, a variable nothing set,
-    ``${x:-y}``, ``$1``, a variable the line filled with what a command prints; one a variable of the line or the
-    environment can fill is known."""
+def _unknown_parts(text: str, scope: ShellScope) -> list[re.Match[str]]:
+    """The expansions of ``text`` that only the running line knows: a substitution, a variable nothing set, ``${x:-y}``,
+    ``$1``, a variable the line filled with what a command prints; one a variable of the line or the environment can
+    fill is known."""
+    parts: list[re.Match[str]] = []
     for match in _UNKNOWN_EXPANSION.finditer(text):
         variable: re.Match[str] | None = _VARIABLE.fullmatch(match.group(0))
         held: tuple[str, ...] | None = (
             None if variable is None else _held(variable.group(1) or variable.group(2) or variable.group(3), scope)
         )
-        if held is not None and not any("$" in value for value in held):
-            continue
-        return match
-    return None
+        if held is None or any("$" in value for value in held):
+            parts.append(match)
+    return parts
 
 
 def _leads_toward_protected(raw: str, scope: ShellScope) -> bool:
     """Whether ``raw``, a word with a part only the running line knows, can name a protected location or a file inside
     one (item 531): what it says before that part is the start of a protected location's path, letter case aside
     (``~/.s`` of ``~/.s$(echo sh)/id_rsa``, ``~/Library/`` of ``~/Library/${X:-Safari}/History.db``), or lies inside
-    one, whatever the part turns out to be. A part that begins the word stands for the home folder, where the
-    protected locations are, as in :func:`_reaches_protected`. A word that is known whole is judged by that."""
+    one, whatever the part turns out to be; or what it says after the last such part begins with the end of a protected
+    location's path, since the part may climb out of the folder before it (``~/Documents/$(echo ..)/.ssh/id_rsa``). A
+    part that begins the word stands for the home folder, where the protected locations are, as in
+    :func:`_reaches_protected`. A word that is known whole is judged by that. What the part itself says is not read: one
+    that holds the protected folder's own name (``~/Documents/$(echo ../.ssh)/id_rsa``) is not told."""
     text: str = raw
     for _ in range(_MOST_UNKNOWN):
-        unknown: re.Match[str] | None = _first_unknown(text, scope)
-        if unknown is None:
+        parts: list[re.Match[str]] = _unknown_parts(text, scope)
+        if not parts:
             return False
-        if unknown.start() == 0:
-            text = str(Path.home()) + text[unknown.end() :]
+        if parts[0].start() == 0:
+            text = str(Path.home()) + text[parts[0].end() :]
             continue
-        starts: list[str] | None = _expansions(text[: unknown.start()], scope)
-        return starts is not None and any(
-            _starts_a_path_into_protected(expand_path(start, cwd), scope) for start in starts for cwd in scope.cwds
-        )
+        starts: list[str] | None = _expansions(text[: parts[0].start()], scope)
+        return (
+            starts is not None
+            and any(
+                _starts_a_path_into_protected(expand_path(start, cwd), scope) for start in starts for cwd in scope.cwds
+            )
+        ) or _ends_a_path_into_protected(text[parts[-1].end() :], scope)
+    return False
+
+
+def _ends_a_path_into_protected(tail: str, scope: ShellScope) -> bool:
+    """Whether ``tail``, the known end of a path whose beginning is not known, begins with the last names of a protected
+    location's path (``.ssh`` of ``/.ssh/id_rsa``, ``Library/Safari`` of ``Library/Safari/History.db``), letter case
+    aside: what comes before it may lead out of any folder to the protected one."""
+    values: list[str] | None = _expansions(tail, scope)
+    if values is None:
+        return False
+    for value in values:
+        names: list[str] = [name.casefold() for name in value.split("/") if name not in ("", ".", "..")]
+        for location in scope.protected:
+            held: list[str] = [name.casefold() for name in str(location).split("/") if name]
+            if any(names[:size] == held[-size:] for size in range(1, min(len(names), len(held)) + 1)):
+                return True
     return False
 
 

@@ -704,6 +704,11 @@ _NAMED_BY_PIECES: list[str] = [
     # A variable the line fills with what a command prints is only known when the line runs.
     "X=$(echo Safari); cat ~/Library/$X/History.db",
     "name=$(printf '.ss'); cat ~/${name}h/id_rsa",
+    # The part may climb out of the folder before it, so the end of the path names it: its names are the protected
+    # location's last ones.
+    "cat ~/Documents/$(echo ..)/.ssh/id_rsa",
+    "cat ./notes/$(date +%F)/.aws/credentials",
+    "cat /tmp/$(whoami)/Library/Safari/History.db",
 ]
 _WALKING_THEM: list[str] = [
     "find ~/Library -name History.db -exec cat {} \\;",
@@ -763,6 +768,13 @@ _WALKING_THEM: list[str] = [
     'X=$(find ~ -name id_rsa); cat "$X"',
     "for f in $(find ~/Library -name History.db); do cp $f ./c; done",
     "cat $(rg --files ~ | grep id_rsa)",
+    # A stage the guard does not know still passes the names of the listing on.
+    "find ~ -name id_rsa | cat | xargs cat",
+    "find ~ -name id_rsa | awk 1 | xargs cat",
+    "find ~ -name id_rsa | tr -d '\\r' | xargs cat",
+    "find ~ -name id_rsa | sed p | xargs cat",
+    "find ~ -name id_rsa | cut -c1- | xargs cat",
+    "cat $(find ~ -name id_rsa | cat)",
 ]
 _NOT_AFTER_THEM: list[str] = [
     "cat ~/Documents/$(date +%Y)/notes.md",
@@ -782,6 +794,9 @@ _NOT_AFTER_THEM: list[str] = [
     "find ~ -type f -exec ls -l {} +",
     "cd ~ && fd -H id_rsa -x stat",
     "echo $(find ./src -name '*.py')",
+    "find ~ -name '*.pdf' | wc -l",
+    "cat ./build/$(uname)/out.log",
+    "cat ~/Documents/$(date +%Y)/notes.md",
     "cat $(find ./src -name '*.py')",
     "n=$(find ~ -name '*.pdf' | wc -l); echo $n",
     "find ./src -name '*.py' | xargs cat",
