@@ -1,4 +1,4 @@
-"""The MCP servers the owner added on Customize › Plugins (items 279 and 316), kept in Dot's home
+"""The MCP servers the owner added on Customize › Connectors (items 279 and 316), kept in Dot's home
 (:func:`connected_servers_path`): each as Dot connects to it, by its address or its command, and whether it signs in.
 Dot connects them at its start after the servers of its config, its plugins and the other agents, and while it runs
 as soon as one is added; a name one of those has leaves this one out."""
@@ -30,7 +30,7 @@ def read_connected(path: Path) -> ConnectedServers:
         return ConnectedServers.model_validate_json(path.read_bytes())
     except (OSError, ValidationError) as error:
         raise McpError(
-            f"Dot's record of the MCP servers added on Customize › Plugins cannot be read ({type(error).__name__})",
+            f"Dot's record of the MCP servers added on Customize › Connectors cannot be read ({type(error).__name__})",
             {"path": str(path)},
         ) from error
 

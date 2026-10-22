@@ -1,0 +1,499 @@
+// Customize › Connectors (items 316 and 542): every service Dot works with, after Codex's page. A search, Connected and
+// All, and the services in sections (Popular, Code, Design, Data, Research, Communication, Productivity, Business,
+// Support, This Mac): each a tile with its mark, what Dot does with it and how it connects, and a "+" that takes its
+// first step, or where it stands once it is connected. A tile opens the service's own page: what Dot does with it, each
+// way it connects with where it stands and its step, its tools, where its data goes. The services, where they stand and
+// their steps are catalogue.js's, which the Connect apps dialog shares (item 492); a service Dot has no way to reach is
+// not listed (item 542). Under the sections, an MCP server of one's own by its address; Connected lists too the servers
+// that come from Dot's config, a plugin or another agent of the Mac. The plugins Dot installs are Plugins'
+// (views/plugins.js).
+
+import { accountsCard } from "../accounts.js";
+import { createCatalogue, MCP_STATE_TONES, MCP_STATE_WORDS, pluginMark, serviceWords, STATE_WORDS, STEP_LABELS, WAY_NAMES, CONNECTED_STATES } from "../catalogue.js";
+import { el, foldSearch, plural } from "../dom.js";
+import { icon } from "../icons.js";
+import { markContent, tintMark } from "../marks.js";
+import { emptyPanel, errorPanel, field, loadingPanel, segmented } from "../panels.js";
+import { attempt } from "../ui.js";
+
+/** The sections of the services, in the order the page and the Connect apps dialog show them (item 492). */
+export const SECTIONS = [
+  { id: "popular", title: "Popular" },
+  { id: "passwords", title: "Password managers" },
+  { id: "code", title: "Code" },
+  { id: "design", title: "Design" },
+  { id: "data", title: "Data" },
+  { id: "research", title: "Research" },
+  { id: "communication", title: "Communication" },
+  { id: "productivity", title: "Productivity" },
+  { id: "business", title: "Business" },
+  { id: "support", title: "Support" },
+  { id: "mac", title: "This Mac" },
+];
+const MCP_ORIGIN_WORDS = {
+  config: "Set up in Dot's config: take its [[mcp]] block out of config.toml to remove it.",
+  plugin: "Comes with one of Dot's plugins; Remove plugin takes the plugin out.",
+  elsewhere: "Added from another agent of this Mac (Customize › Skills › Found on this Mac).",
+};
+// A server's tile names this many of its tools.
+const SHOWN_TOOLS = 6;
+
+/** The tools a server offers to runs, the first few by name. */
+function toolLine(tools) {
+  const shown = tools.slice(0, SHOWN_TOOLS).join(", ");
+  return `${plural(tools.length, "tool", "tools")}: ${shown}${tools.length > SHOWN_TOOLS ? ", …" : ""}`;
+}
+
+/** How to sign in to the applications of the web, the same for each of them: it depends on Dot's browser alone. */
+function webNote(listing) {
+  if (listing.browser_mode === "attach") {
+    return "Dot works in your own Chrome (Settings › Browser › My Chrome), where you are signed in as you always are.";
+  }
+  return listing.headless
+    ? "Dot's browser runs without a window, so there is none to sign in in: switch headless off in the config."
+    : "Sign in opens the page in Dot's browser on the Mac; check again once you are in.";
+}
+
+/** What to do or to know for an application, by where it stands: one line, or none. `runner` is the name macOS asks
+ * for Dot under and lists in Privacy & Security (Dot for the service, item 288). */
+function appGuide(app, runner) {
+  if (app.waiting) {
+    return "macOS is asking on the Mac: answer its question there, then check again.";
+  }
+  switch (app.state) {
+    case "refused":
+      return `macOS was told no. In Privacy & Security › Automation, open ${runner} and switch on ${app.name}.`;
+    case "not_installed":
+      return `Install ${app.name} to use it with Dot.`;
+    case "not_synced":
+      return `${app.name} syncs no folder yet: open it and sign in.`;
+    default:
+      return null;
+  }
+}
+
+/** What to do or to know for one MCP server, by where it stands: one line, or none. */
+function serverGuide(server) {
+  switch (server.state) {
+    case "signing_in":
+      return "Sign in on the service's page; Dot connects once it sends you back here.";
+    case "trying":
+      return "Dot is connecting to it.";
+    case "left_out":
+      return server.error;
+    case "disabled":
+      return "Switched off in Dot's config.";
+    default:
+      return null;
+  }
+}
+
+/** The buttons of an MCP server of `catalogue`: its sign-in page while Dot waits for one, Sign in again or Try again,
+ * Remove for one added here or from another agent, and Remove plugin for one of a plugin (item 497); null when it has
+ * none. */
+function serverActions(catalogue, server, service) {
+  const working = server.state === "trying" || server.state === "signing_in";
+  const actions = [];
+  if (server.state === "signing_in" && server.link !== null) {
+    actions.push(el("a", { class: "btn sm primary", href: server.link, target: "_blank", rel: "noopener noreferrer" }, icon("external"), "Open the sign-in page"));
+  }
+  const again = server.origin === "connected" || (server.origin === "config" && server.signs_in);
+  const acting = catalogue.busy(`server:${server.name}`);
+  if (again && !working && (server.signs_in || server.state === "left_out")) {
+    const button = el("button", { class: "btn sm", type: "button", disabled: acting }, server.signs_in ? "Sign in again" : "Try again");
+    button.addEventListener("click", () => attempt(() => catalogue.connectAgain(server)));
+    actions.push(button);
+  }
+  if (server.picks_tools && server.origin === "connected" && !working) {
+    // The way back in for a server left out with its allow list; for one that runs, a way to cut its tools down.
+    const kind = server.state === "left_out" ? "btn sm primary" : "btn sm";
+    actions.push(el("button", { class: kind, type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose tools"));
+  }
+  if (server.origin === "connected" || server.origin === "elsewhere") {
+    actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.remove(server, service)) }, "Remove"));
+  }
+  if (server.origin === "plugin" && server.plugin !== null) {
+    actions.push(
+      el("button", { class: "btn sm", type: "button", disabled: acting, title: `Take the plugin ${server.plugin} out of Dot`, onclick: () => attempt(() => catalogue.removePlugin(server)) }, "Remove plugin"),
+    );
+  }
+  return actions.length === 0 ? null : el("div", { class: "plugin-actions" }, ...actions);
+}
+
+/** What to do or to know for 1Password (item 493), by where it stands: one line. */
+function vaultGuide(vault) {
+  if (!vault.connected) {
+    return vault.cli === null
+      ? "1Password's command line, op, is not installed: brew install 1password-cli, then check again."
+      : "Connect makes the vault Shared with Dot and a service account that only reads it, through the 1Password app, which asks you first: turn on its Settings › Developer › Integrate with 1Password CLI.";
+  }
+  if (vault.error !== null) {
+    return vault.error;
+  }
+  const names = vault.vaults.map((one) => one.name).join(", ");
+  const logins = vault.vaults.reduce((sum, one) => sum + one.logins, 0);
+  return `Reads ${plural(logins, "login", "logins")} in ${names}: the logins you move there are the ones runs may fill.`;
+}
+
+/** The buttons of 1Password's way (item 493): Connect 1Password and a token instead while it is not connected, with
+ * the token's form once asked for; Disconnect once it is. */
+function vaultActions(catalogue, vault) {
+  const acting = catalogue.busy("vault");
+  if (vault.connected) {
+    return el("div", { class: "plugin-actions" }, el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.disconnectVault()) }, "Disconnect"));
+  }
+  const connect = el(
+    "button",
+    { class: "btn sm primary", type: "button", disabled: acting || vault.cli === null, onclick: () => attempt(() => catalogue.connectVault()) },
+    acting ? "Waiting for 1Password…" : "Connect 1Password",
+  );
+  // A token is read with op too: without it neither way connects.
+  const token = el("button", { class: "btn sm ghost", type: "button", disabled: acting || vault.cli === null, onclick: () => catalogue.askVault() }, "Use a service account token instead");
+  return el("div", { class: "plugin-actions" }, connect, token, catalogue.asking() === "vault" ? catalogue.vaultForm() : null);
+}
+
+/** One way of a service on its page: what it is, how it connects, where it stands, what to do and its step. */
+function wayRow(catalogue, way) {
+  const now = catalogue.wayNow(way);
+  let badge = null;
+  let guideLine = null;
+  let actions = null;
+  if (way.kind === "mcp") {
+    if (now.server === null && now.service !== null && now.service.added) {
+      badge = el("span", { class: "badge b-muted" }, "Name taken");
+      guideLine = `A server of Dot's config or of a plugin is named ${way.ref} already: Connected lists it.`;
+    } else if (now.server === null) {
+      const service = now.service;
+      const keyed = service !== null && service !== undefined && service.secrets.length > 0;
+      const button = el("button", { class: "btn sm primary", type: "button", disabled: catalogue.busy(`mcp:${way.ref}`) }, "Add");
+      button.addEventListener("click", () => attempt(() => (keyed ? catalogue.askSecrets(service) : catalogue.add({ service: way.ref, name: null, address: null, secrets: {} }))));
+      // A service that takes a key asks for it here too (item 408): its form, with its own Add, takes the button's place.
+      actions = el("div", { class: "plugin-actions" }, keyed && catalogue.asking() === way.ref ? catalogue.secretsForm(service) : button);
+      badge = el("span", { class: "badge b-muted" }, serviceWords(service));
+    } else {
+      badge = el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
+      guideLine = serverGuide(now.server);
+      actions = serverActions(catalogue, now.server, now.service);
+    }
+  } else if (way.kind === "vault") {
+    if (now.vault !== null) {
+      badge = catalogue.vaultBadge();
+      guideLine = vaultGuide(now.vault);
+      actions = vaultActions(catalogue, now.vault);
+    }
+  } else if (now.app !== null) {
+    const app = now.app;
+    const listing = catalogue.listing;
+    badge = el("span", { class: `badge ${CONNECTED_STATES.has(app.state) ? "b-ok" : app.state === "refused" ? "b-bad" : "b-muted"}` }, STATE_WORDS[app.state] ?? app.state);
+    guideLine = appGuide(app, listing.runner) ?? (way.kind === "web" && !CONNECTED_STATES.has(app.state) ? webNote(listing) : null);
+    if (app.step !== null) {
+      // While macOS asks, the button says so, as Connect apps' did.
+      const asking = catalogue.busy(`app:${app.id}`);
+      const label = asking && app.step === "ask" ? "Waiting for macOS…" : STEP_LABELS[app.step];
+      const button = el("button", { class: app.step === "settings" ? "btn sm" : "btn sm primary", type: "button", disabled: asking }, label);
+      button.addEventListener("click", () => attempt(() => catalogue.takeStep(app)));
+      actions = el("div", { class: "plugin-actions" }, button);
+    }
+  }
+  return el(
+    "div",
+    { class: "list-row plugin-way", dataset: { way: way.kind, ref: way.ref ?? "" } },
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row" }, el("span", { class: "row-title" }, WAY_NAMES[way.kind]), badge),
+      el("div", { class: "row-text muted" }, way.how),
+      guideLine === null ? null : el("div", { class: "row-text plugin-guide" }, guideLine),
+      way.kind === "mcp" && now.server !== null ? el("div", { class: "row-text muted mono plugin-address" }, now.server.address) : null,
+    ),
+    actions,
+  );
+}
+
+/**
+ * What a service's own page shows of `plugin`, a listing of `catalogue`, under its bar: its mark, name, what Dot does
+ * with it and where it stands; what each way lets Dot do, when its ways do more than that line; how it connects, each
+ * way with its step; the tools of its servers; and where its data goes. The Connectors page and the Connect apps dialog
+ * (item 492) both show it.
+ */
+export function serviceParts(catalogue, plugin) {
+  const tools = plugin.ways
+    .filter((way) => way.kind === "mcp")
+    .map((way) => catalogue.wayNow(way).server)
+    .filter((server) => server !== null && server.tools.length > 0)
+    .flatMap((server) => server.tools);
+  const does = [...new Set(plugin.ways.map((way) => way.does).filter((line) => line !== null))];
+  const data = plugin.ways.filter((way) => way.data !== null);
+  const named = (way, text) => (data.length > 1 ? `${WAY_NAMES[way.kind]}: ${text}` : text);
+  const card = (kind, title, mark, body) =>
+    el("section", { class: "card connect-section plugin-card", dataset: { kind } }, el("div", { class: "card-head" }, icon(mark), el("span", { class: "grow" }, title)), el("div", null, body));
+  const parts = [
+    el(
+      "header",
+      { class: "plugin-hero", dataset: { plugin: plugin.id } },
+      pluginMark(plugin, catalogue.appIcon(plugin)),
+      el("div", { class: "plugin-main" }, el("h2", { class: "plugin-title" }, plugin.name), el("div", { class: "plugin-does" }, plugin.does), el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), catalogue.standing(plugin))),
+    ),
+    does.length < 2 ? null : card("does", "What Dot does with it", "sparkle", el("ul", { class: "plugin-list" }, does.map((line) => el("li", null, line)))),
+    card("ways", "How it connects", "link", plugin.ways.map((way) => wayRow(catalogue, way))),
+    tools.length === 0 ? null : card("tools", "Tools", "bolt", el("ul", { class: "plugin-list plugin-tools mono" }, tools.map((name) => el("li", null, name)))),
+    data.length === 0 ? null : card("data", "Where its data goes", "shield", el("ul", { class: "plugin-list" }, data.map((way) => el("li", null, named(way, way.data))))),
+  ];
+  return parts.filter((part) => part !== null);
+}
+
+export function mount(root, ctx) {
+  const pluginId = ctx.params[1];
+  let disposed = false;
+  // The list is drawn once the Accounts card above it has read the accounts (item 511): the rows the card gets then
+  // would push the tiles down under a finger on its way to one, and the tap would land between two. A service's page
+  // has no card to wait for.
+  let accountsRead = pluginId !== undefined;
+  let shown = "all";
+  let words = "";
+  const holder = el("div", { class: "stack" }, loadingPanel());
+  const catalogue = createCatalogue(paint);
+
+  function tile(plugin) {
+    const isConnected = catalogue.connected(plugin);
+    const step = isConnected ? null : catalogue.firstStep(plugin);
+    const asked = catalogue.asking();
+    const askedService = asked === null ? null : (catalogue.servers.services.find((one) => one.id === asked && plugin.ways.some((way) => way.kind === "mcp" && way.ref === one.id)) ?? null);
+    let action = null;
+    if (step !== null && step.page) {
+      // A service whose step is its page (1Password, item 493): the "+" leads there.
+      action = el("a", { class: "btn sm icon-only plugin-add", href: `#/customize/connectors/${plugin.id}`, title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` }, icon("plus"));
+    } else if (step !== null && step.link !== undefined) {
+      action = el(
+        "a",
+        { class: "btn sm primary plugin-add", href: step.link, target: "_blank", rel: "noopener noreferrer", "aria-label": `Open the sign-in page of ${plugin.name}` },
+        icon("external"),
+        step.label,
+      );
+    } else if (step !== null) {
+      action = el(
+        "button",
+        {
+          class: "btn sm icon-only plugin-add",
+          type: "button",
+          title: `${step.label}: ${plugin.name}`,
+          "aria-label": `${step.label} ${plugin.name}`,
+          disabled: catalogue.busy(step.key),
+        },
+        icon("plus"),
+      );
+      action.addEventListener("click", () => attempt(step.take));
+    }
+    const waiting = plugin.ways.some((way) => way.kind === "mac" && catalogue.busy(`app:${way.ref}`));
+    return el(
+      "div",
+      { class: "plugin-tile", dataset: { plugin: plugin.id, connected: String(isConnected) } },
+      pluginMark(plugin, catalogue.appIcon(plugin)),
+      el(
+        "div",
+        { class: "plugin-main" },
+        el("a", { class: "plugin-name", href: `#/customize/connectors/${plugin.id}` }, plugin.name),
+        el("div", { class: "plugin-does" }, plugin.does),
+        el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), waiting ? el("span", { class: "badge b-warn" }, "Waiting for macOS…") : catalogue.standing(plugin)),
+        askedService === null ? null : catalogue.secretsForm(askedService),
+      ),
+      action,
+    );
+  }
+
+  /** The mark of a server added by hand: the mark of the service it is one of, by its address or its command, as the
+   * service's tile wears it (items 408 and 477), else the plug. */
+  function serverMark(server) {
+    const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent(server.mark));
+    tintMark(mark, server.mark, server.name);
+    return mark;
+  }
+
+  /** An MCP server that is no service of the catalogue: its name, address and tools, where it stands and its actions. */
+  function serverTile(server) {
+    return el(
+      "div",
+      { class: "plugin-tile plugin-server", dataset: { server: server.name, state: server.state } },
+      serverMark(server),
+      el(
+        "div",
+        { class: "plugin-main" },
+        el("span", { class: "plugin-name" }, server.name),
+        el("div", { class: "mono plugin-address" }, server.address),
+        server.tools.length === 0 ? null : el("div", { class: "plugin-does" }, toolLine(server.tools)),
+        server.origin in MCP_ORIGIN_WORDS ? el("div", { class: "plugin-does" }, MCP_ORIGIN_WORDS[server.origin]) : null,
+        el("div", { class: "plugin-meta" }, el("span", { class: "chip" }, "MCP"), el("span", { class: `badge ${MCP_STATE_TONES[server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[server.state] ?? server.state)),
+        serverGuide(server) === null ? null : el("div", { class: "plugin-guide" }, serverGuide(server)),
+      ),
+      serverActions(catalogue, server, null),
+    );
+  }
+
+  function addForm() {
+    const name = el("input", { class: "input", type: "text", maxlength: "24", autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "my-server", "aria-label": "Server name" });
+    const address = el("input", {
+      class: "input mono",
+      type: "text",
+      autocomplete: "off",
+      autocapitalize: "off",
+      spellcheck: "false",
+      placeholder: "https://example.com/mcp",
+      "aria-label": "Server address or command",
+    });
+    const button = el("button", { class: "btn primary", type: "button" }, icon("plus"), "Add");
+    button.addEventListener("click", () =>
+      attempt(async () => {
+        button.disabled = true;
+        try {
+          await catalogue.add({ service: null, name: name.value.trim(), address: address.value.trim(), secrets: {} });
+        } finally {
+          button.disabled = false;
+        }
+        name.value = "";
+        address.value = "";
+      }),
+    );
+    return el(
+      "div",
+      { class: "connect-add" },
+      field("Name", name, "Lowercase letters, digits and dashes."),
+      field("Address", address, "Its URL, or the command that starts it on this Mac."),
+      el("div", { class: "connect-add-actions" }, button),
+    );
+  }
+
+  function matches(plugin) {
+    return words === "" || foldSearch(`${plugin.name} ${plugin.does}`).includes(words);
+  }
+
+  // Made once, so that what is typed in them stays while the page paints again.
+  const form = addForm();
+  const search = el("input", { class: "input plugin-search", type: "search", placeholder: "Search connectors", "aria-label": "Search connectors", autocomplete: "off", spellcheck: "false" });
+  search.addEventListener("input", () => {
+    words = foldSearch(search.value);
+    paint();
+  });
+  const tabs = segmented(
+    [
+      { id: "connected", label: "Connected", hint: "The services Dot is connected to" },
+      { id: "all", label: "All", hint: "Every service Dot works with" },
+    ],
+    shown,
+    (id) => {
+      shown = id;
+      paint();
+    },
+  );
+  tabs.element.classList.add("plugin-tabs");
+  tabs.element.setAttribute("aria-label", "Connectors to show");
+  const recheck = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
+  // Out of what paints again, so that the search keeps the focus while the tiles are drawn anew; a service's page has
+  // none of it.
+  const bar = el("div", { class: "plugin-bar", hidden: pluginId !== undefined }, search, tabs.element, recheck);
+
+  function paintTabs() {
+    const [connectedButton, allButton] = tabs.element.children;
+    const others = catalogue.servers.servers.filter((server) => server.service === null).length;
+    connectedButton.textContent = `Connected ${catalogue.plugins.filter(catalogue.connected).length + others}`;
+    allButton.textContent = `All ${catalogue.plugins.length}`;
+  }
+
+  function sections(list) {
+    return SECTIONS.map(({ id, title }) => {
+      const members = list.filter((plugin) => plugin.section === id);
+      return members.length === 0
+        ? null
+        : el(
+            "section",
+            { class: "plugin-section", dataset: { section: id } },
+            el("h2", { class: "section-label plugin-section-title" }, title),
+            el("div", { class: "plugin-grid" }, members.map(tile)),
+          );
+    });
+  }
+
+  function paintList() {
+    paintTabs();
+    const showing = catalogue.plugins.filter((plugin) => (shown === "all" || catalogue.connected(plugin)) && matches(plugin));
+    const others = catalogue.servers.servers.filter((server) => server.service === null && (words === "" || foldSearch(`${server.name} ${server.address}`).includes(words)));
+    const parts = sections(showing);
+    if (others.length > 0 && (shown === "connected" || words !== "")) {
+      parts.push(
+        el(
+          "section",
+          { class: "plugin-section", dataset: { section: "servers" } },
+          el("h2", { class: "section-label plugin-section-title" }, "Other MCP servers"),
+          el("div", { class: "plugin-grid" }, others.map(serverTile)),
+        ),
+      );
+    }
+    if (showing.length === 0 && (others.length === 0 || shown === "all")) {
+      parts.push(
+        words !== ""
+          ? emptyPanel("search", "No connector matches the search", "")
+          : emptyPanel("plug", "Dot is connected to nothing yet", "All lists what it works with."),
+      );
+    }
+    parts.push(
+      el(
+        "section",
+        { class: "card connect-section plugin-own", dataset: { kind: "mcp" } },
+        el("div", { class: "card-head" }, icon("plug"), el("span", { class: "grow" }, "Your own MCP server")),
+        el(
+          "div",
+          null,
+          el("p", { class: "hint connect-hint" }, "MCP servers hand their tools to Dot. Dot tries one before it keeps it, signs in to it in this browser when it asks, and offers its tools to the runs that start after."),
+          shown === "all" && words === "" ? others.map(serverTile) : null,
+          form,
+        ),
+      ),
+    );
+    holder.replaceChildren(...parts.filter((part) => part !== null));
+  }
+
+  function paintPlugin(plugin) {
+    ctx.setTitle(`${plugin.name} · Connectors`);
+    const again = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
+    holder.replaceChildren(el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/customize/connectors" }, icon("arrowLeft"), "Connectors"), again), ...serviceParts(catalogue, plugin));
+  }
+
+  function paint() {
+    if (disposed || catalogue.plugins === null || !accountsRead) {
+      return;
+    }
+    if (pluginId === undefined) {
+      paintList();
+      return;
+    }
+    const plugin = catalogue.plugins.find((one) => one.id === pluginId);
+    if (plugin === undefined) {
+      holder.replaceChildren(el("a", { class: "back", href: "#/customize/connectors" }, icon("arrowLeft"), "Connectors"), errorPanel(new Error(`Dot lists no connector ${pluginId}.`)));
+    } else {
+      paintPlugin(plugin);
+    }
+  }
+
+  async function load() {
+    try {
+      await catalogue.load();
+    } catch (error) {
+      if (!disposed) {
+        holder.replaceChildren(errorPanel(error, () => attempt(load)));
+      }
+    }
+  }
+
+  // The official sign-ins of Google and Microsoft (item 422) head the list of the connectors, not a service's own page.
+  const accounts = pluginId === undefined ? accountsCard() : null;
+  accounts?.read.then(() => {
+    accountsRead = true;
+    paint();
+  });
+  root.append(bar, ...(accounts === null ? [] : [accounts.element]), holder);
+  attempt(load);
+  return () => {
+    disposed = true;
+    accounts?.dispose();
+    catalogue.dispose();
+  };
+}

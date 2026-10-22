@@ -186,12 +186,15 @@ _ROUTES: tuple[str, ...] = (
     "/campaigns",
     "/schedules",
     "/customize/plugins",
+    "/customize/connectors",
     "/agents",
     "/settings/memory",
     "/settings/appearance",
     "/settings/system",
     "/diagnostics",
 )
+# The pages whose looks at a phone's widths are kept as pictures for reading by eye.
+_SHOWN: tuple[str, ...] = ("/campaigns", "/schedules", "/customize/plugins", "/customize/connectors")
 
 
 async def test_the_pages_fit_a_phone_and_their_heads_and_rows_keep_their_words(
@@ -211,7 +214,7 @@ async def test_the_pages_fit_a_phone_and_their_heads_and_rows_keep_their_words(
                         if measured["sideways"] > 0:
                             seen.append(f"{where}: the page scrolls sideways by {measured['sideways']} px")
                         seen.extend(f"{where}: {fault}" for fault in measured["found"])
-                        if route in ("/campaigns", "/schedules", "/customize/plugins") and width in (390, 430):
+                        if route in _SHOWN and width in (390, 430):
                             slug: str = route.strip("/").replace("/", "-")
                             await page.screenshot(
                                 path=str(tmp_path / f"{slug}-{width}-{scheme}.png"), animations="disabled"

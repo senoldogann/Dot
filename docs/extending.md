@@ -1,12 +1,62 @@
 # Apps, MCP servers, skills and plugins
 
+## Customize
+
+**Customize** (items 278, 289, 316, 401 and 542), which [Connect apps](#connect-apps) leads to since item 492, has three
+tabs: **Plugins**, the gallery of the plugins Dot installs ([Customize › Plugins](#customize--plugins)); **Skills**, the
+skills it reads ([Skills and plugins](#skills-and-plugins)); and **Connectors**, the services Dot works with
+([Customize › Connectors](#customize--connectors)). `#/customize` opens Plugins. The old address `#/connect` leads to
+Connectors, and so does a service's page at the address it had before item 542, `#/customize/plugins/<service>`, since
+the gallery's plugins took that name.
+
 ## Customize › Plugins
 
-**Customize** (items 278, 289, 316 and 401), which [Connect apps](#connect-apps) leads to since item 492, has two tabs: **Plugins**, the services Dot
-works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-and-plugins)). The old address `#/connect`
-leads to Plugins.
+**Plugins** (item 542) is the gallery of the plugins Dot installs, after Qoder's page: a head that says what a plugin
+is, with the search (it reads the names, the publishers, the kinds and the names of the skills); **New & noteworthy**,
+the plugins the gallery features; and **All plugins**, with **All**, **Featured** and **Installed** (each with its
+count) and an order, **Popular** (the stars its repository had when it was pinned) or **Newest** (when the gallery took
+it). A plugin's card has its mark, its name with a check when its publisher makes what its skills are about, who
+publishes it, its kind and how many skills it brings, what it does, and **Install**, or **Installed** with a Remove. A
+card opens the plugin's own page: the skills it brings, the repository and the commit Dot pins, its licence, its stars
+and since when the gallery has it. A plugin with no logo wears a skill's puzzle piece (item 537) on a tile of its
+kind's colour: Development blue, Design pink, Product violet, Data teal, Business orange, Writing green. On a phone New
+& noteworthy is a row that scrolls sideways. `GET /api/plugin-gallery` lists the plugins with where each stands
+(`available`, `installed`, or `taken` when a plugin of Dot's has its name) and the plugins Dot reads that are not the
+gallery's, which **Installed** lists under "Not from the gallery", with a Remove for one in Dot's own plugins folder.
 
-**Plugins** lists 159 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
+The gallery (`plugins/gallery_list.py`) holds 22 plugins of 201 skills, each from a repository under the MIT or Apache
+2.0 licence, pinned to a commit and to the hash of the files of its skills:
+
+- featured: Superpowers (Jesse Vincent's: brainstorm, plan, write the tests first, debug systematically), UI/UX Pro
+  Max, Frontend Design, Product Design, Product Management and Engineering;
+- Anthropic's too: Skill Creator, Data Analysis, Marketing, Sales, Finance, Customer Support, Creative Design, Web App
+  Builder, MCP Builder and Internal Comms;
+- from the makers of what they are about, with their logos: Apollo GraphQL, Redis, MongoDB, Supabase, Cloudflare and
+  Hugging Face.
+
+Left out: Vercel's skills (their repository names no licence), Anthropic's document skills (docx, pptx, xlsx and pdf,
+whose licence lets them be used, not passed on) and the plugins of Qoder's page that are Qoder's own (Architecture
+Visualization, Cloud Agents, Phone Use): Product Design reviews designs and Engineering does the architecture work.
+`uv run pytest tests/smoke/test_gallery_reachable.py -m internet` downloads every plugin again and checks that its
+pinned commit still unpacks to the files pinned.
+
+**Install** (`POST /api/plugin-gallery/{id}`, one at a time) downloads the archive of the pinned commit from GitHub
+(`codeload.github.com`, at most 100 MB in two minutes) and unpacks the plugin's skill folders alone into a hidden folder
+of Dot's plugins, refusing a path that leads out of it, a link, and anything that is neither a file nor a folder. It
+checks their files against the hash the gallery keeps, and only then gives the folder the plugin's name, with a
+`.claude-plugin/plugin.json` and a `gallery.json` that say what it is. A plugin whose files are not the ones pinned, one
+that cannot be downloaded and a name Dot has a plugin of already are refused (409) and leave nothing behind. Dot then
+reads its plugins again: the runs that start after are offered the new skills, with no restart. **Remove** moves the
+plugin's folder to the Trash (item 497) and Dot reads its plugins again, so its skills leave the runs that start after.
+Two plugins may bring a skill of the same name (UI/UX Pro Max and Product Design a `design-system`, Product Management
+and Marketing a `competitive-brief`): the first read is offered, and `dotx skills list` names the other as left out. A
+skill is text the run's model reads as instructions: the gallery takes repositories of known publishers and pins them,
+so what is installed is what was looked at, and a skill acts only through the run's tools, under the same rules and the
+same asks as anything else the run does ([Safety](safety.md)).
+
+## Customize › Connectors
+
+**Connectors** lists 156 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
 Password managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item 492). Each tile has the service's mark, what Dot does with
 it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On this Mac, MCP · On this Mac · Key,
 AppleScript, Dot's browser or Synced folder), where it stands, and a **+** that takes its first step; a tile opens the
@@ -17,19 +67,20 @@ ready, and where its data goes. **Check again** reads them all anew. `GET /api/p
 Each tile's mark is the service's own logo, in its own colours, on a tile that is white in both colour schemes (a dark
 logo such as GitHub's or X's reads in the dark scheme too). The logos are files of `static/icons/plugins`: from
 [gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0), and, for the brands it draws as a wordmark alone
-(Stripe, Box, Wix, Zapier, Webflow, Mixpanel, HubSpot and Sanity), not at all (Calendly, Semrush and the twelve
+(Stripe, Wix, Zapier, Webflow, Mixpanel, HubSpot and Sanity), not at all (Calendly, Semrush and the twelve
 more of item 535) or with an element that may reach past the file (Next.js), Simple Icons' symbol in the brand's
 colour (version 16.35.0, CC0), DuckDB's in black, as its yellow does not show on the tile;
 the folder's LICENSE names the files, the source and the commit they came from, and the brands' guidelines. A mark
 identifies its service and nothing more. The applications of this Mac (Mail, Calendar, Notes, Reminders, Messages,
 Contacts, Excel, Word, PowerPoint, Outlook and OneDrive) show the icon of the application you have installed, read from
 its bundle when the page is drawn (`GET /api/connections/{id}/icon`, a PNG; `connections/app_icons.py`), since Apple's
-and Microsoft's artwork is not Dot's to ship; one that is not installed keeps its own mark, a logo, an icon of the
-interface or letters (DeepWiki, Context7, Jina, Canva, Outlook, Mobbin, Parallel, Plain, MailerLite, Klaviyo and 30
-of item 535's, Honeycomb, Attio and Granola among them, have no logo to show; Cal.com's symbol is its wordmark, too
-small to read). A server added by hand wears
-the mark of the service it is one of, and the composer's menus draw a server and its tools with the same mark (item
-477).
+and Microsoft's artwork is not Dot's to ship; one that is not installed keeps its own mark. A service with no logo
+(DeepWiki, Context7, Jina, Outlook, Mobbin, Parallel, Plain, MailerLite, Klaviyo and 30 of item 535's, Honeycomb, Attio
+and Granola among them; Cal.com's symbol is its wordmark, too small to read) wears the icon of the interface it was
+given, else the plug, in white on a tile of its colour lit from its top left, as an application's icon is (item 542);
+one with no colour of its own takes one of six by its id, the same wherever it shows. A server added by hand wears the
+mark of the service it is one of, and the composer's menus draw a server and its tools with the same mark (item 477),
+on their own light ground.
 
 **Item 535** brought 84 MCP servers more, each tried first as Dot reaches it (`mcp/catalogue.py` says how and what was
 left out with why). Code: Vercel (whose server lets Dot register now), Sourcegraph, grep.app, Xcode (Xcode's own
@@ -63,10 +114,10 @@ page, on the sidebar's own ground as the cog is, wearing the marks of three MCP 
 of them every few seconds when more are (item 509). It has a search, a chip for each section,
 **Suggested for you** (the popular services), then each section's first six tiles with **See all**, and **N connected**,
 which lists what Dot is connected to. A tile shows one thing: its first step as a button (**Add**, **Sign in**,
-**Allow**, **Open System Settings**), or where the service stands once it is connected, or **Not tried yet**. A tile
+**Allow**, **Open System Settings**), or where the service stands once it is connected. A tile
 opens the service's own page in the dialog, as on Customize, with a way back. A service that takes a key asks for it
-there, beside where to get one. **Customize** in the dialog leads to the page, which keeps what the dialog leaves out:
-the accounts, your own MCP servers and the skills. On a phone the dialog takes the screen, and the button is a round
+there, beside where to get one. **Customize** in the dialog leads to Connectors, which keeps what the dialog leaves
+out: the accounts and your own MCP servers; the plugins and the skills are Customize's other tabs. On a phone the dialog takes the screen, and the button is a round
 one at the foot of the list of chats. The services, where they stand and their steps are the same code on both
 (`static/js/catalogue.js`).
 
@@ -89,14 +140,13 @@ While it is connected, a run that may act gets `browser_logins`, the logins' tit
 `browser_fill_login`, which fills one into the current page. Dot fills only on the login's own site, asks you before
 each fill in every mode but `yolo`, and masks the values in everything the browser and web tools give back.
 
-A service none of whose ways was tried says **Not tried yet** and offers no step: Canva (its MCP server lets in approved
-clients only, and its page told Dot's "Unsupported client" on 2026-10-22), and Asana and Box (clients registered by
-hand). Vercel's server, which let in approved clients only, lets Dot register since item 535. Figma
-reads through Framelink's server with your access token instead of Figma's own, which refused Dot's registration, and
-Atlassian either through its own server, signed in (your organization's admin may have to let it in), or through
-`mcp-atlassian` with an API token (item 413). Google and Slack work in Dot's browser; their pages name their MCP servers
-as not tried, since they sign in only clients registered by hand. Any MCP server can still be added by its address
-(below).
+A service Dot has no way to reach is not listed: Canva (its MCP server lets in approved clients only, and its page told
+Dot's "Unsupported client" on 2026-10-22), Asana and Box (clients registered by hand) left Connectors with item 542,
+where they said **Not tried yet** and offered nothing to do. Vercel's server, which let in approved clients only, lets
+Dot register since item 535. Figma reads through Framelink's server with your access token instead of Figma's own,
+which refused Dot's registration, and Atlassian either through its own server, signed in (your organization's admin may
+have to let it in), or through `mcp-atlassian` with an API token (item 413). Google and Slack work in Dot's browser;
+their MCP servers sign in only clients registered by hand. Any MCP server can still be added by its address (below).
 
 The ways a service connects:
 
@@ -178,7 +228,7 @@ has from its config, a plugin or another agent (Customize › Skills › Found o
 
 ## Accounts: Google's and Microsoft's own sign-in
 
-Customize › Plugins opens on **Accounts** (item 422), above the list and not on a service's own page: Google (Gmail,
+Customize › Connectors opens on **Accounts** (item 422), above the list and not on a service's own page: Google (Gmail,
 Google Calendar) and Microsoft (Outlook, Microsoft 365), each with its own mark, through their official sign-ins, with
 the client you register with each, as each asks of an app that runs on a computer. **Sign in** opens the provider's page
 in a new tab; you say yes there, the provider sends the browser back to the daemon's `/oauth/callback` on this Mac's own
@@ -255,13 +305,13 @@ url = "https://mcp.example.com/mcp"       # a remote server; transport = "http" 
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; headers are never logged
 ```
 
-`dotx mcp list` starts the servers of `[[mcp]]` tables and those of plugins (not the ones added on the Plugins page),
+`dotx mcp list` starts the servers of `[[mcp]]` tables and those of plugins (not the ones added on Connectors),
 and shows the tools each offers, or why one does not start. Only tools are used (no resources, prompts or sampling).
 A server at a URL may
 sign in as MCP's authorization asks (OAuth): `oauth = true` has
-Dot send the token it keeps for it, which **Sign in again** on [Customize › Plugins](#customize--plugins) gets, and the servers added
+Dot send the token it keeps for it, which **Sign in again** on [Customize › Connectors](#customize--connectors) gets, and the servers added
 there sign in by themselves. The tool list is read when Dot starts and when a server is added, removed or has its tools
-chosen on the Plugins page, for the runs that start after; a server that dies is started again by the next call. A
+chosen on Connectors, for the runs that start after; a server that dies is started again by the next call. A
 server reached at a URL whose session was quiet for a minute is pinged before it is used, and connected again when the
 ping finds it gone (its connection closed, its server ended the session or failed; a server that answers that it
 does not know ping is there), so that the calls that come go to a new session rather than fail on the old one (item
@@ -338,8 +388,9 @@ A plugin is a folder in the Claude Code layout: `.claude-plugin/plugin.json` (it
 used; hooks, commands and agents are not. A server of `.mcp.json` may also carry Dot's own `allow`, `startup_timeout_s`
 and `call_timeout_s`, as an `[[mcp]]` table does, so a plugin whose server offers many tools names the ones the model
 gets and how long it has to start and to answer. Dot always looks in `<home>/plugins`; `[plugins] dirs` lists more
-directories (each holds plugins, or is one plugin itself; `~` expands). Plugins are read when Dot starts, skills at the
-start of every run.
+directories (each holds plugins, or is one plugin itself; `~` expands). Plugins are read when Dot starts, and again
+when the gallery installs one or Remove plugin takes one out (item 542); skills are read at the start of every run. The
+MCP servers of a plugin that came while Dot runs start when Dot starts again.
 
 `dotx skills list` shows every plugin and skill found, and anything left out and why; `dotx doctor` has a row for each.
 

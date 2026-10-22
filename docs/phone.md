@@ -83,7 +83,7 @@ card. In a Mac's window the settings keep their tabs down the left side when the
 pane (a window of 1412 px with the sidebar open, of 1140 px with it closed), and in one row above the pane in a narrower
 one; see [the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
 Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px
-(item 331). A service's page of Customize › Plugins and an agent's editor name their cards the same way, a row of the
+(item 331). A service's page of Customize › Connectors and an agent's editor name their cards the same way, a row of the
 home's Today strip keeps its facts to one line that fades where it runs out of room, and Team's empty page says what
 brings messages there (item 332).
 

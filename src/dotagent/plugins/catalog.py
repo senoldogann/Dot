@@ -1,5 +1,6 @@
 """The catalog of plugins: every plugins directory read, the usable plugins by name, and what was left out and why."""
 
+import asyncio
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -203,3 +204,39 @@ def load_plugins(config: PluginsConfig, configured_servers: Sequence[McpServerCo
             problems.extend(clashes)
             plugins[plugin.name] = plugin
     return PluginCatalog(plugins=tuple(plugins.values()), problems=tuple(problems))
+
+
+class PluginShelf:
+    """The plugins the runs use now (item 542): those Dot read as it started, read again from disk when a plugin is
+    installed from the gallery or removed, so that the runs that start after are offered its skills without a restart.
+    A plugin's MCP servers start with the daemon only: a plugin read again keeps the servers it had at the start, and
+    one that came since has none until Dot starts again."""
+
+    def __init__(self, catalog: PluginCatalog) -> None:
+        self._started: dict[str, tuple[McpServerConfig, ...]] = {
+            plugin.name: plugin.servers for plugin in catalog.plugins
+        }
+        self._catalog: PluginCatalog = catalog
+
+    @property
+    def plugins(self) -> tuple[Plugin, ...]:
+        return self._catalog.plugins
+
+    @property
+    def problems(self) -> tuple[PluginProblem, ...]:
+        return self._catalog.problems
+
+    def servers(self) -> tuple[McpServerConfig, ...]:
+        return self._catalog.servers()
+
+    def take(self, catalog: PluginCatalog) -> None:
+        """Use ``catalog``, read anew, with the servers each plugin had when Dot started."""
+        kept: tuple[Plugin, ...] = tuple(
+            plugin.model_copy(update={"servers": self._started.get(plugin.name, ())}) for plugin in catalog.plugins
+        )
+        self._catalog = PluginCatalog(plugins=kept, problems=catalog.problems)
+
+
+async def read_again(shelf: PluginShelf, config: PluginsConfig, configured_servers: Sequence[McpServerConfig]) -> None:
+    """Read every plugins directory again into ``shelf``."""
+    shelf.take(await asyncio.to_thread(load_plugins, config, configured_servers))

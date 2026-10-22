@@ -34,8 +34,9 @@ const MOVED = new Map([
   ["/settings/schedules", "/schedules"],
   ["/rules", "/settings/rules"],
   ["/system", "/settings/system"],
-  // Connect apps and the settings' Skills became Customize's two tabs (items 316 and 317).
-  ["/connect", "/customize/plugins"],
+  // Connect apps and the settings' Skills became tabs of Customize (items 316 and 317); the services' tab is Connectors
+  // since the plugins Dot installs took the name Plugins (item 542).
+  ["/connect", "/customize/connectors"],
   // Customize opens on Plugins, under Plugins' own address, so that the open tab is one page with one address.
   ["/customize", "/customize/plugins"],
   ["/settings/skills", "/customize/skills"],
@@ -80,9 +81,9 @@ const ROUTES = [
     tab: "customize",
     layout: "page",
     title: "Customize",
-    pattern: /^\/customize(?:\/(plugins|skills))?(?:\/([a-z0-9-]+))?$/,
+    pattern: /^\/customize(?:\/(plugins|skills|connectors))?(?:\/([a-z0-9-]+))?$/,
     load: () => import("./views/customize.js"),
-    parent: ([, id]) => (id === undefined ? null : "/customize/plugins"),
+    parent: ([tab = "plugins", id]) => (id === undefined ? null : `/customize/${tab}`),
   },
   {
     tab: "settings",

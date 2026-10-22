@@ -1,4 +1,4 @@
-"""Routes of the applications of Customize › Plugins (item 278): where each one stands, and the step that sets it up;
+"""Routes of the applications of Customize › Connectors (item 278): where each one stands, and the step that sets it up;
 the listings of the Plugins page (item 316), which takes those steps; and the icon of an application of the Mac, read
 from its bundle."""
 

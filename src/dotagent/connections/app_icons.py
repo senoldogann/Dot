@@ -1,4 +1,4 @@
-"""The icon of an application of this Mac, read from its bundle when the page asks for it (Customize › Plugins).
+"""The icon of an application of this Mac, read from its bundle when the page asks for it (Customize › Connectors).
 
 Apple's and Microsoft's artwork is theirs, not Dot's to ship: a tile of the page shows the icon of the application the
 owner has installed, read from its bundle (``Contents/Info.plist`` names the ``.icns`` file in ``Contents/Resources``)

@@ -1,5 +1,5 @@
-"""Routes of the MCP servers on Customize › Plugins (items 279 and 316): every server Dot has with where it stands, the
-catalogue's services, adding one, connecting one again (signing in again) and removing one, and the page an
+"""Routes of the MCP servers on Customize › Connectors (items 279 and 316): every server Dot has with where it stands,
+the catalogue's services, adding one, connecting one again (signing in again) and removing one, and the page an
 authorization server sends the browser back to after a sign-in (``/oauth/callback``, outside ``/api``, so that it needs
 no token; its page is :mod:`dotagent.server.callback_page`).
 
@@ -34,6 +34,7 @@ from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
 from dotagent.mcp.types import McpFailure
 from dotagent.oauth.accounts import CameBack, denial_reason
+from dotagent.plugins.catalog import read_again
 from dotagent.plugins.removal import is_dots_own, move_to_trash, trash_folder
 from dotagent.plugins.types import Plugin
 from dotagent.secrets import remove_env_value, write_env_value
@@ -553,6 +554,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             for server in still:
                 await hub.disconnect(server.name)
             refresh_mcp_tools(ctx.runtime.registry, hub)
+            await read_again(ctx.runtime.plugins, ctx.runtime.config.plugins, ctx.runtime.config.mcp)
             log.info("plugin_servers_stopped", plugin=name)
             return await listing()
         if not is_dots_own(plugin, plugins_dir()):
@@ -565,6 +567,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             await hub.disconnect(server.name)
         refresh_mcp_tools(ctx.runtime.registry, hub)
         moved = await asyncio.to_thread(move_to_trash, plugin.root, trash_folder())
+        # The plugins are read again, so that its skills leave the runs that start after and Customize lists it no more.
+        await read_again(ctx.runtime.plugins, ctx.runtime.config.plugins, ctx.runtime.config.mcp)
         log.info("plugin_removed", plugin=name, trash=str(moved))
         return await listing()
 

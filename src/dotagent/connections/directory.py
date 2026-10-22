@@ -1,17 +1,18 @@
-"""The Plugins page of Customize (item 316): every service Dot works with, one listing each, in the section the page
-shows it in. A listing names the ways Dot reaches its service. Each tried way is an entry of the connections'
-catalogues: an MCP service of ``mcp/catalogue.py``, or an application of the Mac, a synced folder or an application of
-the web of ``connections/catalogue.py``; the page reads where it stands from ``GET /connections`` and ``GET
-/mcp/servers`` and takes its step there (items 278 and 279). A way not tried yet has no entry and says what it would
-take. A listing whose ways are all untried is shown as "Not tried yet" and offers no step: "Works" is written only of a
-way that was tried.
+"""Customize › Connectors (items 316 and 542): every service Dot works with, one listing each, in the section the page
+shows it in. A listing names the ways Dot reaches its service, each an entry of the connections' catalogues: an MCP
+service of ``mcp/catalogue.py``, or an application of the Mac, a synced folder or an application of the web of
+``connections/catalogue.py``; the page reads where it stands from ``GET /connections`` and ``GET /mcp/servers`` and
+takes its step there (items 278 and 279). A service Dot has no way to reach is not listed: Canva, Asana and Box, whose
+servers let in only the clients registered with them, left the page with item 542, and so did the note on the servers
+of Google and Slack, which turn Dot's client away too.
 
 A service's mark is its own logo, a file of ``static/icons/plugins`` (full colour, from gilbarbara/logos, CC0; the
 wordmark-only brands keep Simple Icons' symbol in the brand's colour), drawn on a light tile in both colour schemes. An
 application of the Mac wears the icon of the application the owner has installed, read from its bundle when the page is
 drawn (``app``; ``connections/app_icons.py``), since Apple's and Microsoft's artwork is not Dot's to ship. A service
 with no mark anywhere, or whose application is not installed and has no logo, is drawn with one of the interface's icons
-(``glyph``) or a letter or two (``monogram``) in ``colour``. A brand's mark identifies its service, nothing more."""
+(``glyph``), else with the plug every connector without a mark of its own wears (item 542), on a tile tinted with
+``colour``. A brand's mark identifies its service, nothing more."""
 
 from typing import Literal
 from urllib.parse import urlsplit
@@ -34,22 +35,20 @@ type PluginSection = Literal[
     "mac",
 ]
 # ``vault``: the owner's password manager through its command line, whose logins a run fills (item 493).
-type WayKind = Literal["mcp", "mac", "folder", "web", "vault", "untried"]
+type WayKind = Literal["mcp", "mac", "folder", "web", "vault"]
 
 
 class PluginWay(FrozenModel):
-    """One way Dot reaches a service: ``ref`` is its entry's id in the catalogue of ``kind``; an untried way has none,
-    and ``how`` says what it would take."""
+    """One way Dot reaches a service: ``ref`` is its entry's id in the catalogue of ``kind``."""
 
     kind: WayKind
-    ref: str | None
-    how: str | None
+    ref: str
 
 
 class PluginListing(FrozenModel):
-    """One service of the Plugins page. ``does`` says what Dot does with it once connected; ``None`` takes its first
+    """One service of the Connectors page. ``does`` says what Dot does with it once connected; ``None`` takes its first
     way's. Its mark is ``logo`` (a file of ``static/icons/plugins``), else ``glyph`` (an icon of the interface), else
-    ``monogram``; ``colour`` is the hex of the colour a glyph or the letters are drawn in, without the ``#``, and
+    the plug; ``colour`` is the hex of the colour that icon and its tile's tint are drawn in, without the ``#``, and
     ``None`` draws them in the ink. An application of the Mac wears its own icon when it is installed."""
 
     id: str
@@ -59,36 +58,34 @@ class PluginListing(FrozenModel):
     logo: str | None
     colour: str | None
     glyph: str | None
-    monogram: str | None
     ways: tuple[PluginWay, ...]
 
 
 class ServiceMark(FrozenModel):
-    """A service's mark as its listing's tile wears it: ``logo``, else ``glyph``, else ``monogram``, the glyph or the
-    letters in ``colour`` (``None``: in the ink). A server of the service wears it on the Plugins page and in the
-    composer's menus (item 477)."""
+    """A service's mark as its listing's tile wears it: ``logo``, else ``glyph``, else the plug, the icon in ``colour``
+    (``None``: in the ink). A server of the service wears it on the Connectors page and in the composer's menus (item
+    477)."""
 
     logo: str | None
     glyph: str | None
-    monogram: str | None
     colour: str | None
 
 
 class PluginWayView(FrozenModel):
-    """A way as the page shows it: how it connects, where the service's data goes once it does (``None`` for an
-    untried way) and what it lets Dot do (its catalogue entry's words; ``None`` for an untried way)."""
+    """A way as the page shows it: how it connects, where the service's data goes once it does and what it lets Dot do
+    (its catalogue entry's words)."""
 
     kind: WayKind
-    ref: str | None
+    ref: str
     how: str
-    data: str | None
-    does: str | None
+    data: str
+    does: str
 
 
 class PluginView(FrozenModel):
-    """A listing as ``GET /plugins`` gives it: ``tried`` when one of its ways was tried. ``app`` is the id of the
-    application of the Mac (a ``mac`` or ``folder`` way's ``ref``) whose own icon the mark wears once it is installed,
-    which ``GET /connections`` tells (``icon``); ``None`` for a service with no such application."""
+    """A listing as ``GET /plugins`` gives it. ``app`` is the id of the application of the Mac (a ``mac`` or
+    ``folder`` way's ``ref``) whose own icon the mark wears once it is installed, which ``GET /connections`` tells
+    (``icon``); ``None`` for a service with no such application."""
 
     id: str
     name: str
@@ -97,48 +94,24 @@ class PluginView(FrozenModel):
     logo: str | None
     colour: str | None
     glyph: str | None
-    monogram: str | None
     app: str | None
-    tried: bool
     ways: tuple[PluginWayView, ...]
 
 
 def _mcp(ref: str) -> PluginWay:
-    return PluginWay(kind="mcp", ref=ref, how=None)
+    return PluginWay(kind="mcp", ref=ref)
 
 
 def _mac(ref: str) -> PluginWay:
-    return PluginWay(kind="mac", ref=ref, how=None)
+    return PluginWay(kind="mac", ref=ref)
 
 
 def _vault(ref: str) -> PluginWay:
-    return PluginWay(kind="vault", ref=ref, how=None)
+    return PluginWay(kind="vault", ref=ref)
 
 
 def _web(ref: str) -> PluginWay:
-    return PluginWay(kind="web", ref=ref, how=None)
-
-
-def _untried(how: str) -> PluginWay:
-    return PluginWay(kind="untried", ref=None, how=how)
-
-
-# What an untried way of each sort would take, as the catalogue's docstring found on 2026-10-15.
-_OWN_CLIENT: str = (
-    "{name}'s MCP server signs in only a client you register with {name} yourself, which Dot cannot do yet."
-)
-_APPROVED_ONLY: str = (
-    "{name}'s MCP server lets in approved clients alone, so Dot cannot connect to it; Dot can still work in {site} in "
-    "its own browser once you sign in there."
-)
-
-
-def _own_client(name: str) -> PluginWay:
-    return _untried(_OWN_CLIENT.format(name=name))
-
-
-def _approved_only(name: str, site: str) -> PluginWay:
-    return _untried(_APPROVED_ONLY.format(name=name, site=site))
+    return PluginWay(kind="web", ref=ref)
 
 
 PLUGINS: tuple[PluginListing, ...] = (
@@ -150,8 +123,7 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="google-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
-        ways=(_web("google"), _own_client("Google")),
+        ways=(_web("google"),),
     ),
     PluginListing(
         id="notion",
@@ -161,7 +133,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="notion-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("notion"), _web("notion")),
     ),
     PluginListing(
@@ -172,7 +143,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="github-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("github"), _web("github")),
     ),
     PluginListing(
@@ -183,8 +153,7 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="slack-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
-        ways=(_web("slack"), _own_client("Slack")),
+        ways=(_web("slack"),),
     ),
     PluginListing(
         id="linear",
@@ -194,7 +163,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="linear-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("linear"),),
     ),
     PluginListing(
@@ -205,7 +173,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="microsoft-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_web("microsoft"),),
     ),
     PluginListing(
@@ -216,7 +183,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="1E7CF2",
         glyph="mail",
-        monogram=None,
         ways=(_mac("mail"),),
     ),
     PluginListing(
@@ -227,7 +193,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="E5484D",
         glyph="calendar",
-        monogram=None,
         ways=(_mac("calendar"),),
     ),
     PluginListing(
@@ -238,7 +203,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="0572EC",
         glyph="key",
-        monogram=None,
         ways=(_vault("1password"),),
     ),
     PluginListing(
@@ -249,7 +213,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="sentry-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("sentry"),),
     ),
     PluginListing(
@@ -260,7 +223,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="cloudflare-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("cloudflare"),),
     ),
     PluginListing(
@@ -271,7 +233,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="vercel-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("vercel"),),
     ),
     PluginListing(
@@ -282,7 +243,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="supabase-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("supabase"),),
     ),
     PluginListing(
@@ -293,7 +253,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="neon-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("neon"),),
     ),
     PluginListing(
@@ -304,7 +263,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="gitlab-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("gitlab"),),
     ),
     PluginListing(
@@ -315,7 +273,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="netlify-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("netlify"),),
     ),
     PluginListing(
@@ -326,7 +283,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="heroku-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("heroku"),),
     ),
     PluginListing(
@@ -337,7 +293,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="grafana.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("grafana"),),
     ),
     PluginListing(
@@ -348,7 +303,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="playwright.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("playwright"),),
     ),
     PluginListing(
@@ -359,7 +313,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="chrome.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("chrome-devtools"),),
     ),
     PluginListing(
@@ -370,7 +323,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="C7",
         ways=(_mcp("context7"),),
     ),
     PluginListing(
@@ -381,7 +333,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph="search",
-        monogram=None,
         ways=(_mcp("deepwiki"),),
     ),
     PluginListing(
@@ -392,7 +343,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="microsoft-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("microsoft-learn"),),
     ),
     PluginListing(
@@ -403,7 +353,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="aws.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("aws-docs"), _mcp("aws-knowledge")),
     ),
     PluginListing(
@@ -414,7 +363,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="cloudflare-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("cloudflare-docs"),),
     ),
     PluginListing(
@@ -425,7 +373,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="model-context-protocol-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("sequential-thinking"),),
     ),
     PluginListing(
@@ -436,7 +383,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="new-relic-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("newrelic"),),
     ),
     # Item 535: the code section's newer services.
@@ -448,7 +394,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="sourcegraph.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("sourcegraph"),),
     ),
     PluginListing(
@@ -459,7 +404,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="G",
         ways=(_mcp("grep-app"),),
     ),
     PluginListing(
@@ -470,7 +414,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="xcode.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("xcode"), _mcp("xcodebuildmcp")),
     ),
     PluginListing(
@@ -481,7 +424,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="aws.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("aws-api"),),
     ),
     PluginListing(
@@ -492,7 +434,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="microsoft-azure.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("azure"),),
     ),
     PluginListing(
@@ -503,7 +444,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="alibabacloud.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("alibaba-cloud"),),
     ),
     PluginListing(
@@ -514,7 +454,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="digital-ocean-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("digitalocean"),),
     ),
     PluginListing(
@@ -525,7 +464,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="kubernetes.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("kubernetes"),),
     ),
     PluginListing(
@@ -536,7 +474,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="pulumi-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("pulumi"),),
     ),
     PluginListing(
@@ -547,7 +484,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="firebase-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("firebase"),),
     ),
     PluginListing(
@@ -558,7 +494,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="convex.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("convex"),),
     ),
     PluginListing(
@@ -569,7 +504,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="prisma.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("prisma"),),
     ),
     PluginListing(
@@ -580,7 +514,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="expo-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("expo"),),
     ),
     PluginListing(
@@ -591,7 +524,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="buildkite-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("buildkite"),),
     ),
     PluginListing(
@@ -602,7 +534,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="snyk.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("snyk"),),
     ),
     PluginListing(
@@ -613,7 +544,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="socket.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("socket"),),
     ),
     PluginListing(
@@ -624,7 +554,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="J",
         ways=(_mcp("jam"),),
     ),
     PluginListing(
@@ -635,7 +564,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="LR",
         ways=(_mcp("logrocket"),),
     ),
     PluginListing(
@@ -646,7 +574,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="H",
         ways=(_mcp("honeycomb"),),
     ),
     PluginListing(
@@ -657,7 +584,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="A",
         ways=(_mcp("axiom"),),
     ),
     PluginListing(
@@ -668,7 +594,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="betterstack.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("betterstack"),),
     ),
     PluginListing(
@@ -679,7 +604,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="pagerduty-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("pagerduty"),),
     ),
     PluginListing(
@@ -690,7 +614,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="incident-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("incident-io"),),
     ),
     PluginListing(
@@ -701,7 +624,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="launchdarkly-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("launchdarkly"),),
     ),
     PluginListing(
@@ -712,7 +634,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="S",
         ways=(_mcp("statsig"),),
     ),
     PluginListing(
@@ -723,7 +644,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="braintrust.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("braintrust"),),
     ),
     PluginListing(
@@ -734,7 +654,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="clerk-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("clerk"),),
     ),
     PluginListing(
@@ -745,7 +664,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="workos-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("workos"),),
     ),
     PluginListing(
@@ -756,7 +674,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="ST",
         ways=(_mcp("stytch"),),
     ),
     PluginListing(
@@ -767,7 +684,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph="globe",
-        monogram=None,
         ways=(_mcp("globalping"),),
     ),
     PluginListing(
@@ -778,7 +694,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="nextdotjs.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("nextjs"),),
     ),
     PluginListing(
@@ -789,7 +704,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="svelte-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("svelte"),),
     ),
     PluginListing(
@@ -800,7 +714,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="astro-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("astro-docs"),),
     ),
     PluginListing(
@@ -811,7 +724,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="nuxt-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("nuxt-ui"),),
     ),
     PluginListing(
@@ -822,7 +734,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="shopify.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("shopify-dev"),),
     ),
     PluginListing(
@@ -833,7 +744,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="apollostack.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("apollo"),),
     ),
     PluginListing(
@@ -844,7 +754,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="openai-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("openai-docs"),),
     ),
     PluginListing(
@@ -855,7 +764,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="R",
         ways=(_mcp("ref"),),
     ),
     PluginListing(
@@ -866,19 +774,7 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="figma.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("figma"),),
-    ),
-    PluginListing(
-        id="canva",
-        name="Canva",
-        section="design",
-        does="Find, make and export your Canva designs.",
-        logo=None,
-        colour="00C4CC",
-        glyph=None,
-        monogram="C",
-        ways=(_approved_only("Canva", "canva.com"),),
     ),
     PluginListing(
         id="miro",
@@ -888,7 +784,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="miro-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("miro"),),
     ),
     PluginListing(
@@ -899,7 +794,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="webflow.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("webflow"),),
     ),
     PluginListing(
@@ -910,7 +804,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="wix.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("wix"),),
     ),
     PluginListing(
@@ -921,7 +814,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="M",
         ways=(_mcp("mobbin"),),
     ),
     # Item 535: the design section's newer services.
@@ -933,7 +825,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="framer.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("framer"),),
     ),
     PluginListing(
@@ -944,7 +835,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="lucid.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("lucid"),),
     ),
     PluginListing(
@@ -955,7 +845,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="W",
         ways=(_mcp("whimsical"),),
     ),
     PluginListing(
@@ -966,7 +855,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="excalidraw.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("excalidraw"),),
     ),
     PluginListing(
@@ -977,7 +865,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="shadcnui.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("shadcn"),),
     ),
     PluginListing(
@@ -988,7 +875,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="MU",
         ways=(_mcp("magic-ui"),),
     ),
     PluginListing(
@@ -999,7 +885,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="lottiefiles.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("lottiefiles"),),
     ),
     PluginListing(
@@ -1010,7 +895,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="HG",
         ways=(_mcp("heygen"),),
     ),
     PluginListing(
@@ -1021,7 +905,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="sanity.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("sanity"),),
     ),
     PluginListing(
@@ -1032,7 +915,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="contentful.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("contentful"),),
     ),
     PluginListing(
@@ -1043,7 +925,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="wordpress-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("wordpress-com"),),
     ),
     PluginListing(
@@ -1054,7 +935,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="posthog-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("posthog"),),
     ),
     PluginListing(
@@ -1065,7 +945,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="postman-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("postman"),),
     ),
     PluginListing(
@@ -1076,7 +955,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="hugging-face-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("huggingface"),),
     ),
     PluginListing(
@@ -1087,7 +965,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="mapbox-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("mapbox"),),
     ),
     PluginListing(
@@ -1098,7 +975,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="airtable.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("airtable"),),
     ),
     PluginListing(
@@ -1109,7 +985,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="amplitude-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("amplitude"),),
     ),
     PluginListing(
@@ -1120,7 +995,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="mixpanel.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("mixpanel"),),
     ),
     # Item 535: the data section's newer services.
@@ -1132,7 +1006,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="mongodb-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("mongodb"),),
     ),
     PluginListing(
@@ -1143,7 +1016,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="duckdb.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("duckdb"),),
     ),
     PluginListing(
@@ -1154,7 +1026,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="MD",
         ways=(_mcp("motherduck"),),
     ),
     PluginListing(
@@ -1165,7 +1036,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="pinecone-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("pinecone"),),
     ),
     PluginListing(
@@ -1176,7 +1046,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="SM",
         ways=(_mcp("supermemory"),),
     ),
     PluginListing(
@@ -1187,7 +1056,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="CG",
         ways=(_mcp("coingecko"),),
     ),
     PluginListing(
@@ -1198,7 +1066,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="exa-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("exa"),),
     ),
     PluginListing(
@@ -1209,7 +1076,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="tavily.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("tavily"),),
     ),
     PluginListing(
@@ -1220,7 +1086,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="brave.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("brave-search"),),
     ),
     PluginListing(
@@ -1231,7 +1096,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="perplexity-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("perplexity"),),
     ),
     PluginListing(
@@ -1242,7 +1106,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="firecrawl-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("firecrawl"),),
     ),
     PluginListing(
@@ -1253,7 +1116,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="J",
         ways=(_mcp("jina"),),
     ),
     PluginListing(
@@ -1264,7 +1126,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="apify-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("apify"),),
     ),
     PluginListing(
@@ -1275,7 +1136,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="model-context-protocol-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("fetch"),),
     ),
     PluginListing(
@@ -1286,7 +1146,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="semrush.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("semrush"),),
     ),
     PluginListing(
@@ -1297,7 +1156,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="P",
         ways=(_mcp("parallel-search"), _mcp("parallel-task")),
     ),
     # Item 535: the research section's newer services.
@@ -1309,7 +1167,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="kagi.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("kagi"),),
     ),
     PluginListing(
@@ -1320,7 +1177,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="C",
         ways=(_mcp("consensus"),),
     ),
     PluginListing(
@@ -1331,7 +1187,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph="file",
-        monogram=None,
         ways=(_mcp("markitdown"),),
     ),
     PluginListing(
@@ -1342,7 +1197,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="K",
         ways=(_mcp("kiwi"),),
     ),
     PluginListing(
@@ -1353,7 +1207,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="linkedin-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_web("linkedin"),),
     ),
     PluginListing(
@@ -1364,7 +1217,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="x.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_web("x"),),
     ),
     PluginListing(
@@ -1375,7 +1227,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="instagram-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_web("instagram"),),
     ),
     # Item 535: the communication section's newer services.
@@ -1387,7 +1238,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="resend-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("resend"),),
     ),
     PluginListing(
@@ -1398,7 +1248,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="mailgun-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("mailgun"),),
     ),
     PluginListing(
@@ -1409,7 +1258,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="DT",
         ways=(_mcp("dingtalk"),),
     ),
     PluginListing(
@@ -1420,7 +1268,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="atlassian.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("atlassian"), _mcp("atlassian-token")),
     ),
     PluginListing(
@@ -1431,7 +1278,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="todoist-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("todoist"),),
     ),
     PluginListing(
@@ -1442,30 +1288,7 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="clickup-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("clickup"),),
-    ),
-    PluginListing(
-        id="asana",
-        name="Asana",
-        section="productivity",
-        does="Find, create and update tasks and projects in Asana.",
-        logo="asana-icon.svg",
-        colour=None,
-        glyph=None,
-        monogram=None,
-        ways=(_own_client("Asana"),),
-    ),
-    PluginListing(
-        id="box",
-        name="Box",
-        section="productivity",
-        does="Search, read and file the documents you keep in Box.",
-        logo="box.svg",
-        colour=None,
-        glyph=None,
-        monogram=None,
-        ways=(_own_client("Box"),),
     ),
     PluginListing(
         id="memory",
@@ -1475,7 +1298,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="model-context-protocol-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("memory"),),
     ),
     PluginListing(
@@ -1486,7 +1308,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="elevenlabs-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("elevenlabs"),),
     ),
     PluginListing(
@@ -1497,7 +1318,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="calendly.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("calendly"),),
     ),
     # Item 535: the productivity section's newer services.
@@ -1509,7 +1329,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="dropbox.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("dropbox"),),
     ),
     PluginListing(
@@ -1520,7 +1339,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="shortcut-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("shortcut"),),
     ),
     PluginListing(
@@ -1531,7 +1349,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="productboard-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("productboard"),),
     ),
     PluginListing(
@@ -1542,7 +1359,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="Ca",
         ways=(_mcp("cal-com"),),
     ),
     PluginListing(
@@ -1553,7 +1369,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="G",
         ways=(_mcp("granola"),),
     ),
     PluginListing(
@@ -1564,7 +1379,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="F",
         ways=(_mcp("fireflies"),),
     ),
     PluginListing(
@@ -1575,7 +1389,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="TL",
         ways=(_mcp("tldv"),),
     ),
     PluginListing(
@@ -1586,7 +1399,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="J",
         ways=(_mcp("jotform"),),
     ),
     PluginListing(
@@ -1597,7 +1409,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="T",
         ways=(_mcp("tally"),),
     ),
     PluginListing(
@@ -1608,7 +1419,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph="clock",
-        monogram=None,
         ways=(_mcp("time"),),
     ),
     PluginListing(
@@ -1619,7 +1429,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="stripe.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("stripe"),),
     ),
     PluginListing(
@@ -1630,7 +1439,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="zapier.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("zapier"),),
     ),
     PluginListing(
@@ -1641,7 +1449,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="monday-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("monday"),),
     ),
     PluginListing(
@@ -1652,7 +1459,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="paypal.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("paypal"),),
     ),
     PluginListing(
@@ -1663,7 +1469,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="K",
         ways=(_mcp("klaviyo"),),
     ),
     PluginListing(
@@ -1674,7 +1479,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="ML",
         ways=(_mcp("mailerlite"),),
     ),
     # Item 535: the business section's newer services.
@@ -1686,7 +1490,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="hubspot.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("hubspot"),),
     ),
     PluginListing(
@@ -1697,7 +1500,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="A",
         ways=(_mcp("attio"),),
     ),
     PluginListing(
@@ -1708,7 +1510,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="close.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("close"),),
     ),
     PluginListing(
@@ -1719,7 +1520,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="customerio-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("customer-io"),),
     ),
     PluginListing(
@@ -1730,7 +1530,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="B",
         ways=(_mcp("beehiiv"),),
     ),
     PluginListing(
@@ -1741,7 +1540,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="M",
         ways=(_mcp("mercury"),),
     ),
     PluginListing(
@@ -1752,7 +1550,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="R",
         ways=(_mcp("ramp"),),
     ),
     PluginListing(
@@ -1763,7 +1560,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="greenhouse.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("greenhouse"),),
     ),
     PluginListing(
@@ -1774,7 +1570,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="intercom-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("intercom"),),
     ),
     PluginListing(
@@ -1785,7 +1580,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour=None,
         glyph=None,
-        monogram="Pl",
         ways=(_mcp("plain"),),
     ),
     # Item 535: the support section's newer service.
@@ -1797,7 +1591,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="helpscout-icon.svg",
         colour=None,
         glyph=None,
-        monogram=None,
         ways=(_mcp("helpscout"),),
     ),
     PluginListing(
@@ -1808,7 +1601,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="E8A600",
         glyph="pencil",
-        monogram=None,
         ways=(_mac("notes"),),
     ),
     PluginListing(
@@ -1819,7 +1611,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="1E7CF2",
         glyph="list",
-        monogram=None,
         ways=(_mac("reminders"),),
     ),
     PluginListing(
@@ -1830,7 +1621,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="1F9D3A",
         glyph="message",
-        monogram=None,
         ways=(_mac("messages"),),
     ),
     PluginListing(
@@ -1841,7 +1631,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="8E8E93",
         glyph="users",
-        monogram=None,
         ways=(_mac("contacts"),),
     ),
     PluginListing(
@@ -1852,7 +1641,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="217346",
         glyph=None,
-        monogram="X",
         ways=(_mac("excel"),),
     ),
     PluginListing(
@@ -1863,7 +1651,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="2B579A",
         glyph=None,
-        monogram="W",
         ways=(_mac("word"),),
     ),
     PluginListing(
@@ -1874,7 +1661,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="C43E1C",
         glyph=None,
-        monogram="P",
         ways=(_mac("powerpoint"),),
     ),
     PluginListing(
@@ -1885,7 +1671,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo=None,
         colour="0078D4",
         glyph=None,
-        monogram="O",
         ways=(_mac("outlook"),),
     ),
     PluginListing(
@@ -1896,8 +1681,7 @@ PLUGINS: tuple[PluginListing, ...] = (
         logo="microsoft-onedrive.svg",
         colour=None,
         glyph=None,
-        monogram=None,
-        ways=(PluginWay(kind="folder", ref="onedrive", how=None),),
+        ways=(PluginWay(kind="folder", ref="onedrive"),),
     ),
 )
 
@@ -1942,10 +1726,6 @@ _FOLDER_HOW: str = "Dot reads and writes the files it keeps in sync in a folder 
 def _way_view(way: PluginWay) -> PluginWayView:
     """``way`` with how it connects, where the data goes and what it lets Dot do, from its catalogue entry; a ``ref``
     no catalogue of its kind holds raises :class:`LookupError`."""
-    if way.kind == "untried":
-        if way.how is None:
-            raise LookupError("an untried way says what it would take")
-        return PluginWayView(kind="untried", ref=None, how=way.how, data=None, does=None)
     if way.kind == "mcp":
         service = next((one for one in MCP_SERVICES if one.id == way.ref), None)
         if service is None:
@@ -1994,9 +1774,7 @@ def _way_view(way: PluginWay) -> PluginWayView:
 def plugin_view(listing: PluginListing) -> PluginView:
     """``listing`` as the page shows it; its ``does`` is its first way's when it names none."""
     ways: tuple[PluginWayView, ...] = tuple(_way_view(way) for way in listing.ways)
-    does: str | None = listing.does if listing.does is not None else ways[0].does
-    if does is None:
-        raise LookupError(f"{listing.id} says nothing of what Dot does with it")
+    does: str = listing.does if listing.does is not None else ways[0].does
     return PluginView(
         id=listing.id,
         name=listing.name,
@@ -2005,9 +1783,7 @@ def plugin_view(listing: PluginListing) -> PluginView:
         logo=listing.logo,
         colour=listing.colour,
         glyph=listing.glyph,
-        monogram=listing.monogram,
         app=next((way.ref for way in listing.ways if way.kind in ("mac", "folder")), None),
-        tried=any(way.kind != "untried" for way in listing.ways),
         ways=ways,
     )
 
@@ -2023,7 +1799,7 @@ def mark_of_service(service_id: str) -> ServiceMark | None:
     listing."""
     for listing in PLUGINS:
         if any(way.kind == "mcp" and way.ref == service_id for way in listing.ways):
-            return ServiceMark(logo=listing.logo, glyph=listing.glyph, monogram=listing.monogram, colour=listing.colour)
+            return ServiceMark(logo=listing.logo, glyph=listing.glyph, colour=listing.colour)
     return None
 
 

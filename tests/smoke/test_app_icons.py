@@ -1,8 +1,8 @@
-"""The icon of an application of this Mac through the API of a real in-process server (Customize › Plugins). Calendar,
-which every Mac has, answers its own icon as a PNG read from its bundle, and ``GET /api/connections`` says it has one;
-an application of the web has none (404), nor has one that is not installed. OneDrive is found by the second of the two
-bundle ids its builds go by, in a bundle made here, and its icon is that bundle's. Nothing outside this Mac is reached
-and macOS is not asked about any application's Automation: the test answers for it.
+"""The icon of an application of this Mac through the API of a real in-process server (Customize › Connectors).
+Calendar, which every Mac has, answers its own icon as a PNG read from its bundle, and ``GET /api/connections`` says it
+has one; an application of the web has none (404), nor has one that is not installed. OneDrive is found by the second of
+the two bundle ids its builds go by, in a bundle made here, and its icon is that bundle's. Nothing outside this Mac is
+reached and macOS is not asked about any application's Automation: the test answers for it.
 """
 
 import asyncio

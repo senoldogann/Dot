@@ -1,14 +1,15 @@
-// The services Dot works with and where each stands (item 316), for Customize › Plugins (views/plugins.js) and the
-// Connect apps dialog (connectapps.js, item 492): the listings of `GET /plugins`, the applications of `GET /connections`
-// and the MCP servers of `GET /mcp/servers`, the first step each service offers and the steps under way. The steps are
-// Connect apps' (items 278 and 279): macOS's question for an application of the Mac, and after a no the Automation pane
-// of System Settings; OneDrive itself, to sign in; the sign-in page in Dot's browser for an application of the web; an
-// MCP server that Dot tries first, and signs in to in this browser on the service's own page when it asks.
+// The services Dot works with and where each stands (item 316), for Customize › Connectors (views/connectors.js) and
+// the Connect apps dialog (connectapps.js, item 492): the listings of `GET /plugins`, the applications of
+// `GET /connections` and the MCP servers of `GET /mcp/servers`, the first step each service offers and the steps under
+// way. The steps are Connect apps' (items 278 and 279): macOS's question for an application of the Mac, and after a no
+// the Automation pane of System Settings; OneDrive itself, to sign in; the sign-in page in Dot's browser for an
+// application of the web; an MCP server that Dot tries first, and signs in to in this browser on the service's own page
+// when it asks.
 
 import { api, blobUrl } from "./api.js";
 import { clip, el, plural } from "./dom.js";
 import { icon } from "./icons.js";
-import { markContent, markInk } from "./marks.js";
+import { markContent, tintMark } from "./marks.js";
 import { field } from "./panels.js";
 import { attempt, confirmDialog } from "./ui.js";
 
@@ -29,29 +30,28 @@ export const STEP_LABELS = { ask: "Allow", settings: "Open System Settings", sig
 export const MCP_STATE_WORDS = { ready: "Ready", left_out: "Left out", disabled: "Off", trying: "Trying…", signing_in: "Waiting for your sign-in" };
 export const MCP_STATE_TONES = { ready: "b-ok", left_out: "b-bad", trying: "b-info", signing_in: "b-warn" };
 // What each way is called on a service's page, and on its tile when it is the service's first.
-export const WAY_NAMES = { mcp: "MCP server", mac: "AppleScript", web: "Dot's browser", folder: "Synced folder", vault: "1Password's op", untried: "Not tried yet" };
+export const WAY_NAMES = { mcp: "MCP server", mac: "AppleScript", web: "Dot's browser", folder: "Synced folder", vault: "1Password's op" };
 // Where a service account token for 1Password is made (item 493), at 1password.com.
 const VAULT_TOKEN_HELP = "https://start.1password.com/developer-tools/infrastructure-secrets/serviceaccount/";
 // While Dot tries a server or waits for a sign-in, the page asks how it stands this often.
 const MCP_POLL_MS = 2000;
 
 /**
- * A service's mark on its tile, which is light in both colour schemes: its logo in its own colours, else the interface's
- * icon or its letters, drawn in the listing's colour where it reads on the tile, else in the ink. `appIcon` is the pending
- * `blob:` URL of the icon of the application of this Mac the service stands for, as the owner has it installed
+ * A service's mark on its tile: its logo in its own colours on a tile that is light in both colour schemes, else the
+ * interface's icon or the plug on a tile of the listing's colour (item 542). `appIcon` is the pending `blob:` URL of the
+ * icon of the application of this Mac the service stands for, as the owner has it installed
  * (`GET /connections/{id}/icon`), or null; the icon takes the tile's place once it is read, and the mark is as drawn
  * meanwhile, and as it stays when the icon cannot be read (the one that asked says why).
  */
 export function pluginMark(plugin, appIcon) {
   const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent(plugin));
-  const ink = markInk(plugin.colour);
-  if (ink !== null) {
-    mark.style.setProperty("--plugin-ink", ink);
-  }
+  tintMark(mark, plugin, plugin.id);
   if (appIcon !== null) {
     appIcon.then(
       (url) => {
         mark.dataset.icon = "app";
+        delete mark.dataset.tint;
+        delete mark.dataset.light;
         mark.replaceChildren(el("img", { class: "plugin-logo", src: url, alt: "" }));
       },
       () => undefined,
@@ -210,9 +210,6 @@ export function createCatalogue(onChange) {
         service: servers.services.find((one) => one.id === way.ref) ?? null,
       };
     }
-    if (way.kind === "untried") {
-      return {};
-    }
     if (way.kind === "vault") {
       return { vault };
     }
@@ -286,9 +283,9 @@ export function createCatalogue(onChange) {
   }
 
   /** Where `plugin` stands, in a badge: a way that is connected, else the server Dot has for it, else its first way;
-   * null for a service not tried yet, and for an MCP service Dot has no server of. */
+   * null for an MCP service Dot has no server of. */
   function standing(plugin) {
-    const ways = plugin.ways.filter((way) => way.kind !== "untried");
+    const { ways } = plugin;
     const shown = ways.find(wayConnected) ?? ways.find((way) => way.kind === "mcp" && wayNow(way).server !== null) ?? ways[0];
     if (shown === undefined) {
       return null;
@@ -392,12 +389,9 @@ export function createCatalogue(onChange) {
     });
   }
 
-  /** How `plugin` connects, in a chip: its first tried way, an MCP server's sign-in with it; else Not tried yet. */
+  /** How `plugin` connects, in a chip: its first way, an MCP server's sign-in with it. */
   function howChip(plugin) {
-    const first = plugin.ways.find((way) => way.kind !== "untried");
-    if (first === undefined) {
-      return el("span", { class: "chip plugin-untried" }, WAY_NAMES.untried);
-    }
+    const [first] = plugin.ways;
     if (first.kind === "mcp") {
       const service = servers.services.find((one) => one.id === first.ref);
       return el("span", { class: "chip" }, mcpWords(service));

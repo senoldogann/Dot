@@ -1,5 +1,5 @@
-"""Routes of the owner's 1Password (item 493), Customize › Plugins › 1Password: where it stands (``op`` installed, the
-vaults the service account reads, with how many logins each holds); Connect, which makes the vault "Shared with Dot"
+"""Routes of the owner's 1Password (item 493), Customize › Connectors › 1Password: where it stands (``op`` installed,
+the vaults the service account reads, with how many logins each holds); Connect, which makes the vault "Shared with Dot"
 and a service account that only reads it, with the owner's ``op`` through the 1Password app; a service account token
 pasted instead; and Disconnect. Connect and a pasted token are taken on this Mac alone: the 1Password app asks the
 owner there. No token and no value of the vault is logged or answered."""

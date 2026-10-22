@@ -57,7 +57,7 @@ def test_the_palette_lists_skills_by_name_and_tools_under_their_servers_with_one
 
 def test_a_server_of_the_palette_wears_the_mark_its_customize_tile_wears() -> None:
     """Items 447 and 477: the composer's menus draw each server as the Customize page draws its service's tile — its
-    logo, else its icon, else its letters — and a server of no service with the plug (no mark)."""
+    logo, else its icon, else the plug — and a server of no service with the plug (no mark)."""
     marks: dict[str, ServiceMark | None] = {
         name: mark_of_service(name) for name in ("deepwiki", "context7", "microsoft-learn")
     } | {"notes": None}
@@ -69,9 +69,9 @@ def test_a_server_of_the_palette_wears_the_mark_its_customize_tile_wears() -> No
         [],
     )
     assert [(server.name, server.mark) for server in view.servers] == [
-        ("context7", ServiceMark(logo=None, glyph=None, monogram="C7", colour=None)),
-        ("deepwiki", ServiceMark(logo=None, glyph="search", monogram=None, colour=None)),
-        ("microsoft-learn", ServiceMark(logo="microsoft-icon.svg", glyph=None, monogram=None, colour=None)),
+        ("context7", ServiceMark(logo=None, glyph=None, colour=None)),
+        ("deepwiki", ServiceMark(logo=None, glyph="search", colour=None)),
+        ("microsoft-learn", ServiceMark(logo="microsoft-icon.svg", glyph=None, colour=None)),
         ("notes", None),
     ]
 

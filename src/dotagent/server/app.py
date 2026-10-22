@@ -16,6 +16,7 @@ from dotagent.core.errors import (
     ConfigError,
     DotError,
     ElsewhereError,
+    GalleryError,
     InvalidValueError,
     NotFoundError,
     PairingRefused,
@@ -46,6 +47,7 @@ from dotagent.server.routes_connections import connections_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
 from dotagent.server.routes_drafts import drafts_router
 from dotagent.server.routes_files import files_router, looks_router
+from dotagent.server.routes_gallery import gallery_router
 from dotagent.server.routes_harness import harness_router
 from dotagent.server.routes_keys import keys_router
 from dotagent.server.routes_mcp import mcp_router
@@ -78,6 +80,7 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (RunConflict, 409),
     (UndoError, 409),
     (ElsewhereError, 409),
+    (GalleryError, 409),
     (InvalidValueError, 422),
     (ConfigError, 422),
     (ToolInputError, 422),
@@ -124,6 +127,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(browser_router(ctx))
     app.include_router(connections_router(ctx))
     app.include_router(mcp_router(ctx))
+    app.include_router(gallery_router(ctx))
     app.include_router(keys_router(ctx))
     app.include_router(themes_router())
     app.include_router(pages_router(ctx))

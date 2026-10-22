@@ -62,7 +62,7 @@ from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory
 from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.oauth.accounts import Accounts
 from dotagent.oauth.keychain import Keychain, keychain_file
-from dotagent.plugins.catalog import load_plugins, plugin_roots
+from dotagent.plugins.catalog import PluginShelf, load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
 from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox
@@ -145,7 +145,7 @@ class Runtime:
     # Help found by meaning with the memory's embeddings (item 169); ``None`` when they are off.
     help_vectors: HelpVectors | None
     registry: ToolRegistry
-    plugins: PluginCatalog
+    plugins: PluginShelf
     protected: tuple[Path, ...]
     # What the agent may read but never change (:func:`_dot_paths`).
     dot_paths: tuple[Path, ...]
@@ -237,9 +237,9 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     its own file tools once the user agrees (item 398):
     its own code, which the daemon runs at its next start, its plugins and their own files, whose MCP servers start
     with the daemon and are given keys from the key store, and so does each server of its record of those added from
-    other agents (item 165) and of its record of those added on Customize › Plugins, the home of the OpenCode server it
-    starts (its config says what OpenCode's agent may do), its skills (the copies of those added from other agents too)
-    and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
+    other agents (item 165) and of its record of those added on Customize › Connectors, the home of the OpenCode server
+    it starts (its config says what OpenCode's agent may do), its skills (the copies of those added from other agents
+    too) and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
     return (
         *_own_code(),
         *plugin_roots(config.plugins),
@@ -352,7 +352,7 @@ def _added_servers(config: AppConfig, plugins: PluginCatalog) -> tuple[McpServer
 
 
 def _connected_servers(taken: frozenset[str]) -> tuple[McpServerConfig, ...]:
-    """The MCP servers that the owner added on Customize › Plugins (items 279 and 316). One whose name another server
+    """The MCP servers that the owner added on Customize › Connectors (items 279 and 316). One whose name another server
     has (``taken``) is logged and left out, and so are all of them when the record cannot be read."""
     path: Path = connected_servers_path()
     try:
@@ -438,7 +438,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
                 None if memory.embedder is None else HelpVectors(memory.embedder, config.memory.min_similarity, store)
             ),
             registry=registry,
-            plugins=plugins,
+            plugins=PluginShelf(plugins),
             protected=protected,
             dot_paths=dot_paths,
             sandbox=sandbox,

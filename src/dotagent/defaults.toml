@@ -17,9 +17,9 @@
 #   name = "docs"
 #   url = "https://mcp.example.com/mcp"             # a remote server; transport = "http" (default) or "sse"
 #   headers = { Authorization = "Bearer ${DOCS_TOKEN}" }   # ${NAME} as above; headers are never logged
-#   oauth = false                       # true: sign in with your account (Customize › Plugins › Sign in again)
-# Plugins add their own servers (see [plugins]); their names become <plugin>-<server>. Servers added on Customize › Plugins
-# are kept in connected-servers.json in Dot's home, not here.
+#   oauth = false                       # true: sign in with your account (Customize › Connectors › Sign in again)
+# Plugins add their own servers (see [plugins]); their names become <plugin>-<server>. Servers added on
+# Customize › Connectors are kept in connected-servers.json in Dot's home, not here.
 mcp = []
 
 [server]

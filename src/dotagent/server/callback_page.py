@@ -148,21 +148,21 @@ def words_of(callback: Callback) -> Words:
             return Words(
                 title=f"Back from {name}",
                 lead=f"Dot is finishing the sign-in with {name}. Dot on this Mac shows the server as ready on "
-                "Customize › Plugins when it is done, so you can close this tab.",
+                "Customize › Connectors when it is done, so you can close this tab.",
                 tone="ok",
             )
         case "declined":
             return Words(
                 title=f"Not signed in to {name}",
                 lead=f"You did not say yes on {name}'s page, so nothing was saved. Start the sign-in again from "
-                "Customize › Plugins when you want it.",
+                "Customize › Connectors when you want it.",
                 tone="neutral",
             )
         case "expired":
             return Words(
                 title="This sign-in ran out of time",
                 lead=f"Dot waited more than {WAIT_S / 60:g} minutes for {name}'s page to send you back, then gave up. "
-                "Nothing was saved. Start it again from Customize › Plugins.",
+                "Nothing was saved. Start it again from Customize › Connectors.",
                 tone="neutral",
             )
         case "failed":
@@ -177,7 +177,7 @@ def words_of(callback: Callback) -> Words:
                 title="This sign-in has ended",
                 lead="Dot no longer waits for it: it may have been used already (a reload shows this), have run out "
                 "of time, or Dot started again since. If you just signed in, Dot already has it. Otherwise start it "
-                "again from Customize › Plugins.",
+                "again from Customize › Connectors.",
                 tone="neutral",
             )
 

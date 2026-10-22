@@ -1,16 +1,17 @@
 // Connect apps (item 492): the services Dot works with in a dialog over the page, opened from the foot of the sidebar.
 // A search, the sections as chips, Suggested for you (the popular services) and each section's first tiles with See all;
 // each tile shows one step (Add, Sign in, Allow…) or where the service stands once it is connected, and opens the
-// service's own page in the dialog, as Customize › Plugins shows it, with a way back. "Connected" lists what Dot is
-// connected to. The services, where they stand and their steps are catalogue.js's, shared with Customize › Plugins,
-// which keeps what the dialog leaves out: the accounts, the MCP servers of one's own and the skills.
+// service's own page in the dialog, as Customize › Connectors shows it, with a way back. "Connected" lists what Dot is
+// connected to. The services, where they stand and their steps are catalogue.js's, shared with Customize › Connectors,
+// which keeps what the dialog leaves out: the accounts and the MCP servers of one's own; the plugins and the skills are
+// Customize's other tabs.
 
 import { createCatalogue, pluginMark } from "./catalogue.js";
 import { el, foldSearch } from "./dom.js";
 import { icon } from "./icons.js";
 import { emptyPanel, errorPanel, loadingPanel } from "./panels.js";
 import { attempt } from "./ui.js";
-import { SECTIONS, serviceParts } from "./views/plugins.js";
+import { SECTIONS, serviceParts } from "./views/connectors.js";
 
 // A section shows this many tiles under All; See all shows the rest.
 const SECTION_TILES = 6;
@@ -50,7 +51,7 @@ export function openConnectApps({ onClose }) {
     words = foldSearch(search.value);
     paint();
   });
-  const customize = el("a", { class: "btn sm connect-apps-customize", href: "#/customize/plugins", title: "Your own MCP servers, the accounts and the skills", onclick: () => dialog.close() }, "Customize", icon("external"));
+  const customize = el("a", { class: "btn sm connect-apps-customize", href: "#/customize/connectors", title: "Your own MCP servers, the accounts, the plugins and the skills", onclick: () => dialog.close() }, "Customize", icon("external"));
   const chips = [{ id: ALL, title: "All" }, ...SECTIONS.filter((section) => section.id !== "popular")].map(({ id, title: label }) =>
     el("button", { class: "chip connect-apps-chip", type: "button", dataset: { chip: id }, "aria-pressed": String(id === chip), onclick: () => choose(id) }, label),
   );
@@ -94,7 +95,7 @@ export function openConnectApps({ onClose }) {
   }
 
   /** The one thing a tile offers: its first step as a button, the sign-in page an MCP server waits on, a key's form on
-   * the service's page for a service that takes one; else where it stands, or that it was not tried yet. */
+   * the service's page for a service that takes one; else where it stands. */
   function tileAction(plugin) {
     if (catalogue.connected(plugin)) {
       return catalogue.standing(plugin);
@@ -104,7 +105,7 @@ export function openConnectApps({ onClose }) {
     }
     const step = catalogue.firstStep(plugin);
     if (step === null) {
-      return plugin.tried ? catalogue.standing(plugin) : el("span", { class: "chip plugin-untried" }, "Not tried yet");
+      return catalogue.standing(plugin);
     }
     if (step.link !== undefined) {
       return el("a", { class: "btn sm connect-tile-step", href: step.link, target: "_blank", rel: "noopener noreferrer", "aria-label": `Open the sign-in page of ${plugin.name}` }, step.label);

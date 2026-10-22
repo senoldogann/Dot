@@ -372,7 +372,7 @@ async def test_picks_a_run_cannot_start_with_are_refused_and_nothing_starts(logi
                 "a server that is not connected": (
                     {"plugins": ["nowhere"]},
                     f"the MCP server nowhere is not connected (the servers connected now: {SERVER}); Customize › "
-                    "Plugins says why",
+                    "Connectors says why",
                 ),
                 "a skill not offered": ({"skills": ["nope"]}, "no skill offered to this run is called nope"),
                 "Plan first in yolo": (
@@ -691,7 +691,8 @@ async def test_an_at_word_picks_a_server_and_no_skill_and_the_slash_word_the_ski
                 await browser.close()
 
 
-# The services of the catalogue whose tiles wear each sort of mark (connections/directory.py): an icon, letters, a logo.
+# The services of the catalogue whose tiles wear each sort of mark (connections/directory.py): an icon, the plug of a
+# service with no mark of its own (item 542), a logo.
 MARKED: tuple[str, ...] = ("deepwiki", "context7", "microsoft-learn")
 # A server of the config at DeepWiki's address, switched off so that nothing is reached: its tile wears DeepWiki's mark.
 WIKI: str = "my-wiki"
@@ -717,7 +718,7 @@ def _write_copied_skill(home: Path, theirs: Path) -> None:
 
 
 async def _mark_of(mark: Locator) -> str:
-    """What a mark shows, as the page drew it: its picture's file, its icon's name or its letters."""
+    """What a mark shows, as the page drew it: its picture's file or its icon's name."""
     shown: str = await mark.evaluate(
         """(node) => {
           const picture = node.querySelector("img.plugin-logo");
@@ -725,7 +726,7 @@ async def _mark_of(mark: Locator) -> str:
             return `logo:${picture.getAttribute("src")}`;
           }
           const glyph = node.querySelector("svg[data-icon]");
-          return glyph !== null ? `icon:${glyph.dataset.icon}` : `letters:${node.textContent.trim()}`;
+          return glyph !== null ? `icon:${glyph.dataset.icon}` : `nothing:${node.textContent.trim()}`;
         }"""
     )
     return shown
@@ -734,7 +735,7 @@ async def _mark_of(mark: Locator) -> str:
 @pytest.mark.browser
 async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict[str, str], tmp_path: Path) -> None:
     """Items 447 and 477: a server of the at menu, and each of its tools in the slash menu, wear the mark its service's
-    Customize tile wears — a logo, an icon (DeepWiki's) or letters (Context7's) — on that tile's light ground, and a
+    Customize tile wears — a logo, an icon (DeepWiki's) or the plug (Context7's, item 542) — on a light ground, and a
     server of no service the plug; a skill wears its Customize card's mark: an imported one's, a learned one's, else its
     own. The daemon says which skill is a copy and which server is of which service, and a server of the config at a
     service's address wears the service's mark on its own tile too. The menus' palette names the catalogue's servers,
@@ -781,7 +782,7 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                         "address": ACCOUNT,
                         "provider": "google",
                         "reads": "Gmail and Google Calendar",
-                        "mark": {"logo": "google-icon.svg", "glyph": None, "monogram": None, "colour": None},
+                        "mark": {"logo": "google-icon.svg", "glyph": None, "colour": None},
                     }
                 ],
             }
@@ -790,7 +791,7 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                 passes: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
                 for width, scheme in passes:
                     page: Page = await _home_page(browser, address, width, scheme)
-                    await page.goto(f"{address}/#/customize/plugins")
+                    await page.goto(f"{address}/#/customize/connectors")
                     await page.get_by_role("button", name=re.compile(r"^All \d+$")).click()
                     tiles: dict[str, str] = {
                         name: await _mark_of(page.locator(f".plugin-tile[data-plugin='{name}'] .plugin-mark"))
@@ -798,7 +799,7 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     }
                     assert tiles == {
                         "deepwiki": "icon:search",
-                        "context7": "letters:C7",
+                        "context7": "icon:plug",
                         "microsoft-learn": "logo:/icons/plugins/microsoft-icon.svg",
                     }, tiles
                     await page.get_by_role("button", name=re.compile(r"^Connected \d+$")).click()
@@ -823,7 +824,7 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     for name in MARKED:
                         mark: Locator = menu.get_by_role("option").filter(has_text=name).locator(".slash-mark")
                         assert await _mark_of(mark) == tiles[name], name
-                        # On the tile's own ground, light in both colour schemes, as on the Customize page.
+                        # On a light ground in both colour schemes, as a logo's tile on the Customize page.
                         ground: str = await mark.evaluate("(node) => getComputedStyle(node).backgroundColor")
                         assert ground == "rgb(255, 255, 255)", (name, ground)
                     fixture: Locator = menu.get_by_role("option").filter(has_text=SERVER).locator(".slash-mark")

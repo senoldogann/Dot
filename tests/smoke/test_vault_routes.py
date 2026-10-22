@@ -1,4 +1,4 @@
-"""Customize › Plugins › 1Password's routes (item 493), through a real in-process server and a stand-in for ``op``:
+"""Customize › Connectors › 1Password's routes (item 493), through a real in-process server and a stand-in for ``op``:
 where 1Password stands; a pasted token that is none refused; Connect, which makes the vault "Shared with Dot" and a
 read-only service account with the owner's ``op`` and keeps its token in Dot's .env, never answering it; Disconnect.
 No network is used and no 1Password account."""

@@ -1,384 +1,97 @@
-// Customize › Plugins (item 316): every service Dot works with, after Codex's page. A search, Connected and All, and the
-// services in sections (Popular, Code, Design, Data, Research, Communication, Productivity, Business, Support, This Mac):
-// each a tile with its mark, what Dot does with it and how it connects, and a "+" that takes its first step, or where it
-// stands once it is connected. A tile opens the service's own page: what Dot does with it, each way it connects with
-// where it stands and its step, its tools, where its data goes. The services, where they stand and their steps are
-// catalogue.js's, which the Connect apps dialog shares (item 492); a service none of whose ways was tried says "Not
-// tried yet" and offers no step. Under the sections, an MCP server of one's own by its address; Connected lists too the
-// servers that come from Dot's config, a plugin or another agent of the Mac.
+// Customize › Plugins (item 542): the gallery of the plugins Dot installs, after Qoder's page. A head that says what a
+// plugin is, with the search and a few of the gallery's marks; New & noteworthy, the plugins the gallery features; and
+// All plugins, with All, Featured and Installed and an order, Popular (the stars of its repository) or Newest (when the
+// gallery took it). Each plugin is a card: its mark (its logo, else a skill's puzzle piece on a tile of its kind's
+// colour), its name with a check when its publisher makes what its skills are about, who publishes it and how many
+// skills it brings, what it does, and Install, or Installed with Remove. A card opens the plugin's own page: its skills,
+// where it comes from (the repository at the commit Dot pins, its licence) and what Install does. Install downloads
+// that commit, checks its files against the hash the gallery keeps and offers its skills to the runs that start after,
+// with no restart; Remove moves its folder to the Trash (item 497). Installed lists too the plugins Dot reads that are
+// not the gallery's. A service's page, which was at `#/customize/plugins/<id>` before item 542, is under Connectors.
 
-import { accountsCard } from "../accounts.js";
-import { createCatalogue, MCP_STATE_TONES, MCP_STATE_WORDS, pluginMark, serviceWords, STATE_WORDS, STEP_LABELS, WAY_NAMES, CONNECTED_STATES } from "../catalogue.js";
-import { el, foldSearch, plural } from "../dom.js";
+import { api } from "../api.js";
+import { compact, el, foldSearch, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { markContent, markInk } from "../marks.js";
-import { emptyPanel, errorPanel, field, loadingPanel, segmented } from "../panels.js";
-import { attempt } from "../ui.js";
+import { tintMark } from "../marks.js";
+import { emptyPanel, errorPanel, loadingPanel, segmented } from "../panels.js";
+import { attempt, confirmDialog, toast } from "../ui.js";
 
-/** The sections of the services, in the order the page and the Connect apps dialog show them (item 492). */
-export const SECTIONS = [
-  { id: "popular", title: "Popular" },
-  { id: "passwords", title: "Password managers" },
-  { id: "code", title: "Code" },
-  { id: "design", title: "Design" },
-  { id: "data", title: "Data" },
-  { id: "research", title: "Research" },
-  { id: "communication", title: "Communication" },
-  { id: "productivity", title: "Productivity" },
-  { id: "business", title: "Business" },
-  { id: "support", title: "Support" },
-  { id: "mac", title: "This Mac" },
-];
-const MCP_ORIGIN_WORDS = {
-  config: "Set up in Dot's config: take its [[mcp]] block out of config.toml to remove it.",
-  plugin: "Comes with one of Dot's plugins; Remove plugin takes the plugin out.",
-  elsewhere: "Added from another agent of this Mac (Customize › Skills › Found on this Mac).",
+/** The kinds of the gallery's plugins, in their words, each with the colour of themes.css (`--mark-<hue>`) of the tile
+ * of the mark of a plugin of the kind with no logo. */
+const CATEGORIES = {
+  development: { label: "Development", hue: "blue" },
+  design: { label: "Design", hue: "pink" },
+  product: { label: "Product", hue: "violet" },
+  data: { label: "Data", hue: "teal" },
+  business: { label: "Business", hue: "orange" },
+  writing: { label: "Writing", hue: "green" },
 };
-// A server's tile names this many of its tools.
-const SHOWN_TOOLS = 6;
+const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-/** The tools a server offers to runs, the first few by name. */
-function toolLine(tools) {
-  const shown = tools.slice(0, SHOWN_TOOLS).join(", ");
-  return `${plural(tools.length, "tool", "tools")}: ${shown}${tools.length > SHOWN_TOOLS ? ", …" : ""}`;
+/** The mark of a plugin of the gallery: its logo on the light tile a connector's logo sits on, else the puzzle piece a
+ * skill wears (item 537) on a tile of its kind's colour; a plugin of no kind of the gallery's takes the development
+ * one. */
+export function galleryMark(plugin) {
+  if (plugin.logo !== null && plugin.logo !== undefined) {
+    return el("span", { class: "plugin-mark", "aria-hidden": "true" }, el("img", { class: "plugin-logo", src: `/icons/plugins/${plugin.logo}`, alt: "" }));
+  }
+  const mark = el("span", { class: "plugin-mark", "aria-hidden": "true", dataset: { tint: "" } }, icon("puzzle"));
+  mark.style.setProperty("--plugin-hue", `var(--mark-${(CATEGORIES[plugin.category] ?? CATEGORIES.development).hue})`);
+  return mark;
 }
 
-/** How to sign in to the applications of the web, the same for each of them: it depends on Dot's browser alone. */
-function webNote(listing) {
-  if (listing.browser_mode === "attach") {
-    return "Dot works in your own Chrome (Settings › Browser › My Chrome), where you are signed in as you always are.";
-  }
-  return listing.headless
-    ? "Dot's browser runs without a window, so there is none to sign in in: switch headless off in the config."
-    : "Sign in opens the page in Dot's browser on the Mac; check again once you are in.";
-}
-
-/** What to do or to know for an application, by where it stands: one line, or none. `runner` is the name macOS asks
- * for Dot under and lists in Privacy & Security (Dot for the service, item 288). */
-function appGuide(app, runner) {
-  if (app.waiting) {
-    return "macOS is asking on the Mac: answer its question there, then check again.";
-  }
-  switch (app.state) {
-    case "refused":
-      return `macOS was told no. In Privacy & Security › Automation, open ${runner} and switch on ${app.name}.`;
-    case "not_installed":
-      return `Install ${app.name} to use it with Dot.`;
-    case "not_synced":
-      return `${app.name} syncs no folder yet: open it and sign in.`;
-    default:
-      return null;
-  }
-}
-
-/** What to do or to know for one MCP server, by where it stands: one line, or none. */
-function serverGuide(server) {
-  switch (server.state) {
-    case "signing_in":
-      return "Sign in on the service's page; Dot connects once it sends you back here.";
-    case "trying":
-      return "Dot is connecting to it.";
-    case "left_out":
-      return server.error;
-    case "disabled":
-      return "Switched off in Dot's config.";
-    default:
-      return null;
-  }
-}
-
-/** The buttons of an MCP server of `catalogue`: its sign-in page while Dot waits for one, Sign in again or Try again,
- * Remove for one added here or from another agent, and Remove plugin for one of a plugin (item 497); null when it has
- * none. */
-function serverActions(catalogue, server, service) {
-  const working = server.state === "trying" || server.state === "signing_in";
-  const actions = [];
-  if (server.state === "signing_in" && server.link !== null) {
-    actions.push(el("a", { class: "btn sm primary", href: server.link, target: "_blank", rel: "noopener noreferrer" }, icon("external"), "Open the sign-in page"));
-  }
-  const again = server.origin === "connected" || (server.origin === "config" && server.signs_in);
-  const acting = catalogue.busy(`server:${server.name}`);
-  if (again && !working && (server.signs_in || server.state === "left_out")) {
-    const button = el("button", { class: "btn sm", type: "button", disabled: acting }, server.signs_in ? "Sign in again" : "Try again");
-    button.addEventListener("click", () => attempt(() => catalogue.connectAgain(server)));
-    actions.push(button);
-  }
-  if (server.picks_tools && server.origin === "connected" && !working) {
-    // The way back in for a server left out with its allow list; for one that runs, a way to cut its tools down.
-    const kind = server.state === "left_out" ? "btn sm primary" : "btn sm";
-    actions.push(el("button", { class: kind, type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose tools"));
-  }
-  if (server.origin === "connected" || server.origin === "elsewhere") {
-    actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.remove(server, service)) }, "Remove"));
-  }
-  if (server.origin === "plugin" && server.plugin !== null) {
-    actions.push(
-      el("button", { class: "btn sm", type: "button", disabled: acting, title: `Take the plugin ${server.plugin} out of Dot`, onclick: () => attempt(() => catalogue.removePlugin(server)) }, "Remove plugin"),
-    );
-  }
-  return actions.length === 0 ? null : el("div", { class: "plugin-actions" }, ...actions);
-}
-
-/** What to do or to know for 1Password (item 493), by where it stands: one line. */
-function vaultGuide(vault) {
-  if (!vault.connected) {
-    return vault.cli === null
-      ? "1Password's command line, op, is not installed: brew install 1password-cli, then check again."
-      : "Connect makes the vault Shared with Dot and a service account that only reads it, through the 1Password app, which asks you first: turn on its Settings › Developer › Integrate with 1Password CLI.";
-  }
-  if (vault.error !== null) {
-    return vault.error;
-  }
-  const names = vault.vaults.map((one) => one.name).join(", ");
-  const logins = vault.vaults.reduce((sum, one) => sum + one.logins, 0);
-  return `Reads ${plural(logins, "login", "logins")} in ${names}: the logins you move there are the ones runs may fill.`;
-}
-
-/** The buttons of 1Password's way (item 493): Connect 1Password and a token instead while it is not connected, with
- * the token's form once asked for; Disconnect once it is. */
-function vaultActions(catalogue, vault) {
-  const acting = catalogue.busy("vault");
-  if (vault.connected) {
-    return el("div", { class: "plugin-actions" }, el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.disconnectVault()) }, "Disconnect"));
-  }
-  const connect = el(
-    "button",
-    { class: "btn sm primary", type: "button", disabled: acting || vault.cli === null, onclick: () => attempt(() => catalogue.connectVault()) },
-    acting ? "Waiting for 1Password…" : "Connect 1Password",
-  );
-  // A token is read with op too: without it neither way connects.
-  const token = el("button", { class: "btn sm ghost", type: "button", disabled: acting || vault.cli === null, onclick: () => catalogue.askVault() }, "Use a service account token instead");
-  return el("div", { class: "plugin-actions" }, connect, token, catalogue.asking() === "vault" ? catalogue.vaultForm() : null);
-}
-
-/** One way of a service on its page: what it is, how it connects, where it stands, what to do and its step. */
-function wayRow(catalogue, way) {
-  const now = catalogue.wayNow(way);
-  let badge = null;
-  let guideLine = null;
-  let actions = null;
-  if (way.kind === "mcp") {
-    if (now.server === null && now.service !== null && now.service.added) {
-      badge = el("span", { class: "badge b-muted" }, "Name taken");
-      guideLine = `A server of Dot's config or of a plugin is named ${way.ref} already: Connected lists it.`;
-    } else if (now.server === null) {
-      const service = now.service;
-      const keyed = service !== null && service !== undefined && service.secrets.length > 0;
-      const button = el("button", { class: "btn sm primary", type: "button", disabled: catalogue.busy(`mcp:${way.ref}`) }, "Add");
-      button.addEventListener("click", () => attempt(() => (keyed ? catalogue.askSecrets(service) : catalogue.add({ service: way.ref, name: null, address: null, secrets: {} }))));
-      // A service that takes a key asks for it here too (item 408): its form, with its own Add, takes the button's place.
-      actions = el("div", { class: "plugin-actions" }, keyed && catalogue.asking() === way.ref ? catalogue.secretsForm(service) : button);
-      badge = el("span", { class: "badge b-muted" }, serviceWords(service));
-    } else {
-      badge = el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
-      guideLine = serverGuide(now.server);
-      actions = serverActions(catalogue, now.server, now.service);
-    }
-  } else if (way.kind === "vault") {
-    if (now.vault !== null) {
-      badge = catalogue.vaultBadge();
-      guideLine = vaultGuide(now.vault);
-      actions = vaultActions(catalogue, now.vault);
-    }
-  } else if (way.kind !== "untried" && now.app !== null) {
-    const app = now.app;
-    const listing = catalogue.listing;
-    badge = el("span", { class: `badge ${CONNECTED_STATES.has(app.state) ? "b-ok" : app.state === "refused" ? "b-bad" : "b-muted"}` }, STATE_WORDS[app.state] ?? app.state);
-    guideLine = appGuide(app, listing.runner) ?? (way.kind === "web" && !CONNECTED_STATES.has(app.state) ? webNote(listing) : null);
-    if (app.step !== null) {
-      // While macOS asks, the button says so, as Connect apps' did.
-      const asking = catalogue.busy(`app:${app.id}`);
-      const label = asking && app.step === "ask" ? "Waiting for macOS…" : STEP_LABELS[app.step];
-      const button = el("button", { class: app.step === "settings" ? "btn sm" : "btn sm primary", type: "button", disabled: asking }, label);
-      button.addEventListener("click", () => attempt(() => catalogue.takeStep(app)));
-      actions = el("div", { class: "plugin-actions" }, button);
-    }
-  }
+/** The check beside the name of a plugin whose publisher makes what its skills are about. */
+function verified(plugin) {
   return el(
-    "div",
-    { class: "list-row plugin-way", dataset: { way: way.kind, ref: way.ref ?? "" } },
-    el(
-      "div",
-      { class: "row-main" },
-      el("div", { class: "row" }, el("span", { class: "row-title" }, WAY_NAMES[way.kind]), badge),
-      el("div", { class: "row-text muted" }, way.how),
-      guideLine === null ? null : el("div", { class: "row-text plugin-guide" }, guideLine),
-      way.kind === "mcp" && now.server !== null ? el("div", { class: "row-text muted mono plugin-address" }, now.server.address) : null,
-    ),
-    actions,
+    "span",
+    { class: "gallery-verified", title: `From ${plugin.publisher}, who make what its skills are about`, role: "img", "aria-label": "From its maker" },
+    icon("badgeCheck"),
   );
 }
 
-/**
- * What a service's own page shows of `plugin`, a listing of `catalogue`, under its bar: its mark, name, what Dot does
- * with it and where it stands; what each way lets Dot do, when its ways do more than that line; how it connects, each
- * way with its step; the tools of its servers; and where its data goes. The Plugins page and the Connect apps dialog
- * (item 492) both show it.
- */
-export function serviceParts(catalogue, plugin) {
-  const tools = plugin.ways
-    .filter((way) => way.kind === "mcp")
-    .map((way) => catalogue.wayNow(way).server)
-    .filter((server) => server !== null && server.tools.length > 0)
-    .flatMap((server) => server.tools);
-  const does = [...new Set(plugin.ways.map((way) => way.does).filter((line) => line !== null))];
-  const data = plugin.ways.filter((way) => way.data !== null);
-  const named = (way, text) => (data.length > 1 ? `${WAY_NAMES[way.kind]}: ${text}` : text);
-  const card = (kind, title, mark, body) =>
-    el("section", { class: "card connect-section plugin-card", dataset: { kind } }, el("div", { class: "card-head" }, icon(mark), el("span", { class: "grow" }, title)), el("div", null, body));
-  const parts = [
-    el(
-      "header",
-      { class: "plugin-hero", dataset: { plugin: plugin.id } },
-      pluginMark(plugin, catalogue.appIcon(plugin)),
-      el("div", { class: "plugin-main" }, el("h2", { class: "plugin-title" }, plugin.name), el("div", { class: "plugin-does" }, plugin.does), el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), catalogue.standing(plugin))),
-    ),
-    does.length < 2 ? null : card("does", "What Dot does with it", "sparkle", el("ul", { class: "plugin-list" }, does.map((line) => el("li", null, line)))),
-    card("ways", "How it connects", "link", plugin.ways.map((way) => wayRow(catalogue, way))),
-    tools.length === 0 ? null : card("tools", "Tools", "bolt", el("ul", { class: "plugin-list plugin-tools mono" }, tools.map((name) => el("li", null, name)))),
-    data.length === 0 ? null : card("data", "Where its data goes", "shield", el("ul", { class: "plugin-list" }, data.map((way) => el("li", null, named(way, way.data))))),
-  ];
-  return parts.filter((part) => part !== null);
+/** A card of the plugin's page, as a service's page has them: a head with its icon and title, and `body`. */
+function pageCard(kind, title, mark, body) {
+  return el("section", { class: "card connect-section plugin-card", dataset: { kind } }, el("div", { class: "card-head" }, icon(mark), el("span", { class: "grow" }, title)), el("div", null, body));
 }
 
 export function mount(root, ctx) {
   const pluginId = ctx.params[1];
   let disposed = false;
-  // The list is drawn once the Accounts card above it has read the accounts (item 511): the rows the card gets then
-  // would push the tiles down under a finger on its way to one, and the tap would land between two. A service's page
-  // has no card to wait for.
-  let accountsRead = pluginId !== undefined;
+  let gallery = null;
   let shown = "all";
+  let order = "popular";
   let words = "";
+  // The plugins being installed or removed, by id or name: their buttons stay off while the page paints again.
+  const busy = new Set();
   const holder = el("div", { class: "stack" }, loadingPanel());
-  const catalogue = createCatalogue(paint);
 
-  function tile(plugin) {
-    const isConnected = catalogue.connected(plugin);
-    const step = isConnected ? null : catalogue.firstStep(plugin);
-    const asked = catalogue.asking();
-    const askedService = asked === null ? null : (catalogue.servers.services.find((one) => one.id === asked && plugin.ways.some((way) => way.kind === "mcp" && way.ref === one.id)) ?? null);
-    let action = null;
-    if (step !== null && step.page) {
-      // A service whose step is its page (1Password, item 493): the "+" leads there.
-      action = el("a", { class: "btn sm icon-only plugin-add", href: `#/customize/plugins/${plugin.id}`, title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` }, icon("plus"));
-    } else if (step !== null && step.link !== undefined) {
-      action = el(
-        "a",
-        { class: "btn sm primary plugin-add", href: step.link, target: "_blank", rel: "noopener noreferrer", "aria-label": `Open the sign-in page of ${plugin.name}` },
-        icon("external"),
-        step.label,
-      );
-    } else if (step !== null) {
-      action = el(
-        "button",
-        {
-          class: "btn sm icon-only plugin-add",
-          type: "button",
-          title: `${step.label}: ${plugin.name}`,
-          "aria-label": `${step.label} ${plugin.name}`,
-          disabled: catalogue.busy(step.key),
-        },
-        icon("plus"),
-      );
-      action.addEventListener("click", () => attempt(step.take));
-    }
-    const waiting = plugin.ways.some((way) => way.kind === "mac" && catalogue.busy(`app:${way.ref}`));
-    return el(
-      "div",
-      { class: "plugin-tile", dataset: { plugin: plugin.id, connected: String(isConnected), tried: String(plugin.tried) } },
-      pluginMark(plugin, catalogue.appIcon(plugin)),
-      el(
-        "div",
-        { class: "plugin-main" },
-        el("a", { class: "plugin-name", href: `#/customize/plugins/${plugin.id}` }, plugin.name),
-        el("div", { class: "plugin-does" }, plugin.does),
-        el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), waiting ? el("span", { class: "badge b-warn" }, "Waiting for macOS…") : catalogue.standing(plugin)),
-        askedService === null ? null : catalogue.secretsForm(askedService),
-      ),
-      action,
-    );
-  }
-
-  /** The mark of a server added by hand: the mark of the service it is one of, by its address or its command, as the
-   * service's tile wears it (items 408 and 477), else the plug. */
-  function serverMark(server) {
-    const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent(server.mark));
-    const ink = server.mark === null ? null : markInk(server.mark.colour);
-    if (ink !== null) {
-      mark.style.setProperty("--plugin-ink", ink);
-    }
-    return mark;
-  }
-
-  /** An MCP server that is no service of the catalogue: its name, address and tools, where it stands and its actions. */
-  function serverTile(server) {
-    return el(
-      "div",
-      { class: "plugin-tile plugin-server", dataset: { server: server.name, state: server.state } },
-      serverMark(server),
-      el(
-        "div",
-        { class: "plugin-main" },
-        el("span", { class: "plugin-name" }, server.name),
-        el("div", { class: "mono plugin-address" }, server.address),
-        server.tools.length === 0 ? null : el("div", { class: "plugin-does" }, toolLine(server.tools)),
-        server.origin in MCP_ORIGIN_WORDS ? el("div", { class: "plugin-does" }, MCP_ORIGIN_WORDS[server.origin]) : null,
-        el("div", { class: "plugin-meta" }, el("span", { class: "chip" }, "MCP"), el("span", { class: `badge ${MCP_STATE_TONES[server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[server.state] ?? server.state)),
-        serverGuide(server) === null ? null : el("div", { class: "plugin-guide" }, serverGuide(server)),
-      ),
-      serverActions(catalogue, server, null),
-    );
-  }
-
-  function addForm() {
-    const name = el("input", { class: "input", type: "text", maxlength: "24", autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "my-server", "aria-label": "Server name" });
-    const address = el("input", {
-      class: "input mono",
-      type: "text",
-      autocomplete: "off",
-      autocapitalize: "off",
-      spellcheck: "false",
-      placeholder: "https://example.com/mcp",
-      "aria-label": "Server address or command",
-    });
-    const button = el("button", { class: "btn primary", type: "button" }, icon("plus"), "Add");
-    button.addEventListener("click", () =>
-      attempt(async () => {
-        button.disabled = true;
-        try {
-          await catalogue.add({ service: null, name: name.value.trim(), address: address.value.trim(), secrets: {} });
-        } finally {
-          button.disabled = false;
-        }
-        name.value = "";
-        address.value = "";
-      }),
-    );
-    return el(
-      "div",
-      { class: "connect-add" },
-      field("Name", name, "Lowercase letters, digits and dashes."),
-      field("Address", address, "Its URL, or the command that starts it on this Mac."),
-      el("div", { class: "connect-add-actions" }, button),
-    );
-  }
-
-  function matches(plugin) {
-    return words === "" || foldSearch(`${plugin.name} ${plugin.does}`).includes(words);
-  }
-
-  // Made once, so that what is typed in them stays while the page paints again.
-  const form = addForm();
-  const search = el("input", { class: "input plugin-search", type: "search", placeholder: "Search plugins", "aria-label": "Search plugins", autocomplete: "off", spellcheck: "false" });
+  const search = el("input", { class: "input gallery-search", type: "search", placeholder: "Search plugins and skills", "aria-label": "Search plugins", autocomplete: "off", spellcheck: "false" });
   search.addEventListener("input", () => {
     words = foldSearch(search.value);
     paint();
   });
-  const tabs = segmented(
+  const headMarks = el("div", { class: "gallery-head-marks", "aria-hidden": "true" });
+  const head = el(
+    "section",
+    { class: "gallery-head" },
+    el(
+      "div",
+      { class: "gallery-head-main" },
+      el("h2", { class: "gallery-head-title" }, "Discover plugins"),
+      el(
+        "p",
+        { class: "gallery-head-line" },
+        "Skills from the makers of the tools you use and from the community, each pinned to a commit Dot checks. Install one and the runs that start after can use it.",
+      ),
+      el("label", { class: "gallery-find" }, icon("search"), search),
+    ),
+    headMarks,
+  );
+  const filters = segmented(
     [
-      { id: "connected", label: "Connected", hint: "The services Dot is connected to" },
-      { id: "all", label: "All", hint: "Every service Dot works with" },
+      { id: "all", label: "All", hint: "Every plugin of the gallery" },
+      { id: "featured", label: "Featured", hint: "The plugins the gallery features" },
+      { id: "installed", label: "Installed", hint: "The plugins Dot has installed, and the others it reads" },
     ],
     shown,
     (id) => {
@@ -386,116 +99,305 @@ export function mount(root, ctx) {
       paint();
     },
   );
-  tabs.element.classList.add("plugin-tabs");
-  tabs.element.setAttribute("aria-label", "Plugins to show");
-  const recheck = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
-  // Out of what paints again, so that the search keeps the focus while the tiles are drawn anew; a service's page has
-  // none of it.
-  const bar = el("div", { class: "plugin-bar", hidden: pluginId !== undefined }, search, tabs.element, recheck);
+  filters.element.setAttribute("aria-label", "Plugins to show");
+  const orders = segmented(
+    [
+      { id: "popular", label: "Popular", hint: "The most starred repositories first" },
+      { id: "newest", label: "Newest", hint: "The plugins the gallery took last first" },
+    ],
+    order,
+    (id) => {
+      order = id;
+      paint();
+    },
+  );
+  orders.element.setAttribute("aria-label", "Order");
+  const featuredGrid = el("div", { class: "gallery-featured" });
+  const featured = el("section", { class: "gallery-section", dataset: { section: "noteworthy" } }, el("h2", { class: "section-label gallery-section-title" }, "New & noteworthy"), featuredGrid);
+  const allGrid = el("div", { class: "gallery-grid" });
+  const all = el(
+    "section",
+    { class: "gallery-section", dataset: { section: "all" } },
+    el("div", { class: "gallery-section-head" }, el("h2", { class: "section-label gallery-section-title" }, "All plugins"), el("div", { class: "gallery-controls" }, filters.element, orders.element)),
+    allGrid,
+  );
+  // Made once and painted again in place, so that the search keeps the focus and the controls their state.
+  const body = el("div", { class: "gallery", hidden: true }, featured, all);
 
-  function paintTabs() {
-    const [connectedButton, allButton] = tabs.element.children;
-    const others = catalogue.servers.servers.filter((server) => server.service === null).length;
-    connectedButton.textContent = `Connected ${catalogue.plugins.filter(catalogue.connected).length + others}`;
-    allButton.textContent = `All ${catalogue.plugins.length}`;
+  /** Install `plugin`: the daemon downloads its pinned commit, checks it and offers its skills to the next runs. */
+  async function install(plugin) {
+    busy.add(plugin.id);
+    paint();
+    try {
+      const now = await api.post(`/plugin-gallery/${encodeURIComponent(plugin.id)}`, {});
+      if (!disposed) {
+        gallery = now;
+      }
+    } finally {
+      busy.delete(plugin.id);
+      paint();
+    }
+    toast("ok", `${plugin.name} is installed: the runs that start now are offered its ${plural(plugin.skills.length, "skill", "skills")}.`);
   }
 
-  function sections(list) {
-    return SECTIONS.map(({ id, title }) => {
-      const members = list.filter((plugin) => plugin.section === id);
-      return members.length === 0
-        ? null
-        : el(
-            "section",
-            { class: "plugin-section", dataset: { section: id } },
-            el("h2", { class: "section-label plugin-section-title" }, title),
-            el("div", { class: "plugin-grid" }, members.map(tile)),
-          );
+  /** Take the plugin `name` out of Dot after a confirmation: its folder goes to the Trash (item 497). `title` is how
+   * the page names it, `servers` how many MCP servers it brings. */
+  async function remove(name, title, servers) {
+    const sure = await confirmDialog({
+      title: `Remove ${title} from Dot?`,
+      message:
+        servers > 0
+          ? "Its MCP servers stop now and its skills leave the runs that start after. Its folder goes to the Trash, where you can put it back."
+          : "Its skills leave the runs that start after. Its folder goes to the Trash, where you can put it back.",
+      confirmLabel: "Remove",
+      focusCancel: true,
     });
+    if (!sure) {
+      return;
+    }
+    busy.add(name);
+    paint();
+    try {
+      await api.del(`/installed-plugins/${encodeURIComponent(name)}`);
+      const now = await api.get("/plugin-gallery");
+      if (!disposed) {
+        gallery = now;
+      }
+    } finally {
+      busy.delete(name);
+      paint();
+    }
+    toast("ok", `${title} went to the Trash.`);
+  }
+
+  /** What a card or a plugin's page offers: Install, or Installed with Remove, or that a plugin of Dot holds its name.
+   * `wide` writes Remove out, as the plugin's page has room for. */
+  function action(plugin, wide) {
+    if (plugin.state === "installed") {
+      const label = `Remove ${plugin.name}`;
+      const removing = busy.has(plugin.id);
+      const button = wide
+        ? el("button", { class: "btn sm", type: "button", disabled: removing }, icon("trash"), "Remove")
+        : el("button", { class: "btn sm ghost icon-only gallery-remove", type: "button", title: label, "aria-label": label, disabled: removing }, icon("trash"));
+      button.addEventListener("click", () => attempt(() => remove(plugin.id, plugin.name, 0)));
+      return el("div", { class: "gallery-action" }, el("span", { class: "badge b-ok gallery-installed" }, icon("check"), "Installed"), button);
+    }
+    if (plugin.state === "taken") {
+      return el(
+        "div",
+        { class: "gallery-action" },
+        el("span", { class: "badge b-muted", title: `Dot has a plugin named ${plugin.id} already: Installed lists it.` }, "Name taken"),
+      );
+    }
+    const installing = busy.has(plugin.id);
+    const button = el(
+      "button",
+      { class: wide ? "btn sm primary gallery-install" : "btn sm gallery-install", type: "button", disabled: installing, "aria-label": `Install ${plugin.name}` },
+      installing ? [el("span", { class: "spinner", "aria-hidden": "true" }), "Installing…"] : [icon("download"), "Install"],
+    );
+    button.addEventListener("click", () => attempt(() => install(plugin)));
+    return el("div", { class: "gallery-action" }, button);
+  }
+
+  /** A plugin's card: its mark, its name (a link to its page that covers the card) with its check, who publishes it
+   * and how many skills it brings, what it does, and its action. */
+  function card(plugin) {
+    return el(
+      "article",
+      { class: "gallery-card", dataset: { plugin: plugin.id, state: plugin.state } },
+      galleryMark(plugin),
+      el(
+        "div",
+        { class: "gallery-card-main" },
+        el("div", { class: "gallery-card-head" }, el("a", { class: "gallery-card-name", href: `#/customize/plugins/${plugin.id}` }, plugin.name), plugin.official ? verified(plugin) : null),
+        el("div", { class: "gallery-card-by" }, ...joined([plugin.publisher, CATEGORIES[plugin.category]?.label ?? null, plural(plugin.skills.length, "skill", "skills")])),
+        el("p", { class: "gallery-card-does" }, plugin.does),
+      ),
+      action(plugin, false),
+    );
+  }
+
+  /** A plugin Dot reads that is not the gallery's: its name, where it is, its servers and what it says of itself, and
+   * Remove for one in Dot's own plugins folder (a folder of the config's is taken out of the config). */
+  function otherCard(other) {
+    const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, icon("puzzle"));
+    tintMark(mark, null, other.name);
+    let removeButton = null;
+    if (other.own) {
+      const label = `Remove ${other.name}`;
+      removeButton = el("button", { class: "btn sm ghost icon-only gallery-remove", type: "button", title: label, "aria-label": label, disabled: busy.has(other.name) }, icon("trash"));
+      removeButton.addEventListener("click", () => attempt(() => remove(other.name, other.name, other.servers)));
+    }
+    return el(
+      "article",
+      { class: "gallery-card", dataset: { plugin: other.name, state: "other" } },
+      mark,
+      el(
+        "div",
+        { class: "gallery-card-main" },
+        el("div", { class: "gallery-card-head" }, el("span", { class: "gallery-card-name" }, other.name)),
+        el(
+          "div",
+          { class: "gallery-card-by" },
+          ...joined([other.own ? "In Dot's plugins folder" : "From a folder of Dot's config", other.servers > 0 ? plural(other.servers, "MCP server", "MCP servers") : null]),
+        ),
+        other.description === null ? null : el("p", { class: "gallery-card-does" }, other.description),
+      ),
+      removeButton === null ? null : el("div", { class: "gallery-action" }, removeButton),
+    );
+  }
+
+  function matches(plugin) {
+    if (words === "") {
+      return true;
+    }
+    const kind = CATEGORIES[plugin.category]?.label ?? "";
+    return foldSearch(`${plugin.name} ${plugin.publisher} ${plugin.does} ${kind} ${plugin.skills.join(" ")}`).includes(words);
+  }
+
+  function ordered(plugins) {
+    const byStars = (a, b) => b.stars - a.stars || a.name.localeCompare(b.name);
+    return [...plugins].sort(order === "newest" ? (a, b) => b.added.localeCompare(a.added) || byStars(a, b) : byStars);
+  }
+
+  /** The head's marks, scattered about a soft light: the first featured plugins' and, between them, logos of the
+   * gallery, so that the head shows what kinds of plugins it holds. */
+  function paintHead() {
+    if (headMarks.childElementCount > 0) {
+      return;
+    }
+    const featuredOnes = gallery.plugins.filter((plugin) => plugin.featured && plugin.logo === null);
+    const logos = gallery.plugins.filter((plugin) => plugin.logo !== null);
+    const shownMarks = [featuredOnes[0], logos[0], featuredOnes[1], logos[1], featuredOnes[2]].filter((plugin) => plugin !== undefined);
+    headMarks.replaceChildren(...shownMarks.map((plugin) => el("span", { class: "gallery-head-mark" }, galleryMark(plugin))));
+  }
+
+  function paintCounts() {
+    const [allButton, featuredButton, installedButton] = filters.element.children;
+    const installed = gallery.plugins.filter((plugin) => plugin.state === "installed").length + gallery.others.length;
+    allButton.textContent = `All ${gallery.plugins.length}`;
+    featuredButton.textContent = `Featured ${gallery.plugins.filter((plugin) => plugin.featured).length}`;
+    installedButton.textContent = `Installed ${installed}`;
   }
 
   function paintList() {
-    paintTabs();
-    const showing = catalogue.plugins.filter((plugin) => (shown === "all" || catalogue.connected(plugin)) && matches(plugin));
-    const others = catalogue.servers.servers.filter((server) => server.service === null && (words === "" || foldSearch(`${server.name} ${server.address}`).includes(words)));
-    const parts = sections(showing);
-    if (others.length > 0 && (shown === "connected" || words !== "")) {
-      parts.push(
-        el(
-          "section",
-          { class: "plugin-section", dataset: { section: "servers" } },
-          el("h2", { class: "section-label plugin-section-title" }, "Other MCP servers"),
-          el("div", { class: "plugin-grid" }, others.map(serverTile)),
-        ),
-      );
+    paintHead();
+    paintCounts();
+    featured.hidden = words !== "" || shown !== "all";
+    featuredGrid.replaceChildren(...gallery.plugins.filter((plugin) => plugin.featured).map(card));
+    const showing = ordered(
+      gallery.plugins.filter((plugin) => (shown === "all" || (shown === "featured" && plugin.featured) || (shown === "installed" && plugin.state === "installed")) && matches(plugin)),
+    );
+    const others =
+      shown === "installed" ? gallery.others.filter((other) => words === "" || foldSearch(`${other.name} ${other.description ?? ""}`).includes(words)) : [];
+    const parts = showing.map(card);
+    if (others.length > 0) {
+      parts.push(el("h3", { class: "section-label gallery-others-title" }, "Not from the gallery"), ...others.map(otherCard));
     }
-    if (showing.length === 0 && (others.length === 0 || shown === "all")) {
+    if (parts.length === 0) {
       parts.push(
         words !== ""
           ? emptyPanel("search", "No plugin matches the search", "")
-          : emptyPanel("plug", "Dot is connected to nothing yet", "All lists what it works with."),
+          : emptyPanel("puzzle", "No plugin installed yet", "Install one from All, and the runs that start after can use its skills."),
       );
     }
-    parts.push(
-      el(
-        "section",
-        { class: "card connect-section plugin-own", dataset: { kind: "mcp" } },
-        el("div", { class: "card-head" }, icon("plug"), el("span", { class: "grow" }, "Your own MCP server")),
-        el(
-          "div",
-          null,
-          el("p", { class: "hint connect-hint" }, "MCP servers hand their tools to Dot. Dot tries one before it keeps it, signs in to it in this browser when it asks, and offers its tools to the runs that start after."),
-          shown === "all" && words === "" ? others.map(serverTile) : null,
-          form,
-        ),
-      ),
-    );
-    holder.replaceChildren(...parts.filter((part) => part !== null));
+    allGrid.replaceChildren(...parts);
+    holder.hidden = true;
+    body.hidden = false;
   }
 
   function paintPlugin(plugin) {
     ctx.setTitle(`${plugin.name} · Plugins`);
-    const again = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
-    holder.replaceChildren(el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/customize/plugins" }, icon("arrowLeft"), "Plugins"), again), ...serviceParts(catalogue, plugin));
+    const kind = CATEGORIES[plugin.category]?.label ?? null;
+    const facts = [
+      ["Repository", el("a", { href: plugin.homepage, target: "_blank", rel: "noopener noreferrer" }, `github.com/${plugin.repository}`, icon("external"))],
+      ["Pinned to", el("span", { class: "mono" }, plugin.commit.slice(0, 7))],
+      ["Licence", plugin.licence],
+      ["Stars", `${compact(plugin.stars)} on GitHub`],
+      ["In the gallery since", DAY.format(new Date(`${plugin.added}T00:00:00`))],
+    ];
+    holder.replaceChildren(
+      el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/customize/plugins" }, icon("arrowLeft"), "Plugins")),
+      el(
+        "header",
+        { class: "gallery-page-head", dataset: { plugin: plugin.id, state: plugin.state } },
+        galleryMark(plugin),
+        el(
+          "div",
+          { class: "gallery-card-main" },
+          el("div", { class: "gallery-card-head" }, el("h2", { class: "plugin-title" }, plugin.name), plugin.official ? verified(plugin) : null),
+          el("div", { class: "gallery-card-by" }, ...joined([plugin.publisher, kind, plural(plugin.skills.length, "skill", "skills")])),
+          el("p", { class: "gallery-page-does" }, plugin.does),
+        ),
+        action(plugin, true),
+      ),
+      pageCard(
+        "skills",
+        "Skills it brings",
+        "puzzle",
+        el(
+          "ul",
+          { class: "gallery-skills" },
+          plugin.skills.map((name) => el("li", null, icon("puzzle"), el("span", { class: "mono" }, name))),
+        ),
+      ),
+      pageCard(
+        "source",
+        "Where it comes from",
+        "shield",
+        el(
+          "div",
+          null,
+          el("dl", { class: "gallery-facts" }, facts.flatMap(([term, value]) => [el("dt", null, term), el("dd", null, value)])),
+          el(
+            "p",
+            { class: "hint connect-hint" },
+            "Install downloads this commit from GitHub and checks its files against the hash Dot keeps before it puts them in its plugins folder; the runs that start after are offered its skills, with no restart. Remove moves the folder to the Trash.",
+          ),
+        ),
+      ),
+    );
   }
 
   function paint() {
-    if (disposed || catalogue.plugins === null || !accountsRead) {
+    if (disposed || gallery === null) {
       return;
     }
     if (pluginId === undefined) {
       paintList();
       return;
     }
-    const plugin = catalogue.plugins.find((one) => one.id === pluginId);
+    const plugin = gallery.plugins.find((one) => one.id === pluginId);
     if (plugin === undefined) {
-      holder.replaceChildren(el("a", { class: "back", href: "#/customize/plugins" }, icon("arrowLeft"), "Plugins"), errorPanel(new Error(`Dot lists no plugin ${pluginId}.`)));
-    } else {
-      paintPlugin(plugin);
+      // A service's page had this address before the plugins took the name (item 542): it is under Connectors now.
+      location.replace(`${location.pathname}${location.search}#/customize/connectors/${pluginId}`);
+      return;
     }
+    paintPlugin(plugin);
   }
 
   async function load() {
     try {
-      await catalogue.load();
+      const found = await api.get("/plugin-gallery");
+      if (!disposed) {
+        gallery = found;
+        paint();
+      }
     } catch (error) {
       if (!disposed) {
+        holder.hidden = false;
         holder.replaceChildren(errorPanel(error, () => attempt(load)));
       }
     }
   }
 
-  // The official sign-ins of Google and Microsoft (item 422) head the list of the plugins, not a service's own page.
-  const accounts = pluginId === undefined ? accountsCard() : null;
-  accounts?.read.then(() => {
-    accountsRead = true;
-    paint();
-  });
-  root.append(bar, ...(accounts === null ? [] : [accounts.element]), holder);
+  if (pluginId === undefined) {
+    root.append(head, holder, body);
+  } else {
+    root.append(holder);
+  }
   attempt(load);
   return () => {
     disposed = true;
-    accounts?.dispose();
-    catalogue.dispose();
   };
 }

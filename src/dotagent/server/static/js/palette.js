@@ -6,7 +6,7 @@ import { api } from "./api.js";
 
 /** A palette read by `read()` (a promise of `GET /palette`'s answer): `loadPalette()` asks once and keeps the answer, a
  * failure is not kept, so that the next ask tries again; `serverMark(name)` is the mark of an MCP server the palette
- * lists (`{ logo, glyph, monogram, colour }`, or null for a server of no service and for one it has not named yet, which
+ * lists (`{ logo, glyph, colour }`, or null for a server of no service and for one it has not named yet, which
  * wear the plug); `wantServerMarks()` asks for the palette, once, for the chips that name a server before any menu that
  * lists them has been opened (a draft kept, a message sent); `onServerMarks(listener)` runs `listener()` each time the
  * palette arrives and its marks are remembered. */

@@ -3,7 +3,7 @@ The marks in this folder come from two sources, both released under CC0 1.0 Univ
 
 gilbarbara/logos (https://github.com/gilbarbara/logos), commit dafdf2df1334b2327497bfff40111aff0713c992 of 2026-10-17
 (its LICENSE.txt is CC0 1.0 Universal): each file as the source draws it, in the brand's own colours, unchanged:
-airtable.svg, amplitude-icon.svg, apify-icon.svg, apollostack.svg, asana-icon.svg, astro-icon.svg, atlassian.svg,
+airtable.svg, amplitude-icon.svg, apify-icon.svg, apollostack.svg, astro-icon.svg, atlassian.svg,
 aws.svg, brave.svg, buildkite-icon.svg, chrome.svg, clerk-icon.svg, clickup-icon.svg, close.svg, cloudflare-icon.svg,
 contentful.svg, customerio-icon.svg, digital-ocean-icon.svg, dropbox.svg, elevenlabs-icon.svg, exa-icon.svg,
 expo-icon.svg, figma.svg, firebase-icon.svg, firecrawl-icon.svg, framer.svg, github-icon.svg, gitlab-icon.svg,
@@ -16,7 +16,7 @@ playwright.svg, posthog-icon.svg, postman-icon.svg, prisma.svg, productboard-ico
 sentry-icon.svg, shopify.svg, shortcut-icon.svg, slack-icon.svg, snyk.svg, sourcegraph.svg, supabase-icon.svg,
 svelte-icon.svg, tavily.svg, todoist-icon.svg, vercel-icon.svg, wordpress-icon.svg, workos-icon.svg, x.svg, xcode.svg.
 
-Simple Icons (https://simpleicons.org), version 16.35.0: alibabacloud.svg, betterstack.svg, box.svg, braintrust.svg,
+Simple Icons (https://simpleicons.org), version 16.35.0: alibabacloud.svg, betterstack.svg, braintrust.svg,
 calendly.svg, convex.svg, duckdb.svg, excalidraw.svg, greenhouse.svg, hubspot.svg, kagi.svg, lottiefiles.svg, lucid.svg,
 mixpanel.svg, nextdotjs.svg, sanity.svg, semrush.svg, shadcnui.svg, socket.svg, stripe.svg, webflow.svg, wix.svg,
 zapier.svg. gilbarbara/logos draws these brands as a wordmark alone, too small to read in a tile, or not at all, or
