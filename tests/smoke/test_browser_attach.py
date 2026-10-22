@@ -330,9 +330,11 @@ async def test_the_colour_scheme_chosen_reaches_new_tabs_and_the_connection_stay
         )
         assert session.connected
         await session.open_url("after", f"{site}/other", True)
-        dark: ScriptRun = await session.run_script("after", "matchMedia('(prefers-color-scheme: dark)').matches", 5.0)
+        dark: ScriptRun = await session.run_script(
+            "after", "matchMedia('(prefers-color-scheme: dark)').matches", 5.0, False
+        )
         assert (dark.end, dark.text) == ("value", "true"), dark
-        kept: ScriptRun = await session.run_script("before", "document.title", 5.0)
+        kept: ScriptRun = await session.run_script("before", "document.title", 5.0, False)
         assert kept.end == "value", kept
     finally:
         await session.aclose()
@@ -614,7 +616,7 @@ async def test_a_script_reaches_the_runs_own_tab_every_time_while_three_chromes_
     try:
         await own.open_url("own", f"{site}/other", True)
         await attached.open_url("run", f"{site}/", True)
-        titles: list[str] = [(await attached.run_script("run", "document.title", 5.0)).text for _ in range(10)]
+        titles: list[str] = [(await attached.run_script("run", "document.title", 5.0, False)).text for _ in range(10)]
         assert titles == ['"Home"'] * 10
         await wait_for_tabs(chrome.port, [f"{site}/mine", f"{site}/"])
     finally:

@@ -31,7 +31,7 @@ service are marked:
 | ---------- | -------------------------------------------------------------------------------------------------------------------- |
 | `live`     | a running Ollama server with a signed-in cloud model                                                                 |
 | `browser`  | Chrome; it runs headless against a local fixture server                                                              |
-| `internet` | the public internet; a few read-only requests                                                                        |
+| `internet` | the public internet; read-only requests: a few, and two or three to each service of the plugins' catalogue           |
 | `desktop`  | a logged-in screen and `DOT_DESKTOP_TESTS=1`; it moves the real pointer and keyboard against a local AppKit window |
 | `hosted`   | your own `OPENAI_API_KEY`, `OPENCODE_API_KEY`, `ANTHROPIC_API_KEY` and `OLLAMA_API_KEY`; a few tiny requests, skipped per missing key |
 

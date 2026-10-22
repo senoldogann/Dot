@@ -289,10 +289,11 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 slack: Locator = _tile(page, "slack")
                 await expect(slack.locator(".badge")).to_have_text("Not signed in")
                 await expect(slack.get_by_role("button")).to_have_count(0)
-                # A service not tried yet says so and offers no step.
-                vercel: Locator = _tile(page, "vercel")
-                await expect(vercel.locator(".chip")).to_have_text("Not tried yet")
-                await expect(vercel.get_by_role("button")).to_have_count(0)
+                # A service not tried yet says so and offers no step; Vercel, untried until item 535, signs in now.
+                canva: Locator = _tile(page, "canva")
+                await expect(canva.locator(".chip")).to_have_text("Not tried yet")
+                await expect(canva.get_by_role("button")).to_have_count(0)
+                await expect(_tile(page, "vercel").locator(".chip")).to_have_text("MCP · Sign in")
                 await expect(_tile(page, "linear").locator(".chip")).to_have_text("MCP · Sign in")
                 await expect(_tile(page, "linear").get_by_role("button", name="Add Linear")).to_be_visible()
                 # Nothing is wider than the screen.
