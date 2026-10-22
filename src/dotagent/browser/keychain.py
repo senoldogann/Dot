@@ -44,9 +44,14 @@ def read_keychain_mode(profile: Path) -> KeychainMode:
             )
 
 
+def marker_path(profile: Path) -> Path:
+    """The file in which ``profile`` records its keychain (a missing one reads as ``mock``)."""
+    return profile / _MARKER_NAME
+
+
 def write_keychain_mode(profile: Path, mode: KeychainMode) -> None:
     """Record the keychain the cookies of ``profile`` are written with. The profile directory must exist."""
-    (profile / _MARKER_NAME).write_text(f"{mode}\n", encoding="utf-8")
+    marker_path(profile).write_text(f"{mode}\n", encoding="utf-8")
 
 
 def keychain_switches(mode: KeychainMode) -> list[str]:

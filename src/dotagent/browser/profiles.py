@@ -156,21 +156,23 @@ def write_default_zoom(folder: Path, percent: int) -> None:
         ) from error
 
 
-def keep_session_cookies(folder: Path) -> None:
+def keep_session_cookies(folder: Path, *, create: bool = False) -> None:
     """Have the Chrome that starts on the profile in ``folder`` keep the cookies of its last run that have no expiry,
     as a real browser keeps a sign-in (item 453, the owner's word of 2026-10-21: "silmesin"). Chrome writes such
     session cookies into the profile while it runs and deletes them as it starts again, unless its last run crashed:
     then it gives them back. So the profile's preferences say the last run crashed, and Chrome starts with
     :data:`HIDE_CRASH_BUBBLE`; it opens no page of that run (measured 2026-10-21 with Chrome 155, headless and with a
     window: a session cookie came back after each of five restarts, and no tab did). Incognito keeps nothing (item
-    355), and a profile whose preferences hold nothing yet has nothing to keep: neither is written. A new profile whose
-    zoom was just written (:func:`write_default_zoom`) gets the word too, and Chrome has nothing to give back on it.
-    Blocking, and while no Chrome holds the profile; the other preferences stay as they are."""
+    355), and a profile whose preferences hold nothing yet has nothing to keep: neither is written, unless ``create``
+    says the profile was just given cookies (the import of a Chrome profile's, item 529), which Chrome would delete as
+    it first starts on it. A new profile whose zoom was just written (:func:`write_default_zoom`) gets the word too, and
+    Chrome has nothing to give back on it. Blocking, and while no Chrome holds the profile; the other preferences stay
+    as they are."""
     if folder == browser_incognito_dir():
         return
     preferences: Path = folder / _PROFILE_DIR / _PREFERENCES
     kept: JsonObject = _preferences(preferences)
-    if not kept:
+    if not kept and not create:
         return
     ending: JsonValue = kept.get(_PROFILE_KEY, {})
     if not isinstance(ending, dict):
@@ -181,6 +183,7 @@ def keep_session_cookies(folder: Path) -> None:
         return
     changed: JsonObject = {**kept, _PROFILE_KEY: {**ending, _EXIT_TYPE: _CRASHED, _EXITED_CLEANLY: False}}
     try:
+        preferences.parent.mkdir(mode=_PROFILE_FOLDER_MODE, parents=True, exist_ok=True)
         write_whole(preferences, _JSON_OBJECT.dump_json(changed).decode("utf-8"))
     except OSError as error:
         raise BrowserError(
