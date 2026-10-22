@@ -1747,9 +1747,11 @@ def _protected_words(words: list[str], scope: ShellScope, *, climbs: bool = True
 
 
 def _has_too_many_spellings(raw: str, scope: ShellScope) -> bool:
-    """Whether ``raw`` has more spellings (variables, braces) than :data:`_MOST_VALUES`: the guard reads none of them,
-    and a protected location may be one."""
-    return _spellings(raw, scope)[1]
+    """Whether ``raw``, a word that reads as a path (it begins with ``/``, ``~``, ``$`` or ``.`` and has no space in
+    it), has more spellings (variables, braces) than :data:`_MOST_VALUES`: the guard reads none of them, and a protected
+    location may be one. The quotes are gone by the time a word gets here, so a program in quotes (``python3 -c
+    "d={'a':1,...}"``, ``awk '{print $1,$2}'``) has braces the shell would not spell out; it reads as no path."""
+    return bool(raw) and raw[0] in "/~$." and not any(char.isspace() for char in raw) and _spellings(raw, scope)[1]
 
 
 def _maybe_protected(reason: str) -> Finding:
@@ -2586,7 +2588,7 @@ def _walked_roots(command: str, args: list[str]) -> list[str]:
         return operands if "s3" in operands and ("sync" in operands or "--recursive" in long) else []
     if command == "gsutil":
         recursive_gs: bool = any(_RECURSE.fullmatch(word) for word in short)
-        return operands if ("rsync" in operands and recursive_gs) or ("cp" in operands and recursive_gs) else []
+        return operands if recursive_gs and ("rsync" in operands or "cp" in operands) else []
     if command in _RECURSIVE_COPIES:
         # Every operand: the folder a copy goes into may stand anywhere (``cp -R -t dest src``).
         recursive = any(_RECURSE_COPY.fullmatch(word) for word in short) or bool(long & {"--recursive", "--archive"})

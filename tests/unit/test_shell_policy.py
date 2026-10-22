@@ -862,6 +862,15 @@ _NOT_AFTER_THEM: list[str] = [
     "grep -r x ./src/*.py",
     # A lone dollar sign (the end of a line in a pattern) is no spelling to be read.
     "grep -n 'TODO$' src/x.py",
+    # Code and programs in quotes have braces the shell does not spell out: sixty-five and more are no path to read.
+    "python3 -c \"d={'k0':0,'k1':1,'k2':2,'k3':3,'k4':4,'k5':5,'k6':6,'k7':7,'k8':8,'k9':9,'k10':10,'k11':11,'k12':12,"
+    "'k13':13,'k14':14,'k15':15,'k16':16,'k17':17,'k18':18,'k19':19,'k20':20,'k21':21,'k22':22,'k23':23,'k24':24,"
+    "'k25':25,'k26':26,'k27':27,'k28':28,'k29':29,'k30':30,'k31':31,'k32':32,'k33':33,'k34':34,'k35':35,'k36':36,"
+    "'k37':37,'k38':38,'k39':39,'k40':40,'k41':41,'k42':42,'k43':43,'k44':44,'k45':45,'k46':46,'k47':47,'k48':48,"
+    "'k49':49,'k50':50,'k51':51,'k52':52,'k53':53,'k54':54,'k55':55,'k56':56,'k57':57,'k58':58,'k59':59,'k60':60,"
+    "'k61':61,'k62':62,'k63':63,'k64':64}; print(d)\"",
+    "awk '{print $1,$2,$3,$4} {print $5,$6,$7,$8} {print $9,$10,$11,$12} {print $13,$14} {print $1,$2}' f",
+    "jq '.[] | {a,b,c,d} | {e,f,g,h} | {i,j,k,l} | {m,n}' f",
     "grep -E '^\\s*$' f",
     "sed -i 's/ *$//' f",
     "perl -pe 's/\\r$//' f",
@@ -951,14 +960,25 @@ def test_a_step_that_may_reach_a_protected_location_says_so_and_is_not_called_de
 
 
 @pytest.mark.parametrize(
-    ("head", "option"), [("env", "-C ~ "), ("git", "-C ~ "), ("ls", "-C sub "), ("make", "--directory=./a ")]
+    ("head", "option", "decided"),
+    [
+        ("env", "-C ~ ", ("allow", "allow", "allow")),
+        ("git", "-C ~ ", ("allow", "allow", "ask")),
+        ("ls", "-C sub ", ("ask", "ask", "ask")),
+        ("make", "--directory=./a ", ("ask", "ask", "ask")),
+    ],
 )
-def test_a_line_of_hundreds_of_moves_is_judged_in_seconds_not_minutes(head: str, option: str, tmp_path: Path) -> None:
+def test_a_line_of_hundreds_of_moves_is_judged_in_seconds_not_minutes(
+    head: str, option: str, decided: tuple[Verdict, Verdict, Verdict], tmp_path: Path
+) -> None:
     """Each move is judged against every word of the command: forty of them took a minute (the security review of item
-    531), so more than a few different folders ask instead; a generous bound, for a busy machine."""
+    531), so more than a few different folders ask instead, and any number of moves to one folder is one (``env -C ~``
+    two hundred times allows as it does once; ``git true`` is no read, which only the cautious preset asks about);
+    ``sub/sub/...`` and ``a/a/...`` are more than four different folders. A generous bound, for a busy machine."""
     started: float = time.monotonic()
-    _under_the_defaults(f"{head} {option * 200}true", tmp_path)
+    verdicts: tuple[Verdict, Verdict, Verdict] = _under_the_defaults(f"{head} {option * 200}true", tmp_path)
     assert time.monotonic() - started < 20.0
+    assert verdicts == decided
 
 
 @pytest.mark.parametrize("command", _NOT_AFTER_THEM)
