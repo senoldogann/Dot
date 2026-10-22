@@ -268,10 +268,10 @@ owner's to say, and a run of its kind learns a skill of its own rather than rewr
 
 A review model that is not one of the strong ones may give the steps or the parameters as one text instead of a list
 (a JSON array in a string, or a line to each step, numbered or with a bullet), or leave the parameters out (a skill with
-none): Dot reads them as the list they mean, and the owner reads the skill before saving it anyway (item 543). An answer
-that is still no skill (no steps, more than twenty, a kind too short) is asked for once more, and when it fails again the
-panel says which field was wrong and how (`kind: Field required; steps: Input should be a valid list`), not only that
-the answer was no verdict.
+none): Dot reads them as the list they mean (item 543). All the steps run together in one line are no list of them. An
+answer that is still no skill (no steps, one line of them, more than twenty, a kind too short) is asked for once more,
+and when it fails again the panel says which field was wrong and how (`kind: Field required; steps: Input should be a
+valid list`), not only that the answer was no verdict.
 
 A browser without a window refuses to record (there is nothing for the owner to work in: turn `[browser] headless` off),
 a second recording is refused while the first goes on, as is one started while a run works in that chat (a run's own

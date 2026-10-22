@@ -533,22 +533,24 @@ class PlaybookRequest(FrozenModel):
 _LIST_MARK: re.Pattern[str] = re.compile(r"^\s*(?:[-*•]|\d{1,2}[.)])\s+")
 
 
-def _list_from_text(value: object) -> object:
-    """``value`` as the list a model meant: a JSON array written as text, or the lines of a text with the number or the
-    bullet before each taken off, and no item for null; anything else as it came, for the field's own check."""
+def _list_from_text(value: object, least: int) -> object:
+    """``value`` as the list a model meant: a JSON array written as text, or a text of at least ``least`` lines with
+    the number or the bullet before each taken off, and no item for null; anything else as it came, for the field's own
+    check. A text that is structured or code (it opens with a bracket, a brace or a code fence) is read as JSON or not
+    at all: its lines would be the pieces of a broken array (a trailing comma, a cut-off answer), not steps."""
     if value is None:
         return []
     if not isinstance(value, str):
         return value
     text: str = value.strip()
-    if text.startswith("["):
+    if text.startswith(("[", "{", "`")):
         try:
             parsed: object = json.loads(text)
         except (ValueError, RecursionError):
-            parsed = None
-        if isinstance(parsed, list):
-            return parsed
-    return [line for line in (_LIST_MARK.sub("", raw).strip() for raw in text.splitlines()) if line]
+            return value
+        return parsed if isinstance(parsed, list) else value
+    lines: list[str] = [line for line in (_LIST_MARK.sub("", raw).strip() for raw in text.splitlines()) if line]
+    return lines if len(lines) >= least else value
 
 
 class PlaybookDraft(FrozenModel):
@@ -586,10 +588,17 @@ class PlaybookDraft(FrozenModel):
         description="Each parameter the steps name, with what it is; an empty list when the steps name none.",
     )
 
-    @field_validator("steps", "parameters", mode="before")
+    # A line that holds all the steps is no list of them: a skill is not saved as one step because a model ran them
+    # together (a learned skill is saved with no one to read it first). One parameter in a line is a list of one.
+    @field_validator("steps", mode="before")
     @classmethod
-    def _text_as_list(cls, value: object) -> object:
-        return _list_from_text(value)
+    def _steps_as_list(cls, value: object) -> object:
+        return _list_from_text(value, 2)
+
+    @field_validator("parameters", mode="before")
+    @classmethod
+    def _parameters_as_list(cls, value: object) -> object:
+        return _list_from_text(value, 1)
 
 
 Reviewer = Callable[[ReviewRequest], Awaitable[ReviewVerdict]]
@@ -1085,11 +1094,13 @@ def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: ty
 
 def _fields_wrong(exc: ValidationError) -> str:
     """What a verdict got wrong, a field and its problem each (``steps: Input should be a valid list``): the owner
-    reads it where the question failed, and the review model is told it when asked again."""
-    problems: list[str] = [
-        f"{'.'.join(str(part) for part in error['loc']) or 'the arguments'}: {error['msg']}"
-        for error in exc.errors(include_url=False, include_context=False, include_input=False)
-    ]
+    reads it where the question failed, and the review model is told it when asked again. Only names of the verdict's
+    own fields: a key the model made up (``extra_forbidden``) is its own text, which the message would carry into the
+    note to the model, the toast and the tool results the run reads, so the field is left unnamed."""
+    problems: list[str] = []
+    for error in exc.errors(include_url=False, include_context=False, include_input=False):
+        where: tuple[int | str, ...] = error["loc"][:-1] if error["type"] == "extra_forbidden" else error["loc"]
+        problems.append(f"{'.'.join(str(part) for part in where) or 'the arguments'}: {error['msg']}")
     return truncate_middle("; ".join(problems), _FIELDS_WRONG_CHARS)
 
 
