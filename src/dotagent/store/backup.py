@@ -30,9 +30,6 @@ log = get_logger(__name__)
 BACKUP_SUFFIX: str = ".sqlite3.gz"
 _NAME: re.Pattern[str] = re.compile(r"dot-(\d{8}-\d{6})\.sqlite3\.gz")
 _STAMP_FORMAT: str = "%Y%m%d-%H%M%S"
-# The pages copied at a time, and the pause between two such steps, so that the daemon's own writes go on in between.
-_PAGES_PER_STEP: int = 2048
-_STEP_PAUSE_S: float = 0.005
 # How long a copy waits for a write that holds the database before it gives up.
 _BUSY_TIMEOUT_S: float = 30.0
 # A copy that failed is tried again after this long, rather than a whole interval later.
@@ -59,7 +56,11 @@ def _made_at(path: Path) -> float | None:
     matched: re.Match[str] | None = _NAME.fullmatch(path.name)
     if matched is None:
         return None
-    return float(calendar.timegm(time.strptime(matched.group(1), _STAMP_FORMAT)))
+    try:
+        return float(calendar.timegm(time.strptime(matched.group(1), _STAMP_FORMAT)))
+    except ValueError:
+        # Shaped as a copy's name but no time ("dot-20261399-000000"): not one of the copies.
+        return None
 
 
 def list_backups(folder: Path) -> list[Backup]:
@@ -69,8 +70,15 @@ def list_backups(folder: Path) -> list[Backup]:
     found: list[Backup] = []
     for path in folder.iterdir():
         made: float | None = _made_at(path)
-        if made is not None and path.is_file():
-            found.append(Backup(path=str(path), made_at=made, size=path.stat().st_size))
+        if made is None:
+            continue
+        try:
+            size: int = path.stat().st_size
+        except FileNotFoundError:
+            # Thinned or moved away since the folder was listed.
+            continue
+        if path.is_file():
+            found.append(Backup(path=str(path), made_at=made, size=size))
     return sorted(found, key=lambda backup: backup.made_at, reverse=True)
 
 
@@ -100,7 +108,10 @@ def make_backup(database: Path, folder: Path, now: float) -> Backup:
         try:
             target: sqlite3.Connection = sqlite3.connect(raw)
             try:
-                source.backup(target, pages=_PAGES_PER_STEP, sleep=_STEP_PAUSE_S)
+                # In one step: a copy made in several restarts from the first page whenever another connection writes
+                # in between, as the daemon's do all the time. In WAL mode the one step reads a snapshot and holds
+                # back no write.
+                source.backup(target)
                 checked: tuple[str] | None = target.execute("PRAGMA quick_check").fetchone()
             finally:
                 target.close()
@@ -143,15 +154,15 @@ async def keep_backups(config: StoreConfig, database: Path) -> None:
     every_s: float = config.backup_every_hours * 3600.0
     folder: Path = backup_folder(config)
     while True:
-        copies: list[Backup] = await asyncio.to_thread(list_backups, folder)
-        last: float | None = copies[0].made_at if copies else None
-        if last is not None:
-            await asyncio.sleep(max(0.0, last + every_s - time.time()))
-            if not await asyncio.to_thread(changed_since, database, last):
-                # Nothing to copy: look again a whole interval later.
-                await asyncio.sleep(every_s)
-                continue
         try:
+            copies: list[Backup] = await asyncio.to_thread(list_backups, folder)
+            last: float | None = copies[0].made_at if copies else None
+            if last is not None:
+                await asyncio.sleep(max(0.0, last + every_s - time.time()))
+                if not await asyncio.to_thread(changed_since, database, last):
+                    # Nothing to copy: look again a whole interval later.
+                    await asyncio.sleep(every_s)
+                    continue
             made: Backup = await asyncio.to_thread(make_backup, database, folder, time.time())
             gone: list[Backup] = await asyncio.to_thread(
                 thin_backups, folder, config.backup_keep_hourly, config.backup_keep_days, time.time()
@@ -168,7 +179,8 @@ def backup_state(config: StoreConfig, now: float) -> tuple[bool, str]:
     every ``backup_every_hours`` hours (twice that is late, as a database that did not change is not copied)."""
     folder: Path = backup_folder(config)
     if config.backup_every_hours == 0:
-        return False, f"no copies are made ([store] backup_every_hours = 0); {folder} keeps the older ones"
+        # The owner's choice, not a fault.
+        return True, f"off ([store] backup_every_hours = 0); {folder} keeps the older copies"
     copies: list[Backup] = list_backups(folder)
     if not copies:
         return False, f"no copy yet in {folder} (the daemon makes one as it starts)"

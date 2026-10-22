@@ -113,7 +113,8 @@ class ServerConfig(FrozenModel):
 
 class StoreConfig(FrozenModel):
     """What ``dotx prune --apply`` deletes of the database (``[store]``): the events of the runs that ended more than
-    ``retention_days`` days ago, and with them the screenshots only those events name. Nothing is deleted by itself.
+    ``retention_days`` days ago, and with them the screenshots only those events name. Nothing of the database is
+    deleted by itself; the daemon thins only its own copies of it.
     The copies of the database (item 526): made every ``backup_every_hours`` hours while the daemon runs (0: none),
     kept in ``backup_dir`` (``<home>/backups`` when empty), the newest ``backup_keep_hourly`` and one of each of the
     last ``backup_keep_days`` days."""

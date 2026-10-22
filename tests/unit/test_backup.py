@@ -6,6 +6,7 @@ import asyncio
 import gzip
 import os
 import sqlite3
+import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -72,6 +73,31 @@ def test_a_copy_is_the_whole_database_checked_compressed_and_private(tmp_path: P
     assert list_backups(folder) == [made]
 
 
+def test_a_copy_finishes_while_another_connection_writes(tmp_path: Path) -> None:
+    """A copy made in several steps starts over whenever another connection writes in between, as the daemon's do;
+    the copy is made in one, so it ends whatever is written meanwhile."""
+    database: Path = _database(tmp_path / "dot.sqlite3", 20_000)
+    stop: threading.Event = threading.Event()
+
+    def write() -> None:
+        connection: sqlite3.Connection = sqlite3.connect(database, timeout=30.0)
+        try:
+            while not stop.is_set():
+                connection.execute("INSERT INTO notes (body) VALUES ('written meanwhile')")
+                connection.commit()
+        finally:
+            connection.close()
+
+    writer: threading.Thread = threading.Thread(target=write)
+    writer.start()
+    try:
+        made: Backup = make_backup(database, tmp_path / "copies", NOW)
+    finally:
+        stop.set()
+        writer.join()
+    assert Path(made.path).stat().st_size == made.size > 0
+
+
 def test_there_is_no_copy_of_a_database_that_is_not_there(tmp_path: Path) -> None:
     with pytest.raises(StoreError, match="no database to copy"):
         make_backup(tmp_path / "missing.sqlite3", tmp_path / "copies", NOW)
@@ -84,15 +110,21 @@ def test_thinning_keeps_the_newest_hourly_and_one_of_each_recent_day_and_touches
     # A copy each hour of the last 30 hours, and one at noon of each of the 20 days before.
     hourly: list[Path] = [_copy_at(folder, NOW - hours * 3600.0) for hours in range(30)]
     daily: list[Path] = [_copy_at(folder, NOW - (2 + days) * 86400.0) for days in range(20)]
-    others: list[Path] = [folder / "notes.txt", folder / "dot-nonsense.sqlite3.gz", folder / ".dot-1.partial"]
+    others: list[Path] = [
+        folder / "notes.txt",
+        folder / "dot-nonsense.sqlite3.gz",
+        folder / ".dot-1.partial",
+        # Shaped as a copy's name, but no time: not a copy.
+        folder / "dot-20261399-000000.sqlite3.gz",
+    ]
     for other in others:
         other.write_text("kept", encoding="utf-8")
     gone: list[Backup] = thin_backups(folder, keep_hourly=24, keep_days=14, now=NOW)
     left: set[Path] = {Path(backup.path) for backup in list_backups(folder)}
     assert set(hourly[:24]) <= left
-    # Of the hourly ones past the newest 24, the newest of each day is kept as that day's copy.
-    days_kept: set[str] = {path.name[4:12] for path in left}
-    assert len(days_kept) == len({path.name[4:12] for path in left})
+    # Past the newest 24, one copy of a day is kept for each day: never two of the same day.
+    older: list[Path] = [path for path in left if path not in set(hourly[:24])]
+    assert len({path.name[4:12] for path in older}) == len(older)
     assert all(path in left for path in daily[:12]) and not any(path in left for path in daily[13:])
     assert {Path(backup.path) for backup in gone} == set(hourly + daily) - left
     assert all(other.exists() for other in others)
@@ -111,14 +143,18 @@ def test_a_database_is_copied_again_only_when_it_changed(tmp_path: Path) -> None
 
 def test_the_doctor_says_whether_the_copies_are_fresh(tmp_path: Path) -> None:
     folder: Path = tmp_path / "copies"
-    assert backup_state(_store(folder, every_hours=0), NOW)[0] is False
+    # Copies turned off are the owner's choice, not a fault.
+    assert backup_state(_store(folder, every_hours=0), NOW) == (
+        True,
+        f"off ([store] backup_every_hours = 0); {folder} keeps the older copies",
+    )
     fresh, said = backup_state(_store(folder), NOW)
     assert (fresh, "no copy yet" in said) == (False, True)
     folder.mkdir()
     _copy_at(folder, NOW - 1800.0)
     assert backup_state(_store(folder), NOW) == (True, f"the newest of 1 copies is 0.5 h old, in {folder}")
-    late, said = backup_state(_store(folder), NOW + 6 * 3600.0)
-    assert late is False and "older than [store] backup_every_hours asks" in said
+    fresh, said = backup_state(_store(folder), NOW + 6 * 3600.0)
+    assert fresh is False and "older than [store] backup_every_hours asks" in said
 
 
 async def test_the_daemon_s_loop_copies_at_once_when_no_copy_is_there(tmp_path: Path) -> None:

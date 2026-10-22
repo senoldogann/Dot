@@ -36,7 +36,8 @@ the process move things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the 
 | `run-owners/`                                    | one lock per process that drives runs (the daemon, `dotx run`)       |
 | `backups/`                                       | the copies of the database, unless `[store] backup_dir` names a folder |
 
-Deleting a chat deletes the screenshot files that only it named. Nothing else is removed by itself: old runs and their
+Deleting a chat deletes the screenshot files that only it named, and the daemon thins its copies of the database
+(below). Nothing else is removed by itself: old runs and their
 events stay until their chats are deleted or `dotx prune --apply` finds them old, and the journals of file changes
 until it finds them old. `dotx prune` lists the events of the runs that ended more than `[store] retention_days`
 (90) days ago (the steps, tool calls and results of their timelines; the runs keep their answers, numbers and
@@ -48,7 +49,8 @@ database is locked for a moment while it compacts, so run it when no run is acti
 
 **Copies of the database** (item 526). While the daemon runs, it copies the database every `[store]
 backup_every_hours` hours (1), and as it starts when no copy is younger, whenever the database changed since the
-last copy. SQLite's online backup makes the copy while runs go on, a few pages at a time; the copy is checked
+last copy. SQLite's online backup makes the copy in one read of the database, which in its write-ahead mode holds
+back none of the daemon's writes, so runs go on while it is made; the copy is checked
 (`quick_check`), compressed and kept as `dot-<UTC time>.sqlite3.gz` (mode 0600) in `[store] backup_dir`, written
 under a hidden name and renamed once whole. The newest `backup_keep_hourly` (24) copies are kept, and the newest
 copy of each of the last `backup_keep_days` (14) days; only files named as copies are ever removed from the folder.
