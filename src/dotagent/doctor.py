@@ -71,6 +71,7 @@ from dotagent.skills.office import (
     onedrive_folders,
 )
 from dotagent.skills.types import SkillCatalog, SkillProblem
+from dotagent.store.backup import backup_state
 from dotagent.tools.shell import read_login_env
 from dotagent.web.client import WebClient
 from dotagent.web.search import AnthropicRung, SearchChoice, search_ladder, search_ollama
@@ -754,6 +755,12 @@ def _office_checks() -> list[CheckResult]:
     ]
 
 
+def _backup_row(config: AppConfig) -> CheckResult:
+    """How fresh the copies of the database are (item 526); never required, as Dot runs without them."""
+    fresh, detail = backup_state(config.store, time.time())
+    return _result("backups", fresh, False, detail)
+
+
 async def _machine_checks(config: AppConfig) -> list[CheckResult]:
     """What this Mac provides: the home directory, tools, desktop support, the browser profile, the plugins and skills,
     the Office applications and OneDrive folders, and the MCP servers (the configured ones and those of the plugins)."""
@@ -763,6 +770,7 @@ async def _machine_checks(config: AppConfig) -> list[CheckResult]:
         *await asyncio.to_thread(_local_checks),
         *_check_desktop(config),
         await asyncio.to_thread(_codes_row, config),
+        await asyncio.to_thread(_backup_row, config),
         await asyncio.to_thread(_check_browser_mode, config),
         await asyncio.to_thread(_check_browser_profile, config),
         _plugins_row(plugins),

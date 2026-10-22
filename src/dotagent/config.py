@@ -113,9 +113,16 @@ class ServerConfig(FrozenModel):
 
 class StoreConfig(FrozenModel):
     """What ``dotx prune --apply`` deletes of the database (``[store]``): the events of the runs that ended more than
-    ``retention_days`` days ago, and with them the screenshots only those events name. Nothing is deleted by itself."""
+    ``retention_days`` days ago, and with them the screenshots only those events name. Nothing is deleted by itself.
+    The copies of the database (item 526): made every ``backup_every_hours`` hours while the daemon runs (0: none),
+    kept in ``backup_dir`` (``<home>/backups`` when empty), the newest ``backup_keep_hourly`` and one of each of the
+    last ``backup_keep_days`` days."""
 
     retention_days: int = Field(ge=1)
+    backup_every_hours: float = Field(ge=0, le=24 * 7, allow_inf_nan=False)
+    backup_dir: str
+    backup_keep_hourly: int = Field(ge=1, le=24 * 14)
+    backup_keep_days: int = Field(ge=0, le=365)
 
 
 class OllamaConfig(FrozenModel):

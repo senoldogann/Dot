@@ -34,6 +34,7 @@ the process move things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the 
 | `daemon.pid`                                     | held while a daemon runs; a second daemon is refused                 |
 | `STOP`                                           | exists while the emergency stop is engaged                           |
 | `run-owners/`                                    | one lock per process that drives runs (the daemon, `dotx run`)       |
+| `backups/`                                       | the copies of the database, unless `[store] backup_dir` names a folder |
 
 Deleting a chat deletes the screenshot files that only it named. Nothing else is removed by itself: old runs and their
 events stay until their chats are deleted or `dotx prune --apply` finds them old, and the journals of file changes
@@ -44,6 +45,20 @@ space inside the database file and the journals of file changes (`dotx undo`) wh
 `[agent] undo_keep_days`; `dotx prune --apply` deletes those events, and with them the screenshots only they named,
 those files and journals, and gives the space back to the disk, after which a delete returns its space by itself. The
 database is locked for a moment while it compacts, so run it when no run is active.
+
+**Copies of the database** (item 526). While the daemon runs, it copies the database every `[store]
+backup_every_hours` hours (1), and as it starts when no copy is younger, whenever the database changed since the
+last copy. SQLite's online backup makes the copy while runs go on, a few pages at a time; the copy is checked
+(`quick_check`), compressed and kept as `dot-<UTC time>.sqlite3.gz` (mode 0600) in `[store] backup_dir`, written
+under a hidden name and renamed once whole. The newest `backup_keep_hourly` (24) copies are kept, and the newest
+copy of each of the last `backup_keep_days` (14) days; only files named as copies are ever removed from the folder.
+An empty `backup_dir` is `<home>/backups`, which goes with the home folder if that is lost: point it at an external
+disk, or at iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs/Dot Backups`), to keep the copies off
+this Mac. `backup_every_hours = 0` makes none. `dotx backup now` makes one at once and `dotx backup list` lists them;
+`dotx doctor` says how old the newest is. A copy that fails is logged (`backup_failed`) and tried again ten minutes
+later. To go back to a copy, stop the daemon (`dotx service uninstall`), move `dot.sqlite3` and its `dot.sqlite3-wal`
+and `dot.sqlite3-shm` aside (an old write-ahead log left beside the copy would be applied to it), unpack the copy in
+its place (`gunzip -c <copy> > "<home>/dot.sqlite3"`), and start the daemon again (`dotx service install`).
 
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log` (another folder with `DOT_LOG_DIR`: `dotx service status`
 names the one in use, and the sign-in screen of a daemon that could not answer points to it); at 10 MB it is moved to
