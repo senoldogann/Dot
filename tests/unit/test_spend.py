@@ -4,8 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from dotagent.browser.safety import dialog_is_financial
 from dotagent.config import SpendCap
-from dotagent.policy.elements import Element
+from dotagent.policy.elements import Element, StepAssessment, assessment_for, naming_reasons
 from dotagent.policy.engine import decide
 from dotagent.policy.spend import (
     SpendState,
@@ -58,6 +59,112 @@ def _payment(amount: Amount | None, flags: tuple[str, ...] = ("financial",)) -> 
 )
 def test_the_amount_of_a_label_is_the_number_next_to_a_currency(label: str, amount: Amount | None) -> None:
     assert amount_in_label(label) == amount
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Pay",
+        "Pay $19.90",
+        "Pay €19,90",
+        "Total 9,90 €. Pay",
+        "Total: €9.90\nPay",
+        "Lamp — $9.90 — Buy",
+        "Lamp - Buy",
+        "Buy",
+        "Buy $14.99",
+        "Order now",
+        "Order",
+        "Pre-order",
+        "Place your order",
+        "Confirm and pay",
+        "Agree & pay",
+        "Complete checkout",
+        "Proceed to pay",
+        "Place bid",
+        "Add funds",
+        "Rent HD $3.99",
+        "Order · €23.50",
+        "Book for $199",
+        "Book now · $199",
+        "Book this room · $199",
+        "Book flight $320",
+        "Reserve now — €50",
+        "Reserve a table — €10",
+        "Book 2 tickets · $40",
+        "Reserve for 2 guests — €50",
+        "Book 1 room · $199",
+        "Order (3 items) · $45.00",
+        "Book (€199)",
+        "Book at $199",
+        "Reserve · from €120",
+        "Book 1500 TL",
+        "Book: $199",
+        "Reserve: €50",
+        "Order: $45.00",
+        # Labels nobody foresaw err towards the hand-off: a book's place in its series reads as a booking, and a row of
+        # past orders that shows its number without "#" as an order.
+        "Dune · Book 1 · $9.99",
+        "Order 4521 · $45.00 · Delivered",
+        "Subscribe for €4.99/month",
+        "Upgrade · 99 TL",
+        "Satın al",
+        "Şimdi öde",
+        "Öde",
+        "Onayla ve öde",
+        "Ödeme yap",
+        "Maksa",
+        "Osta nyt",
+        "Vahvista tilaus",
+        "Tilaa ja maksa",
+    ],
+)
+def test_a_label_that_asks_for_money_is_a_payment(label: str) -> None:
+    found: StepAssessment = assessment_for(naming_reasons(Element(role="button", name=label)))
+    assert found.risk == "high" and "financial" in found.flags, label
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Payment methods",
+        "PayPal",
+        "Where to buy",
+        "Buyer protection",
+        "Order history",
+        "Order 20261010",
+        "Order #4521 · $45.00 · Delivered",
+        "Order summary · $45.00",
+        "Order total: $45.00",
+        "Order details · $45.00",
+        "Reserve price $500",
+        "Orders over $35 ship free",
+        "Checkout",
+        "Proceed to checkout",
+        "Continue to payment",
+        "Subscribe",
+        "Ode to Joy",
+        "Maksaa 5 €",
+    ],
+)
+def test_a_label_that_names_money_or_leads_to_the_payment_page_is_no_payment(label: str) -> None:
+    """The control that takes the money is the payment: the way to the payment page is a plain click, so that the run
+    fills the order before the button that pays is handed to the owner."""
+    assert "financial" not in assessment_for(naming_reasons(Element(role="button", name=label))).flags, label
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Order #4521 will be charged $45.00 to your card. Continue?",
+        "Order 20261010: $45.00 will be charged",
+        "Reserve: €50 will be taken from your card",
+    ],
+)
+def test_a_dialog_that_names_an_order_and_its_amount_asks_to_pay(message: str) -> None:
+    """In a dialog's sentences an order's number is the order about to be paid: the shapes that make a label a record
+    do not make a dialog one."""
+    assert dialog_is_financial(message), message
 
 
 def test_the_total_of_a_page_is_the_largest_amount_after_a_total_cue() -> None:

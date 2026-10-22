@@ -2223,6 +2223,7 @@ class RunManager:
                 ),
                 instructions,
                 runtime.site_locks,
+                taint_check=runtime.config.policy.yolo_taint_check,
             )
             if starts_tainted:
                 gate.taint()
