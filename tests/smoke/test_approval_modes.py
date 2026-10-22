@@ -238,9 +238,12 @@ async def test_yolo_also_waives_the_question_that_untrusted_content_raises(room:
     await room.broker.resolve(question.record.id, False, "user", "")
     with pytest.raises(ApprovalRejected):
         await asyncio.wait_for(question.answer, WAIT_S)
-    yolo: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
+    checked: list[ReviewRequest] = []
+    yolo: RunGate = _gate(room, "task", "aggressive", "yolo", _answering("approve", checked))
     yolo.taint()
     assert await asyncio.wait_for(yolo.authorize(SCHEDULE), WAIT_S) == ""
+    # Item 525: the review model checks the step the taint would have asked about, and nobody is asked.
+    assert [(request.action, request.tainted) for request in checked] == [(SCHEDULE, True)]
     assert {record.decided_by: record.status for record in await _decided(room)} == {
         "user": "denied",
         YOLO_DECIDER: "approved",

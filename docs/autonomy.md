@@ -38,8 +38,12 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   can read afterwards what went through and why. A yolo run types the password, one-time code or card number it has —
   one you gave it, or one it read from the mail that carried it — into the browser or the desktop itself, and into a
   terminal program that asks for one. Only the desktop tools stay away from password managers and Keychain Access in
-  every mode. The rest is the price of the mode: a run that has read a hostile page can change or delete files, run
-  commands, send a message and move money without asking you. A refusal is not a question: a `research` run's limit
+  every mode. The rest is the price of the mode: a run that has read a hostile page can change or delete files and
+  run commands without asking you. Two things hold for a yolo run that has read outside content (item 525, see
+  [Safety](safety.md#safety)): the review model checks, without asking you, a step a planted instruction would be
+  after (a message, a post, an upload, a payment, a credential, a read of your secrets, an install, a note it saves),
+  and refuses what your instructions do not call for; and it sends no secret Dot holds out of the Mac. A refusal is
+  not a question: a `research` run's limit
   stands, and no rule of yours can refuse — its behaviours are allow, preapproved, ask and hand off.
 
 In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
@@ -65,7 +69,8 @@ looked (item 466; see [The daemon](daemon.md)).
 the preset's and your `ask` rules', money and credentials', a message or a post in your name, a pre-approved spend, and
 the refusal of a read of your secrets or of data sent out (items 429 and 433). **What no mode waives** (item 429): a
 `research` run changes nothing but its notes file and memory — a refusal is not a question, so yolo does not waive it
-either. (A rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off, and a yolo run waives
+either — and a run that read outside content sends no secret Dot holds out of the Mac (item 525). A yolo run that read
+such content also has the review model's refusal of a step it checks (`[policy] yolo_taint_check`, on by default). (A rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off, and a yolo run waives
 the last two with every other question.) The modes that ask keep their guard: in `supervised`, `ask` and
 `auto` money and credentials are still yours (Dot stops and asks you to do that step yourself; the review model is
 never asked about them, and a payment under its pre-approved caps asks you, or the review model in `auto`), and a message

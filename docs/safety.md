@@ -168,7 +168,8 @@ Who answers what the policy asks depends on the approval mode of the run: you, a
 with the rest (item 443). What a `yolo` run waives is every question and every hand-off below it (item 443): the
 refusal of the first step, the questions of the third step, of your `ask` rules, of the preset and of untrusted
 content, the hand-offs of the fourth step and the questions of the fifth, and it records each with the reason it would
-have asked for. Without the first step, a `yolo` run can also
+have asked for; a run marked untrusted keeps two checks of its own (item 525, *Outside content in yolo* below). Without
+the first step, a `yolo` run can also
 read Dot's own key (`api-token` in Dot's home) and with it do what the web UI does, answer a question of the policy
 among it: in `yolo` the guard stops the steps of the work, not a run set on getting around it.
 
@@ -197,6 +198,24 @@ work of such an end, which clears nothing. A message you send starts a run unmar
 marked keeps that origin (`tainted`): it is never among the notes a run starts with, is handed while it works or as a
 site's lessons (item 384), a `memory_search` that returns one marks the run that read it, so its next save asks again,
 and Settings › Memory and `dotx memory list` say of such a note that it was saved while reading outside content.
+
+**Outside content in yolo** (item 525). A `yolo` run asks nothing, and a run marked untrusted may be steered by what a
+stranger wrote. Two checks hold for such a run, and neither asks you:
+
+- *The taint check.* Before a yolo run marked untrusted does a step an instruction planted in what it read would be
+  after (a message, a post, an upload or data sent out, a payment, a credential, a login filled from your password
+  manager, privilege or system settings, a schedule or a note it saves, an install, a change of Dot's own files, a read
+  of your secrets, a deletion outside the workspace), the review model (`[models] review`) judges it against your own
+  instructions, as it does in `auto`, with the run marked untrusted. A step it refuses is refused: the run is told why
+  and goes on with the rest, and the record names the review model. Any other answer, `escalate` too, lets the step
+  run as yolo runs it. A follow or a like is left to the pace of its site. A review model that cannot answer fails the
+  step with its error. `[policy] yolo_taint_check = false` turns the check off.
+- *No secret out.* In every approval mode, `yolo` too, whatever the preset or your rules say, a run marked untrusted
+  sends no secret Dot holds out of the Mac: a key read in this process (saved with `dotx auth set` or in Settings), a
+  value of `<home>/.env`, or text in the form of a key or a private key. A request, a page's address or field, a
+  message, the arguments of an MCP tool and a step that uploads, posts or sends are what it looks at
+  (`policy/egress.py`). The step is refused before it runs, and its `policy` event says why. A run you start with your
+  own message is not marked, so it can still send a key where you tell it to.
 
 **Secrets.**
 
