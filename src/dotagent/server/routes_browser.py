@@ -198,8 +198,9 @@ def browser_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/browser/profiles/{name}/clear")
     async def clear_browser_profile(name: str) -> BrowserView:
-        """Delete the cookies and the caches of the profile ``name`` (item 355). Dot's own Chrome is let go of when it
-        works on it, so the change is refused while runs are active, and while a Chrome window has the profile open."""
+        """Delete what the sites left in the profile ``name``, and the logins and autofill Chrome saved for them (items
+        355 and 532). Dot's own Chrome is let go of when it works on it, so the change is refused while runs are
+        active, and while a Chrome window has the profile open."""
         await asyncio.to_thread(known_profile, name)
         refuse_while_runs("a profile cannot be cleared")
         own: BrowserSession = ctx.runtime.browsers.session_for("own")
