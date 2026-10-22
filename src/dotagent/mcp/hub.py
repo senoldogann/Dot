@@ -25,7 +25,6 @@ from dotagent.tools.schema import flatten_json_schema
 
 log = get_logger(__name__)
 
-MAX_UNFILTERED_TOOLS: int = 30
 _SHOWN_TOOL_NAMES: int = 60
 
 
@@ -55,24 +54,23 @@ def server_log_path(config: McpServerConfig) -> Path:
 
 
 def select_tools(config: McpServerConfig, listed: tuple[McpTool, ...]) -> tuple[McpTool, ...]:
-    """The tools of one server that the model gets: those on the allow list, or all of them when there are few."""
+    """The tools of one server that the model gets: those on the allow list, or every one it lists without one, however
+    many (with ``[agent] tool_surface = "grouped"`` a run turns the server's group on when it needs it)."""
+    if not config.allow:
+        return listed
     offered: dict[str, McpTool] = {tool.remote_name: tool for tool in listed}
-    names: list[JsonValue] = [name for name in sorted(offered)[:_SHOWN_TOOL_NAMES]]
-    if config.allow:
-        wanted: list[str] = list(dict.fromkeys(config.allow))
-        missing: list[JsonValue] = [name for name in wanted if name not in offered]
-        if missing:
-            raise McpError(
-                "the allow list names tools that the MCP server does not offer",
-                {"server": config.name, "missing": missing, "offered": names},
-            )
-        return tuple(offered[name] for name in wanted)
-    if len(listed) > MAX_UNFILTERED_TOOLS:
+    wanted: list[str] = list(dict.fromkeys(config.allow))
+    missing: list[JsonValue] = [name for name in wanted if name not in offered]
+    if missing:
         raise McpError(
-            "the MCP server offers too many tools to hand them all to the model; choose some with `allow`",
-            {"server": config.name, "tools": len(listed), "limit": MAX_UNFILTERED_TOOLS, "offered": names},
+            "the allow list names tools that the MCP server does not offer",
+            {
+                "server": config.name,
+                "missing": missing,
+                "offered": [name for name in sorted(offered)[:_SHOWN_TOOL_NAMES]],
+            },
         )
-    return listed
+    return tuple(offered[name] for name in wanted)
 
 
 def tool_parameters(tool: McpTool) -> JsonObject:
@@ -175,8 +173,7 @@ class McpHub:
         return done.tools
 
     async def offered(self, config: McpServerConfig) -> tuple[McpTool, ...]:
-        """Every tool ``config`` lists, for the owner to choose its allow list from (a server that offers more than
-        ``MAX_UNFILTERED_TOOLS`` is left out until they do)."""
+        """Every tool ``config`` lists, for the owner to choose its allow list from."""
         return await _offered_tools(config, self._login_env)
 
     async def connect(self, config: McpServerConfig) -> tuple[McpTool, ...]:

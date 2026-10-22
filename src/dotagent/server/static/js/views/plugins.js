@@ -104,7 +104,9 @@ function serverActions(catalogue, server, service) {
     actions.push(button);
   }
   if (server.picks_tools && server.origin === "connected" && !working) {
-    actions.push(el("button", { class: "btn sm primary", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose tools"));
+    // The way back in for a server left out with its allow list; for one that runs, a way to cut its tools down.
+    const kind = server.state === "left_out" ? "btn sm primary" : "btn sm";
+    actions.push(el("button", { class: kind, type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose tools"));
   }
   if (server.origin === "connected" || server.origin === "elsewhere") {
     actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.remove(server, service)) }, "Remove"));

@@ -217,6 +217,20 @@ def surface_for(config: AgentConfig, scaffold: Scaffold) -> tuple[Surface, str]:
     return "full", '[agent] tool_surface is "auto", the model is standard and its window holds the whole budget'
 
 
+# The most tools some providers take in one request: Gemini documents 128 function declarations, and OpenAI's API has
+# answered more with a 400. A run of more tools starts grouped whatever its surface (item 524), as an MCP server may
+# offer any number of them.
+MOST_TOOLS_AT_ONCE: int = 128
+
+
+def surface_for_tools(surface: Surface, reason: str, tools: int) -> tuple[Surface, str]:
+    """``surface`` and its ``reason`` for a run of ``tools`` tools, unless they are more than some providers take in one
+    request: then grouped, and why."""
+    if surface == "full" and tools > MOST_TOOLS_AT_ONCE:
+        return "grouped", f"the run has {tools} tools, more than the {MOST_TOOLS_AT_ONCE} some providers take at once"
+    return surface, reason
+
+
 def reminder_due(scaffold: Scaffold, mode: RunMode, steps: int, reminded_at: int) -> bool:
     """Whether a task or research run that is at step ``steps``, and was last reminded at step ``reminded_at`` (0 for
     never), is reminded of its goal now."""

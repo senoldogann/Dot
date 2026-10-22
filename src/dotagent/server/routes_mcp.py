@@ -29,7 +29,7 @@ from dotagent.help.added import remove_server as take_back_added_server
 from dotagent.help.elsewhere import dot_server_name
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService
 from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_connected, read_connected
-from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS, McpHub
+from dotagent.mcp.hub import McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
 from dotagent.mcp.types import McpFailure
@@ -79,8 +79,6 @@ class _Try:
     task: asyncio.Task[None] | None
     link: str | None
     error: str | None
-    # The try failed because the server offers more tools than Dot hands a model at once: the owner can choose some.
-    too_many: bool = False
 
     def running(self) -> bool:
         return self.task is not None and not self.task.done()
@@ -208,16 +206,17 @@ def requested_server(body: McpServerAdd) -> McpServerConfig:
 
 
 def chosen_tools(wanted: tuple[str, ...], offered: tuple[str, ...]) -> list[str]:
-    """The allow list for the tools ``wanted`` of a server that lists ``offered``: each once, in the server's order.
-    Raises ConfigError for none, more than ``MAX_UNFILTERED_TOOLS``, or a name the server does not list."""
+    """The allow list for the tools ``wanted`` of a server that lists ``offered``: each once, in the server's order, and
+    none when every one is wanted, so that the server offers all of its tools, those it adds later too. Raises
+    ConfigError for none, or a name the server does not list."""
     picked: set[str] = set(wanted)
     missing: list[JsonValue] = [name for name in sorted(picked - set(offered))]
     if missing:
         raise ConfigError("the MCP server does not offer these tools", {"missing": missing})
-    if not picked or len(picked) > MAX_UNFILTERED_TOOLS:
-        raise ConfigError(
-            f"choose between 1 and {MAX_UNFILTERED_TOOLS} tools", {"chosen": len(picked), "limit": MAX_UNFILTERED_TOOLS}
-        )
+    if not picked:
+        raise ConfigError("choose at least one tool", {"chosen": 0, "offered": len(offered)})
+    if picked == set(offered):
+        return []
     return [name for name in offered if name in picked]
 
 
@@ -302,9 +301,10 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             error=error,
             link=attempt.link if attempt is not None and attempt.running() else None,
             signs_in=config.oauth,
-            picks_tools=state == "left_out"
-            and not config.allow
-            and ((attempt is not None and attempt.too_many) or (left is not None and "limit" in left.detail)),
+            # A server added on the page that runs may have its tools cut down, and one left out with an allow list may
+            # have the list chosen again (it names a tool the server no longer offers, or one whose schema Dot cannot
+            # use). The others keep their tools where they were set up.
+            picks_tools=origin == "connected" and (state == "ready" or (state == "left_out" and bool(config.allow))),
         )
 
     async def listing() -> McpServersView:
@@ -368,9 +368,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             log.info("mcp_server_added", server=config.name, origin=attempt.origin, signs_in=signs)
         except DotError as error:
             attempt.error = error.message
-            attempt.too_many = "limit" in error.context and not config.allow
             # A try that failed after signing in keeps the sign-in, as one that succeeds is kept with it: Choose tools
-            # (a try left out for its tools) and Try again connect with it (item 499).
+            # and Try again connect with it (item 499).
             if not config.oauth and await asyncio.to_thread(signed_in, sign_in_path(config.name)):
                 attempt.config = config.model_copy(update={"oauth": True})
             log.warning("mcp_server_not_added", server=config.name, error=error.message, context=error.context)
@@ -460,7 +459,6 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             server=name,
             tools=tuple(McpOfferedTool(name=tool.remote_name, description=tool.description) for tool in tools),
             allow=tuple(config.allow),
-            limit=MAX_UNFILTERED_TOOLS,
         )
 
     @router.put("/api/mcp/servers/{name}/allow")
@@ -475,7 +473,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         await hub.connect(kept)
         await asyncio.to_thread(keep_connected, connected_servers_path(), kept)
         refresh_mcp_tools(ctx.runtime.registry, hub)
-        # The try that failed for too many tools is over: the server is kept now, with its choice.
+        # A try of the server that failed or is under way is over: the server is kept now, with its choice.
         tries.pop(name, None)
         log.info("mcp_tools_chosen", server=name, tools=len(kept.allow))
         return view(kept, "connected")

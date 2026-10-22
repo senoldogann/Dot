@@ -6,7 +6,6 @@ import pytest
 from dotagent.config import McpServerConfig
 from dotagent.core.errors import ConfigError, McpError, NotFoundError
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService
-from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS
 from dotagent.mcp.launch import referenced_secrets
 from dotagent.mcp.signin import checked_link
 from dotagent.server.routes_mcp import (
@@ -118,14 +117,14 @@ def test_a_sign_in_page_is_opened_only_at_an_https_address_or_one_of_this_mac() 
 
 
 def test_the_tools_chosen_for_a_server_become_its_allow_list_in_its_own_order() -> None:
-    offered: tuple[str, ...] = tuple(f"tool_{index:02d}" for index in range(MAX_UNFILTERED_TOOLS + 10))
+    offered: tuple[str, ...] = tuple(f"tool_{index:02d}" for index in range(80))
     assert chosen_tools(("tool_05", "tool_01", "tool_05"), offered) == ["tool_01", "tool_05"]
     with pytest.raises(ConfigError) as unknown:
         chosen_tools(("tool_01", "nope"), offered)
     assert unknown.value.context["missing"] == ["nope"]
     with pytest.raises(ConfigError):
         chosen_tools((), offered)
-    with pytest.raises(ConfigError) as many:
-        chosen_tools(offered[: MAX_UNFILTERED_TOOLS + 1], offered)
-    assert many.value.context["limit"] == MAX_UNFILTERED_TOOLS
-    assert len(chosen_tools(offered[:MAX_UNFILTERED_TOOLS], offered)) == MAX_UNFILTERED_TOOLS
+    # Any number of them may be chosen (item 524), and every one of them keeps no list: the server then offers all
+    # of its tools, those it adds later too.
+    assert chosen_tools(offered[:79], offered) == list(offered[:79])
+    assert chosen_tools(tuple(reversed(offered)), offered) == []

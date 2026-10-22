@@ -1263,8 +1263,8 @@ class McpServerView(FrozenModel):
     (``error`` says why), it is switched off in the config, or Dot tries it now, waiting for the owner to sign in on
     ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the owner's account, and Sign in again renews
     that. ``mark``: its service's, the one the service's tile wears (item 477), ``None`` for a server of no service
-    (the plug). ``picks_tools``: it was left out for offering too many tools, and the owner chooses those to offer on
-    the page (``allow``)."""
+    (the plug). ``picks_tools``: the owner may choose on the page which of its tools to offer (``allow``): of one that
+    runs, to cut its tools down, and of one left out with an allow list, to choose the list again."""
 
     name: str
     origin: McpOrigin
@@ -1288,13 +1288,12 @@ class McpOfferedTool(FrozenModel):
 
 
 class McpOfferedView(FrozenModel):
-    """``GET /mcp/servers/{name}/offered``: every tool the server lists, those its allow list names, and how many the
-    model may get from it."""
+    """``GET /mcp/servers/{name}/offered``: every tool the server lists, and those its allow list names (none when it
+    offers them all)."""
 
     server: str
     tools: tuple[McpOfferedTool, ...]
     allow: tuple[str, ...]
-    limit: int
 
 
 class McpAllow(FrozenModel):
