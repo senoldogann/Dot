@@ -4526,6 +4526,13 @@ dialog.modal.connect-apps[open] {
   color: var(--bad);
 }
 
+/* A command reads as the code it is (item 506): monospace, a touch smaller than the words around it, as the line a group
+   at work names. */
+.tool.command .tool-sum {
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+}
+
 /* The duration of a step shows on hover and while the step is open, so a folded row is one quiet line (item 74); on a
    screen with no pointer to hover, always (item 329). */
 .tool-time {
@@ -4752,6 +4759,11 @@ a.memory-line:hover .memory-change {
   background-clip: text;
   color: transparent;
   animation: shimmer var(--motion-shimmer) linear infinite;
+}
+
+/* The start of the thought reads as the thinking itself (item 506): set in italics, quiet under the label. */
+.thought-preview {
+  font-style: italic;
 }
 
 /* Opened, the thought stands under its line, which keeps only its label. */

@@ -8,7 +8,11 @@ that pass (up to `parallel_tools` at once) and hands the results back, until the
 A chat keeps its turns on one page (item 374): each earlier turn reads as its question, what it did and its answer,
 with no "open run" to hop through. What it did is what its run said, in the order it said it, and each stretch of its
 tool calls as one line that says what they did ("Ran 2 commands and read 1 file"), which opens to every call and its
-result, as on the run's own page. A page the turn's run showed with `show_page` stands where it came, in its frame
+result, as on the run's own page: a command reads as the code it is, in typewriter type, and opened it shows the
+command itself over its output (one that carries more than its command, a working folder for one, shows its arguments
+whole); a read wears an eye and a write a sheet of paper, and each says what it did ("Read notes.txt") without its
+tool's name, which a call keeps only where its words do not say what it is (item 506). A page
+the turn's run showed with `show_page` stands where it came, in its frame
 (item 426). That line opens and folds on a click while the run still works and after it ends,
 and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
 Appearance › *Fold tool steps* says whether
