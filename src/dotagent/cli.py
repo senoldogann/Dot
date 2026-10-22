@@ -87,6 +87,8 @@ _FAMILIES: dict[str, str] = {
     "playbooks-drop": "dotagent.cli_playbooks",
     "playbooks-trust": "dotagent.cli_playbooks",
     "prune": "dotagent.cli_prune",
+    "backup-now": "dotagent.cli_backup",
+    "backup-list": "dotagent.cli_backup",
     "undo": "dotagent.cli_undo",
     "eval-list": "dotagent.cli_eval",
     "eval-check": "dotagent.cli_eval",
@@ -403,6 +405,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="delete those screenshots and give the free space back to the disk (without it, only report)",
     )
 
+    backup = commands.add_parser("backup", help="the copies of Dot's database: make one now, or list them")
+    backup_commands = backup.add_subparsers(dest="backup_action", required=True)
+    backup_commands.add_parser("now", help="copy the database now into [store] backup_dir and thin the older copies")
+    backup_commands.add_parser("list", help="list the copies kept, newest first")
+
     undo = commands.add_parser(
         "undo",
         help="take back the file changes that write_file and edit_file made in a run and in the runs it delegated to",
@@ -498,6 +505,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     playbooks_action: object = raw.pop("playbooks_action", None)
     service_action: object = raw.pop("service_action", None)
     eval_action: object = raw.pop("eval_action", None)
+    backup_action: object = raw.pop("backup_action", None)
     models_action: object = raw.pop("models_action", None)
     if raw["name"] == "models" and models_action == "profile":
         raw["name"] = "models-profile"
@@ -527,6 +535,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"service-{service_action}"
     if raw["name"] == "eval":
         raw["name"] = f"eval-{eval_action}"
+    if raw["name"] == "backup":
+        raw["name"] = f"backup-{backup_action}"
     try:
         return COMMAND_ADAPTER.validate_python(raw)
     except ValidationError as exc:

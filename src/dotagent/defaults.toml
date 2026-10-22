@@ -8,7 +8,7 @@
 #   command = "npx"                     # started with the PATH of your login shell
 #   args = ["-y", "some-mcp-server"]
 #   env = { NOTES_TOKEN = "${NOTES_TOKEN}" }   # ${NAME} is looked up like an API key (environment, .env, Keychain)
-#   allow = ["search", "read_note"]     # offer only these tools; empty = all of them (at most 30)
+#   allow = ["search", "read_note"]     # offer only these tools; empty = all of them, however many
 #   enabled = true
 #   startup_timeout_s = 60.0
 #   call_timeout_s = 120.0
@@ -38,6 +38,17 @@ keep_awake = false
 # steps, tool calls and results of the timeline) of the runs that ended more than retention_days days ago, and with
 # them the screenshots only those events name; the runs themselves, their answers, numbers and conversations stay.
 retention_days = 90
+# A copy of the database is made every backup_every_hours hours while the daemon runs, and when it starts if the last
+# one is older, whenever the database changed since (item 526). SQLite's online backup makes it while runs go on; it
+# is checked, compressed and kept in backup_dir: the newest backup_keep_hourly copies, and the newest copy of each
+# of the last backup_keep_days days. An empty backup_dir is <home>/backups, which goes with the home folder if that
+# is lost: point it at an external disk, or at iCloud Drive ("~/Library/Mobile Documents/com~apple~CloudDocs/Dot
+# Backups"), to keep the copies off this Mac. backup_every_hours = 0 makes none. `dotx backup now` makes one at once,
+# and `dotx backup list` lists them.
+backup_every_hours = 1.0
+backup_dir = ""
+backup_keep_hourly = 24
+backup_keep_days = 14
 
 [models]
 # "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic, openrouter and opencode (Zen's free
@@ -281,7 +292,8 @@ steer_single_actions = true
 # search and saving, delegation, skills, the plan and finish) and the groups the thread already used. The other groups
 # (browser, desktop, schedule, memory_admin, one per MCP server) are listed in the prompt; a group is turned on when the
 # model calls use_tools or one of its tools, and stays on for the rest of the run. "auto": grouped for a model of the
-# weak tier or whose window cut the context budget, full otherwise. "full" until evals show that groups help.
+# weak tier or whose window cut the context budget, full otherwise. "full" until evals show that groups help. A run of
+# more than 128 tools starts grouped whatever this says, as some providers take no more in one request (item 524).
 tool_surface = "full"
 # How much the system prompt says (item 280). "full": how to work, each kind of tool at length, trust and safety.
 # "lean": the same rules of trust and safety, of hesitating and of how a run ends, and how to work and each kind of

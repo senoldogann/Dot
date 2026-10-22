@@ -21,7 +21,7 @@ from dotagent.agent.snapshots import stored_taker
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import dot_home, pid_path, running_mark_path, token_path
+from dotagent.core.paths import db_path, dot_home, pid_path, running_mark_path, token_path
 from dotagent.desktop.flight import FlightOverlay
 from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
@@ -32,6 +32,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import read_or_create_token, require_loopback
 from dotagent.server.links import base_url, ui_url
+from dotagent.store.backup import keep_backups
 from dotagent.store.models import RunRecord
 
 log = get_logger(__name__)
@@ -161,6 +162,13 @@ def _log_warm_end(task: "asyncio.Task[None]") -> None:
         log.warning("help_vectors_warming_failed", error_type=type(error).__name__, error=str(error))
 
 
+def _log_backups_end(backups: asyncio.Task[None]) -> None:
+    """The copies of the database that stop before the daemon does are logged: none is made until it starts again."""
+    if backups.cancelled() or backups.exception() is None:
+        return
+    log.error("backups_ended", error=repr(backups.exception()))
+
+
 def _log_relay_end(relay: asyncio.Task[None]) -> None:
     """A relay of the runs of dotx commands that stops before the daemon does is logged: the pages see those runs only
     as they are stored, and their chats' queues wait, until the daemon starts again."""
@@ -264,6 +272,12 @@ async def run_daemon(config: AppConfig) -> int:
             relay: asyncio.Task[None] = asyncio.create_task(manager.relay_elsewhere(), name="relay")
             relay.add_done_callback(_log_relay_end)
             cleanup.push_async_callback(_cancelled, relay)
+            # A copy of the database every [store] backup_every_hours hours, kept where [store] backup_dir says (item
+            # 526); the first at once when none is younger.
+            if config.store.backup_every_hours > 0:
+                backups: asyncio.Task[None] = asyncio.create_task(keep_backups(config.store, db_path()), name="backups")
+                backups.add_done_callback(_log_backups_end)
+                cleanup.push_async_callback(_cancelled, backups)
             # Before the scheduler and the server start: a resumed run takes its place before any new run, and no new
             # message reaches its thread before it.
             resumed: tuple[RunRecord, ...] = await manager.resume_safe() if config.agent.resume == "safe" else ()

@@ -87,6 +87,17 @@ currency, so list sites that bill in one currency. Empty by default.
 4. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
    yourself. A payment under the pre-approved caps of its site (above) is a question instead of a hand-off, unless
    one of your rules hands that step to you (item 385): the caps stand in for the money hand-off, not for your rules.
+   A click is about money when its control's label asks for it: at the start of the label or of a sentence in it,
+   after a stop, a dot, a bar, a dash, a colon or a new line ("Pay $19.90", "Buy", "Order now", "Lamp — $9.90 —
+   Buy", "Öde", "Maksa"), anywhere in it ("Place order", "Confirm and pay", "Complete checkout", "Satın al"), or with
+   an amount in the label next to a verb that offers something for it ("Rent HD $3.99", "Subscribe for €4.99/month",
+   "Book 2 tickets · $40", "Book 1500 TL", "Book: $199"). "Order", "Book" and "Reserve" with an amount count unless
+   the word is followed by "#" or by "summary", "history", "details", "status", "number", "total" or "price", which
+   make the label a record ("Order #4521 · $45.00 · Delivered", "Order summary · $45.00"); a row of past orders that
+   shows its number without "#" hands the click off. A dialog that asks to confirm is judged by the same words,
+   without that exception: there, an order's number is the order about to be paid. The way to the
+   payment page ("Checkout", "Continue to payment") is an ordinary click, so the run fills the order and the button
+   that pays is the one handed to you (item 522).
 5. *The guard* (item 429): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode that asks,
@@ -186,9 +197,11 @@ one, a `search_files` match in one or a search of one, a shell line that names o
 line are read, so a line that reaches them otherwise, by a variable or a search of the workspace, is not seen); a
 failed `edit_file` of one names none of its lines. A run that has seen such content is marked untrusted, and from then
 on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
-or a note, and a shell line that sends data out: an upload or a form, a push, a copy to another machine, a change on a
-code host, inline code that reaches the network or runs a command of it) ask even when the preset or an `allow` rule
-would let them through; only a `preapproved` rule skips the question. A message you send to the run clears the mark;
+or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
+running a script the line downloaded (item 523), and a shell line that sends data out: an upload or a form, a push, a
+copy to another machine, a change on a code host, inline code that reaches the network or runs a command of it) ask
+even when the preset or an `allow` rule would let them through; only a `preapproved` rule skips the question. A
+project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. A message you send to the run clears the mark;
 your answer to a question of a run you watch does not, whether the run waited for it or went on (item 508), as it
 answers what the run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts
 once that run has ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a
@@ -302,8 +315,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   `~/.password-store`), the keys that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them), the shell's
   history, Messages and Mail (`[policy] protected_paths`; a list of your own replaces
   this one), nor Dot's own key file, token, what signing in to an MCP server gave it, browser profiles, configuration,
-  database and journals of file changes. The
-  configuration holds the policy and the MCP servers, the database the rules, the journals what `dotx undo` writes back.
+  database, the copies of the database (`[store] backup_dir`, and `<home>/backups-partial` while one is made, item
+  526) and journals of file changes. The configuration holds the policy and the MCP servers, the database the rules,
+  a copy all of the database and what you go back to, the journals what `dotx undo` writes back.
   In any mode, a tool that names files (the file tools, `web_extract`, `browser_upload`) looks at them again as it
   starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
   and called again it is decided for where the path leads now. A path is judged by the place it names (item 399):

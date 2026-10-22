@@ -9,7 +9,7 @@ from dotagent.agent.compact import estimate_tokens
 from dotagent.agent.executor import ToolOutcome
 from dotagent.agent.loop import _run_tools, _turned_on
 from dotagent.agent.prompt import PromptInputs, build_system_prompt, collect_prompt_inputs
-from dotagent.agent.scaffold import Scaffold, surface_for
+from dotagent.agent.scaffold import MOST_TOOLS_AT_ONCE, Scaffold, surface_for, surface_for_tools
 from dotagent.config import AgentConfig, AppConfig, Tier, load_default_config
 from dotagent.core.types import JsonObject
 from dotagent.harness.components import NO_HARNESS
@@ -321,6 +321,18 @@ def test_auto_groups_the_tools_of_a_weak_model_and_of_a_window_that_cut_the_budg
     assert surface_for(AUTO, _scaffold("standard", 192_000, 192_000))[0] == "full"
     # A chosen size the window cut, to a budget still above [agent] context_tokens, keeps them whole as no size does.
     assert surface_for(AUTO, _scaffold("standard", 153_600, 192_000))[0] == "full"
+
+
+def test_a_run_of_more_tools_than_some_providers_take_at_once_starts_grouped() -> None:
+    """Item 524: an MCP server may offer any number of tools, and some providers refuse a request of more than 128."""
+    full: str = '[agent] tool_surface is "full"'
+    assert surface_for_tools("full", full, MOST_TOOLS_AT_ONCE) == ("full", full)
+    assert surface_for_tools("full", full, MOST_TOOLS_AT_ONCE + 1) == (
+        "grouped",
+        f"the run has {MOST_TOOLS_AT_ONCE + 1} tools, more than the {MOST_TOOLS_AT_ONCE} some providers take at once",
+    )
+    grouped: str = '[agent] tool_surface is "grouped"'
+    assert surface_for_tools("grouped", grouped, 500) == ("grouped", grouped)
 
 
 def _outcome(call_id: str, name: str, arguments: JsonObject, result: ToolResult) -> ToolOutcome:

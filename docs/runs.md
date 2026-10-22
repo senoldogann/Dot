@@ -113,8 +113,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. The
   model turns a group on with `use_tools`. A call to a tool whose group is off does not run: it turns the group on, and
   its result asks the model to call the tool again. A group stays on for the rest of the run. `auto` is `grouped` for a
-  model of the weak tier and for a model whose window cut the context budget, and `full` for every other model. The
-  side panel's Run tab shows under Set up the groups a grouped run starts with and each group it turns on.
+  model of the weak tier and for a model whose window cut the context budget, and `full` for every other model. A run
+  of more than 128 tools starts `grouped` whatever the setting (item 524): some providers take no more in one request
+  (Gemini documents 128 function declarations, and OpenAI's API has answered more with a 400), and an MCP server may
+  offer any number of tools. The groups a grouped run has on (those its chat used, the servers picked for its message,
+  those it turns on) may still bring a request past that; it then fails with the provider's error. The side panel's Run
+  tab shows under Set up the groups a grouped run starts with, why it is grouped, and each group it turns on.
 - `prompt` in `[agent]` decides how much the system prompt says (item 280). `full`, the default, says how to work and
   each kind of tool at length (the web, the browser, the desktop, memory, schedules). `lean` keeps the rules of trust
   and safety, of hesitating and of how a run ends as `full` has them, word for word where they are the same rule, and
