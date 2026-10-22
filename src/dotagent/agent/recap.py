@@ -11,6 +11,7 @@ one run."""
 
 import asyncio
 from collections.abc import Sequence
+from typing import NamedTuple
 
 from dotagent.agent.compact import render_transcript
 from dotagent.agent.continuity import summary_part
@@ -142,6 +143,12 @@ def clipped(text: str) -> str:
     return joined if len(joined) <= _MOST_CHARS else joined[: _MOST_CHARS - 1].rstrip() + "…"
 
 
+def shown(text: str, known: Sequence[str]) -> str:
+    """The model's recap as it is kept and shown: the secrets ``known`` masked first, then clipped, so that a secret
+    the cut runs through leaves no part of itself behind (the pre-push review found it)."""
+    return clipped(redact_known(text, known))
+
+
 async def _discard(delta: StreamDelta) -> None:
     return None
 
@@ -193,14 +200,15 @@ async def _written(runtime: Runtime, run: RunRecord, record: str) -> tuple[str, 
     raise problem
 
 
-async def _write(runtime: Runtime, run_id: str, force: bool) -> RecapView:
+async def _write(runtime: Runtime, run_id: str, force: bool) -> tuple[RecapView, bool]:
+    """The run's recap after a write, and whether one was written (not when none was due and ``force`` is off)."""
     config: RecapConfig = runtime.config.recap
     if not config.enabled:
         raise ConfigError("recaps are off", {"hint": "set [recap] enabled = true in config.toml"})
     run: RunRecord = await runtime.store.get_run(run_id)
     current: Recap | None = await _latest(runtime, run_id)
     if not force and not is_due(current, run, config):
-        return _view(config, current, run)
+        return _view(config, current, run), False
     if run.steps == 0:
         raise InvalidValueError("a run that has taken no step has nothing to recap", {"run_id": run_id})
     plan_event: EventRecord | None = await runtime.store.last_event(run_id, PLAN_EVENT)
@@ -211,25 +219,48 @@ async def _write(runtime: Runtime, run_id: str, force: bool) -> RecapView:
     text, ref = await _written(runtime, run, record)
     # The recap stays in the run's record and goes to every page: the secrets Dot holds are masked in it, as in a
     # compaction's note.
-    masked: str = redact_known(clipped(text), await asyncio.to_thread(known_secrets))
+    masked: str = shown(text, await asyncio.to_thread(known_secrets))
     event: EventRecord = await runtime.bus.emit(
         run.id, RECAP_EVENT, {"text": masked, "model": ref.label, "steps": run.steps, "status": run.status}, True
     )
     log.info("recap_written", run_id=run.id, model=ref.label, steps=run.steps, forced=force)
-    return _view(config, _recap_of(event), run)
+    return _view(config, _recap_of(event), run), True
+
+
+class _Writing(NamedTuple):
+    """A recap being written for a run: its task, and whether it was asked with ``force``."""
+
+    task: asyncio.Task[tuple[RecapView, bool]]
+    forced: bool
 
 
 # The recap being written for each run, so that a second ask while one is written waits for it instead of writing two.
-_writing: dict[str, asyncio.Task[RecapView]] = {}
+_writing: dict[str, _Writing] = {}
+
+
+def _done(run_id: str, task: asyncio.Task[tuple[RecapView, bool]]) -> None:
+    """Forget the write that ended, and log its failure: a page that went away no longer waits to hear it."""
+    if _writing.get(run_id, _Writing(task, False)).task is task:
+        _writing.pop(run_id, None)
+    if task.cancelled():
+        return
+    error: BaseException | None = task.exception()
+    if error is not None:
+        log.warning("recap_not_written", run_id=run_id, error=getattr(error, "message", str(error)))
 
 
 async def write_recap(runtime: Runtime, run_id: str, force: bool) -> RecapView:
     """Write a recap of the run when one is due (``force``: whether or not), and say the run's recap after: the one
-    written, or the newest when none was due. One being written for the run already is waited for, not written again;
-    a page that goes away while it is written does not cut it off."""
-    running: asyncio.Task[RecapView] | None = _writing.get(run_id)
-    if running is None:
-        running = asyncio.create_task(_write(runtime, run_id, force))
-        _writing[run_id] = running
-        running.add_done_callback(lambda _done: _writing.pop(run_id, None))
-    return await asyncio.shield(running)
+    written, or the newest when none was due. One being written for the run already is waited for, not written again,
+    unless this ask is forced and that one wrote none (no recap was due); a page that goes away while one is written
+    does not cut it off."""
+    running: _Writing | None = _writing.get(run_id)
+    if running is not None:
+        view, wrote = await asyncio.shield(running.task)
+        if wrote or running.forced or not force:
+            return view
+    task: asyncio.Task[tuple[RecapView, bool]] = asyncio.create_task(_write(runtime, run_id, force))
+    _writing[run_id] = _Writing(task, force)
+    task.add_done_callback(lambda ended: _done(run_id, ended))
+    view, _wrote = await asyncio.shield(task)
+    return view
