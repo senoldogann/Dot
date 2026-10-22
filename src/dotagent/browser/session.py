@@ -1383,7 +1383,7 @@ class BrowserSession:
         an address refuses it: the request must be answered either way, or Chrome holds it for good."""
         live: tuple[str, ...] = self._live_secrets()
         carries: bool = bool(live) and in_address(url, live)
-        shown: str = self._named(url, live, carries)
+        shown: str = self._shown_with(url, live, carries)
         if carries:
             verdict: UrlVerdict = UrlVerdict(allowed=False, reason=_CARRIES_SECRET)
         else:
@@ -1414,7 +1414,16 @@ class BrowserSession:
         """``url`` as Dot shows it in a refusal and writes it in its log (item 493): :meth:`_named` with the passwords
         and codes no request may carry now."""
         live: tuple[str, ...] = self._live_secrets()
-        return self._named(url, live, bool(live) and in_address(url, live))
+        return self._shown_with(url, live, bool(live) and in_address(url, live))
+
+    def _shown_with(self, url: str, live: tuple[str, ...], carries: bool) -> str:
+        """``url`` as :meth:`_named` names it, and without the cookies any chat's scripts ran with (item 533): a script
+        may have put one in the address it sends the tab to."""
+        return masked(
+            self._named(url, live, carries),
+            tuple(value for values in self._cookie_values.values() for value in values),
+            HIDDEN_VALUE,
+        )
 
     @staticmethod
     def _named(url: str, live: tuple[str, ...], carries: bool) -> str:
@@ -1804,9 +1813,9 @@ class BrowserSession:
     async def read_text(self, thread_id: str, ref: str | None, offset: int, max_chars: int) -> TextView:
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
-            # Masked before it is cut into slices, so that no slice holds a part of a value (item 493).
+            # Masked before it is cut into slices, so that no slice holds a part of a value (items 493 and 533).
             page_text: str = await visible_text(tab.page, ref, _ms(self._config.action_timeout_s))
-            text: str = squeeze_text(masked(page_text, self.vault_values(thread_id)))
+            text: str = squeeze_text(self.held_back(thread_id, page_text))
             return TextView(
                 url=tab.page.url, text=text[offset : offset + max_chars], offset=offset, total_chars=len(text)
             )
@@ -2314,11 +2323,23 @@ class BrowserSession:
         browser tools shows."""
         return frozenset(self._vault_values.get(thread_id, ()))
 
-    def cookie_values(self, thread_id: str) -> frozenset[str]:
-        """The values of the cookies of the sites the thread's scripts ran in, long enough to be a session (item 533),
-        which no result of the browser tools shows either: a script that read them, or wrote one into the page or its
-        address, may not hand them to the model."""
-        return frozenset(self._cookie_values.get(thread_id, ()))
+    def held_back(self, thread_id: str, text: str) -> str:
+        """``text`` without what no result of the thread's browser tools shows: the values filled into its pages from
+        the password manager (item 493), and the cookies of the sites its scripts ran in, long enough to be a session
+        (item 533): a script that read them, or wrote one into a page or an address, may not hand them to the model.
+        Everything the tools hand to a model, or to a judge, goes through here."""
+        return masked(
+            masked(text, self._vault_values.get(thread_id, ())), self._cookie_values.get(thread_id, ()), HIDDEN_VALUE
+        )
+
+    def holds_back(self, thread_id: str) -> bool:
+        """Whether anything is held back from the thread's results (:meth:`held_back`)."""
+        return bool(self._vault_values.get(thread_id) or self._cookie_values.get(thread_id))
+
+    def mask_held(self, thread_id: str, error: DotError) -> None:
+        """Take what :meth:`held_back` holds back out of ``error``'s words and context, which the model reads."""
+        mask_error(error, self._vault_values.get(thread_id, ()))
+        mask_error(error, self._cookie_values.get(thread_id, ()), HIDDEN_VALUE)
 
     async def run_script(self, thread_id: str, script: str, timeout_s: float, hide_secrets: bool) -> ScriptRun:
         """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
@@ -2376,16 +2397,14 @@ class BrowserSession:
                 await self._enforce_landing(current)
             except DotError as error:
                 # What the script led the tab to may be an address that carries a cookie: the refusal names it.
-                if hide_secrets:
-                    mask_error(error, self.cookie_values(thread_id), HIDDEN_VALUE)
+                self.mask_held(thread_id, error)
                 raise
             told: str | None = _TAB_OPENING if surprise is None and opening else surprise
-            hidden: frozenset[str] = self.cookie_values(thread_id) if hide_secrets else frozenset()
             return ScriptRun(
                 end=end,
-                text=masked(text, hidden, HIDDEN_VALUE),
-                url=masked(current.page.url, hidden, HIDDEN_VALUE),
-                surprise=None if told is None else masked(told, hidden, HIDDEN_VALUE),
+                text=self.held_back(thread_id, text),
+                url=self.held_back(thread_id, current.page.url),
+                surprise=None if told is None else self.held_back(thread_id, told),
                 seconds=seconds,
             )
 

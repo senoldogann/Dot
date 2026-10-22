@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
+from dotagent.config import load_config, load_default_config
 from dotagent.core.errors import BrowserError, ForbiddenUrlError
 from dotagent.policy.engine import decide, route_for
 from dotagent.policy.shell import assess_shell
@@ -111,6 +112,33 @@ def test_a_value_is_masked_with_the_word_it_is_given_and_an_error_names_it_in_ev
     plain: BrowserError = BrowserError("it said tok/en+value==12345", {"nested": {"list": ["tok/en+value==12345"]}})
     mask_error(plain, ["tok/en+value==12345"])
     assert str(plain) == f'it said {MASK} | context={{"nested": {{"list": ["{MASK}"]}}}}'
+
+
+def _session(tmp_path: Path) -> BrowserSession:
+    """A session that starts nothing: Chrome is launched when a tool first needs it."""
+    settings: Path = tmp_path / "config.toml"
+    settings.write_text("[browser]\nheadless = true\n", encoding="utf-8")
+    return BrowserSession(
+        load_config(settings).browser, load_default_config().server, tmp_path / "p", tmp_path / "d", no_runs_at_work
+    )
+
+
+def test_what_a_chat_holds_back_is_taken_out_of_every_text_error_and_address_the_session_gives(tmp_path: Path) -> None:
+    """One place masks the password manager's values and the cookies a script ran with (items 493 and 533), under their
+    own words: a result, an error, the address a log line or a refusal names, and what a judge reads."""
+    session: BrowserSession = _session(tmp_path)
+    session._vault_values["chat"] = {"S3cret-Passw0rd"}
+    session._cookie_values["chat"] = {"abcdef0123456789"}
+    assert session.holds_back("chat") and not session.holds_back("other")
+    assert session.held_back("chat", "pass S3cret-Passw0rd, session abcdef0123456789") == (
+        f"pass {MASK}, session [hidden]"
+    )
+    assert session.held_back("other", "session abcdef0123456789") == "session abcdef0123456789"
+    error: BrowserError = BrowserError("saw abcdef0123456789", {"url": "https://x.test/?c=abcdef0123456789"})
+    session.mask_held("chat", error)
+    assert str(error) == 'saw [hidden] | context={"url": "https://x.test/?c=[hidden]"}'
+    # The log names an address without the cookies of any chat.
+    assert session._shown("https://x.test/?c=abcdef0123456789") == "https://x.test/?c=[hidden]"
 
 
 def test_a_value_is_masked_as_an_address_and_a_json_string_write_it_too() -> None:

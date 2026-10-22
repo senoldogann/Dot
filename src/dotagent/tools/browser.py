@@ -37,7 +37,6 @@ from dotagent.browser.safety import (
     unexplained_clicks,
     url_flags,
 )
-from dotagent.browser.snapshot import HIDDEN_VALUE
 from dotagent.browser.types import (
     ActOutcome,
     FindResult,
@@ -81,7 +80,6 @@ from dotagent.tools.base import (
 from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
 from dotagent.vault.hosts import fills_on, website_hosts
-from dotagent.vault.masking import mask_error, masked
 from dotagent.vault.onepassword import Login, LoginSecret, kept_token
 
 _log = get_logger(__name__)
@@ -356,7 +354,7 @@ def _secret_field_check(ctx: ToolContext) -> SecretFieldCheck:
         flag: Flag = secret_field_flag(field.kind)
         summary: str = f"Type into {secret_field_label(field.kind)}" + ("" if field.ref is None else f" ({field.ref})")
         # The page's address may hold a login filled from the password manager (item 493): the record keeps none.
-        url: str = masked(field.url, ctx.browser.vault_values(ctx.thread_id))
+        url: str = ctx.browser.held_back(ctx.thread_id, field.url)
         await ctx.gate.authorize(_action("browser_act", "browser_input", "high", summary, url, (flag,)))
 
     return enter
@@ -383,12 +381,12 @@ async def _page_check(expected: str, outcome: ActOutcome, ctx: ToolContext) -> P
     """The typed judge's numbers about the page after a batch, from its visible text; ``None`` when the judge is off or
     unavailable."""
     page: TextView = await ctx.browser.read_text(ctx.thread_id, None, 0, _CHECKED_PAGE_CHARS)
-    # The judge is a model of its own: it reads no login filled from the password manager either (item 493).
-    values: frozenset[str] = ctx.browser.vault_values(ctx.thread_id)
+    # The judge is a model of its own: it reads no login filled from the password manager either (item 493), nor a
+    # cookie a script ran with (item 533).
     facts: PageFacts = PageFacts(
-        url=masked(outcome.view.url, values),
-        title=masked(outcome.view.title, values),
-        text=masked(page.text, values),
+        url=ctx.browser.held_back(ctx.thread_id, outcome.view.url),
+        title=ctx.browser.held_back(ctx.thread_id, outcome.view.title),
+        text=ctx.browser.held_back(ctx.thread_id, page.text),
         expected=expected,
     )
     return await ctx.runtime.judge.judge_page(facts, ctx.run_id)
@@ -408,12 +406,16 @@ def _act_tool() -> RegisteredTool:
         # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
         # It reads them in yolo too, where a payment, a message or a post it finds is the run's (item 443), and the
         # flags it adds are recorded with the step.
-        # The judge is a model of its own: it reads no login filled from the password manager either (item 493).
-        values: frozenset[str] = ctx.browser.vault_values(ctx.thread_id)
+        # The judge is a model of its own: it reads no login filled from the password manager either (item 493), nor
+        # a cookie a script ran with (item 533).
         judgments: list[ClickJudgment] = await asyncio.gather(
             *(
                 ctx.runtime.judge.judge_click(
-                    ClickFacts(label=masked(element.name, values), role=element.role, url=masked(target, values)),
+                    ClickFacts(
+                        label=ctx.browser.held_back(ctx.thread_id, element.name),
+                        role=element.role,
+                        url=ctx.browser.held_back(ctx.thread_id, target),
+                    ),
                     ctx.run_id,
                 )
                 for element in unexplained_clicks([(step, element) for step, element, _ in judged])
@@ -932,22 +934,10 @@ def _fill_login_tool() -> RegisteredTool:
     )
 
 
-def _cookies_held_back(ctx: ToolContext) -> frozenset[str]:
-    """The cookies the chat's scripts ran with, which a run outside yolo is not shown (item 533; yolo shows all)."""
-    return ctx.browser.cookie_values(ctx.thread_id) if hides_secrets(ctx.approvals) else frozenset()
-
-
 def _held_back(text: str, ctx: ToolContext) -> str:
     """``text`` without the values filled into the chat's pages from the password manager (item 493) and the cookies
     its scripts ran with (item 533)."""
-    return masked(masked(text, ctx.browser.vault_values(ctx.thread_id)), _cookies_held_back(ctx), HIDDEN_VALUE)
-
-
-def _mask_error(error: DotError, ctx: ToolContext) -> None:
-    """Mask the values held back in ``error``'s words and in its context, which the model reads as well (``str`` of the
-    error)."""
-    mask_error(error, ctx.browser.vault_values(ctx.thread_id))
-    mask_error(error, _cookies_held_back(ctx), HIDDEN_VALUE)
+    return ctx.browser.held_back(ctx.thread_id, text)
 
 
 def masked_tool(tool: RegisteredTool) -> RegisteredTool:
@@ -961,7 +951,7 @@ def masked_tool(tool: RegisteredTool) -> RegisteredTool:
         try:
             call: PreparedCall = await tool.prepare(arguments, ctx)
         except DotError as error:
-            _mask_error(error, ctx)
+            ctx.browser.mask_held(ctx.thread_id, error)
             raise
         action: ActionInfo = call.action.model_copy(
             update={"summary": _held_back(call.action.summary, ctx), "target": _held_back(call.action.target, ctx)}
@@ -971,12 +961,12 @@ def masked_tool(tool: RegisteredTool) -> RegisteredTool:
             try:
                 result: ToolResult = await call.run(context)
             except DotError as error:
-                _mask_error(error, context)
+                context.browser.mask_held(context.thread_id, error)
                 raise
             except Exception as error:
                 # An error that is not Dot's own goes to the model and the log as it reads: once values were held back
                 # in the chat, its words are told masked and its chain is left out, where a value may be.
-                if not (context.browser.vault_values(context.thread_id) or _cookies_held_back(context)):
+                if not context.browser.holds_back(context.thread_id):
                     raise
                 _log.warning("browser_tool_failed", tool=tool.spec.name, error=type(error).__name__)
                 raise ToolExecutionError(

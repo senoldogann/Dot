@@ -15,7 +15,7 @@ import pytest_asyncio
 from PIL import Image
 
 from dotagent.browser.session import BrowserSession, no_runs_at_work
-from dotagent.browser.types import FindResult, PageView, Screenshot, ScriptRun
+from dotagent.browser.types import FindResult, PageView, Screenshot, ScriptRun, TextView
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
 
@@ -222,8 +222,9 @@ async def test_a_script_is_run_on_a_page_without_one_and_what_it_gives_back_hide
         "cookies", "() => ({ all: document.cookie, parts: document.cookie.split('; ') })", 5.0, True
     )
     assert "abcdef0123456789" not in nested.text and "session=[hidden]" in nested.text, nested
-    # Yolo sees all it reads (item 443).
-    shown: ScriptRun = await browser.run_script("cookies", "document.cookie", 5.0, False)
+    # Yolo sees all it reads (item 443): a chat of its own, which no script held a cookie of.
+    await browser.open_url("cookies-yolo", f"{site}/many", True)
+    shown: ScriptRun = await browser.run_script("cookies-yolo", "document.cookie", 5.0, False)
     assert json.loads(shown.text) == "session=abcdef0123456789; lang=en"
 
 
@@ -256,3 +257,22 @@ async def test_a_thrown_error_and_the_address_a_script_leads_to_show_no_cookie_v
         "cookie-out-yolo", "() => { throw new Error(document.cookie); }", 5.0, False
     )
     assert "abcdef0123456789" in seen.text, seen
+
+
+async def test_a_cookie_written_into_the_page_is_hidden_before_the_text_is_cut_into_slices(
+    browser: BrowserSession, site: str
+) -> None:
+    """A slice boundary inside the value would leave a half of it in each of two slices that masking cannot match (item
+    533): the text is masked whole, and then cut."""
+    await browser.open_url("slices", f"{site}/many", True)
+    await browser.run_script(
+        "slices",
+        "() => { document.cookie = 'session=abcdef0123456789; path=/'; document.body.append(document.cookie); }",
+        5.0,
+        True,
+    )
+    whole: TextView = await browser.read_text("slices", None, 0, 20_000)
+    assert "abcdef0123456789" not in whole.text and "session=[hidden]" in whole.text, whole.text
+    # Every slice of seven characters, from every offset: none holds a half of the value.
+    slices: list[str] = [(await browser.read_text("slices", None, at, 7)).text for at in range(whole.total_chars)]
+    assert not [piece for piece in slices if "abcdef01" in piece or "23456789" in piece], slices
