@@ -420,7 +420,10 @@ tool call but the ones that plan, ask, remember, consult, read a skill, find hel
 ended, by one call of the review model that distils how it got there: from the acting steps (each tool call with its
 arguments and the start of its result; failed calls marked) the model names the kind of work in a few words, writes the
 steps that worked, one sentence each, with the values that change from goal to goal as parameters in angle brackets, and
-a one-sentence description. The skill is a folder `learned-<kind>/SKILL.md` under `<home>/playbooks` with "Kind of
+a one-sentence description. A model that gives the steps or the parameters as one text instead of a list is read as the
+list it means (a JSON array in a string, or a line to each step), but all the steps run together in one line are no list
+of them: it is asked once more, and no skill is saved as one step for that (item 543). The skill is a folder
+`learned-<kind>/SKILL.md` under `<home>/playbooks` with "Kind of
 work", "When", "Steps", "Parameters" and "Evidence" (the goal, every run it was learned from with its acting steps, the
 date), plus a `playbook.json` that keeps the kind and counts its use; the folder is written whole under a hidden name
 and then takes its own. The model is shown the kinds of the skills the run's owner keeps (those of the run's site first)
