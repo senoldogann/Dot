@@ -162,11 +162,11 @@ currency, so list sites that bill in one currency. Empty by default.
 7. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
    when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 
-| Preset                 | Asks before                                                                                                                                                |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `aggressive` (default) | privilege, system settings, public posts, messages sent for you, destructive actions outside the workspace, and a read that may reach a protected location |
-| `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace                           |
-| `cautious`             | everything that is not read-only                                                                                                                           |
+| Preset                 | Asks before                                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aggressive` (default) | privilege, system settings, public posts, messages sent for you, destructive actions outside the workspace, and a read that may reach a protected location or the clipboard |
+| `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace                                            |
+| `cautious`             | everything that is not read-only                                                                                                                                            |
 
 A shell line is destructive outside the workspace when it removes, cuts or moves away a file there (item 385: `mv` takes
 its sources from where they were), and when it replaces one that is there: a redirect that empties it (`>`, `>|`, `&>`),
@@ -306,6 +306,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   they do not, as for a run's clicks. In `yolo` nothing is masked (item 443): the run reads all it is shown. A page
   script (`browser_eval`) can still read a field's value, and that step is judged as any other; the live Screen view you
   watch is not masked.
+- The clipboard can hold a password you have just copied from your password manager, so a run's read of it asks in
+  every preset (item 534): `desktop_clipboard_read`, `pbpaste`, and an AppleScript's `the clipboard` or `clipboard
+  info`. Putting text on it asks nothing more than before; a `yolo` run asks nothing (item 443).
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).

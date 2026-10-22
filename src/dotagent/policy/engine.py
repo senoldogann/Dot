@@ -52,7 +52,7 @@ _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset(
     {"privilege", "system_settings", "public_post", "external_send", "protected_read"}
 )
 _BALANCED_ASK_FLAGS: frozenset[Flag] = frozenset(
-    {"destructive", "external_send", "public_post", "privilege", "system_settings", "install"}
+    {"destructive", "external_send", "public_post", "privilege", "system_settings", "install", "protected_read"}
 )
 _BEHAVIOR_VERDICT: dict[Behavior, Verdict] = {
     "allow": "allow",

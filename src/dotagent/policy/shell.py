@@ -459,7 +459,6 @@ _SAFE_COMMANDS: frozenset[str] = frozenset(
         "strings",
         "od",
         "base64",
-        "pbpaste",
         "tree",
         "cd",
         "pushd",
@@ -612,6 +611,9 @@ _AS_SHELL: re.Pattern[str] = re.compile(
     r"\bwriteText\s*\(|\.write\s*\(\s*\{\s*text\s*:",
     re.IGNORECASE,
 )
+# What an AppleScript reads off the clipboard (``the clipboard``, ``clipboard info``), as against what it puts there
+# (``set the clipboard to``).
+_AS_CLIPBOARD: re.Pattern[str] = re.compile(r"\bthe\s+clipboard\b(?!\s+to\b)|\bclipboard\s+info\b", re.IGNORECASE)
 _AS_KEYSTROKES: re.Pattern[str] = re.compile(r"\bkeystroke\b|\bkey\s+code\b|\bkeyCode\s*\(", re.IGNORECASE)
 _AS_NATIVE: re.Pattern[str] = re.compile(r"\bObjC\.import\b|\$\.NS[A-Z]|\bNSTask\b|\bNSAppleScript\b")
 _AS_LITERAL: re.Pattern[str] = re.compile(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'")
@@ -1762,6 +1764,12 @@ def _has_too_many_spellings(raw: str, scope: ShellScope) -> bool:
     quotes are gone by the time a word gets here, and no mark in it can tell code from a path the line made of braces
     (``{~/.ssh/id_rsa,:}{,}{,}...`` puts a mark in a choice of its own), so a literal that big costs a question."""
     return bool(raw) and _spellings(raw, scope)[1]
+
+
+def _reads_the_clipboard() -> Finding:
+    """A read of the clipboard, which can hold a password the user has just copied from their password manager: asked
+    about in every preset (item 534), as a read that may reach a protected location is."""
+    return _finding("medium", ("protected_read",), "reads the clipboard, which can hold a password the user copied")
 
 
 def _maybe_protected(reason: str) -> Finding:
@@ -2972,6 +2980,8 @@ def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     findings: list[Finding] = [_finding(risk, tuple(dict.fromkeys(flags)), reason)]
     for statement in _shell_statements(script):
         findings.extend(_shell_statement_findings(statement, scope))
+    if _AS_CLIPBOARD.search(script):
+        findings.append(_reads_the_clipboard())
     if _AS_KEYSTROKES.search(script):
         findings.append(_finding("high", (), "types into whatever application has the keyboard focus"))
     if _AS_NATIVE.search(script):
@@ -3008,6 +3018,8 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
         ran: list[Finding] | None = _assess_runner(command, args, scope, given)
         if ran is not None:
             return ran
+    if command == "pbpaste":
+        return [_reads_the_clipboard()]
     if command == "xargs":
         return _assess_xargs(args, scope, given)
     if command in ("rm", "rmdir", "unlink", "shred", "srm"):
