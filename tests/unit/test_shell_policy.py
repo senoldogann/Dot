@@ -732,6 +732,16 @@ _WALKING_THEM: list[str] = [
     "zip -r9 out.zip ~",
     "git -C ~ grep --no-index -e token",
     "git grep --no-index token ~/Library",
+    # No folder given: the search reads the folder the line is in, whatever an option's value does to its operands.
+    "cd ~ && grep -r 'PRIVATE KEY'",
+    "cd ~ && grep -r -A 30 'PRIVATE KEY'",
+    "cd ~ && grep -r -m 1 token",
+    "cd ~ && rg --hidden -m 1 PRIVATE",
+    "cd ~ && rg -g '*.pem' PRIVATE",
+    "cd ~ && git grep --no-index -A 3 token",
+    "cd ~ && fd -H id_rsa -x cat",
+    "cd ~ && fd -H -t f id_rsa | xargs cat",
+    "cd ~ && rg --files --hidden -g '*id_rsa*' | xargs cat",
 ]
 _NOT_AFTER_THEM: list[str] = [
     "cat ~/Documents/$(date +%Y)/notes.md",
@@ -750,8 +760,6 @@ _NOT_AFTER_THEM: list[str] = [
     "find ~ -name '*.pdf' | xargs echo",
     "find ./src -name '*.py' | xargs cat",
     "rg --files ./src | xargs cat",
-    # The pattern is no folder to walk, and a path given to a search is the only one it reads.
-    "grep -r ~ ./notes",
     "rg -e TODO ./src",
     "grep -rC3 password ./src",
     "zip -r9 out.zip ./src",
@@ -759,6 +767,11 @@ _NOT_AFTER_THEM: list[str] = [
     "git -C ./sub log -1",
     "tar -C ./out -xf a.tar",
     "grep -C 3 token ./notes.md",
+    # From the home folder, a search that is given a folder reads that one.
+    "cd ~ && grep -rn -A 3 TODO ./projects/x",
+    "cd ~ && rg -m 1 TODO ./projects/x",
+    "cd ~ && fd -e py main ./projects -x wc -l",
+    "cd ~ && rg --files ./projects/x | xargs cat",
 ]
 
 # Commands that move into another folder to read the names they are given: those names are the protected locations'.

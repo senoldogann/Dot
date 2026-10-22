@@ -2457,17 +2457,14 @@ _RECURSE_COPY: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*[rRa][A-Za-z0-9]*")
 _TAR_CREATES: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*c[A-Za-z0-9]*|c[A-Za-z0-9]*")
 
 
-def _search_paths(args: list[str], operands: list[str]) -> list[str]:
-    """The paths a grep or a search is given: its operands but the pattern, which is the first of them unless an option
-    gave it (``-e``, ``-f``, ``--regexp``, ``--file``), and then its value is no path."""
-    given: list[str] = [*_option_values(args, "-e", "--regexp"), *_option_values(args, "-f", "--file")]
-    if not given:
-        return operands[1:]
-    paths: list[str] = list(operands)
-    for value in given:
-        if value in paths:
-            paths.remove(value)
-    return paths
+def _searched(operands: list[str], *, pattern: bool) -> list[str]:
+    """The folders a search may read, as its operands give them. Which operand is a folder is not told without each
+    tool's options (the pattern and the value of an option such as ``-A 30`` stand among them), so every one may be; and
+    the directory the line is in is read too, unless an operand after the pattern plainly is a folder: a path, ``~``,
+    a variable (``grep -r -A 30 'PRIVATE KEY'`` reads the whole directory, whatever its first operand is)."""
+    given: list[str] = operands[1:] if pattern else operands
+    plain: bool = any("/" in word or word in (".", "..") or word.startswith(("~", "$")) for word in given)
+    return operands if plain else [*operands, "."]
 
 
 def _walked_roots(command: str, args: list[str]) -> list[str]:
@@ -2483,16 +2480,14 @@ def _walked_roots(command: str, args: list[str]) -> list[str]:
             or bool(long & {"--recursive", "--dereference-recursive"})
             or "recurse" in _option_values(args, "-d", "--directories")
         )
-        return (_search_paths(args, operands) or ["."]) if recursive else []
+        return _searched(operands, pattern=True) if recursive else []
     if command in _RECURSIVE_SEARCHES:
         # ``rg --files`` lists the names of the files and reads none of them.
-        return [] if "--files" in long else (_search_paths(args, operands) or ["."])
+        return [] if "--files" in long else _searched(operands, pattern=True)
     if command == "git":
         # ``git grep --no-index`` searches the files of a folder as any recursive grep does.
         sub, rest = _git_subcommand(args)
-        if sub == "grep" and "--no-index" in rest:
-            return _search_paths(rest, _positional(rest)) or ["."]
-        return []
+        return _searched(_positional(rest), pattern=True) if sub == "grep" and "--no-index" in rest else []
     if command in _RECURSIVE_COPIES:
         recursive = any(_RECURSE_COPY.fullmatch(word) for word in short) or bool(long & {"--recursive", "--archive"})
         return operands[:-1] if recursive else []
@@ -2508,18 +2503,19 @@ def _walked_roots(command: str, args: list[str]) -> list[str]:
         return roots if any(word in _FIND_EXEC for word in expression) else []
     if command == "fd":
         start: int | None = next((index for index, word in enumerate(args) if word in _FD_EXEC), None)
-        return [] if start is None else [word for word in args[:start] if not word.startswith("-")] or ["."]
+        return [] if start is None else _searched(_positional(args[:start]), pattern=True)
     return []
 
 
 def _listed_folders(command: str, args: list[str]) -> list[str]:
     """The folders a listing is made from, as the line gives them (item 531): the roots of a ``find``, the paths of
-    ``fd`` and of ``rg --files`` (the directory the line is in when it is given none). Other listings name files the
-    line shows."""
+    ``fd`` and of ``rg --files`` (:func:`_searched`). Other listings name files the line shows."""
     if command == "find":
         return _find_parts(args)[0]
-    if command in ("fd", "fdfind") or (command in _RECURSIVE_SEARCHES and "--files" in args):
-        return _positional(args) or ["."]
+    if command == "fd":
+        return _searched(_positional(args), pattern=True)
+    if command in _RECURSIVE_SEARCHES and "--files" in args:
+        return _searched(_positional(args), pattern=False)
     return []
 
 
