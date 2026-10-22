@@ -3,19 +3,27 @@ The marks in this folder come from two sources, both released under CC0 1.0 Univ
 
 gilbarbara/logos (https://github.com/gilbarbara/logos), commit dafdf2df1334b2327497bfff40111aff0713c992 of 2026-10-17
 (its LICENSE.txt is CC0 1.0 Universal): each file as the source draws it, in the brand's own colours, unchanged:
-airtable.svg, amplitude-icon.svg, apify-icon.svg, asana-icon.svg, atlassian.svg, aws.svg, brave.svg, chrome.svg,
-clickup-icon.svg, cloudflare-icon.svg, elevenlabs-icon.svg, exa-icon.svg, figma.svg, firecrawl-icon.svg,
-github-icon.svg, gitlab-icon.svg, google-icon.svg, grafana.svg, heroku-icon.svg, hugging-face-icon.svg,
-instagram-icon.svg, intercom-icon.svg, linear-icon.svg, linkedin-icon.svg, mapbox-icon.svg, microsoft-icon.svg,
-microsoft-onedrive.svg, miro-icon.svg, model-context-protocol-icon.svg, monday-icon.svg, neon-icon.svg,
-netlify-icon.svg, new-relic-icon.svg, notion-icon.svg, paypal.svg, perplexity-icon.svg, playwright.svg,
-posthog-icon.svg, postman-icon.svg, sentry-icon.svg, slack-icon.svg, supabase-icon.svg, tavily.svg, todoist-icon.svg,
-vercel-icon.svg, x.svg.
+airtable.svg, amplitude-icon.svg, apify-icon.svg, apollostack.svg, asana-icon.svg, astro-icon.svg, atlassian.svg,
+aws.svg, brave.svg, buildkite-icon.svg, chrome.svg, clerk-icon.svg, clickup-icon.svg, close.svg, cloudflare-icon.svg,
+contentful.svg, customerio-icon.svg, digital-ocean-icon.svg, dropbox.svg, elevenlabs-icon.svg, exa-icon.svg,
+expo-icon.svg, figma.svg, firebase-icon.svg, firecrawl-icon.svg, framer.svg, github-icon.svg, gitlab-icon.svg,
+google-icon.svg, grafana.svg, helpscout-icon.svg, heroku-icon.svg, hugging-face-icon.svg, incident-icon.svg,
+instagram-icon.svg, intercom-icon.svg, kubernetes.svg, launchdarkly-icon.svg, linear-icon.svg, linkedin-icon.svg,
+mailgun-icon.svg, mapbox-icon.svg, microsoft-azure.svg, microsoft-icon.svg, microsoft-onedrive.svg, miro-icon.svg,
+model-context-protocol-icon.svg, monday-icon.svg, mongodb-icon.svg, neon-icon.svg, netlify-icon.svg, new-relic-icon.svg,
+notion-icon.svg, nuxt-icon.svg, openai-icon.svg, pagerduty-icon.svg, paypal.svg, perplexity-icon.svg,
+pinecone-icon.svg, playwright.svg, posthog-icon.svg, postman-icon.svg, prisma.svg, productboard-icon.svg,
+pulumi-icon.svg, qdrant-icon.svg, redis.svg, resend-icon.svg, sentry-icon.svg, shopify.svg, shortcut-icon.svg,
+slack-icon.svg, snyk.svg, sourcegraph.svg, square.svg, supabase-icon.svg, svelte-icon.svg, tavily.svg, todoist-icon.svg,
+vercel-icon.svg, wordpress-icon.svg, workos-icon.svg, x.svg, xcode.svg.
 
-Simple Icons (https://simpleicons.org), version 16.35.0: box.svg, calendly.svg, mixpanel.svg, semrush.svg, stripe.svg,
-webflow.svg, wix.svg, zapier.svg. gilbarbara/logos draws these brands as a wordmark alone, too small to read in a tile,
-or not at all (Calendly, Semrush), so each keeps Simple Icons' symbol: the icon's path alone, with the brand's colour
-as the file's fill.
+Simple Icons (https://simpleicons.org), version 16.35.0: alibabacloud.svg, betterstack.svg, box.svg, braintrust.svg,
+calendly.svg, clickhouse.svg, convex.svg, duckdb.svg, excalidraw.svg, greenhouse.svg, hubspot.svg, kagi.svg,
+lottiefiles.svg, lucid.svg, mixpanel.svg, neo4j.svg, nextdotjs.svg, sanity.svg, semrush.svg, shadcnui.svg, socket.svg,
+stripe.svg, webflow.svg, wix.svg, zapier.svg. gilbarbara/logos draws these brands as a wordmark alone, too
+small to read in a tile, or not at all, or (Next.js) with an element that may reach past the file, so each keeps Simple
+Icons' symbol: the icon's path alone, with the brand's colour as the file's fill. DuckDB's and ClickHouse's are filled black instead, as their yellow (FFF000, FFCC01) does not show on
+the white tile.
 
 The marks are trademarks of their owners. Dot shows each to identify the service it stands for, and nothing more; its
 use implies no endorsement. The owners' brand guidelines, where Simple Icons names them:
@@ -24,26 +32,45 @@ use implies no endorsement. The owners' brand guidelines, where Simple Icons nam
 - Atlassian: https://atlassian.design/foundations/logos
 - Box: https://www.box.com/en-gb/about-us/press
 - Brave: https://brave.com/brave-branding-assets
+- Buildkite: https://buildkite.com/brand-assets
 - Calendly: https://calendly.com/newsroom
 - Cloudflare: https://www.cloudflare.com/trademark/
+- Convex: https://www.convex.dev/brand
+- DigitalOcean: https://www.digitalocean.com/press/
 - ElevenLabs: https://elevenlabs.io/brand
+- Expo: https://expo.dev/brand/
 - Figma: https://www.figma.com/using-the-figma-brand/
+- Firebase: https://firebase.google.com/brand-guidelines
 - GitHub: https://github.com/logos
 - GitLab: https://about.gitlab.com/handbook/marketing/corporate-marketing/brand-activation/trademark-guidelines/
 - Google Chrome: https://partnermarketinghub.withgoogle.com/brands/chrome
 - Google: https://about.google/brand-resource-center/brand-elements/
+- Greenhouse: https://brand.greenhouse.io/brand-portal/p/5
+- HubSpot: https://www.hubspot.com/style-guide
 - Hugging Face: https://huggingface.co/brand
 - Instagram: https://about.meta.com/brand/resources/instagram
 - Intercom: https://www.intercom.com/press
+- Lucid: https://lucid.co/brand
 - Mapbox: https://www.mapbox.com/about/press/brand-guidelines
 - Mixpanel: https://brand.mixpanel.com
+- Neo4j: https://neo4j.com/brand/#logo
 - Neon: https://neon.com/brand
 - Netlify: https://www.netlify.com/press/
 - New Relic: https://newrelic.com/about/media-assets#guidelines
+- Next.js: https://vercel.com/design/brands#next-js
+- Nuxt: https://nuxt.com/design-kit
+- PagerDuty: https://www.pagerduty.com/brand/
 - PayPal: https://newsroom.paypal-corp.com/media-resources
 - PostHog: https://posthog.com/handbook/company/brand-assets
+- Pulumi: https://www.pulumi.com/brand/
+- Qdrant: https://qdrant.tech/brand-resources/
+- Redis: https://redis.io/brand-guidelines
+- Resend: https://resend.com/brand
+- Shopify: https://www.shopify.com/brand-assets
+- Shortcut: https://www.shortcut.com/branding
 - Vercel: https://vercel.com/geist/brands
 - Webflow: https://brand-at.webflow.io
 - Wix: https://www.wix.com/about/design-assets
+- WordPress: https://wordpressfoundation.org/trademark-policy
 - X: https://about.x.com/en/who-we-are/brand-toolkit
 - Zapier: https://www.figma.com/file/NQFxTCE5pGR3dHZt0DkOyy/Zapier-Brand-Guidelines-%5BExternal%5D?type=design&node-id=101-9701&mode=design

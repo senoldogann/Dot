@@ -62,6 +62,10 @@ log = get_logger(__name__)
 _ANSWER_WITHIN_S: float = 20.0
 # What a try that may sign in waits for besides the owner: the server's start and the exchange of the code.
 _TRY_MARGIN_S: float = 60.0
+# How long the first try of a server started on this Mac may take to start (item 535): npx and uvx fetch its package
+# then, which took from 52 seconds to more than five minutes on a cold cache. The server kept keeps its own limit, as a
+# daemon start waits for every server; later starts find the package in the cache.
+FIRST_START_S: float = 300.0
 _SSE_SUFFIX: str = "/sse"
 _URL_SCHEMES: tuple[str, ...] = ("http://", "https://")
 _NAME_RULE: str = "a server's name is lowercase letters, digits and dashes, at most 24, starting with a letter"
@@ -164,6 +168,14 @@ def service_config(service: McpService) -> McpServerConfig:
         return McpServerConfig(name=service.id, url=service.url, transport="http", headers=headers)
     env: dict[str, str] = {key: renamed(value) for key, value in service.env.items()}
     return McpServerConfig(name=service.id, command=service.command, args=list(service.args), env=env)
+
+
+def first_try(config: McpServerConfig) -> McpServerConfig:
+    """``config`` as the try that adds it starts it: a server started on this Mac is given :data:`FIRST_START_S` to
+    start when its own limit is shorter; a server at a URL is left as it is, as its try waits for the sign-in."""
+    if config.command is None or config.startup_timeout_s >= FIRST_START_S:
+        return config
+    return config.model_copy(update={"startup_timeout_s": FIRST_START_S})
 
 
 def requested_service(body: McpServerAdd) -> McpService | None:
@@ -352,7 +364,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
         try:
             if config.url is None:
-                await hub.attempt(config, None)
+                await hub.attempt(first_try(config), None)
             else:
                 waiting: McpServerConfig = config.model_copy(
                     update={"startup_timeout_s": SIGN_IN_WAIT_S + _TRY_MARGIN_S}
