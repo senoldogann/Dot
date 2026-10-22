@@ -32,9 +32,10 @@ _TOPIC_TAG: str = "reports"
 _HEARTBEAT_S: float = 0.01
 # The longest the event loop may go without a turn while the notes are merged. Comparing them on it held it for 0.4 s
 # on the developer's Mac (for 3 s before math.sumprod). Compared in a thread, the loop still waits at times for the
-# interpreter's lock and for its garbage collector: up to 0.07 s on that Mac, and up to 0.12 s on GitHub's macOS
-# runners.
-_LONGEST_GAP_S: float = 0.25
+# interpreter's lock and for its garbage collector: up to 0.07 s on that Mac, up to 0.12 s on GitHub's macOS runners
+# and 0.45 s on one that was busy (item 540). That the notes are compared in a thread other than the loop's is asserted
+# below, so the bound only has to catch a loop held for seconds.
+_LONGEST_GAP_S: float = 1.0
 
 
 class Heartbeat:

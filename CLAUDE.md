@@ -53,6 +53,30 @@ one review a change gets: `/code-review` or a review subagent is not run on top 
 and pushed again, and the hook reads only the new commits. `/security-review` runs only when a change touches a path
 REVIEW.md lists under "Always needs a human".
 
+## Keeping a change short (item 540)
+
+A change that takes days is many pushes, each waiting on the review and the gate. What cuts them, no check cut:
+
+- **One push per round.** Fix every finding and nit of a review together and push once; never push a nit alone. Run
+  what changed first (`ruff`, `mypy`, the tests of its files) so that the gate finds nothing.
+- **The approach before the code, for the policy, the shell guard and the sandbox.** Write in `roadmap/<item>.md` what
+  must hold and what only asks. What must hold goes in the kernel (the sandbox profile, `[policy] sealed_paths`); the
+  guard asks by the names it can read, and the docs say what it does not read. Do not chase spellings: each one closes
+  one and opens the next (items 531 and 534 took eleven rounds each). The hook says when a branch has had three
+  BLOCKs: stop, take the structural option or split the change.
+- **The independent `/security-review` starts with the first push** of a change under "Always needs a human" (the
+  brief is in REVIEW.md), beside the review and the gate rather than after them.
+- **One concern per pull request.** More than about 400 changed lines, or two kinds of rule, is two pull requests.
+- **The item number** comes from `uv run python scripts/next_item.py` right before the first push (main, open pull
+  requests and pushed branches all hold numbers), and the pull request is made from the entry:
+  `gh pr create --title "$(uv run python scripts/pr_body.py N --title)" --body "$(uv run python scripts/pr_body.py N)"`.
+- **Merging main** into a branch whose own change is unchanged costs no review (the hook sees it); do it when the
+  branch is ready, never while a test run of the same worktree is going.
+- **A failure that is not the change's** (a known flaky test, `main` red): rerun the job (`gh run rerun <id> --failed`)
+  and say so in the pull request; fix `main` in the pull request that is blocked by it only when it is one line.
+- **Browser tests**: the files of the screens touched (and `test_phone_*` when the layout changed); the whole suite
+  runs at night.
+
 ## How much process a change needs
 
 - Small: prose only (`docs/`, `ROADMAP.md`, `roadmap/`, `CHANGELOG.md`, `changes/`, comments), or under about 50 changed

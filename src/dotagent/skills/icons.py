@@ -1,103 +1,16 @@
 """The icon a skill shows (item 408): the ``icon`` of its frontmatter when it names one of the interface's icons
 (``static/js/icons.js``, Lucide's shapes), else one read from its name and description by the words they use, else
-the spark every skill wore before. The names here are the interface's; a test keeps the two lists the same."""
+the spark every skill wore before. The names are the interface's, read from it."""
 
 import re
 from collections.abc import Iterable
+from pathlib import Path
 
-# The interface's icons by name, as icons.js's SHAPES has them.
-ICON_NAMES: frozenset[str] = frozenset(
-    (
-        "alert",
-        "arrowDown",
-        "arrowLeft",
-        "arrowRight",
-        "arrowUp",
-        "arrowUpDown",
-        "bell",
-        "bolt",
-        "brain",
-        "branch",
-        "calendar",
-        "check",
-        "chevron",
-        "chevronLeft",
-        "circleDashed",
-        "clock",
-        "cloud",
-        "columns",
-        "command",
-        "copy",
-        "cornerUpRight",
-        "database",
-        "download",
-        "ellipsis",
-        "external",
-        "eye",
-        "eyeOff",
-        "file",
-        "fileDiff",
-        "globe",
-        "grip",
-        "hammer",
-        "hand",
-        "help",
-        "image",
-        "info",
-        "key",
-        "layers",
-        "link",
-        "list",
-        "listOrdered",
-        "lock",
-        "lockOpen",
-        "mail",
-        "maximize",
-        "message",
-        "minimize",
-        "monitor",
-        "moon",
-        "palette",
-        "panelLeft",
-        "panelRight",
-        "paperclip",
-        "pause",
-        "pencil",
-        "pin",
-        "pinOff",
-        "play",
-        "plug",
-        "plus",
-        "pointer",
-        "power",
-        "puzzle",
-        "refresh",
-        "search",
-        "send",
-        "settings",
-        "shield",
-        "sliders",
-        "smartphone",
-        "sparkle",
-        "sparkles",
-        "squareCheck",
-        "squarePen",
-        "squareTerminal",
-        "star",
-        "stop",
-        "sun",
-        "target",
-        "terminal",
-        "trash",
-        "undo",
-        "upload",
-        "user",
-        "users",
-        "wrapText",
-        "wrench",
-        "x",
-    )
-)
+# The interface's icons by name, read from icons.js's SHAPES, so that an icon added there is one a skill may name with
+# no second list to keep in step (item 540: an icon added to the interface without it turned a unit test red on main).
+_ICONS_JS: Path = Path(__file__).resolve().parents[1] / "server" / "static" / "js" / "icons.js"
+_SHAPE: re.Pattern[str] = re.compile(r'^  "?([A-Za-z][A-Za-z0-9]*)"?: \[', re.MULTILINE)
+ICON_NAMES: frozenset[str] = frozenset(_SHAPE.findall(_ICONS_JS.read_text(encoding="utf-8")))
 # What a skill is about, by the words of its name and description, and the icon that says so; the first match wins.
 _BY_WORDS: tuple[tuple[frozenset[str], str], ...] = (
     (

@@ -37,6 +37,9 @@ from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.models import RunRecord
 
+# How long the sidebar may take to slide in on a busy runner (item 540).
+_SLIDES_IN_MS: int = 15_000
+
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "phone-back-token"
@@ -131,7 +134,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
     await _opens_the_chats(page, address, run)
     await button.click()
-    await expect(page.locator(".sidebar")).to_be_in_viewport()
+    await expect(page.locator(".sidebar")).to_be_in_viewport(timeout=_SLIDES_IN_MS)
     await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
     await page.keyboard.press("Escape")
     await expect(page.locator(".sidebar")).not_to_be_in_viewport()
@@ -173,7 +176,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await page.locator(f"#sidebar a[href='#/runs/{run.id}']").first.click()
     await _opens_the_chats(page, address, run)
     await button.click()
-    await expect(page.locator(".sidebar")).to_be_in_viewport()
+    await expect(page.locator(".sidebar")).to_be_in_viewport(timeout=_SLIDES_IN_MS)
 
 
 async def _follow_up_walk(page: Page, address: str, run: RunRecord) -> None:
@@ -189,7 +192,7 @@ async def _follow_up_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(page.locator(".answer")).to_have_count(2)
     await expect(button).to_have_attribute("aria-label", "Show sidebar")
     await button.click()
-    await expect(page.locator(".sidebar")).to_be_in_viewport()
+    await expect(page.locator(".sidebar")).to_be_in_viewport(timeout=_SLIDES_IN_MS)
     await expect(page).to_have_url(re.compile(rf"#/runs/(?!{run.id}$)[^/]+$"))
 
 

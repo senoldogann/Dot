@@ -240,7 +240,9 @@ async def test_the_rules_page_follows_the_rules_changed_on_another_page(
             switched: httpx.Response = await api.patch(f"/api/rules/{rule.json()['id']}", json={"enabled": False})
             assert switched.status_code == 200, switched.text
             await expect(row).to_have_class("list-row faint")
-            await row.scroll_into_view_if_needed()
+            # The page draws the row again as the rules change: scroll to what is there when the script runs, not to
+            # an element that may have left the page by then (item 540).
+            await page.evaluate("document.querySelector('.list-row.faint')?.scrollIntoView({ block: 'center' })")
             await _shot(page, tmp_path / "rules-followed.png")
             deleted: httpx.Response = await api.delete(f"/api/rules/{rule.json()['id']}")
             assert deleted.status_code == 200, deleted.text
