@@ -395,7 +395,12 @@ async def _one_size(
     await expect(view).to_have_count(0)
 
     # The side panel's Run tab lists no files (item 544): they open from their chips and paths in the conversation.
-    await expect(page.locator(".inspector .panel-section-title", has_text="Files")).to_have_count(0)
+    if width < 960 or panel != "on":
+        await page.get_by_role("button", name="Run details", exact=True).click()
+    details: Locator = page.locator(".inspector")
+    await details.get_by_role("tab", name="Run").click()
+    await expect(details.get_by_role("tabpanel").locator(".panel-section-title").first).to_be_visible()
+    await expect(details.locator(".panel-section-title", has_text="Files")).to_have_count(0)
 
     # The file stays beside the conversation as the chat goes on at its next run (item 406): a message sent from the
     # box opens the next run's page with the file still there, until it is closed. Before, the page made again dropped

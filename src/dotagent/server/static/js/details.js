@@ -22,7 +22,7 @@ function fact(label, value) {
  * `paint(state)` takes what changes while the run goes, as
  * `{ status, model, calls, failed, compactions, flagged, input, output, finishedAt }`; `finishedAt` is null until the
  * run is over; `compactions` counts the times the run compacted its context and `flagged` those whose check found
- * something (item 260): the card says it once there is one of either.
+ * something (item 260): the list says it once there is one of either.
  */
 export function createDetails(run, agent, campaign, keepGoing) {
   const status = el("dd");
@@ -56,15 +56,15 @@ export function createDetails(run, agent, campaign, keepGoing) {
     "dl",
     { class: "facts", id: "panel-run-details", "aria-label": "Details" },
     fact("Status", status),
-      agent === null ? null : fact("Agent", el("dd", null, el("a", { href: `#/agents/${agent.id}`, title: agent.role }, agent.name))),
-      fact("Model", model),
-      fact("Reasoning", el("dd", null, run.effort === null ? "Model default" : askedLabel(run.effort, run.once))),
-      run.speed === "fast" ? fact("Speed", el("dd", null, "Fast mode, on the steps of a model that has it")) : null,
-      fact("Approvals", el("dd", null, approvalLabel(run.approvals))),
-      run.goal_mode ? fact("Goal mode", el("dd", null, keepGoing ? "On, asked not to stop" : "On")) : null,
-      campaign === null
-        ? null
-        : fact("Campaign", el("dd", null, el("a", { href: `#/campaigns/${campaign.id}` }, campaign.title), `, session ${campaign.session}`)),
+    agent === null ? null : fact("Agent", el("dd", null, el("a", { href: `#/agents/${agent.id}`, title: agent.role }, agent.name))),
+    fact("Model", model),
+    fact("Reasoning", el("dd", null, run.effort === null ? "Model default" : askedLabel(run.effort, run.once))),
+    run.speed === "fast" ? fact("Speed", el("dd", null, "Fast mode, on the steps of a model that has it")) : null,
+    fact("Approvals", el("dd", null, approvalLabel(run.approvals))),
+    run.goal_mode ? fact("Goal mode", el("dd", null, keepGoing ? "On, asked not to stop" : "On")) : null,
+    campaign === null
+      ? null
+      : fact("Campaign", el("dd", null, el("a", { href: `#/campaigns/${campaign.id}` }, campaign.title), `, session ${campaign.session}`)),
     fact("Tool calls", calls),
     fact("Tokens", tokens),
     contextLabel,

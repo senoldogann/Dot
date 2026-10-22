@@ -49,8 +49,8 @@ is the answer (a small model that is offered both writes the call out as text).
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
   and the event says so with the reason. In the conversation a compaction is a quiet line across the column where it
   happened, with the size of the context before and after it ("Context compacted 401k → 17k tokens", item 312); the
-  Details panel counts them and says how many checks flagged something (item 260), and the Cost panel keeps the
-  summaries' share. Next to the summary a continuity note keeps the
+  facts under the side panel's More count them and say how many checks flagged something (item 260), and the Cost panel
+  keeps the summaries' share. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the

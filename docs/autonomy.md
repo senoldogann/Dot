@@ -8,9 +8,10 @@ other, so every mix works. Each has a default in the configuration, and a single
 | Approvals | `supervised`, `ask`, `auto`, `yolo` | `ask`   | `[policy] approvals`                 | `--approvals`, `--auto-approve`, `--yolo`; `approvals` of `POST /api/runs`; the composer |
 | Goal mode | on, off                             | off     | `[agent] goal_mode`, `goal_patience` | `--goal-mode`, `--no-goal-mode`; `goal_mode` of `POST /api/runs`; the composer           |
 
-`GET /api/status` reports the configured defaults. A run keeps the values it was started with; the run page and its
-Details panel show them. The composer of the web UI sends nothing for a picker you did not touch, so the daemon applies
-its current default. The YOLO choice is remembered by the browser, and the run page carries a chip for it.
+`GET /api/status` reports the configured defaults. A run keeps the values it was started with; the run page and the
+facts under More on its side panel's Run tab show them. The composer of the web UI sends nothing for a picker you did
+not touch, so the daemon applies its current default. The YOLO choice is remembered by the browser, and the run page
+carries a chip for it.
 
 **Approvals** decide who answers a question of the [policy](safety.md#safety), the `ask` outcome of its decision order,
 strictest first (item 398). The composer's Options menu lists them with their icons, under the names in brackets:
@@ -109,8 +110,9 @@ only a diagnosis was asked) changes nothing, and what needs you (a decision, a c
 **Asked not to stop.** When the message you start a `task` or `research` run with asks it not to stop until the work is
 done (whole words such as "don't stop", "keep going", "never stop", "until it is done", "durma", "hiç durma", "bitene
 kadar", "tamamlanana kadar"; not "don't stop the server", "wait until it is done" or "bitene kadar bekle"), the run is
-in goal mode whatever the switch says, and the panel's Details show "On, asked not to stop". Its goal check is told that
-you asked: it accepts a finish only when every part of the goal is done and the evidence shows it, and a stop to report
+in goal mode whatever the switch says, and the facts under the panel's More show "On, asked not to stop". Its goal check
+is told that you asked: it accepts a finish only when every part of the goal is done and the evidence shows it, and a
+stop to report
 progress is `continue`. A delegated run and a campaign's session keep their own setting, and a resumed run, one that an
 answer starts and a follow-up on the run's page keep the run's. Whatever the model, every task and research run outside
 a campaign is told to keep acting while the goal leaves work it can do, not to stop to report progress or to offer what
@@ -234,7 +236,7 @@ an alert bring the ladder one rung down again, so a long run is not stopped for 
 alert shows in the timeline with what was seen and what was done. The ladder is off by default until evals show that it
 helps; without it, a run that keeps changing its steps without getting anywhere goes on using the model until you stop
 it. Give such a run a goal that can be checked, and keep an eye on the token count of a long one (`--verbose`, or the
-Details panel).
+facts under More on the side panel's Run tab).
 
 **Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off, or a run of
 `dotx run` whose terminal was closed (or that got SIGTERM) or whose command died, can go on where it stopped: Continue
