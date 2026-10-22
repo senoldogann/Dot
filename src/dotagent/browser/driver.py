@@ -5,6 +5,7 @@ import json
 import re
 from collections.abc import Awaitable, Callable
 from typing import Literal
+from urllib.parse import quote
 
 from playwright.async_api import CDPSession, Cookie, ElementHandle, Frame, JSHandle, Locator, Page
 from playwright.async_api import Error as PlaywrightError
@@ -891,22 +892,30 @@ async def holds_secret_field(page: Page) -> bool:
     return any(counts)
 
 
-async def without_cookie_values(page: Page, text: str) -> str:
-    """``text``, the JSON a script gave, with each value of the cookies of the page's site shown as ``[hidden]``, as it
-    is written and as JSON writes it (item 533): a script that reads ``document.cookie`` hands the model a session. A
-    value shorter than :data:`_MIN_HIDDEN_VALUE_CHARS` is no session (``en``, ``1``) and stays."""
+async def cookie_secrets(page: Page, url: str) -> tuple[str, ...]:
+    """The values of the cookies of ``url``'s site that a script may have read, each as it is written, as JSON writes it
+    inside a string and as an address writes it (item 533), longest first: a script that reads ``document.cookie``
+    hands the model a session. A value shorter than :data:`_MIN_HIDDEN_VALUE_CHARS` is no session (``en``, ``1``) and
+    is left out."""
     try:
-        cookies: list[Cookie] = await page.context.cookies([page.url])
+        cookies: list[Cookie] = await page.context.cookies([url])
     except PlaywrightError as error:
         raise _failure(
-            "reading the cookies, to hide them from the value of the script, failed", page, {}, error
+            "reading the cookies, to hide them from what the script gave, failed", page, {}, error
         ) from error
-    shown: str = text
+    forms: dict[str, None] = {}
     for cookie in cookies:
         value: str = cookie["value"]
         if len(value) >= _MIN_HIDDEN_VALUE_CHARS:
-            for form in dict.fromkeys((value, json.dumps(value, ensure_ascii=False)[1:-1])):
-                shown = shown.replace(form, HIDDEN_VALUE)
+            forms.update(dict.fromkeys((value, json.dumps(value, ensure_ascii=False)[1:-1], quote(value, safe=""))))
+    return tuple(sorted(forms, key=len, reverse=True))
+
+
+def without_secrets(text: str, secrets: tuple[str, ...]) -> str:
+    """``text`` with each of ``secrets`` shown as ``[hidden]``."""
+    shown: str = text
+    for secret in secrets:
+        shown = shown.replace(secret, HIDDEN_VALUE)
     return shown
 
 

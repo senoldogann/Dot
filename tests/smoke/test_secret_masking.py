@@ -225,3 +225,34 @@ async def test_a_script_is_run_on_a_page_without_one_and_what_it_gives_back_hide
     # Yolo sees all it reads (item 443).
     shown: ScriptRun = await browser.run_script("cookies", "document.cookie", 5.0, False)
     assert json.loads(shown.text) == "session=abcdef0123456789; lang=en"
+
+
+async def test_a_thrown_error_and_the_address_a_script_leads_to_show_no_cookie_value_either(
+    browser: BrowserSession, site: str
+) -> None:
+    await browser.open_url("cookie-out", f"{site}/many", True)
+    await browser.run_script(
+        "cookie-out",
+        "() => { document.cookie = 'session=abcdef0123456789; path=/';"
+        " document.cookie = 'api=tok/en+value==12345; path=/'; }",
+        5.0,
+        False,
+    )
+    thrown: ScriptRun = await browser.run_script("cookie-out", "() => { throw new Error(document.cookie); }", 5.0, True)
+    # (The profile is the module's: the short cookie an earlier test set is still there, and stays.)
+    assert thrown.end == "error" and thrown.text.startswith("Error: session=[hidden]"), thrown
+    assert "abcdef0123456789" not in thrown.text and "tok/en" not in thrown.text and "api=[hidden]" in thrown.text
+    # A script that carries a cookie into an address (written as an address writes it) says it in the landing and in the
+    # surprise: neither shows the value.
+    led: ScriptRun = await browser.run_script(
+        "cookie-out", "() => { location.href = '/landing?c=' + encodeURIComponent(document.cookie); }", 5.0, True
+    )
+    shown: str = f"{led.text} {led.url} {led.surprise}"
+    assert "abcdef0123456789" not in shown and "tok%2Fen%2Bvalue%3D%3D12345" not in shown and "tok/en" not in shown, led
+    assert led.surprise is not None and "[hidden]" in led.surprise, led
+    # Yolo sees all it is shown.
+    await browser.open_url("cookie-out-yolo", f"{site}/many", True)
+    seen: ScriptRun = await browser.run_script(
+        "cookie-out-yolo", "() => { throw new Error(document.cookie); }", 5.0, False
+    )
+    assert "abcdef0123456789" in seen.text, seen

@@ -45,6 +45,7 @@ from dotagent.browser.devtools import devtools_switches, port_is_taken, port_tak
 from dotagent.browser.driver import (
     bring_to_front,
     capture_lines,
+    cookie_secrets,
     fill_login_field,
     go_back,
     holds_secret_field,
@@ -62,7 +63,7 @@ from dotagent.browser.driver import (
     visible_text,
     wait_dom_quiet,
     wait_for_text,
-    without_cookie_values,
+    without_secrets,
 )
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
 from dotagent.browser.look import PageLook, color_scheme
@@ -2340,9 +2341,11 @@ class BrowserSession:
             thread.scripted = True
             before: _Watch = self._watch(thread, tab)
             started: float = time.monotonic()
+            address: str = tab.page.url
             end, text = await run_script(tab.page, script, timeout_s)
-            if hide_secrets and end == "value":
-                text = await without_cookie_values(tab.page, text)
+            # The cookies of the page the script ran in, whatever it led the tab to since: what it gives back, in its
+            # value, in the error it threw and in where it led the tab, shows none of them (item 533).
+            secrets: tuple[str, ...] = await cookie_secrets(tab.page, address) if hide_secrets else ()
             seconds: float = time.monotonic() - started
             current: Tab
             opening: bool
@@ -2357,11 +2360,12 @@ class BrowserSession:
                 await self._settle(current)
             surprise: str | None = describe_surprise(before, self._watch(thread, tab))
             await self._enforce_landing(current)
+            told: str | None = _TAB_OPENING if surprise is None and opening else surprise
             return ScriptRun(
                 end=end,
-                text=text,
-                url=current.page.url,
-                surprise=_TAB_OPENING if surprise is None and opening else surprise,
+                text=without_secrets(text, secrets),
+                url=without_secrets(current.page.url, secrets),
+                surprise=None if told is None else without_secrets(told, secrets),
                 seconds=seconds,
             )
 
