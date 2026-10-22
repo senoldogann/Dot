@@ -28,7 +28,7 @@ session of a campaign (which works in a thread of its own). A chat whose run wai
 its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working hides its rows,
 the open chat's too, and keeps its count (item 513), and the search finds the chats at work, folded or not. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
 and **Schedules** (a page of its own since item 401); in the foot, the cog of **Settings**, **Connect apps** beside it
-([Connect apps](extending.md#connect-apps), item 492), which leads to
+([Connect apps](extending.md#connect-apps), items 492 and 545), which opens
 [Customize › Connectors](extending.md#customize--connectors), and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar

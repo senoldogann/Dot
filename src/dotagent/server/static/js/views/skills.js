@@ -1,5 +1,7 @@
-// Customize › Skills (item 317), after Codex's page: the skills Dot reads, as cards two a row (one on a phone), each
-// with its mark, name, what it is for and that Dot has it. Personal holds the owner's own skills (Dot's skills folder
+// Customize › Skills (items 317 and 545), after Codex's page: the head the three tabs of Customize share
+// (customizehead.js) with the search, Personal and System, Save from a chat and Import from other apps, and the skills
+// Dot reads, as cards two a row (one on a phone), each with its mark on a tile of its colour, name, what it is for and
+// that Dot has it. Personal holds the owner's own skills (Dot's skills folder
 // and the folders of the config), those imported from the Mac's other agents and those Dot and its agents learned from
 // their own work, each with the kind of work, where it acted and how it fared; an agent's is offered to its runs alone
 // until Share, and Drop removes one (item 94). System holds the skills that come with Dot and those of its plugins. A
@@ -11,9 +13,10 @@
 // it back. Import from other apps adds several at once from a checklist (item 219).
 
 import { api, query } from "../api.js";
+import { customizeHead } from "../customizehead.js";
 import { ago, clip, el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { IMPORTED_SKILL_MARK, LEARNED_SKILL_MARK, skillMark } from "../marks.js";
+import { IMPORTED_SKILL_MARK, LEARNED_SKILL_MARK, skillMark, tintMark } from "../marks.js";
 import { emptyPanel, errorPanel, foldGroup, loadingPanel, segmented } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -424,7 +427,7 @@ function skillCard({ name, description, mark, facts, actions, have }) {
   return el(
     "div",
     { class: "skill-card", dataset: { skill: name } },
-    el("span", { class: "skill-mark", "aria-hidden": "true" }, icon(mark)),
+    tintedMark("skill-mark", mark, name),
     el(
       "div",
       { class: "skill-main" },
@@ -439,6 +442,14 @@ function skillCard({ name, description, mark, facts, actions, have }) {
       actions.length === 0 ? null : el("div", { class: "skill-actions" }, actions),
     ),
   );
+}
+
+/** The mark `mark` (an icon's name) of the skill `name` on a tile of its colour (item 545), as a plugin's is on
+ * Plugins: the colour its name picks, the same wherever it shows. */
+function tintedMark(className, mark, name) {
+  const node = el("span", { class: className, "aria-hidden": "true" }, icon(mark));
+  tintMark(node, null, name);
+  return node;
 }
 
 /** A card's facts: its chips, then one quiet line of the rest. */
@@ -557,7 +568,7 @@ export function mount(root) {
   importButton.addEventListener("click", () => attempt(async () => foundChanged(await importFound(found))));
   const saveButton = el("button", { class: "btn sm", type: "button" }, icon("plus"), "Save from a chat");
   saveButton.addEventListener("click", () => attempt(saveFromChat));
-  const search = el("input", { class: "input plugin-search", type: "search", placeholder: "Search skills", "aria-label": "Search skills", autocomplete: "off", spellcheck: "false" });
+  const search = el("input", { class: "input customize-search", type: "search", placeholder: "Search skills", "aria-label": "Search skills", autocomplete: "off", spellcheck: "false" });
   search.addEventListener("input", () => {
     words = foldSearch(search.value);
     paint();
@@ -575,6 +586,13 @@ export function mount(root) {
   );
   tabs.element.classList.add("plugin-tabs");
   tabs.element.setAttribute("aria-label", "Skills to show");
+  // Out of what paints again, so that the search keeps the focus while the cards are drawn anew.
+  const head = customizeHead({
+    title: "Skills",
+    line: "What Dot knows how to do: the skills it learned from your chats, those you wrote or imported, and those of its plugins. A run reads the ones its task needs.",
+    search,
+    controls: [tabs.element, saveButton, importButton],
+  });
 
   // The button can be pressed once what other apps set up is read and something of it can be added.
   function paintImport() {
@@ -719,6 +737,7 @@ export function mount(root) {
     const systemCount = palette.skills.filter((skill) => skill.source === BUILTIN_SOURCE || skill.source.startsWith(PLUGIN_SOURCE)).length;
     personalButton.textContent = `Personal ${personalCount}`;
     systemButton.textContent = `System ${systemCount}`;
+    head.setMarks(palette.skills.map((skill) => tintedMark("plugin-mark", skillMark(skill), skill.name)));
     const parts = shown === "personal" ? personal() : system();
     holder.replaceChildren(...parts.filter((part) => part !== null));
   }
@@ -796,8 +815,7 @@ export function mount(root) {
     }
   }
 
-  // Out of what paints again, so that the search keeps the focus while the cards are drawn anew.
-  root.append(el("div", { class: "plugin-bar" }, search, tabs.element, saveButton, importButton), holder);
+  root.append(head.element, holder);
   load();
   loadFound();
   return () => {

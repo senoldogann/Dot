@@ -40,6 +40,8 @@ const ROW_CHARS = 56;
 // Connect apps at the foot shows the marks of this many servers it is connected to (item 492), another few of them
 // every so often when it is connected to more (item 509).
 const CONNECTED_MARKS = 3;
+// Where Connect apps leads (item 545): the services' tab of Customize.
+const CONNECTORS_PATH = "#/customize/connectors";
 const MARKS_TURN_MS = 6000;
 // Which sections the owner folded (`waiting`, `working`, `chats`), kept between visits.
 const FOLDS_KEY = "dot.sideFolds";
@@ -1150,34 +1152,25 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
   );
-  // Connect apps (item 492): at the foot, right of the cog of Settings, the dialog of the services Dot works with,
-  // with the marks of the MCP servers it is connected to; it leads to Customize, which the list of pages no longer
-  // names. On a phone, a round button of its own.
+  // Connect apps (items 492 and 545): at the foot, right of the cog of Settings, the way to Customize › Connectors, the
+  // page of the services Dot works with, with the marks of the MCP servers it is connected to; the list of pages no
+  // longer names Customize. On a phone, a round button of its own.
   const connectMarks = el("span", { class: "side-connect-marks", "aria-hidden": "true" });
   const connectButton = el(
     "button",
-    { class: "side-connect", type: "button", title: "Connect apps", "aria-label": "Connect apps", onclick: () => attempt(openApps) },
+    {
+      class: "side-connect",
+      type: "button",
+      title: "Connect apps",
+      "aria-label": "Connect apps",
+      onclick: () => {
+        location.hash = CONNECTORS_PATH;
+      },
+    },
     icon("plug"),
     el("span", { class: "side-connect-label" }, "Connect apps"),
     connectMarks,
   );
-  let appsDialog = null;
-  // The dialog's script is fetched the first time it opens, as a page's is (main.js).
-  async function openApps() {
-    if (appsDialog !== null) {
-      return;
-    }
-    const { openConnectApps } = await import("./connectapps.js");
-    if (appsDialog !== null || disposed) {
-      return;
-    }
-    appsDialog = openConnectApps({
-      onClose: () => {
-        appsDialog = null;
-        paintConnected();
-      },
-    });
-  }
   // The marks of the servers that are ready, each as its service's tile wears it (items 408 and 477).
   let readyServers = [];
   async function paintConnected() {
@@ -1254,7 +1247,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       mark(campaignsLink, tab === "campaigns");
       mark(schedulesLink, tab === "schedules");
       mark(settingsLink, tab === "settings");
-      // Customize is reached from Connect apps, which stands for it while it is open.
+      // Customize is reached from Connect apps (item 545), which stands for it while it is open.
       connectButton.toggleAttribute("data-current", tab === "customize");
       routeRunId = runId;
       routeThreadId = null;
@@ -1264,7 +1257,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     },
     dispose() {
       disposed = true;
-      appsDialog?.close();
       closeMenu();
       clearInterval(ageTicker);
       clearInterval(workTicker);

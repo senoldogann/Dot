@@ -1,23 +1,25 @@
-// Customize › Connectors (items 316 and 542): every service Dot works with, after Codex's page. A search, Connected and
-// All, and the services in sections (Popular, Code, Design, Data, Research, Communication, Productivity, Business,
-// Support, This Mac): each a tile with its mark, what Dot does with it and how it connects, and a "+" that takes its
-// first step, or where it stands once it is connected. A tile opens the service's own page: what Dot does with it, each
-// way it connects with where it stands and its step, its tools, where its data goes. The services, where they stand and
-// their steps are catalogue.js's, which the Connect apps dialog shares (item 492); a service Dot has no way to reach is
-// not listed (item 542). Under the sections, an MCP server of one's own by its address; Connected lists too the servers
-// that come from Dot's config, a plugin or another agent of the Mac. The plugins Dot installs are Plugins'
-// (views/plugins.js).
+// Customize › Connectors (items 316, 542 and 545): every service Dot works with, where Connect apps at the foot of the
+// sidebar leads. The head the three tabs share (customizehead.js) with the search, Connected and All and Check again;
+// the accounts; the sections as chips, one showing its section alone; and the services in sections (Popular, which
+// leads as Plugins' New & noteworthy does, Code, Design, Data, Research, Communication, Productivity, Business,
+// Support, This Mac): each a card with its mark, what Dot does with it and how it connects, and its first step in words
+// (Add, Allow, Sign in), or where it stands once it is connected. A card opens the service's own page: what Dot does
+// with it, each way it connects with where it stands and its step, its tools, where its data goes. The services, where
+// they stand and their steps are catalogue.js's; a service Dot has no way to reach is not listed (item 542). Under the
+// sections, an MCP server of one's own by its address; Connected lists too the servers that come from Dot's config, a
+// plugin or another agent of the Mac. The plugins Dot installs are Plugins' (views/plugins.js).
 
 import { accountsCard } from "../accounts.js";
 import { createCatalogue, MCP_STATE_TONES, MCP_STATE_WORDS, pluginMark, serviceWords, STATE_WORDS, STEP_LABELS, WAY_NAMES, CONNECTED_STATES } from "../catalogue.js";
+import { customizeHead } from "../customizehead.js";
 import { el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { markContent, tintMark } from "../marks.js";
 import { emptyPanel, errorPanel, field, loadingPanel, segmented } from "../panels.js";
 import { attempt } from "../ui.js";
 
-/** The sections of the services, in the order the page and the Connect apps dialog show them (item 492). */
-export const SECTIONS = [
+/** The sections of the services, in the order the page shows them and its chips name them (items 492 and 545). */
+const SECTIONS = [
   { id: "popular", title: "Popular" },
   { id: "passwords", title: "Password managers" },
   { id: "code", title: "Code" },
@@ -213,10 +215,9 @@ function wayRow(catalogue, way) {
 /**
  * What a service's own page shows of `plugin`, a listing of `catalogue`, under its bar: its mark, name, what Dot does
  * with it and where it stands; what each way lets Dot do, when its ways do more than that line; how it connects, each
- * way with its step; the tools of its servers; and where its data goes. The Connectors page and the Connect apps dialog
- * (item 492) both show it.
+ * way with its step; the tools of its servers; and where its data goes.
  */
-export function serviceParts(catalogue, plugin) {
+function serviceParts(catalogue, plugin) {
   const tools = plugin.ways
     .filter((way) => way.kind === "mcp")
     .map((way) => catalogue.wayNow(way).server)
@@ -261,8 +262,8 @@ export function mount(root, ctx) {
     const askedService = asked === null ? null : (catalogue.servers.services.find((one) => one.id === asked && plugin.ways.some((way) => way.kind === "mcp" && way.ref === one.id)) ?? null);
     let action = null;
     if (step !== null && step.page) {
-      // A service whose step is its page (1Password, item 493): the "+" leads there.
-      action = el("a", { class: "btn sm icon-only plugin-add", href: `#/customize/connectors/${plugin.id}`, title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` }, icon("plus"));
+      // A service whose step is its page (1Password, item 493): its button leads there.
+      action = el("a", { class: "btn sm plugin-add", href: `#/customize/connectors/${plugin.id}`, title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` }, step.label);
     } else if (step !== null && step.link !== undefined) {
       action = el(
         "a",
@@ -271,16 +272,17 @@ export function mount(root, ctx) {
         step.label,
       );
     } else if (step !== null) {
+      // The step in its words (item 545), as Connect apps' dialog had them: Add, Allow, Sign in.
       action = el(
         "button",
         {
-          class: "btn sm icon-only plugin-add",
+          class: "btn sm plugin-add",
           type: "button",
           title: `${step.label}: ${plugin.name}`,
           "aria-label": `${step.label} ${plugin.name}`,
           disabled: catalogue.busy(step.key),
         },
-        icon("plus"),
+        step.label,
       );
       action.addEventListener("click", () => attempt(step.take));
     }
@@ -368,7 +370,7 @@ export function mount(root, ctx) {
 
   // Made once, so that what is typed in them stays while the page paints again.
   const form = addForm();
-  const search = el("input", { class: "input plugin-search", type: "search", placeholder: "Search connectors", "aria-label": "Search connectors", autocomplete: "off", spellcheck: "false" });
+  const search = el("input", { class: "input customize-search", type: "search", placeholder: "Search connectors", "aria-label": "Search connectors", autocomplete: "off", spellcheck: "false" });
   search.addEventListener("input", () => {
     words = foldSearch(search.value);
     paint();
@@ -389,7 +391,35 @@ export function mount(root, ctx) {
   const recheck = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
   // Out of what paints again, so that the search keeps the focus while the tiles are drawn anew; a service's page has
   // none of it.
-  const bar = el("div", { class: "plugin-bar", hidden: pluginId !== undefined }, search, tabs.element, recheck);
+  const head = customizeHead({
+    title: "Connect your apps",
+    line: "Dot works in the apps and services you use. Connect one once, and every run can read it and act there, asking you first for what matters.",
+    search,
+    controls: [tabs.element, recheck],
+  });
+  head.element.hidden = pluginId !== undefined;
+  // The sections as chips (item 545, as Connect apps' dialog had them): one shows its section alone, All every one.
+  let chosen = "all";
+  const chipButtons = [{ id: "all", title: "All" }, ...SECTIONS].map(({ id, title }) =>
+    el(
+      "button",
+      {
+        class: "chip customize-chip",
+        type: "button",
+        dataset: { chip: id },
+        "aria-pressed": String(id === chosen),
+        onclick: () => {
+          chosen = id;
+          for (const button of chipButtons) {
+            button.setAttribute("aria-pressed", String(button.dataset.chip === chosen));
+          }
+          paint();
+        },
+      },
+      title,
+    ),
+  );
+  const chips = el("div", { class: "customize-chips", role: "group", "aria-label": "Sections", hidden: pluginId !== undefined }, chipButtons);
 
   function paintTabs() {
     const [connectedButton, allButton] = tabs.element.children;
@@ -399,21 +429,27 @@ export function mount(root, ctx) {
   }
 
   function sections(list) {
-    return SECTIONS.map(({ id, title }) => {
+    return SECTIONS.filter(({ id }) => chosen === "all" || id === chosen).map(({ id, title }) => {
       const members = list.filter((plugin) => plugin.section === id);
       return members.length === 0
         ? null
         : el(
             "section",
             { class: "plugin-section", dataset: { section: id } },
-            el("h2", { class: "section-label plugin-section-title" }, title),
+            el("h2", { class: "section-label plugin-section-title", dataset: { count: String(members.length) } }, title),
             el("div", { class: "plugin-grid" }, members.map(tile)),
           );
     });
   }
 
+  /** The head's marks: the logos of the popular services. */
+  function paintHead() {
+    head.setMarks(catalogue.plugins.filter((plugin) => plugin.section === "popular" && plugin.logo !== null).map((plugin) => pluginMark(plugin, null)));
+  }
+
   function paintList() {
     paintTabs();
+    paintHead();
     const showing = catalogue.plugins.filter((plugin) => (shown === "all" || catalogue.connected(plugin)) && matches(plugin));
     const others = catalogue.servers.servers.filter((server) => server.service === null && (words === "" || foldSearch(`${server.name} ${server.address}`).includes(words)));
     const parts = sections(showing);
@@ -489,7 +525,7 @@ export function mount(root, ctx) {
     accountsRead = true;
     paint();
   });
-  root.append(bar, ...(accounts === null ? [] : [accounts.element]), holder);
+  root.append(head.element, ...(accounts === null ? [] : [accounts.element]), chips, holder);
   attempt(load);
   return () => {
     disposed = true;
