@@ -1566,7 +1566,7 @@ function buildBrowser(isDisposed) {
           { class: "profile-row", role: "listitem", "data-profile": profile.name },
           el("span", { class: "grow" }, el("span", null, label), inUse ? el("span", { class: "badge b-info" }, "In use") : null),
           inUse ? null : profileAction("Use", `Use ${label} for runs`, () => changeProfiles(api.post("/browser/profile", { name: profile.name }), `Runs use ${label} from Chrome's next start.`)),
-          profile.kind === "incognito" ? null : profileAction("Clear", `Clear the cookies and cache of ${label}`, () => clearProfile(profile, label)),
+          profile.kind === "incognito" ? null : profileAction("Clear", `Clear the sign-ins and site data of ${label}`, () => clearProfile(profile, label)),
           profile.kind !== "added" || inUse ? null : profileAction("Delete", `Delete ${label}`, () => deleteProfile(profile, label)),
         );
       }),
@@ -1603,7 +1603,7 @@ function buildBrowser(isDisposed) {
   async function clearProfile(profile, label) {
     const sure = await confirmDialog({
       title: `Clear ${label}?`,
-      message: "Its cookies and its cache are deleted, so the sites it was signed in to sign it out. Its settings stay.",
+      message: "Its cookies, the data its sites stored, the logins and autofill Chrome saved, and its cache are deleted, so every site it was signed in to signs it out. Its history, settings and extensions stay.",
       confirmLabel: "Clear",
       danger: true,
       focusCancel: true,
