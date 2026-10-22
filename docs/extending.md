@@ -6,7 +6,7 @@
 works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-and-plugins)). The old address `#/connect`
 leads to Plugins.
 
-**Plugins** lists 164 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
+**Plugins** lists 160 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
 Password managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item 492). Each tile has the service's mark, what Dot does with
 it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On this Mac, MCP · On this Mac · Key,
 AppleScript, Dot's browser or Synced folder), where it stands, and a **+** that takes its first step; a tile opens the
@@ -17,9 +17,9 @@ ready, and where its data goes. **Check again** reads them all anew. `GET /api/p
 Each tile's mark is the service's own logo, in its own colours, on a tile that is white in both colour schemes (a dark
 logo such as GitHub's or X's reads in the dark scheme too). The logos are files of `static/icons/plugins`: from
 [gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0), and, for the brands it draws as a wordmark alone
-(Stripe, Box, Wix, Zapier, Webflow, Mixpanel, HubSpot, Neo4j and Sanity), not at all (Calendly, Semrush and the
-thirteen more of item 535) or with an element that may reach past the file (Next.js), Simple Icons' symbol in the
-brand's colour (version 16.35.0, CC0), DuckDB's and ClickHouse's in black, as their yellow does not show on the tile;
+(Stripe, Box, Wix, Zapier, Webflow, Mixpanel, HubSpot and Sanity), not at all (Calendly, Semrush and the twelve
+more of item 535) or with an element that may reach past the file (Next.js), Simple Icons' symbol in the brand's
+colour (version 16.35.0, CC0), DuckDB's in black, as its yellow does not show on the tile;
 the folder's LICENSE names the files, the source and the commit they came from, and the brands' guidelines. A mark
 identifies its service and nothing more. The applications of this Mac (Mail, Calendar, Notes, Reminders, Messages,
 Contacts, Excel, Word, PowerPoint, Outlook and OneDrive) show the icon of the application you have installed, read from
@@ -31,21 +31,23 @@ small to read). A server added by hand wears
 the mark of the service it is one of, and the composer's menus draw a server and its tools with the same mark (item
 477).
 
-**Item 535** brought 89 MCP servers more, each tried first as Dot reaches it (`mcp/catalogue.py` says how and what was
+**Item 535** brought 85 MCP servers more, each tried first as Dot reaches it (`mcp/catalogue.py` says how and what was
 left out with why). Code: Vercel (whose server lets Dot register now), Sourcegraph, grep.app, Xcode (Xcode's own
 `xcrun mcpbridge`, which needs Xcode open, and XcodeBuildMCP), AWS, Azure, Alibaba Cloud, DigitalOcean, Kubernetes,
 Pulumi, Firebase, Convex, Prisma, Expo, Buildkite, Snyk, Socket, Jam, LogRocket, Honeycomb, Axiom, Better Stack,
 PagerDuty, incident.io, LaunchDarkly, Statsig, Braintrust, Clerk, WorkOS, Stytch, Globalping, Next.js, Svelte, Astro,
 Nuxt UI, Shopify, Apollo GraphOS, OpenAI's docs, Ref and AWS Knowledge (beside AWS's documentation). Design: Framer,
 Lucid, Whimsical, Excalidraw, shadcn/ui, Magic UI, LottieFiles, HeyGen, Sanity, Contentful and WordPress.com. Data:
-MongoDB, Redis, DuckDB, MotherDuck, ClickHouse, Neo4j, Qdrant, Pinecone, Supermemory and CoinGecko. Research: Kagi,
+MongoDB, DuckDB, MotherDuck, Pinecone, Supermemory and CoinGecko. Research: Kagi,
 Consensus, MarkItDown and Kiwi.com. Communication: Resend, Mailgun and DingTalk. Productivity: Dropbox, Shortcut,
 Productboard, Cal.com, Granola, Fireflies, tl;dv, Jotform, Tally and Time. Business: HubSpot (by its own server and a
 private app's token), Attio, Close, Customer.io, beehiiv, Square, Mercury, Ramp and Greenhouse. Support: Help Scout. A
 server started on this Mac uses what this Mac has: Kubernetes your kubeconfig, Azure `az login`, AWS `~/.aws`, Xcode
-the Xcode that is open, and DuckDB and MarkItDown read the files you name, as any server you add reaches what its
-process reaches. Redis, ClickHouse and Qdrant ask for a password or a key, as the page takes no empty secret: one that
-has none, such as a Redis of this Mac, is added by hand under `[[mcp]]`. The try that adds a server started on this
+the Xcode that is open; DuckDB reads the files a query names and writes the new ones it makes, and MarkItDown reads
+the files you name, as any server you add reaches what its process reaches. Redis, ClickHouse, Neo4j and Qdrant are not
+in it yet: each takes an address and a user besides its password, and the page asks for secrets alone, which Dot keeps
+in its `.env` and masks wherever their words appear (`localhost` too); they are added by hand under `[[mcp]]` until
+the catalogue has settings that are not secrets. The try that adds a server started on this
 Mac gives it five minutes to start (`FIRST_START_S`), as `npx` and `uvx` fetch its package then, which took from 52
 seconds to more than five minutes on a cold cache; the server kept starts within its own `startup_timeout_s`, as a
 start of the daemon waits for every server, and finds the package in the cache. `uv run pytest

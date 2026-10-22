@@ -11,19 +11,19 @@ google-icon.svg, grafana.svg, helpscout-icon.svg, heroku-icon.svg, hugging-face-
 instagram-icon.svg, intercom-icon.svg, kubernetes.svg, launchdarkly-icon.svg, linear-icon.svg, linkedin-icon.svg,
 mailgun-icon.svg, mapbox-icon.svg, microsoft-azure.svg, microsoft-icon.svg, microsoft-onedrive.svg, miro-icon.svg,
 model-context-protocol-icon.svg, monday-icon.svg, mongodb-icon.svg, neon-icon.svg, netlify-icon.svg, new-relic-icon.svg,
-notion-icon.svg, nuxt-icon.svg, openai-icon.svg, pagerduty-icon.svg, paypal.svg, perplexity-icon.svg,
-pinecone-icon.svg, playwright.svg, posthog-icon.svg, postman-icon.svg, prisma.svg, productboard-icon.svg,
-pulumi-icon.svg, qdrant-icon.svg, redis.svg, resend-icon.svg, sentry-icon.svg, shopify.svg, shortcut-icon.svg,
-slack-icon.svg, snyk.svg, sourcegraph.svg, square.svg, supabase-icon.svg, svelte-icon.svg, tavily.svg, todoist-icon.svg,
-vercel-icon.svg, wordpress-icon.svg, workos-icon.svg, x.svg, xcode.svg.
+notion-icon.svg, nuxt-icon.svg, openai-icon.svg, pagerduty-icon.svg, paypal.svg, perplexity-icon.svg, pinecone-icon.svg,
+playwright.svg, posthog-icon.svg, postman-icon.svg, prisma.svg, productboard-icon.svg, pulumi-icon.svg, resend-icon.svg,
+sentry-icon.svg, shopify.svg, shortcut-icon.svg, slack-icon.svg, snyk.svg, sourcegraph.svg, square.svg,
+supabase-icon.svg, svelte-icon.svg, tavily.svg, todoist-icon.svg, vercel-icon.svg, wordpress-icon.svg, workos-icon.svg,
+x.svg, xcode.svg.
 
 Simple Icons (https://simpleicons.org), version 16.35.0: alibabacloud.svg, betterstack.svg, box.svg, braintrust.svg,
-calendly.svg, clickhouse.svg, convex.svg, duckdb.svg, excalidraw.svg, greenhouse.svg, hubspot.svg, kagi.svg,
-lottiefiles.svg, lucid.svg, mixpanel.svg, neo4j.svg, nextdotjs.svg, sanity.svg, semrush.svg, shadcnui.svg, socket.svg,
-stripe.svg, webflow.svg, wix.svg, zapier.svg. gilbarbara/logos draws these brands as a wordmark alone, too
-small to read in a tile, or not at all, or (Next.js) with an element that may reach past the file, so each keeps Simple
-Icons' symbol: the icon's path alone, with the brand's colour as the file's fill. DuckDB's and ClickHouse's are filled black instead, as their yellow (FFF000, FFCC01) does not show on
-the white tile.
+calendly.svg, convex.svg, duckdb.svg, excalidraw.svg, greenhouse.svg, hubspot.svg, kagi.svg, lottiefiles.svg, lucid.svg,
+mixpanel.svg, nextdotjs.svg, sanity.svg, semrush.svg, shadcnui.svg, socket.svg, stripe.svg, webflow.svg, wix.svg,
+zapier.svg. gilbarbara/logos draws these brands as a wordmark alone, too small to read in a tile, or not at all, or
+(Next.js) with an element that may reach past the file, so each keeps Simple Icons' symbol: the icon's path alone, with
+the brand's colour as the file's fill. DuckDB's is filled black instead, as its yellow (FFF000) does not show on the
+white tile.
 
 The marks are trademarks of their owners. Dot shows each to identify the service it stands for, and nothing more; its
 use implies no endorsement. The owners' brand guidelines, where Simple Icons names them:
@@ -53,7 +53,6 @@ use implies no endorsement. The owners' brand guidelines, where Simple Icons nam
 - Lucid: https://lucid.co/brand
 - Mapbox: https://www.mapbox.com/about/press/brand-guidelines
 - Mixpanel: https://brand.mixpanel.com
-- Neo4j: https://neo4j.com/brand/#logo
 - Neon: https://neon.com/brand
 - Netlify: https://www.netlify.com/press/
 - New Relic: https://newrelic.com/about/media-assets#guidelines
@@ -63,8 +62,6 @@ use implies no endorsement. The owners' brand guidelines, where Simple Icons nam
 - PayPal: https://newsroom.paypal-corp.com/media-resources
 - PostHog: https://posthog.com/handbook/company/brand-assets
 - Pulumi: https://www.pulumi.com/brand/
-- Qdrant: https://qdrant.tech/brand-resources/
-- Redis: https://redis.io/brand-guidelines
 - Resend: https://resend.com/brand
 - Shopify: https://www.shopify.com/brand-assets
 - Shortcut: https://www.shortcut.com/branding

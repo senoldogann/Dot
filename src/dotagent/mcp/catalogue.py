@@ -36,7 +36,10 @@ Storyblok's open server (it lists no tools), Bright Data's (a tool's schema nest
 Pro (it fails to start with the current MCP library), the open servers of Gorgias and Retell (by their tools, Gorgias's
 is its own team's, and Retell's calls take a key it names no way to pass), and the deprecated packages of Railway,
 Dynatrace, CircleCI, Readwise, Browserbase and Semgrep. HubSpot and PagerDuty come in by their own local servers and
-your token instead."""
+your token instead. Redis, ClickHouse, Neo4j and Qdrant start, but each takes its address and user besides its
+password, and a service asks the page for secrets alone, which Dot keeps in its .env and so masks wherever their
+words appear (``localhost`` among them): they wait for settings of the catalogue that are not secrets, and can be
+added by hand under ``[[mcp]]`` until then."""
 
 import re
 from typing import Literal, Self
@@ -1018,9 +1021,12 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="duckdb",
         name="DuckDB",
-        does="Query CSV, Parquet and JSON files and DuckDB databases with SQL, on this Mac.",
+        does="Query CSV, Parquet and JSON files of this Mac with SQL, and write what a query makes into new files.",
         command="uvx",
-        args=("mcp-server-motherduck", "--db-path", ":memory:", "--read-write", "--allow-switch-databases"),
+        # A database in memory, which the server opens only to read and write (it refuses one in memory to read
+        # alone); its query tool is declared as one that acts, and the policy weighs each query so. No tool to open
+        # another database (--allow-switch-databases): a query names the files it reads.
+        args=("mcp-server-motherduck", "--db-path", ":memory:", "--read-write"),
     ),
     McpService(
         id="markitdown",
@@ -1134,66 +1140,6 @@ MCP_SERVICES: tuple[McpService, ...] = (
                 label="Connection string (mongodb://... or mongodb+srv://...)",
                 help="https://www.mongodb.com/docs/manual/reference/connection-string/",
             ),
-        ),
-    ),
-    McpService(
-        id="redis",
-        name="Redis",
-        does="Read and change the keys, hashes, lists, streams and search indexes of your Redis.",
-        command="uvx",
-        args=("--from", "redis-mcp-server@latest", "redis-mcp-server"),
-        env={"REDIS_HOST": "${REDIS_HOST}", "REDIS_PORT": "${REDIS_PORT}", "REDIS_PWD": "${REDIS_PASSWORD}"},
-        secrets=(
-            ServiceSecret(name="REDIS_HOST", label="Host (localhost for one on this Mac)", help=None),
-            ServiceSecret(name="REDIS_PORT", label="Port (6379 by default)", help=None),
-            ServiceSecret(name="REDIS_PASSWORD", label="Password", help=None),
-        ),
-    ),
-    McpService(
-        id="clickhouse",
-        name="ClickHouse",
-        does="Query your ClickHouse databases with SQL, read-only.",
-        command="uvx",
-        args=("mcp-clickhouse",),
-        env={
-            "CLICKHOUSE_HOST": "${CLICKHOUSE_HOST}",
-            "CLICKHOUSE_USER": "${CLICKHOUSE_USER}",
-            "CLICKHOUSE_PASSWORD": "${CLICKHOUSE_PASSWORD}",
-        },
-        secrets=(
-            ServiceSecret(name="CLICKHOUSE_HOST", label="Host", help=None),
-            ServiceSecret(name="CLICKHOUSE_USER", label="User", help=None),
-            ServiceSecret(name="CLICKHOUSE_PASSWORD", label="Password", help=None),
-        ),
-    ),
-    McpService(
-        id="neo4j",
-        name="Neo4j",
-        does="Read the schema of your Neo4j graph and query it in Cypher.",
-        command="uvx",
-        args=("mcp-neo4j-cypher",),
-        env={"NEO4J_URI": "${NEO4J_URI}", "NEO4J_USERNAME": "${NEO4J_USERNAME}", "NEO4J_PASSWORD": "${NEO4J_PASSWORD}"},
-        secrets=(
-            ServiceSecret(name="NEO4J_URI", label="Address (neo4j+s://... or bolt://...)", help=None),
-            ServiceSecret(name="NEO4J_USERNAME", label="User", help=None),
-            ServiceSecret(name="NEO4J_PASSWORD", label="Password", help=None),
-        ),
-    ),
-    McpService(
-        id="qdrant",
-        name="Qdrant",
-        does="Store notes in a Qdrant collection and find them again by meaning.",
-        command="uvx",
-        args=("mcp-server-qdrant",),
-        env={
-            "QDRANT_URL": "${QDRANT_URL}",
-            "QDRANT_API_KEY": "${QDRANT_API_KEY}",
-            "COLLECTION_NAME": "${QDRANT_COLLECTION}",
-        },
-        secrets=(
-            ServiceSecret(name="QDRANT_URL", label="Address of your Qdrant", help=None),
-            ServiceSecret(name="QDRANT_API_KEY", label="API key", help="https://cloud.qdrant.io/"),
-            ServiceSecret(name="QDRANT_COLLECTION", label="Collection", help=None),
         ),
     ),
     McpService(
