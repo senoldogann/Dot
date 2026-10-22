@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Mapping, Sequence, Set
+from collections.abc import Awaitable, Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +12,7 @@ from pydantic import JsonValue, ValidationError
 
 from dotagent.agent.attachments import (
     ATTACHMENTS_EVENT,
+    RunInbox,
     StoredAttachment,
     UserInput,
     attachment_summary,
@@ -143,6 +144,7 @@ from dotagent.agent.scaffold import (
     scaffold_for,
     summarise_point,
     surface_for,
+    surface_for_tools,
 )
 from dotagent.agent.sites import SiteKnowledge, new_sites, site_knowledge, site_note, site_tag
 from dotagent.agent.stepmodel import (
@@ -156,6 +158,7 @@ from dotagent.agent.stepmodel import (
     routed_event,
     step_state,
 )
+from dotagent.agent.templates import AgentTeam, team_of
 from dotagent.agent.verify import (
     RunFacts,
     answer_paths,
@@ -392,7 +395,7 @@ class AgentRun:
     run: RunRecord
     gate: RunGate
     cancel: asyncio.Event
-    inbox: asyncio.Queue[UserInput]
+    inbox: RunInbox
     spawner: Spawner
     opening: RunOpening
 
@@ -437,15 +440,6 @@ def _waits(call: ToolCall, questions: AskMode) -> bool:
         return False
 
 
-def _drain(inbox: asyncio.Queue[UserInput]) -> list[UserInput]:
-    texts: list[UserInput] = []
-    while True:
-        try:
-            texts.append(inbox.get_nowait())
-        except asyncio.QueueEmpty:
-            return texts
-
-
 class Compaction(FrozenModel):
     """How the earlier conversation was folded: the note that replaces it and how that note came about.
 
@@ -478,7 +472,7 @@ async def _current_plan(agent: AgentRun) -> PlanPayload:
 
 
 async def _model_summary(
-    agent: AgentRun, ref: ModelRef, transcript: str, context_tokens: int
+    agent: AgentRun, ref: ModelRef, transcript: str, context_tokens: int, window: int | None
 ) -> tuple[str | None, int, str | None]:
     """Ask the run's own model for a summary that fits a run with a budget of ``context_tokens``: ``(text or None,
     attempts made, last problem)``.
@@ -508,6 +502,7 @@ async def _model_summary(
             speed="standard",
             session_key=f"{agent.run.thread_id}:summary",
             cache_mark=None,
+            window=window,
         )
         try:
             async with asyncio.timeout(agent.runtime.config.agent.model_call_timeout_s):
@@ -554,7 +549,12 @@ async def _model_summary(
 
 
 async def _compact(
-    agent: AgentRun, head: Sequence[Message], ledger: RunLedger, context_tokens: int, part_chars: int
+    agent: AgentRun,
+    head: Sequence[Message],
+    ledger: RunLedger,
+    context_tokens: int,
+    part_chars: int,
+    window: int | None,
 ) -> Compaction:
     """Fold ``head`` into a continuity note written by the fast model (``[models] fast``), the side work of a run that
     its own, slower model need not do; the run's own model writes it when the fast one gives no usable summary (a
@@ -582,12 +582,19 @@ async def _compact(
     fast_problem: str | None = None if paused is None else f"{unavailable_text(paused, now)} cannot answer now"
     if paused is not None:
         log.info("summary_fast_paused", run_id=agent.run.id, fast=fast.label, own=own.label, until=paused.until)
-    text, attempts, problem = await _model_summary(agent, writer, transcript, context_tokens)
+    # The run's own model is asked with the window the run planned with (item 520), the fast one with its own.
+    text, attempts, problem = await _model_summary(
+        agent,
+        writer,
+        transcript,
+        context_tokens,
+        window if writer.label == own.label else await agent.runtime.router.window_of(writer),
+    )
     if text is None and writer.label != own.label:
         fast_problem = problem if problem is not None else "no reply"
         log.warning("summary_fast_failed", run_id=agent.run.id, fast=fast.label, own=own.label, problem=fast_problem)
         writer = own
-        text, own_attempts, problem = await _model_summary(agent, own, transcript, context_tokens)
+        text, own_attempts, problem = await _model_summary(agent, own, transcript, context_tokens, window)
         attempts += own_attempts
     # The summary stays in the run's context and its record: the secrets Dot holds, and any of a known form, are
     # masked in it (review Y3).
@@ -698,7 +705,7 @@ async def _fit_context(
         if head:
             ledger = with_compaction(ledger)
             part_chars: int = round(plain * _SUMMARY_SHARE * CHARS_PER_TOKEN)
-            compaction: Compaction = await _compact(agent, head, ledger, context_tokens, part_chars)
+            compaction: Compaction = await _compact(agent, head, ledger, context_tokens, part_chars, scaffold.window)
             before: int = estimated
             current = [compaction.note, *tail]
             estimated = round(estimate_tokens([system, *current], specs) * ratio)
@@ -929,6 +936,12 @@ def _new_memories_note(live: LiveNotes) -> str:
         f"account:\n{lines}"
         f"{more}"
     )
+
+
+def _team_name(name: str) -> str:
+    """The name of the ready team an agent called ``name`` is in (item 512), empty for none."""
+    found: AgentTeam | None = team_of(name)
+    return "" if found is None else found.name
 
 
 def _new_teammates_note(agents: Sequence[AgentRecord]) -> str:
@@ -1421,6 +1434,23 @@ async def _complete_in_time(
         ) from exc
 
 
+async def _complete_unless_steered(inbox: RunInbox, call: Awaitable[ModelReply]) -> ModelReply | None:
+    """Await the model's reply to a step, unless a message to the run (a steer, the answer to a question) arrives
+    first: the call is then cancelled and ``None`` returned, and the loop reads the message, which stays in the inbox,
+    before it asks again (item 509). An error of the call is raised as it was."""
+    reply_task: asyncio.Future[ModelReply] = asyncio.ensure_future(call)
+    heard: asyncio.Task[None] = asyncio.ensure_future(inbox.arrival())
+    racing: set[asyncio.Future[ModelReply] | asyncio.Future[None]] = {reply_task, heard}
+    try:
+        await asyncio.wait(racing, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        heard.cancel()
+        if not reply_task.done():
+            reply_task.cancel()
+        await asyncio.wait(racing)
+    return None if reply_task.cancelled() else reply_task.result()
+
+
 def _connection_broke(error: Exception) -> bool:
     """Whether ``error`` says that the model could not be reached, rather than that it cannot answer for a while or
     refused the request: the connection broke or timed out, or its server failed with a status that retrying can get
@@ -1688,6 +1718,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     if not helpers:
         specs = tuple(spec for spec in specs if spec.name != CONSULT_TOOL)
+    surface, surface_reason = surface_for_tools(surface, surface_reason, len(specs))
     # Every tool group of the run, core first. A run with no group besides core has nothing to turn on.
     groups: tuple[str, ...] = (CORE_GROUP, *groups_of([spec.name for spec in specs]))
     grouped: bool = surface == "grouped" and len(groups) > 1
@@ -1765,10 +1796,15 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     role=agent_record.role,
                     instructions=agent_record.instructions,
                     made_by_dot=agent_record.made_by is not None,
+                    team=_team_name(agent_record.name),
                 ),
                 [
                     AgentBrief(
-                        name=member.name, role=member.role, instructions="", made_by_dot=member.made_by is not None
+                        name=member.name,
+                        role=member.role,
+                        instructions="",
+                        made_by_dot=member.made_by is not None,
+                        team=_team_name(member.name),
                     )
                     for member in team
                 ],
@@ -1923,8 +1959,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     while True:
         if agent.cancel.is_set():
             raise RunCancelled("the run was stopped", {"run_id": run.id})
-        steered: list[UserInput] = _drain(agent.inbox)
-        for sent in steered:
+        while not agent.inbox.empty():
+            sent: UserInput = agent.inbox.first()
             text: str = sent.text
             note: Message = await message_with_attachments(
                 runtime, run.thread_id, run.id, text, sent.files, info.vision
@@ -1937,6 +1973,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 agent.gate.add_instruction(sent.said)
                 ledger = with_instruction(ledger, sent.said)
             await runtime.store.append_messages(run.thread_id, [note])
+            # Taken once it is in the thread, with nothing awaited between: a stop before leaves it to the run's end.
+            agent.inbox.get_nowait()
             await runtime.bus.emit(run.id, "steer", steer_event(sent, agent.gate.tainted), True)
         changed: list[MemoryRecord] = await runtime.store.memories_changed_since(memory_seen_at, run.id)
         if changed:
@@ -2018,13 +2056,26 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             session_key=run.thread_id,
             # The end of what the next step sends unchanged, after the system message (item 237).
             cache_mark=_cache_mark(history, config),
+            # The window the run planned with as it started (item 520): a context size chosen since does not change it.
+            window=scaffold.window if routed is None else routed.scaffold.window,
         )
         steps += 1
         asked_at: float = time.monotonic()
         try:
-            reply: ModelReply = await _complete_in_time(
+            call: Awaitable[ModelReply] = _complete_in_time(
                 runtime, step_ref, request, sink, step_origin, config.model_call_timeout_s
             )
+            # A step past the run's limit is its last: a message does not hold back the finish it ends with.
+            heard: ModelReply | None = (
+                await call if past_limit is not None else await _complete_unless_steered(agent.inbox, call)
+            )
+            if heard is None:
+                # A message arrived while the model was at the step: the step is given up and asked again with it.
+                log.info("step_steered", run_id=run.id, step=steps, model=step_ref.label)
+                await sink(_RESET)
+                steps -= 1
+                continue
+            reply: ModelReply = heard
             # A reply the service's content filter stopped is handled as a model that cannot answer this run: a
             # routed step goes back to the run's own model, the run's own model hands over to a standby one.
             filtered: ProviderFilterError | None = filtered_stop(reply, step_ref.label)

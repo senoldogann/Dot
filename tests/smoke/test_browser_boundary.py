@@ -404,7 +404,10 @@ async def test_the_page_a_sign_in_comes_back_to_is_drawn_in_a_tab_no_run_drives(
         async with page.expect_navigation():
             await page.click('text="Back to Dot"')
         await expect(page.locator("h1")).to_have_text("Signed in to Google")
-        assert await page.evaluate("document.querySelector('.callback-mark img').naturalWidth > 0")
+        assert await page.evaluate(
+            "(() => { const mark = document.querySelector('.callback-mark img');"
+            " return mark.decode().then(() => mark.naturalWidth > 0); })()"
+        )
         card: str = await page.evaluate("getComputedStyle(document.querySelector('.signin .card')).backgroundColor")
         assert card not in ("rgba(0, 0, 0, 0)", "transparent"), card
         assert [arrival.path for arrival in _InsideHandler.arrivals.items] == [

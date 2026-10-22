@@ -1,7 +1,8 @@
-"""The tools of an MCP server that offers too many (item 426), for real: a server of 32 tools, more than Dot hands a
-model at once, served in this process over streamable HTTP and added from the Plugins page. It is left out until the
-owner chooses; the page lists what it offers, takes at most 30 ticks, and the server comes back with just those tools
-for the runs that start next. A server set up in Dot's config, or one that is not there, is refused."""
+"""The tools of an MCP server that offers many (items 426 and 524), for real: a server of 32 tools, served in this
+process over streamable HTTP and added from the Plugins page. It is ready with every one of them; the page lists
+what it offers, all of it ticked, and the server comes back with just the tools the owner ticks for the runs that
+start next, or with all of them and no list when every one is ticked. A server set up in Dot's config, or one that
+is not there, is refused."""
 
 import asyncio
 import json
@@ -26,7 +27,6 @@ from dotagent.core.errors import ConfigError
 from dotagent.core.paths import connected_servers_path
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.mcp.connected import read_connected
-from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS
 from dotagent.mcp.types import McpTool
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -41,11 +41,12 @@ FIXTURE: Path = Path(__file__).resolve().parent.parent / "fixtures" / "mcp_fixtu
 START_TIMEOUT_S: float = 15.0
 READY_WITHIN_S: float = 30.0
 _POLL_S: float = 0.2
-_TOOLS: int = MAX_UNFILTERED_TOOLS + 2
+# More than the 30 Dot once took from a server without a choice.
+_TOOLS: int = 32
 
 
 def _many_server() -> MCPServer:
-    """An MCP server open to all, with more tools than Dot hands a model at once."""
+    """An MCP server open to all, with many tools."""
     server: MCPServer = MCPServer("many")
 
     def tool(number: int) -> None:
@@ -162,35 +163,32 @@ async def _added(world: _World, client: httpx.AsyncClient, name: str) -> dict[st
     return await _settled(client, name)
 
 
-async def test_a_server_of_too_many_tools_waits_for_a_choice_and_offers_just_the_chosen(world: _World) -> None:
+async def test_a_server_of_many_tools_is_ready_with_all_of_them_and_offers_just_the_chosen(world: _World) -> None:
+    names: list[str] = [f"tool_{number:02d}" for number in range(_TOOLS)]
     async with _client(world) as client:
-        left: dict[str, object] = await _added(world, client, "many")
-        # Left out for offering too many, and the page is told it may choose.
-        assert (left["state"], left["origin"], left["picks_tools"]) == ("left_out", "connected", True), left
-        assert "too many tools" in str(left["error"]), left
-        assert "many" not in world.runtime.mcp.connected()
-        # What it offers, in its own order, with the limit.
+        ready: dict[str, object] = await _added(world, client, "many")
+        # Ready with every tool it lists, and the page is told it may cut them down.
+        assert (ready["state"], ready["origin"], ready["picks_tools"]) == ("ready", "connected", True), ready
+        assert ready["tools"] == names, ready
+        assert sorted(tool.remote_name for tool in world.runtime.mcp.tools if tool.server == "many") == names
+        # What it offers, in its own order, and no allow list yet.
         offered: httpx.Response = await client.get("/api/mcp/servers/many/offered")
         assert offered.status_code == 200, offered.text
         listing: dict[str, object] = offered.json()
-        assert listing["limit"] == MAX_UNFILTERED_TOOLS and listing["allow"] == []
-        names: list[str] = [tool["name"] for tool in listing["tools"]]  # type: ignore[attr-defined]
-        assert names == [f"tool_{number:02d}" for number in range(_TOOLS)]
+        assert "limit" not in listing and listing["allow"] == [], listing
+        assert [tool["name"] for tool in listing["tools"]] == names  # type: ignore[attr-defined]
         assert listing["tools"][3] == {"name": "tool_03", "description": "Does the 03th thing of the many."}  # type: ignore[index]
-        # A name the server does not list, none, and one more than the limit are refused, and nothing changes.
+        # A name the server does not list and none are refused, and nothing changes.
         unknown: httpx.Response = await client.put("/api/mcp/servers/many/allow", json={"tools": ["tool_01", "nope"]})
         assert unknown.status_code == 422 and "nope" in unknown.text, unknown.text
         none: httpx.Response = await client.put("/api/mcp/servers/many/allow", json={"tools": []})
         assert none.status_code == 422, none.text
-        too_many: httpx.Response = await client.put("/api/mcp/servers/many/allow", json={"tools": names[: _TOOLS - 1]})
-        assert too_many.status_code == 422 and f"between 1 and {MAX_UNFILTERED_TOOLS}" in too_many.text, too_many.text
-        assert "many" not in world.runtime.mcp.connected()
+        assert len([tool for tool in world.runtime.mcp.tools if tool.server == "many"]) == _TOOLS
         # The chosen two come back as the server's tools, in the server's order, whichever order they were sent in.
         chosen: httpx.Response = await client.put("/api/mcp/servers/many/allow", json={"tools": ["tool_03", "tool_01"]})
         assert chosen.status_code == 200, chosen.text
-        ready: dict[str, object] = chosen.json()
-        assert (ready["state"], ready["tools"], ready["picks_tools"]) == ("ready", ["tool_01", "tool_03"], False), ready
-        assert (await _view(client, "many"))["state"] == "ready"
+        cut: dict[str, object] = chosen.json()
+        assert (cut["state"], cut["tools"], cut["picks_tools"]) == ("ready", ["tool_01", "tool_03"], True), cut
         assert sorted(tool.remote_name for tool in world.runtime.mcp.tools if tool.server == "many") == [
             "tool_01",
             "tool_03",
@@ -198,6 +196,11 @@ async def test_a_server_of_too_many_tools_waits_for_a_choice_and_offers_just_the
         # The choice is kept with the server, so a restart offers the same two.
         kept = {config.name: config for config in read_connected(connected_servers_path()).servers}
         assert kept["many"].allow == ["tool_01", "tool_03"]
+        # Every one chosen keeps no list: the server offers all of its tools again, those it adds later too.
+        everything: httpx.Response = await client.put("/api/mcp/servers/many/allow", json={"tools": names})
+        assert everything.status_code == 200 and everything.json()["tools"] == names, everything.text
+        kept = {config.name: config for config in read_connected(connected_servers_path()).servers}
+        assert kept["many"].allow == []
         # The page's own servers only: one set up in Dot's config, and one that is not there, are refused.
         config_set: httpx.Response = await client.put("/api/mcp/servers/fixture/allow", json={"tools": ["add"]})
         assert config_set.status_code == 409, config_set.text
@@ -212,11 +215,10 @@ async def test_a_server_of_too_many_tools_waits_for_a_choice_and_offers_just_the
 
 async def test_a_choice_that_cannot_connect_is_not_kept_and_the_owner_may_choose_again(world: _World) -> None:
     """The server goes away between the list and the choice: the connection fails, the choice is not written down, and
-    the server is still one the owner may choose tools of (its **Choose tools** stays), not one with an allow list the
-    page cannot change."""
+    the server stays as it was, with its tools and its **Choose tools**."""
     async with _client(world) as client:
-        left: dict[str, object] = await _added(world, client, "many")
-        assert left["picks_tools"] is True, left
+        ready: dict[str, object] = await _added(world, client, "many")
+        assert (ready["state"], ready["picks_tools"]) == ("ready", True), ready
         listing: httpx.Response = await client.get("/api/mcp/servers/many/offered")
         assert listing.status_code == 200, listing.text
         real = world.runtime.mcp.connect
@@ -230,11 +232,11 @@ async def test_a_choice_that_cannot_connect_is_not_kept_and_the_owner_may_choose
         finally:
             world.runtime.mcp.connect = real  # type: ignore[method-assign]
         assert chosen.status_code >= 400, chosen.text
-        # The refused choice is not on disk: the server has no record, or one without an allow list.
+        # The refused choice is not on disk: the server keeps no allow list.
         written = {config.name: config for config in read_connected(connected_servers_path()).servers}
         assert "many" not in written or written["many"].allow == [], written.get("many")
         again: dict[str, object] = await _view(client, "many")
-        assert (again["state"], again["picks_tools"]) == ("left_out", True), again
+        assert (again["state"], again["picks_tools"], len(again["tools"])) == ("ready", True, _TOOLS), again  # type: ignore[arg-type]
         retry: httpx.Response = await client.put("/api/mcp/servers/many/allow", json={"tools": ["tool_02"]})
         assert retry.status_code == 200 and retry.json()["tools"] == ["tool_02"], retry.text
         await client.delete("/api/mcp/servers/many")
@@ -244,17 +246,17 @@ def _row(page: Page, name: str) -> Locator:
     return page.locator(f".plugin-server[data-server='{name}']")
 
 
-async def test_the_plugins_page_lists_the_tools_takes_at_most_thirty_and_connects_the_chosen(
+async def test_the_plugins_page_lists_the_tools_all_ticked_and_connects_the_chosen(
     world: _World, tmp_path: Path
 ) -> None:
     port: int = int(world.dot.rpartition(":")[2])
     async with _client(world) as client:
-        left: dict[str, object] = await _added(world, client, "many")
-        assert left["picks_tools"] is True, left
+        ready: dict[str, object] = await _added(world, client, "many")
+        assert (ready["state"], ready["picks_tools"]) == ("ready", True), ready
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=world.runtime.config.browser.channel, headless=True)
         try:
-            # The phone only looks and cancels; the wide page then saves, which leaves the server chosen.
+            # The phone only looks and cancels; the wide page then saves, which leaves the server with the chosen two.
             for width, scheme in ((390, "dark"), (1280, "light")):
                 page: Page = await browser.new_page(
                     viewport={"width": width, "height": 860}, color_scheme=scheme, reduced_motion="reduce"
@@ -263,50 +265,48 @@ async def test_the_plugins_page_lists_the_tools_takes_at_most_thirty_and_connect
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"{world.dot}/#/customize/plugins")
                 row: Locator = _row(page, "many")
-                await expect(row.locator(".badge")).to_have_text("Left out")
-                await expect(row).to_contain_text("too many tools")
-                # Only a server the page added, left out for too many tools, offers the choice.
+                await expect(row.locator(".badge")).to_have_text("Ready")
+                await expect(row).to_contain_text(f"{_TOOLS} tools: tool_00")
+                # Only a server the page added offers the choice.
                 await expect(_row(page, "fixture").get_by_role("button", name="Choose tools")).to_have_count(0)
                 await row.get_by_role("button", name="Choose tools").click()
                 dialog: Locator = page.locator("dialog[open]")
                 await expect(dialog.get_by_role("heading")).to_have_text("Choose the tools of many")
-                boxes: Locator = dialog.get_by_role("checkbox")
+                every: Locator = dialog.get_by_role("checkbox", name="All tools")
+                boxes: Locator = dialog.locator(".import-list").get_by_role("checkbox")
                 await expect(boxes).to_have_count(_TOOLS)
-                save: Locator = dialog.get_by_role("button", name="Save")
-                await expect(save).to_be_disabled()
-                await expect(dialog).to_contain_text(f"0 of at most {MAX_UNFILTERED_TOOLS}")
+                # With no list yet, every tool is ticked, and so is All tools.
+                await expect(every).to_be_checked()
+                await expect(dialog).to_contain_text(f"{_TOOLS} of {_TOOLS}")
+                await expect(dialog.get_by_role("button", name=f"Save {_TOOLS}")).to_be_enabled()
                 await expect(dialog).to_contain_text("tool_03")
                 await expect(dialog).to_contain_text("Does the 03th thing of the many.")
-                # Ticked up to the limit, the others cannot be ticked; unticking one gives the place back.
-                for number in range(MAX_UNFILTERED_TOOLS):
-                    await boxes.nth(number).check()
-                await expect(dialog).to_contain_text(f"{MAX_UNFILTERED_TOOLS} of at most {MAX_UNFILTERED_TOOLS}")
-                await expect(boxes.nth(MAX_UNFILTERED_TOOLS)).to_be_disabled()
-                await expect(boxes.nth(MAX_UNFILTERED_TOOLS + 1)).to_be_disabled()
-                await expect(boxes.nth(0)).to_be_enabled()
-                await boxes.nth(0).uncheck()
-                await expect(boxes.nth(MAX_UNFILTERED_TOOLS)).to_be_enabled()
-                for number in range(1, MAX_UNFILTERED_TOOLS):
-                    await boxes.nth(number).uncheck()
+                # All tools unticks them all, and nothing ticked cannot be saved.
+                await every.uncheck()
+                await expect(dialog).to_contain_text(f"0 of {_TOOLS}")
+                save: Locator = dialog.get_by_role("button", name="Save")
                 await expect(save).to_be_disabled()
                 await boxes.nth(5).check()
                 await boxes.nth(_TOOLS - 1).check()
+                await expect(every).not_to_be_checked()
                 await expect(dialog.get_by_role("button", name="Save 2")).to_be_enabled()
                 await page.screenshot(path=str(tmp_path / f"choose-tools-{width}-{scheme}.png"))
                 # Cancelled, nothing is kept; saved, the server comes back with the two.
                 await dialog.get_by_role("button", name="Cancel").click()
                 await expect(page.locator("dialog[open]")).to_have_count(0)
-                await expect(row.locator(".badge")).to_have_text("Left out")
+                await expect(row).to_contain_text(f"{_TOOLS} tools: tool_00")
                 if width == 390:
                     await page.close()
                     continue
                 await row.get_by_role("button", name="Choose tools").click()
+                await every.uncheck()
                 await boxes.nth(5).check()
                 await boxes.nth(_TOOLS - 1).check()
                 await dialog.get_by_role("button", name="Save 2").click()
-                await expect(row.locator(".badge")).to_have_text("Ready", timeout=READY_WITHIN_S * 1000)
-                await expect(row).to_contain_text("2 tools: tool_05, tool_31")
-                await expect(row.get_by_role("button", name="Choose tools")).to_have_count(0)
+                await expect(row).to_contain_text("2 tools: tool_05, tool_31", timeout=READY_WITHIN_S * 1000)
+                await expect(row.locator(".badge")).to_have_text("Ready")
+                # A server that runs keeps the choice, to cut its tools down or take them all again.
+                await expect(row.get_by_role("button", name="Choose tools")).to_have_count(1)
                 await page.close()
         finally:
             await browser.close()

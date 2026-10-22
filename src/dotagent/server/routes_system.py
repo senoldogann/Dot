@@ -13,7 +13,14 @@ from fastapi.responses import FileResponse
 
 from dotagent import __version__
 from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
-from dotagent.agent.scaffold import context_budget, context_ceiling, context_choices, summarise_point
+from dotagent.agent.scaffold import (
+    context_budget,
+    context_ceiling,
+    most_window,
+    run_window,
+    summarise_point,
+    window_choices,
+)
 from dotagent.agent.sizes import ContextSizes
 from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, ModelsConfig
 from dotagent.config_edit import (
@@ -135,17 +142,20 @@ _PENDING_LIMIT: int = 500
 _EVIDENCE_DAYS: int = 30
 
 
-def _context_choice(config: AgentConfig, window: int | None, chosen: int | None) -> ContextChoice:
-    """The context size of the runs of a model whose request holds ``window`` tokens and whose size is ``chosen``."""
+def _context_choice(config: AgentConfig, info: ModelInfo, chosen: int | None) -> ContextChoice:
+    """The context size of the runs of the model ``info`` describes, whose size is ``chosen``: up to three quarters of
+    the most window it may be given, its own for an Ollama model, which is asked for the window its size needs (item
+    520)."""
+    window: int | None = run_window(info, chosen)
     tokens: int = context_budget(config, window, chosen)
     return ContextChoice(
         tokens=tokens,
         chosen=chosen,
-        default=context_budget(config, window, None),
+        default=context_budget(config, info.context_length, None),
         configured=config.context_tokens if isinstance(config.context_tokens, int) else None,
         floor=CONTEXT_FLOOR,
-        ceiling=context_ceiling(window),
-        sizes=list(context_choices(config, window, chosen)),
+        ceiling=context_ceiling(most_window(info)),
+        sizes=list(window_choices(config, info, chosen)),
         summarise_at=round(summarise_point(config, window, chosen, tokens)),
     )
 
@@ -162,7 +172,7 @@ def _option(
         context_length=info.context_length,
         own_context_length=info.own_context_length,
         window_source=info.window_source,
-        context=_context_choice(agent, info.context_length, sizes.of(ref.label)),
+        context=_context_choice(agent, info, sizes.of(ref.label)),
         efforts=list(info.efforts),
         default_effort=effective_effort(info.efforts, default_effort),
         free=info.free,
@@ -422,7 +432,8 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         changed; nothing changes then. The runs under way keep theirs."""
         ref: ModelRef = parse_model_ref(request.model)
         info: ModelInfo = await ctx.runtime.router.model_info(ref)
-        ceiling: int | None = context_ceiling(info.context_length)
+        # An Ollama model may be given up to three quarters of its own window, which it is then asked for (item 520).
+        ceiling: int | None = context_ceiling(most_window(info))
         if request.tokens is not None and ceiling is None:
             raise ConfigError(
                 "the model's provider does not say how many tokens it holds, so its context size cannot be chosen",
@@ -432,7 +443,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             raise ConfigError(
                 f"the context size of {ref.label} must be from {CONTEXT_FLOOR:,} to {ceiling:,} tokens, three quarters "
                 "of its window",
-                {"model": ref.label, "tokens": request.tokens, "window": info.context_length},
+                {"model": ref.label, "tokens": request.tokens, "window": most_window(info)},
             )
         await asyncio.to_thread(set_context_size, config_path(), ref.label, request.tokens)
         ctx.runtime.context_sizes.choose(ref.label, request.tokens)

@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { callKind, countKinds, describeArguments, flowWords } from "../../src/dotagent/server/static/js/tools.js";
+import { callKind, countKinds, describeArguments, flowWords, toolWords } from "../../src/dotagent/server/static/js/tools.js";
 
 test("a tool's kind: by name, by prefix, else other", () => {
   assert.equal(callKind("shell"), "command");
@@ -41,4 +41,20 @@ test("the line for a call's arguments comes from its most telling one", () => {
   assert.equal(describeArguments(null), "");
   assert.equal(describeArguments("words"), "");
   assert.equal(describeArguments({ url: `https://example.com/${"a".repeat(300)}` }).length, 200);
+});
+
+test("a tool's row names it in words: Dot's in its own, an MCP tool by its server and what it does", () => {
+  assert.equal(toolWords("edit_file"), "Edit file");
+  assert.equal(toolWords("update_plan"), "Update plan");
+  assert.equal(toolWords("web_search"), "Web search");
+  assert.equal(toolWords("skill"), "Use skill");
+  // The server's name is taken off the tool's own, and the server is named as a title.
+  assert.equal(toolWords("mcp__tavily__tavily_search"), "Tavily · Search");
+  assert.equal(toolWords("mcp__linear__create_issue"), "Linear · Create issue");
+  assert.equal(toolWords("mcp__microsoft-learn__microsoft_docs_search"), "Microsoft Learn · Microsoft docs search");
+  // A tool named for its server alone keeps its name.
+  assert.equal(toolWords("mcp__tavily__tavily"), "Tavily · Tavily");
+  // Any other tool reads in words of its name, and a name that is a property of every object is no tool's words.
+  assert.equal(toolWords("draft_reply"), "Draft reply");
+  assert.equal(toolWords("constructor"), "Constructor");
 });

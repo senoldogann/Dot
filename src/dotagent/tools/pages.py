@@ -14,6 +14,7 @@ from dotagent.tools.context import ToolContext
 
 SHOW_PAGE_TOOL: str = "show_page"
 
+# What the tool says of a page; since item 521 it asks for one that lives: animated, with values on hover.
 _DESCRIPTION: str = (
     "Show the user a page you write in HTML, in the conversation where they read you: a chart, a table, a diagram, a "
     "3D view, a mockup or anything that says more drawn than written. It sits under its title in a frame as wide as "
@@ -22,7 +23,10 @@ _DESCRIPTION: str = (
     f"they load from {', '.join(LIBRARY_HOSTS)}: put the data and any image (as a data: URL) in the page itself. "
     "Leave the page without a background of its own, give charts and 3D views a height in pixels, never 100vh, and "
     "take the look of the user's theme, light or dark, from the CSS variables "
-    f"{', '.join(name for name, _ in THEME_VARIABLES)}."
+    f"{', '.join(name for name, _ in THEME_VARIABLES)}. "
+    "Make it live: animate its entrance, show values on hover, let a table sort and a chart toggle its "
+    "series, and keep still under prefers-reduced-motion. Libraries that fit, in a pinned version: Apache ECharts or "
+    "Chart.js for charts, Mermaid for diagrams, D3 for a drawing of your own, three.js for 3D."
 )
 
 

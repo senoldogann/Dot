@@ -14,6 +14,7 @@ import asyncio
 import json
 import re
 import secrets
+from collections import deque
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
@@ -85,6 +86,38 @@ class UserInput(FrozenModel):
     question_id: str | None
     vouches: bool
     said: str
+
+
+class RunInbox(asyncio.Queue[UserInput]):
+    """What reaches a run at work (a steer, the answer to a question it left), in the order sent. :meth:`arrival`
+    waits for a message without taking it, so a step's model call can give way to one (item 509) and the message
+    stays where the loop, or the run's end, reads it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._arrived: asyncio.Event = asyncio.Event()
+        # The queue's own items, in order, for :meth:`first` (the queue's store is its own).
+        self._order: deque[UserInput] = deque()
+
+    def _put(self, item: UserInput) -> None:
+        super()._put(item)
+        self._order.append(item)
+        self._arrived.set()
+
+    def _get(self) -> UserInput:
+        self._order.popleft()
+        return super()._get()
+
+    def first(self) -> UserInput:
+        """The message that came first, left in the inbox: the loop takes it once it is in the thread, so a stop while
+        it is read leaves it for the run's end to keep."""
+        return self._order[0]
+
+    async def arrival(self) -> None:
+        """Return once the inbox holds a message."""
+        while self.empty():
+            self._arrived.clear()
+            await self._arrived.wait()
 
 
 def attachments_root(workspace: Path) -> Path:

@@ -244,6 +244,8 @@ async def test_a_read_and_a_write_say_what_they_did_and_wear_their_own_marks() -
                     await group.locator("summary.steps-head").click()
                 rows: Locator = group.locator(".steps-body .tool-head")
                 await expect(rows.locator(".tool-name.visually-hidden")).to_have_count(2)
+                # Out of sight, the names still read in words for a screen reader (item 513).
+                await expect(rows.locator(".tool-name")).to_have_text(["Write file", "Read file"])
                 await expect(rows.locator(".tool-state [data-icon='file']")).to_have_count(1)
                 await expect(rows.locator(".tool-state [data-icon='eye']")).to_have_count(1)
                 said: list[str] = await rows.locator(".tool-sum").all_text_contents()

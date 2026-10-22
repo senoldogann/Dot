@@ -271,7 +271,8 @@ async def _one_size(
     await expect(view.locator(".file-page")).to_have_count(2)
     first: Locator = view.locator(".file-page").first
     await expect(first).to_have_attribute("data-drawn", "true")
-    assert await first.locator("img").evaluate("(image) => image.complete && image.naturalWidth") >= 600
+    await expect(first.locator("img")).to_have_attribute("src", re.compile(r"."))
+    assert await first.locator("img").evaluate("(image) => image.decode().then(() => image.naturalWidth)") >= 600
     shown: dict[str, float] | None = await view.bounding_box()
     assert shown is not None
     if width < 960:

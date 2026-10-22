@@ -98,12 +98,14 @@ def _finish(answer: str) -> ScriptedTurn:
     return _turn(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": True}))
 
 
-async def _ended_sessions(runtime: Runtime, campaign_id: str, count: int) -> list[RunRecord]:
+async def _ended_sessions(runtime: Runtime, manager: RunManager, campaign_id: str, count: int) -> list[RunRecord]:
+    """The campaign's sessions once ``count`` of them have ended and what follows each is planned: a session's end is
+    stored before its campaign's next session is (``RunManager._record_end``), and ``wait`` returns after both."""
     async with asyncio.timeout(_TIME_LIMIT_S):
         while True:
             sessions: list[RunRecord] = await runtime.store.campaign_sessions(campaign_id)
             if len(sessions) >= count and all(session.status not in WORKING_STATUSES for session in sessions):
-                return sessions
+                return [await manager.wait(session.id) for session in sessions]
             await asyncio.sleep(_POLL_S)
 
 
@@ -138,7 +140,7 @@ async def test_a_session_keeps_a_question_and_allow_once_brings_the_next_session
             )
             assert opening.campaign_id is not None
             campaign_id: str = opening.campaign_id
-            await _ended_sessions(runtime, campaign_id, 1)
+            await _ended_sessions(runtime, manager, campaign_id, 1)
             kept: list[ApprovalRecord] = await _kept(runtime, opening.id)
             campaign: CampaignRecord = await runtime.store.get_campaign(campaign_id)
             assert [(record.status, record.scope_campaign_id) for record in kept] == [("left", campaign_id)]
@@ -148,7 +150,7 @@ async def test_a_session_keeps_a_question_and_allow_once_brings_the_next_session
 
             allowed: ApprovalRecord = await manager.decide(kept[0].id, True, UI_SOURCE, "Go ahead.")
             assert allowed.status == "approved" and allowed.used_at is None
-            sessions: list[RunRecord] = await _ended_sessions(runtime, campaign_id, 2)
+            sessions: list[RunRecord] = await _ended_sessions(runtime, manager, campaign_id, 2)
         finally:
             await scheduler.stop()
         second: RunRecord = sessions[1]
@@ -189,9 +191,9 @@ async def test_allow_once_of_a_step_an_earlier_session_kept_reaches_the_session_
             _turn(targets),
             _report(),
             _finish("The report waits for the owner's yes."),
-            # Session 2 meets the same step, waiting already; then the owner allows it while it works.
+            # Session 2 meets the same step, waiting already; then the owner allows it while it works, which cuts
+            # its held step short (item 509), and the step asked again does it.
             _report(),
-            _finish("Still waiting for the yes."),
             _report(),
             _finish("Exported."),
         ],
@@ -206,7 +208,7 @@ async def test_allow_once_of_a_step_an_earlier_session_kept_reaches_the_session_
             )
             assert opening.campaign_id is not None
             campaign_id: str = opening.campaign_id
-            await _ended_sessions(runtime, campaign_id, 1)
+            await _ended_sessions(runtime, manager, campaign_id, 1)
             kept: list[ApprovalRecord] = await _kept(runtime, opening.id)
             # A day on: the next session starts while the step still waits.
             await runtime.store.set_next_session(campaign_id, time.time())
@@ -216,7 +218,7 @@ async def test_allow_once_of_a_step_an_earlier_session_kept_reaches_the_session_
             assert await _kept(runtime, second.id) == []
             await manager.decide(kept[0].id, True, UI_SOURCE, "")
             model.release.set()
-            sessions: list[RunRecord] = await _ended_sessions(runtime, campaign_id, 2)
+            sessions: list[RunRecord] = await _ended_sessions(runtime, manager, campaign_id, 2)
         finally:
             await scheduler.stop()
         assert [session.id for session in sessions] == [opening.id, second.id]

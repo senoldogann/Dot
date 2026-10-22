@@ -104,7 +104,9 @@ function serverActions(catalogue, server, service) {
     actions.push(button);
   }
   if (server.picks_tools && server.origin === "connected" && !working) {
-    actions.push(el("button", { class: "btn sm primary", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose tools"));
+    // The way back in for a server left out with its allow list; for one that runs, a way to cut its tools down.
+    const kind = server.state === "left_out" ? "btn sm primary" : "btn sm";
+    actions.push(el("button", { class: kind, type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose tools"));
   }
   if (server.origin === "connected" || server.origin === "elsewhere") {
     actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.remove(server, service)) }, "Remove"));
@@ -164,8 +166,8 @@ function wayRow(catalogue, way) {
       const keyed = service !== null && service !== undefined && service.secrets.length > 0;
       const button = el("button", { class: "btn sm primary", type: "button", disabled: catalogue.busy(`mcp:${way.ref}`) }, "Add");
       button.addEventListener("click", () => attempt(() => (keyed ? catalogue.askSecrets(service) : catalogue.add({ service: way.ref, name: null, address: null, secrets: {} }))));
-      // A service that takes a key asks for it here too (item 408), under the row.
-      actions = el("div", { class: "plugin-actions" }, button, keyed && catalogue.asking() === way.ref ? catalogue.secretsForm(service) : null);
+      // A service that takes a key asks for it here too (item 408): its form, with its own Add, takes the button's place.
+      actions = el("div", { class: "plugin-actions" }, keyed && catalogue.asking() === way.ref ? catalogue.secretsForm(service) : button);
       badge = el("span", { class: "badge b-muted" }, serviceWords(service));
     } else {
       badge = el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
@@ -242,6 +244,10 @@ export function serviceParts(catalogue, plugin) {
 export function mount(root, ctx) {
   const pluginId = ctx.params[1];
   let disposed = false;
+  // The list is drawn once the Accounts card above it has read the accounts (item 511): the rows the card gets then
+  // would push the tiles down under a finger on its way to one, and the tap would land between two. A service's page
+  // has no card to wait for.
+  let accountsRead = pluginId !== undefined;
   let shown = "all";
   let words = "";
   const holder = el("div", { class: "stack" }, loadingPanel());
@@ -454,7 +460,7 @@ export function mount(root, ctx) {
   }
 
   function paint() {
-    if (disposed || catalogue.plugins === null) {
+    if (disposed || catalogue.plugins === null || !accountsRead) {
       return;
     }
     if (pluginId === undefined) {
@@ -481,6 +487,10 @@ export function mount(root, ctx) {
 
   // The official sign-ins of Google and Microsoft (item 422) head the list of the plugins, not a service's own page.
   const accounts = pluginId === undefined ? accountsCard() : null;
+  accounts?.read.then(() => {
+    accountsRead = true;
+    paint();
+  });
   root.append(bar, ...(accounts === null ? [] : [accounts.element]), holder);
   attempt(load);
   return () => {

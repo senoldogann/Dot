@@ -113,9 +113,32 @@ class ServerConfig(FrozenModel):
 
 class StoreConfig(FrozenModel):
     """What ``dotx prune --apply`` deletes of the database (``[store]``): the events of the runs that ended more than
-    ``retention_days`` days ago, and with them the screenshots only those events name. Nothing is deleted by itself."""
+    ``retention_days`` days ago, and with them the screenshots only those events name. Nothing of the database is
+    deleted by itself; the daemon thins only its own copies of it.
+    The copies of the database (item 526): made every ``backup_every_hours`` hours while the daemon runs (0: none),
+    kept in ``backup_dir`` (``<home>/backups`` when empty), the newest ``backup_keep_hourly`` and one of each of the
+    last ``backup_keep_days`` days."""
 
     retention_days: int = Field(ge=1)
+    backup_every_hours: float = Field(ge=0, le=24 * 7, allow_inf_nan=False)
+    backup_dir: str
+    backup_keep_hourly: int = Field(ge=1, le=24 * 14)
+    backup_keep_days: int = Field(ge=0, le=365)
+
+    @field_validator("backup_dir")
+    @classmethod
+    def _absolute_backup_dir(cls, value: str) -> str:
+        # A relative folder would be under the daemon's working directory, / for a launchd job.
+        if not value:
+            return value
+        try:
+            folder: Path = Path(value).expanduser()
+        except RuntimeError as error:
+            # A ~user that is not there: a config error, as any other.
+            raise ValueError(f"backup_dir names a home that is not there: {value!r} ({error})") from error
+        if not folder.is_absolute():
+            raise ValueError(f"backup_dir must be empty, absolute or start with ~: {value!r}")
+        return value
 
 
 class OllamaConfig(FrozenModel):

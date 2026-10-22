@@ -233,6 +233,11 @@ async def test_connect_apps_opens_the_services_in_a_dialog_from_the_foot_of_the_
             await expect(key).to_have_count(1)
             await expect(key).to_be_focused()
             await expect(dialog.locator(".plugin-secrets")).to_contain_text("Where to get one")
+            # The form's Add takes the row's place: one Add, not two.
+            await expect(
+                dialog.locator(".plugin-way[data-way='mcp']").get_by_role("button", name="Add", exact=True)
+            ).to_have_count(1)
+            await page.screenshot(path=str(tmp_path / "connect-apps-github-key.png"))
             # Escape ends the dialog, and the close does too.
             await page.keyboard.press("Escape")
             await expect(page.locator("dialog.connect-apps")).to_have_count(0)

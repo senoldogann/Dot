@@ -110,6 +110,15 @@ async def _open(browser: Browser, address: str, route: str, width: int, scheme: 
     return page
 
 
+async def _singles(page: Page) -> None:
+    """Show the single agents of the ready-made ones, which the page shows after its teams (item 509)."""
+    await (
+        page.get_by_role("group", name="Ready-made agents")
+        .get_by_role("button", name=re.compile("^Single agents"))
+        .click()
+    )
+
+
 def _hold_secret() -> None:
     """Give the home of the environment a secret in its .env, as an API key the owner saved."""
     env_file_path().write_text(f"DOT_TEST_SECRET={HELD_SECRET}\n", encoding="utf-8")
@@ -151,8 +160,16 @@ async def test_a_home_that_cannot_list_its_tools_says_so_on_the_cards_and_marks_
                 page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
                 await page.route("**/api/tools", lambda route: route.fulfill(status=500, body="no"))
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await expect(page.locator("#sidebar .side-foot")).to_be_visible()
+                # The agents' list fails too, once the app is up (it reads the faces from it as it starts): the teams
+                # show, unmarked, and say why (item 512).
+                await page.route("**/api/agents", lambda route: route.fulfill(status=500, body="no"))
                 await page.goto(f"{address}/#/agents")
                 await expect(page.locator(".template-card")).to_have_count(len(TEMPLATES))
+                await expect(page.locator("[data-teams-agents-unknown]")).to_contain_text("could not be listed")
+                await expect(page.locator(".team-card")).to_have_count(len(TEAMS))
+                await expect(page.locator(".team-yours")).to_have_count(0)
+                await _singles(page)
                 notice = page.locator("[data-templates-tools-unknown]")
                 await expect(notice).to_contain_text("could not be listed")
                 # No card claims a tool is missing, and the notice is the one place that says why.
@@ -176,6 +193,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 page: Page = await _open(browser, address, "/agents", 1280, "light")
                 cards: Locator = page.locator(".template-card")
                 await expect(cards).to_have_count(len(TEMPLATES))
+                await _singles(page)
                 await expect(cards.locator(".template-name")).to_have_text([template.name for template in TEMPLATES])
                 await expect(cards.locator(".template-role")).to_have_text([template.role for template in TEMPLATES])
                 await expect(cards.locator(".avatar")).to_have_count(len(TEMPLATES))
@@ -192,6 +210,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await page.screenshot(path=tmp_path / "templates-1280-light.png", full_page=True)
                 phone: Page = await _open(browser, address, "/agents", 390, "dark")
                 await expect(phone.locator(".template-card")).to_have_count(len(TEMPLATES))
+                await _singles(phone)
                 # One card a row on a phone, inside the window.
                 lefts: set[float] = set()
                 for index in range(len(TEMPLATES)):
@@ -324,6 +343,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
             try:
                 phone = await _open(browser, address, "/agents", 390, "dark")
                 await expect(phone.locator(".template-card")).to_have_count(len(TEMPLATES))
+                await _singles(phone)
                 # A tool this home does not have is marked on the card before the click that would be refused (item
                 # 425): here the Mac's own tools are off, so the AppleScript three templates name is struck through.
                 chief: Locator = phone.locator('.template-card[data-template="chief-of-staff"]')
@@ -377,6 +397,7 @@ async def test_a_template_schedule_is_added_switched_off_and_read_and_switched_o
             try:
                 for width, scheme in ((1280, "light"), (390, "dark")):
                     page: Page = await _open(browser, address, "/agents", width, scheme)
+                    await _singles(page)
                     card: Locator = page.locator(f".template-card[data-template='{template.id}']")
                     await expect(card).to_be_visible()
                     no_offer: Locator = page.locator(f".template-card[data-template='{plain.id}'] .template-also")
@@ -420,8 +441,9 @@ async def test_a_team_makes_the_agents_the_owner_lacks_and_keeps_those_the_owner
     login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Item 504: Use team makes the agents of the team's templates, each as its template's Use makes one; an agent of
-    the owner's with a member's name, in another case, is kept as it is; used again, the team makes none; a team that
-    is not there is a 404; and a team one of whose agents this home cannot make makes none of them."""
+    the owner's with a member's name, in another case, is kept as it is, but for message_agent, which one that names
+    its tools is given (item 512); used again, the team makes none and gives nothing; a team that is not there is a
+    404; and a team one of whose agents this home cannot make makes none of them."""
     team: AgentTeam = next(each for each in TEAMS if each.id == "engineering")
     with scratch_home() as home, eval_environment(home, {}):
         async with (
@@ -447,12 +469,35 @@ async def test_a_team_makes_the_agents_the_owner_lacks_and_keeps_those_the_owner
                 .raise_for_status()
                 .json()
             )
+            bounded: JsonObject = (
+                (
+                    await http.post(
+                        "/api/agents",
+                        json={
+                            "name": "bug reproduction",
+                            "role": "Mine too",
+                            "instructions": "",
+                            "model": "",
+                            "effort": None,
+                            "approvals": None,
+                            "tools": ["shell"],
+                        },
+                    )
+                )
+                .raise_for_status()
+                .json()
+            )
             used = await http.post(f"/api/agent-teams/{team.id}/use")
             assert used.status_code == 201, used.text
             body: JsonObject = used.json()
             made: list[JsonObject] = body["made"]
-            assert [record["name"] for record in made] == [name for name in _names(team) if name != "Reviewer"]
-            assert [record["id"] for record in body["kept"]] == [mine["id"]]
+            assert [record["name"] for record in made] == ["Release QA"]
+            assert [record["id"] for record in body["kept"]] == [bounded["id"], mine["id"]]
+            # The agent that named its tools can hand its teammates their parts now; the one with every tool had it.
+            assert body["joined"] == ["bug reproduction"]
+            assert [record["tools"] for record in body["kept"]] == [["shell", "message_agent"], []]
+            stored: JsonObject = (await http.get(f"/api/agents/{bounded['id']}")).raise_for_status().json()
+            assert (stored["record"]["role"], stored["record"]["tools"]) == ("Mine too", ["shell", "message_agent"])
             for record in made:
                 template = next(each for each in TEMPLATES if each.name == record["name"])
                 assert (record["role"], record["instructions"], tuple(record["tools"])) == (
@@ -462,8 +507,8 @@ async def test_a_team_makes_the_agents_the_owner_lacks_and_keeps_those_the_owner
                 )
                 assert record["look"] == template.look.model_dump(mode="json")
             again: JsonObject = (await http.post(f"/api/agent-teams/{team.id}/use")).raise_for_status().json()
-            assert again["made"] == []
-            assert [record["id"] for record in again["kept"]] == [made[0]["id"], mine["id"], made[1]["id"]]
+            assert (again["made"], again["joined"]) == ([], [])
+            assert [record["id"] for record in again["kept"]] == [bounded["id"], mine["id"], made[0]["id"]]
             assert (await http.post("/api/agent-teams/no-such-team/use")).status_code == 404
             # A team whose second agent names a tool this home lacks makes none, not its first.
             strange = TEMPLATES[0].model_copy(

@@ -68,6 +68,7 @@ from dotagent.policy.paths import expand_protected
 from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.secrets import env_lock_path, resolve_secret
+from dotagent.store.backup import backup_folder, partial_folder
 from dotagent.store.db import Store
 from dotagent.terminal.session import Terminals
 from dotagent.tools.apple import build_apple_tool
@@ -192,11 +193,12 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
     return (*core, build_desktop_tools(), (build_apple_tool(),))
 
 
-def _guarded_files() -> tuple[Path, ...]:
+def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     """What the agent must neither read nor change: secrets and the lock of their file, what signing in to an MCP server
     gave Dot (its tokens), the browser profiles (Dot's own and the Chrome of the user), the settings that decide what it
-    may do (policy, rules, MCP servers), its own database, the journals of file changes (``dotx undo`` writes back what
-    a journal says) and the locks that tell which process drives a run."""
+    may do (policy, rules, MCP servers), its own database and its copies (item 526: a copy is the whole database, and
+    one planted in their folder would be what the owner goes back to), the journals of file changes (``dotx undo``
+    writes back what a journal says) and the locks that tell which process drives a run."""
     database: Path = db_path()
     return (
         env_file_path(),
@@ -212,6 +214,8 @@ def _guarded_files() -> tuple[Path, ...]:
         database,
         database.with_name(f"{database.name}-wal"),
         database.with_name(f"{database.name}-shm"),
+        backup_folder(config.store),
+        partial_folder(),
         undo_dir(),
         run_owners_dir(),
     )
@@ -254,7 +258,7 @@ async def _confined_paths(config: AppConfig) -> tuple[tuple[Path, ...], tuple[Pa
     """``(the locations a run may not read, what Dot loads and runs)``, resolved: ``[policy] protected_paths`` with
     Dot's own files, and :func:`_dot_paths`."""
     protected: tuple[Path, ...] = await asyncio.to_thread(
-        expand_protected, config.policy.protected_paths, _guarded_files()
+        expand_protected, config.policy.protected_paths, _guarded_files(config)
     )
     dot_paths: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _dot_paths(config))
     return protected, dot_paths
@@ -264,7 +268,7 @@ async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths
     """The sandbox the processes of a run start in outside yolo: a command kept out of Dot's guarded files and from
     changing ``dot_paths``, a search out of every ``protected`` location too. It is built whatever [shell] sandbox says,
     so that Settings can switch it on later, and checked to start when it is on."""
-    sealed: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _guarded_files())
+    sealed: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _guarded_files(config))
     launch_agents: Path = Path(await asyncio.to_thread(os.path.realpath, Path.home() / "Library" / "LaunchAgents"))
     built: Sandbox = build_sandbox(sealed, protected, dot_paths, launch_agents)
     if config.shell.sandbox:
@@ -401,6 +405,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
         )
         peers: Peers = Peers()
         browsers: BrowserPool = BrowserPool(config.browser, config.server, downloads_dir(), peers.threads)
+        router: ModelRouter = ModelRouter(config, _call_recorder(store, bus), login_env)
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -411,9 +416,9 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             assistant=Assistant(config.assistant, await asyncio.to_thread(mac_first_name)),
             accounts=Accounts(store, Keychain(keychain_file()), None),
             vault=OnePassword(None),
-            router=ModelRouter(config, _call_recorder(store, bus), login_env),
+            router=router,
             roles=ModelRoles(config.models),
-            context_sizes=ContextSizes(config.models.context),
+            context_sizes=router.context_sizes,
             judge=judge_for(config, typesafe),
             typesafe=typesafe,
             browser=browsers.main,

@@ -624,7 +624,8 @@
   padding: 0 var(--space-2) 0 var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: var(--surface);
+  /* The sidebar's own ground, as the cog beside it (item 509). */
+  background: transparent;
   color: var(--text);
   font: inherit;
   font-size: var(--text-sm);
@@ -633,6 +634,7 @@
 
 .side-connect:hover {
   border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
 .side-connect[data-current] {
@@ -780,12 +782,16 @@
   font-weight: var(--weight-label);
 }
 
-/* The chat's last line: its words, ellipsized, and the faces of what it delegated at their end (item 507). */
+/* The chat's last line: its words, ellipsized, and the faces of what it delegated at their end (item 507). It is one
+   line whatever it holds (item 510): words put in it bare, as a page of an earlier build put them, wrapped to as many
+   lines as they took and made the row tall. */
 .side-chat-last {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   color: var(--muted);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);

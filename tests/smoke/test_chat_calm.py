@@ -332,7 +332,7 @@ async def test_on_a_phone_the_conversation_never_scrolls_sideways(login_env: dic
                     for head in await page.locator("details.steps:not([open]) > summary.steps-head").all():
                         await head.click()
                     await expect(page.locator(".auto-decision")).to_contain_text("Paid_in_full")
-                    await expect(page.locator(".tool-name").filter(has_text=_LONG_TOOL)).to_be_visible()
+                    await expect(page.locator(f".tool-name[title='{_LONG_TOOL}']")).to_be_visible()
                     await expect(page.locator(".user-message .message-foot")).to_be_visible()
                     # Nothing reaches past the conversation's box, and the box scrolls up and down only.
                     thread: Locator = page.locator(".run-thread")

@@ -268,7 +268,9 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Playwright",
         does="Drive a browser of its own by its accessibility tree, from this Mac.",
         command="npx",
-        args=("-y", "@playwright/mcp@latest"),
+        # The tools a page registers through WebMCP, which the server offers by default, are the words and code of
+        # whatever page it opens: they stay out of a run's tools (item 514).
+        args=("-y", "@playwright/mcp@latest", "--no-webmcp"),
     ),
     McpService(
         id="gitlab",

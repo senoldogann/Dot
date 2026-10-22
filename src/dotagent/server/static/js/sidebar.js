@@ -37,8 +37,10 @@ const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
 // A row of the activity sections shows this many words of its title at most, on one line (item 95).
 const ROW_WORDS = 7;
 const ROW_CHARS = 56;
-// Connect apps at the foot shows the marks of this many servers it is connected to (item 492).
+// Connect apps at the foot shows the marks of this many servers it is connected to (item 492), another few of them
+// every so often when it is connected to more (item 509).
 const CONNECTED_MARKS = 3;
+const MARKS_TURN_MS = 6000;
 // Which sections the owner folded (`waiting`, `working`, `chats`), kept between visits.
 const FOLDS_KEY = "dot.sideFolds";
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
@@ -127,6 +129,16 @@ function chatFaceOf(chat) {
     state: faceState(chat.latest_status),
     look: actor === null ? chatLook(chat.id) : lookOf(actor, null),
   };
+}
+
+/** A copy of `items` in a random order (Fisher–Yates). */
+function shuffled(items) {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const other = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[other]] = [copy[other], copy[index]];
+  }
+  return copy;
 }
 
 // The faces a row shows of the runs it delegated, the rest counted (item 507), as the marks of the connected apps stand
@@ -374,8 +386,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el("div", { class: "row" }, allButton, deleteButton),
   );
   let activity = null;
-  // Where the runs at work stand (`placeWork`), worked out at each paint, and Working's entries as painted, each with
-  // the id of its chat (null for a row that is no chat's).
+  // Where the runs at work stand (`placeWork`), worked out at each paint, and Working's entries as painted.
   let work = { working: [], pinned: new Map() };
   let workingNodes = [];
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
@@ -412,10 +423,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     for (const [id, node] of rowNodes) {
       mark(node, id === routeThreadId);
     }
-    // Folded, Working keeps the open chat in sight (item 202): a chat just sent on its way
-    // from the composer stands there.
-    for (const { chatId, node } of workingNodes) {
-      node.hidden = folds.working === true && (chatId === null || chatId !== routeThreadId);
+    // Folded, Working hides every row, the open chat's too (item 513: it kept that one in sight, item 202, so a fold with
+    // only the open chat at work did nothing); its count stays, and a search shows the chats at work it finds.
+    for (const { node } of workingNodes) {
+      node.hidden = folds.working === true && needle === "";
     }
     const active = rowNodes.get(routeThreadId);
     if (active !== undefined && routeThreadId !== revealedThreadId) {
@@ -630,8 +641,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return node;
   }
 
-  // The sections above the chats. Working's entries are all painted, the open chat's among them, and `markCurrent`
-  // hides them while Working is folded; the search leaves there only the chats it finds (item 202).
+  // The sections above the chats. Working's entries are all painted, and `markCurrent` hides them while Working is
+  // folded; the search leaves there only the chats it finds (item 202), and shows them folded or not.
   function paintActivity() {
     workingNodes = [];
     const found = needle === "" ? work.working : work.working.filter((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
@@ -661,7 +672,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function workingEntry(entry) {
     const node =
       entry.chat === null ? activityRow(entry.row, onNavigate, entry.children) : chatEntry(entry.chat, entry);
-    workingNodes.push({ chatId: entry.chat === null ? null : entry.chat.id, node });
+    workingNodes.push({ node });
     return node;
   }
 
@@ -1167,7 +1178,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       },
     });
   }
-  // The marks of the first servers that are ready, each as its service's tile wears it (items 408 and 477).
+  // The marks of the servers that are ready, each as its service's tile wears it (items 408 and 477).
+  let readyServers = [];
   async function paintConnected() {
     let found;
     try {
@@ -1179,9 +1191,14 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (disposed) {
       return;
     }
-    const ready = found.servers.filter((server) => server.state === "ready" && server.mark !== null).slice(0, CONNECTED_MARKS);
+    readyServers = found.servers.filter((server) => server.state === "ready" && server.mark !== null);
+    showMarks();
+  }
+  /** Show a few of the ready servers' marks, chosen afresh each time. */
+  function showMarks() {
+    const shown = shuffled(readyServers).slice(0, CONNECTED_MARKS);
     connectMarks.replaceChildren(
-      ...ready.map((server) => {
+      ...shown.map((server) => {
         const mark = el("span", { class: "side-connect-mark" }, markContent(server.mark));
         const ink = markInk(server.mark.colour);
         if (ink !== null) {
@@ -1192,6 +1209,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     );
   }
   paintConnected();
+  const marksTicker = setInterval(() => {
+    if (readyServers.length > CONNECTED_MARKS) {
+      showMarks();
+    }
+  }, MARKS_TURN_MS);
   const foot = el("div", { class: "side-foot" }, settingsLink, connectButton, compose);
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
@@ -1246,6 +1268,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       closeMenu();
       clearInterval(ageTicker);
       clearInterval(workTicker);
+      clearInterval(marksTicker);
       stopLifecycle();
       stopStream();
       document.removeEventListener("visibilitychange", onBackInView);

@@ -90,8 +90,8 @@ export function serviceWords(service) {
 }
 
 /**
- * The dialog that chooses the tools of an MCP server left out for offering too many (`offered`, of
- * `GET /mcp/servers/{name}/offered`): a tick for each, those of its allow list ticked, at most `offered.limit`.
+ * The dialog that chooses the tools of an MCP server (`offered`, of `GET /mcp/servers/{name}/offered`): a tick for
+ * each, those of its allow list ticked, or every one when it has none, and All tools to tick or untick them at once.
  * Resolves to the names chosen, or null when the owner closed it.
  */
 function toolsDialog(offered) {
@@ -101,16 +101,24 @@ function toolsDialog(offered) {
     const go = el("button", { class: "btn primary", type: "button", onclick: () => dialog.close("ok") });
     const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, "Cancel");
     const count = el("span", { class: "hint" });
-    const chosen = new Set(offered.allow);
+    const chosen = new Set(offered.allow.length === 0 ? offered.tools.map((tool) => tool.name) : offered.allow);
+    const all = el("input", {
+      type: "checkbox",
+      onchange: () => {
+        for (const tick of ticks) {
+          tick.box.checked = all.checked;
+        }
+        paint();
+      },
+    });
 
     function paint() {
       const picked = ticks.filter((tick) => tick.box.checked).length;
       go.textContent = picked === 0 ? "Save" : `Save ${picked}`;
-      go.disabled = picked === 0 || picked > offered.limit;
-      count.textContent = `${picked} of at most ${offered.limit}`;
-      for (const tick of ticks) {
-        tick.box.disabled = !tick.box.checked && picked >= offered.limit;
-      }
+      go.disabled = picked === 0;
+      count.textContent = `${picked} of ${ticks.length}`;
+      all.checked = picked === ticks.length;
+      all.indeterminate = picked > 0 && picked < ticks.length;
     }
 
     const rows = offered.tools.map((tool) => {
@@ -128,8 +136,9 @@ function toolsDialog(offered) {
         "div",
         { class: "modal-body" },
         el("h3", { id: "tools-title" }, `Choose the tools of ${offered.server}`),
-        el("p", { class: "muted" }, `It offers ${plural(offered.tools.length, "tool", "tools")}, more than Dot hands a model at once. The ones you tick are offered to the runs that start next.`),
+        el("p", { class: "muted" }, `It offers ${plural(offered.tools.length, "tool", "tools")}. The ones you tick are offered to the runs that start next; with all of them ticked, so are the tools it adds later.`),
         count,
+        el("label", { class: "import-row" }, all, el("span", { class: "import-row-main" }, el("span", { class: "import-row-name" }, "All tools"))),
         el("div", { class: "import-list" }, rows),
       ),
       el("div", { class: "modal-actions" }, cancel, go),
@@ -494,8 +503,8 @@ export function createCatalogue(onChange) {
     });
   }
 
-  /** Choose the tools of `server`, left out for offering too many: they become its allow list, and Dot connects it
-   * again with them. */
+  /** Choose the tools of `server`: they become its allow list (none with every one chosen), and Dot connects it again
+   * with them. */
   async function chooseTools(server) {
     const path = `/mcp/servers/${encodeURIComponent(server.name)}`;
     let offered = null;

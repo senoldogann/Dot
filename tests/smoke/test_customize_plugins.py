@@ -26,7 +26,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, FloatRect, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, FloatRect, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -175,12 +175,13 @@ async def _box(locator: Locator) -> FloatRect:
     return box
 
 
-_LOADED: str = "(image) => image.complete && image.naturalWidth > 0"
+_LOADED: str = "(image) => image.decode().then(() => image.naturalWidth > 0)"
 
 
 async def _check_marks(page: Page) -> None:
     """The marks of the list as the page draws them, and the Accounts card above it."""
-    await page.wait_for_function("[...document.querySelectorAll('.plugin-mark img')].every((image) => image.complete)")
+    # Every picture has loaded or failed (``complete``) before one is called broken: the Accounts card's too.
+    await page.wait_for_function("[...document.querySelectorAll('img')].every((image) => image.complete)")
     broken: list[str] = await page.evaluate(
         "[...document.querySelectorAll('img')].filter((image) => image.naturalWidth === 0).map((image) => image.src)"
     )
@@ -395,5 +396,37 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
             wide: int = await small.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
             assert wide <= 0, wide
             await small.screenshot(path=str(tmp_path / f"plugins-{_SMALLEST_PX}-dark.png"), full_page=True)
+        finally:
+            await browser.close()
+
+
+async def test_the_list_of_plugins_stands_still_when_the_accounts_card_has_read_the_accounts(
+    address: str, mac_at_rest: None
+) -> None:
+    """Item 511: the Accounts card at the head of the list gets its providers' rows once it has read the accounts; the
+    list is drawn only then, so a tile stands where it first shows, and a tap on its way to one does not land between
+    two (on a phone the rows came after the tiles, and a tap on a tile reached the grid behind it). The accounts are
+    read late here, as on a slow phone."""
+    port: int = int(address.rpartition(":")[2])
+
+    async def late(route: Route) -> None:
+        await asyncio.sleep(1.0)
+        await route.continue_()
+
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(headless=True)
+        try:
+            page: Page = await browser.new_page(
+                viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, reduced_motion="reduce"
+            )
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.route("**/api/accounts", late)
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"{address}/#/customize/plugins")
+            linear: Locator = _tile(page, "linear")
+            await expect(linear).to_be_visible()
+            first: FloatRect = await _box(linear)
+            await expect(page.locator(".account-provider")).not_to_have_count(0)
+            assert await _box(linear) == first
         finally:
             await browser.close()

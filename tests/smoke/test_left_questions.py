@@ -237,12 +237,9 @@ async def test_an_answer_while_the_run_works_reaches_that_run(login_env: dict[st
 
 
 async def test_an_answer_during_the_last_step_is_read_before_the_run_ends(login_env: dict[str, str]) -> None:
-    # The step that finishes is held until the answer is in: the run reads it before it ends, and finishes again.
-    turns: list[ScriptedTurn] = [
-        ASK,
-        _finish("I could not note the port.", False, NEEDS),
-        _finish("port.txt holds 8431.", True, ""),
-    ]
+    # The step that finishes is held until the answer is in: the answer cuts it short (item 509), and the step asked
+    # again with it finishes.
+    turns: list[ScriptedTurn] = [ASK, _finish("port.txt holds 8431.", True, "")]
     model: _HeldModel = _HeldModel(turns, 2)
     async with _session(login_env, model) as (runtime, manager):
         async with runtime.bus.subscribe(None) as subscription:
@@ -253,7 +250,7 @@ async def test_an_answer_during_the_last_step_is_read_before_the_run_ends(login_
         await manager.decide(str(left.data["approval_id"]), True, UI_SOURCE, ANSWER)
         model.release.set()
         ended: RunRecord = await _ended(manager, run)
-        assert (ended.status, ended.result, ended.steps) == ("done", "port.txt holds 8431.", 3)
+        assert (ended.status, ended.result, ended.steps) == ("done", "port.txt holds 8431.", 2)
         assert [record.id for record in await runtime.store.list_runs(5, run.thread_id)] == [run.id]
         assert [event.data["text"] for event in await _events(runtime, run) if event.kind == "steer"] == [CARRIED]
 

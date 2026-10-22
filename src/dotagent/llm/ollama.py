@@ -171,8 +171,17 @@ def num_ctx_for(model: str, config: OllamaConfig) -> int:
     return config.num_ctx_cloud if is_cloud_model(model) else config.num_ctx
 
 
-def build_chat_payload(request: ChatRequest, details: OllamaModelDetails, config: OllamaConfig) -> JsonObject:
-    options: JsonObject = {"num_ctx": num_ctx_for(request.model, config)}
+def request_window(request: ChatRequest, config: OllamaConfig) -> int:
+    """The window a request asks Ollama for, ``num_ctx``: the one the call names (``ChatRequest.window``: the one its
+    run planned with, or a side call's, item 520), else ``num_ctx`` (``num_ctx_cloud`` for a cloud model)."""
+    return num_ctx_for(request.model, config) if request.window is None else request.window
+
+
+def build_chat_payload(
+    request: ChatRequest, details: OllamaModelDetails, config: OllamaConfig, num_ctx: int
+) -> JsonObject:
+    """The body of a chat request, which asks Ollama for a window of ``num_ctx`` tokens."""
+    options: JsonObject = {"num_ctx": num_ctx}
     if request.temperature is not None:
         options["temperature"] = request.temperature
     if request.max_output_tokens is not None:
@@ -413,7 +422,7 @@ class OllamaProvider:
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         details: OllamaModelDetails = await self._details(request.model)
-        payload: JsonObject = build_chat_payload(request, details, self._config)
+        payload: JsonObject = build_chat_payload(request, details, self._config, request_window(request, self._config))
         url: str = self._url("/api/chat")
         context: JsonObject = request_context(url, payload)
 

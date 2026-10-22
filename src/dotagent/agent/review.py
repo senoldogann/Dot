@@ -1065,6 +1065,7 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
         speed="standard",
         session_key=question.session_key,
         cache_mark=None,
+        window=await question.router.window_of(ref),
     )
     try:
         async with asyncio.timeout(question.timeout_s):

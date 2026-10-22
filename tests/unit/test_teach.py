@@ -71,10 +71,13 @@ def test_what_the_recorder_reports_that_is_not_a_step_is_left_out() -> None:
         _reported(kind="click", label=""),
         _reported(kind="fill"),
         json.dumps(["a", "list"]),
+        # A blank tab is where the owner starts, not a page of the task: about:blank reports its origin as "null".
+        _reported(kind="page"),
+        _reported(kind="page", label="nullblank"),
+        _reported(kind="page", label="about:blank"),
+        _reported(kind="page", label="chrome://newtab/"),
     ]
     assert [taught_step(payload) for payload in nothing] == [None] * len(nothing)
-    # A page opened is a step even with nothing in its address.
-    assert taught_step(_reported(kind="page")) is not None
 
 
 def test_a_recording_takes_the_steps_of_its_own_page_only() -> None:
@@ -120,6 +123,7 @@ def test_the_page_a_recording_starts_on_is_its_first_step_once() -> None:
     page it begins from; a step the page reports itself is not taken twice."""
     page = object()
     recording: Recording = Recording(thread_id="t", page=page, tab_index=0)
+    recording.opened("about:blank")
     recording.opened("https://example.com/invoices")
     recording.opened("https://example.com/invoices")
     recording.take({"page": page}, _reported(kind="page", label="https://example.com/invoices"))

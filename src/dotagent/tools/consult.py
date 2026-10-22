@@ -190,6 +190,7 @@ async def _ask(ctx: ToolContext, ref: ModelRef, text: str, image: ImageData | No
         speed="standard",
         session_key=f"{ctx.thread_id}:consult",
         cache_mark=None,
+        window=await ctx.runtime.router.window_of(ref),
     )
     async with asyncio.timeout(ctx.runtime.config.agent.model_call_timeout_s):
         reply: ModelReply = await ctx.runtime.router.complete(

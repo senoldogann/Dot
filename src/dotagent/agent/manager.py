@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pydantic import JsonValue
 
-from dotagent.agent.attachments import StoredAttachment, UserInput, load_attachments, steer_event
+from dotagent.agent.attachments import RunInbox, StoredAttachment, UserInput, load_attachments, steer_event
 from dotagent.agent.campaign import (
     BRIEF_ENTRIES,
     BRIEF_QUESTIONS,
@@ -168,7 +168,7 @@ class RunHandle:
     task: asyncio.Task[None]
     gate: RunGate
     cancel: asyncio.Event
-    inbox: asyncio.Queue[UserInput]
+    inbox: RunInbox
     finished: asyncio.Event
 
 
@@ -2087,9 +2087,12 @@ class RunManager:
         """Whether a run starts tainted, as the run it goes on from is (item 243): a delegated run as its parent is now,
         a resumed run as the run it resumes was when it was cut off, and the run that tells its chat of a command in the
         background as the chat's last run ended, since that message is Dot's and only a message of the owner restores
-        trust; a schedule's firing as any earlier run whose words it reads ended (``opening.carried``, item 257), for
-        the same reason. Any other run starts untainted. Asked before the run's record is made: the chat's last run
-        is the one before it."""
+        trust. A run that goes on from the runs it names (``opening.carried``) starts tainted when any of them ended so,
+        for the same reason: a schedule's firing, from the earlier runs whose words it reads (item 257); the run a kept
+        step's answer starts, from the run that kept it, the run at the top of its delegations and the chat's last run
+        (items 482, 485); and the run the answer to a question of a run the owner watched starts, from the run that
+        asked and the chat's last run (item 508). Any other run starts untainted. Asked before the run's record is made:
+        the chat's last run is the one before it."""
         if parent is not None:
             return parent.gate.tainted
         if opening.resumed is not None:
@@ -2244,7 +2247,7 @@ class RunManager:
                     )
                 )
             cancel: asyncio.Event = asyncio.Event()
-            inbox: asyncio.Queue[UserInput] = asyncio.Queue()
+            inbox: RunInbox = RunInbox()
             finished: asyncio.Event = asyncio.Event()
             # Started eagerly: the body runs up to its first wait before this returns, so a stop that comes before the
             # run's first step lands inside it and ends it as any stop does (a task cancelled before it started never
@@ -2341,7 +2344,7 @@ class RunManager:
         run: RunRecord,
         gate: RunGate,
         cancel: asyncio.Event,
-        inbox: asyncio.Queue[UserInput],
+        inbox: RunInbox,
         opening: RunOpening,
         finished: asyncio.Event,
     ) -> None:
@@ -2428,7 +2431,7 @@ class RunManager:
         result: str,
         needs: str,
         error: JsonObject | None,
-        inbox: asyncio.Queue[UserInput],
+        inbox: RunInbox,
         finished: asyncio.Event,
     ) -> bool:
         """Record the end of the run (:meth:`_record_end`), then release its handle and set ``finished`` whatever
@@ -2458,7 +2461,7 @@ class RunManager:
         result: str,
         needs: str,
         error: JsonObject | None,
-        inbox: asyncio.Queue[UserInput],
+        inbox: RunInbox,
     ) -> None:
         """Store how the run ended and tell about it: its waiters are released, the answers that reached its inbox
         (shut by :meth:`_drive`) too late are kept, the status and result are stored with the scores of the notes it

@@ -332,7 +332,9 @@ async def test_an_earlier_turn_says_what_failed_and_shows_a_finish_that_was_refu
             await expect(turn.locator(".turn-say")).to_contain_text("Trying the tide tables.", timeout=15000)
             stretch: Locator = turn.locator(".turn-ops details.steps").last
             await expect(stretch.locator(".steps-head .badge")).to_have_text("2 failed")
-            await expect(stretch.locator(".tool-name")).to_have_text(["shell", FINISH_TOOL])
+            # Each call names its tool in words (item 513), the tool's own name their title.
+            await expect(stretch.locator(".tool-name")).to_have_text(["Command", "Finish"])
+            await expect(stretch.locator(".tool-name").first).to_have_attribute("title", "shell")
             await expect(stretch.locator(".tool-state.bad")).to_have_count(2)
             # A failed call keeps the mark of its kind, in the failure's colour: no cross (item 403).
             await expect(stretch.locator(".tool-state [data-icon='x']")).to_have_count(0)

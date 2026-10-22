@@ -9,6 +9,7 @@ it and no window opens, which is what lets the takeover be exercised with ``[bro
 """
 
 import asyncio
+import re
 import threading
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Iterator
@@ -549,7 +550,13 @@ async def test_the_view_comes_back_by_itself_after_a_break_and_a_silence_and_res
             await casts.until_asked(2)
             await page.clock.fast_forward(_STALL_PAST_MS)
             await expect(card.locator(".computer-url")).to_have_text(first)
-            assert await card.locator(".computer-image").evaluate("(image) => image.naturalWidth") > 0
+            await expect(card.locator(".computer-image")).to_have_attribute("src", re.compile(r"."))
+            assert (
+                await card.locator(".computer-image").evaluate(
+                    "(image) => image.decode().then(() => image.naturalWidth)"
+                )
+                > 0
+            )
             # That stream ended after its frame, which closes the view; opened again, it is put out of sight.
             await card.get_by_role("button", name="Watch").click()
             await casts.until_asked(4)

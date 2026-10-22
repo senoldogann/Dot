@@ -377,10 +377,11 @@ async def test_a_queued_message_steered_reaches_the_run_at_work_and_leaves_the_q
         waiting: _Reply = await model.asked()
         await manager.steer_queued(summary.id)
         assert await _queued(runtime, first) == []
-        # The run waited at its first step: it reads the message before it ends with that reply, so it asks for one
-        # more.
-        waiting.go.set()
-        await model.release()
+        # The run waited at its first step: the message cuts that step short (item 509), and the step is asked again
+        # with it, without the first reply ever going.
+        again: _Reply = await model.asked()
+        assert not waiting.live and not waiting.go.is_set()
+        again.go.set()
         assert (await _ended(manager, first.id)).status == "done"
         steers: list[EventRecord] = await runtime.store.events_of_kind(first.id, "steer", 10)
         assert [event.data["text"] for event in steers] == [SUMMARY]
@@ -510,7 +511,7 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
                 # The photo shows its own picture, read from the daemon.
                 picture: Locator = chips.nth(1).locator("img.attach-thumb")
                 await expect(picture).to_have_attribute("src", re.compile(r"^blob:"))
-                assert await picture.evaluate("(image) => image.complete && image.naturalWidth > 0")
+                assert await picture.evaluate("(image) => image.decode().then(() => image.naturalWidth > 0)")
                 # No words on a chip: its name is the tooltip, its × removes it.
                 await expect(chips.first.locator(".attach-remove")).to_be_visible()
                 assert (await chips.first.text_content() or "").strip() == ""
@@ -647,7 +648,7 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
             for width, scheme in _SHOTS:
                 async with _changes(runtime) as changes:
                     first: RunRecord = await _start(manager)
-                    # The run waits at its first step from here on: what is steered reaches it at its second.
+                    # The run waits at its first step from here on: what is steered cuts that step short (item 509).
                     waiting: _Reply = await model.asked()
                     page: Page = await browser.new_page(
                         viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
@@ -720,15 +721,15 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     # Steer sends a message to the run now; with the box empty, the key steers the next one.
                     await rows.nth(0).get_by_role("button", name="Steer").click()
                     await expect(texts).to_have_text([SHORT_SUMMARY, CLOSE])
-                    await expect(page.get_by_text(f"Waiting for the next step: “{MAIL}”")).to_be_visible()
+                    # The run reads each at once: the step at work is cut short and asked again with it (item 509).
+                    waiting = await model.asked()
                     await box.press("ControlOrMeta+Shift+Enter")
                     await expect(texts).to_have_text([CLOSE])
-                    await expect(page.get_by_text(f"Waiting for the next step: “{SHORT_SUMMARY}”")).to_be_visible()
+                    waiting = await model.asked()
 
-                    # The run reads both at its second step and ends done: the queue's next message starts after it,
-                    # with the choices it was sent with, and the page follows it there.
+                    # The run ends done with both read: the queue's next message starts after it, with the choices it
+                    # was sent with, and the page follows it there.
                     waiting.go.set()
-                    await model.release()
                     assert (await _ended(manager, first.id)).status == "done"
                     second: RunRecord = await _started(changes, runtime, first)
                     assert (second.goal, second.model, second.approvals, second.source) == (
@@ -748,7 +749,7 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await expect(texts).to_have_text([FILE])
                     await box.fill(NOW)
                     await box.press("ControlOrMeta+Shift+Enter")
-                    await expect(page.get_by_text(f"Waiting for the next step: “{NOW}”")).to_be_visible()
+                    await model.asked()
                     await expect(box).to_have_value("")
                     await expect(texts).to_have_text([FILE])
                     await send.click()
@@ -817,7 +818,7 @@ async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_stee
 
                 async with _changes(runtime) as changes:
                     first: RunRecord = await _start(manager)
-                    # The run waits at its first step from here on: what is steered reaches it at its second.
+                    # The run waits at its first step from here on: what is steered cuts that step short (item 509).
                     waiting: _Reply = await model.asked()
                     await page.goto(f"{address}/#/runs/{first.id}")
                     # The box of the page in front: the page the chat went on from stands, inert, until it is drawn
@@ -839,7 +840,7 @@ async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_stee
                     await expect(box).to_have_value(f"{NOW}\n")
                     await box.press("ControlOrMeta+Enter")
                     await expect(box).to_have_value("")
-                    await expect(page.get_by_text(f"Waiting for the next step: “{NOW}”")).to_be_visible()
+                    waiting = await model.asked()
                     await expect(queue).to_be_hidden()
 
                     # ⌘⇧Enter sends it the other way: into the queue.
@@ -848,9 +849,8 @@ async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_stee
                     await expect(box).to_have_value("")
                     await expect(queue.locator(".queue-text")).to_have_text([CLOSE])
 
-                    # The run reads the steered message at its second step and ends done; the queued one starts after.
+                    # The run read the steered message at once and ends done; the queued one starts after.
                     waiting.go.set()
-                    await model.release()
                     assert (await _ended(manager, first.id)).status == "done"
                     second: RunRecord = await _started(changes, runtime, first)
                     assert second.goal == CLOSE

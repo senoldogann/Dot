@@ -32,7 +32,8 @@ the mark of the service it is one of, and the composer's menus draw a server and
 ### Connect apps
 
 **Connect apps** (item 492), at the foot of the sidebar right of the cog of Settings, opens the same services in a dialog over the
-page, wearing the marks of the first three MCP servers that are ready. It has a search, a chip for each section,
+page, on the sidebar's own ground as the cog is, wearing the marks of three MCP servers that are ready, another three
+of them every few seconds when more are (item 509). It has a search, a chip for each section,
 **Suggested for you** (the popular services), then each section's first six tiles with **See all**, and **N connected**,
 which lists what Dot is connected to. A tile shows one thing: its first step as a button (**Add**, **Sign in**,
 **Allow**, **Open System Settings**), or where the service stands once it is connected, or **Not tried yet**. A tile
@@ -124,12 +125,23 @@ The ways a service connects:
   instead. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts again, and
   Remove plugin then stops them; a server of the same name added since is the owner's, not the plugin's. A server of
   Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
+  Dot's Playwright server starts with `--no-webmcp` (item 514): the tools a page registers through WebMCP, which the
+  server offers by default, are that page's words and code, and stay out of a run's tools; a server added before keeps
+  the arguments it was added with.
 
-**Choose tools** (item 426): a server added here that offers more tools than a model gets at once (30) is left out, and
-its row says so; its **Choose tools** opens the list of every tool it offers with what each says it does, of which you
-tick 1 to 30. **Save** connects the server with those and keeps the choice with it, so a restart offers the same ones; a
-server that does not answer leaves the choice unwritten and the button stays. A server you signed in to (Linear,
-Postman) lists and connects its tools with that sign-in, so the choice asks for none again (item 499).
+**Choose tools** (items 426 and 524): a server offers a run every tool it lists, however many. With the default `[agent]
+tool_surface = "full"` each step of a run carries the definition of every one of them, so a server of many tools makes
+every request longer; `tool_surface = "grouped"` keeps a server's tools out of a run until it turns the server's group
+on. A run of more than 128 tools starts grouped whatever the setting, as some providers refuse more in one request
+([runs](runs.md)). The groups a grouped run has on (those its chat used before, the servers picked for its message, and
+those it turns on) may still bring a request past what its provider takes, and the request then fails with the
+provider's error, so cut a big server down here. **Choose tools**, on the row of a server added here that runs, opens
+the list of every tool it offers with what each says it does, all of them ticked until you choose, and **All tools**
+ticks or unticks them at once. **Save** connects the server with the ticked ones and keeps the choice with it, so a
+restart offers the same ones; with every one ticked it keeps no list, and the tools the server adds later are offered
+too. A server left out with a list of tools keeps the button, to choose the list again (it may name a tool the server no
+longer offers). A server that does not answer leaves the choice unwritten and the button stays. A server you signed in
+to (Linear, Postman) lists and connects its tools with that sign-in, so the choice asks for none again (item 499).
 
 **Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
 command that starts it on this Mac, added as the services are. Connected lists, besides the services, every server Dot
@@ -140,11 +152,13 @@ has from its config, a plugin or another agent (Customize › Skills › Found o
 
 Customize › Plugins opens on **Accounts** (item 422), above the list and not on a service's own page: Google (Gmail,
 Google Calendar) and Microsoft (Outlook, Microsoft 365), each with its own mark, through their official sign-ins, with
-the client you register with each, as each asks of an app that runs on a computer. **Sign in** opens the provider's page in a new tab; you say yes there, the provider sends the browser back to
-the daemon's `/oauth/callback` on this Mac's own address with a code, which Dot trades for tokens with PKCE, and the
-card follows until the account is there, named by its address; **Sign out** takes it away. A sign-in starts only from a
-page on this Mac (the provider comes back to the Mac's loopback address, which a phone does not reach). An account's
-access token is refreshed with its refresh token once it is about to run out.
+the client you register with each, as each asks of an app that runs on a computer. **Sign in** opens the provider's page
+in a new tab; you say yes there, the provider sends the browser back to the daemon's `/oauth/callback` on this Mac's own
+address with a code, which Dot trades for tokens with PKCE, and the card follows until the account is there, named by
+its address; **Sign out** takes it away. The list below the card is drawn once the card has read the accounts (item
+511), so the tiles do not move down under a finger as its rows come. A sign-in starts only from a page on this Mac (the
+provider comes back to the Mac's loopback address, which a phone does not reach). An account's access token is refreshed
+with its refresh token once it is about to run out.
 
 The tab the provider sends you back to is a page of Dot's own look (item 437), light or dark as the Mac is: it names the
 account with its address and says how the sign-in came out, signed in, or not signed in because you said no, the
@@ -202,7 +216,7 @@ name = "notes"                              # a-z, 0-9 and -, starting with a le
 command = "npx"                             # started with the PATH of your login shell
 args = ["-y", "some-mcp-server"]
 env = { NOTES_TOKEN = "${NOTES_TOKEN}" }    # ${NAME} is looked up like an API key
-allow = ["search", "read_note"]             # offer only these tools; empty = all of them (at most 30)
+allow = ["search", "read_note"]             # offer only these tools; empty = all of them, however many
 enabled = true
 startup_timeout_s = 60.0
 call_timeout_s = 120.0
@@ -219,7 +233,15 @@ A server at a URL may
 sign in as MCP's authorization asks (OAuth): `oauth = true` has
 Dot send the token it keeps for it, which **Sign in again** on [Customize › Plugins](#customize--plugins) gets, and the servers added
 there sign in by themselves. The tool list is read when Dot starts and when a server is added, removed or has its tools
-chosen on the Plugins page, for the runs that start after; a server that dies is started again by the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
+chosen on the Plugins page, for the runs that start after; a server that dies is started again by the next call. A
+server reached at a URL whose session was quiet for a minute is pinged before it is used, and connected again when the
+ping finds it gone (its connection closed, its server ended the session or failed; a server that answers that it
+does not know ping is there), so that the calls that come go to a new session rather than fail on the old one (item
+513). A call or a listing its server refuses as a request of no session it knows (`INVALID_REQUEST`, whatever the
+server's words: "Session not found", "Session has been terminated") is a connection that broke, and the next call
+connects again. A call
+whose connection broke is not repeated, as the tool may have done part of its work, unless the server declares the
+tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,
 or the input schema of one of its tools cannot be handed to a model: a reference that leads nowhere, or a tree whose
 nodes hold nodes, which `allow` can leave out) is left out, and Dot starts without its tools: Settings › System names it

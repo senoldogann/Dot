@@ -1840,10 +1840,12 @@ a.pill:hover {
   text-overflow: ellipsis;
 }
 
+/* Buttons keep their own height beside a taller form (a key's), not stretched to it. */
 .plugin-actions,
 .skill-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
 }
 
@@ -4497,14 +4499,18 @@ dialog.modal.connect-apps[open] {
   color: var(--warn);
 }
 
-/* A name too long for the row, as an MCP tool's can be, breaks where it must rather than widen the chat (item 360). */
+/* What a tool is, in words (item 513): "Edit file", "Tavily · Search". Words too long for the row give way with an
+   ellipsis rather than widen the chat (item 360) or take a second line (item 512): its row is one line, the words at
+   most half of it, the tool's own name their title. */
 .tool-name {
-  font-family: var(--mono);
   font-weight: var(--weight-title);
   font-size: var(--text-sm);
   flex: 0 1 auto;
   min-width: 0;
-  overflow-wrap: anywhere;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tool-sum {
@@ -7522,6 +7528,16 @@ button.attach-chip:hover {
   accent-color: var(--accent);
 }
 
+/* The box that ticks every tool (item 512), over the tools, with how many of them are ticked. */
+.tool-pick-all {
+  align-self: flex-start;
+  font-weight: var(--weight-label);
+}
+
+.tool-picks-count {
+  font-weight: var(--weight-text);
+}
+
 /* The templates (item 315): a card each, as many abreast as fit and one on a phone; the face, name and role on top,
    what it needs and its schedule under them, and Use template at the foot, level across a row. */
 .template-grid {
@@ -7554,28 +7570,67 @@ button.attach-chip:hover {
   line-height: var(--leading-sm);
 }
 
+/* What a template needs and when it runs (item 509): a line each, its icon in place of a label. */
 .template-facts {
   display: grid;
   gap: 4px;
-  margin: 0;
+  color: var(--text-2);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
 }
 
-.template-facts > div {
+.template-fact {
   display: flex;
+  align-items: flex-start;
   gap: 8px;
+  min-width: 0;
 }
 
-.template-facts dt {
+.template-fact > .icon {
   flex: none;
-  width: 72px;
+  width: 14px;
+  height: 14px;
+  margin-top: var(--space-half);
   color: var(--muted);
 }
 
-.template-facts dd {
+/* The Agents page in two parts (item 509): the owner's agents, then the ready-made ones, each under its own head. */
+.agents-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.agents-part:first-of-type {
+  margin-top: 0;
+}
+
+.agents-part > .hint {
   margin: 0;
-  min-width: 0;
+}
+
+.agents-part-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.agents-part-head > .section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.agents-count:not(:empty) {
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 .template-card > .btn {

@@ -51,7 +51,7 @@ from dotagent.core.paths import connected_servers_path, env_file_path
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService, ServiceSecret
 from dotagent.mcp.connected import read_connected
-from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS, McpHub, open_hub
+from dotagent.mcp.hub import McpHub, open_hub
 from dotagent.mcp.signin import SIGN_IN_AGAIN, read_sign_in, sign_in_path
 from dotagent.mcp.types import McpTool
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -71,6 +71,8 @@ LIFETIME_S: int = 3
 START_TIMEOUT_S: float = 15.0
 READY_WITHIN_S: float = 30.0
 _POLL_S: float = 0.1
+# The tools of the server that offers many: more than the 30 Dot once took from a server without a choice.
+_MANY_TOOLS: int = 40
 FIXTURE: Path = Path(__file__).resolve().parent.parent / "fixtures" / "mcp_fixture_server.py"
 _PHONE_PX: int = 860
 
@@ -221,8 +223,8 @@ def _signed_server(provider: _YesSayer, base: str) -> MCPServer:
 
 
 def _many_signed_server(provider: _YesSayer, base: str) -> MCPServer:
-    """An MCP server that is its own authorization server at ``base``, with more tools than Dot hands a model at
-    once."""
+    """An MCP server that is its own authorization server at ``base``, with many tools (more than the 30 Dot once
+    took from a server without a choice, item 524)."""
     server: MCPServer = _auth_server("many", provider, base)
 
     def tool(number: int) -> None:
@@ -231,7 +233,7 @@ def _many_signed_server(provider: _YesSayer, base: str) -> MCPServer:
 
         server.add_tool(run, name=f"tool_{number:02d}", description=f"Does the {number:02d}th thing of the many.")
 
-    for number in range(MAX_UNFILTERED_TOOLS + 1):
+    for number in range(_MANY_TOOLS):
         tool(number)
     return server
 
@@ -409,11 +411,11 @@ async def test_remove_forgets_the_server_and_its_sign_in(world: _World) -> None:
     assert not sign_in_path("signed").exists()
 
 
-async def test_a_server_that_signs_in_and_offers_too_many_tools_has_them_chosen_with_its_sign_in(
+async def test_a_server_that_signs_in_offers_all_its_tools_and_has_them_chosen_with_its_sign_in(
     world: _World,
 ) -> None:
-    """Item 499: the try signs in and is left out for its tools; Choose tools lists them and connects the chosen with
-    the sign-in the try gave, which is kept with them."""
+    """Item 499: the try signs in and the server is ready with every tool it lists, however many (item 524); Choose
+    tools lists them and connects the chosen with the sign-in the try gave, which is kept with them."""
     provider: _YesSayer = _YesSayer()
     listener: socket.socket = bind_listener("127.0.0.1", 0)
     base: str = f"http://127.0.0.1:{listener.getsockname()[1]}"
@@ -429,11 +431,12 @@ async def test_a_server_that_signs_in_and_offers_too_many_tools_has_them_chosen_
             assert isinstance(link, str)
             async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as browser:
                 assert (await browser.get(link)).status_code == 200
-            left: dict[str, object] = await _ready(client, "many")
-            assert (left["state"], left["picks_tools"], left["signs_in"]) == ("left_out", True, True)
+            ready: dict[str, object] = await _ready(client, "many")
+            assert (ready["state"], ready["picks_tools"], ready["signs_in"]) == ("ready", True, True)
+            assert len(ready["tools"]) == _MANY_TOOLS  # type: ignore[arg-type]
             offered: httpx.Response = await client.get("/api/mcp/servers/many/offered")
             assert offered.status_code == 200, offered.text
-            assert len(offered.json()["tools"]) == MAX_UNFILTERED_TOOLS + 1
+            assert (len(offered.json()["tools"]), offered.json()["allow"]) == (_MANY_TOOLS, [])
             chosen: httpx.Response = await client.put("/api/mcp/servers/many/allow", json={"tools": ["tool_01"]})
             assert chosen.status_code == 200, chosen.text
             assert (chosen.json()["state"], chosen.json()["tools"]) == ("ready", ["tool_01"])

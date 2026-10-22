@@ -25,9 +25,8 @@ work and those that ended: three at most, laid over one another as the marks of 
 rest counted, and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. Working lists too what is no chat's: a schedule about to fire, the
 session of a campaign (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and
-its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working keeps the open
-chat in sight, and the search finds the chats at work
-too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
+its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working hides its rows,
+the open chat's too, and keeps its count (item 513), and the search finds the chats at work, folded or not. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
 and **Schedules** (a page of its own since item 401); in the foot, the cog of **Settings**, **Connect apps** beside it
 ([Connect apps](extending.md#connect-apps), item 492), which leads to
 [Customize › Plugins](extending.md#customize--plugins), and
@@ -244,13 +243,17 @@ box would be, which stays at the window's foot as the conversation scrolls (item
 ("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own" once not), "Open parent"
 and, while it works, **Stop**. The tool calls of one stretch of work fold into a single line that says what they did,
 "Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it while it runs,
-"Worked for 12 s" for a stretch with no call; item 374). A folded group at work names the command that runs right
+"Worked for 12 s" for a stretch with no call; item 374). The line is one line at any width (item 512): what it did
+gives way with an ellipsis, and its time, the badge of failed calls and the chevron keep their place. A folded group at
+work names the command that runs right
 after "Working…", in place of how much it did so far, which the open group keeps (item 430). Open, it shows every call, result and screenshot, each call one
 line in line with the group's head (item 402): its mark (a spinner while it runs, then the mark of its kind, in the
 failure's colour when it failed; item 403), what it did (a command is the command itself in the monospace type, the
 policy's words its tooltip; a read or a write says "Read notes.txt", "Write notes.txt", from the start, its mark saying
 which it is, keeps no tool's name, and reads the policy's words once the call is done; another call keeps its tool's name
-beside its words, item 506) and a chevron, a failure's first line its tooltip and its result on a hairline under it once opened, with **Why it
+beside its words, item 506; the name reads in words, item 513: one of Dot's as what it does, "Edit file", "Update
+plan", "Web search", an MCP tool as its server and what it does, "Tavily · Search", the tool's own name its tooltip)
+and a chevron, a failure's first line its tooltip and its result on a hairline under it once opened, with **Why it
 ran** for a step that acted, or that more than the preset decided: the rule of yours, the preset, or who answered and
 why the policy asked (item 468); a group that is
 over wears the mark of the kind its words start with (the terminal's for "Ran 2 commands"), and the model's thinking is
@@ -395,7 +398,8 @@ command, item 220). A Screen tab that has had no page at all says instead, in th
 Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the setting under
 Settings › Browser that opens it when a run starts its browser (item 401). **Watch** and **Close the view** open and
 close it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the
-browser ("Dot has control", or the agent's name). Since that view shows the page, Dot's own Chrome stays in the
+browser ("Dot has control", or the agent's name), on one line, beside Take over and Use it here; a panel too narrow for
+the three puts the words on top and the buttons under them (item 512). Since that view shows the page, Dot's own Chrome stays in the
 background while a run works (`[browser] raise_window`, off by default, items 97 and 118): the tabs Dot opens are opened
 behind, the app you were in gets the focus back right after Chrome starts and after a page opens a tab of its own, and
 switching tabs does not raise the window; Settings › Browser has the switch "Bring Chrome to the front while working"
@@ -722,7 +726,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PUT /models/standby` (`{"models": ["provider:model", …]}`)                    | the standby models in their order (item 478), kept in `config.toml` as `[models] standby`; `[]` for none (422 for one named twice, one that cannot call tools or one of Zen's free models) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |
 | `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
-| `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window) |
+| `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400) |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
@@ -756,7 +760,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
 | `GET /connections`, `GET /connections/{id}/icon`, `POST /connections/{id}`      | the applications of Customize › Plugins, where each stands (`state`), its step (`step`) and whether the installed application has an icon (`icon`); the icon of an application of the Mac or of OneDrive as a PNG read from its bundle (404 for one of the web, one not installed and one whose bundle holds no icon file); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
 | `GET\|POST /mcp/servers` (`secrets` by name for a service that takes a key, item 408), `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`, `mark`, `picks_tools`) and the services to add (`kind`, `secrets`, `logo`); add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one added there, or take back one added from another agent of this Mac and stop it now (item 497; 409 for one of a plugin, which goes with its plugin, and for one of the config) |
-| `GET /mcp/servers/{name}/offered`, `PUT /mcp/servers/{name}/allow` (`{"tools": [...]}`) (item 426) | for a server added on the page (409 for one set up elsewhere, 404 for one that is not there): every tool it lists with what it says it does, and the limit of 30; then the tools to offer, 1 to 30 of the names it lists (422 otherwise, nothing changed), connected first and kept with the server after, so a server that does not answer leaves the choice unwritten and a restart offers the same ones. The page offers the choice when `picks_tools` is true: the server was left out for offering more tools than the model gets at once, also after its first try failed; the endpoint itself also changes the allow list of a server that is ready |
+| `GET /mcp/servers/{name}/offered`, `PUT /mcp/servers/{name}/allow` (`{"tools": [...]}`) (items 426 and 524) | for a server added on the page (409 for one set up elsewhere, 404 for one that is not there): every tool it lists with what it says it does, and its allow list (`allow`, empty when it offers them all); then the tools to offer, at least one of the names it lists (422 otherwise, nothing changed), all of them keeping no list, connected first and kept with the server after, so a server that does not answer leaves the choice unwritten and a restart offers the same ones. The page offers the choice when `picks_tools` is true: the server runs, or it was left out with an allow list |
 | `DELETE /installed-plugins/{name}` | take a plugin out of Dot (item 497): its MCP servers stop, its skills leave the runs that start after, and its folder in Dot's plugins goes to the Trash (409 for one of `[plugins] dirs`; of a plugin whose folder went without Dot, only the servers are stopped) |
 | `GET /accounts`, `POST /accounts/{provider}/start`, `DELETE /accounts/{provider}/{address}` | the accounts of Google and Microsoft signed in through their own sign-ins and whether the client you registered with each is saved (item 422); start a sign-in, only from this Mac's own address (the provider's page to open; 422 when the client is not saved); sign an account out |
 | `GET /vault`, `POST /vault/connect`, `POST /vault/token` (`{"token": "ops_…"}`), `DELETE /vault` | the owner's 1Password (item 493): whether `op` is installed and Dot holds a service account's token, and the vaults it reads with how many logins each; Connect, which makes the vault "Shared with Dot" and a service account that only reads it through the owner's `op` and the 1Password app, which asks first; a token of the owner's, kept once it reads a vault (422 for one that is no `ops_` token); both only from this Mac's own address; Disconnect, which forgets the token. No token and no value is ever answered |
