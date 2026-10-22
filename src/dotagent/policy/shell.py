@@ -109,6 +109,8 @@ _ENV_ASSIGNMENT: re.Pattern[str] = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\
 _ARRAY_ASSIGNMENT: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
 _GLOB_CHARS: str = "*?["
 _MOST_VALUES: int = 64
+# What stands for a part of a word that only the running line knows while its spellings are counted.
+_OPAQUE: str = "\x00"
 # How many parts of a word that only the running line knows :func:`_leads_toward_protected` reads (a leading one stands
 # for the home folder, then the first that follows decides).
 _MOST_UNKNOWN: int = 8
@@ -1267,14 +1269,16 @@ def _unbraced(values: list[str]) -> list[str] | None:
 
 def _spellings(raw: str, scope: ShellScope) -> tuple[list[str] | None, bool]:
     """:func:`_expansions` and whether it gave up for want of room: more spellings (variables, braces) than
-    :data:`_MOST_VALUES`, as against a part only the running line knows."""
+    :data:`_MOST_VALUES`, as against a part only the running line knows. A part only the running line knows (a variable
+    nothing set, a substitution's stand-in) is one opaque spelling and the rest is still counted: it fills nothing in,
+    and a word of 128 spellings with it in front hides what it hides without it."""
     pieces: list[tuple[str, ...]] = []
     last: int = 0
+    unknown: bool = False
     for match in _VARIABLE.finditer(raw):
         held: tuple[str, ...] | None = _held(match.group(1) or match.group(2) or match.group(3), scope)
-        if held is None:
-            return None, False
-        pieces.extend([(raw[last : match.start()],), held])
+        unknown = unknown or held is None
+        pieces.extend([(raw[last : match.start()],), (_OPAQUE,) if held is None else held])
         last = match.end()
     pieces.append((raw[last:],))
     values: list[str] = [""]
@@ -1285,6 +1289,8 @@ def _spellings(raw: str, scope: ShellScope) -> tuple[list[str] | None, bool]:
     spelled: list[str] | None = _unbraced(values)
     if spelled is None:
         return None, True
+    if unknown:
+        return None, False
     expanded: list[str] = [os.path.expanduser(value) for value in spelled]
     return (None if any("$" in value for value in expanded) else expanded), False
 
