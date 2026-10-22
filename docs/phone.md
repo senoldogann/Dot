@@ -105,8 +105,8 @@ keyboard move nothing else. The composer floats over the conversation's foot as 
 page's colour behind it, and the conversation scrolls under it, its last line kept clear of the bar however tall the
 composer grows (items 374 and 401); the "+" and a compact square stop or the send stand beside the box at 36 px, and the
 choices on the line under it. The conversation scrolls up and down only
-(item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a long command or tool
-name breaks over lines. A delegated run's row, under the helpers it belongs to, is one line tall at this width:
+(item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a step's command or
+tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A delegated run's row, under the helpers it belongs to, is one line tall at this width:
 its face, its goal, its state and time, and the way to its page, with the goal or the last line cut by an ellipsis
 rather than wrapped onto a second row (item 401); the helpers' own head is one line too. The details rise from the foot
 as a sheet with a grabber, and a drag of its head down closes it; its Agents tab says of each helper its state, its
