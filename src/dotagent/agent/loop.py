@@ -144,6 +144,7 @@ from dotagent.agent.scaffold import (
     scaffold_for,
     summarise_point,
     surface_for,
+    surface_for_tools,
 )
 from dotagent.agent.sites import SiteKnowledge, new_sites, site_knowledge, site_note, site_tag
 from dotagent.agent.stepmodel import (
@@ -1717,6 +1718,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     if not helpers:
         specs = tuple(spec for spec in specs if spec.name != CONSULT_TOOL)
+    surface, surface_reason = surface_for_tools(surface, surface_reason, len(specs))
     # Every tool group of the run, core first. A run with no group besides core has nothing to turn on.
     groups: tuple[str, ...] = (CORE_GROUP, *groups_of([spec.name for spec in specs]))
     grouped: bool = surface == "grouped" and len(groups) > 1
