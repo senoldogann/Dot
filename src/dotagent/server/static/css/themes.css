@@ -90,6 +90,10 @@
   --mark-ground: #ffffff;
   --mark-ink: #2b2a27;
   --mark-ring: rgb(0 0 0 / 10%);
+  /* The kind of a file on its tile in the Run tab (item 539): the blue of a mark rather than a theme's accent, so a
+     file reads as a file in every look. */
+  --file-kind: light-dark(#3a6fc4, #7fabf0);
+  --on-file-kind: light-dark(#ffffff, #0f2036);
   --scrim: light-dark(rgb(28 27 25 / 40%), rgb(0 0 0 / 55%));
   --scrim-strong: light-dark(rgb(28 27 25 / 78%), rgb(0 0 0 / 80%));
   /* Shadows: a trace of ink in light, none in dark but under what floats over a scrim. */

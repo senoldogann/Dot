@@ -15,6 +15,7 @@ import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { CHAT_BOX_PX, composerFrame, keepDraft, moveDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
+import { createContextPanel } from "../contextpanelview.js";
 import { clip, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { BACKGROUND_SOURCE, backgroundNote, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
@@ -281,6 +282,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // ------------------------------------------------------------------------------------ details and plan
   // The recap heads the Run tab (item 536): what the run did, does and waits for, in a few lines.
   const recap = recapSection({ runId, signal });
+  // What the run is made of (item 539), under the recap: the skills and MCP servers it can use, the files its chat
+  // wrote, the pages and searches it read and the notes it saved. A row of Artifacts opens the Changes tab, which the
+  // inspector holds after the panel.
+  let showChanges = () => undefined;
+  const context = createContextPanel({ onOpenChanges: () => showChanges() });
   const details = createDetails(run, agent, detail.campaign, detail.keep_going);
   const planBody = el("div", { class: "plan-list" }, el("div", { class: "hint" }, NO_PLAN));
   const plan = panelSection({ id: "run-plan", title: "Plan", actions: null, body: planBody });
@@ -323,7 +329,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const setup = setupSection();
   // The files the chat's runs wrote or created (item 368), in a tab of their own that counts them; read on arrival,
   // after each write or edit a run reports, and once the run ends.
-  const changes = changesSection({ runId, onCount: (files) => inspector.setCount("changes", files === 0 ? "" : String(files)) });
+  const changes = changesSection({
+    runId,
+    onCount: (files) => inspector.setCount("changes", files === 0 ? "" : String(files)),
+    onFiles: (files) => context.onFiles(files),
+  });
   const refreshChanges = debounce(() => attempt(changes.refresh), CHANGES_SETTLE_MS);
 
   // ------------------------------------------------------------------------------------------------ cost
@@ -1342,7 +1352,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Run", icon: "info", sections: [recap.element, details.element, filesCard.element, more.element] },
+      { id: "run", label: "Run", icon: "info", sections: [recap.element, ...context.elements, details.element, filesCard.element, more.element] },
       { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
@@ -1357,6 +1367,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       }
     },
   });
+  showChanges = () => inspector.openTab("changes");
   paintScreen();
 
   /** Read the chat's agents again; their tab counts them, and so does a phone's bar. */
@@ -1409,6 +1420,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       seen.failed = failed;
       paintStats();
     },
+    onTool: (call) => context.onTool(call),
+    onMemory: (change) => context.onMemory(change),
     onCompacted: ({ count, flagged }) => {
       seen.compactions = count;
       seen.flagged = flagged;
