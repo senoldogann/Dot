@@ -198,6 +198,6 @@ async def test_a_batch_carries_several_social_actions_while_no_social_pace_is_se
     before: int = len(await runtime.store.paced_times("127.0.0.1", "social", 0.0))
     batch: PreparedCall = await _act(ctx, steps)
     assert (batch.action.risk, batch.action.flags) == ("low", ("social",))
-    clicks: ScriptRun = await ctx.browser.run_script(ctx.thread_id, "document.body.dataset.clicks", 5.0)
+    clicks: ScriptRun = await ctx.browser.run_script(ctx.thread_id, "document.body.dataset.clicks", 5.0, False)
     assert json.loads(clicks.text) == "Follow @author;Follow @editor;Like;"
     assert len(await runtime.store.paced_times("127.0.0.1", "social", 0.0)) == before + 1

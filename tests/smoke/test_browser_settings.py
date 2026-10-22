@@ -149,7 +149,7 @@ def site() -> Iterator[str]:
 
 async def _seen(session: BrowserSession, site: str) -> dict[str, object]:
     await session.open_url("look", site, True)
-    seen: ScriptRun = await session.run_script("look", _SEEN, _SCRIPT_WAIT_S)
+    seen: ScriptRun = await session.run_script("look", _SEEN, _SCRIPT_WAIT_S, False)
     assert seen.end == "value", seen
     value: object = json.loads(seen.text)
     assert isinstance(value, dict), seen

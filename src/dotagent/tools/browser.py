@@ -80,7 +80,6 @@ from dotagent.tools.base import (
 from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
 from dotagent.vault.hosts import fills_on, website_hosts
-from dotagent.vault.masking import masked, masked_json
 from dotagent.vault.onepassword import Login, LoginSecret, kept_token
 
 _log = get_logger(__name__)
@@ -355,7 +354,7 @@ def _secret_field_check(ctx: ToolContext) -> SecretFieldCheck:
         flag: Flag = secret_field_flag(field.kind)
         summary: str = f"Type into {secret_field_label(field.kind)}" + ("" if field.ref is None else f" ({field.ref})")
         # The page's address may hold a login filled from the password manager (item 493): the record keeps none.
-        url: str = masked(field.url, ctx.browser.vault_values(ctx.thread_id))
+        url: str = ctx.browser.held_back(ctx.thread_id, field.url)
         await ctx.gate.authorize(_action("browser_act", "browser_input", "high", summary, url, (flag,)))
 
     return enter
@@ -382,12 +381,12 @@ async def _page_check(expected: str, outcome: ActOutcome, ctx: ToolContext) -> P
     """The typed judge's numbers about the page after a batch, from its visible text; ``None`` when the judge is off or
     unavailable."""
     page: TextView = await ctx.browser.read_text(ctx.thread_id, None, 0, _CHECKED_PAGE_CHARS)
-    # The judge is a model of its own: it reads no login filled from the password manager either (item 493).
-    values: frozenset[str] = ctx.browser.vault_values(ctx.thread_id)
+    # The judge is a model of its own: it reads no login filled from the password manager either (item 493), nor a
+    # cookie a script ran with (item 533).
     facts: PageFacts = PageFacts(
-        url=masked(outcome.view.url, values),
-        title=masked(outcome.view.title, values),
-        text=masked(page.text, values),
+        url=ctx.browser.held_back(ctx.thread_id, outcome.view.url),
+        title=ctx.browser.held_back(ctx.thread_id, outcome.view.title),
+        text=ctx.browser.held_back(ctx.thread_id, page.text),
         expected=expected,
     )
     return await ctx.runtime.judge.judge_page(facts, ctx.run_id)
@@ -407,12 +406,16 @@ def _act_tool() -> RegisteredTool:
         # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
         # It reads them in yolo too, where a payment, a message or a post it finds is the run's (item 443), and the
         # flags it adds are recorded with the step.
-        # The judge is a model of its own: it reads no login filled from the password manager either (item 493).
-        values: frozenset[str] = ctx.browser.vault_values(ctx.thread_id)
+        # The judge is a model of its own: it reads no login filled from the password manager either (item 493), nor
+        # a cookie a script ran with (item 533).
         judgments: list[ClickJudgment] = await asyncio.gather(
             *(
                 ctx.runtime.judge.judge_click(
-                    ClickFacts(label=masked(element.name, values), role=element.role, url=masked(target, values)),
+                    ClickFacts(
+                        label=ctx.browser.held_back(ctx.thread_id, element.name),
+                        role=element.role,
+                        url=ctx.browser.held_back(ctx.thread_id, target),
+                    ),
                     ctx.run_id,
                 )
                 for element in unexplained_clicks([(step, element) for step, element, _ in judged])
@@ -510,7 +513,9 @@ def _eval_tool() -> RegisteredTool:
 
     async def run(args: EvalArgs, ctx: ToolContext) -> ToolResult:
         waited_s: float = args.timeout_s or _DEFAULT_SCRIPT_S
-        script_run: ScriptRun = await ctx.browser.run_script(ctx.thread_id, args.script, waited_s)
+        script_run: ScriptRun = await ctx.browser.run_script(
+            ctx.thread_id, args.script, waited_s, hides_secrets(ctx.approvals)
+        )
         rendered: str = render_script_run(script_run, waited_s, _nonce(), _body_budget(ctx))
         # The value is the page's: the run reads it as untrusted, whatever it says.
         return mark_untrusted(fail(rendered) if script_run.end in ("error", "timeout") else ok(rendered))
@@ -519,7 +524,8 @@ def _eval_tool() -> RegisteredTool:
         name="browser_eval",
         description=(
             "Run JavaScript in your tab's page, with its session, and get the value as JSON: read a whole list or the "
-            "data behind the page, or do many like actions in one call. A thrown error fails the call."
+            "data behind the page, or do many like actions in one call. A thrown error fails the call. It is refused "
+            "on a page that holds a password, code or card field, and cookie values come back as [hidden]."
         ),
         args_model=EvalArgs,
         modes=ACTING_MODES,
@@ -928,49 +934,45 @@ def _fill_login_tool() -> RegisteredTool:
     )
 
 
-def _mask_error(error: DotError, values: frozenset[str]) -> None:
-    """Mask the values in ``error``'s words and in its context, which the model reads as well (``str`` of the error)."""
-    error.message = masked(error.message, values)
-    error.context = {key: masked_json(value, values) for key, value in error.context.items()}
+def _held_back(text: str, ctx: ToolContext) -> str:
+    """``text`` without the values filled into the chat's pages from the password manager (item 493) and the cookies
+    its scripts ran with (item 533)."""
+    return ctx.browser.held_back(ctx.thread_id, text)
 
 
 def masked_tool(tool: RegisteredTool) -> RegisteredTool:
     """``tool``, one that reads pages in Dot's Chrome (the browser tools, the web tools), with the values filled into
-    its chat's pages from the password manager (item 493) taken out of what it gives back and of what it tells the
-    gate: its result's text, an error it raises (its words and its context), and the action's summary and target,
-    which the approvals, the policy's events and the review model read. A page's address holds them once a form sent by
-    GET put them there."""
+    its chat's pages from the password manager (item 493) and the cookies its scripts ran with (item 533) taken out of
+    what it gives back and of what it tells the gate: its result's text, an error it raises (its words and its context),
+    and the action's summary and target, which the approvals, the policy's events and the review model read. A page's
+    address holds them once a form sent by GET put them there, or a script wrote one into the address."""
 
     async def prepare(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
         try:
             call: PreparedCall = await tool.prepare(arguments, ctx)
         except DotError as error:
-            _mask_error(error, ctx.browser.vault_values(ctx.thread_id))
+            ctx.browser.mask_held(ctx.thread_id, error)
             raise
-        values: frozenset[str] = ctx.browser.vault_values(ctx.thread_id)
         action: ActionInfo = call.action.model_copy(
-            update={"summary": masked(call.action.summary, values), "target": masked(call.action.target, values)}
+            update={"summary": _held_back(call.action.summary, ctx), "target": _held_back(call.action.target, ctx)}
         )
 
         async def run(context: ToolContext) -> ToolResult:
             try:
                 result: ToolResult = await call.run(context)
             except DotError as error:
-                _mask_error(error, context.browser.vault_values(context.thread_id))
+                context.browser.mask_held(context.thread_id, error)
                 raise
             except Exception as error:
-                # An error that is not Dot's own goes to the model and the log as it reads: once values were filled in
-                # the chat, its words are told masked and its chain is left out, where a value may be.
-                values: frozenset[str] = context.browser.vault_values(context.thread_id)
-                if not values:
+                # An error that is not Dot's own goes to the model and the log as it reads: once values were held back
+                # in the chat, its words are told masked and its chain is left out, where a value may be.
+                if not context.browser.holds_back(context.thread_id):
                     raise
                 _log.warning("browser_tool_failed", tool=tool.spec.name, error=type(error).__name__)
                 raise ToolExecutionError(
-                    f"{tool.spec.name} failed: {masked(str(error), values)}", {"error": type(error).__name__}
+                    f"{tool.spec.name} failed: {_held_back(str(error), context)}", {"error": type(error).__name__}
                 ) from None
-            return result.model_copy(
-                update={"text": masked(result.text, context.browser.vault_values(context.thread_id))}
-            )
+            return result.model_copy(update={"text": _held_back(result.text, context)})
 
         return PreparedCall(action=action, run=run)
 

@@ -83,7 +83,7 @@ def config(tmp_path: Path) -> BrowserConfig:
 
 async def _script(session: BrowserSession, thread: str, site: str, script: str) -> object:
     await session.open_url(thread, f"{site}/", True)
-    run: ScriptRun = await session.run_script(thread, script, _SCRIPT_S)
+    run: ScriptRun = await session.run_script(thread, script, _SCRIPT_S, False)
     assert run.end == "value", run.text
     return json.loads(run.text)
 
