@@ -1296,6 +1296,11 @@ class Store:
         rows = await self._all("SELECT * FROM harness_steps ORDER BY started_at DESC, id DESC LIMIT ?", (limit,))
         return [_harness_step(row) for row in rows]
 
+    async def count_harness_steps(self) -> int:
+        """How many steps there are in all, nightly and by hand (item 527), past the newest a list shows."""
+        row = await self._one("SELECT COUNT(*) AS n FROM harness_steps", ())
+        return 0 if row is None else int(row["n"])
+
     @_writing
     async def add_harness_probes(
         self, step_id: str, version_id: str | None, label: str, cards: Sequence[tuple[object, ...]], created_at: float
@@ -1381,6 +1386,11 @@ class Store:
         """The newest ``limit`` experiences, the newest first."""
         rows = await self._all("SELECT * FROM harness_experiences ORDER BY created_at DESC, id DESC LIMIT ?", (limit,))
         return [_harness_experience(row) for row in rows]
+
+    async def count_harness_experiences(self) -> int:
+        """How many experiences the library keeps in all (item 527), past the newest a list shows."""
+        row = await self._one("SELECT COUNT(*) AS n FROM harness_experiences", ())
+        return 0 if row is None else int(row["n"])
 
     async def run_harness(self, run_id: str) -> str | None:
         """The version of the harness the run took, ``None`` with none adopted then or for a run from before."""

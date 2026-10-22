@@ -26,6 +26,11 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "harness-page-token"
 HABIT: str = "- Read a file before you change it."
+# Whether each grid of the page keeps its columns inside it, and itself inside the screen (item 527): a column with a
+# fixed least width reaches past a narrow phone's edge, inside a pane that scrolls on its own.
+FITS: str = """() => [...document.querySelectorAll(".stat-row, .harness-columns, .harness-grid, .lesson-grid")].every(
+  (grid) => grid.scrollWidth <= grid.clientWidth && grid.getBoundingClientRect().right <= window.innerWidth
+)"""
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -163,6 +168,12 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
 async def test_the_phone_lists_self_improvement_among_how_dot_works(
     browser: Browser, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
+    # A version in use, so that its two texts stand on the page when its width is measured.
+    written: httpx.Response = await client.post(
+        "/api/harness",
+        json={"habits": HABIT, "tool_guidance": "- Search code with rg.", "summary": "On a phone", "adopt": True},
+    )
+    assert written.status_code == 200, written.text
     page: Page = await browser.new_page(
         viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, device_scale_factor=2
     )
@@ -176,10 +187,15 @@ async def test_the_phone_lists_self_improvement_among_how_dot_works(
         await row.click()
         await expect(page.get_by_role("heading", name="Self-improvement", exact=True)).to_be_visible()
         await expect(page.locator("section.memory-panel", has_text="What Dot follows now")).to_be_visible()
-        # The overview's tiles go two to a row on a phone, and none reaches past the screen's edge.
+        # The overview's tiles go two to a row on a phone, and nothing reaches past the screen's edge: not on this
+        # phone, nor on an iPhone mini (375 points wide) or the first iPhone SE (320).
         tiles = page.get_by_role("group", name="Overview").locator(".stat-tile")
         await expect(tiles).to_have_count(4)
-        assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
-        await page.screenshot(path=tmp_path / "harness-390.png", full_page=True)
+        await expect(page.locator(".harness-columns")).to_be_visible()
+        for width in (390, 375, 320):
+            await page.set_viewport_size({"width": width, "height": 844})
+            assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), width
+            assert await page.evaluate(FITS), width
+            await page.screenshot(path=tmp_path / f"harness-{width}.png", full_page=True)
     finally:
         await page.close()

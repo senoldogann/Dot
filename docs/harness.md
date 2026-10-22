@@ -155,11 +155,12 @@ experiences with their confidence, the runs learned from) and the edges; `dotx h
 Mermaid flowchart. A version's *lineage* (`GET /api/harness/{id}/lineage`, the end of `dotx harness show`) is the same
 read from that version: its ancestors, the attempts of the probes that played it, the steps that touched it and the
 experiences about it. `dotx harness steps` and `experiences` (`GET /api/harness/steps`, `/experiences`) list the newest
-of each; the graph carries the newest steps (`--steps`, 50 by default) and four experiences a step. The library is in
-use: the proposer is shown the newest experiences, a line each of the cue, the lesson and the confidence, before it
-writes a candidate. An experience written in a step that learned from a run which had read content third parties can
-author is kept marked (`tainted`, said on the page) and never shown to the proposer, as a tainted note is never shown to
-the lesson writer: its words cannot pass into a clean run's candidate unmarked.
+of each, and `GET /api/harness` counts them all (`steps_total`, `experiences_total`); the graph carries the newest
+steps (`--steps`, 50 by default) and four experiences a step. The library is in use: the proposer is shown the newest
+experiences, a line each of the cue, the lesson and the confidence, before it writes a candidate. An experience
+written in a step that learned from a run which had read content third parties can author is kept marked
+(`tainted`, said on the page) and never shown to the proposer, as a tainted note is never shown to the lesson
+writer: its words cannot pass into a clean run's candidate unmarked.
 
 ## The page
 
@@ -170,9 +171,11 @@ version it follows and never have to write one. Its words for the states are *ne
 *in use* (`adopted`) and *set aside* (`retired`); **Use** adopts and **Set aside** retires.
 
 A row of four tiles comes first (item 527): what is in use (*Built-in*, or *A version* with its summary), the number of
-versions with how many are in each state, the nights of learning with the last night's outcome (or when the next is,
-or that the learning is off) over a strip of the last 14 nights (green a change, grey none, red a failure, named in a
-legend and each night on a hover), and the lessons kept. On a phone they go two to a row.
+versions with how many are in each state, the steps of learning, nightly and by hand, with the last one's outcome (or
+when the next is, or that the learning is off) over a strip of the newest 14 (green a change, grey none, red a
+failure, named in a legend and each step on a hover), and the lessons kept. The two counts are of every step and
+lesson, past the newest the lists below show. On a phone the tiles go two to a row, and no column of the page is
+wider than the screen, the narrowest iPhone's too.
 
 *What Dot follows now* shows the adopted version's texts side by side where the page is wide enough, or that Dot's
 built-in instructions alone are in use. *Write your own (optional)* keeps its fields folded until **Write a version**

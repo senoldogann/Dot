@@ -753,7 +753,8 @@ class HarnessView(FrozenModel):
     """``GET /api/harness`` (item 389, docs/harness.md): the adopted version, ``None`` while a run's prompt is Dot's
     own text alone, every version the newest first, the bounds a component keeps to, and how the nightly step is set
     (item 393): when it runs ("off" never), the scoring and final sets, the repeats, and who adopts a version the probe
-    showed better."""
+    showed better; and how many steps and experiences there are in all (item 527), as their lists stop at the
+    newest."""
 
     adopted: HarnessVersion | None
     versions: tuple[HarnessVersion, ...]
@@ -765,6 +766,8 @@ class HarnessView(FrozenModel):
     final_tasks: tuple[str, ...]
     step_repeats: int
     adopt: Literal["owner", "auto"]
+    steps_total: int
+    experiences_total: int
 
 
 class HarnessRequest(FrozenModel):

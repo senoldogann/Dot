@@ -14,8 +14,8 @@ const STATE_TONE = { adopted: "b-ok", probed: "b-warn", candidate: "b-info", ret
 const STATE_WORDS = { adopted: "in use", probed: "tried", candidate: "new", retired: "set aside" };
 const STEP_TONE = { done: "b-ok", keep: "b-muted", skipped: "b-muted", failed: "b-bad" };
 const STEP_WORDS = { done: "done", keep: "no change", skipped: "skipped", failed: "failed" };
-// The nights the strip of the overview shows, newest at its right end.
-const STRIP_NIGHTS = 14;
+// The steps of learning the strip of the overview shows, the newest at its right end.
+const STRIP_STEPS = 14;
 // A night's cell in the strip, by its outcome: a change made, none, or a failure; each is named in the legend too.
 const STRIP_KIND = { done: "done", keep: "quiet", skipped: "quiet", failed: "failed" };
 const MADE_BY = { owner: "written by you", proposer: "proposed by Dot", composer: "combined by Dot" };
@@ -186,10 +186,10 @@ function statTile(label, value, sub, ...extra) {
   );
 }
 
-/** The nights of learning as a strip of cells, oldest at the left, each named on a hover and in the legend. */
+/** The newest steps of learning as a strip of cells, oldest at the left, each named on a hover and in the legend. */
 function nightStrip(steps) {
-  const nights = steps.slice(0, STRIP_NIGHTS).reverse();
-  const cells = nights.map((step) =>
+  const shown = steps.slice(0, STRIP_STEPS).reverse();
+  const cells = shown.map((step) =>
     el("span", {
       class: `night-cell ${STRIP_KIND[step.state] ?? "quiet"}`,
       title: `${dateTime(step.started_at)}: ${STEP_WORDS[step.state] ?? step.state}`,
@@ -201,13 +201,14 @@ function nightStrip(steps) {
   return el(
     "div",
     { class: "night-strip-box" },
-    el("div", { class: "night-strip", "aria-label": `The last ${plural(nights.length, "night", "nights")} of learning` }, cells),
+    el("div", { class: "night-strip", role: "group", "aria-label": `The newest ${plural(shown.length, "step", "steps")} of learning` }, cells),
     el("div", { class: "night-legend" }, key("done", "a change"), key("quiet", "no change"), key("failed", "failed")),
   );
 }
 
-/** The overview above the sections: the version in use, the versions, the nights of learning and the lessons. */
-function overview(view, steps, experiences) {
+/** The overview above the sections: the version in use, the versions, the steps of learning and the lessons, counted
+ * in all by the daemon, as the lists of steps and lessons stop at the newest. */
+function overview(view, steps) {
   const counts = {};
   for (const version of view.versions) {
     counts[version.state] = (counts[version.state] ?? 0) + 1;
@@ -227,12 +228,12 @@ function overview(view, steps, experiences) {
     ),
     statTile("Versions", String(view.versions.length), breakdown === "" ? "none yet" : breakdown),
     statTile(
-      "Nights of learning",
-      String(steps.length),
+      "Learning steps",
+      String(view.steps_total),
       lastNight === undefined ? (view.step_time === "off" ? "the nightly learning is off" : `next at ${view.step_time}`) : `last: ${STEP_WORDS[lastNight.state] ?? lastNight.state}, ${dateTime(lastNight.started_at)}`,
       steps.length === 0 ? null : nightStrip(steps),
     ),
-    statTile("Lessons kept", String(experiences.length), experiences.length === 0 ? "kept when a change clearly helped or hurt" : "from the trials of the nights"),
+    statTile("Lessons kept", String(view.experiences_total), view.experiences_total === 0 ? "none until a trial is clear" : "from the trials of the steps"),
   );
 }
 
@@ -427,7 +428,7 @@ export function mount(root, _ctx) {
         ? emptyPanel("sparkle", "No lesson yet", "A night of learning keeps one when a change clearly helped or hurt in its trial.")
         : el("div", { class: "rule-list lesson-grid" }, experiences.map(experienceRow)),
     );
-    overviewHolder.replaceChildren(overview(view, steps, experiences));
+    overviewHolder.replaceChildren(overview(view, steps));
     facts.replaceChildren(...loopFacts(view));
     form.describe(view);
   }
