@@ -1746,12 +1746,17 @@ def _protected_words(words: list[str], scope: ShellScope, *, climbs: bool = True
     return []
 
 
+# What a word that is code (a program in quotes, a literal) holds and a path does not: the quotes are gone by the time a
+# word is read, but the marks of the code and the spaces between its words stay.
+_CODE_MARKS: str = "'\"`();=:"
+
+
 def _has_too_many_spellings(raw: str, scope: ShellScope) -> bool:
-    """Whether ``raw``, a word that reads as a path (it begins with ``/``, ``~``, ``$`` or ``.`` and has no space in
-    it), has more spellings (variables, braces) than :data:`_MOST_VALUES`: the guard reads none of them, and a protected
-    location may be one. The quotes are gone by the time a word gets here, so a program in quotes (``python3 -c
-    "d={'a':1,...}"``, ``awk '{print $1,$2}'``) has braces the shell would not spell out; it reads as no path."""
-    return bool(raw) and raw[0] in "/~$." and not any(char.isspace() for char in raw) and _spellings(raw, scope)[1]
+    """Whether ``raw`` has more spellings (variables, braces) than :data:`_MOST_VALUES`: the guard reads none of them,
+    and a protected location may be one. The quotes are gone by the time a word gets here, so a program in quotes
+    (``python3 -c "d={'a':1,...}"``, ``awk '{print $1,$2}'``) has braces the shell would not spell out: a word with a
+    space or a mark of code in it (:data:`_CODE_MARKS`) is not asked about, any other is."""
+    return bool(raw) and not any(char.isspace() or char in _CODE_MARKS for char in raw) and _spellings(raw, scope)[1]
 
 
 def _maybe_protected(reason: str) -> Finding:
