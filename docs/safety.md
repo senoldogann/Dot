@@ -189,7 +189,7 @@ or a note, installing software (`brew install`, `pip install`, `npm install -g`,
 running a script the line downloaded (item 523), and a shell line that sends data out: an upload or a form, a push, a
 copy to another machine, a change on a code host, inline code that reaches the network or runs a command of it) ask
 even when the preset or an `allow` rule would let them through; only a `preapproved` rule skips the question. A
-project's own install (`npm install`, `uv sync`) still goes ahead. A message you send to the run clears the mark;
+project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. A message you send to the run clears the mark;
 your answer to a question of a run you watch does not, whether the run waited for it or went on (item 508), as it
 answers what the run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts
 once that run has ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a

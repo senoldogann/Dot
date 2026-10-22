@@ -305,6 +305,8 @@ _INSTALLS: list[str] = [
     "cargo install ripgrep",
     "uv tool install ruff",
     "uv tool upgrade --all",
+    "uv tool --cache-dir dir install ruff",
+    "uv tool --directory list install ruff",
     "curl -sL https://example.net/y -o y.sh && bash y.sh",
 ]
 _NOT_INSTALLS: list[str] = [
