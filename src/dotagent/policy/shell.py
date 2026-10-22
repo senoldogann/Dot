@@ -611,16 +611,28 @@ _AS_SHELL: re.Pattern[str] = re.compile(
     r"\bwriteText\s*\(|\.write\s*\(\s*\{\s*text\s*:",
     re.IGNORECASE,
 )
-# What names the clipboard in an AppleScript or a JXA script: ``the clipboard`` (to read it, and to put text on it
-# too: which of the two a script does takes a reading of the script that a pattern gets wrong, and three reviews each
-# found a line that hid a read behind a write), ``clipboard info``, their raw events (``«event JonsgClp»``, or with
-# ``<<`` and ``>>``), JXA's ``theClipboard`` and ``clipboardInfo`` however they are called, and the pasteboard of the
-# Objective-C bridge.
+# What names the clipboard in an AppleScript or a JXA script: ``the clipboard`` (to read it, and to put text on it too:
+# which of the two a script does takes a reading of the script that a pattern gets wrong, and three reviews each found
+# a line that hid a read behind a write), ``clipboard info``, their raw events (``«event JonsgClp»``, or with ``<<``
+# and ``>>``), JXA's ``theClipboard`` and ``clipboardInfo`` however they are called, any pasteboard (``NSPasteboard``,
+# Carbon's ``PasteboardCreate``) and the command ``pbpaste``, however the script runs it. A JXA name written with
+# ``\x74`` or ``\u0074`` escapes is read as the letters it stands for.
 _AS_CLIPBOARD: re.Pattern[str] = re.compile(
-    r"\bthe[\s¬]+clipboard\b|\bclipboard[\s¬]+info\b|theClipboard|clipboardInfo|\bNSPasteboard\b|"
+    r"\bthe[\s¬]+clipboard\b|\bclipboard[\s¬]+info\b|theClipboard|clipboardInfo|pasteboard|\bpbpaste\b|"
     r"(?:«|<<)event\s+Jons\wClp(?:»|>>)",
     re.IGNORECASE,
 )
+_JS_ESCAPE: re.Pattern[str] = re.compile(r"\\x([0-9a-fA-F]{2})|\\u([0-9a-fA-F]{4})|\\u\{([0-9a-fA-F]{1,6})\}")
+# The names that read the clipboard wherever a line says them, in any letter case (this Mac's file system does not tell
+# ``PBPASTE`` from ``pbpaste``): the command, which a wrapper the guard does not look through may run (``time -l
+# pbpaste``, ``arch -arm64e pbpaste``, ``ssh -o ProxyCommand=pbpaste``); and ``osascript`` with the clipboard named
+# anywhere on the line, whatever way its script comes (a pipe, a here-document, a variable, a glued ``-e``).
+_PBPASTE: re.Pattern[str] = re.compile(r"\bpbpaste\b", re.IGNORECASE)
+_OSASCRIPT: re.Pattern[str] = re.compile(r"osascript", re.IGNORECASE)
+_CLIPBOARD_WORD: re.Pattern[str] = re.compile(r"clipboard|pasteboard", re.IGNORECASE)
+# Any pasteboard of the system's, named on the line: inline code in another language (``python3 -c`` with
+# ``NSPasteboard``, ``swift -e``) reads it by the class's name.
+_PASTEBOARD: re.Pattern[str] = re.compile(r"pasteboard", re.IGNORECASE)
 _AS_KEYSTROKES: re.Pattern[str] = re.compile(r"\bkeystroke\b|\bkey\s+code\b|\bkeyCode\s*\(", re.IGNORECASE)
 _AS_NATIVE: re.Pattern[str] = re.compile(r"\bObjC\.import\b|\$\.NS[A-Z]|\bNSTask\b|\bNSAppleScript\b")
 _AS_LITERAL: re.Pattern[str] = re.compile(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'")
@@ -2973,6 +2985,17 @@ def _shell_statement_findings(statement: str, scope: ShellScope) -> list[Finding
     return findings
 
 
+def _without_js_escapes(script: str) -> str:
+    """``script`` with its ``\\xHH``, ``\\uHHHH`` and ``\\u{H...}`` escapes written as the letters they stand for, as a
+    JavaScript string spells a name (``a['\\x74heClipboard']()``)."""
+
+    def letter(found: re.Match[str]) -> str:
+        code: int = int(found.group(1) or found.group(2) or found.group(3), 16)
+        return chr(code) if code <= 0x10FFFF else found.group(0)
+
+    return _JS_ESCAPE.sub(letter, script)
+
+
 def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     flags: list[Flag] = []
     reasons: list[str] = []
@@ -2997,7 +3020,7 @@ def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     findings: list[Finding] = [_finding(risk, tuple(dict.fromkeys(flags)), reason)]
     for statement in _shell_statements(script):
         findings.extend(_shell_statement_findings(statement, scope))
-    if _AS_CLIPBOARD.search(script):
+    if _AS_CLIPBOARD.search(script) or _AS_CLIPBOARD.search(_without_js_escapes(script)):
         findings.append(_names_the_clipboard())
     if _AS_KEYSTROKES.search(script):
         findings.append(_finding("high", (), "types into whatever application has the keyboard focus"))
@@ -3035,7 +3058,7 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
         ran: list[Finding] | None = _assess_runner(command, args, scope, given)
         if ran is not None:
             return ran
-    if command == "pbpaste":
+    if command.casefold() == "pbpaste":
         return [_reads_the_clipboard()]
     if command == "xargs":
         return _assess_xargs(args, scope, given)
@@ -3350,6 +3373,10 @@ def _universal_findings(command: str, scope: ShellScope) -> list[Finding]:
         findings.append(_finding("high", ("destructive", "system_settings"), "writes to a raw disk device"))
     if _EXPANDS_AS_CODE.search(command):
         findings.append(_unknown("expands a variable as code"))
+    if _PBPASTE.search(command):
+        findings.append(_reads_the_clipboard())
+    if (_OSASCRIPT.search(command) and _CLIPBOARD_WORD.search(command)) or _PASTEBOARD.search(command):
+        findings.append(_names_the_clipboard())
     return findings
 
 

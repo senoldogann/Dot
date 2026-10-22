@@ -51,6 +51,52 @@ _NAMING_IT: list[str] = [
     "app.clipboardInfo",
     "Application.currentApplication().setTheClipboardTo('x')",
     "ObjC.import('AppKit'); $.NSPasteboard.generalPasteboard.stringForType($.NSPasteboardTypeString)",
+    # The command that reads it, however a script runs it, and the names a JXA script writes with escapes
+    # or in Carbon's.
+    'do shell script "pbpaste"',
+    '«event sysoexec» "pbpaste"',
+    "var a = Application.currentApplication(); (a.doShellScript)('pbpaste')",
+    "a['doShellScript']('pbpaste')",
+    "a.doShellScript.call(a, 'pbpaste')",
+    "ObjC.import('stdlib'); $.system('pbpaste')",
+    "a['\\x74heClipboard']()",
+    "a.the\\u0043lipboard()",
+    "a.the\\u{43}lipboard()",
+    "ObjC.import('ApplicationServices'); $.PasteboardCreate($('com.apple.pasteboard.clipboard'), r)",
+]
+
+
+# What the security review of the branch found, each a line a run could use and that passed in the aggressive
+# preset: the command in another letter case (this Mac's file system does not tell them apart) or behind a
+# wrapper the guard does not look through, and osascript given its script by a pipe, a here-document, a
+# variable or a glued -e.
+_FOUND_BY_THE_REVIEW: list[str] = [
+    "PBPASTE",
+    "/usr/bin/PbPaste | head -c 8",
+    "x=$(PBPASTE)",
+    "bash -c 'PBPASTE'",
+    "OSASCRIPT -e 'the clipboard'",
+    "/usr/bin/time -l pbpaste",
+    "arch -arm64e pbpaste",
+    "lockf -t 1 f pbpaste",
+    "sandbox-exec -n no-network pbpaste",
+    "tar -cf - . -I pbpaste",
+    "rsync -e pbpaste a b",
+    "ssh -o ProxyCommand=pbpaste h",
+    "osascript -e'the clipboard'",
+    "osascript - <<< 'the clipboard'",
+    "echo 'the clipboard' | osascript -",
+    "cat <<'EOF' | osascript\nthe clipboard\nEOF",
+    "cat <<< 'the clipboard' | osascript",
+    "echo 'the\\x20clipboard' | osascript",
+    "x='the clipboard'; osascript -e \"$x\"",
+    "osascript -e \"$(echo 'the clipboard')\"",
+    "echo 'the clipboard' | xargs -0 osascript -e",
+    'osascript -l JavaScript -e "Application.currentApplication().theClipboard()"',
+    # Inline code in another language names the pasteboard's class.
+    "python3 -c 'from AppKit import NSPasteboard; print(NSPasteboard.generalPasteboard())'",
+    "swift -e 'import AppKit; print(NSPasteboard.general.string(forType: .string) ?? \"\")'",
+    "ruby -e 'require \"osx/cocoa\"; puts OSX::NSPasteboard.generalPasteboard'",
 ]
 
 
@@ -79,6 +125,13 @@ def _verdicts(command: str, workspace: Path) -> tuple[ShellAssessment, list[Verd
     ],
 )
 def test_a_read_of_the_clipboard_by_the_shell_asks_in_every_preset(command: str, tmp_path: Path) -> None:
+    assessment, verdicts = _verdicts(command, tmp_path)
+    assert verdicts == ["ask", "ask", "ask"], (command, assessment)
+    assert "protected_read" in assessment.flags and "destructive" not in assessment.flags
+
+
+@pytest.mark.parametrize("command", _FOUND_BY_THE_REVIEW)
+def test_what_the_security_review_found_asks_in_every_preset(command: str, tmp_path: Path) -> None:
     assessment, verdicts = _verdicts(command, tmp_path)
     assert verdicts == ["ask", "ask", "ask"], (command, assessment)
     assert "protected_read" in assessment.flags and "destructive" not in assessment.flags

@@ -316,14 +316,18 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   as it is, a login's values among them; the live Screen view you watch is not masked.
   A key that pastes (`Control+V`, `Meta+V`, `Shift+Insert`) is refused in such a field as typed text is.
 - The clipboard can hold a password you have just copied from your password manager, so a run's read of it asks in every
-  preset (item 534): `desktop_clipboard_read`, `pbpaste`, and any AppleScript or JXA script given on the line or to the
-  tool that names the clipboard (`the clipboard`, `clipboard info`, their raw events, `theClipboard`, `clipboardInfo`,
-  `NSPasteboard`), whether it reads it or puts text on it: telling the two apart takes a reading of the script that a
-  pattern gets wrong, and a string or a comment that names it asks too, as the guard does not read them (`run script
-  "…"` runs one). A script in a file (`osascript r.applescript`), a name a script builds as it runs, and another
-  language's code (`python3 -c` with `NSPasteboard`) are not read, as no program is (the guard reads the line, not what
-  a program does; see above). `pbcopy` and `desktop_clipboard_write` hand nothing over and ask nothing more than before;
-  a `yolo` run asks nothing (item 443).
+  preset (item 534): `desktop_clipboard_read`; a shell line that names `pbpaste`, in any letter case and behind any
+  wrapper (`time -l pbpaste` too: the guard reads the name, so `grep pbpaste notes` asks as well); a line that runs
+  `osascript` and names the clipboard anywhere (its `-e`, a pipe, a here-document, a variable); a line that names a
+  pasteboard (inline code in another language: `python3 -c` with `NSPasteboard`); and any AppleScript or JXA script
+  given to the tool that names the clipboard (`the clipboard`, `clipboard info`, their raw events, `theClipboard`,
+  `clipboardInfo`, `pbpaste`, a pasteboard), whether it reads it or puts text on it: telling the two apart takes a
+  reading of the script that a pattern gets wrong, and a string or a comment that names it asks too. `pbcopy` and
+  `desktop_clipboard_write` hand nothing over and ask nothing more than before; a `yolo` run asks nothing (item 443).
+  Not covered, as no program is (the guard reads the line, not what a program does; see above): a script in a file
+  (`osascript r.applescript`), a name that the line or the script builds as it runs (`printf 'pb%s' paste | sh`), a
+  script typed into a session (`osascript -i`), and a paste of the clipboard into an application that the run then reads
+  back (`⌘V`, `keystroke "v"`).
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
