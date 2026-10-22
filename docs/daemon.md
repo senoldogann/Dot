@@ -181,8 +181,8 @@ screenshots alike; a phone opens its own sheet). The slash menu picks **Plugins*
 in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
 model; one that is no longer signed in is refused). A plugin, an account or a skill picked is a chip under the box in a colour of
 its name, which its × takes away; the chip of a server wears its service's mark as the menus do (item 530: the logo, the
-icon or the letters, on the tile's light ground), the plug for a server of no service and, for the moment the daemon's
-palette has not named it (a draft kept, a message sent), until it has; Plan first is a chip too, and a chat has neither it nor goal mode nor Keep going; all
+icon or the letters, on the tile's light ground), the plug for a server of no service, and for any server until the
+daemon's palette has named it (a draft kept, a message sent); Plan first is a chip too, and a chat has neither it nor goal mode nor Keep going; all
 three switches stand in the **Options** menu's Execution group, under the approvals (item 353). The picks go with the
 message (`plugins`, `skills`, `accounts` and `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is
 sent they stand under it as chips (the run's `picks` event); a message that steers the run under way leaves them for the

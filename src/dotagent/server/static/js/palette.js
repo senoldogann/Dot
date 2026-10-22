@@ -20,8 +20,13 @@ export function loadPalette() {
         for (const server of palette.servers) {
           serverMarks.set(server.name, server.mark ?? null);
         }
+        // A chip that cannot be drawn again must not keep the palette from the menus: each listener on its own.
         for (const listener of listeners) {
-          listener();
+          try {
+            listener();
+          } catch (error) {
+            console.warn("a chip could not be drawn again with the marks of the MCP servers", error);
+          }
         }
         return palette;
       },
