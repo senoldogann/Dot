@@ -105,3 +105,10 @@ async def test_the_graph_the_lineage_the_steps_and_the_experiences_are_read_thro
         assert [each["id"] for each in (await client.get("/api/harness/steps")).json()] == [step.id]
         assert [each["id"] for each in (await client.get("/api/harness/experiences")).json()] == [experience.id]
         assert (await client.get("/api/harness/hrn_missing/lineage")).status_code == 404
+        # The view counts every step and experience, past the newest the lists show (item 527): the page's overview
+        # says the totals, not the length of a list that stops at 50.
+        for started in range(50):
+            await store.create_harness_step(10.0 + started, None, base.id)
+        view = (await client.get("/api/harness")).json()
+        assert (view["steps_total"], view["experiences_total"]) == (51, 1)
+        assert len((await client.get("/api/harness/steps")).json()) == 50

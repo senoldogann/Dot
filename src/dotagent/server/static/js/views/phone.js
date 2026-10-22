@@ -224,11 +224,34 @@ export function mount(root, _ctx) {
       },
     });
     awake.paint();
+    // The step to do now stands out: the first one not done.
+    const done = [onMac, served, tailnet.reached];
+    const now = done.indexOf(false);
+    if (now >= 0) {
+      [first, second, third][now].classList.add("current");
+    }
+    const count = done.filter(Boolean).length;
+    const progress = el(
+      "div",
+      { class: "phone-progress" },
+      el(
+        "div",
+        { class: "phone-progress-track", role: "progressbar", "aria-label": "Steps done on this Mac", "aria-valuemin": "0", "aria-valuemax": "3", "aria-valuenow": String(count) },
+        done.map((ok, index) => el("span", { class: ok ? "phone-progress-part done" : index === now ? "phone-progress-part now" : "phone-progress-part" })),
+      ),
+      el("span", { class: "phone-progress-words" }, count === 3 ? "Ready: the phone reaches Dot" : `${count} of 3 steps done on this Mac`),
+    );
     return el(
       "section",
       { class: "card" },
       el("div", { class: "card-head" }, el("span", { class: "grow" }, "Reach Dot from anywhere")),
-      el("div", { class: "card-pad stack" }, el("ol", { class: "phone-guide", "aria-label": "Steps on this Mac" }, first, second, third), awake.element),
+      el(
+        "div",
+        { class: "card-pad stack" },
+        progress,
+        el("ol", { class: "phone-guide", "aria-label": "Steps on this Mac" }, first, second, third),
+        el("div", { class: "phone-awake" }, awake.element),
+      ),
     );
   }
 

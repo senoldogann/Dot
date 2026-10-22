@@ -296,6 +296,10 @@ async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins:
                         await set_up.click()
                     await expect(steps).to_contain_text("Tailscale serves Dot to your tailnet over HTTPS")
                     await expect(steps).to_contain_text("Dot takes the name up when it starts again.")
+                    # Two steps of three are done, and the one left is the one to do now (item 527).
+                    progress: Locator = page.get_by_role("progressbar", name="Steps done on this Mac")
+                    await expect(progress).to_have_attribute("aria-valuenow", "2")
+                    await expect(steps.locator(".phone-guide-step.current")).to_contain_text("Dot answers to the name")
                     # Restart Dot asks first: the runs going on would stop with it.
                     await steps.get_by_role("button", name="Restart Dot").click()
                     asked: Locator = page.locator("dialog.modal")
