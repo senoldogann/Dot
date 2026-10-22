@@ -576,7 +576,8 @@ _TERMINAL_APPS: tuple[str, ...] = (
 
 _PIPE_TO_SHELL: re.Pattern[str] = re.compile(
     r"(curl|wget)\b[^|;&]*\|\s*(sudo\s+)?(bash|sh|zsh|python3?|ruby|perl|node)\b|"
-    r"\b(bash|sh|zsh)\s+<\(\s*(curl|wget)\b|\beval\s+\"?\$\(\s*(curl|wget)\b"
+    r"\b(bash|sh|zsh)\s+<\(\s*(curl|wget)\b|\beval\s+\"?\$\(\s*(curl|wget)\b",
+    re.IGNORECASE,
 )
 _FORK_BOMB: re.Pattern[str] = re.compile(r":\(\)\s*\{")
 _DEVICE_WRITE: re.Pattern[str] = re.compile(r"(>\s*|of=)/dev/(r?disk|sd|nvme)")
@@ -1218,6 +1219,13 @@ def _option_values(args: list[str], short: str, long: str) -> list[str]:
     return values
 
 
+def _program(word: str) -> str:
+    """The name of the program ``word`` runs, as this Mac reads it: the last part of the word, in lower case. The
+    default volume does not tell letter cases apart, so ``RM``, ``Rm`` and ``/bin/RM`` run ``rm`` and ``SUDO`` runs
+    ``sudo``; a name is judged by its letters alone (item 538)."""
+    return Path(word).name.casefold()
+
+
 def _positional(args: list[str]) -> list[str]:
     """Arguments that are not options; everything after ``--`` counts as positional."""
     positional: list[str] = []
@@ -1500,7 +1508,7 @@ def _run_by_wrappers(words: list[str], scope: ShellScope) -> tuple[list[str], Sh
         rest = _past_modifiers(rest)
         if not rest:
             break
-        command: str = Path(rest[0]).name
+        command: str = _program(rest[0])
         if command not in _WRAPPERS:
             break
         options, after = _options(rest[1:], _WRAPPER_VALUES.get(command, frozenset()))
@@ -1533,7 +1541,7 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
         count += 1
     assigned: ShellScope = _assign_words(scope, plain[:count])
     rest: list[str] = _past_modifiers(plain[count:])
-    command: str = Path(rest[0]).name if rest else ""
+    command: str = _program(rest[0]) if rest else ""
     if command == "eval":
         return _line_scope(" ".join(rest[1:]), assigned)
     if command in ("cd", "pushd"):
@@ -1543,7 +1551,7 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
     if command == "ln":
         return _linked(assigned, rest[1:])
     run, where = _run_by_wrappers(rest, assigned)
-    ran: str = Path(run[0]).name if run else ""
+    ran: str = _program(run[0]) if run else ""
     places: list[Path] = _fetched_places(ran, run[1:], where) or _located_all(
         _carried_download(ran, run[1:], where), where
     )
@@ -1559,7 +1567,7 @@ def _piped(stages: list[list[str]], documents: tuple[str, ...]) -> _Input:
     given: _Input = _NO_INPUT
     for stage in stages:
         words: list[str] = _plain(_split_redirects(stage, documents)[0])
-        command: str = _GNU_NAMES.get(Path(words[0]).name, Path(words[0]).name) if words else ""
+        command: str = _GNU_NAMES.get(_program(words[0]), _program(words[0])) if words else ""
         operands: list[str] = _positional(words[1:])
         if command in _PRINTERS:
             given = _given_text(" ".join(operands))
@@ -2106,7 +2114,7 @@ def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]
     reached the network and marks the run; a decode did not."""
     words, _, _, _ = _split_redirects(stages[-1], ())
     run, _ = _run_by_wrappers(_plain(words), scope)
-    if not run or Path(run[0]).name not in (_SHELLS | _INTERPRETERS):
+    if not run or _program(run[0]) not in (_SHELLS | _INTERPRETERS):
         return []
     redirected: list[str] = [stages[-1][index + 1] for index, token in enumerate(stages[-1][:-1]) if token == "<"]
     piped: list[str] = [word for stage in stages[:-1] for word in _positional(_plain(stage)[1:])]
@@ -2156,7 +2164,7 @@ def _decodes(run: list[str]) -> bool:
     decode. ``base64 blob`` without ``-d`` encodes, so what it prints is not code; it does not count."""
     if not run:
         return False
-    command: str = Path(run[0]).name
+    command: str = _program(run[0])
     if command in _ALWAYS_DECODE:
         return True
     if command == "openssl":
@@ -2198,7 +2206,7 @@ def _fed_a_decode(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
     rights the same way, so it is judged as ``curl | sh`` is (item 528)."""
     words, _, _, _ = _split_redirects(stages[-1], ())
     run, _ = _run_by_wrappers(_plain(words), scope)
-    if not run or Path(run[0]).name not in (_SHELLS | _INTERPRETERS):
+    if not run or _program(run[0]) not in (_SHELLS | _INTERPRETERS):
         return []
     if any(_decodes(_run_by_wrappers(_plain(stage), scope)[0]) for stage in stages[:-1]):
         return [_finding("high", ("install",), "runs code it decoded from its standard input")]
@@ -2506,7 +2514,7 @@ def _assess_xargs(args: list[str], scope: ShellScope, given: _Input) -> list[Fin
         else [[*command, *given.paths]]
     )
     findings: list[Finding] = [found for run in runs for found in _assess_simple(run, scope, _NO_INPUT)]
-    if Path(command[0]).name not in _NAMES_ONLY and _holds_protected(given.walked, scope):
+    if _program(command[0]) not in _NAMES_ONLY and _holds_protected(given.walked, scope):
         # The piped twin of ``find ~ -exec cat {} +`` (item 531): every file the listing walked may be one it reads.
         findings.append(
             _maybe_protected(
@@ -2625,7 +2633,7 @@ def _runs_a_reader(words: list[str], flags: frozenset[str]) -> bool:
     """Whether ``words`` (the expression of a ``find``, the words of an ``fd``) run a command, by one of ``flags``, that
     may read the files it is given: one that only prints their names or sizes (:data:`_NAMES_ONLY`) does not."""
     return any(
-        word in flags and (index + 1 == len(words) or Path(words[index + 1]).name not in _NAMES_ONLY)
+        word in flags and (index + 1 == len(words) or _program(words[index + 1]) not in _NAMES_ONLY)
         for index, word in enumerate(words)
     )
 
@@ -3246,7 +3254,7 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
         return [found for name in names for found in _assess_simple([*name.split(), *plain[1:]], scope, given)]
     if head not in _TEST_COMMANDS and any(char in head for char in _GLOB_CHARS):
         return [_unknown("runs a command whose name is a pattern the shell matches against file names")]
-    command: str = head if head == "." else _GNU_NAMES.get(Path(head).name, Path(head).name)
+    command: str = head if head == "." else _GNU_NAMES.get(_program(head), _program(head))
     named: list[Finding] = [
         *_assess_named(command, plain, scope, given),
         *_walks_over_protected(command, plain[1:], scope),
