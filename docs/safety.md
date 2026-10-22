@@ -306,12 +306,13 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   they do not, as for a run's clicks. In `yolo` nothing is masked (item 443): the run reads all it is shown. A page
   script (`browser_eval`) can still read a field's value, and that step is judged as any other; the live Screen view you
   watch is not masked.
-- The clipboard can hold a password you have just copied from your password manager, so a run's read of it asks in
-  every preset (item 534): `desktop_clipboard_read`, `pbpaste`, and an AppleScript's or a JXA script's `the clipboard`
-  (also `copy the clipboard to x`), `clipboard info`, `theClipboard()` and `clipboardInfo()`, and any use of the
-  pasteboard through the Objective-C bridge (`NSPasteboard`); a script that only names these words in a string asks
-  too, as the guard does not read strings (`run script "…"` runs one). Putting text on it (`set the clipboard to`,
-  `copy x to the clipboard`) asks nothing more than before; a `yolo` run asks nothing (item 443).
+- The clipboard can hold a password you have just copied from your password manager, so a run's read of it asks in every
+  preset (item 534): `desktop_clipboard_read`, `pbpaste`, and an AppleScript's or a JXA script's `the clipboard` (also
+  `copy the clipboard to x`, or as the raw `«event JonsgClp»`), `clipboard info`, `theClipboard()` and
+  `clipboardInfo()`, and any use of the pasteboard through the Objective-C bridge (`NSPasteboard`); a script that only
+  names these words in a string asks too, as the guard does not read strings (`run script "…"` runs one). Putting text
+  on it (`set the clipboard to`, `copy x to the clipboard`) asks nothing more than before; a `yolo` run asks nothing
+  (item 443).
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).

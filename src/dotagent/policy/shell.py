@@ -611,17 +611,19 @@ _AS_SHELL: re.Pattern[str] = re.compile(
     r"\bwriteText\s*\(|\.write\s*\(\s*\{\s*text\s*:",
     re.IGNORECASE,
 )
-# What an AppleScript or a JXA script puts on the clipboard (``set the clipboard to x``, ``copy x to the clipboard``),
-# which hands it nothing, and what it reads off it: ``the clipboard`` (``get``, ``set x to``, ``copy the clipboard to
-# x``), ``clipboard info``, JXA's ``theClipboard()`` and ``clipboardInfo()``, and the pasteboard of the Objective-C
-# bridge (any use of it: a write is told from a read only by its method).
-_AS_CLIPBOARD_WRITE: re.Pattern[str] = re.compile(
-    r"\bset\s+the\s+clipboard\s+to\b|\bcopy\b[^\n]*?\bto\s+the\s+clipboard\b", re.IGNORECASE
-)
+# What an AppleScript or a JXA script reads off the clipboard: ``the clipboard`` (``get``, ``set x to``, ``copy the
+# clipboard to x``, and its raw form ``«event JonsgClp»``), ``clipboard info`` (``«event JonsiClp»``), JXA's
+# ``theClipboard()`` and ``clipboardInfo()``, and the pasteboard of the Objective-C bridge (any use of it: a write is
+# told from a read only by its method). What puts text there hands the script nothing: ``set the clipboard to`` and
+# ``copy x to the clipboard``; only those words are taken out before the script is read, so that everything else that
+# names the clipboard, on the same line too, is a read.
 _AS_CLIPBOARD_READ: re.Pattern[str] = re.compile(
-    r"\bthe\s+clipboard\b|\bclipboard\s+info\b|\b(?:theClipboard|clipboardInfo)\s*\(|\bNSPasteboard\b",
+    r"\bthe\s+clipboard\b|\bclipboard\s+info\b|\b(?:theClipboard|clipboardInfo)\s*\(|\bNSPasteboard\b|"
+    r"«event\s+Jons\wClp»",
     re.IGNORECASE,
 )
+_AS_CLIPBOARD_SET: re.Pattern[str] = re.compile(r"\bset\s+the\s+clipboard\s+to\b", re.IGNORECASE)
+_AS_CLIPBOARD_COPY: re.Pattern[str] = re.compile(r"(\bcopy\b[^\n]*?)\bto\s+the\s+clipboard\b", re.IGNORECASE)
 _AS_KEYSTROKES: re.Pattern[str] = re.compile(r"\bkeystroke\b|\bkey\s+code\b|\bkeyCode\s*\(", re.IGNORECASE)
 _AS_NATIVE: re.Pattern[str] = re.compile(r"\bObjC\.import\b|\$\.NS[A-Z]|\bNSTask\b|\bNSAppleScript\b")
 _AS_LITERAL: re.Pattern[str] = re.compile(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'")
@@ -2964,6 +2966,13 @@ def _shell_statement_findings(statement: str, scope: ShellScope) -> list[Finding
     return findings
 
 
+def _script_reads_the_clipboard(script: str) -> bool:
+    """Whether an AppleScript or a JXA ``script`` reads the clipboard (:data:`_AS_CLIPBOARD_READ`), once the words that
+    only put text on it are taken out."""
+    kept: str = _AS_CLIPBOARD_COPY.sub(r"\1 ", _AS_CLIPBOARD_SET.sub(" ", script))
+    return _AS_CLIPBOARD_READ.search(kept) is not None
+
+
 def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     flags: list[Flag] = []
     reasons: list[str] = []
@@ -2988,7 +2997,7 @@ def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     findings: list[Finding] = [_finding(risk, tuple(dict.fromkeys(flags)), reason)]
     for statement in _shell_statements(script):
         findings.extend(_shell_statement_findings(statement, scope))
-    if _AS_CLIPBOARD_READ.search(_AS_CLIPBOARD_WRITE.sub(" ", script)):
+    if _script_reads_the_clipboard(script):
         findings.append(_reads_the_clipboard())
     if _AS_KEYSTROKES.search(script):
         findings.append(_finding("high", (), "types into whatever application has the keyboard focus"))

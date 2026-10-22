@@ -42,6 +42,12 @@ def _verdicts(command: str, workspace: Path) -> tuple[ShellAssessment, list[Verd
         "osascript -e 'copy the clipboard to c' -e 'return c'",
         "osascript -e 'set c to the clipboard' -e 'return c'",
         "osascript -e 'set the clipboard to (the clipboard & \"x\")'",
+        # A write on the same line does not hide a read: only its own words are taken out.
+        'osascript -e \'return "copy: " & (the clipboard) & " goes to the clipboard"\'',
+        "osascript -l JavaScript -e 'var copy = app.theClipboard(); copy // to the clipboard'",
+        # The raw forms of the two reads.
+        "osascript -e 'return «event JonsgClp»'",
+        "osascript -e 'return «event JonsiClp»'",
         # JXA, by its own method and by the pasteboard of the Objective-C bridge.
         "osascript -l JavaScript -e 'Application.currentApplication().theClipboard()'",
         "osascript -l JavaScript -e 'var app = Application.currentApplication(); app.includeStandardAdditions = true;"
@@ -93,6 +99,10 @@ async def test_the_desktop_tool_that_reads_the_clipboard_asks_in_every_preset() 
         "set c to the clipboard\nreturn c",
         "clipboard info",
         'set the clipboard to (the clipboard & "x")',
+        'return "copy: " & (the clipboard) & " goes to the clipboard"',
+        "var copy = app.theClipboard(); copy // to the clipboard",
+        "return «event JonsgClp»",
+        "return «event JonsiClp»",
         "Application.currentApplication().theClipboard()",
         "app.clipboardInfo()",
         "ObjC.import('AppKit'); $.NSPasteboard.generalPasteboard.stringForType($.NSPasteboardTypeString)",
