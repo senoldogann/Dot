@@ -611,9 +611,17 @@ _AS_SHELL: re.Pattern[str] = re.compile(
     r"\bwriteText\s*\(|\.write\s*\(\s*\{\s*text\s*:",
     re.IGNORECASE,
 )
-# What an AppleScript reads off the clipboard (``the clipboard``, ``clipboard info``), as against what it puts there
-# (``set the clipboard to``).
-_AS_CLIPBOARD: re.Pattern[str] = re.compile(r"\bthe\s+clipboard\b(?!\s+to\b)|\bclipboard\s+info\b", re.IGNORECASE)
+# What an AppleScript or a JXA script puts on the clipboard (``set the clipboard to x``, ``copy x to the clipboard``),
+# which hands it nothing, and what it reads off it: ``the clipboard`` (``get``, ``set x to``, ``copy the clipboard to
+# x``), ``clipboard info``, JXA's ``theClipboard()`` and ``clipboardInfo()``, and the pasteboard of the Objective-C
+# bridge (any use of it: a write is told from a read only by its method).
+_AS_CLIPBOARD_WRITE: re.Pattern[str] = re.compile(
+    r"\bset\s+the\s+clipboard\s+to\b|\bcopy\b[^\n]*?\bto\s+the\s+clipboard\b", re.IGNORECASE
+)
+_AS_CLIPBOARD_READ: re.Pattern[str] = re.compile(
+    r"\bthe\s+clipboard\b|\bclipboard\s+info\b|\b(?:theClipboard|clipboardInfo)\s*\(|\bNSPasteboard\b",
+    re.IGNORECASE,
+)
 _AS_KEYSTROKES: re.Pattern[str] = re.compile(r"\bkeystroke\b|\bkey\s+code\b|\bkeyCode\s*\(", re.IGNORECASE)
 _AS_NATIVE: re.Pattern[str] = re.compile(r"\bObjC\.import\b|\$\.NS[A-Z]|\bNSTask\b|\bNSAppleScript\b")
 _AS_LITERAL: re.Pattern[str] = re.compile(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'")
@@ -2980,7 +2988,7 @@ def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     findings: list[Finding] = [_finding(risk, tuple(dict.fromkeys(flags)), reason)]
     for statement in _shell_statements(script):
         findings.extend(_shell_statement_findings(statement, scope))
-    if _AS_CLIPBOARD.search(script):
+    if _AS_CLIPBOARD_READ.search(_AS_CLIPBOARD_WRITE.sub(" ", script)):
         findings.append(_reads_the_clipboard())
     if _AS_KEYSTROKES.search(script):
         findings.append(_finding("high", (), "types into whatever application has the keyboard focus"))
