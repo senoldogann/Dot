@@ -19,7 +19,7 @@ import pytest
 from playwright.async_api import BrowserContext, async_playwright
 
 from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile
-from dotagent.browser.keychain import KeychainMode, read_keychain_mode
+from dotagent.browser.keychain import KeychainMode, read_keychain_mode, write_keychain_mode
 from dotagent.browser.login import chrome_arguments
 from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.session import BrowserSession, no_runs_at_work
@@ -56,8 +56,9 @@ async def wait_until_listening(port: int) -> None:
                 await asyncio.sleep(_POLL_S)
 
 
-async def save_cookie_in_ordinary_chrome(profile: Path, url: str) -> None:
-    """Start Chrome the way ``dotx browser login`` does (hidden, with a debugging port), set one cookie, quit it."""
+async def save_cookie_in_ordinary_chrome(profile: Path, url: str, *, session_cookie: bool = False) -> None:
+    """Start Chrome the way ``dotx browser login`` does (hidden, with a debugging port), set one cookie that lasts an
+    hour (and one with no expiry, when ``session_cookie``), quit it."""
     port: int = free_port()
     keychain: KeychainMode = read_keychain_mode(profile)
     command: list[str] = [
@@ -73,7 +74,10 @@ async def save_cookie_in_ordinary_chrome(profile: Path, url: str) -> None:
         async with async_playwright() as playwright:
             browser = await playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
             await browser.contexts[0].add_cookies(
-                [{"name": "dot_session", "value": "signed-in", "url": url, "expires": time.time() + 3600}]
+                [
+                    {"name": "dot_session", "value": "signed-in", "url": url, "expires": time.time() + 3600},
+                    *([{"name": "dot_visit", "value": "this-session", "url": url}] if session_cookie else []),
+                ]
             )
             quit_chrome = await browser.new_browser_cdp_session()
             await quit_chrome.send("Browser.close")
@@ -129,6 +133,26 @@ async def test_the_sign_ins_of_a_profile_that_a_real_chrome_wrote_are_imported(p
     assert report.cookies == 1
     assert has_stored_cookies(dot_profile)
     assert read_keychain_mode(dot_profile) == "system"
+
+
+async def test_the_session_cookies_of_an_imported_profile_survive_the_first_start_of_dots_chrome(
+    profile: Path, headless_config: BrowserConfig, tmp_path: Path
+) -> None:
+    """The first start of Dot's Chrome on an imported profile is the check that ends the import, and Chrome deletes the
+    cookies that have no expiry as it starts unless the profile says its last run crashed (items 453 and 529)."""
+    await save_cookie_in_ordinary_chrome(profile, "http://127.0.0.1:9", session_cookie=True)
+    dot_profile: Path = tmp_path / "dot"
+    report: ImportReport = await asyncio.to_thread(import_chrome_profile, profile, "Default", dot_profile)
+    assert report.cookies == 1
+    # Both cookies were written with the mock key, so no Keychain is asked in a test: the profile says so.
+    write_keychain_mode(dot_profile, "mock")
+    session: BrowserSession = BrowserSession(
+        headless_config, SERVER, dot_profile, tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        assert await session.stored_cookie_count() == 2
+    finally:
+        await session.aclose()
 
 
 async def _chrome_starting(profile: Path) -> None:

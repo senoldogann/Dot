@@ -19,8 +19,14 @@ the sites Dot should use with your accounts:
   first. If the Dot service has its browser open, stop it for the import (`dotx service uninstall`, import,
   `dotx service install`). Your Chrome profile is only read and nothing is decrypted; the cookie values stay encrypted
   with the key that Chrome keeps in the Keychain, which Chrome itself reads when Dot's browser starts (macOS may ask
-  once; choose Always Allow). The command ends by counting the cookies Chrome can read. The copy is a snapshot: a
-  sign-in that expires or rotates needs a new import, and a site that keeps its sign-in in IndexedDB asks again.
+  once; choose Always Allow). The command ends by counting the cookies Chrome can read, and says when it reads fewer
+  than it was given. The copy is a snapshot: a sign-in that expires or rotates needs a new import, and a site that keeps
+  its sign-in in IndexedDB asks again. The import is all or nothing (item 529): a failure puts back what Dot's profile
+  held, and leaves no copy of your Chrome's local storage behind; when it cannot put something right or cannot remove
+  that copy, it says which file. The cookies of your Chrome that have no expiry are kept
+  too, as in Dot's own profile (item 453). `--replace` is asked for only when Dot's profile holds a cookie, and the
+  Incognito profile is refused, as Dot's Chrome empties it as it starts. When the Keychain refused Chrome, Chrome has
+  dropped the cookies it could not read: allow it and import again with `--replace`.
 
 Cookies are encrypted with a key, and a profile cannot be read with another key than the one it was written with. A
 profile that Dot made uses Playwright's mock keychain in the sign-in window and in the automated sessions alike, so no

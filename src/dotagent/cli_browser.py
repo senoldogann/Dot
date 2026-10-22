@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
-from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile
+from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile, require_importable
 from dotagent.browser.login import open_profile_for_login
 from dotagent.browser.profiles import profile_dir
 from dotagent.browser.session import BrowserSession, no_runs_at_work
@@ -47,6 +47,7 @@ async def cmd_browser_import_chrome(command: BrowserImportChromeCommand) -> int:
     settings: AppConfig = load_user_config()
     # Into the profile Dot's own Chrome works on (item 355).
     dot_profile: Path = profile_dir(settings.browser.profile)
+    require_importable(dot_profile)
     if has_stored_cookies(dot_profile) and not command.replace:
         raise BrowserError(
             "Dot's own profile already holds sign-ins; repeat with --replace to replace them",
@@ -62,17 +63,27 @@ async def cmd_browser_import_chrome(command: BrowserImportChromeCommand) -> int:
         'Checking that Chrome can read them. macOS may ask whether Chrome may use "Chrome Safe Storage" in your '
         "Keychain: choose Always Allow.\n"
     )
+    if report.staging_left is not None:
+        sys.stdout.write(
+            f"Warning: {report.staging_left} could not be removed and holds a plain copy of the local storage of your "
+            "Chrome: delete it.\n"
+        )
     readable: int = await _readable_cookies(settings.browser, settings.server, dot_profile)
     if readable == 0:
         raise BrowserError(
             'Chrome could not read the copied cookies; allow Chrome to use "Chrome Safe Storage" in the Keychain and '
-            "import again",
+            "import again with --replace (Chrome has dropped the cookies it could not read)",
             {"profile": str(dot_profile), "copied": report.cookies},
         )
     sys.stdout.write(
         f"Chrome reads {readable} cookies from Dot's profile. The browser tools are signed in the way your Chrome was; "
         "sign-ins that expire need a new import.\n"
     )
+    if readable < report.loadable:
+        sys.stdout.write(
+            f"Note: {report.loadable} cookies were copied that Chrome can be expected to read, and it reads "
+            f"{readable}; the others could not be read with the key (or expired meanwhile).\n"
+        )
     return 0
 
 
