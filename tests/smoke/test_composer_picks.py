@@ -12,6 +12,7 @@ homes are throw-away directories.
 """
 
 import asyncio
+import json
 import re
 import sys
 import time
@@ -23,7 +24,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, ConsoleMessage, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.picks import PICKS_EVENT
@@ -827,6 +828,19 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     fixture: Locator = menu.get_by_role("option").filter(has_text=SERVER).locator(".slash-mark")
                     assert await _mark_of(fixture) == "icon:plug"
                     await page.screenshot(path=str(tmp_path / f"at-marks-{width}-{scheme}.png"), animations="disabled")
+                    # Picked for the message, a server's chip wears the same mark (item 530): its service's, on the
+                    # tile's ground, or the plug for a server of no service.
+                    for name in (*MARKED, SERVER):
+                        await goal.fill("")
+                        await goal.type(f"@{name}")
+                        await menu.get_by_role("option").filter(has_text=name).first.click()
+                        chip_mark: Locator = page.locator(f".composer .pick-chip[data-name='{name}'] .pick-mark")
+                        assert await _mark_of(chip_mark) == (tiles[name] if name in MARKED else "icon:plug"), name
+                        chip_ground: str = await chip_mark.evaluate("(node) => getComputedStyle(node).backgroundColor")
+                        assert (chip_ground == "rgb(255, 255, 255)") == (name in MARKED), (name, chip_ground)
+                    await page.screenshot(path=str(tmp_path / f"chips-{width}-{scheme}.png"), animations="disabled")
+                    for _ in range(len(MARKED) + 1):
+                        await page.locator(".composer .pick-remove").first.click()
                     await goal.fill("")
                     await goal.type("/")
                     for name in MARKED:
@@ -848,5 +862,61 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     )
                     await goal.fill("")
                     await page.close()
+            finally:
+                await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_server_chip_drawn_before_the_palette_arrives_wears_the_plug_and_then_the_mark(
+    login_env: dict[str, str],
+) -> None:
+    """Item 530: a draft kept, or a message sent, names its servers before the menu that lists them has been opened, so
+    the chip of a server is drawn with the plug, asks for the palette, and wears the service's mark as it arrives."""
+    with scratch_home() as home, eval_environment(home, {}):
+        learn: ServiceMark | None = mark_of_service("microsoft-learn")
+        assert learn is not None
+        palette: JsonObject = {
+            "skills": [],
+            "servers": [
+                {"name": "microsoft-learn", "tools": [], "mark": learn.model_dump()},
+                {"name": SERVER, "tools": [], "mark": None},
+            ],
+            "accounts": [],
+        }
+        draft: JsonObject = {
+            "text": "",
+            "files": [],
+            "picks": {"plugins": ["microsoft-learn", SERVER], "skills": [], "accounts": [], "plan_first": False},
+        }
+        arrived: asyncio.Event = asyncio.Event()
+
+        async def answer(route: Route) -> None:
+            await arrived.wait()
+            await route.fulfill(json=palette)
+
+        async with (
+            _daemon(login_env, _config("full"), []) as (runtime, manager, _model),
+            _served(runtime, manager) as address,
+            async_playwright() as playwright,
+        ):
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(
+                    viewport={"width": 1280, "height": _HEIGHT}, color_scheme="light", reduced_motion="reduce"
+                )
+                await page.add_init_script(f"localStorage.setItem('dot.draft.home', {json.dumps(json.dumps(draft))})")
+                await page.route("**/api/palette", answer)
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs")
+                marks: Locator = page.locator(".composer .pick-list .pick-chip[data-kind='plugin'] .pick-mark")
+                await expect(marks).to_have_count(2)
+                assert [await _mark_of(marks.nth(at)) for at in range(2)] == ["icon:plug", "icon:plug"]
+                arrived.set()
+                served: Locator = page.locator(".composer .pick-chip[data-name='microsoft-learn'] .pick-mark")
+                await expect(served.locator("img.plugin-logo")).to_have_count(1)
+                assert await _mark_of(served) == "logo:/icons/plugins/microsoft-icon.svg"
+                assert await served.evaluate("(node) => getComputedStyle(node).backgroundColor") == "rgb(255, 255, 255)"
+                of_no_service: Locator = page.locator(f".composer .pick-chip[data-name='{SERVER}'] .pick-mark")
+                assert await _mark_of(of_no_service) == "icon:plug"
             finally:
                 await browser.close()
