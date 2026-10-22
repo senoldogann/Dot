@@ -3373,9 +3373,19 @@ def _universal_findings(command: str, scope: ShellScope) -> list[Finding]:
         findings.append(_finding("high", ("destructive", "system_settings"), "writes to a raw disk device"))
     if _EXPANDS_AS_CODE.search(command):
         findings.append(_unknown("expands a variable as code"))
-    if _PBPASTE.search(command):
+    findings.extend(_clipboard_findings(command))
+    return findings
+
+
+def _clipboard_findings(text: str) -> list[Finding]:
+    """What a line says of the clipboard anywhere in it, in any letter case (item 534): the command ``pbpaste`` (behind
+    a wrapper the guard does not look through too), ``osascript`` with the clipboard named, and any pasteboard (inline
+    code in another language). It is read as the line was written and as its words are once the shell has taken the
+    quotes out (``pb''paste``, ``pb\\paste``, ``osa""script``, ``NSPaste''board``)."""
+    findings: list[Finding] = []
+    if _PBPASTE.search(text):
         findings.append(_reads_the_clipboard())
-    if (_OSASCRIPT.search(command) and _CLIPBOARD_WORD.search(command)) or _PASTEBOARD.search(command):
+    if (_OSASCRIPT.search(text) and _CLIPBOARD_WORD.search(text)) or _PASTEBOARD.search(text):
         findings.append(_names_the_clipboard())
     return findings
 
@@ -3395,6 +3405,7 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
     tokens: list[str] | None = _tokenize(reading.text)
     if tokens is None:
         return [*findings, _unknown("the line cannot be parsed, so what it runs cannot be judged")]
+    findings.extend(_clipboard_findings(" ".join(tokens)))
     state: ShellScope = replace(scope, depth=scope.depth + 1)
     stages: list[list[str]] = []
     for operator, segment in _commands(_without_patterns(tokens)):
