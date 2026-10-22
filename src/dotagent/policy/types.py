@@ -117,8 +117,8 @@ OUTSIDE_CHANNELS: frozenset[str] = frozenset({"web", "browser"})
 
 # Flags whose consequences reach beyond the machine, or beyond the run (persistence: what is remembered or scheduled
 # shapes every later run; upload: what a command sends to a server, a push, a form, a remote copy; install: software
-# installed, or a script the line downloaded and runs, which stays on the Mac and runs with the owner's rights after the
-# run); untrusted input must never trigger them silently.
+# installed, or a script the line downloaded or a blob it decoded and runs, which stays on the Mac and runs with the
+# owner's rights after the run); untrusted input must never trigger them silently.
 TAINT_ESCALATION_FLAGS: frozenset[Flag] = frozenset(
     {
         "external_send",

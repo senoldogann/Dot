@@ -2003,13 +2003,27 @@ def _decodes(run: list[str]) -> bool:
     return any(word in _DECODE_LONG or switch.fullmatch(word) is not None for word in run[1:])
 
 
+def _decoder_output_files(run: list[str]) -> list[str]:
+    """The file a decoder names for what it decodes (its ``>`` redirects the caller adds): ``openssl``'s ``-out`` (a
+    single-dash long option, so read as a word, not as ``-o`` letter by letter), the second file ``xxd`` is given
+    (``xxd [options] [infile [outfile]]``, where ``-o`` is an offset), else the ``-o``/``--output`` of ``base64``,
+    ``gpg`` and the rest."""
+    command, args = Path(run[0]).name, run[1:]
+    if command == "openssl":
+        return _option_values(args, "", "-out")
+    if command == "xxd":
+        return _positional(_options(args, _XXD_VALUES)[1])[1:2]
+    return _option_values(args, "-o", "--output")
+
+
 def _decoded_writes(words: list[str], targets: list[str], scope: ShellScope) -> tuple[Path, ...]:
-    """Where a decoder on this line writes what it decoded: its ``-o`` file and its ``>`` redirects, located. The file
-    is opaque code on disk, tracked like a download so that a later line that runs it is judged the same (item 523)."""
+    """Where a decoder on this line writes what it decoded: the file it names and its ``>`` redirects, located. The
+    file is opaque code on disk, tracked like a download so that a later line that runs it is judged the same
+    (item 523)."""
     run, _ = _run_by_wrappers(_plain(words), scope)
     if not _decodes(run):
         return ()
-    written: list[str] = [*_option_values(run[1:], "-o", "--output"), *targets]
+    written: list[str] = [*_decoder_output_files(run), *targets]
     return tuple(_located_all(written, scope))
 
 

@@ -340,6 +340,9 @@ _DECODE_RUNS: list[str] = [
     "base64 -d -o x.sh blob && bash x.sh",
     "echo DATA | base64 -d > p.sh && sh p.sh",
     "base64 -d blob > run && python3 run",
+    "openssl enc -d -aes-256-cbc -in blob -out x.sh; sh x.sh",
+    "xxd -r -p dump x.sh; sh x.sh",
+    "gpg -o x.sh -d blob.gpg && sh x.sh",
 ]
 _PLAIN_PIPES: list[str] = [
     "base64 blob | sh",
