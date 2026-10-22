@@ -5,7 +5,6 @@ import json
 import re
 from collections.abc import Awaitable, Callable
 from typing import Literal
-from urllib.parse import quote
 
 from playwright.async_api import CDPSession, Cookie, ElementHandle, Frame, JSHandle, Locator, Page
 from playwright.async_api import Error as PlaywrightError
@@ -13,7 +12,6 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from dotagent.browser.safety import key_enters_text, secret_kind, secret_selector
 from dotagent.browser.snapshot import (
-    HIDDEN_VALUE,
     SnapshotLine,
     closest_first,
     entries_of,
@@ -893,30 +891,18 @@ async def holds_secret_field(page: Page) -> bool:
 
 
 async def cookie_secrets(page: Page, url: str) -> tuple[str, ...]:
-    """The values of the cookies of ``url``'s site that a script may have read, each as it is written, as JSON writes it
-    inside a string and as an address writes it (item 533), longest first: a script that reads ``document.cookie``
-    hands the model a session. A value shorter than :data:`_MIN_HIDDEN_VALUE_CHARS` is no session (``en``, ``1``) and
-    is left out."""
+    """The values of the cookies of ``url``'s site that a script may read, those long enough to be a session (item
+    533): a script that reads ``document.cookie`` hands the model a session. A value shorter than
+    :data:`_MIN_HIDDEN_VALUE_CHARS` (``en``, ``1``) is no session and is left out."""
     try:
         cookies: list[Cookie] = await page.context.cookies([url])
     except PlaywrightError as error:
         raise _failure(
             "reading the cookies, to hide them from what the script gave, failed", page, {}, error
         ) from error
-    forms: dict[str, None] = {}
-    for cookie in cookies:
-        value: str = cookie["value"]
-        if len(value) >= _MIN_HIDDEN_VALUE_CHARS:
-            forms.update(dict.fromkeys((value, json.dumps(value, ensure_ascii=False)[1:-1], quote(value, safe=""))))
-    return tuple(sorted(forms, key=len, reverse=True))
-
-
-def without_secrets(text: str, secrets: tuple[str, ...]) -> str:
-    """``text`` with each of ``secrets`` shown as ``[hidden]``."""
-    shown: str = text
-    for secret in secrets:
-        shown = shown.replace(secret, HIDDEN_VALUE)
-    return shown
+    return tuple(
+        dict.fromkeys(cookie["value"] for cookie in cookies if len(cookie["value"]) >= _MIN_HIDDEN_VALUE_CHARS)
+    )
 
 
 async def measure_viewport(page: Page) -> Viewport:

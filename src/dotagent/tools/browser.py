@@ -37,6 +37,7 @@ from dotagent.browser.safety import (
     unexplained_clicks,
     url_flags,
 )
+from dotagent.browser.snapshot import HIDDEN_VALUE
 from dotagent.browser.types import (
     ActOutcome,
     FindResult,
@@ -80,7 +81,7 @@ from dotagent.tools.base import (
 from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
 from dotagent.vault.hosts import fills_on, website_hosts
-from dotagent.vault.masking import masked, masked_json
+from dotagent.vault.masking import mask_error, masked
 from dotagent.vault.onepassword import Login, LoginSecret, kept_token
 
 _log = get_logger(__name__)
@@ -931,49 +932,57 @@ def _fill_login_tool() -> RegisteredTool:
     )
 
 
-def _mask_error(error: DotError, values: frozenset[str]) -> None:
-    """Mask the values in ``error``'s words and in its context, which the model reads as well (``str`` of the error)."""
-    error.message = masked(error.message, values)
-    error.context = {key: masked_json(value, values) for key, value in error.context.items()}
+def _cookies_held_back(ctx: ToolContext) -> frozenset[str]:
+    """The cookies the chat's scripts ran with, which a run outside yolo is not shown (item 533; yolo shows all)."""
+    return ctx.browser.cookie_values(ctx.thread_id) if hides_secrets(ctx.approvals) else frozenset()
+
+
+def _held_back(text: str, ctx: ToolContext) -> str:
+    """``text`` without the values filled into the chat's pages from the password manager (item 493) and the cookies
+    its scripts ran with (item 533)."""
+    return masked(masked(text, ctx.browser.vault_values(ctx.thread_id)), _cookies_held_back(ctx), HIDDEN_VALUE)
+
+
+def _mask_error(error: DotError, ctx: ToolContext) -> None:
+    """Mask the values held back in ``error``'s words and in its context, which the model reads as well (``str`` of the
+    error)."""
+    mask_error(error, ctx.browser.vault_values(ctx.thread_id))
+    mask_error(error, _cookies_held_back(ctx), HIDDEN_VALUE)
 
 
 def masked_tool(tool: RegisteredTool) -> RegisteredTool:
     """``tool``, one that reads pages in Dot's Chrome (the browser tools, the web tools), with the values filled into
-    its chat's pages from the password manager (item 493) taken out of what it gives back and of what it tells the
-    gate: its result's text, an error it raises (its words and its context), and the action's summary and target,
-    which the approvals, the policy's events and the review model read. A page's address holds them once a form sent by
-    GET put them there."""
+    its chat's pages from the password manager (item 493) and the cookies its scripts ran with (item 533) taken out of
+    what it gives back and of what it tells the gate: its result's text, an error it raises (its words and its context),
+    and the action's summary and target, which the approvals, the policy's events and the review model read. A page's
+    address holds them once a form sent by GET put them there, or a script wrote one into the address."""
 
     async def prepare(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
         try:
             call: PreparedCall = await tool.prepare(arguments, ctx)
         except DotError as error:
-            _mask_error(error, ctx.browser.vault_values(ctx.thread_id))
+            _mask_error(error, ctx)
             raise
-        values: frozenset[str] = ctx.browser.vault_values(ctx.thread_id)
         action: ActionInfo = call.action.model_copy(
-            update={"summary": masked(call.action.summary, values), "target": masked(call.action.target, values)}
+            update={"summary": _held_back(call.action.summary, ctx), "target": _held_back(call.action.target, ctx)}
         )
 
         async def run(context: ToolContext) -> ToolResult:
             try:
                 result: ToolResult = await call.run(context)
             except DotError as error:
-                _mask_error(error, context.browser.vault_values(context.thread_id))
+                _mask_error(error, context)
                 raise
             except Exception as error:
-                # An error that is not Dot's own goes to the model and the log as it reads: once values were filled in
-                # the chat, its words are told masked and its chain is left out, where a value may be.
-                values: frozenset[str] = context.browser.vault_values(context.thread_id)
-                if not values:
+                # An error that is not Dot's own goes to the model and the log as it reads: once values were held back
+                # in the chat, its words are told masked and its chain is left out, where a value may be.
+                if not (context.browser.vault_values(context.thread_id) or _cookies_held_back(context)):
                     raise
                 _log.warning("browser_tool_failed", tool=tool.spec.name, error=type(error).__name__)
                 raise ToolExecutionError(
-                    f"{tool.spec.name} failed: {masked(str(error), values)}", {"error": type(error).__name__}
+                    f"{tool.spec.name} failed: {_held_back(str(error), context)}", {"error": type(error).__name__}
                 ) from None
-            return result.model_copy(
-                update={"text": masked(result.text, context.browser.vault_values(context.thread_id))}
-            )
+            return result.model_copy(update={"text": _held_back(result.text, context)})
 
         return PreparedCall(action=action, run=run)
 

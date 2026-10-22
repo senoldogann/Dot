@@ -63,7 +63,6 @@ from dotagent.browser.driver import (
     visible_text,
     wait_dom_quiet,
     wait_for_text,
-    without_secrets,
 )
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
 from dotagent.browser.look import PageLook, color_scheme
@@ -81,6 +80,7 @@ from dotagent.browser.remote_input import InputEvent, InputResult, MouseButton, 
 from dotagent.browser.render import describe_step
 from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdict
 from dotagent.browser.snapshot import (
+    HIDDEN_VALUE,
     SnapshotLine,
     count_refs,
     diff_views,
@@ -120,6 +120,7 @@ from dotagent.core.errors import (
     ApprovalParked,
     ApprovalRejected,
     BrowserError,
+    DotError,
     ForbiddenUrlError,
     HandedOff,
     PolicyDenied,
@@ -131,7 +132,7 @@ from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.desktop.types import AppInfo
 from dotagent.store.models import BrowserMode
-from dotagent.vault.masking import in_address, masked
+from dotagent.vault.masking import in_address, mask_error, masked
 
 _log = get_logger("dotagent.browser.session")
 
@@ -473,6 +474,9 @@ class BrowserSession:
         # browser tools of the thread shows: kept apart from its tabs, which an idle thread lets go of while its chat
         # goes on, and for as long as the daemon runs.
         self._vault_values: dict[str, set[str]] = {}
+        # The cookie values of the sites a thread's scripts ran in (item 533), which no result of the browser tools
+        # shows either, kept as long as the daemon runs.
+        self._cookie_values: dict[str, set[str]] = {}
         # The passwords and one-time codes among them, which no request of Dot's own Chrome carries in its address, with
         # the moment each stops being kept out (a password's never comes while the daemon runs).
         self._vault_secrets: dict[str, float] = {}
@@ -2310,6 +2314,12 @@ class BrowserSession:
         browser tools shows."""
         return frozenset(self._vault_values.get(thread_id, ()))
 
+    def cookie_values(self, thread_id: str) -> frozenset[str]:
+        """The values of the cookies of the sites the thread's scripts ran in, long enough to be a session (item 533),
+        which no result of the browser tools shows either: a script that read them, or wrote one into the page or its
+        address, may not hand them to the model."""
+        return frozenset(self._cookie_values.get(thread_id, ()))
+
     async def run_script(self, thread_id: str, script: str, timeout_s: float, hide_secrets: bool) -> ScriptRun:
         """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
         263). What the script led to is waited for as after a step (a tab it opened, a dialog), and the page is settled
@@ -2339,33 +2349,43 @@ class BrowserSession:
                     {"url": tab.page.url},
                 )
             thread.scripted = True
-            before: _Watch = self._watch(thread, tab)
-            started: float = time.monotonic()
             address: str = tab.page.url
-            end, text = await run_script(tab.page, script, timeout_s)
-            # The cookies of the page the script ran in, whatever it led the tab to since: what it gives back, in its
-            # value, in the error it threw and in where it led the tab, shows none of them (item 533).
-            secrets: tuple[str, ...] = await cookie_secrets(tab.page, address) if hide_secrets else ()
-            seconds: float = time.monotonic() - started
-            current: Tab
-            opening: bool
-            if end == "timeout":
-                # The script holds the page still: it takes no turn, and the tabs it opened are what can land.
-                opening = await self._let_births_land(tab)
-                current = await self._current_tab(thread)
-                await self._let_commit(current)
-            else:
-                opening = await self._let_events_land(tab)
-                current = await self._current_tab(thread)
-                await self._settle(current)
-            surprise: str | None = describe_surprise(before, self._watch(thread, tab))
-            await self._enforce_landing(current)
+            if hide_secrets:
+                # The cookies of the page the script runs in: held before it runs as well as after, so that one it
+                # deletes or overwrites is hidden too, and for the rest of the chat (item 533).
+                self._cookie_values.setdefault(thread_id, set()).update(await cookie_secrets(tab.page, address))
+            try:
+                before: _Watch = self._watch(thread, tab)
+                started: float = time.monotonic()
+                end, text = await run_script(tab.page, script, timeout_s)
+                if hide_secrets:
+                    self._cookie_values.setdefault(thread_id, set()).update(await cookie_secrets(tab.page, address))
+                seconds: float = time.monotonic() - started
+                current: Tab
+                opening: bool
+                if end == "timeout":
+                    # The script holds the page still: it takes no turn, and the tabs it opened are what can land.
+                    opening = await self._let_births_land(tab)
+                    current = await self._current_tab(thread)
+                    await self._let_commit(current)
+                else:
+                    opening = await self._let_events_land(tab)
+                    current = await self._current_tab(thread)
+                    await self._settle(current)
+                surprise: str | None = describe_surprise(before, self._watch(thread, tab))
+                await self._enforce_landing(current)
+            except DotError as error:
+                # What the script led the tab to may be an address that carries a cookie: the refusal names it.
+                if hide_secrets:
+                    mask_error(error, self.cookie_values(thread_id), HIDDEN_VALUE)
+                raise
             told: str | None = _TAB_OPENING if surprise is None and opening else surprise
+            hidden: frozenset[str] = self.cookie_values(thread_id) if hide_secrets else frozenset()
             return ScriptRun(
                 end=end,
-                text=without_secrets(text, secrets),
-                url=without_secrets(current.page.url, secrets),
-                surprise=None if told is None else without_secrets(told, secrets),
+                text=masked(text, hidden, HIDDEN_VALUE),
+                url=masked(current.page.url, hidden, HIDDEN_VALUE),
+                surprise=None if told is None else masked(told, hidden, HIDDEN_VALUE),
                 seconds=seconds,
             )
 

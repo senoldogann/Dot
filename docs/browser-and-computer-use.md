@@ -178,8 +178,10 @@ Both modes share what follows.
   the aggressive and balanced presets allow it, the cautious preset asks, a research run does not have it and a `yolo`
   run does it without asking. What the script does inside the page is not checked or paced action by action, as
   `browser_act`'s steps are. Outside `yolo` it is refused on a page that holds a password, one-time-code or card field,
-  in any frame (a script reads a field's value whole, one Chrome filled in too), and what it gives back shows the
-  values of the site's cookies, the ones long enough to be a session, as `[hidden]` (item 533). It takes the place of
+  in any frame (a script reads a field's value whole, one Chrome filled in too), and from then on no result of a browser
+  tool of that chat shows the values of the site's cookies, the ones long enough to be a session: they read `[hidden]`
+  in the script's value, in its error, in where it led the tab and in what a later tool reads (item 533). It takes the
+  place of
   AppleScript's `execute javascript`, which lands in the front window of whichever Chrome macOS picks when several run
   (item 263).
 - `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the

@@ -10,6 +10,8 @@ from urllib.parse import quote, quote_plus, unquote
 
 from pydantic import JsonValue
 
+from dotagent.core.errors import DotError, ForbiddenUrlError
+
 # What stands where a value was.
 MASK: str = "[filled from 1Password]"
 # The shortest value masked: a one-time code has six digits; a shorter one would match ordinary text.
@@ -47,9 +49,10 @@ def _forms(value: str) -> frozenset[str]:
     return frozenset(written | {" ".join(form.split()) for form in written})
 
 
-def masked(text: str, values: Iterable[str]) -> str:
-    """``text`` with each of ``values`` of a few characters or more replaced by :data:`MASK`, in each of the forms a
-    page may write it in, the longest first, so that a value inside another is masked with it."""
+def masked(text: str, values: Iterable[str], mask: str = MASK) -> str:
+    """``text`` with each of ``values`` of a few characters or more replaced by ``mask`` (:data:`MASK` for a value of
+    the password manager), in each of the forms a page may write it in, the longest first, so that a value inside
+    another is masked with it."""
     forms: set[str] = {
         form
         for value in values
@@ -58,7 +61,7 @@ def masked(text: str, values: Iterable[str]) -> str:
         if len(form) >= _MASKED_FROM_CHARS
     }
     for form in sorted(forms, key=len, reverse=True):
-        text = text.replace(form, MASK)
+        text = text.replace(form, mask)
     return text
 
 
@@ -90,13 +93,23 @@ def in_address(address: str, values: Iterable[str]) -> bool:
     return any(masked(reading, kept) != reading for reading in _read_back(address))
 
 
-def masked_json(value: JsonValue, values: Iterable[str]) -> JsonValue:
+def masked_json(value: JsonValue, values: Iterable[str], mask: str = MASK) -> JsonValue:
     """``value`` with each of its strings masked as :func:`masked` masks text, its keys among them, all the way down."""
     kept: tuple[str, ...] = tuple(values)
     if isinstance(value, str):
-        return masked(value, kept)
+        return masked(value, kept, mask)
     if isinstance(value, list):
-        return [masked_json(item, kept) for item in value]
+        return [masked_json(item, kept, mask) for item in value]
     if isinstance(value, dict):
-        return {masked(key, kept): masked_json(item, kept) for key, item in value.items()}
+        return {masked(key, kept, mask): masked_json(item, kept, mask) for key, item in value.items()}
     return value
+
+
+def mask_error(error: DotError, values: Iterable[str], mask: str = MASK) -> None:
+    """Mask ``values`` in ``error``'s words and in its context, which the model reads as well (``str`` of the error),
+    and in the address a refused one names."""
+    kept: tuple[str, ...] = tuple(values)
+    error.message = masked(error.message, kept, mask)
+    error.context = {key: masked_json(item, kept, mask) for key, item in error.context.items()}
+    if isinstance(error, ForbiddenUrlError):
+        error.url = masked(error.url, kept, mask)

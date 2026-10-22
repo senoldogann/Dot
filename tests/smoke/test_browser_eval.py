@@ -29,7 +29,7 @@ from dotagent.agent.verify import new_facts
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ScriptRun
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
-from dotagent.core.errors import BrowserError
+from dotagent.core.errors import BrowserError, ForbiddenUrlError
 from dotagent.core.paths import workspace_dir
 from dotagent.policy.engine import preset_verdict
 from dotagent.policy.types import ActionInfo, Preset
@@ -323,14 +323,66 @@ async def test_the_tool_keeps_a_script_off_a_page_with_a_secret_field_and_hides_
     refused: PreparedCall = await eval_tool.prepare({"script": "document.querySelector('input').value"}, ctx)
     with pytest.raises(BrowserError, match="a script stays off a page that holds a password"):
         await refused.run(ctx)
-    yolo: ToolContext = replace(ctx, approvals="yolo")
-    shown: ToolResult = await (await eval_tool.prepare({"script": "document.querySelector('input').value"}, yolo)).run(
-        yolo
-    )
-    assert (shown.is_error, "hunter2" in shown.text) == (False, True)
     await ctx.browser.open_url(ctx.thread_id, f"{site}/", True)
     script: str = "() => { document.cookie = 'session=abcdef0123456789; path=/'; return document.cookie; }"
     hidden: ToolResult = await (await eval_tool.prepare({"script": script}, ctx)).run(ctx)
     assert "abcdef0123456789" not in hidden.text and "session=[hidden]" in hidden.text, hidden.text
+    # A yolo run, in a chat of its own, reads all it is shown: the page with the field, and the cookie.
+    yolo: ToolContext = replace(await _run_context(runtime), approvals="yolo")
+    await yolo.browser.open_url(yolo.thread_id, f"{site}/login", True)
+    shown: ToolResult = await (await eval_tool.prepare({"script": "document.querySelector('input').value"}, yolo)).run(
+        yolo
+    )
+    assert (shown.is_error, "hunter2" in shown.text) == (False, True)
+    await yolo.browser.open_url(yolo.thread_id, f"{site}/", True)
     visible: ToolResult = await (await eval_tool.prepare({"script": "document.cookie"}, yolo)).run(yolo)
     assert "session=abcdef0123456789" in visible.text, visible.text
+
+
+async def test_a_refused_address_that_carries_a_cookie_is_told_without_it(browser: BrowserSession, site: str) -> None:
+    """The refusal of a forbidden address names it, and a script may have put a cookie there (item 533)."""
+    await browser.open_url("cookie-away", f"{site}/", True)
+    await browser.run_script(
+        "cookie-away", "() => { document.cookie = 'session=abcdef0123456789; path=/'; }", 5.0, False
+    )
+    forbidden: str = site.replace("127.0.0.1", "localhost") + "/next?c="
+    with pytest.raises(ForbiddenUrlError) as refused:
+        await browser.run_script(
+            "cookie-away",
+            f"() => {{ location.href = {json.dumps(forbidden)} + encodeURIComponent(document.cookie); }}",
+            5.0,
+            True,
+        )
+    assert "may not be opened" in str(refused.value) and "[hidden]" in refused.value.url
+    assert "abcdef0123456789" not in str(refused.value) and "abcdef0123456789" not in refused.value.url
+
+
+async def test_a_cookie_a_script_overwrites_or_deletes_is_hidden_too(browser: BrowserSession, site: str) -> None:
+    await browser.open_url("cookie-over", f"{site}/", True)
+    await browser.run_script(
+        "cookie-over", "() => { document.cookie = 'session=abcdef0123456789; path=/'; }", 5.0, False
+    )
+    ran: ScriptRun = await browser.run_script(
+        "cookie-over",
+        "() => { const had = document.cookie; document.cookie = 'session=x; path=/'; return had; }",
+        5.0,
+        True,
+    )
+    assert "abcdef0123456789" not in ran.text and "session=[hidden]" in ran.text, ran
+
+
+async def test_the_cookies_a_script_ran_with_stay_out_of_every_later_result_of_the_chat(
+    runtime: Runtime, site: str
+) -> None:
+    """A script that wrote a cookie into the page or its address is no way round the hiding: what the chat's tools give
+    back afterwards shows none of it (item 533)."""
+    ctx: ToolContext = await _run_context(runtime)
+    tools = runtime.registry.tools
+    await ctx.browser.open_url(ctx.thread_id, f"{site}/", True)
+    sets: str = "() => { document.cookie = 'session=abcdef0123456789; path=/'; return 1; }"
+    await (await tools["browser_eval"].prepare({"script": sets}, ctx)).run(ctx)
+    copies: str = "() => { document.body.append(document.cookie); location.hash = document.cookie; return 1; }"
+    await (await tools["browser_eval"].prepare({"script": copies}, ctx)).run(ctx)
+    for name in ("browser_read_text", "browser_snapshot"):
+        seen: ToolResult = await (await tools[name].prepare({}, ctx)).run(ctx)
+        assert "abcdef0123456789" not in seen.text and "[hidden]" in seen.text, (name, seen.text)
