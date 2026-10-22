@@ -19,6 +19,7 @@ from dotagent.store.backup import (
     Backup,
     backup_state,
     changed_since,
+    copied_before,
     keep_backups,
     list_backups,
     make_backup,
@@ -173,7 +174,7 @@ def test_the_doctor_says_whether_the_copies_are_fresh(tmp_path: Path) -> None:
     folder.mkdir()
     _copy_at(folder, NOW - 1800.0)
     os.utime(database, (NOW - 3600.0, NOW - 3600.0))
-    assert backup_state(_store(folder), database, NOW) == (True, f"the newest of 1 copies is 0.5 h old, in {folder}")
+    assert backup_state(_store(folder), database, NOW) == (True, f"the only copy is 0.5 h old, in {folder}")
     # A quiet night: nothing changed, so no copy was due, and the old one is not late.
     assert backup_state(_store(folder), database, NOW + 8 * 3600.0)[0] is True
     # Written after the newest copy, and no copy for hours: late.
@@ -192,6 +193,23 @@ def test_a_folder_that_cannot_be_read_is_a_row_of_its_own(tmp_path: Path) -> Non
     finally:
         folder.chmod(0o700)
     assert fresh is False and said.startswith(f"{folder} cannot be read: ")
+
+
+def test_a_copy_named_after_now_holds_no_copy_back(tmp_path: Path) -> None:
+    """A copy named after now (a clock that was ahead, another Mac's) says nothing of what was copied when: the loop
+    and the doctor go by the newest copy named before now."""
+    database: Path = _database(tmp_path / "dot.sqlite3", 3)
+    folder: Path = tmp_path / "copies"
+    folder.mkdir()
+    ahead: Path = _copy_at(folder, NOW + 86400.0)
+    assert copied_before(list_backups(folder), NOW) == []
+    fresh, said = backup_state(_store(folder), database, NOW)
+    assert fresh is False and "named after now" in said
+    _copy_at(folder, NOW - 1800.0)
+    assert Path(list_backups(folder)[0].path) == ahead
+    assert [copy.made_at for copy in copied_before(list_backups(folder), NOW)] == [NOW - 1800.0]
+    os.utime(database, (NOW - 3600.0, NOW - 3600.0))
+    assert backup_state(_store(folder), database, NOW) == (True, f"the newest of 2 copies is 0.5 h old, in {folder}")
 
 
 def test_a_copy_clears_what_a_copy_cut_off_left_and_nothing_else(tmp_path: Path, home: Path) -> None:

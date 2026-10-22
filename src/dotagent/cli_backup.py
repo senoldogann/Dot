@@ -45,7 +45,8 @@ async def cmd_backup_list() -> int:
         sys.stdout.write(f"No copies in {folder}.\n")
         return 0
     now: float = time.time()
-    sys.stdout.write(f"{len(copies)} copies in {folder}, newest first:\n")
+    counted: str = "1 copy" if len(copies) == 1 else f"{len(copies)} copies"
+    sys.stdout.write(f"{counted} in {folder}, newest first:\n")
     for copy in copies:
         sys.stdout.write(f"  {Path(copy.path).name}  {_size(copy.size)}  {_age(copy.made_at, now)}\n")
     return 0

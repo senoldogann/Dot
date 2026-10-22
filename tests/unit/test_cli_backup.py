@@ -38,4 +38,4 @@ async def test_backup_now_copies_the_database_and_list_lists_it(home: Path, caps
     assert made.startswith(f"Copied the database to {home / 'backups'}/dot-") and made.rstrip().endswith("MiB).")
     assert await dispatch(BackupListCommand(name="backup-list")) == 0
     listed: str = capsys.readouterr().out
-    assert listed.startswith(f"1 copies in {home / 'backups'}, newest first:") and ".sqlite3.gz" in listed
+    assert listed.startswith(f"1 copy in {home / 'backups'}, newest first:") and ".sqlite3.gz" in listed

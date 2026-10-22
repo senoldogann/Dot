@@ -96,6 +96,12 @@ def list_backups(folder: Path) -> list[Backup]:
     return sorted(found, key=lambda backup: backup.made_at, reverse=True)
 
 
+def copied_before(copies: list[Backup], now: float) -> list[Backup]:
+    """The copies named before ``now``, newest first: one named after (a clock that was ahead, a copy of another
+    Mac's) says nothing of what was copied when."""
+    return [copy for copy in copies if copy.made_at <= now]
+
+
 def changed_since(database: Path, moment: float) -> bool:
     """Whether the database file or its write-ahead log was written after ``moment``."""
     written: list[float] = [
@@ -154,9 +160,13 @@ def make_backup(database: Path, folder: Path, now: float) -> Backup:
             source.close()
         if checked is None or checked[0] != "ok":
             raise StoreError("the copy of the database is damaged", {"database": str(database), "check": repr(checked)})
-        with raw.open("rb") as plain, gzip.open(packing, "wb", compresslevel=6) as packed:
+        # Opened private from the start: a folder the owner chose may let others of this Mac read what is in it.
+        with (
+            raw.open("rb") as plain,
+            os.fdopen(os.open(packing, os.O_CREAT | os.O_EXCL | os.O_WRONLY, _FILE_MODE), "wb") as out,
+            gzip.GzipFile(fileobj=out, mode="wb", compresslevel=6) as packed,
+        ):
             shutil.copyfileobj(plain, packed, 1 << 20)
-        packing.chmod(_FILE_MODE)
         try:
             # A link, not a rename: a copy made in the same second by another process stays as it is.
             os.link(packing, final)
@@ -195,10 +205,12 @@ async def keep_backups(config: StoreConfig, database: Path) -> None:
     while True:
         try:
             copies: list[Backup] = await asyncio.to_thread(list_backups, folder)
-            last: float | None = copies[0].made_at if copies else None
+            # A copy named after now (a clock that was ahead, a copy of another Mac's) says nothing of what was copied
+            # when: the loop goes by the newest copy named before now (:func:`copied_before`).
+            past: list[Backup] = copied_before(copies, time.time())
+            last: float | None = past[0].made_at if past else None
             if last is not None:
-                # Never longer than an interval: a copy named from a clock ahead must not hold the next one back.
-                await asyncio.sleep(min(every_s, max(0.0, last + every_s - time.time())))
+                await asyncio.sleep(max(0.0, last + every_s - time.time()))
                 if not await asyncio.to_thread(changed_since, database, last):
                     # Nothing to copy: look again soon, so that a write after a quiet spell is copied soon too.
                     await asyncio.sleep(min(every_s, _QUIET_POLL_S))
@@ -230,7 +242,12 @@ def backup_state(config: StoreConfig, database: Path, now: float) -> tuple[bool,
         return False, f"{folder} cannot be read: {error}"
     if not copies:
         return False, f"no copy yet in {folder} (the daemon makes one as it starts)"
-    hours: float = (now - copies[0].made_at) / 3600.0
-    late: bool = hours > 2 * config.backup_every_hours + 1 and changed_since(database, copies[0].made_at)
-    said: str = f"the newest of {len(copies)} copies is {hours:.1f} h old, in {folder}"
+    # As the daemon's loop goes: by the newest copy named before now.
+    past: list[Backup] = copied_before(copies, now)
+    if not past:
+        return False, f"every copy in {folder} is named after now (a clock that was ahead); a new one is made soon"
+    hours: float = (now - past[0].made_at) / 3600.0
+    late: bool = hours > 2 * config.backup_every_hours + 1 and changed_since(database, past[0].made_at)
+    counted: str = "the only copy" if len(copies) == 1 else f"the newest of {len(copies)} copies"
+    said: str = f"{counted} is {hours:.1f} h old, in {folder}"
     return not late, said if not late else f"{said}: older than [store] backup_every_hours asks"
