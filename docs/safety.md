@@ -87,6 +87,17 @@ currency, so list sites that bill in one currency. Empty by default.
 4. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
    yourself. A payment under the pre-approved caps of its site (above) is a question instead of a hand-off, unless
    one of your rules hands that step to you (item 385): the caps stand in for the money hand-off, not for your rules.
+   A click is about money when its control's label asks for it: at the start of the label or of a sentence in it,
+   after a stop, a dot, a bar, a dash, a colon or a new line ("Pay $19.90", "Buy", "Order now", "Lamp — $9.90 —
+   Buy", "Öde", "Maksa"), anywhere in it ("Place order", "Confirm and pay", "Complete checkout", "Satın al"), or with
+   an amount in the label next to a verb that offers something for it ("Rent HD $3.99", "Subscribe for €4.99/month",
+   "Book 2 tickets · $40", "Book 1500 TL", "Book: $199"). "Order", "Book" and "Reserve" with an amount count unless
+   the word is followed by "#" or by "summary", "history", "details", "status", "number", "total" or "price", which
+   make the label a record ("Order #4521 · $45.00 · Delivered", "Order summary · $45.00"); a row of past orders that
+   shows its number without "#" hands the click off. A dialog that asks to confirm is judged by the same words,
+   without that exception: there, an order's number is the order about to be paid. The way to the
+   payment page ("Checkout", "Continue to payment") is an ordinary click, so the run fills the order and the button
+   that pays is the one handed to you (item 522).
 5. *The guard* (item 429): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode that asks,
