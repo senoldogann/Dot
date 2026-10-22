@@ -435,6 +435,12 @@ class AsideRequest(FrozenModel):
     text: str = Field(min_length=1, max_length=_TEXT_CHARS)
 
 
+class RecapRequest(FrozenModel):
+    """Write a recap of a run (item 536): when one is due, or with ``force`` whether or not (the section's button)."""
+
+    force: bool = False
+
+
 class DecisionRequest(FrozenModel):
     """Approve or deny. For a question the run asked, ``note`` carries the answer."""
 

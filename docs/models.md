@@ -6,7 +6,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | ------------------- | ----------------------------------------------------------------------------------------- | --------------------------- |
 | `main`              | the agent loop of a run that names no model; Settings › Models sets it                    | `ollama:minimax-m2.7:cloud` |
 | `vision`            | describing the images a tool returns, when `main` cannot see them; Settings › Models sets it | `ollama:gemma4:cloud`    |
-| `fast`              | writing the summary of a compaction (see [Tools](runs.md#tools)); Settings › Models sets it      | `ollama:gpt-oss:20b-cloud`  |
+| `fast`              | writing the summary of a compaction (see [Tools](runs.md#tools)) and a run's recap (its page's Run tab, item 536); Settings › Models sets it | `ollama:gpt-oss:20b-cloud`  |
 | `search`            | relaying a web search through the Anthropic API's own search tool (see [Tools](runs.md#tools))   | `anthropic:claude-haiku-5-5` |
 | `review`            | answering the policy's questions in `auto` approvals, checking a run against its goal, and drawing its lessons; Settings › Models sets it | `ollama:minimax-m2.7:cloud` |
 | `effort`            | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
