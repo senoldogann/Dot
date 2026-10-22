@@ -51,7 +51,7 @@ from dotagent.core.errors import (
 from dotagent.core.jsonutil import parse_json_object
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import opencode_dir
-from dotagent.core.text import redact_json, redact_secrets, truncate_middle
+from dotagent.core.text import redact_json, redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.opencode import OpenCodeProvider
 from dotagent.llm.router import ModelRef, parse_model_ref
@@ -78,6 +78,7 @@ from dotagent.policy.paths import expand_path
 from dotagent.policy.shell import ShellAssessment, assess_shell
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime
+from dotagent.secrets import known_secrets
 from dotagent.store.models import AgentRecord, RunMode
 from dotagent.tools.base import ToolResult
 from dotagent.tools.channels import Channel
@@ -505,8 +506,10 @@ class _Follow:
         if not call.announced:
             call.announced = True
             step.tools.append(name)
+            # The secrets Dot holds are masked word for word, as the executor masks those of its own calls (item 525).
+            known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
             await self.emit(
-                "tool_call", {"call_id": event.call_id, "tool": name, "args": redact_json(event.input)}, True
+                "tool_call", {"call_id": event.call_id, "tool": name, "args": redact_json(event.input, known)}, True
             )
         if event.status == "running":
             return
@@ -514,7 +517,7 @@ class _Follow:
         if ok and call.action is not None:
             self.agent.gate.observe(call.action)
             self.runtime.peers.saw(self.agent.run.id, name, call.action)
-        text: str = event.output if ok else event.error
+        text: str = redact_known(event.output if ok else event.error, await asyncio.to_thread(known_secrets))
         seconds: float = (
             (event.ended_ms - event.started_ms) / 1000
             if event.ended_ms is not None and event.started_ms is not None

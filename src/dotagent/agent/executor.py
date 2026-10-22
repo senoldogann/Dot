@@ -19,10 +19,11 @@ from dotagent.core.errors import (
     ToolInputError,
 )
 from dotagent.core.logs import get_logger
-from dotagent.core.text import redact_json, redact_secrets, strip_blobs_keep_text, truncate_middle
+from dotagent.core.text import redact_json, redact_known, strip_blobs_keep_text, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolCall, invalid_arguments_text
 from dotagent.policy.types import ActionInfo
+from dotagent.secrets import known_secrets
 from dotagent.tools.apple import APPLE_SCRIPT_TOOL, script_apps
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult, fail, ok
 from dotagent.tools.channels import channel_of
@@ -44,10 +45,11 @@ class ToolOutcome:
     action: ActionInfo | None
 
 
-def _safe_json(value: JsonObject) -> JsonObject:
+def _safe_json(value: JsonObject, known: Sequence[str]) -> JsonObject:
     # A command or a script longer than a blob's size stays readable in the call's row; only a picture's base64 goes.
-    # Secrets are masked first: a cut in the middle of a key would leave halves no pattern knows (item 431).
-    sanitized = strip_blobs_keep_text(redact_json(value), _EVENT_TEXT_CHARS)
+    # Secrets are masked first: a cut in the middle of a key would leave halves no pattern knows (item 431), and the
+    # secrets Dot holds (``known``) word for word, whatever their form (item 525).
+    sanitized = strip_blobs_keep_text(redact_json(value, known), _EVENT_TEXT_CHARS)
     return sanitized if isinstance(sanitized, dict) else {}
 
 
@@ -215,8 +217,13 @@ async def _execute_one(
     call: ToolCall, registry: ToolRegistry, hidden: Mapping[str, str], ctx: ToolContext, gate: RunGate
 ) -> ToolOutcome:
     started: float = time.monotonic()
+    # The secrets Dot holds, masked in the step's events as the forms of keys are.
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
     await ctx.runtime.bus.emit(
-        ctx.run_id, "tool_call", {"call_id": call.id, "tool": call.name, "args": _safe_json(call.arguments)}, True
+        ctx.run_id,
+        "tool_call",
+        {"call_id": call.id, "tool": call.name, "args": _safe_json(call.arguments, known)},
+        True,
     )
     tool: RegisteredTool | None = registry.tools.get(call.name)
     action: ActionInfo | None = None
@@ -254,7 +261,7 @@ async def _execute_one(
             "call_id": call.id,
             "tool": call.name,
             "ok": not clipped.is_error,
-            "text": truncate_middle(redact_secrets(clipped.text), _EVENT_TEXT_CHARS),
+            "text": truncate_middle(redact_known(clipped.text, known), _EVENT_TEXT_CHARS),
             "images": list(files),
             "seconds": round(seconds, 2),
             "waited_s": round(waited_s, 2),

@@ -124,12 +124,15 @@ async def test_a_yolo_run_that_read_a_page_does_not_send_a_secret_it_was_told_to
                 )
                 assert (sent.data["tool"], sent.data["ok"]) == ("web_fetch", False), sent.data
                 assert "send a secret out of the Mac" in str(sent.data["text"]), sent.data
-                # The secret is masked in the record, as every secret Dot holds is.
+                # The secret is masked in the result, as every secret Dot holds is in a step's events.
                 assert HELD not in str(sent.data["text"])
                 # So is it in the record of the refusal.
                 policy: list[EventRecord] = await runtime.store.events_of_kind(run.id, "policy", 10)
                 assert [event.data["source"] for event in policy] == ["taint"], policy
                 assert HELD not in str(policy[0].data), policy[0].data
+                # And in the record of the call itself, whose arguments held it.
+                calls: list[EventRecord] = await runtime.store.events_of_kind(run.id, "tool_call", 10)
+                assert len(calls) == 3 and all(HELD not in str(event.data) for event in calls), calls
     finally:
         next(site_iterator, None)
     # The page was read, and the address it named never got the request.

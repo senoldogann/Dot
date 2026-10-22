@@ -265,16 +265,17 @@ def strip_blobs_keep_text(value: JsonValue, text_chars: int) -> JsonValue:
     return value
 
 
-def redact_json(value: JsonValue) -> JsonValue:
-    """Mask secrets inside every string of a JSON value, and the whole string of a field whose name names a secret
-    (``{"password": "hunter2"}``), however it looks."""
+def redact_json(value: JsonValue, known: Sequence[str] = ()) -> JsonValue:
+    """Mask secrets inside every string of a JSON value, ``known`` (the secrets Dot holds) word for word too
+    (:func:`redact_known`), and the whole string of a field whose name names a secret (``{"password": "hunter2"}``),
+    however it looks."""
     if isinstance(value, str):
-        return redact_secrets(value)
+        return redact_known(value, known)
     if isinstance(value, list):
-        return [redact_json(item) for item in value]
+        return [redact_json(item, known) for item in value]
     if isinstance(value, dict):
         return {
-            key: "***" if isinstance(item, str) and item and _SECRET_FIELD.fullmatch(key) else redact_json(item)
+            key: "***" if isinstance(item, str) and item and _SECRET_FIELD.fullmatch(key) else redact_json(item, known)
             for key, item in value.items()
         }
     return value
