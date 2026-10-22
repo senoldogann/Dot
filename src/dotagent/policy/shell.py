@@ -1701,16 +1701,22 @@ def _assess_redirects(targets: list[str], scope: ShellScope) -> list[Finding]:
     return findings
 
 
-def _protected_words(words: list[str], scope: ShellScope) -> list[Finding]:
+# The commands that move the line to another folder and read nothing: what it reads after the move is judged from where
+# it lands (``cd "$(dirname "$f")/.."`` is no step toward a protected location).
+_MOVES: frozenset[str] = frozenset({"cd", "pushd", "popd"})
+
+
+def _protected_words(words: list[str], scope: ShellScope, *, reads: bool = True) -> list[Finding]:
     """A finding when a word names a protected location: as a path (a glob that can reach one, a path through a link
     the line made or a variable it set), or as the value of an assignment or an option (``K=~/.ssh``,
     ``--key=~/.ssh/id``), or as the file a command reads after an at sign (curl's ``--data-binary @~/.ssh/id``, item
-    385; ``@-`` is the standard input)."""
+    385; ``@-`` is the standard input). Unless the command ``reads`` nothing, a word that may lead into one without
+    saying so (:func:`_leads_toward_protected`) is a finding too."""
     parts: list[str] = [part for word in words for part in (word, word.partition("=")[2]) if part]
     candidates: list[str] = [*parts, *(part[1:] for part in parts if part.startswith("@") and part != "@-")]
     if any(_reaches_protected(candidate, scope) for candidate in candidates):
         return [_finding("high", ("secret_access",), "names a protected location")]
-    if any(_leads_toward_protected(candidate, scope) for candidate in candidates):
+    if reads and any(_leads_toward_protected(candidate, scope) for candidate in candidates):
         return [
             _maybe_protected(
                 "names a path that may lie in a protected location: part of it is only known when the line runs"
@@ -1742,28 +1748,38 @@ def _unknown_parts(text: str, scope: ShellScope) -> list[re.Match[str]]:
 
 def _leads_toward_protected(raw: str, scope: ShellScope) -> bool:
     """Whether ``raw``, a word with a part only the running line knows, can name a protected location or a file inside
-    one (item 531): what it says before that part is the start of a protected location's path, letter case aside
+    one (item 531). What it says before that part is the start of a protected location's path, letter case aside
     (``~/.s`` of ``~/.s$(echo sh)/id_rsa``, ``~/Library/`` of ``~/Library/${X:-Safari}/History.db``), or lies inside
-    one, whatever the part turns out to be; or what it says after the last such part begins with the end of a protected
-    location's path, since the part may climb out of the folder before it (``~/Documents/$(echo ..)/.ssh/id_rsa``). A
-    part that begins the word stands for the home folder, where the protected locations are, as in
-    :func:`_reaches_protected`. A word that is known whole is judged by that. What the part itself says is not read: one
-    that holds the protected folder's own name (``~/Documents/$(echo ../.ssh)/id_rsa``) is not told."""
+    one, whatever the part turns out to be; a part that begins the word stands for the home folder, where the protected
+    locations are, as in :func:`_reaches_protected`. What it says after the last such part begins with the end of a
+    protected location's path, since the part may lead out of the folder before it
+    (``~/Documents/$(echo ..)/.ssh/id_rsa``, ``$(pwd)/../.ssh/id_rsa``). And a word that climbs (``..``) in the part it
+    knows is not told from one that reaches a protected location, whatever the unknown part is. What the part itself
+    says is not read: one that holds the protected folder's own name (``~/Documents/$(echo ../.ssh)/id_rsa``) is not
+    told. A word that is known whole is judged by :func:`_reaches_protected`."""
+    parts: list[re.Match[str]] = _unknown_parts(raw, scope)
+    if not parts:
+        return False
+    known: list[str] = [
+        raw[begin:stop]
+        for begin, stop in zip(
+            [0, *(part.end() for part in parts)], [*(part.start() for part in parts), len(raw)], strict=True
+        )
+    ]
+    if ".." in "\0".join(known).split("/") or _ends_a_path_into_protected(known[-1], scope):
+        return True
     text: str = raw
     for _ in range(_MOST_UNKNOWN):
-        parts: list[re.Match[str]] = _unknown_parts(text, scope)
-        if not parts:
+        found: list[re.Match[str]] = _unknown_parts(text, scope)
+        if not found:
             return False
-        if parts[0].start() == 0:
-            text = str(Path.home()) + text[parts[0].end() :]
+        if found[0].start() == 0:
+            text = str(Path.home()) + text[found[0].end() :]
             continue
-        starts: list[str] | None = _expansions(text[: parts[0].start()], scope)
-        return (
-            starts is not None
-            and any(
-                _starts_a_path_into_protected(expand_path(start, cwd), scope) for start in starts for cwd in scope.cwds
-            )
-        ) or _ends_a_path_into_protected(text[parts[-1].end() :], scope)
+        starts: list[str] | None = _expansions(text[: found[0].start()], scope)
+        return starts is not None and any(
+            _starts_a_path_into_protected(expand_path(start, cwd), scope) for start in starts for cwd in scope.cwds
+        )
     return False
 
 
@@ -3156,8 +3172,10 @@ def _assess_segment(
     """Judge one simple command of the line as written (redirects included), and the scope it leaves."""
     words, targets, emptied, text = _split_redirects(segment, documents)
     given: _Input = piped if text is None else _given_text(text)
+    plain: list[str] = _plain(words)
+    moves: bool = bool(plain) and Path(plain[0]).name in _MOVES
     findings: list[Finding] = [
-        *_protected_words([word for word in segment if not _is_redirect(word)], scope),
+        *_protected_words([word for word in segment if not _is_redirect(word)], scope, reads=not moves),
         *_assess_simple(words, scope, given),
         *_assess_redirects(targets, scope),
         *_replacing(emptied, [], scope),

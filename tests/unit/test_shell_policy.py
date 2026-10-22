@@ -709,6 +709,12 @@ _NAMED_BY_PIECES: list[str] = [
     "cat ~/Documents/$(echo ..)/.ssh/id_rsa",
     "cat ./notes/$(date +%F)/.aws/credentials",
     "cat /tmp/$(whoami)/Library/Safari/History.db",
+    # The end is read whether the unknown part begins the word or not, and a climb beside an unknown part is not told
+    # from a way to a protected location.
+    'cat "$(pwd)/../.ssh/id_rsa"',
+    'cat "$X/../.ssh/id_rsa"',
+    "cat ~/Documents/$(echo ..)/x/../.ssh/id_rsa",
+    'cat "$(echo ~/Library)/Safari/History.db"',
 ]
 _WALKING_THEM: list[str] = [
     "find ~/Library -name History.db -exec cat {} \\;",
@@ -796,6 +802,10 @@ _NOT_AFTER_THEM: list[str] = [
     "echo $(find ./src -name '*.py')",
     "find ~ -name '*.pdf' | wc -l",
     "cat ./build/$(uname)/out.log",
+    # A move reads nothing; what is read after it is judged from where it lands.
+    'cd "$(dirname "$f")/.."',
+    "cd $(git rev-parse --show-toplevel)/..",
+    'cd "$(dirname "$0")/.." && ls',
     "cat ~/Documents/$(date +%Y)/notes.md",
     "cat $(find ./src -name '*.py')",
     "n=$(find ~ -name '*.pdf' | wc -l); echo $n",
