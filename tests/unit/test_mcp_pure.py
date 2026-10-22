@@ -28,7 +28,7 @@ from dotagent.config import McpServerConfig, load_config
 from dotagent.core.errors import ConfigError, McpError
 from dotagent.core.types import JsonObject
 from dotagent.harness.components import NO_HARNESS
-from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS, select_tools
+from dotagent.mcp.hub import select_tools
 from dotagent.mcp.naming import MAX_NAME_CHARS, exposed_name, require_distinct_names
 from dotagent.mcp.types import McpTool, ToolHints
 from dotagent.policy.engine import decide
@@ -106,17 +106,14 @@ def _server(allow: tuple[str, ...]) -> McpServerConfig:
     )
 
 
-def test_a_server_with_few_tools_hands_them_all_over() -> None:
-    tools: tuple[McpTool, ...] = _plain_tools(MAX_UNFILTERED_TOOLS)
+def test_a_server_without_an_allow_list_hands_over_every_tool_however_many() -> None:
+    """Item 524: no number of tools leaves a server out; the 30 Dot once took without a choice is gone."""
+    tools: tuple[McpTool, ...] = _plain_tools(120)
     assert select_tools(_server(()), tools) == tools
 
 
-def test_a_server_with_many_tools_needs_an_allow_list() -> None:
-    tools: tuple[McpTool, ...] = _plain_tools(MAX_UNFILTERED_TOOLS + 1)
-    with pytest.raises(McpError) as caught:
-        select_tools(_server(()), tools)
-    assert caught.value.context["tools"] == MAX_UNFILTERED_TOOLS + 1
-    chosen: tuple[McpTool, ...] = select_tools(_server(("tool007", "tool003", "tool007")), tools)
+def test_an_allow_list_hands_over_its_tools_once_each_in_its_own_order() -> None:
+    chosen: tuple[McpTool, ...] = select_tools(_server(("tool007", "tool003", "tool007")), _plain_tools(120))
     assert [tool.remote_name for tool in chosen] == ["tool007", "tool003"]
 
 

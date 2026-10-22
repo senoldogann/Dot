@@ -129,11 +129,16 @@ The ways a service connects:
   server offers by default, are that page's words and code, and stay out of a run's tools; a server added before keeps
   the arguments it was added with.
 
-**Choose tools** (item 426): a server added here that offers more tools than a model gets at once (30) is left out, and
-its row says so; its **Choose tools** opens the list of every tool it offers with what each says it does, of which you
-tick 1 to 30. **Save** connects the server with those and keeps the choice with it, so a restart offers the same ones; a
-server that does not answer leaves the choice unwritten and the button stays. A server you signed in to (Linear,
-Postman) lists and connects its tools with that sign-in, so the choice asks for none again (item 499).
+**Choose tools** (items 426 and 524): a server offers a run every tool it lists, however many. With the default
+`[agent] tool_surface = "full"` each step of a run carries the definition of every one of them, so a server of many
+tools makes every request longer; `tool_surface = "grouped"` keeps a server's tools out of a run until it turns the
+server's group on. **Choose tools**, on the row of a server added here that runs, opens the list of every tool it offers
+with what each says it does, all of them ticked until you choose, and **All tools** ticks or unticks them at once.
+**Save** connects the server with the ticked ones and keeps the choice with it, so a restart offers the same ones; with
+every one ticked it keeps no list, and the tools the server adds later are offered too. A server left out with a list
+of tools keeps the button, to choose the list again (it may name a tool the server no longer offers). A server that
+does not answer leaves the choice unwritten and the button stays. A server you signed in to (Linear, Postman) lists and connects its tools with
+that sign-in, so the choice asks for none again (item 499).
 
 **Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
 command that starts it on this Mac, added as the services are. Connected lists, besides the services, every server Dot
@@ -208,7 +213,7 @@ name = "notes"                              # a-z, 0-9 and -, starting with a le
 command = "npx"                             # started with the PATH of your login shell
 args = ["-y", "some-mcp-server"]
 env = { NOTES_TOKEN = "${NOTES_TOKEN}" }    # ${NAME} is looked up like an API key
-allow = ["search", "read_note"]             # offer only these tools; empty = all of them (at most 30)
+allow = ["search", "read_note"]             # offer only these tools; empty = all of them, however many
 enabled = true
 startup_timeout_s = 60.0
 call_timeout_s = 120.0
