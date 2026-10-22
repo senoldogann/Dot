@@ -48,20 +48,22 @@ those files and journals, and gives the space back to the disk, after which a de
 database is locked for a moment while it compacts, so run it when no run is active.
 
 **Copies of the database** (item 526). While the daemon runs, it copies the database every `[store] backup_every_hours`
-hours (1), and as it starts when no copy is younger, whenever the database changed since the last copy. SQLite's online
-backup makes the copy in one read of the database, which in its write-ahead mode holds back none of the daemon's writes,
-so runs go on while it is made; the copy is checked (`quick_check`), compressed and kept as `dot-<UTC time>.sqlite3.gz`
+hours (1), and as it starts when no copy is younger, whenever the database changed since the last copy; a database found
+unchanged is looked at again every ten minutes, so a write after a quiet spell is copied soon. SQLite's online backup
+makes the copy in one read of the database, which in its write-ahead mode holds back none of the daemon's writes, so
+runs go on while it is made; the copy is checked (`quick_check`), compressed and kept as `dot-<UTC time>.sqlite3.gz`
 (mode 0600) in `[store] backup_dir`, written under a hidden name and renamed once whole. The newest `backup_keep_hourly`
 (24) copies are kept, and the newest copy of each of the last `backup_keep_days` (14) days; only files named as copies
 are ever removed from the folder. An empty `backup_dir` is `<home>/backups`, which goes with the home folder if that is
 lost: point it at an external disk, or at iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs/Dot Backups`),
 to keep the copies off this Mac. While a copy is made, its uncompressed file is a hidden file of Dot's home (0600),
 removed once compressed; what a copy cut off left is cleared by the next. `backup_every_hours = 0` makes none. `dotx
-backup now` makes one at once and `dotx backup list` lists them; `dotx doctor` says how old the newest is, and calls it
-late only when the database changed since. A copy that fails is logged (`backup_failed`) and tried again ten minutes
-later. To go back to a copy, stop the daemon (`dotx service uninstall`), move `dot.sqlite3` and its `dot.sqlite3-wal`
-and `dot.sqlite3-shm` aside (an old write-ahead log left beside the copy would be applied to it), unpack the copy in its
-place (`gunzip -c <copy> > "<home>/dot.sqlite3"`), and start the daemon again (`dotx service install`).
+backup now` makes one at once and `dotx backup list` lists them; `dotx doctor` says how old the newest is, calls it late
+only when the database changed since, and says so when the folder cannot be read. Two copies made in the same second
+keep the first. A copy that fails is logged (`backup_failed`) and tried again ten minutes later. To go back to a copy,
+stop the daemon (`dotx service uninstall`), move `dot.sqlite3` and its `dot.sqlite3-wal` and `dot.sqlite3-shm` aside (an
+old write-ahead log left beside the copy would be applied to it), unpack the copy in its place (`gunzip -c <copy> >
+"<home>/dot.sqlite3"`), and start the daemon again (`dotx service install`).
 
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log` (another folder with `DOT_LOG_DIR`: `dotx service status`
 names the one in use, and the sign-in screen of a daemon that could not answer points to it); at 10 MB it is moved to

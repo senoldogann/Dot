@@ -107,6 +107,16 @@ def test_a_copy_finishes_while_another_connection_writes(tmp_path: Path) -> None
     assert Path(made.path).stat().st_size == made.size > 0
 
 
+def test_a_copy_made_in_the_same_second_leaves_the_first_as_it_is(tmp_path: Path) -> None:
+    database: Path = _database(tmp_path / "dot.sqlite3", 3)
+    folder: Path = tmp_path / "copies"
+    first: Backup = make_backup(database, folder, NOW)
+    kept: int = Path(first.path).stat().st_ino
+    second: Backup = make_backup(database, folder, NOW)
+    assert second.path == first.path and Path(first.path).stat().st_ino == kept
+    assert [child.name for child in folder.iterdir()] == [Path(first.path).name]
+
+
 def test_there_is_no_copy_of_a_database_that_is_not_there(tmp_path: Path) -> None:
     with pytest.raises(StoreError, match="no database to copy"):
         make_backup(tmp_path / "missing.sqlite3", tmp_path / "copies", NOW)
@@ -170,6 +180,18 @@ def test_the_doctor_says_whether_the_copies_are_fresh(tmp_path: Path) -> None:
     os.utime(database, (NOW + 3600.0, NOW + 3600.0))
     fresh, said = backup_state(_store(folder), database, NOW + 8 * 3600.0)
     assert fresh is False and "older than [store] backup_every_hours asks" in said
+
+
+def test_a_folder_that_cannot_be_read_is_a_row_of_its_own(tmp_path: Path) -> None:
+    database: Path = _database(tmp_path / "dot.sqlite3", 3)
+    folder: Path = tmp_path / "copies"
+    folder.mkdir()
+    folder.chmod(0o000)
+    try:
+        fresh, said = backup_state(_store(folder), database, NOW)
+    finally:
+        folder.chmod(0o700)
+    assert fresh is False and said.startswith(f"{folder} cannot be read: ")
 
 
 def test_a_copy_clears_what_a_copy_cut_off_left_and_nothing_else(tmp_path: Path, home: Path) -> None:

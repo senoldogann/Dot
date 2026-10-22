@@ -37,8 +37,10 @@ _LEFTOVER_S: float = 3600.0
 _STAMP_FORMAT: str = "%Y%m%d-%H%M%S"
 # How long a copy waits for a write that holds the database before it gives up.
 _BUSY_TIMEOUT_S: float = 30.0
-# A copy that failed is tried again after this long, rather than a whole interval later.
+# A copy that failed is tried again after this long, rather than a whole interval later; and a database found
+# unchanged is looked at again after this long, so a write after a quiet spell waits no longer for its copy.
 _RETRY_S: float = 600.0
+_QUIET_POLL_S: float = 600.0
 _FOLDER_MODE: int = 0o700
 _FILE_MODE: int = 0o600
 
@@ -147,7 +149,11 @@ def make_backup(database: Path, folder: Path, now: float) -> Backup:
         with raw.open("rb") as plain, gzip.open(packing, "wb", compresslevel=6) as packed:
             shutil.copyfileobj(plain, packed, 1 << 20)
         packing.chmod(_FILE_MODE)
-        packing.replace(final)
+        try:
+            # A link, not a rename: a copy made in the same second by another process stays as it is.
+            os.link(packing, final)
+        except FileExistsError:
+            log.info("backup_same_second", path=str(final))
     finally:
         raw.unlink(missing_ok=True)
         packing.unlink(missing_ok=True)
@@ -185,8 +191,8 @@ async def keep_backups(config: StoreConfig, database: Path) -> None:
             if last is not None:
                 await asyncio.sleep(max(0.0, last + every_s - time.time()))
                 if not await asyncio.to_thread(changed_since, database, last):
-                    # Nothing to copy: look again a whole interval later.
-                    await asyncio.sleep(every_s)
+                    # Nothing to copy: look again soon, so that a write after a quiet spell is copied soon too.
+                    await asyncio.sleep(min(every_s, _QUIET_POLL_S))
                     continue
             made: Backup = await asyncio.to_thread(make_backup, database, folder, time.time())
             gone: list[Backup] = await asyncio.to_thread(
@@ -207,7 +213,12 @@ def backup_state(config: StoreConfig, database: Path, now: float) -> tuple[bool,
     if config.backup_every_hours == 0:
         # The owner's choice, not a fault.
         return True, f"off ([store] backup_every_hours = 0); {folder} keeps the older copies"
-    copies: list[Backup] = list_backups(folder)
+    try:
+        copies: list[Backup] = list_backups(folder)
+    except OSError as error:
+        # A folder this process may not list (macOS may hold iCloud Drive back from a launchd job): a row of its own,
+        # as the doctor's other checks go on.
+        return False, f"{folder} cannot be read: {error}"
     if not copies:
         return False, f"no copy yet in {folder} (the daemon makes one as it starts)"
     hours: float = (now - copies[0].made_at) / 3600.0
