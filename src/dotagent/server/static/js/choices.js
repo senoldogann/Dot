@@ -16,7 +16,7 @@ import { approvalBadge, approvalLabel, approvalsPicker, goalModePicker } from ".
 import { getSnapshot, loadModels, refresh } from "./state.js";
 import { attempt, toast } from "./ui.js";
 
-export const MODES = [
+const MODES = [
   { id: "task", label: "Task", hint: "Carry the goal out end to end on this Mac", icon: "target" },
   { id: "chat", label: "Chat", hint: "Converse; use tools whenever they help", icon: "message" },
   { id: "research", label: "Research", hint: "Read-only: gather information and report, change nothing", icon: "search" },
@@ -63,7 +63,7 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
 
 /**
  * The pills of a run's choices for the composer `frame` (composer.js), whose frame bounds their menus. `modes` are the
- * modes it offers (`MESSAGE_MODES` for a message, Auto among them, item 495; `MODES` for an agent's). `kept` is where
+ * modes it offers (`MESSAGE_MODES`, Auto among them, item 495, on an agent's page too since item 513). `kept` is where
  * the box starts and keeps them: `mode` (an id of `modes`), `model` (a reference, or "" for the daemon's default),
  * `level` (`read(info)`, the reasoning level chosen for a model, or null for the daemon's; `write(info, level)`, null to
  * go back to the daemon's), `speed` (`read()`, "fast" or "standard"; `write(speed)`: fast mode, which a run asks for

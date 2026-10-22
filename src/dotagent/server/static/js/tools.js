@@ -197,10 +197,107 @@ function section(title, content, copyable) {
   );
 }
 
-/** A tool's name, with a place to break after each `__` (an MCP tool's is `mcp__server__tool`) for a row too narrow for
- * it (item 360). */
-function nameParts(tool) {
-  return tool.split(/(?<=__)/).flatMap((part, index) => (index === 0 ? [part] : [el("wbr", null), part]));
+// What a row calls each of Dot's own tools (item 513): what it does, in a few words, rather than the name a model calls.
+const TOOL_WORDS = {
+  shell: "Command",
+  terminal_open: "Open terminal",
+  terminal_send: "Type in terminal",
+  terminal_read: "Read terminal",
+  terminal_close: "Close terminal",
+  read_file: "Read file",
+  write_file: "Write file",
+  edit_file: "Edit file",
+  list_dir: "List folder",
+  search_files: "Search in files",
+  find_files: "Find files",
+  web_search: "Web search",
+  web_fetch: "Fetch page",
+  web_extract: "Read page",
+  web_crawl: "Crawl site",
+  browser_open: "Open page",
+  browser_new_tab: "New tab",
+  browser_snapshot: "Look at page",
+  browser_find: "Find on page",
+  browser_links: "List links",
+  browser_act: "Act on page",
+  browser_eval: "Run script on page",
+  browser_scroll: "Scroll page",
+  browser_read_text: "Read page text",
+  browser_screenshot: "Screenshot page",
+  browser_wait_text: "Wait for text",
+  browser_back: "Go back",
+  browser_switch_tab: "Switch tab",
+  browser_close_tab: "Close tab",
+  browser_upload: "Upload file",
+  browser_fill_login: "Fill in login",
+  browser_logins: "List logins",
+  desktop_apps: "List apps",
+  desktop_open_app: "Open app",
+  desktop_read: "Read window",
+  desktop_screenshot: "Screenshot screen",
+  desktop_snapshot: "Look at window",
+  desktop_act: "Act in app",
+  desktop_clipboard_read: "Read clipboard",
+  desktop_clipboard_write: "Copy to clipboard",
+  apple_script: "AppleScript",
+  mail_read: "Read mail",
+  mail_search: "Search mail",
+  calendar_events: "Calendar",
+  memory_save: "Save note",
+  memory_search: "Search notes",
+  memory_update: "Update note",
+  memory_forget: "Forget note",
+  write_notes: "Write notes",
+  update_plan: "Update plan",
+  mark_plan_step: "Mark plan step",
+  skill: "Use skill",
+  delegate: "Delegate",
+  message_agent: "Message agent",
+  create_agent: "Make agent",
+  consult: "Ask a helper",
+  notify: "Notify",
+  show_page: "Show page",
+  draft_message: "Draft message",
+  ask_user: "Ask you",
+  finish: "Finish",
+  use_tools: "Turn on tools",
+  schedule_create: "Add schedule",
+  schedule_list: "List schedules",
+  schedule_delete: "Delete schedule",
+  find_help: "Find help",
+  code_fetch: "Fetch code",
+};
+
+/** A name in words, its first letter capital: `draft_reply` reads "Draft reply". */
+function sentence(name) {
+  const words = name.replace(/[_-]+/g, " ").trim();
+  return words === "" ? name : `${words[0].toUpperCase()}${words.slice(1)}`;
+}
+
+/** A server's name as a title: `microsoft-learn` reads "Microsoft Learn". */
+function titled(name) {
+  return name
+    .split(/[_-]+/)
+    .filter((word) => word !== "")
+    .map((word) => `${word[0].toUpperCase()}${word.slice(1)}`)
+    .join(" ");
+}
+
+/** What a tool's row calls it (item 513): one of Dot's in its own words ("Edit file"), an MCP tool by its server and
+ * what it does, the server's name taken off the tool's own ("mcp__tavily__tavily_search" reads "Tavily · Search"), and
+ * any other in words of its name. The name itself is the words' title. */
+export function toolWords(tool) {
+  if (Object.hasOwn(TOOL_WORDS, tool)) {
+    return TOOL_WORDS[tool];
+  }
+  const mcp = /^mcp__(.+?)__(.+)$/.exec(tool);
+  if (mcp === null) {
+    return sentence(tool);
+  }
+  const [, server, name] = mcp;
+  const own = server.replace(/-/g, "_").toLowerCase();
+  const rest = name.toLowerCase().startsWith(`${own}_`) && name.length > own.length + 1 ? name.slice(own.length + 1) : name;
+  return `${titled(server)} · ${sentence(rest)}`;
 }
 
 /**
@@ -223,7 +320,8 @@ export function toolRow({ tool, args }) {
     "summary",
     { class: "tool-head", title: tool },
     state,
-    el("span", { class: named ? "tool-name" : "tool-name visually-hidden" }, ...nameParts(tool)),
+    // The words name the tool, and the tool's own name is theirs to show on a hover (item 513).
+    el("span", { class: named ? "tool-name" : "tool-name visually-hidden", title: tool }, toolWords(tool)),
     summary,
     badges,
     time,

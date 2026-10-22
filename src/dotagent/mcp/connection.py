@@ -8,6 +8,7 @@ next to Dot's own logs, never to the terminal.
 
 import asyncio
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
@@ -17,7 +18,16 @@ from mcp import Client, MCPError, StdioServerParameters, stdio_client
 from mcp.client.auth import OAuthFlowError
 from mcp.client.sse import sse_client
 from mcp.client.streamable_http import StreamableHTTPError, streamable_http_client
-from mcp.types import CONNECTION_CLOSED, REQUEST_TIMEOUT, CallToolResult, ListToolsResult, Tool, ToolAnnotations
+from mcp.types import (
+    CONNECTION_CLOSED,
+    INVALID_REQUEST,
+    METHOD_NOT_FOUND,
+    REQUEST_TIMEOUT,
+    CallToolResult,
+    ListToolsResult,
+    Tool,
+    ToolAnnotations,
+)
 from pydantic import JsonValue
 
 from dotagent.config import McpServerConfig, McpTransport
@@ -41,6 +51,10 @@ _SHOWN_ARGUMENT_CHARS: int = 500
 # a tool call is answered on a stream that stays silent while the tool works.
 _HTTP_TIMEOUT_S: float = 30.0
 _HTTP_READ_TIMEOUT_S: float = 300.0
+# A session reached at a URL that was quiet this long is asked whether it is still there before it is used (item 513):
+# the server or the network may have dropped it meanwhile, and the calls sent on it would all fail at once.
+_QUIET_CHECK_S: float = 60.0
+_PING_TIMEOUT_S: float = 10.0
 
 
 class _Slot:
@@ -54,12 +68,27 @@ class _Slot:
 
 @dataclass
 class _Live:
-    """A running server: its session, the task that holds the session open, and whether the connection broke."""
+    """A running server: its session, the task that holds the session open, whether the connection broke, and when
+    (monotonic seconds) the session last answered."""
 
     client: Client
     owner: asyncio.Task[None]
     stop: asyncio.Event
     broken: bool
+    answered_at: float
+
+
+class _ConnectionLost(McpError):
+    """The connection to the server broke while a request was out: the next request connects again."""
+
+
+def _session_gone(error: MCPError) -> bool:
+    """Whether ``error`` says the session cannot be used any more, so that the next request connects again rather than
+    fail on the same session (item 513): its connection closed, or its server refused the request as one of no session
+    it knows (``INVALID_REQUEST``). Servers word that last in their own ways ("Session not found", "Not Found: Session
+    has been terminated", the client's own "Session terminated" for a 404 with no body), so the code alone decides; a
+    request Dot sends whole is not invalid otherwise, and taking one for a gone session costs one connection more."""
+    return error.code in (CONNECTION_CLOSED, INVALID_REQUEST)
 
 
 def _prepare_log(path: Path) -> int:
@@ -205,12 +234,10 @@ class McpConnection:
 
     def _context(self) -> JsonObject:
         """What identifies the server in an error: never its environment or its headers, which may hold secrets."""
-        context: JsonObject = {
-            "server": self._config.name,
-            "transport": self._config.transport_kind(),
-            "log": str(self._log_path),
-        }
+        context: JsonObject = {"server": self._config.name, "transport": self._config.transport_kind()}
+        # A server reached at a URL writes no log of Dot's: only a server Dot starts has one to name.
         if self._config.command is not None:
+            context["log"] = str(self._log_path)
             context["command"] = self._config.command
             context["args"] = list(self._config.args)
         if self._config.url is not None:
@@ -278,7 +305,7 @@ class McpConnection:
         await asyncio.wait(waiting, timeout=self._config.startup_timeout_s, return_when=asyncio.FIRST_COMPLETED)
         if slot.client is not None:
             log.info("mcp_server_started", server=self.name, protocol=slot.client.protocol_version)
-            return _Live(client=slot.client, owner=owner, stop=slot.stop, broken=False)
+            return _Live(client=slot.client, owner=owner, stop=slot.stop, broken=False, answered_at=time.monotonic())
         if not owner.done():
             owner.cancel()
             await asyncio.wait({owner})
@@ -325,7 +352,7 @@ class McpConnection:
     async def _ensure_live(self) -> _Live:
         async with self._lock:
             current: _Live | None = self._live
-            if current is not None and not current.broken and not current.owner.done():
+            if current is not None and not current.broken and not current.owner.done() and await self._answers(current):
                 return current
             if current is not None:
                 log.warning("mcp_server_restart", server=self.name)
@@ -335,13 +362,39 @@ class McpConnection:
             self._live = started
             return started
 
-    async def _lost(self, live: _Live, step: str, error: MCPError) -> McpError:
-        """Remember that the connection broke so the next call starts the server again."""
+    async def _answers(self, live: _Live) -> bool:
+        """Whether a session can be used: a server Dot started holds its session while it runs, and one reached at a URL
+        that was quiet for :data:`_QUIET_CHECK_S` is pinged first (item 513). One that does not answer is connected
+        again, so that the calls that come wait for the new session rather than fail on the old one."""
+        if self._config.command is not None or time.monotonic() - live.answered_at < _QUIET_CHECK_S:
+            return True
+        try:
+            async with asyncio.timeout(_PING_TIMEOUT_S):
+                await live.client.send_ping()
+        except TimeoutError:
+            log.warning("mcp_server_quiet_session_gone", server=self.name, error="the ping was not answered in time")
+            live.broken = True
+            return False
+        except MCPError as exc:
+            # A server that does not know ping answered it, so the session is there; any other error (a session its
+            # server ended, a connection that closed, a gateway's failure) is connected again.
+            if exc.code == METHOD_NOT_FOUND:
+                live.answered_at = time.monotonic()
+                return True
+            log.warning("mcp_server_quiet_session_gone", server=self.name, error=truncate_middle(repr(exc), 200))
+            live.broken = True
+            return False
+        live.answered_at = time.monotonic()
+        return True
+
+    async def _lost(self, live: _Live, step: str, error: MCPError) -> _ConnectionLost:
+        """Remember that the connection broke so the next call starts the server again. The error keeps the words of
+        the server or the client library ("Session not found", a redirect that was not followed), which say why."""
         live.broken = True
-        log.warning("mcp_server_connection_lost", server=self.name, step=step)
-        return McpError(
+        log.warning("mcp_server_connection_lost", server=self.name, step=step, error=error.message)
+        return _ConnectionLost(
             f"the MCP server closed the connection while {step}; the next call {self._again()}",
-            {**self._context(), "code": error.code, **await self._tail_since(0)},
+            {**self._context(), "code": error.code, "error": error.message, **await self._tail_since(0)},
         )
 
     async def list_tools(self) -> tuple[McpTool, ...]:
@@ -359,12 +412,13 @@ class McpConnection:
                     {**self._context(), "timeout_s": self._config.startup_timeout_s},
                 ) from exc
             except MCPError as exc:
-                if exc.code == CONNECTION_CLOSED:
+                if _session_gone(exc):
                     raise await self._lost(live, "listing its tools", exc) from exc
                 raise McpError(
                     "the MCP server could not list its tools",
                     {**self._context(), "code": exc.code, "error": exc.message},
                 ) from exc
+            live.answered_at = time.monotonic()
             listed.extend(page.tools)
             if page.next_cursor is None:
                 return tuple(_to_tool(self._config, tool) for tool in listed)
@@ -373,24 +427,39 @@ class McpConnection:
             "the MCP server lists more pages of tools than supported", {**self._context(), "pages": _MAX_LIST_PAGES}
         )
 
-    async def call_tool(self, name: str, arguments: JsonObject) -> CallToolResult:
-        """Run a tool. A call that failed is never repeated: the tool may already have done part of its work."""
+    async def call_tool(self, name: str, arguments: JsonObject, read_only: bool) -> CallToolResult:
+        """Run a tool. A call that failed is not repeated, since the tool may already have done part of its work, but
+        for one the server declares ``read_only`` whose connection broke while it was out (item 513): it reads and
+        changes nothing, so it is called once more, on a new connection, with a warning."""
+        try:
+            return await self._call_once(name, arguments)
+        except _ConnectionLost as lost:
+            if not read_only:
+                raise
+            log.warning("mcp_call_repeated", server=self.name, tool=name, error=lost.message)
+            return await self._call_once(name, arguments)
+
+    async def _call_once(self, name: str, arguments: JsonObject) -> CallToolResult:
         live: _Live = await self._ensure_live()
         try:
-            return await live.client.call_tool(name, arguments, read_timeout_seconds=self._config.call_timeout_s)
+            result: CallToolResult = await live.client.call_tool(
+                name, arguments, read_timeout_seconds=self._config.call_timeout_s
+            )
         except MCPError as exc:
             if exc.code == REQUEST_TIMEOUT:
                 raise McpError(
                     "the MCP tool call timed out",
                     {**self._context(), "tool": name, "timeout_s": self._config.call_timeout_s},
                 ) from exc
-            if exc.code == CONNECTION_CLOSED:
+            if _session_gone(exc):
                 raise await self._lost(live, f"running {name}", exc) from exc
             shown: str = truncate_middle(redact_secrets(dumps_compact(arguments)), _SHOWN_ARGUMENT_CHARS)
             raise McpError(
                 "the MCP server rejected the call",
                 {**self._context(), "tool": name, "code": exc.code, "error": exc.message, "arguments": shown},
             ) from exc
+        live.answered_at = time.monotonic()
+        return result
 
     async def close(self) -> None:
         async with self._lock:

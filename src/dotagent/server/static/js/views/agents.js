@@ -8,7 +8,7 @@
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook } from "../actors.js";
 import { api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
-import { MODES, runChoices } from "../choices.js";
+import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
@@ -751,21 +751,28 @@ function agentKept(record) {
     speed: KEPT_SPEED,
     approvals: heldChoice(record.approvals ?? null),
     goalMode: KEPT_GOAL_MODE,
-    mode: "task",
+    // An agent's message starts on Auto, as the home's and a chat's do (items 495 and 513): its words settle the mode.
+    mode: AUTO_MODE.id,
     model: record.model ?? "",
     once: null,
   };
 }
 
 /** The composer of an agent's page: a message for the agent, sent with Enter, with the new chat's mode, model and
- * reasoning and Options pills; the model starts at the agent's own. */
+ * reasoning and Options pills; the model starts at the agent's own, the mode at Auto, and /auto, /task, /chat and
+ * /research name one as on the home (item 513). */
 function agentComposer(record, ctx) {
   const frame = composerFrame({
     label: `Message ${record.name}`,
     boxLabel: "Message",
     placeholder: `Message ${record.name}`,
     maxPx: MAX_GOAL_PX,
-    commands: [],
+    commands: MESSAGE_MODES.map((option) => ({
+      label: `/${option.id}`,
+      hint: `${option.label}: ${option.hint}`,
+      insert: "",
+      run: () => choices.setMode(option.id),
+    })),
     send: submit,
     sendLabel: "Start",
     draftKey: null,
@@ -774,7 +781,7 @@ function agentComposer(record, ctx) {
   const { textarea: goal, attachments } = frame;
   const choices = runChoices({
     frame,
-    modes: MODES,
+    modes: MESSAGE_MODES,
     kept: agentKept(record),
     optionsTitle: "Approvals",
     more: () => [],

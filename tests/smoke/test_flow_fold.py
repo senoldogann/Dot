@@ -242,7 +242,7 @@ async def test_calls_whose_mark_is_shared_keep_their_names_and_say_what_they_did
                 if not await group.evaluate("(node) => node.open"):
                     await group.locator("summary.steps-head").click()
                 rows: Locator = group.locator(".steps-body .tool-head")
-                await expect(rows.locator(".tool-name")).to_have_text(["write_file", "read_file"])
+                await expect(rows.locator(".tool-name")).to_have_text(["Write file", "Read file"])
                 await expect(rows.locator(".tool-name.visually-hidden")).to_have_count(0)
                 said: list[str] = await rows.locator(".tool-sum").all_text_contents()
                 assert len(said) == 2 and said[0] != said[1] and all(_NOTE in words for words in said), said

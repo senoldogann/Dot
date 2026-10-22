@@ -164,7 +164,8 @@ class McpHub:
                 "the MCP server was removed from Dot while the run worked",
                 {"server": tool.server, "tool": tool.remote_name},
             )
-        return await connection.call_tool(tool.remote_name, arguments)
+        # A tool the server declares read-only is called again once when its connection broke (item 513).
+        return await connection.call_tool(tool.remote_name, arguments, tool.hints.read_only is True)
 
     async def attempt(self, config: McpServerConfig, auth: httpx2.Auth | None) -> tuple[McpTool, ...]:
         """Connect to ``config`` once, signing in with ``auth``, and close the connection again: the tools the model

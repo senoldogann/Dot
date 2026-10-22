@@ -386,8 +386,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el("div", { class: "row" }, allButton, deleteButton),
   );
   let activity = null;
-  // Where the runs at work stand (`placeWork`), worked out at each paint, and Working's entries as painted, each with
-  // the id of its chat (null for a row that is no chat's).
+  // Where the runs at work stand (`placeWork`), worked out at each paint, and Working's entries as painted.
   let work = { working: [], pinned: new Map() };
   let workingNodes = [];
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
@@ -424,10 +423,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     for (const [id, node] of rowNodes) {
       mark(node, id === routeThreadId);
     }
-    // Folded, Working keeps the open chat in sight (item 202): a chat just sent on its way
-    // from the composer stands there.
-    for (const { chatId, node } of workingNodes) {
-      node.hidden = folds.working === true && (chatId === null || chatId !== routeThreadId);
+    // Folded, Working hides every row, the open chat's too (item 513: it kept that one in sight, item 202, so a fold with
+    // only the open chat at work did nothing); its count stays, and a search shows the chats at work it finds.
+    for (const { node } of workingNodes) {
+      node.hidden = folds.working === true && needle === "";
     }
     const active = rowNodes.get(routeThreadId);
     if (active !== undefined && routeThreadId !== revealedThreadId) {
@@ -642,8 +641,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return node;
   }
 
-  // The sections above the chats. Working's entries are all painted, the open chat's among them, and `markCurrent`
-  // hides them while Working is folded; the search leaves there only the chats it finds (item 202).
+  // The sections above the chats. Working's entries are all painted, and `markCurrent` hides them while Working is
+  // folded; the search leaves there only the chats it finds (item 202), and shows them folded or not.
   function paintActivity() {
     workingNodes = [];
     const found = needle === "" ? work.working : work.working.filter((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
@@ -673,7 +672,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function workingEntry(entry) {
     const node =
       entry.chat === null ? activityRow(entry.row, onNavigate, entry.children) : chatEntry(entry.chat, entry);
-    workingNodes.push({ chatId: entry.chat === null ? null : entry.chat.id, node });
+    workingNodes.push({ node });
     return node;
   }
 

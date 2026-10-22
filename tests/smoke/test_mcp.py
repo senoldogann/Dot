@@ -421,17 +421,26 @@ async def test_the_settings_and_the_database_are_out_of_reach_of_the_agent(runti
 
 
 async def test_a_server_that_died_is_started_again_by_the_next_call(runtime: Runtime) -> None:
+    """A call whose server died is not repeated when the tool may change something (wipe declares no hints): it fails,
+    and the next call starts the server again. A read-only one is called once more on the new server (item 513)."""
     first, _ = await _call(runtime, "mcp__fixture__process_id", {})
     old_pid: int = int(_answer(first, "process_id"))
     os.kill(old_pid, signal.SIGKILL)
 
-    with pytest.raises(McpError, match="closed the connection while running add"):
-        await _call(runtime, "mcp__fixture__add", {"a": 1, "b": 1})
+    with pytest.raises(McpError, match="closed the connection while running wipe"):
+        await _call(runtime, "mcp__fixture__wipe", {"target": "the logs"})
 
     again, _ = await _call(runtime, "mcp__fixture__add", {"a": 1, "b": 1})
     assert _answer(again, "add") == "2"
     second, _ = await _call(runtime, "mcp__fixture__process_id", {})
-    assert int(_answer(second, "process_id")) != old_pid
+    restarted: int = int(_answer(second, "process_id"))
+    assert restarted != old_pid
+    os.kill(restarted, signal.SIGKILL)
+
+    repeated, _ = await _call(runtime, "mcp__fixture__add", {"a": 2, "b": 2})
+    assert _answer(repeated, "add") == "4"
+    third, _ = await _call(runtime, "mcp__fixture__process_id", {})
+    assert int(_answer(third, "process_id")) not in (old_pid, restarted)
 
 
 # --------------------------------------------------------------------------------------------- the hub on its own
