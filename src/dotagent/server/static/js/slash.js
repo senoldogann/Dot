@@ -48,10 +48,12 @@ export function paletteGroups(commands, palette) {
     for (const server of palette.servers) {
       groups.push({
         title: `MCP · ${server.name}`,
+        section: "MCP tools",
         kind: "plugin",
         items: server.tools.map((tool) => ({
           id: `tool-${tool.name}`,
-          label: tool.name,
+          // The server stands before its tool as the tool's row names them, so that tools of many servers read apart.
+          label: tool.name.toLowerCase().startsWith(server.name.toLowerCase()) ? tool.name : `${server.name} / ${tool.name}`,
           hint: tool.description,
           kind: "tool",
           serverName: server.name,
@@ -102,6 +104,22 @@ export function pickGroups(palette) {
     });
   }
   return groups;
+}
+
+/** What the menu draws: its groups in sections, the groups that say they are one section (the MCP tools of every server)
+ * drawn as one, each `{ title, items }`; `title` is what a screen reader hears of the section. */
+export function menuSections(groups) {
+  const sections = [];
+  for (const group of groups) {
+    const title = group.section ?? group.title;
+    const last = sections.at(-1);
+    if (last !== undefined && last.title === title) {
+      last.items.push(...group.items);
+    } else {
+      sections.push({ title, items: [...group.items] });
+    }
+  }
+  return sections;
 }
 
 /** The groups with only the items whose label holds `word` (case folded), and no empty group. */
