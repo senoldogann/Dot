@@ -2,6 +2,7 @@
 the section shows."""
 
 import asyncio
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -125,78 +126,83 @@ def test_a_secret_the_cut_runs_through_leaves_no_part_of_itself() -> None:
     assert secret[:10] not in out and "***" in out and len(out) <= 1_200
 
 
-def _view(steps: int) -> RecapView:
-    return RecapView(enabled=True, recap=_recap(steps, "running"), steps=steps, status="running", due=False)
+class _Recaps:
+    """One run's recaps as the stand-ins of ``_latest`` and ``_write`` keep them: the newest, and the asks that wrote.
+    An ask without force waits for ``released`` and writes one only when ``unforced_writes``; a forced one writes."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, unforced_writes: bool) -> None:
+        self.newest: Recap | None = None
+        self.asked: list[bool] = []
+        self.released: asyncio.Event = asyncio.Event()
+        self._unforced_writes: bool = unforced_writes
+
+        async def get_run(run_id: str) -> RunRecord:
+            return _run(9, "running")
+
+        self.runtime: Runtime = cast(
+            "Runtime", SimpleNamespace(config=SimpleNamespace(recap=CONFIG), store=SimpleNamespace(get_run=get_run))
+        )
+        monkeypatch.setattr(recap, "_latest", self._latest)
+        monkeypatch.setattr(recap, "_write", self._write)
+
+    async def _latest(self, runtime: Runtime, run_id: str) -> Recap | None:
+        return self.newest
+
+    async def _write(self, runtime: Runtime, run_id: str, force: bool) -> RecapView:
+        self.asked.append(force)
+        if not force:
+            await self.released.wait()
+        if force or self._unforced_writes:
+            self.newest = Recap(
+                text=f"written by ask {len(self.asked)}",
+                model="ollama:fast",
+                steps=9,
+                status="running",
+                written_at=float(len(self.asked)),
+            )
+        return RecapView(enabled=True, recap=self.newest, steps=9, status="running", due=False)
+
+    async def ask(self, force: bool) -> asyncio.Task[RecapView]:
+        """An ask, once it has read the recap there is and waits in its turn."""
+        task: asyncio.Task[RecapView] = asyncio.create_task(recap.write_recap(self.runtime, "run_a", force))
+        for _ in range(3):
+            await asyncio.sleep(0)
+        return task
 
 
-async def test_a_forced_ask_that_joins_a_write_which_wrote_none_writes_one(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_a_forced_ask_behind_an_ask_that_wrote_none_writes_one(monkeypatch: pytest.MonkeyPatch) -> None:
     """The pre-push review: the button pressed while another page's ask found none due wrote nothing."""
-    released: asyncio.Event = asyncio.Event()
-    asked: list[bool] = []
-
-    async def write(runtime: Runtime, run_id: str, force: bool) -> tuple[RecapView, bool]:
-        asked.append(force)
-        if not force:
-            await released.wait()
-            return _view(4), False
-        return _view(9), True
-
-    monkeypatch.setattr(recap, "_write", write)
-    nobody: Runtime = cast("Runtime", object())
-    looking = asyncio.create_task(recap.write_recap(nobody, "run_join", False))
-    await asyncio.sleep(0)
-    pressed = asyncio.create_task(recap.write_recap(nobody, "run_join", True))
-    await asyncio.sleep(0)
-    released.set()
-    assert (await looking).steps == 4
-    assert (await pressed).steps == 9
-    assert asked == [False, True]
+    recaps: _Recaps = _Recaps(monkeypatch, unforced_writes=False)
+    looking: asyncio.Task[RecapView] = await recaps.ask(False)
+    pressed: asyncio.Task[RecapView] = await recaps.ask(True)
+    recaps.released.set()
+    assert (await looking).recap is None
+    view: RecapView = await pressed
+    assert view.recap is not None and view.recap.text == "written by ask 2"
+    assert recaps.asked == [False, True]
 
 
-async def test_two_forced_asks_that_join_a_write_which_wrote_none_write_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The pre-push review: both woke and each wrote its own."""
-    released: asyncio.Event = asyncio.Event()
-    asked: list[bool] = []
-
-    async def write(runtime: Runtime, run_id: str, force: bool) -> tuple[RecapView, bool]:
-        asked.append(force)
-        if not force:
-            await released.wait()
-            return _view(4), False
-        await asyncio.sleep(0)
-        return _view(9), True
-
-    monkeypatch.setattr(recap, "_write", write)
-    nobody: Runtime = cast("Runtime", object())
-    looking = asyncio.create_task(recap.write_recap(nobody, "run_twice", False))
-    await asyncio.sleep(0)
-    here = asyncio.create_task(recap.write_recap(nobody, "run_twice", True))
-    there = asyncio.create_task(recap.write_recap(nobody, "run_twice", True))
-    await asyncio.sleep(0)
-    released.set()
-    assert (await looking).steps == 4
-    assert (await here).steps == (await there).steps == 9
-    assert asked == [False, True]
+async def test_two_forced_asks_behind_an_ask_that_wrote_none_write_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The pre-push review: both went on and each wrote its own; then a loop of joins could spin without end."""
+    recaps: _Recaps = _Recaps(monkeypatch, unforced_writes=False)
+    looking: asyncio.Task[RecapView] = await recaps.ask(False)
+    here: asyncio.Task[RecapView] = await recaps.ask(True)
+    there: asyncio.Task[RecapView] = await recaps.ask(True)
+    recaps.released.set()
+    await looking
+    texts: set[str] = {view.recap.text for view in (await here, await there) if view.recap is not None}
+    assert texts == {"written by ask 2"}
+    assert recaps.asked == [False, True]
 
 
-async def test_an_ask_that_joins_a_write_which_wrote_one_writes_no_second(monkeypatch: pytest.MonkeyPatch) -> None:
-    released: asyncio.Event = asyncio.Event()
-    asked: list[bool] = []
-
-    async def write(runtime: Runtime, run_id: str, force: bool) -> tuple[RecapView, bool]:
-        asked.append(force)
-        await released.wait()
-        return _view(6), True
-
-    monkeypatch.setattr(recap, "_write", write)
-    nobody: Runtime = cast("Runtime", object())
-    first = asyncio.create_task(recap.write_recap(nobody, "run_once", False))
-    await asyncio.sleep(0)
-    second = asyncio.create_task(recap.write_recap(nobody, "run_once", True))
-    await asyncio.sleep(0)
-    released.set()
-    assert (await first).steps == (await second).steps == 6
-    assert asked == [False]
+async def test_an_ask_behind_an_ask_that_wrote_one_takes_it_and_writes_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    recaps: _Recaps = _Recaps(monkeypatch, unforced_writes=True)
+    first: asyncio.Task[RecapView] = await recaps.ask(False)
+    second: asyncio.Task[RecapView] = await recaps.ask(True)
+    recaps.released.set()
+    views: list[RecapView] = [await first, await second]
+    assert [view.recap.text for view in views if view.recap is not None] == ["written by ask 1"] * 2
+    assert recaps.asked == [False]
 
 
 def test_the_section_shows_a_few_lines_and_a_few_hundred_characters_whatever_the_model_wrote() -> None:

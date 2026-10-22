@@ -10,8 +10,8 @@ run ended after its last; a page asks for one only while the section is in sight
 one run."""
 
 import asyncio
+import weakref
 from collections.abc import Sequence
-from typing import NamedTuple
 
 from dotagent.agent.compact import render_transcript
 from dotagent.agent.continuity import summary_part
@@ -200,15 +200,15 @@ async def _written(runtime: Runtime, run: RunRecord, record: str) -> tuple[str, 
     raise problem
 
 
-async def _write(runtime: Runtime, run_id: str, force: bool) -> tuple[RecapView, bool]:
-    """The run's recap after a write, and whether one was written (not when none was due and ``force`` is off)."""
+async def _write(runtime: Runtime, run_id: str, force: bool) -> RecapView:
+    """The run's recap after a write: a new one when one is due or ``force`` is on, else the newest there is."""
     config: RecapConfig = runtime.config.recap
     if not config.enabled:
         raise ConfigError("recaps are off", {"hint": "set [recap] enabled = true in config.toml"})
     run: RunRecord = await runtime.store.get_run(run_id)
     current: Recap | None = await _latest(runtime, run_id)
     if not force and not is_due(current, run, config):
-        return _view(config, current, run), False
+        return _view(config, current, run)
     if run.steps == 0:
         raise InvalidValueError("a run that has taken no step has nothing to recap", {"run_id": run_id})
     plan_event: EventRecord | None = await runtime.store.last_event(run_id, PLAN_EVENT)
@@ -224,24 +224,32 @@ async def _write(runtime: Runtime, run_id: str, force: bool) -> tuple[RecapView,
         run.id, RECAP_EVENT, {"text": masked, "model": ref.label, "steps": run.steps, "status": run.status}, True
     )
     log.info("recap_written", run_id=run.id, model=ref.label, steps=run.steps, forced=force)
-    return _view(config, _recap_of(event), run), True
+    return _view(config, _recap_of(event), run)
 
 
-class _Writing(NamedTuple):
-    """A recap being written for a run: its task, and whether it was asked with ``force``."""
-
-    task: asyncio.Task[tuple[RecapView, bool]]
-    forced: bool
-
-
-# The recap being written for each run, so that a second ask while one is written waits for it instead of writing two.
-_writing: dict[str, _Writing] = {}
+# One lock a run, while an ask holds or waits for it: the asks for one run's recap are taken one after another.
+_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
+# The asks under way, held until each ends: the loop keeps only a weak reference to a task, and a write goes on after
+# the page that asked for it has gone away.
+_under_way: set[asyncio.Task[RecapView]] = set()
 
 
-def _done(run_id: str, task: asyncio.Task[tuple[RecapView, bool]]) -> None:
-    """Forget the write that ended, and log its failure: a page that went away no longer waits to hear it."""
-    if _writing.get(run_id, _Writing(task, False)).task is task:
-        _writing.pop(run_id, None)
+async def _in_turn(runtime: Runtime, run_id: str, force: bool) -> RecapView:
+    """The ask in its turn: a recap another ask wrote while this one waited is the recap it asked for, forced or not;
+    without one, it writes as ``_write`` does. Each ask reads and writes once, so none can wait on another forever
+    (the pre-push review found a loop of joins that could)."""
+    seen: Recap | None = await _latest(runtime, run_id)
+    lock: asyncio.Lock = _locks.setdefault(run_id, asyncio.Lock())
+    async with lock:
+        latest: Recap | None = await _latest(runtime, run_id)
+        if latest is not None and (seen is None or latest.written_at > seen.written_at):
+            return _view(runtime.config.recap, latest, await runtime.store.get_run(run_id))
+        return await _write(runtime, run_id, force)
+
+
+def _ended(run_id: str, task: asyncio.Task[RecapView]) -> None:
+    """An ask ended: let go of it, and log a write that failed, which a page that went away no longer waits to hear."""
+    _under_way.discard(task)
     if task.cancelled():
         return
     error: BaseException | None = task.exception()
@@ -251,17 +259,10 @@ def _done(run_id: str, task: asyncio.Task[tuple[RecapView, bool]]) -> None:
 
 async def write_recap(runtime: Runtime, run_id: str, force: bool) -> RecapView:
     """Write a recap of the run when one is due (``force``: whether or not), and say the run's recap after: the one
-    written, or the newest when none was due. One being written for the run already is waited for, not written again,
-    unless this ask is forced and that one wrote none (no recap was due); a page that goes away while one is written
-    does not cut it off."""
-    # A forced ask woken by a write that wrote none looks again: another forced ask woken with it may have started the
-    # write already, and it joins that one rather than write a second (the pre-push review found two).
-    while (running := _writing.get(run_id)) is not None:
-        view, wrote = await asyncio.shield(running.task)
-        if wrote or running.forced or not force:
-            return view
-    task: asyncio.Task[tuple[RecapView, bool]] = asyncio.create_task(_write(runtime, run_id, force))
-    _writing[run_id] = _Writing(task, force)
-    task.add_done_callback(lambda ended: _done(run_id, ended))
-    view, _wrote = await asyncio.shield(task)
-    return view
+    written, or the newest when none was due. Asks for one run wait for each other: one that waited behind a write
+    takes the recap it wrote instead of writing a second; a page that goes away while one is written does not cut it
+    off."""
+    task: asyncio.Task[RecapView] = asyncio.create_task(_in_turn(runtime, run_id, force))
+    _under_way.add(task)
+    task.add_done_callback(lambda ended: _ended(run_id, ended))
+    return await asyncio.shield(task)
