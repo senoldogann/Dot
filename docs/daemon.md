@@ -215,8 +215,8 @@ one of OpenCode's agent. The box of a run held it as **Save skill**, under a **M
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
 failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
-agent, model, approval mode, goal mode and campaign) are in the panel's Details, on its Run tab, its start under More
-(item 452). Your goal is the
+agent, model, approval mode, goal mode, campaign, work, time, mode, start and id) are under More on the panel's Run tab,
+closed the first time (items 452 and 544). Your goal is the
 first message, in the bubble of your messages on the raised surface. What you write reads there as markdown, as an
 answer does: its headings, lists (nested as far as their items are indented, with a block of code or a quote under an
 item, numbered on from the number they begin at, and task lists with their boxes), tables (their columns aligned as
@@ -328,9 +328,12 @@ section only when it has a row (item 539): **Skills & MCP** (the skills and serv
 Customize), **Artifacts** (the files the chat wrote with their added and removed lines, each opening the Changes tab
 where the diff is), **Web reading** (the pages it fetched and the searches it made, a page opening in a new tab; a
 fetch that failed is not a page it read) and **Memory updated** (the notes it saved, corrected or forgot, each opening
-its note in Settings › Memory). Each row wears its mark on a tile, a file the letters of its kind. In the side panel
-(Run details), under More on the Run tab, **Cost** lists the bill of the run, each value beside its label as in
-Details: where the minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the
+its note in Settings › Memory). Each row wears its mark on a tile, a file the letters of its kind. In a tab of
+several sections each scrolls on its own once it holds more than two fifths of the screen, its head staying over it,
+and a tab of one section has the panel to itself (item 544). The Run tab lists no files of the conversation and no
+Details card since item 544: the files open from their chips and paths in the conversation, and the run's facts stand
+under More. In the side panel (Run details), under More on the Run tab, **Cost** lists the bill of the run, each value
+beside its label as the facts are: where the minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the
 input tokens with the share the provider served from its cache, the output tokens, the compactions (with their rate per
 100 steps), the runs
 it delegated and the web searches by engine, and a figure of none has no line (item 452). It is

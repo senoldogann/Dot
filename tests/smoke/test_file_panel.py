@@ -5,7 +5,7 @@ document and a presentation first as macOS's Quick Look draws them, in a sandbox
 list and table, and a presentation's slides with their charts. A file the answer names by its path opens the same
 way: a CSV file as a grid, which opens on the Mac, an image, and a Markdown file formatted, its HTML never drawn,
 with its source a click away (item 269); a path the panel does not show says why. The side panel's Run tab lists
-the conversation's files. A long text pasted into the
+no files, which open from the conversation (item 544). A long text pasted into the
 conversation's box goes as a file, which opens beside the conversation from its chip (item 269). Closing the file
 gives the panel back as it was and the focus to what opened it. Wide and on a phone, light and dark. The daemon's
 routes refuse a file outside the home folder and a script to open, and serve a PDF's page as a PNG.
@@ -394,42 +394,14 @@ async def _one_size(
     await page.keyboard.press("Escape")
     await expect(view).to_have_count(0)
 
-    # The side panel's Run tab lists the conversation's files (item 364), each opening beside it; the tab comes back
-    # after it.
-    if width < 960 or panel != "on":
-        await page.get_by_role("button", name="Run details", exact=True).click()
-    details: Locator = page.locator(".inspector")
-    await details.get_by_role("tab", name="Run").click()
-    files_card: Locator = details.locator(".panel-section", has=page.locator(".panel-section-title", has_text="Files"))
-    listed: Locator = files_card.locator("button.file-row")
-    await expect(listed).to_have_text(
-        [
-            re.compile(name)
-            for name in (
-                "report.pdf",
-                "budget.xlsx",
-                "minutes.docx",
-                "deck.pptx",
-                "rows.csv",
-                "todo.md",
-                "chart.png",
-                "notes.txt",
-            )
-        ]
-    )
-    listed_budget: Locator = listed.filter(has_text="budget.xlsx")
-    await listed_budget.click()
-    await expect(view).to_have_attribute("data-kind", "workbook")
-    await page.keyboard.press("Escape")
-    await expect(view).to_have_count(0)
-    await expect(listed_budget).to_be_focused()
-    await page.screenshot(path=str(shots / f"files-{width}-{scheme}.png"))
+    # The side panel's Run tab lists no files (item 544): they open from their chips and paths in the conversation.
+    await expect(page.locator(".inspector .panel-section-title", has_text="Files")).to_have_count(0)
 
     # The file stays beside the conversation as the chat goes on at its next run (item 406): a message sent from the
     # box opens the next run's page with the file still there, until it is closed. Before, the page made again dropped
     # it.
     if width >= 960:
-        await listed_budget.click()
+        await budget.click()
         await expect(view).to_have_attribute("data-kind", "workbook")
         before: str = page.url
         await box.fill("Go on")

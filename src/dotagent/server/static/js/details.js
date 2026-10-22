@@ -1,12 +1,13 @@
-// The facts of one run for the side panel: its state, the agent it is a chat with, the model and the reasoning level it ran
-// with, its approvals, the campaign it is a session of, the work it did and how long it took. The run page's top bar
-// shows none of them (item 120). The card holds what a glance needs; the run's mode, its start and its id stand under
-// the Run tab's More (item 452). The facts that never change are written once; `paint` brings the others up to date.
+// The facts of one run for the side panel's More (item 544): its state, the agent it is a chat with, the model and the
+// reasoning level it ran with, its approvals, the campaign it is a session of, the work it did and how long it took,
+// its mode, its start and its id. The run page's top bar shows none of them (item 120); a glance needs none of them, so
+// they fold away with how the run was set up and what it cost. The facts that never change are written once; `paint`
+// brings the others up to date.
 
 import { compact, copyText, dateTimeFull, duration, el, modelName, plural, setText } from "./dom.js";
 import { askedLabel } from "./efforts.js";
 import { icon } from "./icons.js";
-import { panelSection, statusBadge } from "./panels.js";
+import { statusBadge } from "./panels.js";
 import { approvalLabel } from "./runmodes.js";
 import { attempt, toast } from "./ui.js";
 
@@ -15,10 +16,10 @@ function fact(label, value) {
 }
 
 /**
- * The details card of `run`, of the chat with `agent` (`{ id, name, role }`, or null) and a session of `campaign`
- * (`{ id, title, session }`, or null); `keepGoing` says that its goal asked it not to stop until it is done, which put
- * it in goal mode (item 132), which the card names only when it is on. `more` is the list of the facts a glance does
- * not need. `paint(state)` takes what changes while the run goes, as
+ * The facts of `run`, of the chat with `agent` (`{ id, name, role }`, or null) and a session of `campaign`
+ * (`{ id, title, session }`, or null), as one list (`element`); `keepGoing` says that its goal asked it not to stop
+ * until it is done, which put it in goal mode (item 132), which the list names only when it is on.
+ * `paint(state)` takes what changes while the run goes, as
  * `{ status, model, calls, failed, compactions, flagged, input, output, finishedAt }`; `finishedAt` is null until the
  * run is over; `compactions` counts the times the run compacted its context and `flagged` those whose check found
  * something (item 260): the card says it once there is one of either.
@@ -51,14 +52,10 @@ export function createDetails(run, agent, campaign, keepGoing) {
       ? null
       : fact("Delegated by", el("dd", null, el("a", { href: `#/runs/${run.parent_run_id}` }, "Open the parent run")));
 
-  const card = panelSection({
-    id: "run-details",
-    title: "Details",
-    actions: null,
-    body: el(
-      "dl",
-      { class: "facts" },
-      fact("Status", status),
+  const element = el(
+    "dl",
+    { class: "facts", id: "panel-run-details", "aria-label": "Details" },
+    fact("Status", status),
       agent === null ? null : fact("Agent", el("dd", null, el("a", { href: `#/agents/${agent.id}`, title: agent.role }, agent.name))),
       fact("Model", model),
       fact("Reasoning", el("dd", null, run.effort === null ? "Model default" : askedLabel(run.effort, run.once))),
@@ -68,25 +65,18 @@ export function createDetails(run, agent, campaign, keepGoing) {
       campaign === null
         ? null
         : fact("Campaign", el("dd", null, el("a", { href: `#/campaigns/${campaign.id}` }, campaign.title), `, session ${campaign.session}`)),
-      fact("Tool calls", calls),
-      fact("Tokens", tokens),
-      contextLabel,
-      context,
-      fact("Duration", took),
-      parent,
-    ),
-  });
-  const element = card.element;
-  element.setAttribute("aria-label", "Details");
-  const more = el(
-    "dl",
-    { class: "facts", "aria-label": "More about this run" },
+    fact("Tool calls", calls),
+    fact("Tokens", tokens),
+    contextLabel,
+    context,
+    fact("Duration", took),
+    parent,
     fact("Mode", el("dd", null, run.mode)),
     fact("Started", el("dd", null, dateTimeFull(run.created_at))),
     fact("Run id", el("dd", { class: "run-id" }, el("code", { class: "mono" }, run.id), copy)),
   );
 
-  // What each fact was drawn from: the card is painted every second while the run works, and a fact is drawn again only
+  // What each fact was drawn from: the list is painted every second while the run works, and a fact is drawn again only
   // when it changed (item 310); a status badge drawn again starts its motion again.
   const drawn = new Map();
   function draw(node, from, build) {
@@ -114,5 +104,5 @@ export function createDetails(run, agent, campaign, keepGoing) {
     setText(took, duration(Math.max(0, end - run.created_at)));
   }
 
-  return { element, more, paint };
+  return { element, paint };
 }
