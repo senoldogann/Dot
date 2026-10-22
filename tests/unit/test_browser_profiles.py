@@ -1,7 +1,8 @@
 """The profiles of Dot's own Chrome (item 355): Default and Incognito are always there, the ones added are listed by
-name and can be deleted, a name is a folder's and nothing else, and clearing a profile deletes its cookies and caches
-while its settings stay. The zoom Dot's own Chrome draws pages at (item 358) is written into a profile's preferences,
-the others kept, and so is the word that has Chrome keep the session cookies of its last run (item 453)."""
+name and can be deleted, a name is a folder's and nothing else, and clearing a profile deletes the cookies, the storage
+of the sites and the logins Chrome saved, with the caches, while its history and settings stay (item 532). The zoom
+Dot's own Chrome draws pages at (item 358) is written into a profile's preferences, the others kept, and so is the word
+that has Chrome keep the session cookies of its last run (item 453)."""
 
 import json
 from pathlib import Path
@@ -83,14 +84,73 @@ def test_only_an_added_profile_is_deleted(home: Path) -> None:
         delete_profile("Gone")
 
 
-def test_clearing_deletes_the_cookies_and_the_caches_and_keeps_the_rest(home: Path) -> None:
+# What a site leaves in a profile and Chrome saves for it, as a Chrome 155 profile names it (item 532).
+_SITE_FOLDERS: tuple[str, ...] = (
+    "Cache/Cache_Data",
+    "Code Cache/js",
+    "GPUCache",
+    "DawnGraphiteCache",
+    "DawnWebGPUCache",
+    "Local Storage/leveldb",
+    "Session Storage",
+    "IndexedDB/http_example.com_0.indexeddb.leveldb",
+    "Service Worker/CacheStorage",
+    "Shared Dictionary/cache",
+    "WebStorage",
+    "File System",
+    "databases",
+    "blob_storage",
+)
+_SITE_FILES: tuple[str, ...] = (
+    "Cookies",
+    "Cookies-journal",
+    "Trust Tokens",
+    "Trust Tokens-journal",
+    "Reporting and NEL",
+    "Device Bound Sessions",
+    "Login Data",
+    "Login Data-journal",
+    "Login Data For Account",
+    "Login Data For Account-journal",
+    "Web Data",
+    "Web Data-journal",
+    "Account Web Data",
+    "Affiliation Database",
+    "Affiliation Database-journal",
+)
+_PROFILES_OWN: tuple[str, ...] = ("Extension State", "Extensions", "History", "Preferences", "Secure Preferences")
+
+
+def test_clearing_signs_the_sites_out_of_the_profile_and_keeps_the_rest(home: Path) -> None:
     profile: Path = profile_dir("default") / "Default"
-    (profile / "Cache" / "Cache_Data").mkdir(parents=True)
-    (profile / "Code Cache").mkdir()
-    for name in ("Cookies", "Cookies-journal", "Preferences", "History"):
+    for folder in _SITE_FOLDERS:
+        (profile / folder).mkdir(parents=True)
+        (profile / folder / "data").write_text("x", encoding="utf-8")
+    for name in (*_SITE_FILES, *_PROFILES_OWN[2:]):
         (profile / name).write_text("x", encoding="utf-8")
+    for name in _PROFILES_OWN[:2]:
+        (profile / name).mkdir()
     clear_site_data(profile_dir("default"))
-    assert sorted(entry.name for entry in profile.iterdir()) == ["History", "Preferences"]
+    assert sorted(entry.name for entry in profile.iterdir()) == sorted(_PROFILES_OWN)
+
+
+def test_clearing_a_profile_with_nothing_to_clear_is_no_error(home: Path) -> None:
+    clear_site_data(profile_dir("default"))
+    (profile_dir("default") / "Default").mkdir(parents=True)
+    clear_site_data(profile_dir("default"))
+
+
+def test_clearing_deletes_a_link_and_not_what_it_points_to(home: Path, tmp_path: Path) -> None:
+    profile: Path = profile_dir("default") / "Default"
+    outside: Path = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "kept.txt").write_text("x", encoding="utf-8")
+    profile.mkdir(parents=True)
+    (profile / "Local Storage").symlink_to(outside, target_is_directory=True)
+    (profile / "IndexedDB").symlink_to(tmp_path / "missing")
+    clear_site_data(profile_dir("default"))
+    assert list(profile.iterdir()) == []
+    assert (outside / "kept.txt").read_text(encoding="utf-8") == "x"
 
 
 def test_incognito_is_emptied(home: Path) -> None:
