@@ -90,12 +90,13 @@ currency, so list sites that bill in one currency. Empty by default.
    A click is about money when its control's label asks for it: at the start of the label or of a sentence in it,
    after a stop, a dot, a bar, a dash, a colon or a new line ("Pay $19.90", "Buy", "Order now", "Lamp — $9.90 —
    Buy", "Öde", "Maksa"), anywhere in it ("Place order", "Confirm and pay", "Complete checkout", "Satın al"), or with
-   an amount after a verb that offers something for it ("Rent HD $3.99", "Subscribe for €4.99/month", "Book 2
-   tickets · $40"). "Order", "Book" and "Reserve" with an amount count unless what follows them makes the label a
-   record: an order's number, a colon, or "summary", "history", "details", "status", "number", "total" or "price"
-   ("Order 4521 · $45.00 · Delivered", "Book: Dune · $9.99"). The way to the payment page ("Checkout", "Continue to
-   payment") is an ordinary click, so the run fills the order and the button that pays is the one handed to you
-   (item 522).
+   an amount in the label next to a verb that offers something for it ("Rent HD $3.99", "Subscribe for €4.99/month",
+   "Book 2 tickets · $40"). "Order", "Book" and "Reserve" with an amount count unless what follows them makes the
+   label a record: an order's number, a colon, or "summary", "history", "details", "status", "number", "total" or
+   "price" ("Order 4521 · $45.00 · Delivered", "Book: Dune · $9.99"). A dialog that asks to confirm is judged by the
+   same words, without that exception: there, an order's number is the order about to be paid. The way to the
+   payment page ("Checkout", "Continue to payment") is an ordinary click, so the run fills the order and the button
+   that pays is the one handed to you (item 522).
 5. *The guard* (item 429): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode that asks,

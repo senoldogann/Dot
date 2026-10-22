@@ -41,12 +41,14 @@ _FINANCIAL_ACTION: re.Pattern[str] = re.compile(
 _PRICED_ACTION: re.Pattern[str] = re.compile(
     rf"(?i){_SENTENCE_START}(?:rent|subscribe|upgrade|renew|unlock|tilaa|vuokraa)\b"
 )
-# "Order", "Book" or "Reserve" with an amount in the label is an offer too ("Book 2 tickets · $40", "Reserve for 2
-# guests — €50"), unless what follows the word makes the label a record rather than an offer: an order's number, a
-# colon, or a word that names a record ("Order 4521 · $45.00 · Delivered", "Order #4521", "Book: Dune · $9.99", "Order
-# summary · $45.00", "Reserve price $500"). Only those shapes are left out, so a label nobody foresaw errs towards the
-# hand-off.
-_BOOKING: re.Pattern[str] = re.compile(
+# "Order", "Book" or "Reserve" with an amount in the text is an offer too ("Book 2 tickets · $40", "Reserve for 2
+# guests — €50"). In a dialog's sentences an order's number is the order about to be paid, so a dialog counts them all
+# (`_BOOKING`).
+_BOOKING: re.Pattern[str] = re.compile(rf"(?i){_SENTENCE_START}(?:order|book|reserve)\b")
+# A control's label is no offer when what follows the word makes it a record: an order's number, a colon, or a word
+# that names a record ("Order 4521 · $45.00 · Delivered", "Order #4521", "Book: Dune · $9.99", "Order summary ·
+# $45.00", "Reserve price $500"). Only those shapes are left out, so a label nobody foresaw errs towards the hand-off.
+_BOOKING_LABEL: re.Pattern[str] = re.compile(
     rf"(?i){_SENTENCE_START}(?:order|book|reserve)\b"
     r"(?!\s*#|\s+\d{4,}|\s*:|\s+(?:summary|history|details|status|number|total|price)\b)"
 )
@@ -111,14 +113,24 @@ def looks_like_key(text: str) -> bool:
     return _KEY_LIKE.search(text) is not None
 
 
-def asks_to_pay(text: str) -> bool:
-    """Whether ``text`` is a call to buy, pay or donate: words that say so ("Pay now", "Confirm and pay"), a verb that
-    offers something for an amount the text names ("Rent HD $3.99"), or a booking with its amount ("Book now ·
-    $199")."""
+def _pays(text: str, booking: re.Pattern[str]) -> bool:
     if _FINANCIAL_ACTION.search(text) is not None:
         return True
-    offers: bool = _PRICED_ACTION.search(text) is not None or _BOOKING.search(text) is not None
+    offers: bool = _PRICED_ACTION.search(text) is not None or booking.search(text) is not None
     return offers and bool(find_amounts(text))
+
+
+def asks_to_pay(text: str) -> bool:
+    """Whether ``text``, a dialog's message, is a call to buy, pay or donate: words that say so ("Pay now", "Confirm and
+    pay"), a verb that offers something for an amount the text names ("Rent HD $3.99"), or an order or a booking with
+    its amount ("Order #4521 will be charged $45.00")."""
+    return _pays(text, _BOOKING)
+
+
+def label_asks_to_pay(label: str) -> bool:
+    """Whether a control's label is a call to pay, as :func:`asks_to_pay` judges a dialog, except that a label shaped
+    as a record ("Order 4521 · $45.00 · Delivered") is none."""
+    return _pays(label, _BOOKING_LABEL)
 
 
 def typing_reasons(element: Element | None, text: str | None) -> list[str]:
@@ -146,7 +158,7 @@ def naming_reasons(element: Element | None) -> list[str]:
     following or liking."""
     if element is None:
         return []
-    reasons: list[str] = ["financial"] if asks_to_pay(element.name) else []
+    reasons: list[str] = ["financial"] if label_asks_to_pay(element.name) else []
     for label, pattern in (
         ("destructive", _DESTRUCTIVE_ACTION),
         ("send", _SEND_ACTION),

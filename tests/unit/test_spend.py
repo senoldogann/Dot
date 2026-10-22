@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from dotagent.browser.safety import dialog_is_financial
 from dotagent.config import SpendCap
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, naming_reasons
 from dotagent.policy.engine import decide
@@ -97,6 +98,8 @@ def test_the_amount_of_a_label_is_the_number_next_to_a_currency(label: str, amou
         "Book (€199)",
         "Book at $199",
         "Reserve · from €120",
+        # A book's place in its series reads as a booking: a label nobody foresaw errs towards the hand-off.
+        "Dune · Book 1 · $9.99",
         "Subscribe for €4.99/month",
         "Upgrade · 99 TL",
         "Satın al",
@@ -145,6 +148,20 @@ def test_a_label_that_names_money_or_leads_to_the_payment_page_is_no_payment(lab
     """The control that takes the money is the payment: the way to the payment page is a plain click, so that the run
     fills the order before the button that pays is handed to the owner."""
     assert "financial" not in assessment_for(naming_reasons(Element(role="button", name=label))).flags, label
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Order #4521 will be charged $45.00 to your card. Continue?",
+        "Order 20261010: $45.00 will be charged",
+        "Reserve: €50 will be taken from your card",
+    ],
+)
+def test_a_dialog_that_names_an_order_and_its_amount_asks_to_pay(message: str) -> None:
+    """In a dialog's sentences an order's number is the order about to be paid: the shapes that make a label a record
+    do not make a dialog one."""
+    assert dialog_is_financial(message), message
 
 
 def test_the_total_of_a_page_is_the_largest_amount_after_a_total_cue() -> None:
