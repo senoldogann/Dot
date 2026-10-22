@@ -26,6 +26,11 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "harness-page-token"
 HABIT: str = "- Read a file before you change it."
+# Whether each grid of the page keeps its columns inside it, and itself inside the screen (item 527): a column with a
+# fixed least width reaches past a narrow phone's edge, inside a pane that scrolls on its own.
+FITS: str = """() => [...document.querySelectorAll(".stat-row, .harness-columns, .harness-grid, .lesson-grid")].every(
+  (grid) => grid.scrollWidth <= grid.clientWidth && grid.getBoundingClientRect().right <= window.innerWidth
+)"""
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -102,7 +107,7 @@ async def _open(browser: Browser, client: httpx.AsyncClient, width: int) -> Page
 
 
 async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
-    browser: Browser, client: httpx.AsyncClient
+    browser: Browser, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
     page: Page = await _open(browser, client, 1280)
     try:
@@ -113,12 +118,20 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
         await expect(page.get_by_text("Dot's built-in instructions alone: no version is in use.")).to_be_visible()
         await expect(page.get_by_text("No version yet")).to_be_visible()
         await expect(page.get_by_text("Nothing learned yet")).to_be_visible()
-        # The form says what goes in it (item 412): that it is optional, what each field takes, with examples.
+        # The overview leads the page (item 527): the instructions in use, the versions, the nights and the lessons.
+        overview = page.get_by_role("group", name="Overview")
+        await expect(overview.locator(".stat-tile")).to_have_count(4)
+        await expect(overview).to_contain_text("Built-in")
+        await expect(overview).to_contain_text("the nightly learning is off")
+        # The form says what goes in it (item 412): that it is optional, what each field takes, with examples; its
+        # fields stay folded until the owner asks for them.
         write = page.locator("section.memory-panel", has_text="Write your own (optional)")
         await expect(write.locator(".harness-intro")).to_contain_text("Optional: you need not write anything here.")
         await expect(write.locator(".harness-intro")).to_contain_text(
             "Once a time of day is set for the nightly learning"
         )
+        await expect(page.get_by_role("textbox", name="Habits")).to_have_count(0)
+        await write.get_by_role("button", name="Write a version").click()
         assert "For example:" in (await page.get_by_role("textbox", name="Habits").get_attribute("placeholder") or "")
         await write.get_by_role("button", name="Start from an example").click()
         await expect(page.get_by_role("textbox", name="Habits")).to_have_value(re.compile(r"^- Read a file whole"))
@@ -133,6 +146,8 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
         await expect(row).to_have_count(1)
         await expect(row.locator(".badge")).to_have_text("in use")
         await expect(row.get_by_text("Read first")).to_be_visible()
+        await expect(overview).to_contain_text("A version")
+        await expect(overview).to_contain_text("1 in use")
         # The API says the same.
         view: dict[str, object] = (await client.get("/api/harness")).json()
         assert view["adopted"] is not None
@@ -145,13 +160,20 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
         await expect(in_use.get_by_text(HABIT)).to_be_visible()
         await expect(page.get_by_text("every night at", exact=False)).to_have_count(0)
         await expect(page.get_by_text("off: set a time of day in the config file", exact=False)).to_be_visible()
+        await page.screenshot(path=tmp_path / "harness-1280.png", full_page=True)
     finally:
         await page.close()
 
 
 async def test_the_phone_lists_self_improvement_among_how_dot_works(
-    browser: Browser, client: httpx.AsyncClient
+    browser: Browser, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
+    # A version in use, so that its two texts stand on the page when its width is measured.
+    written: httpx.Response = await client.post(
+        "/api/harness",
+        json={"habits": HABIT, "tool_guidance": "- Search code with rg.", "summary": "On a phone", "adopt": True},
+    )
+    assert written.status_code == 200, written.text
     page: Page = await browser.new_page(
         viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, device_scale_factor=2
     )
@@ -165,5 +187,15 @@ async def test_the_phone_lists_self_improvement_among_how_dot_works(
         await row.click()
         await expect(page.get_by_role("heading", name="Self-improvement", exact=True)).to_be_visible()
         await expect(page.locator("section.memory-panel", has_text="What Dot follows now")).to_be_visible()
+        # The overview's tiles go two to a row on a phone, and nothing reaches past the screen's edge: not on this
+        # phone, nor on an iPhone mini (375 points wide) or the first iPhone SE (320).
+        tiles = page.get_by_role("group", name="Overview").locator(".stat-tile")
+        await expect(tiles).to_have_count(4)
+        await expect(page.locator(".harness-columns")).to_be_visible()
+        for width in (390, 375, 320):
+            await page.set_viewport_size({"width": width, "height": 844})
+            assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), width
+            assert await page.evaluate(FITS), width
+            await page.screenshot(path=tmp_path / f"harness-{width}.png", full_page=True)
     finally:
         await page.close()
