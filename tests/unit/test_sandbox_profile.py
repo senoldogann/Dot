@@ -5,12 +5,14 @@ a process starts without it, and on, only once its profiles start."""
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from dotagent.core.errors import ConfigError
 from dotagent.policy.sandbox import (
+    CLIPBOARD_SERVICES,
     HANDING_PROGRAMS,
     HANDING_SERVICES,
     SANDBOX_EXEC,
@@ -157,3 +159,47 @@ async def test_a_sandbox_whose_program_does_not_start_is_never_switched_on(tmp_p
     # Off needs nothing to start.
     await switched.switch(False)
     assert switched.on is False
+
+
+# What looks the clipboard's service up and says what macOS answered (0: found, 1100: refused), without asking the
+# service for anything: no test reads or writes the clipboard of the Mac it runs on.
+_LOOK_UP_THE_CLIPBOARD: str = """import ctypes
+
+lib = ctypes.CDLL(None)
+lookup = lib.bootstrap_look_up
+lookup.argtypes = [ctypes.c_uint, ctypes.c_char_p, ctypes.POINTER(ctypes.c_uint)]
+lookup.restype = ctypes.c_int
+port = ctypes.c_uint(0)
+bootstrap = ctypes.c_uint.in_dll(lib, "bootstrap_port")
+print(lookup(bootstrap.value, b"com.apple.pasteboard.1", ctypes.byref(port)))
+"""
+
+
+def test_the_profile_closes_the_clipboard_to_a_process_of_a_run() -> None:
+    """Item 534: the pasteboard's service is refused in a rule of its own, beside the services that hand work on."""
+    rules: list[str] = sandbox_profile((), (), Path("/home/Library/LaunchAgents")).splitlines()
+    assert CLIPBOARD_SERVICES == ("com.apple.pasteboard.1",)
+    assert '(deny mach-lookup (global-name "com.apple.pasteboard.1"))' in rules
+    handed: str = next(rule for rule in rules if rule.startswith("(deny mach-lookup "))
+    assert not any(f'(global-name "{service}")' in handed for service in CLIPBOARD_SERVICES)
+
+
+def test_macos_refuses_a_command_of_a_run_the_clipboards_service(tmp_path: Path) -> None:
+    """Item 534: whatever the line that starts a program says (a name in quotes the shell takes out twice, a script in a
+    file), the program cannot look the clipboard's service up, so it can neither read what the user copied nor put text
+    there; a process outside the sandbox finds it. The look-up reads nothing from the clipboard."""
+    probe: Path = tmp_path / "look_up.py"
+    probe.write_text(_LOOK_UP_THE_CLIPBOARD, encoding="utf-8")
+    home: Path = Path(os.path.realpath(tmp_path)) / "home"
+    home.mkdir()
+    words: tuple[str, ...] = build_sandbox(
+        (home / "token",), (home / "token",), (home / "skills",), home / "agents"
+    ).commands
+    outside: subprocess.CompletedProcess[str] = subprocess.run(
+        [sys.executable, str(probe)], capture_output=True, text=True, check=False
+    )
+    inside: subprocess.CompletedProcess[str] = subprocess.run(
+        [*words, sys.executable, str(probe)], capture_output=True, text=True, check=False
+    )
+    assert (outside.returncode, outside.stdout.strip()) == (0, "0"), outside
+    assert (inside.returncode, inside.stdout.strip()) == (0, "1100"), inside

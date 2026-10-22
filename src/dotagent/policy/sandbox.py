@@ -23,6 +23,14 @@ into the user's ``~/Library/LaunchAgents``. An application that is already open 
 Safari), with its own powers; ``desktop_open_app`` opens one from Dot's own process, and asks first for one that is not
 on the sealed system volume, however it is named.
 
+The clipboard is closed too (item 534): the profile refuses a lookup of the pasteboard's service
+(:data:`CLIPBOARD_SERVICES`), so no process of a run reads what the user has just copied (a password from their
+password manager) or puts text there, whatever the line that started it says: ``pbpaste`` and ``pbcopy``, an
+AppleScript's ``the clipboard``, a program's own ``NSPasteboard``. The shell guard asks before a run tries it
+(:mod:`dotagent.policy.shell`), by the names it can read; the sandbox is what holds when it cannot read them (a name
+spelt by a quote the shell takes out twice, a script in a file). The tools ``desktop_clipboard_write`` and
+``desktop_clipboard_read`` run in Dot's own process, outside the sandbox, and ask as the policy says.
+
 Apple Events are the exception, and the profile cannot refuse them: ``(deny appleevent-send …)`` compiles and holds
 nothing (measured on macOS 26: with the rule over the terminal apps, Script Editor, Automator, Shortcuts, System
 Events, the Finder and Xcode, a script still drove the Finder and the terminal apps, and started an application that
@@ -31,7 +39,8 @@ application; the Automation permission the owner grants (TCC) and the policy's r
 (:mod:`dotagent.tools.apple`) are what stand in its way.
 
 What the sandbox costs: macOS starts no program that runs as root from inside it (``ps``, ``top``, ``sudo``,
-``crontab``), and a run's command opens nothing (``open``). What it does not cover: Apple Events, as above; a program
+``crontab``), a run's command opens nothing (``open``), and it neither reads nor writes the clipboard (``pbcopy`` fails:
+``desktop_clipboard_write`` is the way to put text there). What it does not cover: Apple Events, as above; a program
 that speaks to a service through its own interface, not through the programs above; and the programs Dot starts itself
 (its browser, the MCP servers), which run from where they are installed, which a process of a run may change when the
 user's account may; Dot's own code is among what it loads and runs.
@@ -69,6 +78,12 @@ HANDING_SERVICES: tuple[str, ...] = (
 )
 
 
+# The service of the clipboard: a process that cannot look it up can neither read what the user copied nor put text on
+# the clipboard (item 534). Measured on macOS 26: ``pbpaste`` prints nothing and an AppleScript's ``the clipboard``
+# fails with -4960 under a profile that refuses it; ``bootstrap_look_up`` answers 1100 where it answers 0 outside.
+CLIPBOARD_SERVICES: tuple[str, ...] = ("com.apple.pasteboard.1",)
+
+
 class Sandbox(FrozenModel):
     """The words that start a process of a run in the sandbox: ``commands`` for a shell command, a terminal session and
     an AppleScript, ``search`` for ripgrep. :data:`UNSANDBOXED` has none."""
@@ -94,8 +109,9 @@ def sandbox_profile(sealed: tuple[Path, ...], unwritable: tuple[Path, ...], laun
     """A profile that allows everything but reading or changing ``sealed``, changing ``unwritable``, and renaming or
     removing a folder above any of them (a file can still be made inside such a folder); and having another program act
     outside it: opening anything through Launch Services, starting :data:`HANDING_PROGRAMS` where macOS installs them or
-    the services of :data:`HANDING_SERVICES` they would hand something to, creating a job of launchd, and writing into
-    ``launch_agents``, where launchd finds the jobs it starts at a login. The paths must be resolved: the sandbox
+    the services of :data:`HANDING_SERVICES` they would hand something to, creating a job of launchd, writing into
+    ``launch_agents``, where launchd finds the jobs it starts at a login, and looking up the clipboard's service
+    (:data:`CLIPBOARD_SERVICES`). The paths must be resolved: the sandbox
     matches the path a file has, not the link a process names it by. Apple Events are not among them: macOS does not
     hold this profile to ``appleevent-send``."""
     ancestors: list[Path] = sorted(
@@ -117,6 +133,7 @@ def sandbox_profile(sealed: tuple[Path, ...], unwritable: tuple[Path, ...], laun
     rules.append("(deny lsopen)")
     rules.append(f"(deny process-exec {_filters('literal', list(HANDING_PROGRAMS))})")
     rules.append(f"(deny mach-lookup {_filters('global-name', HANDING_SERVICES)})")
+    rules.append(f"(deny mach-lookup {_filters('global-name', CLIPBOARD_SERVICES)})")
     rules.append("(deny job-creation)")
     return "\n".join(rules)
 

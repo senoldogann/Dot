@@ -629,7 +629,7 @@ _JS_ESCAPE: re.Pattern[str] = re.compile(r"\\x([0-9a-fA-F]{2})|\\u([0-9a-fA-F]{4
 # anywhere on the line, whatever way its script comes (a pipe, a here-document, a variable, a glued ``-e``).
 _PBPASTE: re.Pattern[str] = re.compile(r"\bpbpaste\b", re.IGNORECASE)
 _OSASCRIPT: re.Pattern[str] = re.compile(r"osascript", re.IGNORECASE)
-_CLIPBOARD_WORD: re.Pattern[str] = re.compile(r"clipboard|pasteboard", re.IGNORECASE)
+_CLIPBOARD_WORD: re.Pattern[str] = re.compile(r"clipboard", re.IGNORECASE)
 # Any pasteboard of the system's, named on the line: inline code in another language (``python3 -c`` with
 # ``NSPasteboard``, ``swift -e``) reads it by the class's name.
 _PASTEBOARD: re.Pattern[str] = re.compile(r"pasteboard", re.IGNORECASE)

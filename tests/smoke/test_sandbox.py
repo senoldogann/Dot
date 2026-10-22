@@ -237,6 +237,34 @@ async def test_a_command_of_a_run_hands_launchd_nothing_and_one_of_a_yolo_run_do
     assert "Darwin" in await _run(await _context(runtime, "yolo"), "shell", {"command": "launchctl version"})
 
 
+# What looks the clipboard's service up and prints what macOS answered (0: found, 1100: refused), asking it for nothing:
+# no test reads or writes the clipboard of the Mac it runs on.
+_LOOK_UP_THE_CLIPBOARD: str = """import ctypes
+
+lib = ctypes.CDLL(None)
+lookup = lib.bootstrap_look_up
+lookup.argtypes = [ctypes.c_uint, ctypes.c_char_p, ctypes.POINTER(ctypes.c_uint)]
+lookup.restype = ctypes.c_int
+port = ctypes.c_uint(0)
+bootstrap = ctypes.c_uint.in_dll(lib, "bootstrap_port")
+print(lookup(bootstrap.value, b"com.apple.pasteboard.1", ctypes.byref(port)))
+"""
+
+
+async def test_a_command_of_a_run_cannot_look_up_the_clipboards_service_and_one_of_a_yolo_run_can(
+    runtime: Runtime,
+) -> None:
+    """Item 534: the clipboard can hold a password the user has just copied, so the profile refuses its service to a
+    command of a run whatever line or program asks; a yolo run's command, outside the sandbox, finds it."""
+    script: Path = workspace_dir() / "look_up.py"
+    await asyncio.to_thread(script.write_text, _LOOK_UP_THE_CLIPBOARD, encoding="utf-8")
+    line: dict[str, str] = {"command": f"python3 {shlex.quote(str(script))}"}
+    shut: str = await _run(await _context(runtime, "ask"), "shell", line)
+    assert shut.startswith("[exit 0") and shut.rstrip().endswith("1100"), shut
+    open_: str = await _run(await _context(runtime, "yolo"), "shell", line)
+    assert open_.startswith("[exit 0") and open_.rstrip().endswith("0") and "1100" not in open_, open_
+
+
 async def test_a_search_of_a_run_reads_neither_dots_own_files_nor_the_protected_locations(runtime: Runtime) -> None:
     ctx: ToolContext = await _context(runtime, "ask")
     vault: Path = Path(runtime.config.policy.protected_paths[0])
