@@ -43,11 +43,8 @@ function appendChildren(node, children) {
 
 /** The event a button of a file sends up the page to show its file in the panel beside the conversation (item 195). */
 export const OPEN_FILE_EVENT = "dot:open-file";
-/** The buttons of files: each names its file in its data, as `fileSource` reads it. */
-export const FILE_BUTTONS = "button[data-attachment], button[data-path]";
-
 /** The file a button names: `{ attachment, name }` for a file a message carries, `{ path }` for one named by its path. */
-export function fileSource(node) {
+function fileSource(node) {
   const { attachment, name, path } = node.dataset;
   return attachment === undefined ? { path } : { attachment, name };
 }

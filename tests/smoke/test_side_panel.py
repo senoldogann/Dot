@@ -1,8 +1,9 @@
-"""The side panel of a run in tabs (item 203): Run (the details, the cost and the files), Plan, Agents and Screen, one
-at a time, each section of a tab open, the plan's steps done beside its tab; the arrows, Home and End move between the
-tabs, and the tab chosen last is kept. Beside the conversation the panel slides in and out, at once under reduced
-motion, and the Screen tab without a frame keeps the shape of a screen and says why (item 220). A scripted run with a
-plan, served by a real server, beside the conversation and as a drawer on a phone, light and dark."""
+"""The side panel of a run in tabs (item 203): Run (the recap, the context and, folded under More, the facts and the
+cost, item 544), Plan, Agents and Screen, one at a time, the plan's steps done beside its tab; in a tab of several
+sections each scrolls on its own, and a tab of one section has the panel to itself; the arrows, Home and End move
+between the tabs, and the tab chosen last is kept. Beside the conversation the panel slides in and out, at once under
+reduced motion, and the Screen tab without a frame keeps the shape of a screen and says why (item 220). A scripted run
+with a plan, served by a real server, beside the conversation and as a drawer on a phone, light and dark."""
 
 import asyncio
 import time
@@ -188,26 +189,32 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                 await expect(run_tab).to_have_attribute("aria-selected", "true")
                 shown: Locator = panel.get_by_role("tabpanel")
                 await expect(shown).to_have_count(1)
-                # The Files card (item 364) stays hidden while the conversation has no file; what a glance does not need
-                # folds away under More, closed the first time (item 452).
+                # No Files card and no Details card (item 544): the facts a glance does not need fold away under
+                # More, closed the first time (item 452).
                 top: Locator = shown.locator(":scope > .panel-section:not([hidden])")
                 await expect(top.locator(":scope > .panel-section-head .panel-section-title")).to_have_text(
-                    ["Details", "More"]
+                    ["Recap", "Skills & MCP", "More"]
                 )
-                await expect(shown.get_by_label("Details")).to_contain_text("running")
-                await expect(shown.get_by_label("Details")).not_to_contain_text("Run id")
+                # Each section of the tab scrolls on its own once it holds more than its share of the screen.
+                skills: Locator = shown.locator("#panel-run-skills")
+                assert await skills.evaluate("(body) => getComputedStyle(body).overflowY") == "auto"
+                assert await skills.evaluate("(body) => getComputedStyle(body).maxHeight") != "none"
                 more: Locator = shown.get_by_role("button", name="More")
                 if index == 0:
                     await expect(more).to_have_attribute("aria-expanded", "false")
+                    await expect(shown.get_by_label("Details")).to_be_hidden()
                 if await more.get_attribute("aria-expanded") == "false":
                     await more.click()
-                # The bill under More, label beside value as the details are, no line over it saying it again; the run's
-                # id beside it.
-                await expect(shown.get_by_label("More about this run")).to_contain_text("Run id")
+                # The facts under More: the run's state, its id among them.
+                await expect(shown.get_by_label("Details")).to_contain_text("running")
+                await expect(shown.get_by_label("Details")).to_contain_text("Run id")
                 bill: Locator = shown.get_by_label("Cost of this run")
                 await expect(bill).to_be_visible()
                 await expect(bill).to_contain_text("Input tokens")
-                await expect(top.locator(":scope > .panel-section-head .panel-summary")).to_have_text(["", ""])
+                # Skills & MCP counts what the run may use; More says nothing over itself when no set-up warns.
+                await expect(top.locator(":scope > .panel-section-head .panel-summary")).to_have_text(
+                    ["", "3 skills", ""]
+                )
                 # The drawer has its own way out; beside the conversation, the header's button closes the panel.
                 close: Locator = panel.get_by_role("button", name="Close the details")
                 if width < 960:
@@ -218,6 +225,9 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                 # The plan's tab: its steps at once, nothing to unfold.
                 await panel.get_by_role("tab", name="Plan").click()
                 await expect(shown.locator(".panel-section-title")).to_have_text(["Plan"])
+                # A tab of one section has the panel to itself: its body is not held to a share of the screen.
+                plan_body: Locator = shown.locator("#panel-run-plan")
+                assert await plan_body.evaluate("(body) => getComputedStyle(body).maxHeight") == "none"
                 for step in _STEPS:
                     await expect(shown).to_contain_text(step)
                 await _shoot(page, tmp_path / f"panel-plan-{width}-{scheme}.png")

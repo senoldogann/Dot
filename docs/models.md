@@ -208,8 +208,9 @@ works](runs.md#how-a-run-works)); without a model it shows `[models] main`.
 to one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model
 that offers fewer than two has no choice to make, and its picker stays hidden. `models.effort` is the default; one run
 picks another with `dotx run --effort high`, with the Reasoning menu of the composer in the web UI, or with `effort` in
-`POST /api/runs`. The run keeps the level it was started with (the Details panel shows it). A level the model does not
-offer is refused (a 422 over HTTP); the configured default, which is not tied to one model, is rounded to the nearest
+`POST /api/runs`. The run keeps the level it was started with (the facts under the side panel's More show it). A level
+the model does not offer is refused (a 422 over HTTP); the configured default, which is not tied to one model, is
+rounded to the nearest
 level the model has (`off` to its lowest, `max` to its highest).
 
 **Fast mode.** Claude Opus 5.5, Opus 5 and Opus 4.8 have fast mode: up to 2.5 times the output speed, at twice the price
@@ -220,8 +221,9 @@ Tier commitment. The Models API does not say which models have it, so Dot names 
 (`FAST_MODE_MODELS` in `llm/anthropic.py`); Settings › Models marks them `fast mode` (`fast_mode` in `GET /api/models`).
 The Reasoning menu of the composer has Speed, Standard or Fast, for such a model, off at first; the pill then reads
 `High · Fast`. A chat keeps it with its choices, a new chat's box in this browser, and the run it starts keeps it as its
-model and level (`speed` in `POST /api/runs` and in the queue; the Details panel says so). Each step of such a run on a
-model with fast mode asks for it (`speed: "fast"` with the beta `fast-mode-2026-02-01`, which the preview models need
+model and level (`speed` in `POST /api/runs` and in the queue; the facts under the side panel's More say so). Each step
+of such a run on a model with fast mode asks for it (`speed: "fast"` with the beta `fast-mode-2026-02-01`, which the
+preview models need
 and Opus 5.5 takes without effect); a step on another model (a routed step, a standby model) runs at the standard speed,
 as do helpers on a model without it. Dot never falls back by itself: a refusal (an organization not let into a preview
 model's fast mode, fast mode's own rate limit, once retried) is the run's error, as Anthropic says it. Fast mode for a
@@ -235,8 +237,9 @@ only what joins or checks their reports; the helpers work at the run's level, or
 reads the choice until the message goes, and the next message goes with the level the chat keeps, which the choice never
 changes. The run keeps it as it was started: the run that resumes it, the one that carries on after an answered question
 and every session of a campaign started with it (`once` in `POST /api/runs` and in the queue, `ultrathink` or
-`ultracode`; the Details panel says `Max, Ultrathink`). A model without the level is refused (a 422 over HTTP), and a
-helper, which cannot delegate, is never told to split. The names are Claude Code's, where ultrathink is a word in a
+`ultracode`; the facts under the side panel's More say `Max, Ultrathink`). A model without the level is refused (a 422
+over HTTP), and a helper, which cannot delegate, is never told to split. The names are Claude Code's, where ultrathink
+is a word in a
 prompt that asks for deeper thinking on that turn and Ultracode runs a task as a workflow of many agents; in Dot they
 are these levels, the second with the split. The word `ultrathink` or `ultracode` typed in the composer (a whole word,
 any case; the first of the two when both are there) is the same choice for that message when the model offers its

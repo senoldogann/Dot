@@ -1275,6 +1275,16 @@
   padding: 4px 16px 16px;
 }
 
+/* In a tab of several sections each scrolls on its own once it holds more than a share of the screen (item 544), its
+   head staying over it, so that a long recap or list does not push the sections under it out of sight. A tab of one
+   section has the panel to itself; Dot's computer and the screenshots keep their own size. */
+.inspector-panel:not([data-tab="screen"]) > .panel-section:not(:only-child) > .panel-section-body {
+  max-height: 40vh;
+  max-height: 40dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* The context under the recap (item 539): a row a line, its mark on a tile and its name, with what stands beside them
    at the right (a server's tools, a file's counts). A page keeps its address on one line; the row never widens the
    panel. */
@@ -1731,42 +1741,6 @@ button.context-row {
 
 .file-chart figcaption {
   margin-bottom: 4px;
-}
-
-/* The files of the conversation, in the panel: a row a file, its name over where it is. */
-.files-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.file-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 8px;
-  align-items: center;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.file-row:hover {
-  background: var(--surface-2);
-}
-
-.file-row-name,
-.file-row-where {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-row-where {
-  grid-column: 2;
 }
 
 /* The recap of the run (item 536): its few lines, a step apart, and under them the step it is as of and its model. */

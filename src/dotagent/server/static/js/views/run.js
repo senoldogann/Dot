@@ -16,7 +16,7 @@ import { createDetails } from "../details.js";
 import { CHAT_BOX_PX, composerFrame, keepDraft, moveDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
 import { createContextPanel } from "../contextpanelview.js";
-import { clip, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
+import { clip, debounce, duration, el, modelName, OPEN_FILE_EVENT, plural, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { BACKGROUND_SOURCE, backgroundNote, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
@@ -73,8 +73,6 @@ const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismis
 const LESSON_DONE = { save: "Saved to memory: later runs find it like any note.", dismiss: "The lesson is dismissed.", undo: "Undone: the lesson is no longer in memory." };
 // A replayed run brings its question events in a burst: one refresh after it is enough.
 const QUESTIONS_SETTLE_MS = 120;
-// The conversation changes with every event of a run: the list of its files is drawn again once it settles.
-const FILES_SETTLE_MS = 250;
 // The tools whose results change a file the Changes tab lists (item 368), and how long its read waits for more.
 const CHANGING_TOOLS = new Set(["write_file", "edit_file"]);
 const CHANGES_SETTLE_MS = 400;
@@ -341,14 +339,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const cost = createCostCard();
 
   // ------------------------------------------------------------------------------------------------ more
-  // The Run tab holds what a glance needs (item 452): the details and the conversation's files. The run's mode, its
-  // start and its id, how it was set up and where its time went fold away under More, closed the first time; a line of
-  // the set-up that warns is counted beside its title.
+  // The Run tab holds what a glance needs: the recap and what the run used, wrote, read and remembered (items 536 and
+  // 539). The facts of the run (its model, its approvals, its work, its time, its mode and its id), how it was set up
+  // and where its time went fold away under More, closed the first time (items 452 and 544); a line of the set-up that
+  // warns is counted beside its title.
   const more = panelFold({
     id: "run-more",
     title: "More",
     actions: null,
-    body: el("div", { class: "run-more" }, details.more, setup.element, cost.element),
+    body: el("div", { class: "run-more" }, details.element, setup.element, cost.element),
     openAtFirst: false,
   });
 
@@ -1278,44 +1277,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       : run.source === BACKGROUND_SOURCE
         ? backgroundNote(run.goal)
         : userMessage({ text: run.goal, sentAt: run.created_at, files: [], editFromHere: ownsMessages && run.rewindable ? () => editFromHere(run) : null });
-  // ------------------------------------------------------------------------------------------------- files
-  // The files of the conversation (item 195): those its messages carried and those its answers name, in the order it
-  // shows them, each opening beside it as its chip or its path does. The list follows the conversation as it grows.
-  const filesBody = el("div", { class: "files-list" });
-  const filesCard = panelSection({ id: "run-files", title: "Files", actions: null, body: filesBody });
-  filesCard.element.hidden = true;
-  let filesShown = "";
-
-  function fileRow(source) {
-    const name = source.name ?? source.path.slice(source.path.lastIndexOf("/") + 1);
-    return el(
-      "button",
-      { class: "file-row", type: "button", title: source.path ?? name, dataset: source, onclick: (event) => requestFile(event.currentTarget) },
-      icon("file"),
-      el("span", { class: "file-row-name" }, name),
-      source.path === undefined ? null : el("span", { class: "small muted file-row-where" }, source.path),
-    );
-  }
-
-  function paintFiles(thread) {
-    const sources = new Map();
-    for (const button of thread.querySelectorAll(FILE_BUTTONS)) {
-      const source = fileSource(button);
-      const key = source.attachment ?? source.path;
-      if (!sources.has(key)) {
-        sources.set(key, source);
-      }
-    }
-    const shown = [...sources.keys()].join("\n");
-    if (shown === filesShown) {
-      return;
-    }
-    filesShown = shown;
-    filesCard.element.hidden = sources.size === 0;
-    filesCard.setSummary(el("span", null, sources.size === 1 ? "1 file" : `${sources.size} files`));
-    filesBody.replaceChildren(...[...sources.values()].map(fileRow));
-  }
-
   const actorName = agent !== null ? agent.name : dotName();
   // The width of the panel (item 109): chosen on Dot's computer or dragged on the handle beside the panel.
   const stage = createStageSize({ layout });
@@ -1342,17 +1303,17 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     screenQuiet.hidden = screenContent;
     computer.element.hidden = !screenContent;
   }
-  // The side panel (item 84), in tabs (item 203), each with its icon (item 227): the run (its details, its cost, item
-  // 96, and the files of the conversation), the plan, the agents of the chat and the screen (Dot's computer and the
-  // screenshots). The run's state is the top bar's face and the Details section's first
-  // fact; no card at the head of the conversation (item 113).
+  // The side panel (item 84), in tabs (item 203), each with its icon (item 227): the run (its recap, its context and,
+  // under More, its facts and its cost, item 544), the files it changed, the plan, the agents of the chat and the screen
+  // (Dot's computer and the screenshots). The run's state is the top bar's face; no card at the head of the
+  // conversation (item 113). The conversation's files open from their chips and paths in it.
   // The file beside the conversation stays as the chat goes on at its next run (a message sent, an answer that came;
   // item 406): the browser's tab keeps it by the thread, and the next run's page shows it again as it opens.
   const fileKey = `dot.panelFile.${run.thread_id}`;
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Run", icon: "info", sections: [recap.element, ...context.elements, details.element, filesCard.element, more.element] },
+      { id: "run", label: "Run", icon: "info", sections: [recap.element, ...context.elements, more.element] },
       { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
@@ -1506,8 +1467,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     lessonsCard,
   );
   paintWorking();
-  const filesWatch = new MutationObserver(debounce(() => paintFiles(thread), FILES_SETTLE_MS));
-  filesWatch.observe(thread, { childList: true, subtree: true });
   const main = el("div", { class: "run-main" }, thread, dock);
   // On a phone the dock floats over the conversation's foot (item 374), a pane of glass with the messages going by
   // under it: its height is kept on the column that holds them both, where the conversation's padding reads it. The
@@ -1533,7 +1492,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   }
   paintStats();
   paintCost();
-  paintFiles(thread);
   syncControls();
   // The words in the box are read again when the window crosses the phone's width.
   PHONE.addEventListener("change", syncControls);
@@ -1657,7 +1615,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     }
     window.removeEventListener("scroll", onScroll);
     thread.removeEventListener("scroll", onScroll);
-    filesWatch.disconnect();
     lessonCuts.disconnect();
     settling.disconnect();
     clearTimeout(settled);

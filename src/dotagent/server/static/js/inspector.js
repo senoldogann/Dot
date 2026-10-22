@@ -92,7 +92,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
     );
     const panel = el(
       "div",
-      { class: "inspector-panel", role: "tabpanel", id: `inspector-panel-${id}`, "aria-labelledby": button.id, hidden: true },
+      { class: "inspector-panel", role: "tabpanel", id: `inspector-panel-${id}`, "aria-labelledby": button.id, hidden: true, dataset: { tab: id } },
       ...sections,
       id === screensIn ? screens : null,
     );

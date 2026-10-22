@@ -49,8 +49,8 @@ is the answer (a small model that is offered both writes the call out as text).
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
   and the event says so with the reason. In the conversation a compaction is a quiet line across the column where it
   happened, with the size of the context before and after it ("Context compacted 401k → 17k tokens", item 312); the
-  Details panel counts them and says how many checks flagged something (item 260), and the Cost panel keeps the
-  summaries' share. Next to the summary a continuity note keeps the
+  facts under the side panel's More count them and say how many checks flagged something (item 260), and the Cost panel
+  keeps the summaries' share. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
@@ -250,12 +250,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `.xls`, `.ppt`) or one locked with a password is refused, saying what to save instead. Anything else is refused at
   upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one named like a file
   Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
-- A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269), a
-  file's path an answer names in code (under `~/` or `/Users/<you>/`; Dot names the files it made by their full paths),
-  and a file in the side panel's **Files** (on its Run tab: the conversation's files, those its messages carried and
-  those its answers name) open it in the side panel, which takes half of the page while it has its own width, and the
-  whole screen on a phone. A PDF shows its pages as pictures the daemon draws with Core Graphics as they come into view;
-  a page more than 20,000 px tall at the width asked is refused rather than drawn (item 386). A Word document, an Excel
+- A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269) and
+  a file's path an answer names in code (under `~/` or `/Users/<you>/`; Dot names the files it made by their full
+  paths) open it in the side panel (the Run tab's list of the conversation's files went with item 544), which takes
+  half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
+  daemon draws with Core Graphics as they come into view; a page more than 20,000 px tall at the width asked is refused
+  rather than drawn (item 386). A Word document, an Excel
   workbook and a presentation show first as macOS's Quick Look draws them (item 268), as Finder would: their fonts,
   fills, pictures and shapes, a workbook's sheets one tab each (Quick Look leaves hidden sheets out and shows the values
   the file saved). The daemon asks `qlmanage` for the drawing once per version of the file, keeps it in `looks/` in its
