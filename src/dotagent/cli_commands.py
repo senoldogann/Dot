@@ -386,6 +386,14 @@ class PruneCommand(FrozenModel):
     apply: bool
 
 
+class BackupNowCommand(FrozenModel):
+    name: Literal["backup-now"]
+
+
+class BackupListCommand(FrozenModel):
+    name: Literal["backup-list"]
+
+
 type Command = Annotated[
     RunCommand
     | ResumeCommand
@@ -441,6 +449,8 @@ type Command = Annotated[
     | PlaybooksDropCommand
     | PlaybooksTrustCommand
     | PruneCommand
+    | BackupNowCommand
+    | BackupListCommand
     | UndoCommand
     | EvalListCommand
     | EvalCheckCommand
