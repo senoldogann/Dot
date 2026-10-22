@@ -353,7 +353,11 @@ class PolicyConfig(FrozenModel):
     ``unanswered`` is what a question nobody answers within ``approval_timeout_s`` comes to, ``parked_hours`` how
     long a step kept for the owner waits before it lapses (item 482), and ``permit_hours`` how long their yes to a kept
     step holds once they gave it (item 483). ``yolo_taint_check``: a yolo run that read outside content has the review
-    model check the steps an instruction planted there is after (item 525)."""
+    model check the steps an instruction planted there is after (item 525). ``protected_paths`` are the locations the
+    shell guard and the search tools keep a run from (the credentials programs read there are the commands' own to
+    read: ssh, git, a cloud CLI); ``sealed_paths`` the stores no program a run starts has any use for (the data of the
+    browsers, Mail and Messages), which the sandbox closes to a command too, whatever path, variable or substitution
+    names them (item 531): the guard keeps them from a run by name as well, as it does ``protected_paths``."""
 
     preset: Preset
     approvals: ApprovalMode
@@ -363,9 +367,16 @@ class PolicyConfig(FrozenModel):
     parked_hours: float = Field(gt=0, le=24 * 30, allow_inf_nan=False)
     permit_hours: float = Field(gt=0, le=24 * 30, allow_inf_nan=False)
     protected_paths: list[str]
+    sealed_paths: list[str]
     code_sources: list[Literal["mail", "messages"]]
     spend: dict[SpendSite, SpendCap]
     pace: PaceConfig
+
+    @property
+    def refused_paths(self) -> list[str]:
+        """Every location the shell guard and the search tools keep a run from: ``protected_paths`` and, besides them,
+        ``sealed_paths`` (item 531)."""
+        return [*self.protected_paths, *(path for path in self.sealed_paths if path not in self.protected_paths)]
 
 
 class BrowserConfig(FrozenModel):

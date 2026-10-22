@@ -43,6 +43,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 GOAL: str = "Work on this Mac."
 TOKEN: str = "token-of-the-test-4b1e"
 VAULT_SECRET: str = "vault-secret-77c2"
+STORE_SECRET: str = "store-secret-91d4"
 REFUSED: str = "Operation not permitted"
 
 
@@ -51,7 +52,12 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     home: Path = tmp_path_factory.mktemp("home")
     vault: Path = tmp_path_factory.mktemp("vault")
     (vault / "note.txt").write_text(VAULT_SECRET, encoding="utf-8")
-    (home / "config.toml").write_text(f'[policy]\nprotected_paths = ["{vault}"]\n', encoding="utf-8")
+    # A store no program needs (the data of a browser): sealed, where the vault is only protected (item 531).
+    store: Path = tmp_path_factory.mktemp("store")
+    (store / "note.txt").write_text(STORE_SECRET, encoding="utf-8")
+    (home / "config.toml").write_text(
+        f'[policy]\nprotected_paths = ["{vault}"]\nsealed_paths = ["{store}"]\n', encoding="utf-8"
+    )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
@@ -249,6 +255,31 @@ async def test_a_search_of_a_run_reads_neither_dots_own_files_nor_the_protected_
     assert VAULT_SECRET not in kept and _refused(kept), kept
     assert VAULT_SECRET in read, read
     assert TOKEN in await _search(await _context(runtime, "yolo"), _matching(TOKEN), dot_home())
+
+
+async def test_a_command_of_a_run_cannot_read_the_sealed_stores_however_its_line_names_them(runtime: Runtime) -> None:
+    """Item 531: the data of the browsers, Mail and Messages (``[policy] sealed_paths``) are closed to a command by the
+    sandbox, as Dot's own files are: named whole, built from pieces by a substitution, walked by a recursive search of
+    the folder or read by a program a script runs, macOS answers ``Operation not permitted``; a yolo run's command
+    reads them, as the user's account may."""
+    ctx: ToolContext = await _context(runtime, "ask")
+    store: Path = Path(runtime.config.policy.sealed_paths[0])
+    note: Path = store / "note.txt"
+    script: Path = workspace_dir() / "peek-store.py"
+    await asyncio.to_thread(script.write_text, f"print(open({str(note)!r}).read())\n", encoding="utf-8")
+    lines: list[str] = [
+        f"cat {shlex.quote(str(note))}",
+        f'cat "$(echo {shlex.quote(str(store.parent))})/{store.name}/note.txt"',
+        f"grep -r {shlex.quote(_matching(STORE_SECRET))} {shlex.quote(str(store))}",
+        f"python3 {shlex.quote(str(script))}",
+    ]
+    for line in lines:
+        answer: str = await _run(ctx, "shell", {"command": line})
+        assert _refused(answer) and STORE_SECRET not in answer, (line, answer)
+    assert STORE_SECRET in await _run(await _context(runtime, "yolo"), "shell", {"command": lines[0]})
+    # A search is kept out of it too, as out of every protected location.
+    kept: str = await _search(ctx, _matching(STORE_SECRET), store)
+    assert STORE_SECRET not in kept and _refused(kept), kept
 
 
 async def test_a_terminal_of_a_run_starts_in_the_sandbox_and_one_of_a_yolo_run_takes_no_line_outside_yolo(

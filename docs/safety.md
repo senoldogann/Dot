@@ -162,11 +162,11 @@ currency, so list sites that bill in one currency. Empty by default.
 7. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
    when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 
-| Preset                 | Asks before                                                                                                                 |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `aggressive` (default) | privilege, system settings, public posts, messages sent for you, and destructive actions outside the workspace              |
-| `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace |
-| `cautious`             | everything that is not read-only                                                                                            |
+| Preset                 | Asks before                                                                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aggressive` (default) | privilege, system settings, public posts, messages sent for you, destructive actions outside the workspace, and a read that may reach a protected location |
+| `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace                           |
+| `cautious`             | everything that is not read-only                                                                                                                           |
 
 A shell line is destructive outside the workspace when it removes, cuts or moves away a file there (item 385: `mv` takes
 its sources from where they were), and when it replaces one that is there: a redirect that empties it (`>`, `>|`, `&>`),
@@ -200,8 +200,9 @@ on outward-facing or lasting actions (messages, posts, follows and likes, privil
 or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
 running a script the line downloaded (item 523), or a blob it decoded and ran (`base64 -d x | sh`, or a decode to a
 file the line then runs; item 528), and a shell line that sends data out: an upload or a form, a push, a
-copy to another machine, a change on a code host, inline code that reaches the network or runs a command of it) ask
-even when the preset or an `allow` rule would let them through; only a `preapproved` rule skips the question. A
+copy to another machine, a change on a code host, inline code that reaches the network or runs a command of it, and a
+read that may reach a protected location, item 531) ask even when the preset or an `allow` rule would let them through;
+only a `preapproved` rule skips the question. A
 project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. A message you send to the run clears the mark;
 your answer to a question of a run you watch does not, whether the run waited for it or went on (item 508), as it
 answers what the run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts
@@ -310,12 +311,15 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
 - Outside a `yolo` run (which may, without asking, item 433) the agent can neither read nor change `~/.ssh`,
   `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
-  `~/.config/gcloud`, the data of your browsers (Chrome, Safari, Firefox, Brave, Edge and Arc) and their cookies, the
-  tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`,
-  `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`,
-  `~/.password-store`), the keys that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them), the shell's
-  history, Messages and Mail (`[policy] protected_paths`; a list of your own replaces
-  this one), nor Dot's own key file, token, what signing in to an MCP server gave it, browser profiles, configuration,
+  `~/.config/gcloud`, the tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`,
+  `~/.config/gh`, `~/.npmrc`, `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`,
+  `~/.azure`, `~/.config/op`, `~/.password-store`), what 1Password, Bitwarden and Dashlane keep on this Mac, the keys
+  that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them) and the shell's history
+  (`[policy] protected_paths`; a list of your own replaces this one), the data and caches of your browsers (Chrome and
+  its Beta, Dev and Canary, Chromium, Safari, Firefox, Brave, Edge, Arc, Vivaldi and Opera), their cookies, Messages and
+  Mail (`[policy] sealed_paths`, which the sandbox below closes to a command as well, item 531; a list of your own
+  replaces this one too), nor Dot's own key file, token, what signing in to an MCP server gave it, browser profiles,
+  configuration,
   database, the copies of the database (`[store] backup_dir`, and `<home>/backups-partial` while one is made, item
   526) and journals of file changes. The configuration holds the policy and the MCP servers, the database the rules,
   a copy all of the database and what you go back to, the journals what `dotx undo` writes back.
@@ -342,12 +346,13 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   daemon and are given keys from the key store: put a plugin or a skill in place yourself.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
-  files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals,
-  and the data
-  directory of your Chrome), nor change what Dot loads and runs, nor rename a folder above any of them, whatever program
-  does it: a script the run wrote, code that builds the path, a link, another letter case. macOS answers
-  `Operation not permitted`. The search tools may not read your protected locations either; a command still may (ssh and
-  git read their keys there), and for those the guard reads its line. A search that meets a place it may not read shows
+  files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals)
+  and the stores no program has any use for (`[policy] sealed_paths`: the data and caches of your browsers, their
+  cookies, Messages and Mail, item 531), nor change what Dot loads and runs, nor rename a folder above any of them,
+  whatever program does it: a script the run wrote, code that builds the path, a link, another letter case. macOS
+  answers `Operation not permitted`. The search tools may not read your protected locations either; a command still may
+  (ssh and git read their keys there), and for those the guard reads its line. A search that meets a place it may not
+  read shows
   what it found elsewhere and names the places it did not read, as a search of any run does with a folder whose reading
   macOS broke off (it does now and then under `~/Library/Containers` when the home folder is searched). macOS starts no
   program that runs as root inside the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo`
@@ -511,8 +516,29 @@ event and approval.
 > as `python3`, also after a `cp`, an `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh | bash`) is judged
 > as piping the download into a shell; a file named after an at sign (`curl --data-binary @file`) as that file; a script
 > handed to a terminal app (`open -a Terminal`, a `.command` file) as a step outside Dot's sandbox, which every preset
-> asks about (item 385), and outside yolo the sandbox refuses the opening itself (item 418). It does not follow what a
-> recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps those out of
-> Dot's own files, not out of yours, and a shell can do more than any analysis can foresee. Treat Dot as a user of your
-> account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
+> asks about (item 385), and outside yolo the sandbox refuses the opening itself (item 418). A word with a part only the
+> running line knows (`~/.s$(echo sh)/id_rsa`, `~/Library/${X:-Safari}/History.db`, a variable filled with what a
+> command prints) that begins as a protected location's path, or ends with the last names of one (`~/Documents/$(echo
+> ..)/.ssh/id_rsa`), or climbs (`..`) beside a part it does not know (`$(pwd)/../.ssh/id_rsa`; the climb alone of a `cd`
+> is no step), or is a word with more spellings, by variables and braces, than it reads (64; a program or a literal in
+> quotes as dense as that asks too, since the guard cannot tell its braces from ones the shell spells out), and a
+> command that reads every file under a folder that holds one (`grep -r secret ~`, `rg token ~/Library`, `find ~ -exec
+> cat {} \;`, `find ~ | xargs cat` or `cat $(find ~ -name id_rsa)`, `cp -R`, `ditto`, `rsync -a`, `scp -r`, `tar`
+> creating an archive or adding to one, `zip -r`, `diff -r`, `git grep` and `git diff --no-index`, `hdiutil create
+> -srcfolder`, `rclone`, `aws s3 sync`, `gsutil`, `pax`, and what reads the names of a listing from its standard input:
+> `cpio`, `tar -T -`, `zip -@`; a folder given as a glob that matches a protected location or one above it, `~/Lib*` and
+> `/Users/*`, counts as that folder, and the GNU tools Homebrew installs as `ggrep` or `gfind` as the tools they are)
+> are asked about in every preset (item 531), as a read that may reach a protected location. A command that runs in
+> another folder by an option of its own (`env -C`, `git -C`, `tar -C`, `make -C`, `uv --directory`, `yarn --cwd`, `pnpm
+> --dir`) has its words judged from there too (a line that moves between more than four different folders asks, each
+> being read against every word): `git -C ~ diff --no-index .ssh/id_rsa /dev/null` names the key of `~/.ssh`. A
+> recursive search reads the folder the line is in when it is given none, and which of its words is a folder is not told
+> without each tool's options, so from a folder that holds a protected location (the home folder) it asks whatever
+> folder it is given. It does not follow what a recursive command does inside the other folders it walks, nor the code
+> of a script it runs, nor `git add -A` in a folder that holds one, nor the other tools that upload or copy a folder
+> whole under names it does not know, nor a loop that reads what a search lists (`find ~ | while read f; do cat "$f";
+> done`), nor a path whose unknown part holds the protected folder's own name (`~/Documents/$(echo ../.ssh)/id_rsa`);
+> the sandbox keeps those out of Dot's own files and of the sealed stores (the data of your browsers, Mail and
+> Messages), not out of the rest of yours, and a shell can do more than any analysis can foresee. Treat Dot as a user of
+> your account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
 > `cautious` on a machine where a mistake would be expensive.

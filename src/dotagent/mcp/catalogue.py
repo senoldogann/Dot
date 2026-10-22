@@ -19,7 +19,29 @@ resource metadata and its authorization server's metadata offer dynamic client r
 (``none``) and PKCE with S256; Parallel's Search server is open to all, as its docs say. Left out then: Ahrefs (its
 metadata names no client without a secret), Make and Pipedrive (a client with a secret only), Datadog (its address is
 under ``/api/unstable/`` and is one region's), Zoom (clients registered by hand), Dropbox (registration for a few named
-clients only) and Plaid (a token of client credentials, no sign-in), the last three as their docs say."""
+clients only) and Plaid (a token of client credentials, no sign-in), the last three as their docs say.
+
+The services item 535 added were each tried on 2026-10-22 as Dot reaches them. One that signs in went through Dot's own
+sign-in as far as the authorization page: the MCP library's OAuth client, with the metadata Dot registers with and its
+callback on 127.0.0.1, found the authorization server, registered Dot as a client and was shown the service's sign-in or
+consent page (Buildkite's, WordPress.com's and beehiiv's behind a check of the browser that a browser passes). Vercel
+and Dropbox, left out before, now let Dot register and show their pages. One open to all, and every one started
+on this Mac, was started by ``dotx mcp list`` in a throwaway home and listed its tools, a key it takes given a
+placeholder (Kubernetes with a placeholder kubeconfig). Left out then: Canva (its page says "Unsupported client"),
+Semgrep, Replicate and Otter (their authorization servers name themselves with a slash their address lacks, which the
+MCP library refuses), Gamma (it refuses a callback on 127.0.0.1), Railway (registration turned off), PlanetScale, Make
+and Coda (a client with a secret only), Asana, Box, HubSpot's own server, PagerDuty's, Smartsheet, Zendesk, Xero,
+Render and DocuSign (no registration), QuickBooks (it refuses a client that is not a browser), Datadog (as above),
+Storyblok's open server (it lists no tools), Bright Data's (a tool's schema nests deeper than Dot reads), Postgres MCP
+Pro (it fails to start with the current MCP library), the open servers of Gorgias and Retell (by their tools, Gorgias's
+is its own team's, and Retell's calls take a key it names no way to pass), and the deprecated packages of Railway,
+Dynatrace, CircleCI, Readwise, Browserbase and Semgrep. HubSpot and PagerDuty come in by their own local servers and
+your token instead. Redis, ClickHouse, Neo4j and Qdrant start, but each takes its address and user besides its
+password, and a service asks the page for secrets alone, which Dot keeps in its .env and so masks wherever their
+words appear (``localhost`` among them): they wait for settings of the catalogue that are not secrets, and can be
+added by hand under ``[[mcp]]`` until then. Square lets Dot register now too, but its tools take payments, and no flag
+marks a payment made through an MCP tool yet: it waits for that flag, so that a call of it stops as the money rule
+says whatever the server declares."""
 
 import re
 from typing import Literal, Self
@@ -562,5 +584,664 @@ MCP_SERVICES: tuple[McpService, ...] = (
         does="Look up and manage invoices, orders, payments, subscriptions and disputes in PayPal.",
         url="https://mcp.paypal.com/mcp",
         signs_in=True,
+    ),
+    # Item 535: those that sign in, each taken through Dot's sign-in to the service's own page (the docstring).
+    McpService(
+        id="vercel",
+        name="Vercel",
+        does="Look into your Vercel projects, their deployments and logs, and search Vercel's docs.",
+        url="https://mcp.vercel.com",
+        signs_in=True,
+    ),
+    McpService(
+        id="sourcegraph",
+        name="Sourcegraph",
+        does="Search and read code across repositories with Sourcegraph.",
+        url="https://sourcegraph.com/.api/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="prisma",
+        name="Prisma",
+        does="Create and manage Prisma Postgres databases, their schemas and backups.",
+        url="https://mcp.prisma.io/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="jam",
+        name="Jam",
+        does="Read the bug reports recorded with Jam: the video, the console logs and the network requests.",
+        url="https://mcp.jam.dev/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="buildkite",
+        name="Buildkite",
+        does="Look into your Buildkite pipelines, builds and the logs of their jobs.",
+        url="https://mcp.buildkite.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="honeycomb",
+        name="Honeycomb",
+        does="Query your Honeycomb traces and events.",
+        url="https://mcp.honeycomb.io/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="axiom",
+        name="Axiom",
+        does="Query your Axiom logs, traces and datasets.",
+        url="https://mcp.axiom.co/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="expo",
+        name="Expo",
+        does="Look into your Expo apps and their builds and updates.",
+        url="https://mcp.expo.dev/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="launchdarkly",
+        name="LaunchDarkly",
+        does="Look up, create and change feature flags in LaunchDarkly.",
+        url="https://mcp.launchdarkly.com/mcp/fm",
+        signs_in=True,
+    ),
+    McpService(
+        id="digitalocean",
+        name="DigitalOcean",
+        does="Manage your DigitalOcean apps, droplets, databases and domains.",
+        url="https://mcp.digitalocean.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="pulumi",
+        name="Pulumi",
+        does="Look into your Pulumi stacks and deployments, and search the Pulumi registry.",
+        url="https://mcp.ai.pulumi.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="braintrust",
+        name="Braintrust",
+        does="Look into the experiments, logs and scores of your AI apps in Braintrust.",
+        url="https://api.braintrust.dev/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="betterstack",
+        name="Better Stack",
+        does="Query your Better Stack logs, uptime monitors and incidents.",
+        url="https://mcp.betterstack.com",
+        signs_in=True,
+    ),
+    McpService(
+        id="incident-io",
+        name="incident.io",
+        does="Look up and work on incidents, alerts and on-call in incident.io.",
+        url="https://mcp.incident.io/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="statsig",
+        name="Statsig",
+        does="Look up and manage feature gates, experiments and metrics in Statsig.",
+        url="https://api.statsig.com/v1/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="workos",
+        name="WorkOS",
+        does="Work with your WorkOS environments: organizations, users and sign-in.",
+        url="https://mcp.workos.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="stytch",
+        name="Stytch",
+        does="Work with your Stytch projects and their sign-in settings.",
+        url="https://mcp.stytch.dev/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="clerk",
+        name="Clerk",
+        does="Work with your Clerk apps, their users and organizations.",
+        url="https://mcp.clerk.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="logrocket",
+        name="LogRocket",
+        does="Look into LogRocket's session replays and the errors your users met.",
+        url="https://mcp.logrocket.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="globalping",
+        name="Globalping",
+        does="Ping, trace the route to and check the DNS and HTTP of a host from probes around the world.",
+        url="https://mcp.globalping.dev/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="ref",
+        name="Ref",
+        does="Search the documentation of APIs, services and libraries, made for coding agents.",
+        url="https://api.ref.tools/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="motherduck",
+        name="MotherDuck",
+        does="Query your MotherDuck databases, DuckDB in the cloud, with SQL.",
+        url="https://api.motherduck.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="supermemory",
+        name="Supermemory",
+        does="Save and recall memories with Supermemory, shared with your other apps.",
+        url="https://mcp.supermemory.ai/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="sanity",
+        name="Sanity",
+        does="Read and change the content and schemas of your Sanity projects.",
+        url="https://mcp.sanity.io",
+        signs_in=True,
+    ),
+    McpService(
+        id="contentful",
+        name="Contentful",
+        does="Read and change the entries, content types and assets of your Contentful spaces.",
+        url="https://mcp.contentful.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="wordpress-com",
+        name="WordPress.com",
+        does="Read and manage the posts, pages and comments of your WordPress.com sites.",
+        url="https://public-api.wordpress.com/wpcom/v2/mcp/v1",
+        signs_in=True,
+    ),
+    McpService(
+        id="framer",
+        name="Framer",
+        does="Work on your Framer sites: their pages, components and CMS.",
+        url="https://mcp.framer.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="lottiefiles",
+        name="LottieFiles",
+        does="Search LottieFiles' animations and work with your own.",
+        url="https://mcp.lottiefiles.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="lucid",
+        name="Lucid",
+        does="Find, read and make Lucidchart diagrams and Lucidspark boards.",
+        url="https://mcp.lucid.app/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="whimsical",
+        name="Whimsical",
+        does="Read and make Whimsical boards, flowcharts and wireframes.",
+        url="https://mcp.whimsical.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="heygen",
+        name="HeyGen",
+        does="Make videos with HeyGen's AI avatars and voices.",
+        url="https://mcp.heygen.com/mcp/v1/",
+        signs_in=True,
+    ),
+    McpService(
+        id="dropbox",
+        name="Dropbox",
+        does="Search, read and organize the files and folders of your Dropbox.",
+        url="https://mcp.dropbox.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="cal-com",
+        name="Cal.com",
+        does="See and manage your Cal.com bookings and event types.",
+        url="https://mcp.cal.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="granola",
+        name="Granola",
+        does="Read your Granola meeting notes and transcripts.",
+        url="https://mcp.granola.ai/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="fireflies",
+        name="Fireflies",
+        does="Search and read your Fireflies meeting transcripts and summaries.",
+        url="https://mcp.fireflies.ai/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="tldv",
+        name="tl;dv",
+        does="Search and read your tl;dv meeting recordings, transcripts and notes.",
+        url="https://mcp.tldv.io/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="jotform",
+        name="Jotform",
+        does="Read your Jotform forms and their submissions, and make new forms.",
+        url="https://mcp.jotform.com",
+        signs_in=True,
+    ),
+    McpService(
+        id="tally",
+        name="Tally",
+        does="Make Tally forms and read what was submitted to them.",
+        url="https://api.tally.so/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="shortcut",
+        name="Shortcut",
+        does="Find, create and update stories, epics and iterations in Shortcut.",
+        url="https://mcp.shortcut.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="productboard",
+        name="Productboard",
+        does="Read and update the features, notes and insights of your Productboard.",
+        url="https://mcp.productboard.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="attio",
+        name="Attio",
+        does="Find and update the companies, people, deals and notes of your Attio CRM.",
+        url="https://mcp.attio.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="close",
+        name="Close",
+        does="Find and update the leads, contacts and opportunities of your Close CRM.",
+        url="https://mcp.close.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="customer-io",
+        name="Customer.io",
+        does="Look into your Customer.io people, segments, campaigns and messages.",
+        url="https://mcp.customer.io/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="beehiiv",
+        name="beehiiv",
+        does="Read your beehiiv publications, their posts and subscribers.",
+        url="https://mcp.beehiiv.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="resend",
+        name="Resend",
+        does="Send e-mail and manage domains, contacts and broadcasts with Resend.",
+        url="https://mcp.resend.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="mercury",
+        name="Mercury",
+        does="Look at your Mercury bank accounts, balances and transactions.",
+        url="https://mcp.mercury.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="ramp",
+        name="Ramp",
+        does="Look into your Ramp cards, transactions, bills and spend.",
+        url="https://mcp.ramp.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="greenhouse",
+        name="Greenhouse",
+        does="Find and read candidates, jobs and applications in Greenhouse Recruiting.",
+        url="https://mcp.greenhouse.io/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="helpscout",
+        name="Help Scout",
+        does="Search and answer Help Scout conversations, and read your Docs.",
+        url="https://mcp.helpscout.net/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="consensus",
+        name="Consensus",
+        does="Search research papers and what they found, with Consensus.",
+        url="https://mcp.consensus.app/mcp",
+        signs_in=True,
+    ),
+    # Item 535: those open to all, each started by `dotx mcp list` and listing its tools.
+    McpService(
+        id="grep-app",
+        name="grep.app",
+        does="Find code in a million public GitHub repositories by its text.",
+        url="https://mcp.grep.app",
+    ),
+    McpService(
+        id="svelte",
+        name="Svelte",
+        does="Read the documentation of Svelte and SvelteKit, and check Svelte code.",
+        url="https://mcp.svelte.dev/mcp",
+    ),
+    McpService(
+        id="astro-docs",
+        name="Astro Docs",
+        does="Search the documentation of Astro.",
+        url="https://mcp.docs.astro.build/mcp",
+    ),
+    McpService(
+        id="nuxt-ui",
+        name="Nuxt UI",
+        does="Read the components, examples and documentation of Nuxt UI.",
+        url="https://ui.nuxt.com/mcp",
+    ),
+    McpService(
+        id="openai-docs",
+        name="OpenAI Docs",
+        does="Search and read OpenAI's developer documentation.",
+        url="https://developers.openai.com/mcp",
+    ),
+    McpService(
+        id="aws-knowledge",
+        name="AWS Knowledge",
+        does="Search AWS's documentation, and which services and features each region has.",
+        url="https://knowledge-mcp.global.api.aws",
+    ),
+    McpService(
+        id="socket",
+        name="Socket",
+        does="Check the security and quality scores of npm, PyPI and other packages with Socket.",
+        url="https://mcp.socket.dev/",
+    ),
+    McpService(
+        id="excalidraw",
+        name="Excalidraw",
+        does="Draw hand-drawn diagrams with Excalidraw, and share one at excalidraw.com.",
+        url="https://mcp.excalidraw.com/mcp",
+    ),
+    McpService(
+        id="kiwi",
+        name="Kiwi.com",
+        does="Search flights between cities on the dates you give, with Kiwi.com.",
+        url="https://mcp.kiwi.com",
+    ),
+    McpService(
+        id="coingecko",
+        name="CoinGecko",
+        does="Look up the prices, market data and history of cryptocurrencies.",
+        url="https://mcp.coingecko.com/mcp",
+    ),
+    # Item 535: one at an address that takes a key: GraphOS's tools need the graph's key, its docs do not.
+    McpService(
+        id="apollo",
+        name="Apollo GraphOS",
+        does="Read and check your GraphOS graphs and schemas, and search Apollo's GraphQL docs.",
+        url="https://mcp.apollographql.com",
+        headers={"x-api-key": "${APOLLO_KEY}"},
+        secrets=(
+            ServiceSecret(
+                name="APOLLO_KEY",
+                label="Graph API key",
+                help="https://www.apollographql.com/docs/graphos/platform/access-management/api-keys",
+            ),
+        ),
+    ),
+    # Item 535: started on this Mac, each started by `dotx mcp list` and listing its tools.
+    McpService(
+        id="duckdb",
+        name="DuckDB",
+        does="Query and write CSV, Parquet and JSON files of this Mac with SQL, in a DuckDB database of its own.",
+        command="uvx",
+        # A database in memory, which the server opens only to read and write (it refuses one in memory to read
+        # alone). A query reads and writes the files it names (COPY ... TO overwrites one) and may ATTACH another
+        # database: its query tool is declared as one that acts, and the policy weighs each query so. The server's
+        # own tool to switch databases is left out (--allow-switch-databases).
+        args=("mcp-server-motherduck", "--db-path", ":memory:", "--read-write"),
+    ),
+    McpService(
+        id="markitdown",
+        name="MarkItDown",
+        does="Turn PDF, Word, Excel, PowerPoint, HTML and other files into Markdown, on this Mac.",
+        command="uvx",
+        args=("markitdown-mcp",),
+    ),
+    McpService(
+        id="time",
+        name="Time",
+        does="Tell the time in any time zone and convert a time from one zone to another.",
+        command="uvx",
+        args=("mcp-server-time",),
+    ),
+    McpService(
+        id="shadcn",
+        name="shadcn/ui",
+        does="Browse, search and add shadcn/ui components to a project.",
+        command="npx",
+        args=("-y", "shadcn@latest", "mcp"),
+    ),
+    McpService(
+        id="magic-ui",
+        name="Magic UI",
+        does="Find Magic UI's animated React components and their code.",
+        command="npx",
+        args=("-y", "@magicuidesign/mcp@latest"),
+    ),
+    McpService(
+        id="nextjs",
+        name="Next.js DevTools",
+        does="Read Next.js's docs, and look into a Next.js app running on this Mac: its errors, routes and logs.",
+        command="npx",
+        args=("-y", "next-devtools-mcp@latest"),
+    ),
+    McpService(
+        id="shopify-dev",
+        name="Shopify Dev",
+        does="Search Shopify's developer docs and its API schemas, and check the code written for them.",
+        command="npx",
+        args=("-y", "@shopify/dev-mcp@latest"),
+    ),
+    McpService(
+        id="xcode",
+        name="Xcode",
+        does="Build, run and test your Xcode projects through Xcode itself, while it is open.",
+        command="xcrun",
+        args=("mcpbridge",),
+    ),
+    McpService(
+        id="xcodebuildmcp",
+        name="XcodeBuildMCP",
+        does="Build, run and test iOS and macOS apps on simulators and devices with Xcode's command-line tools.",
+        command="npx",
+        args=("-y", "xcodebuildmcp@latest", "mcp"),
+    ),
+    McpService(
+        id="kubernetes",
+        name="Kubernetes",
+        does="Look into and manage the clusters of your kubeconfig: pods, deployments, logs and events.",
+        command="npx",
+        args=("-y", "kubernetes-mcp-server@latest"),
+    ),
+    McpService(
+        id="azure",
+        name="Azure",
+        does="Work with your Azure resources, signed in with Azure's command line (az login).",
+        command="npx",
+        args=("-y", "@azure/mcp@latest", "server", "start"),
+    ),
+    McpService(
+        id="aws-api",
+        name="AWS",
+        does="Run AWS command-line calls on your account, with the credentials of this Mac's AWS configuration.",
+        command="uvx",
+        args=("awslabs.aws-api-mcp-server@latest",),
+    ),
+    McpService(
+        id="firebase",
+        name="Firebase",
+        does="Work with your Firebase projects: their apps, Firestore, authentication and rules.",
+        command="npx",
+        args=("-y", "firebase-tools@latest", "mcp"),
+    ),
+    McpService(
+        id="convex",
+        name="Convex",
+        does="Look into your Convex deployments: their tables, data, functions and logs.",
+        command="npx",
+        args=("-y", "convex@latest", "mcp", "start"),
+    ),
+    McpService(
+        id="snyk",
+        name="Snyk",
+        does="Scan code, dependencies, containers and infrastructure files for vulnerabilities with Snyk.",
+        command="npx",
+        args=("-y", "snyk@latest", "mcp", "-t", "stdio"),
+    ),
+    # Item 535: started on this Mac with a key, each started by `dotx mcp list` with a placeholder, listing its tools.
+    McpService(
+        id="mongodb",
+        name="MongoDB",
+        does="Query and manage your MongoDB databases and collections, and your Atlas clusters.",
+        command="npx",
+        args=("-y", "mongodb-mcp-server@latest"),
+        env={"MDB_MCP_CONNECTION_STRING": "${MONGODB_CONNECTION_STRING}"},
+        secrets=(
+            ServiceSecret(
+                name="MONGODB_CONNECTION_STRING",
+                label="Connection string (mongodb://... or mongodb+srv://...)",
+                help="https://www.mongodb.com/docs/manual/reference/connection-string/",
+            ),
+        ),
+    ),
+    McpService(
+        id="pinecone",
+        name="Pinecone",
+        does="Search and manage your Pinecone indexes and the records in them, and read Pinecone's docs.",
+        command="npx",
+        args=("-y", "@pinecone-database/mcp"),
+        env={"PINECONE_API_KEY": "${PINECONE_API_KEY}"},
+        secrets=(ServiceSecret(name="PINECONE_API_KEY", label="API key", help="https://app.pinecone.io/"),),
+    ),
+    McpService(
+        id="pagerduty",
+        name="PagerDuty",
+        does="Look up and work on PagerDuty incidents, services, schedules and on-call.",
+        command="uvx",
+        args=("pagerduty-mcp",),
+        env={"PAGERDUTY_USER_API_KEY": "${PAGERDUTY_API_KEY}"},
+        secrets=(
+            ServiceSecret(
+                name="PAGERDUTY_API_KEY",
+                label="User API token",
+                help="https://support.pagerduty.com/main/docs/api-access-keys",
+            ),
+        ),
+    ),
+    McpService(
+        id="hubspot",
+        name="HubSpot",
+        does="Find and update the contacts, companies, deals and tickets of your HubSpot CRM.",
+        command="npx",
+        args=("-y", "@hubspot/mcp-server"),
+        env={"PRIVATE_APP_ACCESS_TOKEN": "${HUBSPOT_TOKEN}"},
+        secrets=(
+            ServiceSecret(
+                name="HUBSPOT_TOKEN",
+                label="Access token of a private app",
+                help="https://developers.hubspot.com/docs/api/private-apps",
+            ),
+        ),
+    ),
+    McpService(
+        id="mailgun",
+        name="Mailgun",
+        does="Send e-mail and look into your Mailgun domains, events and statistics.",
+        command="npx",
+        args=("-y", "@mailgun/mcp-server"),
+        env={"MAILGUN_API_KEY": "${MAILGUN_API_KEY}"},
+        secrets=(
+            ServiceSecret(
+                name="MAILGUN_API_KEY",
+                label="API key",
+                help="https://app.mailgun.com/settings/api_security",
+            ),
+        ),
+    ),
+    McpService(
+        id="kagi",
+        name="Kagi",
+        does="Search the web with Kagi, and summarize a page or a video.",
+        command="uvx",
+        args=("kagimcp",),
+        env={"KAGI_API_KEY": "${KAGI_API_KEY}"},
+        secrets=(ServiceSecret(name="KAGI_API_KEY", label="API key", help="https://kagi.com/settings?p=api"),),
+    ),
+    McpService(
+        id="alibaba-cloud",
+        name="Alibaba Cloud",
+        does="Look into and manage your Alibaba Cloud instances, databases, storage and monitoring.",
+        command="uvx",
+        args=("alibaba-cloud-ops-mcp-server@latest",),
+        env={
+            "ALIBABA_CLOUD_ACCESS_KEY_ID": "${ALIBABA_CLOUD_ACCESS_KEY_ID}",
+            "ALIBABA_CLOUD_ACCESS_KEY_SECRET": "${ALIBABA_CLOUD_ACCESS_KEY_SECRET}",
+        },
+        secrets=(
+            ServiceSecret(
+                name="ALIBABA_CLOUD_ACCESS_KEY_ID",
+                label="AccessKey ID",
+                help="https://www.alibabacloud.com/help/en/ram/user-guide/create-an-accesskey-pair",
+            ),
+            ServiceSecret(
+                name="ALIBABA_CLOUD_ACCESS_KEY_SECRET",
+                label="AccessKey secret",
+                help="https://www.alibabacloud.com/help/en/ram/user-guide/create-an-accesskey-pair",
+            ),
+        ),
+    ),
+    McpService(
+        id="dingtalk",
+        name="DingTalk",
+        does="Read your DingTalk contacts and calendar, and send messages and work notices.",
+        command="npx",
+        args=("-y", "dingtalk-mcp@latest"),
+        env={"DINGTALK_Client_ID": "${DINGTALK_CLIENT_ID}", "DINGTALK_Client_Secret": "${DINGTALK_CLIENT_SECRET}"},
+        secrets=(
+            ServiceSecret(
+                name="DINGTALK_CLIENT_ID",
+                label="Client ID of your DingTalk app",
+                help="https://open-dev.dingtalk.com/",
+            ),
+            ServiceSecret(
+                name="DINGTALK_CLIENT_SECRET",
+                label="Client secret of your DingTalk app",
+                help="https://open-dev.dingtalk.com/",
+            ),
+        ),
     ),
 )

@@ -127,7 +127,7 @@ pythonpath = ["tests/smoke"]
 markers = [
     "live: needs a running Ollama server with a signed-in cloud model",
     "browser: drives a real headless Chrome against a local fixture server",
-    "internet: sends a few read-only requests to public sites (a search page and a documentation page)",
+    "internet: sends read-only requests to public sites (a search page, a documentation page, and each MCP server and package registry of the plugins' catalogue)",
     "desktop: moves the real pointer and keyboard of this Mac against a local AppKit fixture window",
     "hosted: sends a few tiny requests to the real OpenAI, OpenCode Go, Anthropic and Ollama search services with your own keys, and to Zen's free models through the opencode program",
 ]
