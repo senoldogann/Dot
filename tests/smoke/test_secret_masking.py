@@ -210,12 +210,12 @@ async def test_a_script_is_run_on_a_page_without_one_and_what_it_gives_back_hide
     ran: ScriptRun = await browser.run_script(
         "cookies",
         "() => { document.cookie = 'session=abcdef0123456789; path=/'; document.cookie = 'lang=en; path=/';"
-        " return document.cookie; }",
+        " document.cookie = 'consent=dismissed; path=/'; return document.cookie; }",
         5.0,
         True,
     )
-    # The value of the session is no part of what the model reads; a short value that is no session stays.
-    assert (ran.end, json.loads(ran.text)) == ("value", "session=[hidden]; lang=en"), ran
+    # The value of the session is no part of what the model reads; a short value and a plain word, no session, stay.
+    assert (ran.end, json.loads(ran.text)) == ("value", "session=[hidden]; lang=en; consent=dismissed"), ran
     assert "abcdef0123456789" not in ran.text
     # JSON writes it as the value is when it is a string inside an object, too.
     nested: ScriptRun = await browser.run_script(
@@ -225,7 +225,7 @@ async def test_a_script_is_run_on_a_page_without_one_and_what_it_gives_back_hide
     # Yolo sees all it reads (item 443): a chat of its own, which no script held a cookie of.
     await browser.open_url("cookies-yolo", f"{site}/many", True)
     shown: ScriptRun = await browser.run_script("cookies-yolo", "document.cookie", 5.0, False)
-    assert json.loads(shown.text) == "session=abcdef0123456789; lang=en"
+    assert json.loads(shown.text) == "session=abcdef0123456789; lang=en; consent=dismissed"
 
 
 async def test_a_thrown_error_and_the_address_a_script_leads_to_show_no_cookie_value_either(
@@ -276,3 +276,19 @@ async def test_a_cookie_written_into_the_page_is_hidden_before_the_text_is_cut_i
     # Every slice of seven characters, from every offset: none holds a half of the value.
     slices: list[str] = [(await browser.read_text("slices", None, at, 7)).text for at in range(whole.total_chars)]
     assert not [piece for piece in slices if "abcdef01" in piece or "23456789" in piece], slices
+
+
+async def test_a_cookie_of_a_narrower_path_is_hidden_when_a_frame_of_that_path_gives_it_back(
+    browser: BrowserSession, site: str
+) -> None:
+    await browser.open_url("paths", f"{site}/many", True)
+    ran: ScriptRun = await browser.run_script(
+        "paths",
+        "async () => { document.cookie = 'acct=zxcvbnm1234567890; path=/account';"
+        " const frame = document.createElement('iframe'); frame.src = '/account'; document.body.append(frame);"
+        " await new Promise((done) => { frame.onload = done; }); return frame.contentDocument.cookie; }",
+        10.0,
+        True,
+    )
+    # (The profile is the module's: the cookies of the tests before are among what the frame gives back.)
+    assert ran.end == "value" and "acct=[hidden]" in ran.text and "zxcvbnm1234567890" not in ran.text, ran
