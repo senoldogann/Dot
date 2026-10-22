@@ -1,4 +1,4 @@
-"""Customize › Connectors (items 278, 316 and 542) end to end: Connect apps' Customize (item 492) opens the page,
+"""Customize › Connectors (items 278, 316, 542 and 545) end to end: Connect apps at the foot of the sidebar opens it,
 wide and light and on a phone and dark. Every service in its section, 25 or more, each with its mark, what Dot does
 with it and how it connects; a search, and Connected next to All. With macOS's answers given by the test (an
 application allowed, one not asked, one refused, one not installed), Mail is connected and offers no step, Outlook is
@@ -245,15 +245,14 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 if width < _PHONE_PX:
                     await page.get_by_role("button", name="Show sidebar").first.click()
-                # Customize is reached from Connect apps at the foot of the sidebar (item 492); the list of pages
-                # names it no more.
+                # Customize is reached from Connect apps at the foot of the sidebar (items 492 and 545), which opens
+                # Connectors itself; the list of pages names it no more.
                 pages: Locator = page.locator("#sidebar nav.side-links a.side-link")
                 await expect(pages).to_have_text(["Agents", "Campaigns", "Schedules"])
                 connect: Locator = page.locator("#sidebar .side-foot").get_by_role("button", name="Connect apps")
                 link_box: FloatRect = await _box(connect)
                 assert link_box["y"] + link_box["height"] <= 860, link_box
                 await connect.click()
-                await page.get_by_role("dialog", name="Connect apps").get_by_role("link", name="Customize").click()
                 await expect(page).to_have_url(f"{address}/#/customize/connectors")
                 await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Connectors")
                 # Every service in its section, each with its mark, what Dot does with it and how it connects.

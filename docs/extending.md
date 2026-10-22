@@ -2,10 +2,12 @@
 
 ## Customize
 
-**Customize** (items 278, 289, 316, 401 and 542), which [Connect apps](#connect-apps) leads to since item 492, has three
+**Customize** (items 278, 289, 316, 401, 542 and 545), whose Connectors [Connect apps](#connect-apps) opens, has three
 tabs: **Plugins**, the gallery of the plugins Dot installs ([Customize › Plugins](#customize--plugins)); **Skills**, the
 skills it reads ([Skills and plugins](#skills-and-plugins)); and **Connectors**, the services Dot works with
-([Customize › Connectors](#customize--connectors)). `#/customize` opens Plugins. The old address `#/connect` leads to
+([Customize › Connectors](#customize--connectors)). Each opens with the same head (item 545): a card lit by the theme's
+accent with the tab's title, a line on what it holds, its search and its controls, and a few of its marks scattered
+beside them, which a phone leaves out. `#/customize` opens Plugins. The old address `#/connect` leads to
 Connectors, and so does a service's page at the address it had before item 542, `#/customize/plugins/<service>`, since
 the gallery's plugins took that name; but for the four services whose gallery plugin has the same name (Cloudflare,
 Supabase, MongoDB and Hugging Face), where that address opens the plugin's page.
@@ -57,12 +59,15 @@ same asks as anything else the run does ([Safety](safety.md)).
 
 ## Customize › Connectors
 
-**Connectors** lists 156 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
-Password managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item 492). Each tile has the service's mark, what Dot does with
-it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On this Mac, MCP · On this Mac · Key,
-AppleScript, Dot's browser or Synced folder), where it stands, and a **+** that takes its first step; a tile opens the
-service's own page: each way it connects, with where it stands and its step, the tools of its MCP server once it is
-ready, and where its data goes. **Check again** reads them all anew. `GET /api/plugins` returns the listings
+**Connectors** lists 156 services with a search, **Connected** and **All** (each with its count) and **Check again** in
+its head, the accounts under it, and the sections as chips (item 545), one showing its section alone: Popular,
+Password managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac
+(item 492), each titled with its count. Popular stands up as Plugins' New & noteworthy does, four cards a row. Each card
+has the service's mark, what Dot does with it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On
+this Mac, MCP · On this Mac · Key, AppleScript, Dot's browser or Synced folder), where it stands, and its first step in
+words on the line of its name (**Add**, **Allow**, **Sign in**, **Connect**), and lifts under the pointer; a card
+opens the service's own page: each way it connects, with where it stands and its step, the tools of its MCP server once
+it is ready, and where its data goes. **Check again** reads them all anew. `GET /api/plugins` returns the listings
 (`connections/directory.py`).
 
 Each tile's mark is the service's own logo, in its own colours, on a tile that is white in both colour schemes (a dark
@@ -110,17 +115,12 @@ answers, and a package is on its registry, not deprecated.
 
 ### Connect apps
 
-**Connect apps** (item 492), at the foot of the sidebar right of the cog of Settings, opens the same services in a dialog over the
-page, on the sidebar's own ground as the cog is, wearing the marks of three MCP servers that are ready, another three
-of them every few seconds when more are (item 509). It has a search, a chip for each section,
-**Suggested for you** (the popular services), then each section's first six tiles with **See all**, and **N connected**,
-which lists what Dot is connected to. A tile shows one thing: its first step as a button (**Add**, **Sign in**,
-**Allow**, **Open System Settings**), or where the service stands once it is connected. A tile
-opens the service's own page in the dialog, as on Customize, with a way back. A service that takes a key asks for it
-there, beside where to get one. **Customize** in the dialog leads to Connectors, which keeps what the dialog leaves
-out: the accounts and your own MCP servers; the plugins and the skills are Customize's other tabs. On a phone the dialog takes the screen, and the button is a round
-one at the foot of the list of chats. The services, where they stand and their steps are the same code on both
-(`static/js/catalogue.js`).
+**Connect apps** (items 492 and 545), at the foot of the sidebar right of the cog of Settings, on the sidebar's own
+ground as the cog is, opens Customize › Connectors, which it stands for while it is open, wearing the marks of three
+MCP servers that are ready, another three of them every few seconds when more are (item 509). It opened the services
+in a dialog of their own until item 545, which gave the page the dialog's chips and its steps in words, so that the
+services have one place, in the look of Plugins. On a phone the button is a round one at the foot of the list of
+chats. The services, where they stand and their steps are `static/js/catalogue.js`'s.
 
 ### 1Password
 
@@ -339,8 +339,10 @@ as a read, with no flag; any other counts as one that may change things (`destru
 
 ## Skills and plugins
 
-**Customize › Skills** (item 317) lists the skills Dot reads as cards, two a row (one on a phone), each with what it is
-for and that Dot has it, with a search and, past a section's first six cards, See N more. **Personal** holds yours
+**Customize › Skills** (items 317 and 545) lists the skills Dot reads as cards, two a row (one on a phone), each with
+its mark light on a tile of its colour (the colour its name picks, as a plugin's is on Plugins), what it is for and
+that Dot has it, under the head of Customize with Personal and System, **Save from a chat** and **Import from other
+apps**, with a search and, past a section's first six cards, See N more. **Personal** holds yours
 (Dot's skills folder and the `[skills] dirs` folders), those imported from the Mac's other agents (with Remove) and the
 learned ones (below, with Share and Drop); **System** holds those that come with Dot and those of its plugins. **Save
 from a chat** writes the skill of a chat that ended done (`POST /api/runs/{id}/skill`). Under Personal, Found on this

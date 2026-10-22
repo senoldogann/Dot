@@ -12,6 +12,7 @@
 // Face) is the plugin's.
 
 import { api } from "../api.js";
+import { customizeHead } from "../customizehead.js";
 import { compact, el, foldSearch, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { tintMark } from "../marks.js";
@@ -67,28 +68,17 @@ export function mount(root, ctx) {
   const busy = new Set();
   const holder = el("div", { class: "stack" }, loadingPanel());
 
-  const search = el("input", { class: "input gallery-search", type: "search", placeholder: "Search plugins and skills", "aria-label": "Search plugins", autocomplete: "off", spellcheck: "false" });
+  const search = el("input", { class: "input customize-search", type: "search", placeholder: "Search plugins and skills", "aria-label": "Search plugins", autocomplete: "off", spellcheck: "false" });
   search.addEventListener("input", () => {
     words = foldSearch(search.value);
     paint();
   });
-  const headMarks = el("div", { class: "gallery-head-marks", "aria-hidden": "true" });
-  const head = el(
-    "section",
-    { class: "gallery-head" },
-    el(
-      "div",
-      { class: "gallery-head-main" },
-      el("h2", { class: "gallery-head-title" }, "Discover plugins"),
-      el(
-        "p",
-        { class: "gallery-head-line" },
-        "Skills from the makers of the tools you use and from the community, each pinned to a commit Dot checks. Install one and the runs that start after can use it.",
-      ),
-      el("label", { class: "gallery-find" }, icon("search"), search),
-    ),
-    headMarks,
-  );
+  const head = customizeHead({
+    title: "Discover plugins",
+    line: "Skills from the makers of the tools you use and from the community, each pinned to a commit Dot checks. Install one and the runs that start after can use it.",
+    search,
+    controls: [],
+  });
   const filters = segmented(
     [
       { id: "all", label: "All", hint: "Every plugin of the gallery" },
@@ -265,13 +255,10 @@ export function mount(root, ctx) {
   /** The head's marks, scattered about a soft light: the first featured plugins' and, between them, logos of the
    * gallery, so that the head shows what kinds of plugins it holds. */
   function paintHead() {
-    if (headMarks.childElementCount > 0) {
-      return;
-    }
     const featuredOnes = gallery.plugins.filter((plugin) => plugin.featured && plugin.logo === null);
     const logos = gallery.plugins.filter((plugin) => plugin.logo !== null);
     const shownMarks = [featuredOnes[0], logos[0], featuredOnes[1], logos[1], featuredOnes[2]].filter((plugin) => plugin !== undefined);
-    headMarks.replaceChildren(...shownMarks.map((plugin) => el("span", { class: "gallery-head-mark" }, galleryMark(plugin))));
+    head.setMarks(shownMarks.map(galleryMark));
   }
 
   function paintCounts() {
@@ -394,7 +381,7 @@ export function mount(root, ctx) {
   }
 
   if (pluginId === undefined) {
-    root.append(head, holder, body);
+    root.append(head.element, holder, body);
   } else {
     root.append(holder);
   }

@@ -1,9 +1,8 @@
-"""Connect apps (item 492) end to end: the button at the foot of the sidebar, right of Settings, opens the services Dot
-works with in a dialog over the page, wide and light in the desktop shell, and on a phone and dark. Suggested for you
-(the popular services) leads, then each section's first six tiles with See all; a chip shows one section, the search
-what it finds and keeps its focus, Connected what Dot is connected to; each tile shows one thing to do or where it
-stands; a tile opens the service's own page in the dialog, where a service that takes a key asks for it, and Back
-returns to the tile; Escape and the close end it. A server that is ready wears its service's mark on the button.
+"""Connect apps (items 492 and 545) end to end: the button at the foot of the sidebar, right of Settings, wears the mark
+of the server that is ready and leads to Customize › Connectors, the page of the services Dot works with, which
+stands for it while it is open: wide and light in the desktop shell, and on a phone and dark, where it is a round
+button of its own. On the page the sections are chips, one showing its section alone and All every one; Popular stands
+up as Plugins' New & noteworthy does; the search keeps its focus and shows what it finds, each card its step in words.
 
 The server that is ready is the MCP fixture of the tests, started on this Mac, which the test has the daemon take for
 one of Sentry's, for its mark (``service_of``): no service of the catalogue answers offline.
@@ -38,9 +37,9 @@ FIXTURE: Path = Path(__file__).resolve().parent.parent / "fixtures" / "mcp_fixtu
 # The fixture server of the config, and the service the test has the daemon count it as.
 _SERVER: str = "fixture"
 _AS_SERVICE: str = "sentry"
-# The sections as the dialog titles them (views/plugins.js), the popular ones leading as Suggested for you.
+# The sections as the page titles them (views/connectors.js).
 _TITLES: dict[str, str] = {
-    "popular": "Suggested for you",
+    "popular": "Popular",
     "passwords": "Password managers",
     "code": "Code",
     "design": "Design",
@@ -52,11 +51,7 @@ _TITLES: dict[str, str] = {
     "support": "Support",
     "mac": "This Mac",
 }
-# A section shows this many tiles under All.
-_SECTION_TILES: int = 6
 _PHONE_PX: int = 720
-# Where the desktop window centres its traffic lights and the room it keeps for them (test_desktop_lights.py).
-_LIGHTS_BOTTOM_PX: float = 40.0
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -140,7 +135,7 @@ async def _page(browser: Browser, address: str, width: int, scheme: Literal["lig
     return page
 
 
-async def test_connect_apps_opens_the_services_in_a_dialog_from_the_foot_of_the_sidebar(
+async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_sidebar(
     runtime: Runtime, address: str, tmp_path: Path
 ) -> None:
     views = plugin_views()
@@ -169,85 +164,52 @@ async def test_connect_apps_opens_the_services_in_a_dialog_from_the_foot_of_the_
             await expect(marks).to_have_count(1)
             await expect(marks.locator("img")).to_have_attribute("src", f"/icons/plugins/{sentry.logo}")
 
+            # It opens Customize › Connectors, no dialog over the page, and stands for the page while it is open.
             await button.click()
-            dialog: Locator = page.get_by_role("dialog", name="Connect apps")
-            await expect(dialog).to_be_visible()
-            # Clear of the traffic lights the desktop window draws at its top left.
-            assert (await _box(dialog))["y"] >= _LIGHTS_BOTTOM_PX
-            search: Locator = dialog.get_by_role("searchbox", name="Search apps")
-            await expect(search).to_be_focused()
-            titles: Locator = dialog.locator(".connect-apps-section-title")
+            await expect(page).to_have_url(f"{address}/#/customize/connectors")
+            await expect(page.get_by_role("dialog")).to_have_count(0)
+            await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Connectors")
+            await expect(button).to_have_attribute("data-current", "")
+            await expect(page.locator(".customize-hero-title")).to_have_text("Connect your apps")
+            titles: Locator = page.locator(".plugin-section-title")
             await expect(titles).to_have_text([_TITLES[section] for section in shown_sections])
-            # Suggested for you holds every popular service; each other section its first six, with See all past them.
-            for section in shown_sections:
-                block: Locator = dialog.locator(f".connect-apps-section[data-section='{section}']")
-                limit: int = members[section] if section == "popular" else min(members[section], _SECTION_TILES)
-                await expect(block.locator(".connect-tile")).to_have_count(limit)
-                more: int = 1 if section != "popular" and members[section] > _SECTION_TILES else 0
-                await expect(block.get_by_role("button", name=f"See all of {_TITLES[section]}")).to_have_count(more)
-            # Each tile offers one thing at most beside its page: a step, or where the service stands.
-            tiles: Locator = dialog.locator(".connect-tile")
-            for index in range(await tiles.count()):
-                tile: Locator = tiles.nth(index)
-                await expect(tile.locator(":scope > .plugin-mark")).to_have_count(1)
-                await expect(tile.locator(":scope > .connect-tile-open")).to_have_count(1)
-                assert await tile.evaluate("tile => tile.children.length") <= 3
-            # See all shows the whole of its section, under its chip.
-            await dialog.get_by_role("button", name="See all of Code").click()
-            await expect(dialog.locator(".connect-apps-chip[data-chip='code']")).to_have_attribute(
-                "aria-pressed", "true"
+            # Popular stands up as Plugins' New & noteworthy does; a section's title counts its cards.
+            popular: Locator = page.locator(".plugin-section[data-section='popular'] .plugin-tile").first
+            assert await popular.evaluate("(tile) => getComputedStyle(tile).flexDirection") == "column"
+            assert await titles.first.get_attribute("data-count") == str(members["popular"])
+            await page.screenshot(path=str(tmp_path / "connectors-1280-light.png"))
+            # A chip shows its section alone, All every one.
+            chips: Locator = page.get_by_role("group", name="Sections")
+            await chips.locator(".customize-chip[data-chip='code']").click()
+            await expect(chips.locator(".customize-chip[data-chip='code']")).to_have_attribute("aria-pressed", "true")
+            await expect(page.locator(".plugin-section[data-section]")).to_have_count(1)
+            await expect(page.locator(".plugin-section[data-section='code'] .plugin-tile")).to_have_count(
+                members["code"]
             )
-            await expect(dialog.locator(".connect-tile")).to_have_count(members["code"])
-            # Connected lists only what Dot is connected to. A server of the config wears its service's mark but is
-            # not the service's own server, as on Customize (item 408).
-            await dialog.get_by_role("button", name="connected").click()
-            await expect(dialog.locator(".connect-tile[data-connected='false']")).to_have_count(0)
-            # The search keeps its focus while the tiles are drawn anew, and shows what it finds.
-            await dialog.locator(".connect-apps-chip[data-chip='all']").click()
+            # A chip and a search that find nothing together say so, rather than leave the page empty.
+            search: Locator = page.get_by_role("searchbox", name="Search connectors")
+            await search.fill("linear")
+            await expect(page.locator(".plugin-section[data-section]")).to_have_count(0)
+            await expect(page.locator(".empty-state")).to_contain_text("No connector matches the search")
+            await search.fill("")
+            await chips.locator(".customize-chip[data-chip='all']").click()
+            await expect(titles).to_have_text([_TITLES[section] for section in shown_sections])
+            # The search keeps its focus while the cards are drawn anew, and a card says its step in words.
             await search.press_sequentially("linear")
             await expect(search).to_be_focused()
-            await expect(dialog.locator(".connect-tile")).to_have_count(1)
-            await expect(dialog.locator(".connect-tile[data-plugin='linear']")).to_be_visible()
-            await expect(dialog.get_by_role("button", name="Add Linear")).to_be_visible()
+            await expect(page.locator(".plugin-tile[data-plugin]")).to_have_count(1)
+            await expect(page.get_by_role("button", name="Add Linear")).to_have_text("Add")
             await search.fill("")
-            wide: int = await dialog.locator(".connect-apps-body").evaluate(
-                "body => body.scrollWidth - body.clientWidth"
-            )
+            wide: int = await page.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
             assert wide <= 0, wide
-            await page.screenshot(path=str(tmp_path / "connect-apps-1280-light.png"))
-
-            # A tile opens the service's page in the dialog; Back returns to the tile, with the focus on it.
-            github: Locator = dialog.locator(".connect-tile[data-plugin='github']")
-            await github.locator(".connect-tile-open").click()
-            await expect(dialog).to_have_attribute("data-view", "service")
-            await expect(dialog.locator(".plugin-hero .plugin-title")).to_have_text("GitHub")
-            await expect(dialog.locator(".plugin-way[data-way='mcp']")).to_contain_text("Takes a key")
-            await page.screenshot(path=str(tmp_path / "connect-apps-github.png"))
-            await dialog.get_by_role("button", name="Back to the apps").click()
-            await expect(dialog).to_have_attribute("data-view", "list")
-            await expect(github.locator(".connect-tile-open")).to_be_focused()
-            # GitHub takes a key: its tile's Add opens its page with the key's field, where to get one beside it.
-            await github.get_by_role("button", name="Add GitHub").click()
-            await expect(dialog).to_have_attribute("data-view", "service")
-            key: Locator = dialog.locator(".plugin-secrets input[type='password']")
-            await expect(key).to_have_count(1)
-            await expect(key).to_be_focused()
-            await expect(dialog.locator(".plugin-secrets")).to_contain_text("Where to get one")
-            # The form's Add takes the row's place: one Add, not two.
-            await expect(
-                dialog.locator(".plugin-way[data-way='mcp']").get_by_role("button", name="Add", exact=True)
-            ).to_have_count(1)
-            await page.screenshot(path=str(tmp_path / "connect-apps-github-key.png"))
-            # Escape ends the dialog, and the close does too.
-            await page.keyboard.press("Escape")
-            await expect(page.locator("dialog.connect-apps")).to_have_count(0)
-            await button.click()
-            await dialog.get_by_role("button", name="Close Connect apps").click()
-            await expect(page.locator("dialog.connect-apps")).to_have_count(0)
+            # Back from Customize the button reads the servers that are ready again: here, the same one.
+            async with page.expect_response(lambda response: response.url.endswith("/api/mcp/servers")):
+                await page.get_by_role("link", name="Agents").click()
+            await expect(button).not_to_have_attribute("data-current", "")
+            await expect(marks).to_have_count(1)
             assert errors == []
 
-            # On a phone: a round button at the foot of the list of chats, and the dialog over the whole screen with
-            # its tiles in one column.
+            # On a phone: a round button at the foot of the list of chats, which opens the same page.
             phone: Page = await _page(browser, address, 390, "dark")
             await phone.get_by_role("button", name="Show sidebar").first.click()
             round_button: Locator = phone.locator("#sidebar .side-foot").get_by_role("button", name="Connect apps")
@@ -255,13 +217,10 @@ async def test_connect_apps_opens_the_services_in_a_dialog_from_the_foot_of_the_
             size: FloatRect = await _box(round_button)
             assert round(size["width"]) == 44 and round(size["height"]) == 44, size
             await round_button.click()
-            sheet: Locator = phone.get_by_role("dialog", name="Connect apps")
-            await expect(sheet).to_be_visible()
-            assert round((await _box(sheet))["width"]) == 390
-            first, second = phone.locator(".connect-tile").nth(0), phone.locator(".connect-tile").nth(1)
-            assert (await _box(first))["x"] == (await _box(second))["x"]
+            await expect(phone).to_have_url(f"{address}/#/customize/connectors")
+            await expect(phone.locator(".plugin-tile[data-plugin]").first).to_be_visible()
             over: int = await phone.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
             assert over <= 0, over
-            await phone.screenshot(path=str(tmp_path / "connect-apps-390-dark.png"))
+            await phone.screenshot(path=str(tmp_path / "connectors-390-dark.png"))
         finally:
             await browser.close()

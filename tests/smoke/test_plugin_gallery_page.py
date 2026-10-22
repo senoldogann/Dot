@@ -241,7 +241,7 @@ async def test_the_gallery_installs_lists_and_removes_a_plugin(
                 await expect(page).to_have_url(f"{address}/#/customize/plugins")
                 await expect(page.locator(".customize-tabs a")).to_have_text(["Plugins", "Skills", "Connectors"])
                 await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Plugins")
-                await expect(page.locator(".gallery-head-title")).to_have_text("Discover plugins")
+                await expect(page.locator(".customize-hero-title")).to_have_text("Discover plugins")
                 # New & noteworthy holds the featured plugin; All plugins every one, the most starred first.
                 await expect(page.locator(".gallery-featured .gallery-card")).to_have_count(1)
                 cards: Locator = page.locator(".gallery-grid .gallery-card")
