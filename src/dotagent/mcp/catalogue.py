@@ -24,8 +24,8 @@ clients only) and Plaid (a token of client credentials, no sign-in), the last th
 The services item 535 added were each tried on 2026-10-22 as Dot reaches them. One that signs in went through Dot's own
 sign-in as far as the authorization page: the MCP library's OAuth client, with the metadata Dot registers with and its
 callback on 127.0.0.1, found the authorization server, registered Dot as a client and was shown the service's sign-in or
-consent page (Buildkite's, WordPress.com's and beehiiv's behind a check of the browser that a browser passes). Vercel,
-Square and Dropbox, left out before, now let Dot register and show their pages. One open to all, and every one started
+consent page (Buildkite's, WordPress.com's and beehiiv's behind a check of the browser that a browser passes). Vercel
+and Dropbox, left out before, now let Dot register and show their pages. One open to all, and every one started
 on this Mac, was started by ``dotx mcp list`` in a throwaway home and listed its tools, a key it takes given a
 placeholder (Kubernetes with a placeholder kubeconfig). Left out then: Canva (its page says "Unsupported client"),
 Semgrep, Replicate and Otter (their authorization servers name themselves with a slash their address lacks, which the
@@ -39,7 +39,9 @@ Dynatrace, CircleCI, Readwise, Browserbase and Semgrep. HubSpot and PagerDuty co
 your token instead. Redis, ClickHouse, Neo4j and Qdrant start, but each takes its address and user besides its
 password, and a service asks the page for secrets alone, which Dot keeps in its .env and so masks wherever their
 words appear (``localhost`` among them): they wait for settings of the catalogue that are not secrets, and can be
-added by hand under ``[[mcp]]`` until then."""
+added by hand under ``[[mcp]]`` until then. Square lets Dot register now too, but its tools take payments, and no flag
+marks a payment made through an MCP tool yet: it waits for that flag, so that a call of it stops as the money rule
+says whatever the server declares."""
 
 import re
 from typing import Literal, Self
@@ -914,13 +916,6 @@ MCP_SERVICES: tuple[McpService, ...] = (
         signs_in=True,
     ),
     McpService(
-        id="square",
-        name="Square",
-        does="Look up and manage your Square payments, orders, customers and catalog.",
-        url="https://mcp.squareup.com/mcp",
-        signs_in=True,
-    ),
-    McpService(
         id="greenhouse",
         name="Greenhouse",
         does="Find and read candidates, jobs and applications in Greenhouse Recruiting.",
@@ -1021,11 +1016,12 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="duckdb",
         name="DuckDB",
-        does="Query CSV, Parquet and JSON files of this Mac with SQL, and write what a query makes into new files.",
+        does="Query and write CSV, Parquet and JSON files of this Mac with SQL, in a DuckDB database of its own.",
         command="uvx",
         # A database in memory, which the server opens only to read and write (it refuses one in memory to read
-        # alone); its query tool is declared as one that acts, and the policy weighs each query so. No tool to open
-        # another database (--allow-switch-databases): a query names the files it reads.
+        # alone). A query reads and writes the files it names (COPY ... TO overwrites one) and may ATTACH another
+        # database: its query tool is declared as one that acts, and the policy weighs each query so. The server's
+        # own tool to switch databases is left out (--allow-switch-databases).
         args=("mcp-server-motherduck", "--db-path", ":memory:", "--read-write"),
     ),
     McpService(

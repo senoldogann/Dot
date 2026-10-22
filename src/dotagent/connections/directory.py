@@ -1734,17 +1734,6 @@ PLUGINS: tuple[PluginListing, ...] = (
         ways=(_mcp("beehiiv"),),
     ),
     PluginListing(
-        id="square",
-        name="Square",
-        section="business",
-        does=None,
-        logo="square.svg",
-        colour=None,
-        glyph=None,
-        monogram=None,
-        ways=(_mcp("square"),),
-    ),
-    PluginListing(
         id="mercury",
         name="Mercury",
         section="business",
