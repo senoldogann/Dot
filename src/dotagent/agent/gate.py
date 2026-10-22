@@ -30,6 +30,7 @@ from dotagent.policy.engine import (
     checked_when_tainted,
     decide,
     decide_past_review,
+    mode_gate,
     route_for,
     supervised,
     waived_in_yolo,
@@ -269,7 +270,14 @@ class RunGate:
         await self._refuse_carried_secret(info, {} if arguments is None else arguments)
         # Before the locks of a site's pace and spend: the review model may take a while, and the other runs' steps
         # on the same site would wait for it (item 525).
-        if self._approval_mode == "yolo" and self._taint_check and self.tainted and checked_when_tainted(info):
+        # A step the run's mode refuses anyway (a research run's change) is not put to the review model first.
+        if (
+            self._approval_mode == "yolo"
+            and self._taint_check
+            and self.tainted
+            and checked_when_tainted(info)
+            and mode_gate(info, self._mode) is None
+        ):
             await self._check_taint(info)
         paced: PacedAction | None = paced_action(info)
         if paced is None:

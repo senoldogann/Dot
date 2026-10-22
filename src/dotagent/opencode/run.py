@@ -600,7 +600,9 @@ class _Follow:
                 return
         asked_at: float = time.monotonic()
         try:
-            authorized: Authorization = await self.agent.gate.authorize_recorded(action)
+            # What OpenCode asks for, whole: an action's target may show it cut (item 525).
+            asked: JsonObject = {"patterns": list(event.patterns), "metadata": event.metadata}
+            authorized: Authorization = await self.agent.gate.authorize_recorded(action, asked)
             call.decision = authorized.decision
             note: str = authorized.note
             await self.agent.gate.wait_free()

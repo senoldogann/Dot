@@ -105,7 +105,8 @@ Memory page marks a lesson with its agent's name. A note a run saves with `memor
 
 A run can make a teammate itself (item 99). The `create_agent` tool (a name, a role, instructions, the tools it may
 use, a model if one is wanted) makes an agent as the Agents page does, under your approvals (the `persistence` flag,
-like saving a note: `ask` asks once the run has read untrusted content, `yolo` makes it); the agent lasts after the
+like saving a note: `ask` asks once the run has read untrusted content, `yolo` makes it, but for a run that read such
+content, whose step the review model checks first and may refuse, item 525); the agent lasts after the
 run, its record keeps the run that made it, and the Agents page marks it "Made by Dot". The prompt's Team section
 tells a run with no team that when the work splits into roles (finding sources, writing, checking) or into parts
 that recur, it makes the teammates it needs, each with only the tools its role needs, and sends them the parts with
