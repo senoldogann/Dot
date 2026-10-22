@@ -76,7 +76,7 @@ def test_a_first_push_is_reviewed(repo: Path, tmp_path: Path) -> None:
 
 def test_a_push_that_only_brings_main_in_is_not_reviewed_again(repo: Path, tmp_path: Path) -> None:
     pushed: str = _git(repo, "rev-parse", "HEAD")
-    # Main moves, in a file the change does not touch and in one it does not, and the branch takes it in cleanly.
+    # Main moves in a file the change does not touch, and the branch takes it in cleanly.
     _git(repo, "checkout", "-q", "main")
     _commit(repo, "other.txt", "other, moved on\n", "main moves")
     _git(repo, "push", "-q", "origin", "main")
@@ -123,3 +123,11 @@ def test_after_three_blocked_reviews_the_hook_says_to_reconsider_the_approach(re
     done, asked = _run_hook(repo, tmp_path, _git(repo, "rev-parse", "HEAD"), pushed)
     assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
     assert "3 earlier reviews of this branch BLOCKed" in done.stderr and "reconsider" in done.stderr
+
+
+def test_a_push_that_only_changes_whitespace_of_the_change_is_reviewed(repo: Path, tmp_path: Path) -> None:
+    """Whitespace is meaning in Python and YAML: a dedent that moves a line out of an `if` is a change."""
+    pushed: str = _git(repo, "rev-parse", "HEAD")
+    _commit(repo, "feature.txt", "  its own change\n", "re-indent")
+    done, asked = _run_hook(repo, tmp_path, _git(repo, "rev-parse", "HEAD"), pushed)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr

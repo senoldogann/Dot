@@ -11,12 +11,13 @@
 # reviews of the branch that BLOCKed, the hook says so before the next one (REVIEW.md: reconsider the approach).
 set -euo pipefail
 
-# The change a tip makes against main as a patch id: line numbers and whitespace do not count, so lines of main moving
-# under the change do not alter it, and a merge that resolved a conflict by editing the change does.
+# The change a tip makes against main as a patch id: line numbers do not count, so lines of main moving under the change
+# do not alter it, but whitespace does (--verbatim: a dedent changes what Python means), and so does a merge that
+# resolved a conflict by editing the change. Nothing is printed when it cannot be told, and then the push is reviewed.
 own_change() {
   local fork
   fork=$(git merge-base origin/main "$1" 2>/dev/null) || return 0
-  git diff "$fork..$1" | git patch-id --stable | cut -d' ' -f1
+  git diff "$fork..$1" | git patch-id --verbatim 2>/dev/null | cut -d' ' -f1 || true
 }
 
 zero_sha=0000000000000000000000000000000000000000
@@ -48,8 +49,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   fi
 
   if [[ "$remote_sha" != "$zero_sha" ]] && git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
-    before=$(own_change "$remote_sha")
-    after=$(own_change "$local_sha")
+    before=$(own_change "$remote_sha" || true)
+    after=$(own_change "$local_sha" || true)
     if [[ -n "$after" && "$before" == "$after" ]]; then
       echo "claude-review: $local_ref at ${local_sha:0:7} only brings main in: the change is the patch that was at" \
         "${remote_sha:0:7}, reviewed then"

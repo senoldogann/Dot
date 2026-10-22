@@ -37,26 +37,31 @@ def next_item(files: Iterable[str], titles: Iterable[str], branches: Iterable[st
     return max(taken(files, titles, branches), default=0) + 1
 
 
+class SourceError(RuntimeError):
+    """A place that holds item numbers could not be read, so a number would be a guess."""
+
+
 def _lines(*command: str) -> list[str]:
     done = subprocess.run(command, capture_output=True, text=True, check=False)
     if done.returncode != 0:
-        print(f"next_item: `{' '.join(command)}` failed: {done.stderr.strip()}", file=sys.stderr)
-        return []
+        raise SourceError(f"`{' '.join(command)}` failed: {done.stderr.strip() or done.returncode}")
     return done.stdout.splitlines()
 
 
 def main() -> int:
-    subprocess.run(["git", "fetch", "--quiet", "origin"], check=False)
-    files: list[str] = _lines("git", "ls-tree", "-r", "--name-only", "origin/main", "roadmap", "changes")
-    branches: list[str] = _lines("git", "ls-remote", "--heads", "origin")
-    titles: list[str] = []
-    prs: list[str] = _lines("gh", "pr", "list", "--state", "open", "--json", "title,headRefName")
-    for pull in json.loads("\n".join(prs) or "[]"):
-        titles.append(pull["title"])
-        branches.append(pull["headRefName"])
+    try:
+        _lines("git", "fetch", "--quiet", "origin")
+        files: list[str] = _lines("git", "ls-tree", "-r", "--name-only", "origin/main", "roadmap", "changes")
+        branches: list[str] = _lines("git", "ls-remote", "--heads", "origin")
+        titles: list[str] = []
+        for pull in json.loads("\n".join(_lines("gh", "pr", "list", "--state", "open", "--json", "title,headRefName"))):
+            titles.append(pull["title"])
+            branches.append(pull["headRefName"])
+    except (SourceError, OSError) as error:
+        print(f"next_item: {error}; no number is given, as it could collide with one it did not see", file=sys.stderr)
+        return 1
     found: dict[int, str] = taken(files, titles, branches)
-    number: int = next_item(files, titles, branches)
-    print(number)
+    print(next_item(files, titles, branches))
     if found:
         highest: int = max(found)
         print(f"({highest} is the highest taken, on {found[highest]})", file=sys.stderr)
