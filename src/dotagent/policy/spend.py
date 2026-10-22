@@ -69,6 +69,11 @@ def _largest(amounts: tuple[Amount, ...]) -> Amount | None:
     return max(amounts, key=lambda amount: amount.value) if amounts else None
 
 
+def starts_with_amount(text: str) -> bool:
+    """Whether ``text`` starts with an amount of money ("$199", "€23.50", "23,50 €", "USD 5")."""
+    return _AMOUNT.match(text) is not None
+
+
 def amount_in_label(label: str) -> Amount | None:
     """The amount a control's label names ("Pay €19.90"), the largest of several ("Save $5 · Pay $500"), or ``None``."""
     return _largest(find_amounts(label))

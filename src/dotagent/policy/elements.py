@@ -9,7 +9,7 @@ import re
 from collections.abc import Collection, Sequence
 
 from dotagent.core.types import FrozenModel
-from dotagent.policy.spend import find_amounts
+from dotagent.policy.spend import find_amounts, starts_with_amount
 from dotagent.policy.types import Flag, Risk
 
 _KEY_LIKE: re.Pattern[str] = re.compile(
@@ -37,12 +37,20 @@ _FINANCIAL_ACTION: re.Pattern[str] = re.compile(
     r"|^\s*[öo]de\s*$"
 )
 # A verb that offers something for the amount of money its label names: "Rent HD $3.99", "Subscribe for €4.99/month",
-# "Upgrade · 99 TL", and "Order", "Book" or "Reserve" with the amount right after them ("Order · €23.50", "Book for
-# $199"), as a row of past orders or a book's title is not ("Order #4521 · $45.00 · Delivered", "Book: Dune · $9.99").
-# Without an amount, "Subscribe" stays a follow and "Order 20261010" a plain click.
+# "Upgrade · 99 TL". Without an amount, "Subscribe" stays a follow.
 _PRICED_ACTION: re.Pattern[str] = re.compile(
-    rf"(?i){_SENTENCE_START}(?:(?:rent|subscribe|upgrade|renew|unlock|tilaa|vuokraa)\b"
-    r"|(?:order|book|reserve)\s*(?:for\s+|[·•|—–:-]\s*)?(?=[$€£₺¥\d]))"
+    rf"(?i){_SENTENCE_START}(?:rent|subscribe|upgrade|renew|unlock|tilaa|vuokraa)\b"
+)
+# "Order", "Book" or "Reserve", then only words that say when or what (`_BOOKING_WORDS`: "now", "this room", "a
+# table"), then the amount: "Order · €23.50", "Book now · $199", "Reserve a table — €10". A row of past orders, an
+# order's summary or a book's title has other words or a number there, and is no payment ("Order 4521 · $45.00 ·
+# Delivered", "Order summary · $45.00", "Book: Dune · $9.99", "Order 20261010").
+_BOOKING_WORDS: str = (
+    r"now|today|it|this|a|the|your|my|online|for|room|rooms|seat|seats|table|ticket|tickets|flight|flights|stay|tour"
+    r"|trip|car|hotel"
+)
+_BOOKING: re.Pattern[str] = re.compile(
+    rf"(?i){_SENTENCE_START}(?:order|book|reserve)(?:\s+(?:{_BOOKING_WORDS})\b)*\s*(?:[·•|—–:-]\s*)?"
 )
 _DESTRUCTIVE_ACTION: re.Pattern[str] = re.compile(
     r"(?i)\b(?:delete|remove|erase|discard|destroy|wipe|deactivate|terminate|permanently|empty (?:the )?trash"
@@ -106,11 +114,14 @@ def looks_like_key(text: str) -> bool:
 
 
 def asks_to_pay(text: str) -> bool:
-    """Whether ``text`` is a call to buy, pay or donate: words that say so ("Pay now", "Confirm and pay"), or a verb
-    that offers something for an amount the text names ("Rent HD $3.99")."""
+    """Whether ``text`` is a call to buy, pay or donate: words that say so ("Pay now", "Confirm and pay"), a verb that
+    offers something for an amount the text names ("Rent HD $3.99"), or a booking with its amount ("Book now ·
+    $199")."""
     if _FINANCIAL_ACTION.search(text) is not None:
         return True
-    return _PRICED_ACTION.search(text) is not None and bool(find_amounts(text))
+    if _PRICED_ACTION.search(text) is not None and find_amounts(text):
+        return True
+    return any(starts_with_amount(text[booking.end() :]) for booking in _BOOKING.finditer(text))
 
 
 def typing_reasons(element: Element | None, text: str | None) -> list[str]:
