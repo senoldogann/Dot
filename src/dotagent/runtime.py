@@ -255,20 +255,23 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
 
 
 async def _confined_paths(config: AppConfig) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
-    """``(the locations a run may not read, what Dot loads and runs)``, resolved: ``[policy] protected_paths`` with
-    Dot's own files, and :func:`_dot_paths`."""
+    """``(the locations a run may not read, what Dot loads and runs)``, resolved: ``[policy] protected_paths`` and
+    ``sealed_paths`` with Dot's own files, and :func:`_dot_paths`."""
     protected: tuple[Path, ...] = await asyncio.to_thread(
-        expand_protected, config.policy.protected_paths, _guarded_files(config)
+        expand_protected, config.policy.refused_paths, _guarded_files(config)
     )
     dot_paths: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _dot_paths(config))
     return protected, dot_paths
 
 
 async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> SwitchedSandbox:
-    """The sandbox the processes of a run start in outside yolo: a command kept out of Dot's guarded files and from
-    changing ``dot_paths``, a search out of every ``protected`` location too. It is built whatever [shell] sandbox says,
-    so that Settings can switch it on later, and checked to start when it is on."""
-    sealed: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _guarded_files(config))
+    """The sandbox the processes of a run start in outside yolo: a command kept out of Dot's guarded files and of the
+    ``[policy] sealed_paths`` (the data of the browsers, Mail and Messages: item 531) and from changing ``dot_paths``, a
+    search out of every ``protected`` location too. It is built whatever [shell] sandbox says, so that Settings can
+    switch it on later, and checked to start when it is on."""
+    sealed: tuple[Path, ...] = await asyncio.to_thread(
+        expand_protected, config.policy.sealed_paths, _guarded_files(config)
+    )
     launch_agents: Path = Path(await asyncio.to_thread(os.path.realpath, Path.home() / "Library" / "LaunchAgents"))
     built: Sandbox = build_sandbox(sealed, protected, dot_paths, launch_agents)
     if config.shell.sandbox:

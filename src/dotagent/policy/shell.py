@@ -9,6 +9,7 @@ one, a line that cannot be parsed) as a destructive step outside it, which every
 command does with the files it walks (a recursive copy of the home folder) nor the code of a script it runs is
 followed."""
 
+import fnmatch
 import os
 import re
 import shlex
@@ -108,6 +109,11 @@ _ENV_ASSIGNMENT: re.Pattern[str] = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\
 _ARRAY_ASSIGNMENT: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
 _GLOB_CHARS: str = "*?["
 _MOST_VALUES: int = 64
+# What stands for a part of a word that only the running line knows while its spellings are counted.
+_OPAQUE: str = "\x00"
+# How many parts of a word that only the running line knows :func:`_leads_toward_protected` reads (a leading one stands
+# for the home folder, then the first that follows decides).
+_MOST_UNKNOWN: int = 8
 _MOST_PLACES: int = 16
 _DEEPEST: int = 12
 _QUIET_TARGETS: frozenset[str] = frozenset({"/dev/null", "/dev/stdout", "/dev/stderr", "/dev/tty"})
@@ -480,6 +486,18 @@ _LISTERS: frozenset[str] = frozenset({"find", "fd", "ls", "git"})
 _PRINTERS: frozenset[str] = frozenset({"echo", "printf"})
 _SEARCHERS: frozenset[str] = frozenset({"grep", "egrep", "fgrep", "rg"})
 _FILTERS: frozenset[str] = frozenset({"sort", "uniq", "head", "tail", "grep", "egrep", "fgrep", "rg"})
+# The commands that print a count or a digest of what they read, so that a listing piped into one is no list of names.
+_COUNTERS: frozenset[str] = frozenset({"wc", "md5", "md5sum", "shasum", "sha1sum", "sha256sum", "cksum"})
+# The GNU tools Homebrew installs under a name of their own, read as the tools they are (item 531).
+_GNU_NAMES: dict[str, str] = {
+    "ggrep": "grep",
+    "gegrep": "egrep",
+    "gfgrep": "fgrep",
+    "gfind": "find",
+    "gcp": "cp",
+    "gdiff": "diff",
+    "gxargs": "xargs",
+}
 _LIST_SWITCH: re.Pattern[str] = re.compile(r"-[A-Za-z]*l[A-Za-z]*|--files|--files-with-matches|--files-without-match")
 
 _XARGS_VALUES: frozenset[str] = frozenset(
@@ -667,10 +685,12 @@ class _Reading:
 class _Input:
     """What a command reads on its standard input, as far as the line shows it: the text (a here-document, a
     here-string, what an ``echo`` pipes in) and the paths it names (``find ... |``); an unknown path is
-    ``_SUBSTITUTED``."""
+    ``_SUBSTITUTED``. ``walked`` are the folders a listing searched, as the line gives them (item 531): the files a
+    command reads there are every file under them."""
 
     text: str | None
     paths: tuple[str, ...]
+    walked: tuple[str, ...] = ()
 
 
 _NO_INPUT: _Input = _Input(text=None, paths=(_SUBSTITUTED,))
@@ -1247,29 +1267,39 @@ def _unbraced(values: list[str]) -> list[str] | None:
     return done
 
 
-def _expansions(raw: str, scope: ShellScope) -> list[str] | None:
-    """The values the word ``raw`` can take when it runs: its variables put in (every value each may hold, see
-    :func:`_held`), its braces spelled out and a leading ``~`` expanded; None when part of it is only known then (a
-    substitution, a variable nothing set, ``$1``, ``${x:-y}``)."""
+def _spellings(raw: str, scope: ShellScope) -> tuple[list[str] | None, bool]:
+    """:func:`_expansions` and whether it gave up for want of room: more spellings (variables, braces) than
+    :data:`_MOST_VALUES`, as against a part only the running line knows. A part only the running line knows (a variable
+    nothing set, a substitution's stand-in) is one opaque spelling and the rest is still counted: it fills nothing in,
+    and a word of 128 spellings with it in front hides what it hides without it."""
     pieces: list[tuple[str, ...]] = []
     last: int = 0
+    unknown: bool = False
     for match in _VARIABLE.finditer(raw):
         held: tuple[str, ...] | None = _held(match.group(1) or match.group(2) or match.group(3), scope)
-        if held is None:
-            return None
-        pieces.extend([(raw[last : match.start()],), held])
+        unknown = unknown or held is None
+        pieces.extend([(raw[last : match.start()],), (_OPAQUE,) if held is None else held])
         last = match.end()
     pieces.append((raw[last:],))
     values: list[str] = [""]
     for choices in pieces:
         values = [value + choice for value in values for choice in choices]
         if len(values) > _MOST_VALUES:
-            return None
+            return None, True
     spelled: list[str] | None = _unbraced(values)
     if spelled is None:
-        return None
+        return None, True
+    if unknown:
+        return None, False
     expanded: list[str] = [os.path.expanduser(value) for value in spelled]
-    return None if any("$" in value for value in expanded) else expanded
+    return (None if any("$" in value for value in expanded) else expanded), False
+
+
+def _expansions(raw: str, scope: ShellScope) -> list[str] | None:
+    """The values the word ``raw`` can take when it runs: its variables put in (every value each may hold, see
+    :func:`_held`), its braces spelled out and a leading ``~`` expanded; None when part of it is only known then (a
+    substitution, a variable nothing set, ``$1``, ``${x:-y}``) or there are too many to judge."""
+    return _spellings(raw, scope)[0]
 
 
 def _through_links(path: Path, links: tuple[tuple[Path, Path], ...]) -> Path:
@@ -1529,14 +1559,18 @@ def _piped(stages: list[list[str]], documents: tuple[str, ...]) -> _Input:
     given: _Input = _NO_INPUT
     for stage in stages:
         words: list[str] = _plain(_split_redirects(stage, documents)[0])
-        command: str = Path(words[0]).name if words else ""
+        command: str = _GNU_NAMES.get(Path(words[0]).name, Path(words[0]).name) if words else ""
         operands: list[str] = _positional(words[1:])
         if command in _PRINTERS:
             given = _given_text(" ".join(operands))
         elif command in _LISTERS or (command in _SEARCHERS and any(_LIST_SWITCH.fullmatch(w) for w in words[1:])):
-            given = _Input(text=None, paths=tuple(operands) or (".",))
+            given = _Input(
+                text=None, paths=tuple(operands) or (".",), walked=tuple(_listed_folders(command, words[1:]))
+            )
         elif command not in _FILTERS:
-            given = _NO_INPUT
+            # A stage it does not know (``cat``, ``awk``, ``tr``) passes on names it cannot read, still those of the
+            # listing it follows; a count or a digest passes none (item 531).
+            given = _NO_INPUT if command in _COUNTERS else _Input(text=None, paths=(_SUBSTITUTED,), walked=given.walked)
     return given
 
 
@@ -1690,16 +1724,142 @@ def _assess_redirects(targets: list[str], scope: ShellScope) -> list[Finding]:
     return findings
 
 
-def _protected_words(words: list[str], scope: ShellScope) -> list[Finding]:
+# The commands that move the line to another folder: a climb (``..``) beside a part only the running line knows is no
+# step toward a protected location in ``cd "$(dirname "$f")/.."``, which reads nothing. Where the line lands is still
+# read: the beginning and the end of the path a move names are judged as any other word's.
+_MOVES: frozenset[str] = frozenset({"cd", "pushd", "popd"})
+
+
+def _protected_words(words: list[str], scope: ShellScope, *, climbs: bool = True) -> list[Finding]:
     """A finding when a word names a protected location: as a path (a glob that can reach one, a path through a link
     the line made or a variable it set), or as the value of an assignment or an option (``K=~/.ssh``,
     ``--key=~/.ssh/id``), or as the file a command reads after an at sign (curl's ``--data-binary @~/.ssh/id``, item
-    385; ``@-`` is the standard input)."""
+    385; ``@-`` is the standard input). A word that may lead into one without saying so
+    (:func:`_leads_toward_protected`) is a finding too; ``climbs`` is false for a move, which is no step by a ``..``."""
     parts: list[str] = [part for word in words for part in (word, word.partition("=")[2]) if part]
     candidates: list[str] = [*parts, *(part[1:] for part in parts if part.startswith("@") and part != "@-")]
     if any(_reaches_protected(candidate, scope) for candidate in candidates):
         return [_finding("high", ("secret_access",), "names a protected location")]
+    if any(_leads_toward_protected(candidate, scope, climbs=climbs) for candidate in candidates):
+        return [
+            _maybe_protected(
+                "names a path that may lie in a protected location: part of it is only known when the line runs"
+            )
+        ]
+    if any(_has_too_many_spellings(candidate, scope) for candidate in candidates):
+        return [
+            _maybe_protected(
+                f"names a word with more than {_MOST_VALUES} spellings (variables, braces), which are not read one"
+                " by one: a protected location may be one of them"
+            )
+        ]
     return []
+
+
+def _has_too_many_spellings(raw: str, scope: ShellScope) -> bool:
+    """Whether ``raw`` has more spellings (variables, braces) than :data:`_MOST_VALUES`: the guard reads none of them,
+    and a protected location may be one. Any word asks, a program in quotes (``python3 -c "d={'a':1,...}"``) too: the
+    quotes are gone by the time a word gets here, and no mark in it can tell code from a path the line made of braces
+    (``{~/.ssh/id_rsa,:}{,}{,}...`` puts a mark in a choice of its own), so a literal that big costs a question."""
+    return bool(raw) and _spellings(raw, scope)[1]
+
+
+def _maybe_protected(reason: str) -> Finding:
+    """A step that may reach a protected location, which the line does not show: asked about in every preset (item
+    531), as a step the guard cannot read is (:func:`_unknown`), but one that fetches nothing and destroys nothing."""
+    return _finding("high", ("protected_read", "outside_workspace"), reason)
+
+
+def _unknown_parts(text: str, scope: ShellScope) -> list[re.Match[str]]:
+    """The expansions of ``text`` that only the running line knows: a substitution, a variable nothing set, ``${x:-y}``,
+    ``$1``, a variable the line filled with what a command prints; one a variable of the line or the environment can
+    fill is known."""
+    parts: list[re.Match[str]] = []
+    for match in _UNKNOWN_EXPANSION.finditer(text):
+        variable: re.Match[str] | None = _VARIABLE.fullmatch(match.group(0))
+        held: tuple[str, ...] | None = (
+            None if variable is None else _held(variable.group(1) or variable.group(2) or variable.group(3), scope)
+        )
+        if held is None or any("$" in value for value in held):
+            parts.append(match)
+    return parts
+
+
+def _leads_toward_protected(raw: str, scope: ShellScope, *, climbs: bool = True) -> bool:
+    """Whether ``raw``, a word with a part only the running line knows, can name a protected location or a file inside
+    one (item 531). What it says before that part is the start of a protected location's path, letter case aside
+    (``~/.s`` of ``~/.s$(echo sh)/id_rsa``, ``~/Library/`` of ``~/Library/${X:-Safari}/History.db``), or lies inside
+    one, whatever the part turns out to be; a part that begins the word stands for the home folder, where the protected
+    locations are, as in :func:`_reaches_protected`. What it says after the last such part begins with the end of a
+    protected location's path, since the part may lead out of the folder before it
+    (``~/Documents/$(echo ..)/.ssh/id_rsa``, ``$(pwd)/../.ssh/id_rsa``). And, unless it is a move that is judged
+    (``climbs`` false), a word that climbs (``..``) in the part it knows is not told from one that reaches a protected
+    location, whatever the unknown part is. What the part itself
+    says is not read: one that holds the protected folder's own name (``~/Documents/$(echo ../.ssh)/id_rsa``) is not
+    told. A word that is known whole is judged by :func:`_reaches_protected`."""
+    parts: list[re.Match[str]] = _unknown_parts(raw, scope)
+    if not parts:
+        return False
+    known: list[str] = [
+        raw[begin:stop]
+        for begin, stop in zip(
+            [0, *(part.end() for part in parts)], [*(part.start() for part in parts), len(raw)], strict=True
+        )
+    ]
+    if (climbs and _climbs(known, scope)) or _ends_a_path_into_protected(known[-1], scope):
+        return True
+    text: str = raw
+    for _ in range(_MOST_UNKNOWN):
+        found: list[re.Match[str]] = _unknown_parts(text, scope)
+        if not found:
+            return False
+        if found[0].start() == 0:
+            text = str(Path.home()) + text[found[0].end() :]
+            continue
+        starts: list[str] | None = _expansions(text[: found[0].start()], scope)
+        return starts is not None and any(
+            _starts_a_path_into_protected(expand_path(start, cwd), scope) for start in starts for cwd in scope.cwds
+        )
+    return False
+
+
+def _climbs(pieces: list[str], scope: ShellScope) -> bool:
+    """Whether one of ``pieces``, the parts of a word that the line shows, spells a climb (``..``) once its variables
+    are put in and its braces spelled out (``$D`` for ``D=..``, ``.{.,}``)."""
+    return any(".." in value.split("/") for piece in pieces for value in _expansions(piece, scope) or [piece])
+
+
+def _ends_a_path_into_protected(tail: str, scope: ShellScope) -> bool:
+    """Whether ``tail``, the known end of a path whose beginning is not known, begins with the last names of a protected
+    location's path (``.ssh`` of ``/.ssh/id_rsa``, ``Library/Safari`` of ``Library/Safari/History.db``), letter case
+    aside: what comes before it may lead out of any folder to the protected one."""
+    values: list[str] | None = _expansions(tail, scope)
+    if values is None:
+        return False
+    for value in values:
+        names: list[str] = []
+        for name in value.split("/"):
+            if name == "..":
+                if names:
+                    names.pop()
+            elif name not in ("", "."):
+                names.append(name.casefold())
+        for location in scope.protected:
+            held: list[str] = [name.casefold() for name in str(location).split("/") if name]
+            if any(names[:size] == held[-size:] for size in range(1, min(len(names), len(held)) + 1)):
+                return True
+    return False
+
+
+def _starts_a_path_into_protected(start: Path, scope: ShellScope) -> bool:
+    """Whether a path that begins as ``start`` (it may end in the middle of a name) can be a protected location or
+    lie in one."""
+    folded: str = str(start).casefold()
+    for location in scope.protected:
+        place: str = str(location).casefold().rstrip("/")
+        if place.startswith(folded) or folded == place or folded.startswith(f"{place}/"):
+            return True
+    return False
 
 
 _GIT_GLOBAL_WITH_VALUE: frozenset[str] = frozenset(
@@ -2345,7 +2505,15 @@ def _assess_xargs(args: list[str], scope: ShellScope, given: _Input) -> list[Fin
         if placeholder
         else [[*command, *given.paths]]
     )
-    return [found for run in runs for found in _assess_simple(run, scope, _NO_INPUT)]
+    findings: list[Finding] = [found for run in runs for found in _assess_simple(run, scope, _NO_INPUT)]
+    if Path(command[0]).name not in _NAMES_ONLY and _holds_protected(given.walked, scope):
+        # The piped twin of ``find ~ -exec cat {} +`` (item 531): every file the listing walked may be one it reads.
+        findings.append(
+            _maybe_protected(
+                "runs a command on the files a search lists under a folder that holds a protected location"
+            )
+        )
+    return findings
 
 
 def _runs_with(command: list[str], roots: list[str], scope: ShellScope, placeholder: re.Pattern[str]) -> list[Finding]:
@@ -2358,9 +2526,8 @@ def _runs_with(command: list[str], roots: list[str], scope: ShellScope, placehol
     return [found for run in runs for found in _assess_simple(run, scope, _NO_INPUT)]
 
 
-def _assess_find(args: list[str], scope: ShellScope) -> list[Finding]:
-    """find judged on every root it searches: ``-delete`` removes under them, ``-exec`` (and ``-execdir``, ``-ok``)
-    runs its command on them, ``-fprint`` and ``-fls`` write a file."""
+def _find_parts(args: list[str]) -> tuple[list[str], list[str]]:
+    """The roots ``find`` searches (the directory the line is in when it is given none) and its expression."""
     index: int = 0
     roots: list[str] = []
     while index < len(args) and re.fullmatch(r"-[HLPEXdsx]+|-f|-O\d", args[index]):
@@ -2371,8 +2538,186 @@ def _assess_find(args: list[str], scope: ShellScope) -> list[Finding]:
     while index < len(args) and not args[index].startswith("-") and args[index] not in ("(", "!", ")", ","):
         roots.append(args[index])
         index += 1
-    searched: list[str] = roots or ["."]
-    expression: list[str] = args[index:]
+    return roots or ["."], args[index:]
+
+
+# The commands that read every file under a folder they are given, and the words that make some of them do it: a
+# recursive grep or copy, a search (ripgrep, ag, ack) always, a find that runs a command on what it finds (item 531).
+_RECURSIVE_GREPS: frozenset[str] = frozenset({"grep", "egrep", "fgrep"})
+_RECURSIVE_SEARCHES: frozenset[str] = frozenset({"rg", "ag", "ack"})
+_RECURSIVE_COPIES: frozenset[str] = frozenset({"cp", "rsync"})
+_RECURSE: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*[rR][A-Za-z0-9]*")
+_RECURSE_COPY: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*[rRa][A-Za-z0-9]*")
+# tar creating an archive, or adding to one (append, update): it reads the files it is given.
+_TAR_CREATES: re.Pattern[str] = re.compile(r"-[A-Za-z0-9]*[cru][A-Za-z0-9]*|[cru][A-Za-z0-9]*")
+
+
+def _searched(operands: list[str]) -> list[str]:
+    """The folders a search may read, as its operands give them, and the directory the line is in. Which operand is a
+    folder is not told without each tool's options (the pattern and the value of an option such as ``-A 30`` or
+    ``--ignore-file /dev/null`` stand among them, and one can look like a path), and a search given no folder reads the
+    directory the line is in; so every operand may be one, and that directory is always counted, which costs a question
+    from the home folder, not a miss."""
+    return [*operands, "."]
+
+
+def _walked_roots(command: str, args: list[str]) -> list[str]:
+    """The folders ``command`` reads every file under, as it is given them (item 531): what a recursive ``grep``, a
+    search, a recursive ``cp`` or ``rsync``, ``ditto``, ``tar`` creating an archive, ``zip -r`` and a ``find`` that runs
+    a command on what it finds read, which may be a protected location below the folder."""
+    operands: list[str] = _positional(args)
+    short: list[str] = [word for word in args if word.startswith("-") and not word.startswith("--")]
+    long: set[str] = {word.partition("=")[0] for word in args if word.startswith("--")}
+    if command in _RECURSIVE_GREPS:
+        recursive: bool = (
+            any(_RECURSE.fullmatch(word) for word in short)
+            or bool(long & {"--recursive", "--dereference-recursive"})
+            or "recurse" in _option_values(args, "-d", "--directories")
+        )
+        return _searched(operands) if recursive else []
+    if command in _RECURSIVE_SEARCHES:
+        # ``rg --files`` lists the names of the files and reads none of them.
+        return [] if "--files" in long else _searched(operands)
+    if command == "git":
+        # ``git grep --no-index`` searches the files of a folder as any recursive grep does, and ``git diff --no-index``
+        # compares two folders file by file, printing what differs: against an empty folder, all of it.
+        sub, rest = _git_subcommand(args)
+        if sub == "grep" and "--no-index" in rest:
+            return _searched(_positional(rest))
+        return _positional(rest) if sub == "diff" and "--no-index" in rest else []
+    if command == "diff":
+        # ``diff -r a b`` prints the files of one folder that the other has not (``-N``: as if they were empty).
+        return operands if any(_RECURSE.fullmatch(word) for word in short) or "--recursive" in long else []
+    if command == "scp":
+        return operands if any(_RECURSE.fullmatch(word) for word in short) else []
+    if command == "hdiutil":
+        return [args[index + 1] for index, word in enumerate(args[:-1]) if word in ("-srcfolder", "-srcdir")]
+    if command in ("rclone", "pax"):
+        return operands
+    if command == "aws":
+        return operands if "s3" in operands and ("sync" in operands or "--recursive" in long) else []
+    if command == "gsutil":
+        recursive_gs: bool = any(_RECURSE.fullmatch(word) for word in short)
+        return operands if recursive_gs and ("rsync" in operands or "cp" in operands) else []
+    if command in _RECURSIVE_COPIES:
+        # Every operand: the folder a copy goes into may stand anywhere (``cp -R -t dest src``).
+        recursive = any(_RECURSE_COPY.fullmatch(word) for word in short) or bool(long & {"--recursive", "--archive"})
+        return operands if recursive else []
+    if command == "ditto":
+        return operands
+    if command in _TARS:
+        creates: bool = any(_TAR_CREATES.fullmatch(word) for word in [*short, *operands[:1]]) or bool(
+            long & {"--create", "--append", "--update"}
+        )
+        return [*operands, *_option_values(args, "-C", "--directory")] if creates else []
+    if command == "zip":
+        return operands if any(_RECURSE.fullmatch(word) for word in short) else []
+    if command == "find":
+        roots, expression = _find_parts(args)
+        return roots if _runs_a_reader(expression, _FIND_EXEC) else []
+    if command == "fd":
+        start: int | None = next((index for index, word in enumerate(args) if word in _FD_EXEC), None)
+        return _searched(_positional(args[:start])) if start is not None and _runs_a_reader(args, _FD_EXEC) else []
+    return []
+
+
+def _runs_a_reader(words: list[str], flags: frozenset[str]) -> bool:
+    """Whether ``words`` (the expression of a ``find``, the words of an ``fd``) run a command, by one of ``flags``, that
+    may read the files it is given: one that only prints their names or sizes (:data:`_NAMES_ONLY`) does not."""
+    return any(
+        word in flags and (index + 1 == len(words) or Path(words[index + 1]).name not in _NAMES_ONLY)
+        for index, word in enumerate(words)
+    )
+
+
+def _listed_folders(command: str, args: list[str]) -> list[str]:
+    """The folders a listing is made from, as the line gives them (item 531): the roots of a ``find``, the paths of
+    ``fd`` and of ``rg --files`` (:func:`_searched`). Other listings name files the line shows."""
+    if command == "find":
+        return _find_parts(args)[0]
+    if command == "fd" or (command in _RECURSIVE_SEARCHES and "--files" in args):
+        return _searched(_positional(args))
+    return []
+
+
+def _glob_holds_protected(pattern: Path, scope: ShellScope) -> bool:
+    """Whether the folder glob ``pattern`` (``~/Lib*``, ``/Users/*``) matches a protected location or a folder above
+    one, letter case aside."""
+    folded: str = str(pattern).casefold()
+    return any(
+        fnmatch.fnmatchcase(str(place).casefold(), folded)
+        for location in scope.protected
+        for place in (location, *location.parents)
+    )
+
+
+def _holds_protected(folders: Sequence[str], scope: ShellScope) -> bool:
+    """Whether one of ``folders``, as the line gives them, is or holds a protected location, a glob that matches one
+    too. A folder only the running line knows stands for the home folder, as in :func:`_places`."""
+    for folder in folders:
+        for place in _places(folder, scope):
+            if any(within(location, place) for location in scope.protected):
+                return True
+            if any(char in str(place) for char in _GLOB_CHARS) and _glob_holds_protected(place, scope):
+                return True
+    return False
+
+
+def _substituted_listing(inner: str, scope: ShellScope) -> list[Finding]:
+    """A finding when what the command ``inner``, substituted into the line, prints is a listing of the files under a
+    folder that holds a protected location (item 531): ``cat $(find ~ -name id_rsa)``, the substituted twin of ``find ~
+    -name id_rsa | xargs cat``. The line hands those files to a command the guard cannot follow, which may read them; a
+    listing that goes through ``wc`` or the like prints only a count."""
+    reading: _Reading = _read(inner)
+    tokens: list[str] | None = _tokenize(reading.text)
+    if tokens is None:
+        return []
+    stages: list[list[str]] = []
+    for operator, segment in _commands(_without_patterns(tokens)):
+        stages = [*stages, segment] if operator in ("|", "|&") else [segment]
+    if _holds_protected(_piped(stages, reading.documents).walked, scope):
+        return [_maybe_protected("hands the files a search lists under a folder that holds a protected location on")]
+    return []
+
+
+def _walks_over_protected(command: str, args: list[str], scope: ShellScope) -> list[Finding]:
+    """A finding when ``command`` reads every file under a folder that holds a protected location (item 531):
+    ``grep -r secret ~``, ``find ~/Library -exec cat {} \\;``, ``cp -R ~/Library copy``. The guard reads the line, not
+    what the program finds in the folders it walks, so a folder above a protected location is asked about."""
+    if _holds_protected(_walked_roots(command, args), scope):
+        return [_maybe_protected("reads every file under a folder that holds a protected location")]
+    return []
+
+
+def _reads_a_name_list(command: str, args: list[str]) -> bool:
+    """Whether ``command`` reads the names of the files it works on from its standard input: ``cpio`` and ``pax``,
+    ``tar -T -``, ``zip -@``, ``rsync --files-from=-`` (``xargs`` is read apart, :func:`_assess_xargs`)."""
+    if command in ("cpio", "pax"):
+        return True
+    if command in _TARS:
+        return any(
+            word.startswith("--files-from")
+            or (word.startswith("-") and not word.startswith("--") and "T" in word)
+            or (index == 0 and word.isalnum() and "T" in word)
+            for index, word in enumerate(args)
+        )
+    if command == "zip":
+        return any(
+            word == "-@" or (word.startswith("-") and not word.startswith("--") and "@" in word) for word in args
+        )
+    return command == "rsync" and any(word.startswith("--files-from") for word in args)
+
+
+# The commands that print or count what they are given without reading it, so that ``find ~ | xargs ls`` is no walk.
+_NAMES_ONLY: frozenset[str] = frozenset(
+    {"echo", "printf", "ls", "stat", "basename", "dirname", "realpath", "readlink", "du", "file", "true"}
+)
+
+
+def _assess_find(args: list[str], scope: ShellScope) -> list[Finding]:
+    """find judged on every root it searches: ``-delete`` removes under them, ``-exec`` (and ``-execdir``, ``-ok``)
+    runs its command on them, ``-fprint`` and ``-fls`` write a file."""
+    searched, expression = _find_parts(args)
     findings: list[Finding] = []
     at: int = 0
     while at < len(expression):
@@ -2758,6 +3103,41 @@ def _assess_privileged(command: str, args: list[str], scope: ShellScope, given: 
     return [elevated, *_assess_simple(rest, scope, given)]
 
 
+# The options that move a command into another folder before it reads the names it is given: ``-C`` of git, make, tar
+# and env, and the long ones of uv, yarn, npm and the like (item 531).
+_CHDIR_OPTIONS: frozenset[str] = frozenset(
+    {"-C", "--directory", "--cwd", "--chdir", "--dir", "--working-directory", "--working-dir", "--workdir", "--prefix"}
+)
+# The most different folders the options of one command may move it to that are read: each is judged against every
+# word of the command, so a line of many (``env -C ~ -C ~ ...`` forty times took a minute) asks instead.
+_MOST_MOVES: int = 4
+
+
+def _moved_scopes(words: list[str], scope: ShellScope) -> list[ShellScope] | None:
+    """``scope`` in each folder the options of ``words`` move their command to, one after the other, so that a relative
+    name is read from there: ``git -C ~ diff --no-index .ssh/id_rsa`` reads the key of ``~/.ssh``. A word that is no
+    folder (``grep -C 3``) moves the scope to a place that holds nothing. A move to where an earlier one went is the
+    same scope; None when there are more than :data:`_MOST_MOVES` different ones."""
+    moved: list[ShellScope] = []
+    where: ShellScope = scope
+    for index, word in enumerate(words):
+        name, glued, value = word.partition("=")
+        if word in _CHDIR_OPTIONS and index + 1 < len(words):
+            folder: str = words[index + 1]
+        elif glued and name in _CHDIR_OPTIONS and name.startswith("--"):
+            folder = value
+        elif word.startswith("-C") and not word.startswith("--") and len(word) > 2:
+            folder = word[2:]
+        else:
+            continue
+        where = _with_places(where, _places(folder, where))
+        if all(where.cwds != earlier.cwds for earlier in moved):
+            moved.append(where)
+            if len(moved) > _MOST_MOVES:
+                return None
+    return moved
+
+
 def _assess_wrapped(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
     """A wrapper judged by the command it runs, its options and their values passed over: ``env`` in the directory of
     its ``-C`` and with the words of its ``-S``, ``timeout`` past its duration, ``watch`` on the line it repeats."""
@@ -2866,8 +3246,27 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
         return [found for name in names for found in _assess_simple([*name.split(), *plain[1:]], scope, given)]
     if head not in _TEST_COMMANDS and any(char in head for char in _GLOB_CHARS):
         return [_unknown("runs a command whose name is a pattern the shell matches against file names")]
-    command: str = head if head == "." else Path(head).name
-    named: list[Finding] = _assess_named(command, plain, scope, given)
+    command: str = head if head == "." else _GNU_NAMES.get(Path(head).name, Path(head).name)
+    named: list[Finding] = [
+        *_assess_named(command, plain, scope, given),
+        *_walks_over_protected(command, plain[1:], scope),
+    ]
+    if given.walked and _reads_a_name_list(command, plain[1:]) and _holds_protected(given.walked, scope):
+        named.append(
+            _maybe_protected(
+                "reads the names of the files a search lists under a folder that holds a protected location"
+            )
+        )
+    moves: list[ShellScope] | None = _moved_scopes(plain[1:], scope)
+    if moves is None:
+        named.append(
+            _maybe_protected("moves between more folders than the guard reads, one of which may be a protected one")
+        )
+    for moved in moves or []:
+        # The words it names are read from the folder its option moves it to (item 531: ``env -C ~/Library cat
+        # Safari/History.db``, ``git -C ~ diff --no-index .ssh/id_rsa /dev/null``), where the line, judged from the
+        # folder it is in, does not show them.
+        named.extend((*_protected_words(plain[1:], moved), *_walks_over_protected(command, plain[1:], moved)))
     if "/" in head and head != command:
         # A program named by its path runs as itself: one the line downloaded or decoded counts as that run (items 385,
         # 528). What the program is is still read: a wrapper or a privilege command at that path still runs its command.
@@ -2894,8 +3293,10 @@ def _assess_segment(
     """Judge one simple command of the line as written (redirects included), and the scope it leaves."""
     words, targets, emptied, text = _split_redirects(segment, documents)
     given: _Input = piped if text is None else _given_text(text)
+    plain: list[str] = _plain(words)
+    moves: bool = bool(plain) and plain[0] in _MOVES
     findings: list[Finding] = [
-        *_protected_words([word for word in segment if not _is_redirect(word)], scope),
+        *_protected_words([word for word in segment if not _is_redirect(word)], scope, climbs=not moves),
         *_assess_simple(words, scope, given),
         *_assess_redirects(targets, scope),
         *_replacing(emptied, [], scope),
@@ -2948,6 +3349,7 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
         findings.extend(_fed_a_decode(stages, state))
     for inner in reading.substituted:
         findings.extend(_assess_all(inner, state))
+        findings.extend(_substituted_listing(inner, state))
     return findings
 
 

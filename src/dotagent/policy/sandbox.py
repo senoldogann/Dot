@@ -5,10 +5,12 @@ The shell guard (:mod:`dotagent.policy.shell`) reads a line, not what the progra
 and then runs, or code that builds a path, reaches whatever the user's account reaches. So outside yolo the processes of
 a run (a shell command, a terminal session, an AppleScript and what it runs, the search tools' ripgrep) start under
 ``sandbox-exec`` with a profile that allows everything but three things: reading or changing Dot's own files (its keys,
-token, settings, database, browser profiles and journals), changing what it loads and runs or its emergency stop, and
-renaming or removing a folder above any of them, which would move them away from the paths the profile names. The search
-tools may not read the user's protected locations either: a search has no reason to, while the programs a shell runs
-(ssh, git, a cloud CLI) read their own credentials there. macOS refuses such a call with "Operation not permitted",
+token, settings, database, browser profiles and journals) and the stores no program has any use for (``[policy]
+sealed_paths``: the data of the user's browsers, Mail and Messages, item 531), changing what it loads and runs or its
+emergency stop, and renaming or removing a folder above any of them, which would move them away from the paths the
+profile names. The search tools may not read the user's protected locations either: a search has no reason to, while
+the programs a shell runs (ssh, git, a cloud CLI) read their own credentials there, so those stay open to a command and
+are the guard's to keep. macOS refuses such a call with "Operation not permitted",
 whatever path, link or letter case names the file. ``[shell] sandbox = false`` starts them without it, and Settings ›
 Rules switches it while the daemon runs (:class:`SwitchedSandbox`).
 
