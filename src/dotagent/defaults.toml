@@ -379,6 +379,11 @@ preset = "aggressive"
 # it was given. A research run stays read-only, the desktop tools never control a password manager, and the pace of a
 # site holds (a rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off).
 approvals = "ask"
+# A yolo run that read outside content (a page, a mail, a tool's answer) has the review model check, before it does it,
+# a step that sends, posts, uploads, pays, reads a secret, installs, schedules or saves a note, changes Dot's own files,
+# fills a login or deletes outside the workspace (item 525): its refusal stands, and nobody is asked; any other answer
+# lets the step run. false turns the check off. In every mode, such a run sends no secret Dot holds out of the Mac.
+yolo_taint_check = true
 approval_timeout_s = 900.0
 # What a question nobody answers within approval_timeout_s comes to (item 482): "refuse" (the run is told no, as
 # always) or "park": a step the run hands to you (money, a credential, a rule of yours that hands it off) is kept for

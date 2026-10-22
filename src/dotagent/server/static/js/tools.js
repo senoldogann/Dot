@@ -63,7 +63,7 @@ const FLOW_ORDER = ["command", "read", "write", "search", "page", "browser", "de
 // mark of the kind its summary starts with (item 402).
 const KIND_ICONS = {
   command: "terminal",
-  read: "file",
+  read: "eye",
   write: "file",
   search: "globe",
   page: "globe",
@@ -302,18 +302,29 @@ export function toolWords(tool) {
 
 /**
  * A row for a tool call, one line in line with its group's head (item 402): its mark (a spinner while it runs, then the
- * mark of its kind, in the failure's colour when it failed; item 403), what it did and the way into it. A command is the command itself, its
- * tool's name for screen readers alone and the policy's words its tooltip, since its mark says what it is; another call,
- * whose mark several tools share (a file's: read, write, edit), keeps its tool's name and says what it did in the
- * policy's words once it is done ("Read notes.txt"). `finish(result)` fills in the outcome once the `tool_result` event
+ * mark of its kind, in the failure's colour when it failed; item 403), what it did and the way into it. A command is the
+ * command itself, its tool's name for screen readers alone and the policy's words its tooltip, since its mark says what
+ * it is; a read or a write says Read, Write or Edit and what it acts on from the start ("Read notes.txt"), its mark
+ * saying which it is, and keeps no tool's name (item 506), the policy's words taking that place once it is done;
+ * another call keeps its tool's name beside its words. `finish(result)` fills in the outcome once the `tool_result` event
  * arrives.
  */
 export function toolRow({ tool, args }) {
   const state = el("span", { class: "tool-state" }, el("span", { class: "spinner" }));
   const words = describeArguments(args);
-  const command = callKind(tool) === "command";
-  const named = words === "" || !command;
-  const summary = el("span", { class: "tool-sum" }, words);
+  const kind = callKind(tool);
+  const command = kind === "command";
+  // Opened, a command shows the command itself rather than its arguments (item 506), as long as it carries nothing else
+  // that matters (a working folder for one), and then its arguments show whole.
+  const asked = typeof args === "object" && args !== null ? Object.entries(args) : [];
+  const aside = asked.filter(([key, value]) => key !== "command" && value !== null && value !== undefined && value !== "");
+  const plain = typeof args === "object" && args !== null && typeof args.command === "string" && aside.length === 0 ? args.command : null;
+  // A read or a write is read as what it is by its mark and its words, so it keeps no tool's name (item 506).
+  const named = words === "" || (!command && kind !== "read" && kind !== "write");
+  // A read or a write says which it is before its result comes, so a call still running, or one cut off, is read as what
+  // it was; the policy's words take its place once it is done.
+  const spoken = kind === "read" ? "Read" : kind === "write" ? (tool === "edit_file" ? "Edit" : "Write") : "";
+  const summary = el("span", { class: "tool-sum" }, spoken === "" || words === "" ? words : `${spoken} ${words}`);
   const time = el("span", { class: "tool-time" });
   const badges = el("span", { class: "cluster" });
   const head = el(
@@ -328,7 +339,7 @@ export function toolRow({ tool, args }) {
     el("span", { class: "chev" }, icon("chevron")),
   );
   const body = el("div", { class: "tool-body" });
-  const details = el("details", { class: "tool running" }, head, body);
+  const details = el("details", { class: command ? "tool command running" : "tool running" }, head, body);
   const shots = el("div", { class: "shots" });
   const node = el("div", { class: "stack tight" }, details, shots);
   let result = null;
@@ -340,7 +351,9 @@ export function toolRow({ tool, args }) {
     const argsText = JSON.stringify(args, null, 2);
     // replaceChildren writes a null as the word "null": a section that is not there is left out before (item 472).
     const parts = [
-      section("Arguments", el("pre", { class: "out" }, argsText), argsText),
+      plain === null
+        ? section("Arguments", el("pre", { class: "out" }, argsText), argsText)
+        : section("Command", el("pre", { class: "out" }, plain), plain),
       result === null
         ? el("div", { class: "small muted" }, cut ? "Cut off: the run ended before this call reported back." : "Still running…")
         : section(
