@@ -307,11 +307,14 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   script (`browser_eval`) can still read a field's value, and that step is judged as any other; the live Screen view you
   watch is not masked.
 - The clipboard can hold a password you have just copied from your password manager, so a run's read of it asks in every
-  preset (item 534): `desktop_clipboard_read`, `pbpaste`, and any AppleScript or JXA script that names the clipboard
-  (`the clipboard`, `clipboard info`, their raw events, `theClipboard`, `clipboardInfo`, `NSPasteboard`), whether it
-  reads it or puts text on it: telling the two apart takes a reading of the script that a pattern gets wrong, and a
-  string or a comment that names it asks too, as the guard does not read them (`run script "…"` runs one). `pbcopy` and
-  `desktop_clipboard_write` hand nothing over and ask nothing more than before; a `yolo` run asks nothing (item 443).
+  preset (item 534): `desktop_clipboard_read`, `pbpaste`, and any AppleScript or JXA script given on the line or to the
+  tool that names the clipboard (`the clipboard`, `clipboard info`, their raw events, `theClipboard`, `clipboardInfo`,
+  `NSPasteboard`), whether it reads it or puts text on it: telling the two apart takes a reading of the script that a
+  pattern gets wrong, and a string or a comment that names it asks too, as the guard does not read them (`run script
+  "…"` runs one). A script in a file (`osascript r.applescript`), a name a script builds as it runs, and another
+  language's code (`python3 -c` with `NSPasteboard`) are not read, as no program is (the guard reads the line, not what
+  a program does; see above). `pbcopy` and `desktop_clipboard_write` hand nothing over and ask nothing more than before;
+  a `yolo` run asks nothing (item 443).
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).

@@ -39,6 +39,8 @@ _NAMING_IT: list[str] = [
     'tell application "System Events" to set the clipboard to "x"',
     "return «event JonsgClp»",
     "return «event JonsiClp»",
+    "return <<event JonsgClp>>",
+    "return <<event JonsiClp>>",
     '«event JonspClp» "x"',
     "Application.currentApplication().theClipboard()",
     "(app.theClipboard)()",
