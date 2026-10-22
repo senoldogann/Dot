@@ -38,7 +38,7 @@ def test_a_key_where_a_long_command_is_cut_is_masked_before_the_cut() -> None:
     command: str = "echo " + "word " * 516 + f' && curl -H "X-Key: {key}" ' + "&& echo done " * 177
     cut_first: str = truncate_middle(command, _LIMIT)
     assert key not in cut_first and "a1B2c3D4e5" in cut_first
-    shown = _safe_json({"command": command})
+    shown = _safe_json({"command": command}, ())
     text = shown["command"]
     assert isinstance(text, str) and "chars omitted" in text
     assert "a1B2c3D4e5" not in text

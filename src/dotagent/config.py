@@ -352,10 +352,12 @@ class PolicyConfig(FrozenModel):
     empty, the tool does not exist. ``spend`` maps a site (its host without ``www.``) to its pre-approved caps.
     ``unanswered`` is what a question nobody answers within ``approval_timeout_s`` comes to, ``parked_hours`` how
     long a step kept for the owner waits before it lapses (item 482), and ``permit_hours`` how long their yes to a kept
-    step holds once they gave it (item 483)."""
+    step holds once they gave it (item 483). ``yolo_taint_check``: a yolo run that read outside content has the review
+    model check the steps an instruction planted there is after (item 525)."""
 
     preset: Preset
     approvals: ApprovalMode
+    yolo_taint_check: bool
     approval_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     unanswered: Unanswered
     parked_hours: float = Field(gt=0, le=24 * 30, allow_inf_nan=False)
