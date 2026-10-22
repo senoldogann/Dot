@@ -237,6 +237,23 @@ async def test_a_command_of_a_run_hands_launchd_nothing_and_one_of_a_yolo_run_do
     assert "Darwin" in await _run(await _context(runtime, "yolo"), "shell", {"command": "launchctl version"})
 
 
+LOOK_UP_THE_CLIPBOARD: Path = Path(__file__).resolve().parents[1] / "fixtures" / "look_up_the_clipboard.py"
+
+
+async def test_a_command_of_a_run_cannot_look_up_the_clipboards_service_and_one_of_a_yolo_run_can(
+    runtime: Runtime,
+) -> None:
+    """Item 534: the clipboard can hold a password the user has just copied, so the profile refuses its service to a
+    command of a run whatever line or program asks; a yolo run's command, outside the sandbox, finds it."""
+    line: dict[str, str] = {"command": f"python3 {shlex.quote(str(LOOK_UP_THE_CLIPBOARD))}"}
+    open_: str = await _run(await _context(runtime, "yolo"), "shell", line)
+    if not open_.rstrip().endswith("0") or "1100" in open_:
+        # The service is registered per login session: a Mac reached without one has nothing to refuse.
+        pytest.skip(f"the clipboard's service is not found outside the sandbox here: {open_!r}")
+    shut: str = await _run(await _context(runtime, "ask"), "shell", line)
+    assert shut.startswith("[exit 0") and shut.rstrip().endswith("1100"), shut
+
+
 async def test_a_search_of_a_run_reads_neither_dots_own_files_nor_the_protected_locations(runtime: Runtime) -> None:
     ctx: ToolContext = await _context(runtime, "ask")
     vault: Path = Path(runtime.config.policy.protected_paths[0])

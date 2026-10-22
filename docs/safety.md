@@ -162,11 +162,11 @@ currency, so list sites that bill in one currency. Empty by default.
 7. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
    when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 
-| Preset                 | Asks before                                                                                                                                                |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `aggressive` (default) | privilege, system settings, public posts, messages sent for you, destructive actions outside the workspace, and a read that may reach a protected location |
-| `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace                           |
-| `cautious`             | everything that is not read-only                                                                                                                           |
+| Preset                 | Asks before                                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aggressive` (default) | privilege, system settings, public posts, messages sent for you, destructive actions outside the workspace, and a read that may reach a protected location or the clipboard |
+| `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace                                            |
+| `cautious`             | everything that is not read-only                                                                                                                                            |
 
 A shell line is destructive outside the workspace when it removes, cuts or moves away a file there (item 385: `mv` takes
 its sources from where they were), and when it replaces one that is there: a redirect that empties it (`>`, `>|`, `&>`),
@@ -315,6 +315,23 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   cookie a script wrote into the text of a page shows in it; the other lines of Dot's log that write an address write it
   as it is, a login's values among them; the live Screen view you watch is not masked.
   A key that pastes (`Control+V`, `Meta+V`, `Shift+Insert`) is refused in such a field as typed text is.
+- The clipboard can hold a password you have just copied from your password manager. Outside a `yolo` run the sandbox
+  refuses the clipboard's service to every process of a run (below), so no command, terminal session or AppleScript of a
+  run can read it itself, whatever the line says; what another application does for a run is outside the sandbox (Apple
+  Events, as below): Terminal's `do script`, a System Events keystroke that pastes into an application the run then
+  reads back, a script in a file that does so; the Automation and Accessibility permissions you granted and the guard's
+  names stand in the way of those. A run's tries are asked about in every preset (item 534), by the names the guard can
+  read: `desktop_clipboard_read`; a shell line that names `pbpaste` (in any letter case, in any word of a wrapper's
+  arguments such as `time -l pbpaste`, with the quotes the shell takes out: `grep pbpaste notes` asks as well); a line
+  that runs `osascript` and names the clipboard anywhere (its `-e`, a pipe, a here-document, a variable); a line that
+  names a pasteboard (inline code in another language: `python3 -c` with `NSPasteboard`); and any AppleScript or JXA
+  script given to the tool that names the clipboard (`the clipboard`, `clipboard info`, their raw events,
+  `theClipboard`, `clipboardInfo`, `pbpaste`, a pasteboard), whether it reads it or puts text on it: telling the two
+  apart takes a reading of the script that a pattern gets wrong, and a string or a comment that names it asks too.
+  `desktop_clipboard_write` hands nothing over and asks nothing more than before. A `yolo` run asks nothing and has no
+  sandbox (item 443), and neither has a run with `[shell] sandbox = false`: there the guard's names are all there is,
+  and what it does not read gets through (a name the line builds as it runs, a quote the shell takes out twice, `sh -c
+  "pb''paste"`, a script in a file, `osascript r.applescript`, a script typed into a session, `osascript -i`).
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
@@ -369,7 +386,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   for it, outside the sandbox (item 418): it opens nothing through Launch Services (`open`, a program's own call),
   starts neither the `launchctl`, `shortcuts` nor `lsregister` that macOS installs and reaches neither the Shortcuts
   service nor the Launch Services database they would hand the work to, whatever program asks, creates no job of
-  launchd, and writes nothing into `~/Library/LaunchAgents`, where launchd finds the jobs it starts at a login. These
+  launchd, and writes nothing into `~/Library/LaunchAgents`, where launchd finds the jobs it starts at a login. Nor can it
+  look up the clipboard's service (item 534: no `pbpaste`, no `the clipboard` of an AppleScript, no `NSPasteboard`, whatever
+  the line says; `pbcopy` fails too, `desktop_clipboard_write` puts text there from Dot's own process). These
   rules are best-effort, as the guard's are. An application that is open is still driven (Mail, Calendar), with its own
   powers; `desktop_open_app` opens one from Dot's own process, and asks first for one whose bundle is not on the sealed
   system volume, however it names it: by the bundle's path, or by a name or a bundle id Launch Services resolves to
