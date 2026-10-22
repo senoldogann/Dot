@@ -118,24 +118,56 @@ function markdownLinkParts(text) {
 
 // A backslash before a mark makes the mark a letter (item 537): while a line is read its marks stand as private
 // characters, so that no reader takes them for marks, and each is given back as itself (in code with its backslash).
+// The characters are a block of the private use area that the line does not use itself (icon fonts keep their glyphs
+// there, in the first plane and in the last: Nerd Fonts' Material Design icons are U+F0001 on), so that a glyph of the
+// writer's is never taken for a hidden mark; a line that uses every block (none does) keeps its backslashes.
 const ESCAPABLE = /\\([\\`*_{}[\]()#+\-.!|~<>])/g;
-const HIDDEN_FROM = 0xe000;
-const HIDDEN = /[\ue000-\ue07f]/g;
+const FIRST_BLOCK = 0xf0000;
+const BLOCK = 0x80;
+const BLOCKS = 0x1ff;
 const ENTITIES = { "&lt;": "<", "&gt;": ">", "&amp;": "&", "&quot;": '"', "&#39;": "'", "&nbsp;": "\u00a0" };
 const BREAK = /<br\s*\/?>/i;
 
-function hideEscapes(text) {
-  return text.replace(ESCAPABLE, (_, mark) => String.fromCharCode(HIDDEN_FROM + mark.charCodeAt(0)));
+/** The first character of a block of 128 private characters that `line` does not use, or null when it uses them all. */
+function freeBlock(line) {
+  const used = new Set();
+  for (const char of line) {
+    const point = char.codePointAt(0);
+    if (point >= FIRST_BLOCK && point < FIRST_BLOCK + BLOCKS * BLOCK) {
+      used.add(Math.floor((point - FIRST_BLOCK) / BLOCK));
+    }
+  }
+  for (let block = 0; block < BLOCKS; block += 1) {
+    if (!used.has(block)) {
+      return FIRST_BLOCK + block * BLOCK;
+    }
+  }
+  return null;
 }
 
-function showEscapes(text, keepBackslash) {
-  return text.replace(HIDDEN, (char) => `${keepBackslash ? "\\" : ""}${String.fromCharCode(char.charCodeAt(0) - HIDDEN_FROM)}`);
+/** `line` with its escaped marks hidden in a block it does not use, and the function that gives them back (`show(text,
+ * keepBackslash)`; in code with their backslash); a line that leaves no block is returned as it is. */
+function escapes(line) {
+  const base = freeBlock(line);
+  if (base === null) {
+    return { hidden: line, show: (text) => text };
+  }
+  const hidden = line.replace(ESCAPABLE, (_, mark) => String.fromCodePoint(base + mark.charCodeAt(0)));
+  const show = (text, keepBackslash) => {
+    let out = "";
+    for (const char of text) {
+      const point = char.codePointAt(0);
+      out += point >= base && point < base + BLOCK ? `${keepBackslash ? "\\" : ""}${String.fromCodePoint(point - base)}` : char;
+    }
+    return out;
+  };
+  return { hidden, show };
 }
 
 // The words of a line as they read: the escapes given back and the few entities a writer uses spelled out; a `<br>` is a
 // break of its own.
-function wordsOf(part) {
-  const value = showEscapes(part.value, false).replace(/&(?:lt|gt|amp|quot|#39|nbsp);/g, (entity) => ENTITIES[entity]);
+function wordsOf(part, show) {
+  const value = show(part.value, false).replace(/&(?:lt|gt|amp|quot|#39|nbsp);/g, (entity) => ENTITIES[entity]);
   if (part.type !== "text" || !BREAK.test(value)) {
     return [{ ...part, value }];
   }
@@ -145,25 +177,26 @@ function wordsOf(part) {
 /** The inline pieces of one line of text: `{type: "text" | "code" | "bold" | "italic" | "strike" | "link" | "break", value, href?}`. */
 export function parseInline(line) {
   const parts = [];
-  const segments = hideEscapes(line).split(/(`+)/);
+  const { hidden, show } = escapes(line);
+  const segments = hidden.split(/(`+)/);
   // An odd split index holds the backtick run that opens or closes a code span.
   for (let index = 0; index < segments.length; index += 1) {
     if (index % 2 === 0) {
       if (segments[index] !== "") {
-        parts.push(...markdownLinkParts(segments[index]).flatMap(wordsOf));
+        parts.push(...markdownLinkParts(segments[index]).flatMap((piece) => wordsOf(piece, show)));
       }
       continue;
     }
     const fence = segments[index];
     const closing = segments.indexOf(fence, index + 1);
     if (closing === -1 || closing % 2 === 0) {
-      parts.push({ type: "text", value: showEscapes(fence, false) });
+      parts.push({ type: "text", value: show(fence, false) });
       continue;
     }
-    parts.push({ type: "code", value: showEscapes(segments.slice(index + 1, closing).join(""), true).trim() });
+    parts.push({ type: "code", value: show(segments.slice(index + 1, closing).join(""), true).trim() });
     index = closing;
   }
-  return parts.map((part) => (part.href === undefined ? part : { ...part, href: showEscapes(part.href, false) }));
+  return parts.map((part) => (part.href === undefined ? part : { ...part, href: show(part.href, false) }));
 }
 
 // Whether the line under `line` makes it the head of a table.

@@ -253,6 +253,23 @@ async def test_a_block_of_code_wraps_its_lines_when_asked_and_copies_what_it_hol
                     assert await other.evaluate("node => getComputedStyle(node).whiteSpace") == "pre"
                     await wrap.click()
                     assert await pre.evaluate("node => getComputedStyle(node).whiteSpace") == "pre"
+                    # Settings turned the wrapping on after the other block was drawn: its lines wrap, and its first
+                    # click unwraps them, whatever its switch was drawn as. A block whose own switch was used keeps
+                    # what it said.
+                    await page.evaluate("document.documentElement.setAttribute('data-wrap-code', '')")
+                    assert await other.evaluate("node => getComputedStyle(node).whiteSpace") == "pre-wrap"
+                    assert await pre.evaluate("node => getComputedStyle(node).whiteSpace") == "pre"
+                    second: Locator = (
+                        page.locator(".answer .code-block").nth(1).get_by_role("button", name="Wrap long lines")
+                    )
+                    # Its switch is lit as Settings says, with no click: it follows the setting while on the page.
+                    await expect(second).to_have_attribute("aria-pressed", "true")
+                    await second.click()
+                    assert await other.evaluate("node => getComputedStyle(node).whiteSpace") == "pre"
+                    assert await second.get_attribute("aria-pressed") == "false"
+                    await page.evaluate("document.documentElement.removeAttribute('data-wrap-code')")
+                    # A block that was switched keeps what it said, and the one that was not follows Settings again.
+                    assert await wrap.get_attribute("aria-pressed") == "false"
                     # The buttons of the head are as large as a thumb needs on a phone, and in sight.
                     sizes = await block.locator(".code-head .btn").evaluate_all(_SIZES)
                     assert len(sizes) == 2 and all(width >= 28 and height >= 28 for width, height in sizes), sizes

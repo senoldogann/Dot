@@ -11,6 +11,23 @@ function wrapsByDefault() {
   return document.documentElement.hasAttribute("data-wrap-code");
 }
 
+// The blocks that follow Settings light their switch as Settings says, also when it changes while they are on the page
+// (the page's style wraps their lines at once; the switch is an attribute, which is set again here). A block whose own
+// switch was used has said what it wants and keeps it.
+let following = false;
+function followSettings() {
+  if (following) {
+    return;
+  }
+  following = true;
+  new MutationObserver(() => {
+    const wraps = wrapsByDefault();
+    for (const block of document.querySelectorAll(".code-block:not([data-wrap])")) {
+      block.querySelector(".code-wrap")?.setAttribute("aria-pressed", String(wraps));
+    }
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-wrap-code"] });
+}
+
 /**
  * The block for `text`: `label` stands in its head, `language` (when it is code of one) is kept for a copy of the
  * answer, `copyText` is what its copy puts on the clipboard when that is more than it shows (a result that is cut), and
@@ -19,6 +36,7 @@ function wrapsByDefault() {
  * @param {{ text: string, label: string, language?: string, copyText?: string, tone?: "bad" | null, wrapped?: boolean | null, className?: string }} options
  */
 export function codeBlock({ text, label, language = "", copyText = text, tone = null, wrapped = null, className = "" }) {
+  followSettings();
   const wrap = el(
     "button",
     {
@@ -42,7 +60,9 @@ export function codeBlock({ text, label, language = "", copyText = text, tone = 
     el("pre", null, el("code", null, text)),
   );
   wrap.addEventListener("click", () => {
-    const now = wrap.getAttribute("aria-pressed") !== "true";
+    // What the lines do now, not what the switch was drawn as: Settings may have changed it since (the setting is read by
+    // the page's style, the switch only when the block is drawn).
+    const now = getComputedStyle(block.querySelector("pre")).whiteSpace === "pre";
     wrap.setAttribute("aria-pressed", String(now));
     block.dataset.wrap = now ? "on" : "off";
   });

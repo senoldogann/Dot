@@ -238,6 +238,27 @@ test("a backslash before a mark makes it a letter, except in code, which keeps t
   );
 });
 
+test("a private-use character of a writer's (an icon font's glyph) stays itself, in whatever block it is", () => {
+  // The first plane's private use area holds the glyphs of icon fonts (U+E02A sits where `*` would be hidden at U+E000),
+  // the last plane's those of Nerd Fonts' Material Design icons (U+F002A, where `*` would be hidden at U+F0000).
+  const parts = parseInline("prompt \ue02a\u{f002a}\u{f005f} done \\* and \ue02a");
+  assert.deepEqual(
+    parts.map((part) => [part.type, part.value]),
+    [["text", "prompt \ue02a\u{f002a}\u{f005f} done * and \ue02a"]],
+  );
+  // A line that uses the first blocks of the area still hides its marks in one it does not: the glyphs and the escaped
+  // marks come back as they were, in text and in code.
+  const crowded = parseInline("\u{f002a} \\* `\\_` \u{f00aa} \u{f0130}");
+  assert.deepEqual(
+    crowded.map((part) => [part.type, part.value]),
+    [
+      ["text", "\u{f002a} * "],
+      ["code", "\\_"],
+      ["text", " \u{f00aa} \u{f0130}"],
+    ],
+  );
+});
+
 test("a break written as a tag is a break, and the entities a writer spells out are the marks they stand for", () => {
   const parts = parseInline("a<br>b<br/>c &lt;tag&gt; &amp; &quot;q&quot;");
   assert.deepEqual(
