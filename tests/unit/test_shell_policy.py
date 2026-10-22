@@ -296,8 +296,8 @@ _READS_ONLY: list[str] = [
     "perl -ne 'print if /x/' notes.txt",
     "node -e 'console.log(1)'",
 ]
-# Software installed for the whole account, and a script the line downloads and runs (item 523); and next to them what
-# installs nothing for the account: a project's own install, and what only lists the tools uv installed.
+# Software installed for the whole account, and a script the line downloads and runs (item 523), every uv tool command
+# among them; and next to them what installs nothing for the account, a project's own install.
 _INSTALLS: list[str] = [
     "pip install requests",
     "brew install wget",
@@ -313,8 +313,6 @@ _NOT_INSTALLS: list[str] = [
     "npm install",
     "uv sync",
     "uv add requests",
-    "uv tool list",
-    "uv tool dir --bin",
 ]
 
 

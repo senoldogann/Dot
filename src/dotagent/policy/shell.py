@@ -2176,11 +2176,7 @@ def _assess_installer(command: str, args: list[str]) -> Finding | None:
     if command in ("gem", "cargo", "go", "pipx", "port", "mas") and sub in ("install", "uninstall", "upgrade"):
         return _finding("medium", ("install",), f"{reason} installs software")
     if command == "uv" and sub == "tool":
-        # uv tool list and uv tool dir only read, and uv tool alone prints its help. Any other word after tool, an
-        # option's value too (``--cache-dir dir install``), may be the command that installs.
-        words: list[str] = [arg for arg in args[args.index(sub) + 1 :] if not arg.startswith("-")]
-        if words not in ([], ["list"], ["dir"]):
-            return _finding("medium", ("install",), "uv tool installs software")
+        return _finding("medium", ("install",), "uv tool installs software")
     return None
 
 
