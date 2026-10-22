@@ -636,7 +636,7 @@ class ShellScope:
     gave each variable; ``depth`` counts the command strings the command is nested in (``bash -c``, ``$(...)``);
     ``downloaded`` are the files a fetcher saved and the folders ``git clone`` made earlier in the line (item 385);
     ``decoded`` are the files a decoder wrote earlier in the line, opaque code the guard never read, like a download
-    (item 523)."""
+    (item 527)."""
 
     cwds: tuple[Path, ...]
     workspace: Path
@@ -1940,7 +1940,7 @@ def _names_one(raw: str, places: tuple[Path, ...], scope: ShellScope) -> bool:
 def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
     """A finding when the last of ``stages`` (one pipeline's commands so far) is a shell or an interpreter and a file
     the line downloaded or decoded reaches its standard input: by ``<`` (``sh < y.sh``) or as an operand of a command
-    before it in the pipe (``cat y.sh | bash``). That runs the file as naming it does (item 385, item 523). A download
+    before it in the pipe (``cat y.sh | bash``). That runs the file as naming it does (item 385, item 527). A download
     reached the network and marks the run; a decode did not."""
     words, _, _, _ = _split_redirects(stages[-1], ())
     run, _ = _run_by_wrappers(_plain(words), scope)
@@ -1959,7 +1959,7 @@ def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]
 def _runs_download(raw: str, scope: ShellScope) -> list[Finding]:
     """A finding when ``raw``, a script the line runs, is a file the line fetched (or lies in a folder it cloned) or a
     file a decoder wrote: fetching or decoding a script and then running it is piping it into a shell in two steps
-    (item 385, item 523). A download reached the network, so it marks the run; a decode did not."""
+    (item 385, item 527). A download reached the network, so it marks the run; a decode did not."""
     if _names_one(raw, scope.downloaded, scope):
         return [_fetching("high", ("install",), "runs a script the line downloaded")]
     if _names_one(raw, scope.decoded, scope):
@@ -2019,7 +2019,7 @@ def _decoded_writes(words: list[str], targets: list[str], scope: ShellScope) -> 
     options (:func:`_positional`: its operands and space-separated option values), the value of ``-o``/``--output`` in
     any spelling, the value glued after ``=`` in a long option, and its ``>`` redirects -- as code it may have written.
     The file is opaque code on disk, judged like a download when a later line runs it; taking an input file too costs
-    only a question if that file is run, the safe side (item 523)."""
+    only a question if that file is run, the safe side (item 527)."""
     run, _ = _run_by_wrappers(_plain(words), scope)
     if not _decodes(run):
         return ()
@@ -2033,7 +2033,7 @@ def _fed_a_decode(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
     """A finding when the last of ``stages`` (one pipeline's commands so far) is a shell or an interpreter and an
     earlier command in the pipe decodes its standard input (``base64 -d blob | sh``, ``cat blob | base64 -d | bash``).
     Decoding a blob and running it hides the code from the guard as a download does, and runs it with the owner's
-    rights the same way, so it is judged as ``curl | sh`` is (item 523 / K1)."""
+    rights the same way, so it is judged as ``curl | sh`` is (item 527)."""
     words, _, _, _ = _split_redirects(stages[-1], ())
     run, _ = _run_by_wrappers(_plain(words), scope)
     if not run or Path(run[0]).name not in (_SHELLS | _INTERPRETERS):

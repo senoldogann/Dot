@@ -315,7 +315,7 @@ _NOT_INSTALLS: list[str] = [
     "uv add requests",
 ]
 # A blob decoded and then run -- piped straight into a shell or an interpreter, or decoded to a file the line then
-# runs -- hides the code from the guard as a download does, so it is judged the same (item 523 / K1). The blobs here
+# runs -- hides the code from the guard as a download does, so it is judged the same (item 527). The blobs here
 # are placeholder file names; what they decode to does not reach the policy, which judges the shape of the line. Next
 # to them, lines that run no decoded code: encoding (no ``-d``), a decode written to a file or read, a plain file
 # piped into a shell.
