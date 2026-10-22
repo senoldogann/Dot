@@ -3,6 +3,7 @@
 // heading is drawn one level down and keeps the level it was written at in `data-level`, for a copy (item 206).
 
 import { table as tableMarkdown } from "./clipboard.js";
+import { codeBlock } from "./codeblock.js";
 import { copyButton } from "./copybutton.js";
 import { el, requestFile } from "./dom.js";
 import { parseBlocks } from "./markdown.js";
@@ -31,6 +32,10 @@ function inlineNode(part) {
       return el("strong", null, part.value);
     case "italic":
       return el("em", null, part.value);
+    case "strike":
+      return el("del", null, part.value);
+    case "break":
+      return el("br");
     case "link":
       return el("a", { href: part.href, target: "_blank", rel: "noopener noreferrer nofollow" }, part.value);
     default:
@@ -42,43 +47,53 @@ function inlineNodes(parts) {
   return parts.map(inlineNode);
 }
 
-function cellRow(tag, cells) {
-  return el("tr", null, cells.map((cell) => el(tag, null, inlineNodes(cell))));
+// A column that is aligned says so by a class, as the page's content security policy allows no style of its own.
+function cellRow(tag, cells, aligns) {
+  return el(
+    "tr",
+    null,
+    cells.map((cell, column) => el(tag, { class: aligns[column] === null || aligns[column] === undefined ? null : `align-${aligns[column]}` }, inlineNodes(cell))),
+  );
+}
+
+// One item of a list: its words, a box when it is a task, and the blocks under it (a list inside it, code, more words).
+function itemNode(item) {
+  const task =
+    item.checked === null
+      ? null
+      : el("input", { class: "task-box", type: "checkbox", checked: item.checked, disabled: true, "aria-label": item.checked ? "Done" : "Not done" });
+  return el("li", { class: task === null ? null : "task" }, task, inlineNodes(item.inline), item.blocks.map(blockNode));
 }
 
 /** The node of one block that `parseBlocks` read, as `prose` draws it in its `div.prose`. */
 export function blockNode(block) {
   switch (block.type) {
     case "code":
-      // A block of code has a copy of itself a press away, as a table does (item 439), on a line over its right edge,
-      // so that the code scrolls sideways under it untouched. It copies the text as it was written, not as drawn.
-      return el(
-        "div",
-        { class: "prose-code" },
-        el("div", { class: "prose-code-bar" }, copyButton(block.text, "Copy the code")),
-        el("pre", null, el("code", null, block.text)),
-      );
+      // A block of code is a box with its head (item 537): the language it was written for, a switch that wraps its long
+      // lines and a copy of it, as it was written, not as drawn (item 439).
+      return codeBlock({ text: block.text, label: block.title || block.language || "text", language: block.language, className: "prose-code" });
     case "heading":
       return el(`h${Math.min(block.level + 1, 4)}`, { dataset: { level: String(block.level) } }, inlineNodes(block.inline));
     case "list":
-      return el(
-        block.ordered ? "ol" : "ul",
-        null,
-        block.items.map((item) => el("li", null, inlineNodes(item))),
-      );
+      return el(block.ordered ? "ol" : "ul", { start: block.ordered && block.start !== 1 ? String(block.start) : null }, block.items.map(itemNode));
     case "table": {
       const table = el(
         "table",
         null,
-        el("thead", null, cellRow("th", block.header)),
-        el("tbody", null, block.rows.map((row) => cellRow("td", row))),
+        el("thead", null, cellRow("th", block.header, block.aligns)),
+        el("tbody", null, block.rows.map((row) => cellRow("td", row, block.aligns))),
       );
-      // A table has a copy of itself as markdown a press away (item 403), on a line over its right edge, so that the
-      // table scrolls sideways under it untouched.
-      return el("div", { class: "prose-table" }, el("div", { class: "prose-table-bar" }, copyButton(() => tableMarkdown(table), "Copy the table")), table);
+      // A table is a box with a head, as a block of code is (item 537), and has a copy of itself as markdown a press away
+      // (item 403); the table scrolls sideways under its head.
+      return el(
+        "div",
+        { class: "prose-table" },
+        el("div", { class: "code-head" }, el("span", { class: "code-label" }, "table"), el("span", { class: "spacer" }), copyButton(() => tableMarkdown(table), "Copy the table")),
+        el("div", { class: "prose-table-scroll" }, table),
+      );
     }
     case "quote":
-      return el("blockquote", null, inlineNodes(block.inline));
+      return el("blockquote", null, block.blocks.map(blockNode));
     case "rule":
       return el("hr");
     default:

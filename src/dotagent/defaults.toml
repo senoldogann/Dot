@@ -704,6 +704,15 @@ flash = true
 open_dot = true
 double_tap_ms = 400
 
+[recap]
+# The recap of a run (item 536): a few short lines on what it did, what it does now and what waits for you, at the
+# head of its page's Run tab, written by the fast model ([models] fast) from the run's record and never seen by the
+# run. Its first once the run took first_after_steps steps, a new one every every_steps steps more and one once the run
+# ended, each asked for only while the section is in sight on a page; its refresh button writes one at once.
+enabled = true
+first_after_steps = 4
+every_steps = 8
+
 [memory]
 # Who embeds the notes, for finding them by meaning: "ollama" (the local server; nothing leaves this Mac) or "openai"
 # (the OpenAI API with OPENAI_API_KEY; the text of every note and search is sent to OpenAI). embed_model names a model of

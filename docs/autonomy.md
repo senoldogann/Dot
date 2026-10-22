@@ -22,7 +22,7 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   what a rule of yours allows go on without a question.
 - `ask` (Auto-accept edits, a pencil; the default): you do. Edits and the routine work the preset allows run without a
   question; the run waits for your answer to what the policy raises, on a card that shows what the action acts on whole
-  (a long command scrolls within it).
+  (a long command wraps and scrolls within the box of code every command of a chat is in, whose copy takes it whole).
 - `auto` (Auto, a shield): the review model (`[models] review`) does. It is given your instructions (the goal and every
   message you sent to the run: the only authority it recognises), the action (up to 12,000 characters of what it acts
   on, and of a longer target its start and its end), why the policy stopped at it and whether the run has read untrusted

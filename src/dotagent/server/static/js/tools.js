@@ -1,9 +1,10 @@
 // One tool call of a run: a collapsed row that shows what ran and how it went, and opens to the arguments and output.
 
 import { imageUrl } from "./api.js";
-import { clip, copyText, duration, el, plural } from "./dom.js";
+import { codeBlock } from "./codeblock.js";
+import { clip, duration, el, plural } from "./dom.js";
 import { icon, toolIconName } from "./icons.js";
-import { showImage, toast } from "./ui.js";
+import { showImage } from "./ui.js";
 import { showsWhy, whyText } from "./why.js";
 
 const PRIMARY_KEYS = ["command", "url", "path", "query", "goal", "text", "name", "app", "ref", "title", "script", "key"];
@@ -120,8 +121,14 @@ function firstLine(text) {
   return line === undefined ? "" : clip(line, SUMMARY_CHARS);
 }
 
+// What a step shows of its command, its arguments and its result is a box of code with its head (item 537): the
+// words of the part at its left, the wrap switch (the lines wrap from the start) and the copy of the whole of it.
+function stepBlock(label, text, failed, copyText = text) {
+  return codeBlock({ text, label, copyText, tone: failed ? "bad" : null, wrapped: true, className: "code-out" });
+}
+
 function textBlock(text, failed) {
-  const view = el("pre", { class: failed ? "out bad" : "out" }, text.length > TEXT_PREVIEW_CHARS ? text.slice(0, TEXT_PREVIEW_CHARS) : text);
+  const view = stepBlock(failed ? "Error" : "Result", text.length > TEXT_PREVIEW_CHARS ? text.slice(0, TEXT_PREVIEW_CHARS) : text, failed, text);
   if (text.length <= TEXT_PREVIEW_CHARS) {
     return view;
   }
@@ -131,7 +138,7 @@ function textBlock(text, failed) {
       class: "btn sm",
       type: "button",
       onclick: () => {
-        view.textContent = text;
+        view.querySelector("code").textContent = text;
         more.remove();
       },
     },
@@ -167,34 +174,8 @@ function whyLine(decision, flags) {
   );
 }
 
-function section(title, content, copyable) {
-  return el(
-    "div",
-    null,
-    el(
-      "div",
-      { class: "row" },
-      el("h4", null, title),
-      el("span", { class: "spacer" }),
-      copyable === null
-        ? null
-        : el(
-            "button",
-            {
-              class: "btn ghost sm",
-              type: "button",
-              onclick: () =>
-                copyText(copyable).then(
-                  () => toast("ok", "Copied"),
-                  (error) => toast("error", `Could not copy: ${error.message}`),
-                ),
-            },
-            icon("copy"),
-            "Copy",
-          ),
-    ),
-    content,
-  );
+function section(title, content) {
+  return el("div", null, el("div", { class: "row" }, el("h4", null, title)), content);
 }
 
 // What a row calls each of Dot's own tools (item 513): what it does, in a few words, rather than the name a model calls.
@@ -351,17 +332,13 @@ export function toolRow({ tool, args }) {
     const argsText = JSON.stringify(args, null, 2);
     // replaceChildren writes a null as the word "null": a section that is not there is left out before (item 472).
     const parts = [
-      plain === null
-        ? section("Arguments", el("pre", { class: "out" }, argsText), argsText)
-        : section("Command", el("pre", { class: "out" }, plain), plain),
+      plain === null ? stepBlock("Arguments", argsText, false) : stepBlock("Command", plain, false),
       result === null
         ? el("div", { class: "small muted" }, cut ? "Cut off: the run ended before this call reported back." : "Still running…")
-        : section(
-            result.ok ? "Result" : "Error",
-            result.text === "" ? el("div", { class: "small muted" }, "(no text)") : textBlock(result.text, !result.ok),
-            result.text === "" ? null : result.text,
-          ),
-      result === null || !showsWhy(result.decision, result.kind) ? null : section("Why it ran", whyLine(result.decision, result.flags ?? []), null),
+        : result.text === ""
+          ? section(result.ok ? "Result" : "Error", el("div", { class: "small muted" }, "(no text)"))
+          : textBlock(result.text, !result.ok),
+      result === null || !showsWhy(result.decision, result.kind) ? null : section("Why it ran", whyLine(result.decision, result.flags ?? [])),
     ];
     body.replaceChildren(...parts.filter((part) => part !== null));
   }

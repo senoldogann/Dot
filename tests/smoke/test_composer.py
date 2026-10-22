@@ -166,10 +166,14 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
                 await goal.click()
                 await goal.type("/")
                 await expect(menu).to_be_visible()
-                await expect(menu.locator(".slash-group")).to_have_text(["Commands", "Skills"])
                 # Five commands (Auto and the three modes, item 495, and /loop, item 400), the owner's skill and the
                 # three that come with Dot (item 196).
                 await expect(menu.locator("[role=option]")).to_have_count(9)
+                # The sections have no titles on the page (item 537); a screen reader hears each.
+                labels: list[str | None] = [
+                    await section.get_attribute("aria-label") for section in await menu.locator("[role=group]").all()
+                ]
+                assert labels == ["Commands", "Skills"], labels
                 await expect(menu.locator("[role=option][aria-selected=true]")).to_contain_text("/auto")
                 assert await goal.get_attribute("aria-expanded") == "true"
                 await page.screenshot(path=str(tmp_path / f"slash-open-{width}.png"))

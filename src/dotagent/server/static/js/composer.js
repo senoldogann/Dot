@@ -12,15 +12,15 @@ import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
 import { icon } from "./icons.js";
-import { markContent, markInk, skillMark } from "./marks.js";
+import { markContent, markInk } from "./marks.js";
 import { touchFirst, trackHeight } from "./layout.js";
 import { openMenu } from "./menu.js";
 import { markdownMirror } from "./mirror.js";
 import { loadPalette } from "./palette.js";
-import { arePicks, createPicks, pickColour } from "./picks.js";
+import { arePicks, createPicks } from "./picks.js";
 import { clearPref, readPref, writePref } from "./prefs.js";
 import { takesSnapshots } from "./snapshots.js";
-import { filterGroups, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
+import { filterGroups, menuSections, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
 import { openTeachPanel } from "./teach.js";
 
 const DRAFT_PREFIX = "dot.draft.";
@@ -112,27 +112,29 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
       }
       return span;
     }
+    // A skill is a puzzle piece and a command a terminal in a box, plain lines in the menu's ink (item 537).
     if (item.kind === "skill") {
-      // A skill wears its Customize card's mark (item 477), in its pick's colour.
-      const span = el("span", { class: "slash-mark", dataset: { kind: "skill" } }, icon(skillMark(item)));
-      span.style.setProperty("--pick-tint", `var(--character-${pickColour(item.label)})`);
-      return span;
+      return el("span", { class: "slash-mark", dataset: { kind: "skill" } }, icon("puzzle"));
     }
-    return el("span", { class: "slash-mark", dataset: { kind: "command" } }, icon(item.label === "/loop" ? "refresh" : "terminal"));
+    return el("span", { class: "slash-mark", dataset: { kind: "command" } }, icon(item.label === "/loop" ? "refresh" : "squareTerminal"));
   }
 
   function paint() {
     menu.replaceChildren();
     const groups = filterGroups(range.trigger === "@" ? pickGroups(palette) : paletteGroups(commands, palette), range.word);
-    shown = groups.flatMap((group) => group.items);
+    const sections = menuSections(groups);
+    shown = sections.flatMap((section) => section.items);
     active = Math.min(active, Math.max(shown.length - 1, 0));
-    for (const group of groups) {
-      menu.append(el("div", { class: "slash-group" }, group.title));
-      for (const item of group.items) {
-        const at = shown.indexOf(item);
+    // The sections stand one above the other with a hairline between them and no title: the marks say what each is
+    // (item 537); a screen reader hears each section's title.
+    sections.forEach((section, index) => {
+      if (index > 0) {
+        menu.append(el("div", { class: "slash-divider", role: "separator" }));
+      }
+      const options = section.items.map((item) => {
         const option = el(
           "div",
-          { class: "slash-option", role: "option", id: `${menu.id}-${item.id}`, "aria-selected": String(at === active) },
+          { class: "slash-option", role: "option", id: `${menu.id}-${item.id}`, "aria-selected": String(shown.indexOf(item) === active) },
           itemMark(item),
           el("span", { class: "slash-label" }, item.label),
           el("span", { class: "slash-hint" }, item.hint),
@@ -141,9 +143,10 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
           event.preventDefault();
           pick(item);
         });
-        menu.append(option);
-      }
-    }
+        return option;
+      });
+      menu.append(el("div", { class: "slash-section", role: "group", "aria-label": section.title }, options));
+    });
     if (problem !== null) {
       menu.append(el("div", { class: "slash-note" }, `Skills and MCP tools could not be loaded: ${problem}`));
     }
@@ -153,11 +156,15 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
       const loading = palette === null && range.trigger === "@";
       menu.append(el("div", { class: "slash-note" }, loading ? "Reading the MCP servers and the plugins…" : `Nothing matches ${range.trigger}${range.word}.`));
     }
+    if (shown.length > 0) {
+      // What the keys do, under the list (a touch screen has none of them: the foot is left off it).
+      menu.append(el("div", { class: "slash-foot", "aria-hidden": "true" }, icon("arrowUpDown"), "Select · Enter/Tab to add · Esc to close"));
+    }
     menu.hidden = false;
     textarea.setAttribute("aria-expanded", "true");
     if (shown.length > 0) {
       textarea.setAttribute("aria-activedescendant", `${menu.id}-${shown[active].id}`);
-      menu.children[Array.from(menu.children).findIndex((child) => child.id === `${menu.id}-${shown[active].id}`)]?.scrollIntoView({ block: "nearest" });
+      menu.querySelectorAll('[role="option"]')[active]?.scrollIntoView({ block: "nearest" });
     } else {
       textarea.removeAttribute("aria-activedescendant");
     }
