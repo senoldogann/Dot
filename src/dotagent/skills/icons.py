@@ -39,6 +39,7 @@ ICON_NAMES: frozenset[str] = frozenset(
         "fileDiff",
         "globe",
         "grip",
+        "hammer",
         "hand",
         "help",
         "image",
