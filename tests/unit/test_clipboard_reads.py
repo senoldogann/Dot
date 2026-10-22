@@ -1,6 +1,8 @@
 """A read of the clipboard asks in every preset (item 534): it can hold a password the user has just copied from their
-password manager, which a run's tool, its shell (``pbpaste``) or an AppleScript it runs (``the clipboard``) would
-hand to the model. A write to the clipboard, which hands nothing, stays as it was."""
+password manager, which a run's tool, its shell (``pbpaste``) or a script it runs (AppleScript's ``the clipboard``,
+JXA's ``theClipboard()``, the pasteboard of the Objective-C bridge) would hand to the model. A script that only puts
+text on the clipboard is not told from one that reads it, so it asks too; ``pbcopy`` and the tool that writes hand
+nothing and stay as they were."""
 
 from pathlib import Path
 from typing import cast
@@ -14,9 +16,40 @@ from dotagent.policy.shell import ShellAssessment, assess_applescript, assess_sh
 from dotagent.policy.types import ActionInfo, Preset, Verdict
 from dotagent.tools.base import PreparedCall
 from dotagent.tools.context import ToolContext
-from dotagent.tools.desktop import _clipboard_read_tool
+from dotagent.tools.desktop import ClipboardWriteArgs, _clipboard_read_tool, _clipboard_write_tool
 
 _PRESETS: tuple[Preset, ...] = ("aggressive", "balanced", "cautious")
+# Scripts that name the clipboard, in every form the reviews found: the words, a copy and an assignment, a `copy` in a
+# string or a comment before the read, a write that hides nothing, the raw events, and JXA's names however they are
+# called.
+_NAMING_IT: list[str] = [
+    "the clipboard",
+    "get the clipboard as text",
+    "return (the clipboard)",
+    "clipboard info",
+    "copy the clipboard to c\nreturn c",
+    "set c to the clipboard\nreturn c",
+    'set the clipboard to (the clipboard & "x")',
+    'return "copy: " & (the clipboard) & " goes to the clipboard"',
+    'if "copy" is not "" then set c to the clipboard',
+    "(* copy *) set c to the clipboard",
+    "set c to the ¬\n clipboard",
+    'set the clipboard to "x"',
+    'copy "x" to the clipboard',
+    'tell application "System Events" to set the clipboard to "x"',
+    "return «event JonsgClp»",
+    "return «event JonsiClp»",
+    '«event JonspClp» "x"',
+    "Application.currentApplication().theClipboard()",
+    "(app.theClipboard)()",
+    "var c = app.theClipboard; c.call(app)",
+    "app.theClipboard.call(app)",
+    "app.theClipboard/**/()",
+    "app.clipboardInfo()",
+    "app.clipboardInfo",
+    "Application.currentApplication().setTheClipboardTo('x')",
+    "ObjC.import('AppKit'); $.NSPasteboard.generalPasteboard.stringForType($.NSPasteboardTypeString)",
+]
 
 
 def _verdicts(command: str, workspace: Path) -> tuple[ShellAssessment, list[Verdict]]:
@@ -34,26 +67,13 @@ def _verdicts(command: str, workspace: Path) -> tuple[ShellAssessment, list[Verd
         "pbpaste",
         "pbpaste | head -c 8",
         "secret=$(pbpaste); echo done",
+        "/usr/bin/pbpaste",
+        "env pbpaste",
+        "osascript -e 'do shell script \"pbpaste\"'",
         "osascript -e 'the clipboard'",
-        "osascript -e 'get the clipboard as text'",
-        "osascript -e 'return (the clipboard)'",
-        "osascript -e 'clipboard info'",
-        # An assignment is a read as well: ``copy x to y`` copies the clipboard, and ``set y to`` takes it.
         "osascript -e 'copy the clipboard to c' -e 'return c'",
-        "osascript -e 'set c to the clipboard' -e 'return c'",
-        "osascript -e 'set the clipboard to (the clipboard & \"x\")'",
-        # A write on the same line does not hide a read: only its own words are taken out.
-        'osascript -e \'return "copy: " & (the clipboard) & " goes to the clipboard"\'',
-        "osascript -l JavaScript -e 'var copy = app.theClipboard(); copy // to the clipboard'",
-        # The raw forms of the two reads.
+        "osascript -l JavaScript -e 'var app = Application.currentApplication(); (app.theClipboard)()'",
         "osascript -e 'return «event JonsgClp»'",
-        "osascript -e 'return «event JonsiClp»'",
-        # JXA, by its own method and by the pasteboard of the Objective-C bridge.
-        "osascript -l JavaScript -e 'Application.currentApplication().theClipboard()'",
-        "osascript -l JavaScript -e 'var app = Application.currentApplication(); app.includeStandardAdditions = true;"
-        " app.clipboardInfo()'",
-        'osascript -l JavaScript -e \'ObjC.import("AppKit"); $.NSPasteboard.generalPasteboard.stringForType('
-        "$.NSPasteboardTypeString)'",
     ],
 )
 def test_a_read_of_the_clipboard_by_the_shell_asks_in_every_preset(command: str, tmp_path: Path) -> None:
@@ -62,53 +82,15 @@ def test_a_read_of_the_clipboard_by_the_shell_asks_in_every_preset(command: str,
     assert "protected_read" in assessment.flags and "destructive" not in assessment.flags
 
 
-@pytest.mark.parametrize(
-    "command",
-    [
-        "pbcopy < notes.txt",
-        "echo hi | pbcopy",
-        "osascript -e 'set the clipboard to \"x\"'",
-        "osascript -e 'copy \"x\" to the clipboard'",
-        'osascript -e \'tell application "System Events" to set the clipboard to "x"\'',
-        "osascript -l JavaScript -e 'Application.currentApplication().setTheClipboardTo(\"x\")'",
-        "echo the clipboard",
-    ],
-)
-def test_a_write_to_the_clipboard_asks_nothing_more_than_before(command: str, tmp_path: Path) -> None:
-    assessment, _ = _verdicts(command, tmp_path)
-    assert "protected_read" not in assessment.flags, (command, assessment)
+@pytest.mark.parametrize("script", _NAMING_IT)
+def test_a_script_of_a_shell_line_that_names_the_clipboard_asks_in_every_preset(script: str, tmp_path: Path) -> None:
+    command: str = "osascript -e '" + script.replace("'", "'\\''") + "'"
+    assessment, verdicts = _verdicts(command, tmp_path)
+    assert verdicts == ["ask", "ask", "ask"], (command, assessment)
 
 
-async def test_the_desktop_tool_that_reads_the_clipboard_asks_in_every_preset() -> None:
-    prepared: PreparedCall = await _clipboard_read_tool().prepare({}, cast(ToolContext, None))
-    action: ActionInfo = prepared.action
-    assert (action.tool, action.kind, action.flags) == (
-        "desktop_clipboard_read",
-        "desktop_observe",
-        ("protected_read",),
-    )
-    assert [preset_verdict(preset, action)[0] for preset in _PRESETS] == ["ask", "ask", "ask"]
-
-
-@pytest.mark.parametrize(
-    "script",
-    [
-        "the clipboard",
-        "get the clipboard as text",
-        "copy the clipboard to c\nreturn c",
-        "set c to the clipboard\nreturn c",
-        "clipboard info",
-        'set the clipboard to (the clipboard & "x")',
-        'return "copy: " & (the clipboard) & " goes to the clipboard"',
-        "var copy = app.theClipboard(); copy // to the clipboard",
-        "return «event JonsgClp»",
-        "return «event JonsiClp»",
-        "Application.currentApplication().theClipboard()",
-        "app.clipboardInfo()",
-        "ObjC.import('AppKit'); $.NSPasteboard.generalPasteboard.stringForType($.NSPasteboardTypeString)",
-    ],
-)
-def test_a_script_of_the_apple_script_tool_that_reads_the_clipboard_asks_in_every_preset(
+@pytest.mark.parametrize("script", _NAMING_IT)
+def test_a_script_of_the_apple_script_tool_that_names_the_clipboard_asks_in_every_preset(
     script: str, tmp_path: Path
 ) -> None:
     protected: tuple[Path, ...] = expand_protected(load_default_config().policy.refused_paths, ())
@@ -126,17 +108,30 @@ def test_a_script_of_the_apple_script_tool_that_reads_the_clipboard_asks_in_ever
 
 
 @pytest.mark.parametrize(
-    "script",
-    [
-        'set the clipboard to "x"',
-        'copy "x" to the clipboard',
-        'tell application "System Events" to set the clipboard to "x"',
-        "Application.currentApplication().setTheClipboardTo('x')",
-    ],
+    "command",
+    ["pbcopy < notes.txt", "echo hi | pbcopy", "echo the clipboard", "osascript -e 'display dialog \"hello\"'"],
 )
-def test_a_script_that_only_puts_text_on_the_clipboard_asks_nothing_more_than_before(
-    script: str, tmp_path: Path
+def test_what_names_no_clipboard_or_only_writes_by_a_program_asks_nothing_more_than_before(
+    command: str, tmp_path: Path
 ) -> None:
-    protected: tuple[Path, ...] = expand_protected(load_default_config().policy.refused_paths, ())
-    assessment: ShellAssessment = assess_applescript(script, tmp_path, tmp_path, protected, ())
-    assert "protected_read" not in assessment.flags, (script, assessment)
+    assessment, _ = _verdicts(command, tmp_path)
+    assert "protected_read" not in assessment.flags, (command, assessment)
+
+
+async def test_the_desktop_tool_that_reads_the_clipboard_asks_in_every_preset() -> None:
+    prepared: PreparedCall = await _clipboard_read_tool().prepare({}, cast(ToolContext, None))
+    action: ActionInfo = prepared.action
+    assert (action.tool, action.kind, action.flags) == (
+        "desktop_clipboard_read",
+        "desktop_observe",
+        ("protected_read",),
+    )
+    assert [preset_verdict(preset, action)[0] for preset in _PRESETS] == ["ask", "ask", "ask"]
+
+
+async def test_the_desktop_tool_that_writes_the_clipboard_asks_nothing_more_than_before() -> None:
+    prepared: PreparedCall = await _clipboard_write_tool().prepare(
+        ClipboardWriteArgs(text="hello").model_dump(), cast(ToolContext, None)
+    )
+    assert "protected_read" not in prepared.action.flags
+    assert [preset_verdict(preset, prepared.action)[0] for preset in ("aggressive", "balanced")] == ["allow", "allow"]

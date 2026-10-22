@@ -611,19 +611,14 @@ _AS_SHELL: re.Pattern[str] = re.compile(
     r"\bwriteText\s*\(|\.write\s*\(\s*\{\s*text\s*:",
     re.IGNORECASE,
 )
-# What an AppleScript or a JXA script reads off the clipboard: ``the clipboard`` (``get``, ``set x to``, ``copy the
-# clipboard to x``, and its raw form ``«event JonsgClp»``), ``clipboard info`` (``«event JonsiClp»``), JXA's
-# ``theClipboard()`` and ``clipboardInfo()``, and the pasteboard of the Objective-C bridge (any use of it: a write is
-# told from a read only by its method). What puts text there hands the script nothing: ``set the clipboard to`` and
-# ``copy x to the clipboard``; only those words are taken out before the script is read, so that everything else that
-# names the clipboard, on the same line too, is a read.
-_AS_CLIPBOARD_READ: re.Pattern[str] = re.compile(
-    r"\bthe\s+clipboard\b|\bclipboard\s+info\b|\b(?:theClipboard|clipboardInfo)\s*\(|\bNSPasteboard\b|"
-    r"«event\s+Jons\wClp»",
+# What names the clipboard in an AppleScript or a JXA script: ``the clipboard`` (to read it, and to put text on it too:
+# which of the two a script does takes a reading of the script that a pattern gets wrong, and three reviews each found
+# a line that hid a read behind a write), ``clipboard info``, their raw events (``«event JonsgClp»``), JXA's
+# ``theClipboard`` and ``clipboardInfo`` however they are called, and the pasteboard of the Objective-C bridge.
+_AS_CLIPBOARD: re.Pattern[str] = re.compile(
+    r"\bthe[\s¬]+clipboard\b|\bclipboard[\s¬]+info\b|theClipboard|clipboardInfo|\bNSPasteboard\b|«event\s+Jons\wClp»",
     re.IGNORECASE,
 )
-_AS_CLIPBOARD_SET: re.Pattern[str] = re.compile(r"\bset\s+the\s+clipboard\s+to\b", re.IGNORECASE)
-_AS_CLIPBOARD_COPY: re.Pattern[str] = re.compile(r"(\bcopy\b[^\n]*?)\bto\s+the\s+clipboard\b", re.IGNORECASE)
 _AS_KEYSTROKES: re.Pattern[str] = re.compile(r"\bkeystroke\b|\bkey\s+code\b|\bkeyCode\s*\(", re.IGNORECASE)
 _AS_NATIVE: re.Pattern[str] = re.compile(r"\bObjC\.import\b|\$\.NS[A-Z]|\bNSTask\b|\bNSAppleScript\b")
 _AS_LITERAL: re.Pattern[str] = re.compile(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'")
@@ -1780,6 +1775,16 @@ def _reads_the_clipboard() -> Finding:
     """A read of the clipboard, which can hold a password the user has just copied from their password manager: asked
     about in every preset (item 534), as a read that may reach a protected location is."""
     return _finding("medium", ("protected_read",), "reads the clipboard, which can hold a password the user copied")
+
+
+def _names_the_clipboard() -> Finding:
+    """A script that names the clipboard, to read it or to put text on it: asked about as a read is (item 534)."""
+    return _finding(
+        "medium",
+        ("protected_read",),
+        "names the clipboard, which can hold a password the user copied (a script that puts text there is not told "
+        "from one that reads it)",
+    )
 
 
 def _maybe_protected(reason: str) -> Finding:
@@ -2966,13 +2971,6 @@ def _shell_statement_findings(statement: str, scope: ShellScope) -> list[Finding
     return findings
 
 
-def _script_reads_the_clipboard(script: str) -> bool:
-    """Whether an AppleScript or a JXA ``script`` reads the clipboard (:data:`_AS_CLIPBOARD_READ`), once the words that
-    only put text on it are taken out."""
-    kept: str = _AS_CLIPBOARD_COPY.sub(r"\1 ", _AS_CLIPBOARD_SET.sub(" ", script))
-    return _AS_CLIPBOARD_READ.search(kept) is not None
-
-
 def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     flags: list[Flag] = []
     reasons: list[str] = []
@@ -2997,8 +2995,8 @@ def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     findings: list[Finding] = [_finding(risk, tuple(dict.fromkeys(flags)), reason)]
     for statement in _shell_statements(script):
         findings.extend(_shell_statement_findings(statement, scope))
-    if _script_reads_the_clipboard(script):
-        findings.append(_reads_the_clipboard())
+    if _AS_CLIPBOARD.search(script):
+        findings.append(_names_the_clipboard())
     if _AS_KEYSTROKES.search(script):
         findings.append(_finding("high", (), "types into whatever application has the keyboard focus"))
     if _AS_NATIVE.search(script):
