@@ -306,7 +306,8 @@ record taken for data, never for instructions. The run never sees it, the secret
 is kept as a `recap` event of the run, its model call counted with the purpose `recap`. Under it stand the step it is
 as of and its model; its button writes it again. One is due once the run took `[recap] first_after_steps` steps (4),
 then every `every_steps` steps more (8), and once more when the run ended after the last; a page asks for one only
-while the section is in sight, and as the run takes steps at most every 20 seconds, never two at once for one run;
+while the section is in sight, and as the run takes steps at most every 20 seconds, never two at once for one run, and
+after a write that failed it shows why and asks no more until its button is pressed or a recap arrives;
 `[recap] enabled = false` writes none and hides the section. In the side panel (Run details),
 under More on the Run tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the
 minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the input tokens with the

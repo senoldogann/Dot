@@ -153,6 +153,32 @@ async def test_a_forced_ask_that_joins_a_write_which_wrote_none_writes_one(monke
     assert asked == [False, True]
 
 
+async def test_two_forced_asks_that_join_a_write_which_wrote_none_write_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The pre-push review: both woke and each wrote its own."""
+    released: asyncio.Event = asyncio.Event()
+    asked: list[bool] = []
+
+    async def write(runtime: Runtime, run_id: str, force: bool) -> tuple[RecapView, bool]:
+        asked.append(force)
+        if not force:
+            await released.wait()
+            return _view(4), False
+        await asyncio.sleep(0)
+        return _view(9), True
+
+    monkeypatch.setattr(recap, "_write", write)
+    nobody: Runtime = cast("Runtime", object())
+    looking = asyncio.create_task(recap.write_recap(nobody, "run_twice", False))
+    await asyncio.sleep(0)
+    here = asyncio.create_task(recap.write_recap(nobody, "run_twice", True))
+    there = asyncio.create_task(recap.write_recap(nobody, "run_twice", True))
+    await asyncio.sleep(0)
+    released.set()
+    assert (await looking).steps == 4
+    assert (await here).steps == (await there).steps == 9
+    assert asked == [False, True]
+
+
 async def test_an_ask_that_joins_a_write_which_wrote_one_writes_no_second(monkeypatch: pytest.MonkeyPatch) -> None:
     released: asyncio.Event = asyncio.Event()
     asked: list[bool] = []

@@ -254,8 +254,9 @@ async def write_recap(runtime: Runtime, run_id: str, force: bool) -> RecapView:
     written, or the newest when none was due. One being written for the run already is waited for, not written again,
     unless this ask is forced and that one wrote none (no recap was due); a page that goes away while one is written
     does not cut it off."""
-    running: _Writing | None = _writing.get(run_id)
-    if running is not None:
+    # A forced ask woken by a write that wrote none looks again: another forced ask woken with it may have started the
+    # write already, and it joins that one rather than write a second (the pre-push review found two).
+    while (running := _writing.get(run_id)) is not None:
         view, wrote = await asyncio.shield(running.task)
         if wrote or running.forced or not force:
             return view

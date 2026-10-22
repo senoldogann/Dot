@@ -30,6 +30,9 @@ export function recapSection({ runId, signal }) {
   const section = panelSection({ id: "run-recap", title: "Recap", actions: again, body });
   let inSight = false;
   let writing = false;
+  // A write that failed: the section asks for none of its own again until its button is pressed or a recap arrives,
+  // as each try would ask the models again for as long as the run takes steps.
+  let stalled = false;
   let lastLook = 0;
   let timer = 0;
 
@@ -60,8 +63,10 @@ export function recapSection({ runId, signal }) {
     meta.textContent = "Writing a recap…";
     try {
       paint(await api.post(`/runs/${runId}/recap`, { force }));
+      stalled = false;
     } catch (error) {
       failed(error);
+      stalled = true;
     } finally {
       writing = false;
       again.disabled = false;
@@ -69,9 +74,10 @@ export function recapSection({ runId, signal }) {
     }
   }
 
-  /** Read the run's recap, and write one when it is due; only while the section is in sight. */
+  /** Read the run's recap, and write one when it is due; only while the section is in sight, and not after a write
+   * failed (its failure stays in sight). */
   async function look() {
-    if (!inSight || writing || signal.aborted) {
+    if (!inSight || writing || stalled || signal.aborted) {
       return;
     }
     lastLook = Date.now();
@@ -125,6 +131,7 @@ export function recapSection({ runId, signal }) {
         return;
       }
       if (record.kind === "recap") {
+        stalled = false;
         look();
       } else if (STEP_KINDS.has(record.kind)) {
         lookSoon();
