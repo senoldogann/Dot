@@ -520,25 +520,25 @@ event and approval.
 > running line knows (`~/.s$(echo sh)/id_rsa`, `~/Library/${X:-Safari}/History.db`, a variable filled with what a
 > command prints) that begins as a protected location's path, or ends with the last names of one (`~/Documents/$(echo
 > ..)/.ssh/id_rsa`), or climbs (`..`) beside a part it does not know (`$(pwd)/../.ssh/id_rsa`; the climb alone of a `cd`
-> is no step), or is a word with more spellings, by variables and braces, than it reads (64; unless it holds a space or
-> a mark of code, as a program in quotes does, whose braces the shell would not spell out), and a command that reads
-> every file under a folder that holds one (`grep -r secret ~`, `rg token ~/Library`, `find ~ -exec cat {} \;`, `find ~
-> | xargs cat` or `cat $(find ~ -name id_rsa)`, `cp -R`, `ditto`, `rsync -a`, `scp -r`, `tar` creating an archive or
-> adding to one, `zip -r`, `diff -r`, `git grep` and `git diff --no-index`, `hdiutil create -srcfolder`, `rclone`, `aws
-> s3 sync`, `gsutil`, `pax`, and what reads the names of a listing from its standard input: `cpio`, `tar -T -`, `zip
-> -@`; a folder given as a glob that matches a protected location or one above it, `~/Lib*` and `/Users/*`, counts as
-> that folder, and the GNU tools Homebrew installs as `ggrep` or `gfind` as the tools they are) are asked about in every
-> preset (item 531), as a read that may reach a protected location. A command that runs in another folder by an option
-> of its own (`env -C`, `git -C`, `tar -C`, `make -C`, `uv --directory`, `yarn --cwd`, `pnpm --dir`) has its words
-> judged from there too (a line that moves between more than four different folders asks, each being read against every
-> word): `git -C ~ diff --no-index .ssh/id_rsa /dev/null` names the key of `~/.ssh`. A recursive search reads the folder
-> the line is in when it is given none, and which of its words is a folder is not told without each tool's options, so
-> from a folder that holds a protected location (the home folder) it asks whatever folder it is given. It does not
-> follow what a recursive command does inside the other folders it walks, nor the code of a script it runs, nor `git add
-> -A` in a folder that holds one, nor the other tools that upload or copy a folder whole under names it does not know,
-> nor a loop that reads what a search lists (`find ~ | while read f; do cat "$f"; done`), nor a path whose unknown part
-> holds the protected folder's own name (`~/Documents/$(echo ../.ssh)/id_rsa`); the sandbox keeps those out of Dot's own
-> files and of the sealed stores (the data of your browsers, Mail and Messages), not out of the rest of yours, and a
-> shell can do more than any analysis can foresee. Treat Dot as a user of your account with the rights of your account:
-> keep backups, keep the workspace for scratch work, and use `balanced` or `cautious` on a machine where a mistake would
-> be expensive.
+> is no step), or is a word with more spellings, by variables and braces, than it reads (64; a program or a literal in
+> quotes as dense as that asks too, since the guard cannot tell its braces from ones the shell spells out), and a
+> command that reads every file under a folder that holds one (`grep -r secret ~`, `rg token ~/Library`, `find ~ -exec
+> cat {} \;`, `find ~ | xargs cat` or `cat $(find ~ -name id_rsa)`, `cp -R`, `ditto`, `rsync -a`, `scp -r`, `tar`
+> creating an archive or adding to one, `zip -r`, `diff -r`, `git grep` and `git diff --no-index`, `hdiutil create
+> -srcfolder`, `rclone`, `aws s3 sync`, `gsutil`, `pax`, and what reads the names of a listing from its standard input:
+> `cpio`, `tar -T -`, `zip -@`; a folder given as a glob that matches a protected location or one above it, `~/Lib*` and
+> `/Users/*`, counts as that folder, and the GNU tools Homebrew installs as `ggrep` or `gfind` as the tools they are)
+> are asked about in every preset (item 531), as a read that may reach a protected location. A command that runs in
+> another folder by an option of its own (`env -C`, `git -C`, `tar -C`, `make -C`, `uv --directory`, `yarn --cwd`, `pnpm
+> --dir`) has its words judged from there too (a line that moves between more than four different folders asks, each
+> being read against every word): `git -C ~ diff --no-index .ssh/id_rsa /dev/null` names the key of `~/.ssh`. A
+> recursive search reads the folder the line is in when it is given none, and which of its words is a folder is not told
+> without each tool's options, so from a folder that holds a protected location (the home folder) it asks whatever
+> folder it is given. It does not follow what a recursive command does inside the other folders it walks, nor the code
+> of a script it runs, nor `git add -A` in a folder that holds one, nor the other tools that upload or copy a folder
+> whole under names it does not know, nor a loop that reads what a search lists (`find ~ | while read f; do cat "$f";
+> done`), nor a path whose unknown part holds the protected folder's own name (`~/Documents/$(echo ../.ssh)/id_rsa`);
+> the sandbox keeps those out of Dot's own files and of the sealed stores (the data of your browsers, Mail and
+> Messages), not out of the rest of yours, and a shell can do more than any analysis can foresee. Treat Dot as a user of
+> your account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
+> `cautious` on a machine where a mistake would be expensive.

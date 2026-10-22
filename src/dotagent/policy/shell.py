@@ -1734,29 +1734,28 @@ def _protected_words(words: list[str], scope: ShellScope, *, climbs: bool = True
     candidates: list[str] = [*parts, *(part[1:] for part in parts if part.startswith("@") and part != "@-")]
     if any(_reaches_protected(candidate, scope) for candidate in candidates):
         return [_finding("high", ("secret_access",), "names a protected location")]
-    if any(
-        _leads_toward_protected(candidate, scope, climbs=climbs) or _has_too_many_spellings(candidate, scope)
-        for candidate in candidates
-    ):
+    if any(_leads_toward_protected(candidate, scope, climbs=climbs) for candidate in candidates):
         return [
             _maybe_protected(
                 "names a path that may lie in a protected location: part of it is only known when the line runs"
             )
         ]
+    if any(_has_too_many_spellings(candidate, scope) for candidate in candidates):
+        return [
+            _maybe_protected(
+                f"names a word with more than {_MOST_VALUES} spellings (variables, braces), which are not read one"
+                " by one: a protected location may be one of them"
+            )
+        ]
     return []
-
-
-# What a word that is code (a program in quotes, a literal) holds and a path does not: the quotes are gone by the time a
-# word is read, but the marks of the code and the spaces between its words stay.
-_CODE_MARKS: str = "'\"`();=:"
 
 
 def _has_too_many_spellings(raw: str, scope: ShellScope) -> bool:
     """Whether ``raw`` has more spellings (variables, braces) than :data:`_MOST_VALUES`: the guard reads none of them,
-    and a protected location may be one. The quotes are gone by the time a word gets here, so a program in quotes
-    (``python3 -c "d={'a':1,...}"``, ``awk '{print $1,$2}'``) has braces the shell would not spell out: a word with a
-    space or a mark of code in it (:data:`_CODE_MARKS`) is not asked about, any other is."""
-    return bool(raw) and not any(char.isspace() or char in _CODE_MARKS for char in raw) and _spellings(raw, scope)[1]
+    and a protected location may be one. Any word asks, a program in quotes (``python3 -c "d={'a':1,...}"``) too: the
+    quotes are gone by the time a word gets here, and no mark in it can tell code from a path the line made of braces
+    (``{~/.ssh/id_rsa,:}{,}{,}...`` puts a mark in a choice of its own), so a literal that big costs a question."""
+    return bool(raw) and _spellings(raw, scope)[1]
 
 
 def _maybe_protected(reason: str) -> Finding:
