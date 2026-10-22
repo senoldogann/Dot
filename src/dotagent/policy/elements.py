@@ -45,12 +45,14 @@ _PRICED_ACTION: re.Pattern[str] = re.compile(
 # guests — €50"). In a dialog's sentences an order's number is the order about to be paid, so a dialog counts them all
 # (`_BOOKING`).
 _BOOKING: re.Pattern[str] = re.compile(rf"(?i){_SENTENCE_START}(?:order|book|reserve)\b")
-# A control's label is no offer when what follows the word makes it a record: an order's number, a colon, or a word
-# that names a record ("Order 4521 · $45.00 · Delivered", "Order #4521", "Book: Dune · $9.99", "Order summary ·
-# $45.00", "Reserve price $500"). Only those shapes are left out, so a label nobody foresaw errs towards the hand-off.
+# A control's label is no offer when the word is followed by an order's number sign or by a word that names a record
+# ("Order #4521 · $45.00 · Delivered", "Order summary · $45.00", "Order total: $45.00", "Reserve price $500"): neither
+# can be the start of a price. Only those shapes are left out, so a label nobody foresaw errs towards the hand-off: a
+# number or a colon after the word may start the price ("Book 1500 TL", "Book: $199"), and a row of past orders that
+# shows its number without "#" hands the click off too.
 _BOOKING_LABEL: re.Pattern[str] = re.compile(
     rf"(?i){_SENTENCE_START}(?:order|book|reserve)\b"
-    r"(?!\s*#|\s+\d{4,}|\s*:|\s+(?:summary|history|details|status|number|total|price)\b)"
+    r"(?!\s*#|\s+(?:summary|history|details|status|number|total|price)\b)"
 )
 _DESTRUCTIVE_ACTION: re.Pattern[str] = re.compile(
     r"(?i)\b(?:delete|remove|erase|discard|destroy|wipe|deactivate|terminate|permanently|empty (?:the )?trash"
