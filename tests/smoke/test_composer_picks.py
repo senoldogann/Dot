@@ -618,11 +618,12 @@ async def test_an_at_word_picks_a_server_and_no_skill_and_the_slash_word_the_ski
                     await goal.click()
                     await goal.type("Look it up @")
                     await expect(menu).to_be_visible()
-                    await expect(menu.locator(".slash-group").first).to_have_text("MCP servers")
+                    # The sections have no title on the page (item 537); a screen reader hears each.
+                    await expect(menu.locator("[role=group]").first).to_have_attribute("aria-label", "MCP servers")
                     server: Locator = menu.get_by_role("option").filter(has_text=SERVER).first
                     await expect(server.locator(".slash-hint")).to_have_text("10 tools")
-                    await expect(menu.locator(".slash-group", has_text="Skills")).to_have_count(0)
-                    await expect(menu.locator(".slash-group", has_text="Commands")).to_have_count(0)
+                    await expect(menu.locator("[role=group][aria-label='Skills']")).to_have_count(0)
+                    await expect(menu.locator("[role=group][aria-label='Commands']")).to_have_count(0)
                     # A server added by hand has no service behind it: the plug, as its Customize tile has (item 408).
                     await expect(server.locator("img.plugin-logo")).to_have_count(0)
                     await expect(server.locator(".slash-mark svg")).to_have_count(1)
@@ -673,7 +674,7 @@ async def test_an_at_word_picks_a_server_and_no_skill_and_the_slash_word_the_ski
                     await goal.fill("")
                     await goal.type(f"/{SKILL_NAME[:6]}")
                     await expect(menu).to_be_visible()
-                    await expect(menu.locator(".slash-group", has_text="Skills")).to_have_count(1)
+                    await expect(menu.locator("[role=group][aria-label='Skills']")).to_have_count(1)
                     await expect(menu.get_by_role("option")).to_have_count(1)
                     await goal.press("Enter")
                     await expect(goal).to_have_value("")
@@ -852,11 +853,10 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                         name: await _mark_of(menu.get_by_role("option").filter(has_text=name).locator(".slash-mark"))
                         for name in (COPIED_SKILL, LEARNED_SKILL, SKILL_NAME)
                     }
-                    assert skill_marks == {
-                        COPIED_SKILL: cards[COPIED_SKILL],
-                        LEARNED_SKILL: "icon:brain",
-                        SKILL_NAME: cards[SKILL_NAME],
-                    }, skill_marks
+                    # A skill is a puzzle piece in the menu, whatever its Customize card draws (item 537).
+                    assert skill_marks == {name: "icon:puzzle" for name in (COPIED_SKILL, LEARNED_SKILL, SKILL_NAME)}, (
+                        skill_marks
+                    )
                     await page.screenshot(
                         path=str(tmp_path / f"slash-marks-{width}-{scheme}.png"), animations="disabled"
                     )

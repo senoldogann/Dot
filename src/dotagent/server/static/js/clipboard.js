@@ -24,6 +24,8 @@ const LEFT_OUT = [
   ".turn-face",
   ".message-foot",
   ".answer-foot",
+  // The head of a block of code or of a table (its label and its buttons; item 537).
+  ".code-head",
 ].join(", ");
 // The elements that stand on lines of their own; any other is part of a line.
 const BLOCKS = new Set([
@@ -67,7 +69,7 @@ const BLOCKS = new Set([
 ]);
 const WEB_ADDRESS = /^https?:\/\//i;
 // The elements that mark up words within a line of a message (prose.js).
-const MARKUP = new Set(["A", "B", "BR", "BUTTON", "CODE", "EM", "I", "STRONG"]);
+const MARKUP = new Set(["A", "B", "BR", "BUTTON", "CODE", "DEL", "EM", "I", "S", "STRONG"]);
 // The items of one list or the cells of one table in a message, as a selection across several of them cuts them out.
 const CUT_FROM = ".prose li, .prose td, .prose th, .prose ul, .prose ol, .prose table";
 
@@ -124,6 +126,9 @@ function inlineOf(node) {
     case "EM":
     case "I":
       return wrapped("*", inline(node.childNodes));
+    case "DEL":
+    case "S":
+      return wrapped("~~", inline(node.childNodes));
     case "CODE":
       return codeSpan(node.textContent);
     case "A":
@@ -163,36 +168,54 @@ function cellText(cell) {
   return inline(cell.childNodes).replace(/\s*\n\s*/g, " ").replaceAll("|", "\\|").trim();
 }
 
-/** A table as markdown: its rows in order, a row of dashes under the first, and empty cells where a row is short. */
+// What a table's rule line says of a column that is aligned (the class prose.js gives its cells).
+const RULES = { "align-left": ":--", "align-center": ":-:", "align-right": "--:" };
+
+/** A table as markdown: its rows in order, a row of dashes under the first (with the colons of the columns that are
+ * aligned), and empty cells where a row is short. */
 export function table(element) {
-  const rows = (element.tagName === "TR" ? [element] : [...element.querySelectorAll("tr")]).map((row) =>
-    [...row.children].filter((cell) => cell.tagName === "TD" || cell.tagName === "TH").map(cellText),
-  );
-  const width = Math.max(0, ...rows.map((cells) => cells.length));
+  const cells = (row) => [...row.children].filter((cell) => cell.tagName === "TD" || cell.tagName === "TH");
+  const lines = element.tagName === "TR" ? [element] : [...element.querySelectorAll("tr")];
+  const rows = lines.map((row) => cells(row).map(cellText));
+  const width = Math.max(0, ...rows.map((one) => one.length));
   if (width === 0) {
     return "";
   }
-  const line = (cells) => `| ${[...cells, ...Array(width - cells.length).fill("")].join(" | ")} |`;
-  return [line(rows[0]), line(Array(width).fill("---")), ...rows.slice(1).map(line)].join("\n");
+  const line = (one) => `| ${[...one, ...Array(width - one.length).fill("")].join(" | ")} |`;
+  const rule = Array.from({ length: width }, (_, column) => {
+    const aligned = cells(lines[0])[column]?.className.split(" ").find((name) => name in RULES);
+    return aligned === undefined ? "---" : RULES[aligned];
+  });
+  return [line(rows[0]), line(rule), ...rows.slice(1).map(line)].join("\n");
 }
 
-// The items of a list, each under its own mark, the lines after an item's first set in under it.
+// What stands under the first words of an item and is no paragraph of its own: a list inside it, a block of code.
+const UNDER_WORDS = /^(\s*([-*+]|\d+[.)])\s|`{3,}|~{3,})/;
+
+// The items of a list, each under its own mark (a numbered one from the number the list starts at), a task with its box,
+// the lines after an item's first set in under it: a list or code inside it on the next line, a paragraph after a
+// blank one.
 function list(element) {
   const ordered = element.tagName === "OL";
+  const start = ordered ? Number.parseInt(element.getAttribute("start") ?? "1", 10) || 1 : 1;
   const items = [...element.children].filter((item) => item.tagName === "LI" && !item.matches(LEFT_OUT));
   return items
     .map((item, index) => {
-      const mark = ordered ? `${index + 1}. ` : "- ";
-      return `${mark}${blocks(item.childNodes).join("\n\n").replaceAll("\n", `\n${" ".repeat(mark.length)}`)}`;
+      const mark = `${ordered ? `${start + index}.` : "-"} `;
+      const box = item.querySelector(":scope > input[type='checkbox']");
+      const task = box === null ? "" : `${box.checked ? "[x]" : "[ ]"} `;
+      const parts = blocks(item.childNodes);
+      const loose = parts.slice(1).some((part) => !UNDER_WORDS.test(part));
+      return `${mark}${task}${parts.join(loose ? "\n\n" : "\n").replaceAll("\n", `\n${" ".repeat(mark.length)}`)}`;
     })
     .join("\n");
 }
 
-// Code as a fenced block, its fence longer than any run of backticks in the code.
-function fenced(code) {
+// Code as a fenced block, its fence longer than any run of backticks in the code, and the language it was written for.
+function fenced(code, language = "") {
   const body = code.replace(/\n$/, "");
   const fence = "`".repeat(Math.max(2, longestRun(body, /`+/g)) + 1);
-  return `${fence}\n${body}\n${fence}`;
+  return `${fence}${language}\n${body}\n${fence}`;
 }
 
 function quoted(text) {
@@ -224,7 +247,7 @@ function block(element) {
     case "BLOCKQUOTE":
       return quoted(blocks(element.childNodes).join("\n\n"));
     case "PRE":
-      return fenced(element.textContent);
+      return fenced(element.textContent, element.closest(".code-block")?.dataset.language ?? "");
     case "TABLE":
     case "THEAD":
     case "TBODY":

@@ -2,6 +2,7 @@
 // run waits for (`pending`) or left for the user and went on without (`left`).
 
 import { api } from "./api.js";
+import { codeBlock } from "./codeblock.js";
 import { clip, dateTime, el } from "./dom.js";
 import { icon } from "./icons.js";
 import { toast } from "./ui.js";
@@ -186,13 +187,22 @@ function technicalDetails(args) {
   if (chips.length === 0 && target === null) {
     return null;
   }
-  // The whole target, as the action would act on it (item 242): a long command wraps, and scrolls within the card.
   return el(
     "div",
     { class: "stack tight" },
     chips.length > 0 ? el("div", { class: "cluster" }, chips) : null,
-    target === null ? null : el("pre", { class: "approval-target", tabindex: "0", "aria-label": "What the action acts on" }, target),
+    target === null ? null : targetBlock(target, args.kind === "shell" ? "Command" : "Target"),
   );
+}
+
+// The whole target, as the action would act on it (item 242): a long command wraps, and scrolls within the card past a
+// dozen lines. It is the box of code a chat shows everywhere else (item 537), so the owner can copy what is asked.
+function targetBlock(target, label) {
+  const block = codeBlock({ text: target, label, wrapped: true, className: "approval-target" });
+  const text = block.querySelector("pre");
+  text.tabIndex = 0;
+  text.setAttribute("aria-label", "What the action acts on");
+  return block;
 }
 
 /** What a kept step's card says of it: what I did it does, and until when the step waits. */

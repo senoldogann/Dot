@@ -104,18 +104,30 @@ function newBubble(scope, step, live) {
   return { node, body, step, text: "", drawn: [], caret, queued: false, ended: false };
 }
 
-// What holds the last line of a message: a list's last item, a table's last cell.
-const LINE_HOLDERS = new Set(["UL", "OL", "TABLE", "THEAD", "TBODY", "TR"]);
+// What holds the last line of a message: a list's last item, a table's last cell, a quote's last block.
+const LINE_HOLDERS = new Set(["UL", "OL", "TABLE", "THEAD", "TBODY", "TR", "BLOCKQUOTE"]);
+// What an item of a list holds that has a last line of its own: a list inside it, a quote, a box of code, a paragraph.
+const ITEM_BLOCKS = "ul, ol, blockquote, .code-block, p";
 
-/** The element the last line of `node` (a `div.prose`) ends in: its last block, or the last item or cell in it. */
+/** The element the last line of `node` (a `div.prose`) ends in: its last block, or the last item, cell or block in it. */
 function lastLine(node) {
   let at = node.lastElementChild ?? node;
-  // A block of code is drawn in its own box with a copy bar over it (item 439): the caret is in the code, not after it.
-  if (at.classList.contains("prose-code") && at.lastElementChild !== null) {
-    at = at.lastElementChild;
-  }
-  while (LINE_HOLDERS.has(at.tagName) && at.lastElementChild !== null) {
-    at = at.lastElementChild;
+  for (;;) {
+    // A block of code is drawn in its own box with its head (items 439 and 537): the caret is in the code, not after it.
+    if (at.classList.contains("code-block")) {
+      at = at.lastElementChild ?? at;
+      break;
+    }
+    // A table is in a box with its head, and scrolls in a holder of its own: the caret is in its last cell.
+    if (at.classList.contains("prose-table")) {
+      at = at.querySelector("table") ?? at;
+      continue;
+    }
+    const inner = at.lastElementChild;
+    if (inner === null || !(LINE_HOLDERS.has(at.tagName) || (at.tagName === "LI" && inner.matches(ITEM_BLOCKS)))) {
+      break;
+    }
+    at = inner;
   }
   return at.tagName === "HR" ? node : at;
 }

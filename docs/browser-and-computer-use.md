@@ -300,7 +300,10 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
   sent to Chrome with AppleScript reaches whichever Chrome window macOS picks; `browser_eval` runs in the run's tab.
 - `desktop_snapshot` lists an application's window as elements with a role, a name, a value, a state, a position and a
   ref (`a12`). A second view lists only what changed; `query` finds elements anywhere in the application and
-  `scope = menu_bar` lists the menu bar. `desktop_read` reads one element's full text.
+  `scope = menu_bar` lists the menu bar. `desktop_read` reads one element's full text. `desktop_clipboard_read` reads
+  the text on the clipboard, which can hold a password you just copied from your password manager, so it asks in every
+  preset, as `pbpaste` and an AppleScript that names the clipboard do (item 534); and outside a yolo run the sandbox, where
+  it is on, closes the clipboard to a run's commands as well; a yolo run asks nothing (item 443).
 - `desktop_act` runs up to `max_batch_steps` steps in one call (25 by default; a longer batch is cut the same way):
   `click`, `double_click`, `right_click`, `hover`, `press`,
   `focus`, `set_value`, `type`, `paste`, `key`, `scroll`, `drag`, `menu`, `wait` and `activate`. A step names an element

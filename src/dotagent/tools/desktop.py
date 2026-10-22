@@ -487,7 +487,14 @@ def _read_tool() -> RegisteredTool:
 
 def _clipboard_read_tool() -> RegisteredTool:
     def classify(args: NoArgs, ctx: ToolContext) -> ActionInfo:
-        return _action("desktop_clipboard_read", "desktop_observe", "low", "Read the clipboard", "clipboard", ())
+        return _action(
+            "desktop_clipboard_read",
+            "desktop_observe",
+            "medium",
+            "Read the clipboard, which can hold a password the user copied",
+            "clipboard",
+            ("protected_read",),
+        )
 
     async def run(args: NoArgs, ctx: ToolContext) -> ToolResult:
         return _screen_result(render_clipboard(await ctx.runtime.desktop.read_clipboard(), _nonce()))
@@ -496,7 +503,7 @@ def _clipboard_read_tool() -> RegisteredTool:
         name="desktop_clipboard_read",
         description=(
             "Read the text on the clipboard. It can hold anything the user copied, passwords included, so use it only "
-            "when the task is about what they copied."
+            "when the task is about what they copied; the user is asked first."
         ),
         args_model=NoArgs,
         modes=ALL_MODES,

@@ -15,6 +15,12 @@ test("what nobody was asked about names the rule, the preset or the reason", () 
   assert.equal(whyText(decided("mode", "policy", "chat runs read"), []), "Allowed: chat runs read.");
 });
 
+test("a preset whose reason is its own name says it once", () => {
+  const aggressive = { ...decided("preset", "policy", "aggressive preset"), preset: "aggressive" };
+  assert.equal(whyText(aggressive, []), "Allowed by the aggressive preset.");
+  assert.equal(whyText(aggressive, ["install"]), "Allowed by the aggressive preset. Flags: install.");
+});
+
 test("who answered a question says so, with why it was asked", () => {
   assert.equal(whyText(decided("taint", "reviewer", "the run read a page"), []), "The review model approved it; the policy asked because the run read a page.");
   assert.equal(whyText(decided("preset", "user", "deletes ask in balanced"), []), "You approved it; the policy asked because deletes ask in balanced.");
