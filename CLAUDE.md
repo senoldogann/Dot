@@ -66,10 +66,16 @@ A change that takes days is many pushes, each waiting on the review and the gate
   BLOCKs: stop, take the structural option or split the change.
 - **The independent `/security-review` starts with the first push** of a change under "Always needs a human" (the
   brief is in REVIEW.md), beside the review and the gate rather than after them.
-- **One concern per pull request.** More than about 400 changed lines, or two kinds of rule, is two pull requests.
-- **The item number** comes from `uv run python scripts/next_item.py` right before the first push (main, open pull
-  requests and pushed branches all hold numbers), and the pull request is made from the entry:
-  `gh pr create --title "$(uv run python scripts/pr_body.py N --title)" --body "$(uv run python scripts/pr_body.py N)"`.
+- **A pull request carries a batch (item 541).** What a session builds goes in one branch and one pull request, so that
+  the review, the gate and the merge run once: several roadmap items, each its own commit `Item N: ...` with its own
+  `roadmap/<n>.md` (and `changes/<n>.md` when what Dot does changes), the numbers taken together (`scripts/next_item.py
+  3`). Merge a batch with `gh pr merge --rebase`, so that each item stays one commit that can be reverted alone (a pull
+  request of one item may be squashed). Order the commits by item and say in the body which is which. Keep a part out of
+  the batch when it needs the owner's look (a change under "Always needs a human" waiting on them must not hold the
+  rest) or is a risk that should be reverted alone.
+- **The item numbers** come from `uv run python scripts/next_item.py [count]` right before the first push (main, open
+  pull requests and pushed branches all hold numbers), and the pull request is made from the entries (`gh pr create
+  --title "$(uv run python scripts/pr_body.py N M --title)" --body "$(uv run python scripts/pr_body.py N M)"`).
 - **Merging main** into a branch whose own change is unchanged costs no review (the hook sees it); do it when the
   branch is ready, never while a test run of the same worktree is going.
 - **A failure that is not the change's** (a known flaky test, `main` red): rerun the job (`gh run rerun <id> --failed`)
