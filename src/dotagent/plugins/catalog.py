@@ -210,7 +210,9 @@ class PluginShelf:
     """The plugins the runs use now (item 542): those Dot read as it started, read again from disk when a plugin is
     installed from the gallery or removed, so that the runs that start after are offered its skills without a restart.
     A plugin's MCP servers start with the daemon only: a plugin read again keeps the servers it had at the start, and
-    one that came since has none until Dot starts again."""
+    one that came since has none until Dot starts again. A plugin whose folder went without Dot while servers it
+    started run stays on the shelf, so that Remove plugin can still stop them (item 497); Remove plugin then lets go of
+    it (:meth:`forget`)."""
 
     def __init__(self, catalog: PluginCatalog) -> None:
         self._started: dict[str, tuple[McpServerConfig, ...]] = {
@@ -230,11 +232,22 @@ class PluginShelf:
         return self._catalog.servers()
 
     def take(self, catalog: PluginCatalog) -> None:
-        """Use ``catalog``, read anew, with the servers each plugin had when Dot started."""
-        kept: tuple[Plugin, ...] = tuple(
+        """Use ``catalog``, read anew, with the servers each plugin had when Dot started, and the plugins it no longer
+        holds whose servers started with Dot and have not been stopped by Remove plugin."""
+        read: tuple[Plugin, ...] = tuple(
             plugin.model_copy(update={"servers": self._started.get(plugin.name, ())}) for plugin in catalog.plugins
         )
-        self._catalog = PluginCatalog(plugins=kept, problems=catalog.problems)
+        names: set[str] = {plugin.name for plugin in read}
+        gone: tuple[Plugin, ...] = tuple(
+            plugin for plugin in self._catalog.plugins if plugin.name not in names and self._started.get(plugin.name)
+        )
+        self._catalog = PluginCatalog(plugins=read + gone, problems=catalog.problems)
+
+    def forget(self, name: str) -> None:
+        """Let go of the servers the plugin ``name`` started with, once Remove plugin stopped them: a plugin whose
+        folder went leaves the shelf at the next reading, and one of its name read later has no servers until Dot
+        starts again."""
+        self._started.pop(name, None)
 
 
 async def read_again(shelf: PluginShelf, config: PluginsConfig, configured_servers: Sequence[McpServerConfig]) -> None:

@@ -272,7 +272,7 @@ class TestDownload:
             asked.append(str(request.url))
             return httpx.Response(200, content=b"archive bytes")
 
-        monkeypatch.setattr(gallery.httpx, "AsyncClient", self._client(handler))
+        monkeypatch.setattr(httpx, "AsyncClient", self._client(handler))
 
         path: Path = await gallery.download_archive(_entry(), tmp_path)
 
@@ -283,9 +283,7 @@ class TestDownload:
     async def test_refuses_a_missing_or_too_large_archive(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: int, size: int, words: str
     ) -> None:
-        monkeypatch.setattr(
-            gallery.httpx, "AsyncClient", self._client(lambda _: httpx.Response(status, content=b"x" * size))
-        )
+        monkeypatch.setattr(httpx, "AsyncClient", self._client(lambda _: httpx.Response(status, content=b"x" * size)))
         monkeypatch.setattr(gallery, "ARCHIVE_LIMIT_BYTES", 100)
 
         with pytest.raises(GalleryError, match=words):
@@ -313,3 +311,30 @@ def test_the_shelf_keeps_the_servers_a_plugin_had_at_the_start(tmp_path: Path) -
         ("acme-tools", ["acme-tools-fixture"]),
         ("new-one", []),
     ]
+
+
+def test_the_shelf_keeps_a_plugin_whose_folder_went_while_its_servers_run_until_remove_plugin_forgets_it(
+    tmp_path: Path,
+) -> None:
+    """A plugin whose folder went without Dot stays on the shelf while the servers it started run, so that Remove plugin
+    can still stop them (item 497); forgotten, it leaves at the next reading, and one of its name read later starts
+    none of them. One that started no server simply leaves."""
+    server: McpServerConfig = McpServerConfig(name="acme-tools-fixture", command="tool")
+    started: Plugin = Plugin(
+        name="acme-tools", root=tmp_path / "gone", description=None, version=None, skill_dirs=(), servers=(server,)
+    )
+    quiet: Plugin = Plugin(
+        name="quiet", root=tmp_path / "quiet", description=None, version=None, skill_dirs=(), servers=()
+    )
+    shelf: PluginShelf = PluginShelf(PluginCatalog(plugins=(started, quiet), problems=()))
+
+    shelf.take(PluginCatalog(plugins=(), problems=()))
+    assert [(plugin.name, [one.name for one in plugin.servers]) for plugin in shelf.plugins] == [
+        ("acme-tools", ["acme-tools-fixture"])
+    ]
+
+    shelf.forget("acme-tools")
+    shelf.take(PluginCatalog(plugins=(), problems=()))
+    assert not shelf.plugins
+    shelf.take(PluginCatalog(plugins=(started.model_copy(update={"servers": ()}),), problems=()))
+    assert [(plugin.name, len(plugin.servers)) for plugin in shelf.plugins] == [("acme-tools", 0)]

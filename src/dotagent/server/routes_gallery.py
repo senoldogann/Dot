@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
-from dotagent.core.errors import NotFoundError
+from dotagent.core.errors import GalleryError, NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import plugins_dir
 from dotagent.plugins.catalog import read_again
@@ -97,6 +97,10 @@ def gallery_router(ctx: ServerContext) -> APIRouter:
         if entry is None:
             raise NotFoundError("Dot's gallery has no plugin of this name", {"plugin": plugin_id})
         async with installing:
+            # A plugin Dot reads under the name, from a folder of the config or one whose folder went while servers it
+            # started run, keeps it: those servers would be credited to the plugin installed.
+            if any(plugin.name == entry.id for plugin in ctx.runtime.plugins.plugins):
+                raise GalleryError(f"Dot already has a plugin named {entry.id}", {"plugin": entry.id})
             await install(entry, plugins_dir(), download_archive)
             await read_again(ctx.runtime.plugins, ctx.runtime.config.plugins, ctx.runtime.config.mcp)
         log.info("plugin_installed", plugin=entry.id, repository=entry.repository, commit=entry.commit)

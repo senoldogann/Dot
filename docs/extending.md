@@ -7,7 +7,8 @@ tabs: **Plugins**, the gallery of the plugins Dot installs ([Customize › Plugi
 skills it reads ([Skills and plugins](#skills-and-plugins)); and **Connectors**, the services Dot works with
 ([Customize › Connectors](#customize--connectors)). `#/customize` opens Plugins. The old address `#/connect` leads to
 Connectors, and so does a service's page at the address it had before item 542, `#/customize/plugins/<service>`, since
-the gallery's plugins took that name.
+the gallery's plugins took that name; but for the four services whose gallery plugin has the same name (Cloudflare,
+Supabase, MongoDB and Hugging Face), where that address opens the plugin's page.
 
 ## Customize › Plugins
 

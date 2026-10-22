@@ -1,7 +1,8 @@
 """Removing what other sources gave Dot (item 497), through the API of a real in-process server: a server of a plugin
 is not removed on its own, since it goes with its plugin; Remove plugin stops the plugin's servers now, moves its
 folder to the Trash (one made here) and leaves them out of the servers Dot lists; a plugin read from a folder of
-``[plugins] dirs`` is refused, the owner's to take out of the config.
+``[plugins] dirs`` is refused, the owner's to take out of the config. A plugin whose folder went without Dot keeps its
+running servers Remove plugin's to stop when the plugins are read again (item 542).
 
 No network and no model service is used: the plugin's MCP server is the test fixture, started on this Mac.
 """
@@ -21,6 +22,7 @@ import pytest_asyncio
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.core.types import JsonObject
+from dotagent.plugins.catalog import read_again
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server import routes_mcp
 from dotagent.server.app import create_app
@@ -32,6 +34,7 @@ TOKEN: str = "remove-plugin-token"
 FIXTURE: Path = Path(__file__).resolve().parent.parent / "fixtures" / "mcp_fixture_server.py"
 _OWN: str = "acme-tools"
 _OUTSIDE: str = "elsewhere-tools"
+_GONE: str = "gone-tools"
 
 
 def _plugin(folder: Path, name: str) -> None:
@@ -46,13 +49,16 @@ def _plugin(folder: Path, name: str) -> None:
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
-async def setup(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[tuple[httpx.AsyncClient, Path, Path]]:
-    """A runtime whose home holds a plugin of Dot's own folder, and whose config reads another from a folder of its
-    own; the Trash is a folder made here. Yields the client, Dot's plugins folder and the Trash."""
+async def setup(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> AsyncIterator[tuple[httpx.AsyncClient, Runtime, Path, Path]]:
+    """A runtime whose home holds two plugins of Dot's own folder, and whose config reads another from a folder of its
+    own; the Trash is a folder made here. Yields the client, the runtime, Dot's plugins folder and the Trash."""
     home: Path = tmp_path_factory.mktemp("home")
     outside: Path = tmp_path_factory.mktemp("outside")
     trash: Path = tmp_path_factory.mktemp("trash")
     _plugin(home / "plugins" / _OWN, _OWN)
+    _plugin(home / "plugins" / _GONE, _GONE)
     _plugin(outside / _OUTSIDE, _OUTSIDE)
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[plugins]\ndirs = ["{outside}"]\n', encoding="utf-8"
@@ -79,7 +85,7 @@ async def setup(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[tuple
         async with httpx.AsyncClient(
             transport=transport, base_url="http://127.0.0.1:8765", headers={"Authorization": f"Bearer {TOKEN}"}
         ) as client:
-            yield client, home / "plugins", trash
+            yield client, runtime, home / "plugins", trash
     finally:
         await manager.shutdown()
         await close_runtime(runtime)
@@ -94,9 +100,9 @@ def _servers(listing: httpx.Response) -> dict[str, tuple[str, str | None, str]]:
 
 
 async def test_remove_plugin_stops_its_servers_and_moves_its_folder_to_the_trash(
-    setup: tuple[httpx.AsyncClient, Path, Path],
+    setup: tuple[httpx.AsyncClient, Runtime, Path, Path],
 ) -> None:
-    client, plugins, trash = setup
+    client, _runtime, plugins, trash = setup
     before: dict[str, tuple[str, str | None, str]] = _servers(await client.get("/api/mcp/servers"))
     own: str = f"{_OWN}-fixture"
     assert before[own] == ("plugin", _OWN, "ready"), before
@@ -112,3 +118,28 @@ async def test_remove_plugin_stops_its_servers_and_moves_its_folder_to_the_trash
     assert not (plugins / _OWN).exists()
     assert (trash / _OWN / ".claude-plugin" / "plugin.json").is_file()
     assert (await client.delete(f"/api/installed-plugins/{_OWN}")).status_code == 404
+
+
+async def test_a_plugin_whose_folder_went_keeps_its_servers_for_remove_plugin_when_the_plugins_are_read_again(
+    setup: tuple[httpx.AsyncClient, Runtime, Path, Path],
+) -> None:
+    """Item 542: an install from the gallery or a Remove plugin reads the plugins again. A plugin whose folder went
+    without Dot stays the owner of the server it started, which Remove plugin stops; a plugin of its name put there
+    later starts none of the old one's servers."""
+    client, runtime, plugins, _trash = setup
+    gone: str = f"{_GONE}-fixture"
+    assert _servers(await client.get("/api/mcp/servers"))[gone] == ("plugin", _GONE, "ready")
+    await asyncio.to_thread(shutil.rmtree, plugins / _GONE)
+
+    await read_again(runtime.plugins, runtime.config.plugins, runtime.config.mcp)
+
+    assert _servers(await client.get("/api/mcp/servers"))[gone][:2] == ("plugin", _GONE)
+    stopped: httpx.Response = await client.delete(f"/api/installed-plugins/{_GONE}")
+    assert stopped.status_code == 200, stopped.text
+    assert gone not in _servers(stopped)
+    assert all(plugin.name != _GONE for plugin in runtime.plugins.plugins)
+    await asyncio.to_thread(_plugin, plugins / _GONE, _GONE)
+    await read_again(runtime.plugins, runtime.config.plugins, runtime.config.mcp)
+    again = next(plugin for plugin in runtime.plugins.plugins if plugin.name == _GONE)
+    assert again.servers == ()
+    assert gone not in _servers(await client.get("/api/mcp/servers"))

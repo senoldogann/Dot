@@ -554,6 +554,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             for server in still:
                 await hub.disconnect(server.name)
             refresh_mcp_tools(ctx.runtime.registry, hub)
+            ctx.runtime.plugins.forget(name)
             await read_again(ctx.runtime.plugins, ctx.runtime.config.plugins, ctx.runtime.config.mcp)
             log.info("plugin_servers_stopped", plugin=name)
             return await listing()
@@ -567,7 +568,9 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             await hub.disconnect(server.name)
         refresh_mcp_tools(ctx.runtime.registry, hub)
         moved = await asyncio.to_thread(move_to_trash, plugin.root, trash_folder())
-        # The plugins are read again, so that its skills leave the runs that start after and Customize lists it no more.
+        # The plugins are read again, so that its skills leave the runs that start after and Customize lists it no more;
+        # a plugin of its name installed later starts none of the servers stopped here.
+        ctx.runtime.plugins.forget(name)
         await read_again(ctx.runtime.plugins, ctx.runtime.config.plugins, ctx.runtime.config.mcp)
         log.info("plugin_removed", plugin=name, trash=str(moved))
         return await listing()

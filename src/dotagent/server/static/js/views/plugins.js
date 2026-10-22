@@ -3,11 +3,13 @@
 // All plugins, with All, Featured and Installed and an order, Popular (the stars of its repository) or Newest (when the
 // gallery took it). Each plugin is a card: its mark (its logo, else a skill's puzzle piece on a tile of its kind's
 // colour), its name with a check when its publisher makes what its skills are about, who publishes it and how many
-// skills it brings, what it does, and Install, or Installed with Remove. A card opens the plugin's own page: its skills,
-// where it comes from (the repository at the commit Dot pins, its licence) and what Install does. Install downloads
-// that commit, checks its files against the hash the gallery keeps and offers its skills to the runs that start after,
-// with no restart; Remove moves its folder to the Trash (item 497). Installed lists too the plugins Dot reads that are
-// not the gallery's. A service's page, which was at `#/customize/plugins/<id>` before item 542, is under Connectors.
+// skills it brings, what it does, and Install, or Installed with Remove. A card opens the plugin's own page: its
+// skills, where it comes from (the repository at the commit Dot pins, its licence) and what Install does. Install
+// downloads that commit, checks its files against the hash the gallery keeps and offers its skills to the runs that
+// start after, with no restart; Remove moves its folder to the Trash (item 497). Installed lists too the plugins Dot
+// reads that are not the gallery's. A service's page, which was at `#/customize/plugins/<id>` before item 542, is under
+// Connectors; the address of a service whose gallery plugin has the same id (Cloudflare, Supabase, MongoDB, Hugging
+// Face) is the plugin's.
 
 import { api } from "../api.js";
 import { compact, el, foldSearch, joined, plural } from "../dom.js";

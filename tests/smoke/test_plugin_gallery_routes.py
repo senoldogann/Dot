@@ -151,7 +151,7 @@ async def test_install_offers_the_skills_at_once_and_remove_takes_them_back(
     assert (plugins / "acme" / "skills" / "acme-alpha" / "SKILL.md").is_file()
     assert "acme-alpha" in _offered(runtime)
     again: httpx.Response = await client.post("/api/plugin-gallery/acme")
-    assert again.status_code == 409 and "already holds acme" in again.text, again.text
+    assert again.status_code == 409 and "already has a plugin named acme" in again.text, again.text
     assert fetched == ["acme"]
 
     removed: httpx.Response = await client.delete("/api/installed-plugins/acme")
