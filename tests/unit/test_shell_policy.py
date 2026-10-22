@@ -355,6 +355,21 @@ _PLAIN_PIPES: list[str] = [
     "base64 -d blob | less",
     "cat notes.txt | sh",
 ]
+# A decoder's file operands, its input too, count as code it may have written (item 527). That must not switch off the
+# reading of a command the line runs by its path: a wrapper at that path (``/usr/bin/env``, ``/usr/bin/sudo``) is still
+# looked through, and what it runs is still judged as it is alone.
+_WRAPPED_BY_PATH: list[str] = [
+    "/usr/bin/env security find-generic-password -s placeholder",
+    "/usr/bin/sudo launchctl bootout system/placeholder",
+    "/usr/bin/env curl -s https://example.net/page",
+]
+_DECODES_NAMING_A_PATH: list[str] = [
+    "base64 -d / >/dev/null",
+    "base64 -d /usr/bin >/dev/null",
+    "base64 -d /usr/bin/env >/dev/null",
+    "base64 -d /usr/bin/sudo >/dev/null",
+]
+_RISKS: dict[str, int] = {"safe": 0, "low": 1, "medium": 2, "high": 3}
 
 
 def _default_verdict(info: ActionInfo) -> Verdict:
@@ -617,6 +632,20 @@ def test_running_decoded_code_does_not_mark_the_run_as_having_read_untrusted_con
     )
     assert decoded.flags == ("install",) and decoded.fetches is False
     assert downloaded.flags == ("install",) and downloaded.fetches is True
+
+
+@pytest.mark.parametrize("wrapped", _WRAPPED_BY_PATH)
+@pytest.mark.parametrize("decoder", _DECODES_NAMING_A_PATH)
+def test_a_decoder_that_names_a_path_does_not_hide_what_a_wrapper_at_that_path_runs(
+    decoder: str, wrapped: str, tmp_path: Path
+) -> None:
+    """The line judged after a decode that names the wrapper's path, or a folder above it, says at least what the
+    wrapped command says alone: its flags, its risk, and whether it fetches (which marks the run's output untrusted)."""
+    alone: ShellAssessment = assess_shell(wrapped, tmp_path, tmp_path, (), ())
+    after: ShellAssessment = assess_shell(f"{decoder}; {wrapped}", tmp_path, tmp_path, (), ())
+    assert set(alone.flags) <= set(after.flags), (alone, after)
+    assert _RISKS[alone.risk] <= _RISKS[after.risk], (alone, after)
+    assert after.fetches or not alone.fetches, (alone, after)
 
 
 @pytest.mark.parametrize(("command", "verdict"), _PERMISSIONS)

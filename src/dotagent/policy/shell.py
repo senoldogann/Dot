@@ -1922,19 +1922,21 @@ def _carried_download(command: str, args: list[str], scope: ShellScope) -> list[
     words, folders = _target_folders(args) if command in _TARGET_FOLDER_COMMANDS else (args, [])
     operands: list[str] = _positional(words)
     sources, destinations = (operands, folders) if folders else (operands[:-1], operands[-1:])
-    if any(_names_one(source, scope.downloaded, scope) for source in sources):
+    if any(_names_one(source, scope.downloaded, scope, under=True) for source in sources):
         return destinations
     return []
 
 
-def _names_one(raw: str, places: tuple[Path, ...], scope: ShellScope) -> bool:
-    """Whether ``raw``, a path the line runs or feeds a shell, is one of ``places`` or lies under one."""
+def _names_one(raw: str, places: tuple[Path, ...], scope: ShellScope, *, under: bool) -> bool:
+    """Whether ``raw``, a path the line runs or feeds a shell, is one of ``places`` or, with ``under``, lies under one
+    (the folder ``git clone`` made holds the scripts in it). The files a decoder named are matched as written: a decoder
+    that names ``/`` as an input makes every path under it no decoded code."""
     if not places:
         return False
     paths: list[Path] = [
         _located(value, cwd, scope) for value in _expansions(raw, scope) or [raw] for cwd in scope.cwds
     ]
-    return any(path == place or place in path.parents for path in paths for place in places)
+    return any(path == place or (under and place in path.parents) for path in paths for place in places)
 
 
 def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
@@ -1949,9 +1951,9 @@ def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]
     redirected: list[str] = [stages[-1][index + 1] for index, token in enumerate(stages[-1][:-1]) if token == "<"]
     piped: list[str] = [word for stage in stages[:-1] for word in _positional(_plain(stage)[1:])]
     fed: tuple[str, ...] = (*redirected, *piped)
-    if any(_names_one(word, scope.downloaded, scope) for word in fed):
+    if any(_names_one(word, scope.downloaded, scope, under=True) for word in fed):
         return [_fetching("high", ("install",), "runs a script the line downloaded, from its standard input")]
-    if any(_names_one(word, scope.decoded, scope) for word in fed):
+    if any(_names_one(word, scope.decoded, scope, under=False) for word in fed):
         return [_finding("high", ("install",), "runs code the line decoded, from its standard input")]
     return []
 
@@ -1960,9 +1962,9 @@ def _runs_download(raw: str, scope: ShellScope) -> list[Finding]:
     """A finding when ``raw``, a script the line runs, is a file the line fetched (or lies in a folder it cloned) or a
     file a decoder wrote: fetching or decoding a script and then running it is piping it into a shell in two steps
     (item 385, item 527). A download reached the network, so it marks the run; a decode did not."""
-    if _names_one(raw, scope.downloaded, scope):
+    if _names_one(raw, scope.downloaded, scope, under=True):
         return [_fetching("high", ("install",), "runs a script the line downloaded")]
-    if _names_one(raw, scope.decoded, scope):
+    if _names_one(raw, scope.decoded, scope, under=False):
         return [_finding("high", ("install",), "runs code the line decoded")]
     return []
 
@@ -2865,11 +2867,17 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
     if head not in _TEST_COMMANDS and any(char in head for char in _GLOB_CHARS):
         return [_unknown("runs a command whose name is a pattern the shell matches against file names")]
     command: str = head if head == "." else Path(head).name
+    named: list[Finding] = _assess_named(command, plain, scope, given)
     if "/" in head and head != command:
-        # A program named by its path runs as itself: one the line downloaded counts as that download run (item 385).
-        ran: list[Finding] = _runs_download(head, scope)
-        if ran:
-            return [*ran, *_assess_command(command, plain[1:], scope, given)]
+        # A program named by its path runs as itself: one the line downloaded or decoded counts as that run (items 385,
+        # 527). What the program is is still read: a wrapper or a privilege command at that path still runs its command.
+        return [*_runs_download(head, scope), *named]
+    return named
+
+
+def _assess_named(command: str, plain: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
+    """The command ``plain`` runs, named ``command``: a declarer, a privilege command, a wrapper (all looked through to
+    what they run) or any other."""
     if command in _DECLARERS:
         declared: list[Finding] = [found for word in plain[1:] for found in _assignment_findings(word, scope)]
         return [*declared, *_assess_command(command, plain[1:], scope, given)]
