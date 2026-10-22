@@ -299,6 +299,15 @@ bottom (item 201): resting the pointer on it shows the message nearest to it and
 to that message, and from the keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are
 darker. The column needs a pointer that rests, two messages or more, and a window wider than a phone's; there, the
 conversation leaves it its room at the left, beside the side panel too (item 228). In the side panel (Run details),
+the Run tab opens with the **Recap** (item 536): a few short lines on what the run has done, what it is doing now and
+what waits for you, written by the fast model (`[models] fast`; the run's own model when the fast one fails) from the
+run's record (its task, status, plan, the questions that wait for you and its conversation), with no tools and the
+record taken for data, never for instructions. The run never sees it, the secrets Dot holds are masked in it, and it
+is kept as a `recap` event of the run, its model call counted with the purpose `recap`. Under it stand the step it is
+as of and its model; its button writes it again. One is due once the run took `[recap] first_after_steps` steps (4),
+then every `every_steps` steps more (8), and once more when the run ended after the last; a page asks for one only
+while the section is in sight, and as the run takes steps at most every 20 seconds, never two at once for one run;
+`[recap] enabled = false` writes none and hides the section. In the side panel (Run details),
 under More on the Run tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the
 minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the input tokens with the
 share the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps), the runs
@@ -734,6 +743,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
+| `GET /runs/{id}/recap`, `POST /runs/{id}/recap` (`{"force": …}`)                | the run's recap and whether one is due; one written when it is due, or whether or not with `force` (item 536) |
 | `POST /teach`, `GET\|DELETE /teach/{thread_id}`, `POST /teach/{thread_id}/stop`, `/draft`, `/save`, `GET /teach/{thread_id}/screencast` | a task the owner shows Dot once: start the recording of the chat's tab, the steps as they come, stop it, the review model's draft of the skill, the saving of it (`{"skill": …}`), the discarding, and the tab's frames while it goes on (item 423) |
 | `POST /runs/{id}/loop` (`{"every": "30m", "text": …}`)                         | a loop of the run's chat (item 281): a schedule of the chat, returned |
 | `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet, a campaign's, or the thread of a delegated run); reorder it (`{"ids": […]}`, each once); resume a held one |

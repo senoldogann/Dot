@@ -467,6 +467,15 @@ class SnapshotsConfig(FrozenModel):
     double_tap_ms: int = Field(gt=0)
 
 
+class RecapConfig(FrozenModel):
+    """The recap of a run (item 536): whether one is written, after how many steps the first, and after how many more
+    each new one; one more is due when the run ended after its last."""
+
+    enabled: bool
+    first_after_steps: int = Field(ge=1)
+    every_steps: int = Field(ge=1)
+
+
 type EmbedProvider = Literal["ollama", "openai"]
 
 
@@ -723,6 +732,7 @@ class AppConfig(FrozenModel):
     browser: BrowserConfig
     desktop: DesktopConfig
     snapshots: SnapshotsConfig
+    recap: RecapConfig
     assistant: AssistantConfig
     memory: MemoryConfig
     harness: HarnessConfig

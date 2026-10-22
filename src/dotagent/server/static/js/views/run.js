@@ -23,6 +23,7 @@ import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { chatLoops, LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
 import { createQueue } from "../queue.js";
+import { recapSection } from "../recap.js";
 import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
@@ -278,6 +279,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const connectionSlot = el("div", { class: "connection-slot" }, connectionNote);
 
   // ------------------------------------------------------------------------------------ details and plan
+  // The recap heads the Run tab (item 536): what the run did, does and waits for, in a few lines.
+  const recap = recapSection({ runId, signal });
   const details = createDetails(run, agent, detail.campaign, detail.keep_going);
   const planBody = el("div", { class: "plan-list" }, el("div", { class: "hint" }, NO_PLAN));
   const plan = panelSection({ id: "run-plan", title: "Plan", actions: null, body: planBody });
@@ -1339,7 +1342,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Run", icon: "info", sections: [details.element, filesCard.element, more.element] },
+      { id: "run", label: "Run", icon: "info", sections: [recap.element, details.element, filesCard.element, more.element] },
       { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
@@ -1573,6 +1576,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       messageRead(message.data.data.text);
     }
     timeline.push(message.data);
+    recap.onEvent(message.data);
     if (message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
       refreshChanges();
     }
