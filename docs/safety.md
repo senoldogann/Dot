@@ -87,6 +87,11 @@ currency, so list sites that bill in one currency. Empty by default.
 4. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
    yourself. A payment under the pre-approved caps of its site (above) is a question instead of a hand-off, unless
    one of your rules hands that step to you (item 385): the caps stand in for the money hand-off, not for your rules.
+   A click is about money when its control's label asks for it, at the label's start ("Pay $19.90", "Buy", "Order
+   now", "Öde", "Maksa"), anywhere in it ("Place order", "Confirm and pay", "Complete checkout", "Satın al"), or with
+   an amount next to a verb that offers something for it ("Rent HD $3.99", "Subscribe for €4.99/month"); the way to
+   the payment page ("Checkout", "Continue to payment") is an ordinary click, so the run fills the order and the
+   button that pays is the one handed to you (item 522).
 5. *The guard* (item 429): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode that asks,

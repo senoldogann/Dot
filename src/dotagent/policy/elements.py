@@ -9,18 +9,36 @@ import re
 from collections.abc import Collection, Sequence
 
 from dotagent.core.types import FrozenModel
+from dotagent.policy.spend import find_amounts
 from dotagent.policy.types import Flag, Risk
 
 _KEY_LIKE: re.Pattern[str] = re.compile(
     r"sk-[A-Za-z0-9_\-]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}"
     r"|-----BEGIN [A-Z ]*PRIVATE KEY-----"
 )
+# Where a label's own sentence starts: at its start, or after a stop or a separator ("Total 9 €. Pay", "Lamp · Buy").
+_SENTENCE_START: str = r"(?:^\s*|[.!?·•|]\s+)"
+# A call to pay. The control that takes the money is the one that counts, so a way to the payment page ("Checkout",
+# "Proceed to checkout", "Continue to payment") stays a plain click: the run fills the order and the button that pays
+# ("Place order", "Pay €19.90", "Complete checkout") is the one handed to the owner.
 _FINANCIAL_ACTION: re.Pattern[str] = re.compile(
-    r"(?i)\b(?:buy now|buy it now|purchase|place (?:your |my )?order|complete (?:your |my )?(?:order|purchase|payment)"
-    r"|confirm (?:your |my )?(?:order|purchase|payment)|pay now|pay with|make (?:a )?payment|submit payment|donate"
-    r"|send money|wire transfer|sat[ıi]n al|[öo]demeyi tamamla|sipari[şs]i? (?:ver|onayla|tamamla)"
-    r"|ba[ğg][ıi][şs] yap)\b"
-    r"|^pay$|^[öo]de$"
+    r"(?i)\b(?:buy now|buy it now|purchase|place (?:your |my |the |a )?(?:order|bid)"
+    r"|(?:complete|confirm|submit|finish) (?:your |my |the )?(?:order|purchase|payment|booking|checkout|bid)"
+    r"|order now|pay now|pay with|(?:continue|proceed|go) to pay|make (?:a )?payment|submit payment|bid now|donate"
+    r"|send money|wire transfer|add funds|top up"
+    r"|sat[ıi]n al|[şs]imdi [öo]de|[öo]deme yap|[öo]demeyi tamamla|al[ıi][şs]veri[şs]i tamamla"
+    r"|sipari[şs]i? (?:ver|onayla|tamamla)|ba[ğg][ıi][şs] yap|vahvista (?:tilaus|osto|maksu)|lahjoita)\b"
+    # "Confirm and pay", "Agree & pay", "Onayla ve öde", "Tilaa ja maksa".
+    r"|\s(?:and|&|ve|ja)\s+(?:pay|[öo]de|maksa)\b"
+    # At the start of a sentence only ("Pay $19.90", "Buy", "Order now"), so that "Payment methods", "Where to buy",
+    # "Order history" or "Ode to Joy" stay plain clicks.
+    rf"|{_SENTENCE_START}(?:pay|buy|pre-?order|order(?=\s*$|\s+(?:now|today)\b)|öde|maksa|osta)\b"
+    r"|^\s*[öo]de\s*$"
+)
+# A verb that offers something for the amount of money its label names: "Rent HD $3.99", "Subscribe for €4.99/month",
+# "Upgrade · 99 TL". Without an amount, "Subscribe" stays a follow and "Order 20261010" a plain click.
+_PRICED_ACTION: re.Pattern[str] = re.compile(
+    rf"(?i){_SENTENCE_START}(?:rent|subscribe|upgrade|renew|unlock|order|book|reserve|tilaa|vuokraa)\b"
 )
 _DESTRUCTIVE_ACTION: re.Pattern[str] = re.compile(
     r"(?i)\b(?:delete|remove|erase|discard|destroy|wipe|deactivate|terminate|permanently|empty (?:the )?trash"
@@ -84,8 +102,11 @@ def looks_like_key(text: str) -> bool:
 
 
 def asks_to_pay(text: str) -> bool:
-    """Whether ``text`` is a call to buy, pay or donate."""
-    return _FINANCIAL_ACTION.search(text) is not None
+    """Whether ``text`` is a call to buy, pay or donate: words that say so ("Pay now", "Confirm and pay"), or a verb
+    that offers something for an amount the text names ("Rent HD $3.99")."""
+    if _FINANCIAL_ACTION.search(text) is not None:
+        return True
+    return _PRICED_ACTION.search(text) is not None and bool(find_amounts(text))
 
 
 def typing_reasons(element: Element | None, text: str | None) -> list[str]:
@@ -113,9 +134,8 @@ def naming_reasons(element: Element | None) -> list[str]:
     following or liking."""
     if element is None:
         return []
-    reasons: list[str] = []
+    reasons: list[str] = ["financial"] if asks_to_pay(element.name) else []
     for label, pattern in (
-        ("financial", _FINANCIAL_ACTION),
         ("destructive", _DESTRUCTIVE_ACTION),
         ("send", _SEND_ACTION),
         ("post", _POST_ACTION),
