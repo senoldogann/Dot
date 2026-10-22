@@ -2,13 +2,14 @@
 and thins the older copies; ``dotx backup list`` lists the copies kept, newest first (item 526)."""
 
 import asyncio
+import sqlite3
 import sys
 import time
 from pathlib import Path
 
 from dotagent.cli_commands import BackupListCommand, BackupNowCommand, Command
 from dotagent.config import AppConfig, load_user_config
-from dotagent.core.errors import InvalidValueError
+from dotagent.core.errors import InvalidValueError, StoreError
 from dotagent.core.paths import db_path
 from dotagent.store.backup import Backup, backup_folder, list_backups, make_backup, thin_backups
 
@@ -53,11 +54,18 @@ async def cmd_backup_list() -> int:
 
 
 async def dispatch(command: Command) -> int:
-    """Carry out one of this module's commands."""
-    match command:
-        case BackupNowCommand():
-            return await cmd_backup_now()
-        case BackupListCommand():
-            return await cmd_backup_list()
-        case _:
-            raise InvalidValueError("not a command of this module", {"name": command.name})
+    """Carry out one of this module's commands. A folder that cannot be read or written, and a database SQLite
+    refuses, end the command with Dot's error, not a traceback."""
+    try:
+        match command:
+            case BackupNowCommand():
+                return await cmd_backup_now()
+            case BackupListCommand():
+                return await cmd_backup_list()
+            case _:
+                raise InvalidValueError("not a command of this module", {"name": command.name})
+    except (OSError, sqlite3.Error) as error:
+        raise StoreError(
+            "the copies of the database could not be made or listed",
+            {"command": command.name, "error_type": type(error).__name__, "error": str(error)},
+        ) from error

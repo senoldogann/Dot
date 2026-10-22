@@ -129,7 +129,14 @@ class StoreConfig(FrozenModel):
     @classmethod
     def _absolute_backup_dir(cls, value: str) -> str:
         # A relative folder would be under the daemon's working directory, / for a launchd job.
-        if value and not Path(value).expanduser().is_absolute():
+        if not value:
+            return value
+        try:
+            folder: Path = Path(value).expanduser()
+        except RuntimeError as error:
+            # A ~user that is not there: a config error, as any other.
+            raise ValueError(f"backup_dir names a home that is not there: {value!r} ({error})") from error
+        if not folder.is_absolute():
             raise ValueError(f"backup_dir must be empty, absolute or start with ~: {value!r}")
         return value
 

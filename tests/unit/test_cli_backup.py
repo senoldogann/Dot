@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from dotagent import cli_backup
 from dotagent.cli import build_parser, parse_command
 from dotagent.cli_backup import dispatch
 from dotagent.cli_commands import BackupListCommand, BackupNowCommand
+from dotagent.core.errors import StoreError
 
 
 def test_the_commands_are_parsed() -> None:
@@ -39,3 +41,15 @@ async def test_backup_now_copies_the_database_and_list_lists_it(home: Path, caps
     assert await dispatch(BackupListCommand(name="backup-list")) == 0
     listed: str = capsys.readouterr().out
     assert listed.startswith(f"1 copy in {home / 'backups'}, newest first:") and ".sqlite3.gz" in listed
+
+
+async def test_a_folder_that_cannot_be_written_ends_with_dot_s_error(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refused(database: Path, folder: Path, now: float) -> None:
+        raise PermissionError(13, "Operation not permitted", str(folder))
+
+    monkeypatch.setattr(cli_backup, "make_backup", refused)
+    with pytest.raises(StoreError, match="could not be made or listed") as failed:
+        await dispatch(BackupNowCommand(name="backup-now"))
+    assert failed.value.context["error_type"] == "PermissionError"

@@ -143,6 +143,8 @@ def test_a_relative_folder_for_the_copies_is_refused() -> None:
     store: StoreConfig = load_default_config().store
     for folder in ("", "/Volumes/Disk/Dot", "~/Library/Mobile Documents/com~apple~CloudDocs/Dot Backups"):
         StoreConfig.model_validate({**store.model_dump(), "backup_dir": folder})
+    with pytest.raises(ValidationError, match="backup_dir names a home that is not there"):
+        StoreConfig.model_validate({**store.model_dump(), "backup_dir": "~nosuchuser0123/Dot"})
     with pytest.raises(ValidationError, match="backup_dir must be empty, absolute or start with ~"):
         StoreConfig.model_validate({**store.model_dump(), "backup_dir": "Dot Backups"})
 
@@ -177,6 +179,16 @@ def test_thinning_keeps_the_newest_hourly_and_one_of_each_recent_day_and_touches
     assert all(path in left for path in daily[:12]) and not any(path in left for path in daily[13:])
     assert {Path(backup.path) for backup in gone} == set(hourly + daily) - left
     assert all(other.exists() for other in others)
+
+
+def test_copies_named_after_now_take_no_place_of_real_ones(tmp_path: Path) -> None:
+    folder: Path = tmp_path / "copies"
+    folder.mkdir()
+    ahead: list[Path] = [_copy_at(folder, NOW + hours * 3600.0) for hours in range(1, 25)]
+    real: list[Path] = [_copy_at(folder, NOW - hours * 3600.0) for hours in range(30)]
+    thin_backups(folder, keep_hourly=24, keep_days=0, now=NOW)
+    left: set[Path] = {Path(backup.path) for backup in list_backups(folder)}
+    assert set(ahead) <= left and set(real[:24]) <= left and not set(real[24:]) & left
 
 
 def test_a_database_is_copied_again_only_when_it_changed(tmp_path: Path) -> None:

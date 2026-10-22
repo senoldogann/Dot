@@ -187,10 +187,13 @@ def thin_backups(folder: Path, keep_hourly: int, keep_days: int, now: float) -> 
     """Delete the copies past what is kept and return them: the newest ``keep_hourly``, and the newest copy of each of
     the last ``keep_days`` days (days of UTC) besides. Only files named as copies are ever looked at."""
     copies: list[Backup] = list_backups(folder)
-    kept: set[str] = {backup.path for backup in copies[:keep_hourly]}
+    # A copy named after now takes no place of a real one, and goes only once its name is past (:func:`copied_before`).
+    past: list[Backup] = copied_before(copies, now)
+    kept: set[str] = {backup.path for backup in copies if backup.made_at > now}
+    kept.update(backup.path for backup in past[:keep_hourly])
     oldest_day: float = now - keep_days * 86400.0
     days: set[str] = set()
-    for backup in copies:
+    for backup in past:
         day: str = datetime.fromtimestamp(backup.made_at, UTC).strftime("%Y%m%d")
         if backup.made_at >= oldest_day and day not in days:
             days.add(day)
