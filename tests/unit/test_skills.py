@@ -93,6 +93,9 @@ def test_a_skill_s_icon_is_its_frontmatter_s_when_the_interface_has_it_else_read
     icons_js: str = (STATIC / "js" / "icons.js").read_text()
     shapes: set[str] = set(re.findall(r"^  \"?([A-Za-z][A-Za-z0-9]*)\"?: \[", icons_js, re.M))
     assert shapes == set(ICON_NAMES)
+    # What the parse could get wrong: a reformat of icons.js that makes it find nothing would turn every skill's icon
+    # into the spark.
+    assert len(ICON_NAMES) >= 88 and {"mail", "lockOpen", "x", "puzzle"} <= ICON_NAMES
 
 
 def test_a_byte_order_mark_before_the_frontmatter_is_tolerated(tmp_path: Path) -> None:

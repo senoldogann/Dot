@@ -65,7 +65,11 @@ def _script(drawing: Path) -> str:
     return next(part.name for part in drawing.glob("*.js"))
 
 
-async def test_a_file_is_drawn_once_a_version_and_a_workbook_a_page_a_sheet(tmp_path: Path) -> None:
+async def test_a_file_is_drawn_once_a_version_and_a_workbook_a_page_a_sheet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Quick Look on a busy runner took longer than the thirty seconds the product gives it (item 540).
+    monkeypatch.setattr(quicklook, "DRAW_TIMEOUT_S", 120.0)
     looks: QuickLook = open_quick_look(tmp_path / "looks")
     minutes: Path = _written(tmp_path / "minutes.docx", _document("Budget 2027"))
     drawing: str = await looks.look(minutes)

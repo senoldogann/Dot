@@ -36,7 +36,17 @@ by what it lets a run do as much as by how it reads.
 
 - After the first full pass, review only the new diff
 - Don't repeat findings that were fixed or answered with a reason
-- After 3 rounds, stop and ask the author to reconsider the approach
+- After 3 rounds, stop and ask the author to reconsider the approach (the hook counts the rounds and says so; a push
+  that only brings main in is not a round)
+
+## Security review brief
+
+A change under "Always needs a human" is also read by an independent agent that knows only the branch. Start it at the
+first push, beside the review and the gate, and take its findings in the same push as the review's. The brief: the
+worktree it may read; what it must not do (edit, commit, push, write outside a `mktemp -d` folder, feed a shell a
+destructive line: probes go in files); the change in a paragraph; and what a finding is, an input that gets through with
+the verdict it gets and its twin's, while a limit the docs already state is not one. It reports findings or says plainly
+that it found none, and what it tried.
 
 ## Skip
 

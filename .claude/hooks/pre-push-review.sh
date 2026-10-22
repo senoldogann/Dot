@@ -6,8 +6,19 @@
 # Skip once:    git push --no-verify
 #
 # Each review is saved under .git/claude-review/<commit>.md next to the diff it read; a commit that passed is not
-# reviewed again.
+# reviewed again, and neither is a push that only brings main in (item 540): when the change the branch makes against
+# main is the same patch as at the tip already on the remote, there is nothing of its own to read. After three earlier
+# reviews of the branch that BLOCKed, the hook says so before the next one (REVIEW.md: reconsider the approach).
 set -euo pipefail
+
+# The change a tip makes against main as a patch id: line numbers do not count, so lines of main moving under the change
+# do not alter it, but whitespace does (--verbatim: a dedent changes what Python means), and so does a merge that
+# resolved a conflict by editing the change. Nothing is printed when it cannot be told, and then the push is reviewed.
+own_change() {
+  local fork
+  fork=$(git merge-base origin/main "$1" 2>/dev/null) || return 0
+  git diff "$fork..$1" | git patch-id --verbatim 2>/dev/null | cut -d' ' -f1 || true
+}
 
 zero_sha=0000000000000000000000000000000000000000
 repo_root=$(git rev-parse --show-toplevel)
@@ -35,6 +46,30 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   if [[ -f "$review_dir/$local_sha.pass" ]]; then
     echo "claude-review: $local_ref at ${local_sha:0:7} already passed review"
     continue
+  fi
+
+  if [[ "$remote_sha" != "$zero_sha" ]] && git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+    before=$(own_change "$remote_sha" || true)
+    after=$(own_change "$local_sha" || true)
+    if [[ -n "$after" && "$before" == "$after" ]]; then
+      echo "claude-review: $local_ref at ${local_sha:0:7} only brings main in: the change is the patch that was at" \
+        "${remote_sha:0:7}, reviewed then"
+      touch "$review_dir/$local_sha.pass"
+      continue
+    fi
+  fi
+
+  blocked=0
+  for earlier in "$review_dir"/*.md; do
+    [[ -e "$earlier" ]] || continue
+    commit=$(basename "$earlier" .md)
+    if git merge-base --is-ancestor "$commit" "$local_sha" 2>/dev/null && grep -q '^VERDICT: BLOCK$' "$earlier"; then
+      blocked=$((blocked + 1))
+    fi
+  done
+  if ((blocked >= 3)); then
+    echo "claude-review: $blocked earlier reviews of this branch BLOCKed. REVIEW.md: after 3 rounds stop and reconsider" \
+      "the approach (the structural fix, or two smaller changes) rather than closing the next spelling." >&2
   fi
 
   echo "claude-review: reviewing $base..$local_sha ($local_ref -> $remote_ref) with Claude Code"
