@@ -2003,27 +2003,17 @@ def _decodes(run: list[str]) -> bool:
     return any(word in _DECODE_LONG or switch.fullmatch(word) is not None for word in run[1:])
 
 
-def _decoder_output_files(run: list[str]) -> list[str]:
-    """The file a decoder names for what it decodes (its ``>`` redirects the caller adds): ``openssl``'s ``-out`` (a
-    single-dash long option, so read as a word, not as ``-o`` letter by letter), the second file ``xxd`` is given
-    (``xxd [options] [infile [outfile]]``, where ``-o`` is an offset), else the ``-o``/``--output`` of ``base64``,
-    ``gpg`` and the rest."""
-    command, args = Path(run[0]).name, run[1:]
-    if command == "openssl":
-        return _option_values(args, "", "-out")
-    if command == "xxd":
-        return _positional(_options(args, _XXD_VALUES)[1])[1:2]
-    return _option_values(args, "-o", "--output")
-
-
 def _decoded_writes(words: list[str], targets: list[str], scope: ShellScope) -> tuple[Path, ...]:
-    """Where a decoder on this line writes what it decoded: the file it names and its ``>`` redirects, located. The
-    file is opaque code on disk, tracked like a download so that a later line that runs it is judged the same
-    (item 523)."""
+    """Where a decoder on this line may have written what it decoded, located. Which word is a decoder's output file
+    differs by tool and by option spelling (``base64 -o``, ``openssl -out``, ``xxd``'s second operand), too many to
+    read one by one, so the guard takes every file the decoder names -- its operands and its option values, all the
+    words that are not options (:func:`_positional`), and its ``>`` redirects -- as code it may have written. The file
+    is opaque code on disk, tracked like a download so that a later line that runs it is judged the same; taking an
+    input file too only costs a question if the line later runs that file, the safe side (item 523)."""
     run, _ = _run_by_wrappers(_plain(words), scope)
     if not _decodes(run):
         return ()
-    written: list[str] = [*_decoder_output_files(run), *targets]
+    written: list[str] = [*_positional(run[1:]), *targets]
     return tuple(_located_all(written, scope))
 
 
