@@ -1568,7 +1568,7 @@ a.pill:hover {
   margin: 0;
 }
 
-/* A provider's mark, as a service's on the Plugins list: its colours on a tile that is light in both colour schemes. */
+/* A provider's mark, as a service's on the Connectors list: its colours on a tile that is light in both colour schemes. */
 .account-mark {
   display: inline-grid;
   flex: none;

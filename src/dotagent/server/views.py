@@ -1254,7 +1254,7 @@ class ConnectionsView(FrozenModel):
 
 
 class PluginsView(FrozenModel):
-    """``GET /plugins``: the listings of Customize's Plugins page (item 316), in its order."""
+    """``GET /plugins``: the listings of Customize's Connectors page (items 316 and 542), in its order."""
 
     plugins: tuple[PluginView, ...]
 
@@ -1310,8 +1310,8 @@ type McpServerState = Literal["ready", "left_out", "disabled", "trying", "signin
 class McpServerView(FrozenModel):
     """One MCP server Dot has, as Customize › Connectors shows it (item 279). ``origin`` is where it is set up: Dot's
     config, a plugin (``plugin`` names it), another agent of the Mac (Customize › Skills › Found on this Mac), or the
-    Plugins page itself. Remove takes out one added on the page or from another agent (item 497); one of a plugin goes
-    with its plugin, and one of the config is the owner's to take out of it. ``address`` is its URL or its command.
+    Connectors page itself. Remove takes out one added on the page or from another agent (item 497); one of a plugin
+    goes with its plugin, and one of the config is the owner's to take out of it. ``address`` is its URL or its command.
     ``state``: its tools are offered to runs (``ready``, with ``tools``, their names on the server), it was left out
     (``error`` says why), it is switched off in the config, or Dot tries it now, waiting for the owner to sign in on
     ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the owner's account, and Sign in again renews

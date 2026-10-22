@@ -1789,7 +1789,7 @@ def plugin_view(listing: PluginListing) -> PluginView:
 
 
 def plugin_views() -> tuple[PluginView, ...]:
-    """Every listing of the Plugins page, in its order."""
+    """Every listing of the Connectors page, in its order."""
     return tuple(plugin_view(listing) for listing in PLUGINS)
 
 

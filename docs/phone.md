@@ -124,7 +124,7 @@ The button at the top left is the one way back (item 338): a chevron on the page
 (item 373), in a 36 px box. On a chat's page, wherever it was opened from, it opens the list of chats in place, as the
 sidebar comes over the page: the address stays the run's, and no page of chats stands between them (item 401). On a
 delegated run's page it says Back and leads to the run that started it. On any other page opened by a link of another
-page (a service from Plugins, a tab from the settings' list) it says Back and returns to that page; on a page opened
+page (a service from Connectors, a tab from the settings' list) it says Back and returns to that page; on a page opened
 directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team) it leads there;
 on a page opened from the sidebar it is the way back to the list of chats. The browser's own Back and Forward and a
 reload keep it as it was, and it is reckoned again when the phone turns. A chat that goes on at another of its runs (a

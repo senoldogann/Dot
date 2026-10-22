@@ -4,6 +4,7 @@ import asyncio
 import io
 import shutil
 import tarfile
+import threading
 from collections.abc import Callable, Mapping
 from datetime import date
 from pathlib import Path
@@ -338,3 +339,28 @@ def test_the_shelf_keeps_a_plugin_whose_folder_went_while_its_servers_run_until_
     assert not shelf.plugins
     shelf.take(PluginCatalog(plugins=(started.model_copy(update={"servers": ()}),), problems=()))
     assert [(plugin.name, len(plugin.servers)) for plugin in shelf.plugins] == [("acme-tools", 0)]
+
+
+async def test_the_shelf_keeps_the_reading_that_began_last(tmp_path: Path) -> None:
+    """A reading that began before a plugin went to the Trash and ends after the one that began once it was there (an
+    install's and a Remove plugin's) must not bring the plugin back: the shelf takes one reading at a time."""
+    removed: Plugin = Plugin(
+        name="removed", root=tmp_path / "removed", description=None, version=None, skill_dirs=(), servers=()
+    )
+    shelf: PluginShelf = PluginShelf(PluginCatalog(plugins=(removed,), problems=()))
+    began: threading.Event = threading.Event()
+    go_on: threading.Event = threading.Event()
+
+    def before_the_trash() -> PluginCatalog:
+        began.set()
+        go_on.wait(5)
+        return PluginCatalog(plugins=(removed,), problems=())
+
+    first: asyncio.Task[None] = asyncio.create_task(shelf.refill(before_the_trash))
+    await asyncio.to_thread(began.wait, 5)
+    second: asyncio.Task[None] = asyncio.create_task(shelf.refill(lambda: PluginCatalog(plugins=(), problems=())))
+    await asyncio.sleep(0.05)
+    go_on.set()
+    await asyncio.gather(first, second)
+
+    assert not shelf.plugins

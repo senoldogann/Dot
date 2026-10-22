@@ -1,7 +1,7 @@
 """The catalog of plugins: every plugins directory read, the usable plugins by name, and what was left out and why."""
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from dotagent.config import McpServerConfig, PluginsConfig
@@ -219,6 +219,9 @@ class PluginShelf:
             plugin.name: plugin.servers for plugin in catalog.plugins
         }
         self._catalog: PluginCatalog = catalog
+        # One reading at a time: one that began before a plugin went to the Trash must not end after the reading that
+        # began once it was there, or the plugin would come back on the shelf.
+        self._reading: asyncio.Lock = asyncio.Lock()
 
     @property
     def plugins(self) -> tuple[Plugin, ...]:
@@ -243,6 +246,12 @@ class PluginShelf:
         )
         self._catalog = PluginCatalog(plugins=read + gone, problems=catalog.problems)
 
+    async def refill(self, read: Callable[[], PluginCatalog]) -> None:
+        """Take what ``read`` finds on disk (in a thread), after any reading under way: the last reading to begin is
+        the one the shelf keeps."""
+        async with self._reading:
+            self.take(await asyncio.to_thread(read))
+
     def forget(self, name: str) -> None:
         """Let go of the servers the plugin ``name`` started with, once Remove plugin stopped them: a plugin whose
         folder went leaves the shelf at the next reading, and one of its name read later has no servers until Dot
@@ -251,5 +260,5 @@ class PluginShelf:
 
 
 async def read_again(shelf: PluginShelf, config: PluginsConfig, configured_servers: Sequence[McpServerConfig]) -> None:
-    """Read every plugins directory again into ``shelf``."""
-    shelf.take(await asyncio.to_thread(load_plugins, config, configured_servers))
+    """Read every plugins directory again into ``shelf``, after any reading under way (:meth:`PluginShelf.refill`)."""
+    await shelf.refill(lambda: load_plugins(config, configured_servers))

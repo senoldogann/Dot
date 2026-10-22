@@ -135,7 +135,7 @@ def status_of(outcome: Outcome) -> int:
 
 def words_of(callback: Callback) -> Words:
     """The title, the line under it and the tone for ``callback``. An MCP server's page does not say it signed in: the
-    code is traded for its tokens after the page, and the server's row on Plugins says when that is done."""
+    code is traded for its tokens after the page, and the server's row on Connectors says when that is done."""
     name: str = "" if callback.subject is None else callback.subject.name
     match callback.outcome:
         case "signed_in":

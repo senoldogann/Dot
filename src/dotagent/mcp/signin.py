@@ -2,7 +2,7 @@
 registered with the server's authorization server on the first sign-in (dynamic client registration), the code brought
 back to Dot's own page, ``/oauth/callback``, by the browser that signed in. The flow itself is the MCP library's
 (:class:`mcp.client.auth.oauth2.OAuthClientProvider`); Dot keeps what it gives and answers its two questions: where to
-send the owner (the link the Plugins page shows) and what came back (the code the callback hands over).
+send the owner (the link the Connectors page shows) and what came back (the code the callback hands over).
 
 What a sign-in gave is kept in Dot's home, one file per server readable by the owner alone (:func:`sign_in_path`): the
 tokens, the client the authorization server registered, the redirect address it was registered with, and when the access

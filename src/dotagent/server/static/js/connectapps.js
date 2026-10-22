@@ -51,7 +51,7 @@ export function openConnectApps({ onClose }) {
     words = foldSearch(search.value);
     paint();
   });
-  const customize = el("a", { class: "btn sm connect-apps-customize", href: "#/customize/connectors", title: "Your own MCP servers, the accounts, the plugins and the skills", onclick: () => dialog.close() }, "Customize", icon("external"));
+  const customize = el("a", { class: "btn sm connect-apps-customize", href: "#/customize/connectors", title: "Your own MCP servers and the accounts", onclick: () => dialog.close() }, "Customize", icon("external"));
   const chips = [{ id: ALL, title: "All" }, ...SECTIONS.filter((section) => section.id !== "popular")].map(({ id, title: label }) =>
     el("button", { class: "chip connect-apps-chip", type: "button", dataset: { chip: id }, "aria-pressed": String(id === chip), onclick: () => choose(id) }, label),
   );
