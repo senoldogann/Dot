@@ -344,6 +344,9 @@ _DECODE_RUNS: list[str] = [
     "xxd -r -p dump x.sh; sh x.sh",
     "xxd -r -ps dump x.sh; sh x.sh",
     "gpg -o x.sh -d blob.gpg && sh x.sh",
+    "base64 -d --output=x.sh blob; sh x.sh",
+    "base64 -dox.sh blob && sh x.sh",
+    "gpg -ox.sh -d blob.gpg; sh x.sh",
 ]
 _PLAIN_PIPES: list[str] = [
     "base64 blob | sh",

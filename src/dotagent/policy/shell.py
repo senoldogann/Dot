@@ -1967,9 +1967,11 @@ def _runs_download(raw: str, scope: ShellScope) -> list[Finding]:
     return []
 
 
-# base64, base32, basenc and xxd fold their short switches into one word (``-rp``), so a decode switch is read letter
-# by letter; openssl and gpg spell each on its own and reuse letters (openssl's ``-md`` is a digest, not decode), so
-# only their decrypt switch counts; uudecode and b64decode only ever decode.
+# base64, base32, basenc, xxd and gpg fold their short switches into one word, with any value glued to the end
+# (``-rp``, ``-dox.sh``), so a decode switch is read among a word's leading letters, where a value cannot reach; the
+# ``d`` of gpg's ``-d`` is its decrypt and no other of its switches. openssl spells each switch on its own and reuses
+# letters (``-md`` is a digest, not decode), so only its own ``-d``/``-decrypt`` word counts; uudecode and b64decode
+# only ever decode.
 _DECODE_LETTERS: dict[str, str] = {
     "base64": "dD",
     "gbase64": "dD",
@@ -1977,16 +1979,19 @@ _DECODE_LETTERS: dict[str, str] = {
     "gbase32": "d",
     "basenc": "d",
     "xxd": "r",
+    "gpg": "d",
+    "gpg2": "d",
 }
-_DECODE_LONG: frozenset[str] = frozenset({"--decode"})
+_DECODE_LONG: frozenset[str] = frozenset({"--decode", "--decrypt"})
 _ALWAYS_DECODE: frozenset[str] = frozenset({"uudecode", "b64decode"})
+_LEADING_FLAGS: re.Pattern[str] = re.compile(r"-([A-Za-z]+)")
 
 
 def _decodes(run: list[str]) -> bool:
     """Whether ``run`` -- a command and its arguments, its wrappers already looked through -- turns an encoded or
     encrypted blob back into the bytes it stood for: ``base64 -d`` (and ``gbase64``, ``base32``, ``basenc``), ``xxd
-    -r``, ``openssl`` or ``gpg`` given a decrypt switch, or ``uudecode``/``b64decode``, whose only work is to decode.
-    ``base64 blob`` without ``-d`` encodes, so what it prints is not code; it does not count."""
+    -r``, ``gpg -d`` or ``openssl`` given a decrypt switch, or ``uudecode``/``b64decode``, whose only work is to
+    decode. ``base64 blob`` without ``-d`` encodes, so what it prints is not code; it does not count."""
     if not run:
         return False
     command: str = Path(run[0]).name
@@ -1994,26 +1999,33 @@ def _decodes(run: list[str]) -> bool:
         return True
     if command == "openssl":
         return "-d" in run[1:] or "-decrypt" in run[1:]
-    if command in ("gpg", "gpg2"):
-        return any(word in ("-d", "--decrypt") for word in run[1:])
     letters: str | None = _DECODE_LETTERS.get(command)
     if letters is None:
         return False
-    switch: re.Pattern[str] = re.compile(rf"-[A-Za-z]*[{letters}][A-Za-z]*")
-    return any(word in _DECODE_LONG or switch.fullmatch(word) is not None for word in run[1:])
+    wanted: set[str] = set(letters)
+    for word in run[1:]:
+        if word in _DECODE_LONG:
+            return True
+        lead: re.Match[str] | None = _LEADING_FLAGS.match(word) if not word.startswith("--") else None
+        if lead is not None and wanted & set(lead.group(1)):
+            return True
+    return False
 
 
 def _decoded_writes(words: list[str], targets: list[str], scope: ShellScope) -> tuple[Path, ...]:
     """Where a decoder on this line may have written what it decoded, located. Which word is a decoder's output file
-    differs by tool and by option spelling (``base64 -o``, ``openssl -out``, ``xxd``'s second operand), too many to
-    read one by one, so the guard takes every file the decoder names -- its operands and its option values, all the
-    words that are not options (:func:`_positional`), and its ``>`` redirects -- as code it may have written. The file
-    is opaque code on disk, tracked like a download so that a later line that runs it is judged the same; taking an
-    input file too only costs a question if the line later runs that file, the safe side (item 523)."""
+    differs by tool and by option spelling (``base64 -o``/``--output=``/``-ox``, ``openssl -out``, ``xxd``'s second
+    operand), too many to read one by one, so the guard takes every file the decoder names -- the words that are not
+    options (:func:`_positional`: its operands and space-separated option values), the value of ``-o``/``--output`` in
+    any spelling, the value glued after ``=`` in a long option, and its ``>`` redirects -- as code it may have written.
+    The file is opaque code on disk, judged like a download when a later line runs it; taking an input file too costs
+    only a question if that file is run, the safe side (item 523)."""
     run, _ = _run_by_wrappers(_plain(words), scope)
     if not _decodes(run):
         return ()
-    written: list[str] = [*_positional(run[1:]), *targets]
+    args: list[str] = run[1:]
+    glued: list[str] = [word.split("=", 1)[1] for word in args if word.startswith("-") and "=" in word]
+    written: list[str] = [*_positional(args), *_option_values(args, "-o", "--output"), *glued, *targets]
     return tuple(_located_all(written, scope))
 
 
