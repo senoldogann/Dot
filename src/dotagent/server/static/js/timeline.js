@@ -8,7 +8,7 @@
 import { AUTO_LINES, settingValue } from "./appearance/settings.js";
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles, sentPictures } from "./attachments.js";
-import { clip, clock, compact, dateTime, duration, el, plural, setText } from "./dom.js";
+import { clip, clock, compact, dateTime, duration, el, plural, repeatsAnswer, setText } from "./dom.js";
 import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
@@ -64,11 +64,6 @@ function paintRing(ring, status) {
   ring.className = `status-ring s-${status}`;
   ring.title = label;
   ring.setAttribute("aria-label", label);
-}
-
-/** Whether two texts read the same, whatever their line breaks and spacing. */
-function sameText(first, second) {
-  return first.replace(/\s+/g, " ").trim() === second.replace(/\s+/g, " ").trim();
 }
 
 /** A markdown text as one plain line (item 245): without the marks of its headings, lists, bold and code, its links as
@@ -499,10 +494,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
    * A turn that ends with a plain reply has that text twice: as its last message and as the result of the run. The result
    * is shown as the answer, so every message that repeats it goes, as an earlier turn leaves them out (history.js), also
    * when a step came after it: a task run told to finish (the loop's note on a reply without a tool) thinks once more and
-   * calls finish with the same words (item 460).
+   * calls finish with the same words (item 460), or with its first line reworded (item 567).
    */
   function dropRepeatedReply(scope, result) {
-    const repeated = scope.replies.filter((reply) => sameText(reply.text, result));
+    const repeated = scope.replies.filter((reply) => repeatsAnswer(reply.text, result));
     scope.replies = [];
     for (const reply of repeated) {
       reply.node.remove();

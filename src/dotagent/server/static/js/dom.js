@@ -158,6 +158,66 @@ export function clipWords(text, words, limit) {
   return short.length <= limit ? short : clip(short, limit);
 }
 
+// A reply of fewer words, after its first line, is the answer said again only word for word (item 567).
+const REPEAT_MIN_WORDS = 20;
+// A reply's first line is the answer's reworded when at least this share of its words are in the answer's first line.
+const REWORDED_SHARE = 0.5;
+
+/** The words of a text as they are compared: its marks of markdown left out, in lower case. */
+function wordsOf(text) {
+  return text
+    .toLowerCase()
+    .replace(/[*_`#>[\]()|]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word !== "");
+}
+
+/** The lines of a text as they are compared, each its words (wordsOf) joined, the blank ones left out. */
+function linesOf(text) {
+  return text
+    .split("\n")
+    .map((line) => wordsOf(line).join(" "))
+    .filter((line) => line !== "");
+}
+
+/**
+ * Whether `line` is `other` reworded, its punctuation left out: at least half its words are in `other`, and it says
+ * nothing more. A line that only adds to the other ("The tests do not pass:" for "The tests pass:") or has a number of
+ * its own says more.
+ */
+function rewordedFrom(line, other) {
+  const plain = (text) => text.split(/[^\p{L}\p{N}]+/u).filter((word) => word !== "");
+  const words = plain(line);
+  const theirs = new Set(plain(other));
+  const mine = new Set(words);
+  const added = words.filter((word) => !theirs.has(word));
+  const adds = added.length > 0 && [...theirs].every((word) => mine.has(word));
+  if (words.length === 0 || adds || added.some((word) => /\p{N}/u.test(word))) {
+    return false;
+  }
+  return words.length - added.length >= words.length * REWORDED_SHARE;
+}
+
+/**
+ * Whether a run's reply says nothing its answer does not (item 567), so that the answer alone may stand for it: the
+ * same words, whatever their spacing and marks, or the same lines after a first line the answer rewords, those lines
+ * twenty words and more. A model told to finish after a plain reply finishes with that reply again and may reword its
+ * first line on the way. A reply with a line the answer lacks, more on one of its lines, or a first line of its own is
+ * shown, however much of it the answer holds: what it adds would be lost.
+ */
+export function repeatsAnswer(reply, answer) {
+  if (wordsOf(reply).join(" ") === wordsOf(answer).join(" ")) {
+    return true;
+  }
+  const said = linesOf(reply);
+  const told = linesOf(answer);
+  const rest = said.slice(1);
+  if (said.length !== told.length || rest.join(" ").split(" ").length < REPEAT_MIN_WORDS) {
+    return false;
+  }
+  return rest.join("\n") === told.slice(1).join("\n") && rewordedFrom(said[0], told[0]);
+}
+
 /**
  * `text` as it is compared when looking for a name: case, accents and the Turkish dotted and dotless i do not matter, so
  * "İstanbul", "ISTANBUL" and "istanbul" are one word, and so are "Işık" and "isik". The same fold as `fold_search` in

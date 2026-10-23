@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { clip, compact, duration, joined, modelName, plural } from "../../src/dotagent/server/static/js/dom.js";
+import { clip, compact, duration, joined, modelName, plural, repeatsAnswer } from "../../src/dotagent/server/static/js/dom.js";
 
 test("plural", () => {
   assert.equal(plural(1, "file", "files"), "1 file");
@@ -41,4 +41,37 @@ test("compact counts", () => {
 test("the model part of a provider:model reference", () => {
   assert.equal(modelName("ollama:gpt-oss:20b-cloud"), "gpt-oss:20b-cloud");
   assert.equal(modelName("openai:gpt-5"), "gpt-5");
+});
+
+// The answer a model gave once as a plain reply and again, a line reworded, when it was told to finish (item 567): the
+// prompt a run wrote for another agent came back with its first line changed, and the chat showed it twice.
+const BODY = Array.from({ length: 40 }, (_, at) => `Line ${at} of the prompt says what the agent must fix in the module.`).join("\n");
+
+test("repeatsAnswer finds the answer said again, whatever its spacing, its marks or a first line reworded", () => {
+  assert.equal(repeatsAnswer("Done.\n\nAll  **three** files.", "Done. All three files."), true);
+  assert.equal(
+    repeatsAnswer(`Kusurları düzeltecek kod ajanı için, olduğu gibi kopyalanacak prompt:\n${BODY}`, `Kusurları düzeltecek kod ajanına olduğu gibi yapıştırabileceğin prompt:\n${BODY}`),
+    true,
+  );
+});
+
+test("repeatsAnswer keeps a short line, a note much shorter than the answer and a text that says something else", () => {
+  assert.equal(repeatsAnswer("Reading the page now.", "Reading the page now, then the next."), false);
+  assert.equal(repeatsAnswer(BODY.split("\n").slice(0, 10).join("\n"), BODY), false);
+  assert.equal(repeatsAnswer(BODY, BODY.replace(/the agent must fix in the module/g, "nobody reads, about the weather")), false);
+});
+
+// A reply that says more than the answer is shown, whatever share of it the answer holds: what it adds would be lost.
+const REPORT = Array.from({ length: 8 }, (_, at) => `Step ${at} copied the files of the project to the backup disk.`).join("\n");
+
+test("repeatsAnswer keeps a reply that says one thing more than the answer", () => {
+  const warning = "But the backup step failed: the disk is full.";
+  assert.equal(repeatsAnswer(`Report:\n${REPORT}\n${warning}`, `Report:\n${REPORT}`), false);
+  assert.equal(repeatsAnswer(`Report:\n${REPORT} ${warning}`, `Report:\n${REPORT}`), false);
+  assert.equal(repeatsAnswer(`Report done. ${warning}\n${REPORT}`, `Report done.\n${REPORT}`), false);
+  // A first line that adds a word to the answer's, or has a number of its own, says more than a rewording.
+  assert.equal(repeatsAnswer(`The tests do not pass:\n${REPORT}`, `The tests pass:\n${REPORT}`), false);
+  assert.equal(repeatsAnswer(`3 tests failed:\n${REPORT}`, `2 tests failed:\n${REPORT}`), false);
+  const long = `Report:\n${Array.from({ length: 100 }, () => REPORT).join("\n")}`;
+  assert.equal(repeatsAnswer(`${long}\n${warning}`, long), false);
 });

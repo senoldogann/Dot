@@ -292,7 +292,12 @@ never lifted to its top and dropped back. The answer of the run is the last mess
 (its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how long
 the run took shows where the pointer rests on it (on a touch screen it always shows). A message that only says the
 answer again is not shown beside it, wherever it stands in the turn (item 460): a task run that answers in a plain
-reply is told to call finish, thinks once more and finishes with the same words. A copy out of the conversation
+reply is told to call finish, thinks once more and finishes with the same words, or with its first line reworded
+(item 567: the lines after it the same, twenty words and more, and at least half the words of the first line in the
+answer's). A message with a line the answer lacks, or more on one of its lines, stays, and so does one whose first line
+only adds words to the answer's or has a number of its own; a first line that swaps a word for another ("No tests
+pass:" for "All tests pass:") is taken for a rewording, and the answer, the run's last word, stands for it. A copy out
+of the conversation
 keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as the markdown
 it was written in, a list as a list, a table as a table and code in its fence, with the formatted copy alongside for the
 applications that read it; the line under a message or an answer stays out, and a copy within a block of code is its
