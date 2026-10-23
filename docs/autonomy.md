@@ -312,7 +312,8 @@ a resting lesson is left alone, so one learnt again does not take its rest, and 
 folded away rests and names the one it was folded into, so nothing the reflection does deletes a note); it rests a
 lesson that no run was handed, and that was not written again, for `lesson_rest_days` (60), or whose score says it did
 not help (handed to `[memory] score_min_uses` runs in the last `score_days`, more of which failed than ended done); a
-lesson you saved yourself is never folded away nor retired. It also puts aside a note of Dot's that a newer note,
+lesson you saved yourself is never folded away nor retired, and a note saved while reading outside content never folds
+away nor puts aside a clean older one (item 557). It also puts aside a note of Dot's that a newer note,
 written or changed since the last reflection, made outdated (item 306): the review model reads each such pair of notes
 close in meaning (at most 12 a night; your notes, the lessons you saved and the `core` notes are never the older one)
 and keeps the older one when in doubt; the one it calls outdated rests, names the note that replaced it (the Memory page
@@ -322,7 +323,9 @@ it `rest`, after which searches skip it while `dotx memory list` and the Memory 
 `journal`, of the day it read: the day of the middle of that time, so the reflection at 03:30 names the day before ("On
 2026-10-11 I worked on 4 runs (2 done, 1 failed, 1 cancelled). Learned: … Tidied the lessons: 1 merged, 1 retired."), or
 its first and last day when it read more than a day and a quarter, after a daemon that was off ("From 2026-10-08 to
-2026-10-12 I worked on …"). The reflection touches only the notes Dot wrote, never yours. It also keeps what Dot knows
+2026-10-12 I worked on …"). The journal names the lessons that were saved, not the ones the second look left out nor
+the proposals that wait for you, which later runs would otherwise be handed through the note (item 557). The
+reflection touches only the notes Dot wrote, never yours. It also keeps what Dot knows
 about you (see Memory): after a day with runs, one call of the review model rewrites Dot's lines of that section from
 the section as it stands, your own lines, your notes and the day's goals, at most `[memory] owner_chars` (1500)
 characters. A night the Mac slept through is caught up once when it wakes. A daemon that was off at that time, or whose

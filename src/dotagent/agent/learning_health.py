@@ -211,9 +211,15 @@ async def record_learning(
     return health
 
 
-async def check_learning(store: Store, bus: EventBus, now: float, quiet_s: float | None) -> None:
+async def check_learning(
+    store: Store, bus: EventBus, now: float, quiet_s: float | None, reflecting: bool = False
+) -> None:
     """Tell the owner when learning has stopped by the clock alone (no reflection went well for ``quiet_s``), though no
-    work ended since: read first, and written only when there is something to tell."""
+    work ended since: read first, and written only when there is something to tell. Nothing is told while a reflection
+    is under way (``reflecting``): it may be the one that ends the quiet, and after a Mac that slept through its time
+    the tick that starts it is the tick that checks (item 557); one that fails is told as the failures in a row are."""
+    if reflecting:
+        return
     health: LearningHealth | None = await read_learning_health(store)
     if health is None or health.told_at is not None or stall_reason(health, now, quiet_s) is None:
         return

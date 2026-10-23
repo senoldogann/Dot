@@ -25,6 +25,14 @@ class SkillRoot(FrozenModel):
 HOME_SOURCE: str = "home"
 # Where a skill that Dot distilled itself was found (:mod:`dotagent.agent.playbooks`).
 PLAYBOOK_SOURCE: str = "learned"
+# The prefixes of the names of the skills Dot keeps in its playbook folder: what it learned from its own work, what the
+# owner taught it by showing a task once (item 423) and the folders written before item 92. The prompt tells a run that
+# a ``taught-`` skill is the owner's own instruction, and the uses of learned skills are counted by these names, so
+# they are Dot's alone: a skill of any other root with one is left out and reported (item 557).
+PLAYBOOK_PREFIX: str = "learned-"
+TAUGHT_PREFIX: str = "taught-"
+OLD_PLAYBOOK_PREFIX: str = "playbook-"
+PLAYBOOK_PREFIXES: tuple[str, ...] = (PLAYBOOK_PREFIX, TAUGHT_PREFIX, OLD_PLAYBOOK_PREFIX)
 # Where a skill that comes with Dot was found, and the folder of those skills in the package (item 196).
 BUILTIN_SOURCE: str = "built-in"
 BUILTIN_SKILLS: Path = Path(__file__).parent / "builtin"
@@ -69,10 +77,10 @@ def read_skill(file: Path, source: str) -> Skill:
 
 
 def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
-    """Read every root. A root that is missing, a folder that is not a skill, or a name used twice is reported and left
-    out while the other skills still load. A skill reached through two roots (a symlink and its target) counts once. A
-    skill that comes with Dot gives way to one of the user's with its name, which is no problem: it is how the user
-    replaces it."""
+    """Read every root. A root that is missing, a folder that is not a skill, a name used twice, or a name that is
+    Dot's (:data:`PLAYBOOK_PREFIXES`, on a skill that is not in the playbook folder) is reported and left out while the
+    other skills still load. A skill reached through two roots (a symlink and its target) counts once. A skill that
+    comes with Dot gives way to one of the user's with its name, which is no problem: it is how the user replaces it."""
     skills: dict[str, Skill] = {}
     problems: list[SkillProblem] = []
     seen: set[Path] = set()
@@ -94,6 +102,15 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
                 skill: Skill = read_skill(file, root.source)
             except SkillError as exc:
                 problems.append(SkillProblem(path=file, reason=_reason(exc)))
+                continue
+            if root.source != PLAYBOOK_SOURCE and skill.name.startswith(PLAYBOOK_PREFIXES):
+                problems.append(
+                    SkillProblem(
+                        path=file,
+                        reason=f"the name {skill.name} is kept for the skills Dot learned or was taught "
+                        f"({', '.join(PLAYBOOK_PREFIXES)}): give the skill another name",
+                    )
+                )
                 continue
             if skill.name in skills:
                 if root.source != BUILTIN_SOURCE:

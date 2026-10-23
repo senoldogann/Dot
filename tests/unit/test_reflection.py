@@ -1,15 +1,26 @@
 """The pure parts of the nightly reflection (item 70): when it is due, which runs it reads, what a run's stored results
 tell it, which lesson notes say the same or rest, and what it writes."""
 
+import asyncio
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
 
+from dotagent.agent import reflection as reflection_module
+from dotagent.agent.lessons import (
+    LESSON_DISMISSED,
+    LESSON_SAVED,
+    LESSONS_PROPOSED,
+    DrawnLessons,
+    LessonCase,
+)
 from dotagent.agent.reflection import (
     _MERGE_RECENT,
+    _learn,
     _Result,
     call_facts,
     digest_of,
@@ -371,5 +382,97 @@ async def test_a_failed_reflection_is_shown_until_one_after_it_is_done(tmp_path:
         assert await reflection_failure(store) is None
         assert render_reflection(done, failed).startswith("  reflection: last done ")
         assert "failed" not in render_reflection(done, failed)
+    finally:
+        await store.close()
+
+
+def test_a_note_saved_while_reading_outside_content_never_folds_away_a_clean_older_lesson() -> None:
+    """Item 557: page content must not put a trusted lesson aside by arriving as its newer twin."""
+    clean: MemoryRecord = _note(
+        "a", "Create notes.txt with write_file before read_file reads it.", 10.0, None, ("lesson",)
+    )
+    twin: MemoryRecord = _note(
+        "b", "Create notes.txt with write_file before read_file reads it back.", 20.0, None, ("lesson",)
+    )
+    tainted: MemoryRecord = twin.model_copy(update={"tainted": True})
+    assert duplicate_pairs([clean, twin], {}, set()) == [(clean, twin)]
+    assert duplicate_pairs([clean, tainted], {}, set()) == []
+    # A clean newer note still folds a tainted older one away, and two tainted notes pair as any two do.
+    assert duplicate_pairs([clean.model_copy(update={"tainted": True}), twin], {}, set()) == [
+        (clean.model_copy(update={"tainted": True}), twin)
+    ]
+    assert duplicate_pairs([clean.model_copy(update={"tainted": True}), tainted], {}, set()) == [
+        (clean.model_copy(update={"tainted": True}), tainted)
+    ]
+
+
+def test_a_note_saved_while_reading_outside_content_is_never_the_newer_note_that_puts_a_clean_one_aside() -> None:
+    """Item 557: the judge reads the text of the tainted note, which could argue its own case."""
+    old: MemoryRecord = _note("old", "The user prefers answers in Turkish.", 10.0, None, ())
+    new: MemoryRecord = _note("new", "The user prefers answers in English.", 200.0, None, ())
+    vectors: dict[str, tuple[float, ...]] = {"old": (1.0, 0.0), "new": (1.0, 0.0)}
+    tainted: MemoryRecord = new.model_copy(update={"tainted": True})
+    assert outdated_pairs([old, new], vectors, 100.0, 1000.0, 0.9, set()) == [(old, new)]
+    assert outdated_pairs([old, tainted], vectors, 100.0, 1000.0, 0.9, set()) == []
+    # A tainted note may be put aside by a clean newer one, or by another tainted one.
+    tainted_old: MemoryRecord = old.model_copy(update={"tainted": True})
+    assert outdated_pairs([tainted_old, new], vectors, 100.0, 1000.0, 0.9, set()) == [(tainted_old, new)]
+    assert outdated_pairs([tainted_old, tainted], vectors, 100.0, 1000.0, 0.9, set()) == [(tainted_old, tainted)]
+
+
+async def test_the_journal_names_the_lessons_that_were_saved_and_not_the_ones_left_out_or_waiting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 557: a lesson the second look dismissed, or a proposal the owner has not decided, is not handed to later
+    runs through the nightly journal note."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        drawn: dict[str, tuple[str, ...]] = {}
+
+        async def learn(runtime: object, deciding: object, case: LessonCase, signals: tuple[str, ...]) -> DrawnLessons:
+            lessons: tuple[str, ...] = drawn[case.goal]
+            await store.add_event(case.run_id, LESSONS_PROPOSED, {"lessons": list(lessons), "tainted": case.tainted})
+            if case.goal == "auto":
+                await store.add_event(
+                    case.run_id, LESSON_SAVED, {"index": 0, "memory_id": "mem_1", "by": "auto", "created": True}
+                )
+                await store.add_event(
+                    case.run_id, LESSON_DISMISSED, {"index": 1, "by": "auto", "reason": "too general"}
+                )
+            return DrawnLessons(lessons=lessons, error=None)
+
+        monkeypatch.setattr(reflection_module, "learn_from", learn)
+        drawn.update({"auto": ("Use -layout with pdftotext.", "Always ask twice."), "propose": ("Check the date.",)})
+        runs: list[RunRecord] = []
+        thread = await store.create_thread("t", "test")
+        for goal in drawn:
+            run: RunRecord = await store.create_run(
+                thread.id,
+                goal,
+                "task",
+                "ollama:x",
+                None,
+                "test",
+                None,
+                "standard",
+                None,
+                "ask",
+                False,
+                None,
+                None,
+                None,
+            )
+            await store.finish_run(run.id, "failed", "Could not finish.")
+            runs.append(await store.get_run(run.id))
+        runtime = SimpleNamespace(store=store)
+        written, named, tainted = await _learn(runtime, asyncio.Lock(), runs)  # type: ignore[arg-type]
+        assert (written, named, tainted) == (
+            ["Use -layout with pdftotext.", "Always ask twice.", "Check the date."],
+            ["Use -layout with pdftotext."],
+            False,
+        )
+        text: str = journal_text("On 2026-10-11", runs, named, 0, 0, 0, 500)
+        assert "Learned: Use -layout with pdftotext." in text
+        assert "Always ask twice" not in text and "Check the date" not in text
     finally:
         await store.close()

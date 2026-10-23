@@ -71,8 +71,15 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.memory.ranking import Similar, Vector, most_similar
 from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.secrets import known_secrets
-from dotagent.skills.catalog import PLAYBOOK_SOURCE, playbook_root, read_skill
-from dotagent.skills.parse import parse_skill
+from dotagent.skills.catalog import (
+    PLAYBOOK_PREFIX,
+    PLAYBOOK_PREFIXES,
+    PLAYBOOK_SOURCE,
+    TAUGHT_PREFIX,
+    playbook_root,
+    read_skill,
+)
+from dotagent.skills.parse import parse_skill, split_frontmatter
 from dotagent.skills.types import SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.models import EventRecord, RunRecord, RunStatus
 
@@ -82,13 +89,12 @@ if TYPE_CHECKING:
 
 log = get_logger(__name__)
 
-PLAYBOOK_PREFIX: str = "learned-"
-# The prefix of a skill the owner taught by showing the task once (item 423): it is Dot's to offer and read, and the
-# owner's to keep.
-TAUGHT_PREFIX: str = "taught-"
-# The prefix of the folders written before item 92, which a run may still read.
-_OLD_PREFIX: str = "playbook-"
-_FOLDER_NAME: re.Pattern[str] = re.compile(r"(?:learned|taught|playbook)-[a-z0-9-]*")
+# The prefixes of the names of the skills in the playbook folder (:data:`dotagent.skills.catalog.PLAYBOOK_PREFIXES`):
+# ``taught-`` is a skill the owner taught by showing the task once (item 423), Dot's to offer and read and the owner's
+# to keep; ``playbook-`` the folders written before item 92, which a run may still read.
+_FOLDER_NAME: re.Pattern[str] = re.compile(
+    rf"(?:{'|'.join(re.escape(prefix) for prefix in PLAYBOOK_PREFIXES)})[a-z0-9-]*"
+)
 META_FILE: str = "playbook.json"
 RETIRED_DIR: str = ".retired"
 _LOCK_FILE: str = ".lock"
@@ -100,6 +106,8 @@ PLAYBOOK_FAILED: str = "playbook_failed"
 PLAYBOOK_RETIRED: str = "playbook_retired"
 # A playbook that this many runs read and then failed is retired.
 MAX_FAILURES: int = 2
+# How many of the newest tool calls and results of a run its skill work reads (item 557): the steps that ended a long
+# run, not the first part of it.
 _EVENTS_READ: int = 2000
 _DIGEST_STEPS: int = 80
 _ARGS_CHARS: int = 200
@@ -359,7 +367,7 @@ def used_playbooks(events: Sequence[EventRecord]) -> tuple[str, ...]:
             continue
         arguments: JsonValue = event.data.get("args")
         name: JsonValue = arguments.get("name") if isinstance(arguments, dict) else None
-        if isinstance(name, str) and name.startswith((PLAYBOOK_PREFIX, TAUGHT_PREFIX, _OLD_PREFIX)):
+        if isinstance(name, str) and name.startswith(PLAYBOOK_PREFIXES):
             names[name] = None
     return tuple(names)
 
@@ -423,8 +431,8 @@ def render_playbook(playbook: Playbook, earlier: PlaybookMeta | None) -> str:
 
 def meta_of(playbook: Playbook, earlier: PlaybookMeta | None) -> PlaybookMeta:
     """The record of a skill just written from ``playbook``, or updated from ``earlier`` by it (the runs appended,
-    the kind and the counts kept). The steps are the run's alone either way, and so is the mark of content third
-    parties can author (``tainted``): a run of the kind that read none clears it."""
+    the kind and the counts kept, the failures in a row cleared). The steps are the run's alone either way, and so is
+    the mark of content third parties can author (``tainted``): a run of the kind that read none clears it."""
     tainted_runs: tuple[str, ...] = (playbook.run_id,) if playbook.tainted else ()
     if playbook.taught:
         # The owner showed it, so no run stands behind it and nothing of it is withheld: it is trusted as they gave it.
@@ -467,6 +475,9 @@ def meta_of(playbook: Playbook, earlier: PlaybookMeta | None) -> PlaybookMeta:
             "runs": (*earlier.runs, playbook.run_id),
             "acting_steps": (*earlier.acting_steps, playbook.acting_steps),
             "updated_at": playbook.written_at,
+            # The steps are those of a run that ended done now: the failures in a row were of the steps before them
+            # (item 557), and one failure of a run that reads these would otherwise retire them.
+            "failing": 0,
             "tainted": playbook.tainted,
             "tainted_runs": (*earlier.tainted_runs, *tainted_runs),
         }
@@ -651,9 +662,32 @@ def record_use(root: Path, name: str, succeeded: bool) -> PlaybookMeta | None:
             retired.parent.mkdir(parents=True, exist_ok=True)
             if retired.exists():
                 # A skill of the name retired before keeps its folder, under the next free name (item 306).
-                shutil.move(str(retired), str(_unused(root / RETIRED_DIR, name)))
+                aside: Path = _unused(root / RETIRED_DIR, name)
+                shutil.move(str(retired), str(aside))
+                _renamed(aside, name)
             shutil.move(str(folder), str(retired))
     return meta
+
+
+def _renamed(folder: Path, was: str) -> None:
+    """The skill in ``folder``, which was ``was`` and now has the name of its folder, under that name in its SKILL.md
+    and its record: the loader reads a skill whose name is its folder's, and a listing or a drop finds it by that name
+    (item 557). A skill that cannot be read stays as it is, logged: moving it aside never fails the retirement."""
+    file: Path = folder / SKILL_FILE
+    try:
+        yaml_text, body = split_frontmatter(file, file.read_text(encoding="utf-8"))
+        front: object = yaml.safe_load(yaml_text)
+        if not isinstance(front, dict):
+            raise SkillError("the frontmatter of SKILL.md is not a mapping of keys to values", {"path": str(file)})
+        front["name"] = folder.name
+        write_whole(
+            file,
+            f"---\n{yaml.safe_dump(front, sort_keys=False, allow_unicode=True, width=_FRONTMATTER_WIDTH)}---\n"
+            + body.replace(f"# {was}\n", f"# {folder.name}\n", 1),
+        )
+        _save_meta(folder, read_meta(folder).model_copy(update={"name": folder.name}))
+    except (DotError, OSError, UnicodeDecodeError, yaml.YAMLError) as error:
+        log.warning("playbook_not_renamed", folder=str(folder), was=was, error=str(error))
 
 
 def _unused(parent: Path, name: str) -> Path:
@@ -721,7 +755,7 @@ def _entries(folder: Path, retired: bool) -> list[PlaybookEntry]:
         return entries
     for child in sorted(folder.iterdir()):
         file: Path = child / SKILL_FILE
-        if not child.name.startswith((PLAYBOOK_PREFIX, TAUGHT_PREFIX, _OLD_PREFIX)) or not file.is_file():
+        if not child.name.startswith(PLAYBOOK_PREFIXES) or not file.is_file():
             continue
         try:
             skill: Skill = read_skill(file, PLAYBOOK_SOURCE)
@@ -753,9 +787,15 @@ async def offered_to_run(config: AppConfig, skills: SkillCatalog, agent_id: str 
     return offered_skills(skills.skills, entries, agent_id)
 
 
-async def _record_uses(runtime: "Runtime", run: RunRecord, status: RunStatus, events: Sequence[EventRecord]) -> None:
+async def _acting_events(runtime: "Runtime", run: RunRecord) -> list[EventRecord]:
+    """The newest tool calls and results of ``run`` (:data:`_EVENTS_READ` of them), oldest first."""
+    return await runtime.store.events_of_kinds(run.id, ("tool_call", "tool_result"), _EVENTS_READ)
+
+
+async def _record_uses(runtime: "Runtime", run: RunRecord, status: RunStatus) -> None:
+    """Count the use of each learned skill ``run`` read with the ``skill`` tool, wherever in the run it did."""
     root: Path = playbooks_dir()
-    for name in used_playbooks(events):
+    for name in used_playbooks(await runtime.store.tool_calls_named(run.id, SKILL_TOOL)):
         meta: PlaybookMeta | None = await asyncio.to_thread(record_use, root, name, status == "done")
         if meta is None:
             continue
@@ -873,8 +913,8 @@ async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) 
     the skill of its kind or update the one that exists (``skipped`` when it may not). A review model that fails, or a
     folder that cannot be written, ends it with a ``playbook_failed`` event and fails it; the run keeps its end either
     way."""
-    events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _EVENTS_READ)
-    await _record_uses(runtime, run, status, events)
+    await _record_uses(runtime, run, status)
+    events: list[EventRecord] = await _acting_events(runtime, run)
     steps: tuple[ActingStep, ...] = acting_steps(events)
     if not distils(status, len(steps), runtime.config.agent.skill_min_steps):
         if status == "done":
@@ -929,7 +969,7 @@ async def save_playbook(runtime: "Runtime", run: RunRecord) -> tuple[str, bool]:
             "first",
             {"run_id": run.id},
         )
-    events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _EVENTS_READ)
+    events: list[EventRecord] = await _acting_events(runtime, run)
     steps: tuple[ActingStep, ...] = acting_steps(events)
     why: str | None = unsavable(run, len(steps))
     if why is not None:

@@ -30,7 +30,11 @@ the chat; a note folded into a summary, in the run or since, is handed again aft
 
 How learning fares, the last card, says for the reflection, the lessons and the skills when each last went well and,
 for one that failed, how many times in a row and why. A work with neither a success nor a failure recorded (one that
-had nothing to learn from leaves no mark) says "nothing recorded yet", not that it has not gone well.
+had nothing to learn from leaves no mark) says "nothing recorded yet", not that it has not gone well. Learning that
+has stopped (a work that failed three times in a row, or no reflection that went well for two days while the
+reflection is on) is told once, as "Dot's learning has stopped", and again only after it worked again; the clock is
+not read while a reflection is under way, so the one that catches up after a Mac slept through its time tells nothing
+before it ends (item 557).
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
@@ -82,7 +86,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - `memory_update` lets the agent correct a note in place, and the note is then the agent's, even one you wrote: the
   prompt no longer shows the model's words as yours. You edit one on the Memory page or with `PATCH /api/memories/{id}`,
   and it keeps its author. The page also shows who wrote each note and how often runs used it.
-- Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings.
+- Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings, each
+  cut to the best `candidate_pool` (30) notes among the ones that may be found: resting and expired notes, and the
+  lessons of an agent in the search of another run, take none of those places (item 557).
   `embed_enabled = false` searches by words only. An answer of Ollama that says its model runner broke off is asked
   again, as a broken connection is; when the embedding service still fails at the start of a run, the run recalls its
   notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Run tab, under Set
@@ -161,7 +167,8 @@ the firings since item 257: a firing from before names no schedule. The agent ca
 them (the ones its first run started with until you picked others: its mode, model, reasoning level, speed, approval
 mode and goal mode; item 291). `/loop 30m <message>` in the box of a run or of a new chat makes such a schedule from the
 composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the nightly reflection at
-`[agent] reflection_time` (see Reflection above); it is not a schedule and does not count against `max_schedules`.
+`[agent] reflection_time` (see Reflection in [Autonomy](autonomy.md)); it is not a schedule and does not count against
+`max_schedules`.
 
 On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task or research: a chat that only talks

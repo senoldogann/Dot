@@ -284,12 +284,16 @@ class Scheduler:
             log.error("learning_not_recorded", work="harness", state=outcome.state, error=error.message)
 
     async def _check_learning(self, now: float) -> None:
-        """Tell the owner when no reflection went well for too long, though none ended since
+        """Tell the owner when no reflection went well for too long, though none ended since, and none is under way
         (:func:`dotagent.agent.learning_health.check_learning`). A record that cannot be read is logged: it keeps the
         scheduler from nothing."""
         try:
             await check_learning(
-                self._runtime.store, self._runtime.bus, now, quiet_limit(self._runtime.config.agent.reflection_time)
+                self._runtime.store,
+                self._runtime.bus,
+                now,
+                quiet_limit(self._runtime.config.agent.reflection_time),
+                self.reflecting(),
             )
         except StoreError as error:
             log.error("learning_not_checked", error=error.message)

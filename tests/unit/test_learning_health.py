@@ -143,6 +143,31 @@ async def test_two_quiet_days_are_told_by_the_clock_once(tmp_path: Path) -> None
         await store.close()
 
 
+async def test_the_quiet_of_two_days_is_not_told_while_the_reflection_that_may_end_it_is_under_way(
+    tmp_path: Path,
+) -> None:
+    """Item 557: a Mac that slept through its reflection starts the catch-up in the very tick that checks the clock."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    bus: EventBus = EventBus(store)
+    try:
+        async with bus.subscribe_kinds(frozenset({LEARNING_STALLED_EVENT})) as notices:
+            await record_learning(store, bus, "reflection", T0, LEARNED, QUIET_S)
+            monday: float = T0 + 3 * QUIET_S
+            await check_learning(store, bus, monday, QUIET_S, reflecting=True)
+            assert _notices(notices) == []
+            # It went well: nothing to tell once it is over.
+            await record_learning(store, bus, "reflection", monday + 60, LEARNED, QUIET_S)
+            await check_learning(store, bus, monday + 120, QUIET_S)
+            assert _notices(notices) == []
+            # Had it not, the quiet is told as soon as it is not under way any more.
+            await check_learning(store, bus, monday + 60 + QUIET_S, QUIET_S, reflecting=True)
+            assert _notices(notices) == []
+            await check_learning(store, bus, monday + 60 + QUIET_S, QUIET_S)
+            assert len(_notices(notices)) == 1
+    finally:
+        await store.close()
+
+
 def test_dotx_stats_shows_when_each_work_last_went_well_its_failures_and_why_learning_stopped() -> None:
     assert render_learning_health(None, T0, QUIET_S, True) == ["  learning health: nothing recorded yet"]
     health: LearningHealth = with_outcome(new_health(T0), "reflection", T0, LEARNED)
