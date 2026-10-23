@@ -159,6 +159,23 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "false")
                     await _fold(page, "Daemon").locator(".fold-toggle").click()
                     await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "true")
+                    # On a phone a folded card reads as one row: its title and its facts stay on the same line, beside
+                    # the actions, rather than the facts dropping onto a second line under the title (item 549).
+                    if width < 960:
+                        await expect(_fold(page, "Health checks").locator(".fold-summary .badge")).to_have_count(1)
+                        for title in ("Daemon", "Permissions", "Health checks"):
+                            card = _fold(page, title)
+                            title_box = await card.locator(".fold-title").bounding_box()
+                            summary_box = await card.locator(".fold-summary").bounding_box()
+                            assert title_box is not None and summary_box is not None, title
+                            title_middle = title_box["y"] + title_box["height"] / 2
+                            summary_middle = summary_box["y"] + summary_box["height"] / 2
+                            assert abs(title_middle - summary_middle) <= 4, (title, title_box, summary_box)
+                            assert summary_box["x"] >= title_box["x"] + title_box["width"], (
+                                title,
+                                title_box,
+                                summary_box,
+                            )
                     await page.screenshot(path=tmp_path / f"system-{width}-{scheme}.png", full_page=True)
                     # The rows that open the two pages end in a chevron that points right, as drawn: turned a quarter
                     # round it pointed up, as a fold does.

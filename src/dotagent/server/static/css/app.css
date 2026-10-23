@@ -7379,6 +7379,18 @@ dialog.lightbox img {
     white-space: normal;
   }
 
+  /* Settings' cards (Settings › System) keep the title and its facts on one line (item 549): the head is bare on a
+     phone, and a folded card reads as one row, as it does on the Mac. The facts take the room the actions leave and
+     wrap within themselves only when the screen is narrower than they are. */
+  .settings-pane .fold-toggle {
+    flex-wrap: nowrap;
+  }
+
+  .settings-pane .fold-summary {
+    flex: 1 1 auto;
+    padding-left: 0;
+  }
+
 }
 
 /* Side questions (/btw): set apart from the run's own conversation, which never sees them. */

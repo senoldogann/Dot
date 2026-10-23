@@ -234,10 +234,12 @@ function buildDaemon() {
     {
       class: "btn ghost sm",
       type: "button",
+      title: "Read the daemon again",
+      "aria-label": "Read the daemon again",
       onclick: () => attempt(refresh),
     },
     icon("refresh"),
-    "Refresh",
+    el("span", { class: "label" }, "Refresh"),
   );
   const body = el("div", null, inlineLoading());
   // Item 231: whether the daemon's next start resumes on its own the runs it cut off, kept in the config file.
