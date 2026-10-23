@@ -80,6 +80,15 @@ from dotagent.config import AppConfig
 from dotagent.core.errors import DotError, InvalidValueError, NotFoundError, SkillError
 from dotagent.core.files import write_whole
 from dotagent.core.jsonutil import dumps_compact
+from dotagent.core.learned_text import (
+    OWNER_MARK,
+    finds_email,
+    finds_handle,
+    finds_home_path,
+    finds_link,
+    hidden_character,
+    wears,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
 from dotagent.core.text import redact_known, redact_secrets, truncate_tail
@@ -167,13 +176,15 @@ _SAME_KIND: float = 0.85
 _KINDS_SHOWN: int = 30
 # What the writer reads for the answer of a run that read content third parties can author.
 _ANSWER_LEFT_OUT: str = "(Left out: the run read content other people wrote.)"
-# What withholds a line of a skill that may come from content third parties can author, when a run is offered it: a web
-# address, an e-mail address or an account, a command (code, a tool that runs one, the syntax of a shell, an option, a
-# command with its argument), a path in the home folder and one in the Mac's own folders (item 351: /tmp and the like).
+# What withholds a line of a skill that may come from content third parties can author, when a run is offered it: what
+# the one gate for learned texts refuses (a web address, an e-mail address, an account, a path in somebody's home
+# folder, a character that does not print: :func:`withholds`, item 587), and what only a skill's line is asked, since
+# it is a step a run follows: a command (code, a tool that runs one, the syntax of a shell, an option, a command with
+# its argument), a path in the home folder and one in the Mac's own folders (item 351: /tmp and the like), and, as a
+# withheld line costs little, any dotted word followed by a slash, whatever its domain.
 _WITHHELD: tuple[re.Pattern[str], ...] = (
-    re.compile(r"\b[a-z][a-z0-9+.-]*://|\bwww\.\w|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/", re.IGNORECASE),
-    re.compile(r"\b(?:javascript|vbscript|mailto):\S|\bdata:[\w.+-]+/[\w.+-]+[;,]", re.IGNORECASE),
-    re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+|(?<![\w.@])@[A-Za-z0-9_]{2,}"),
+    # A dotted word and a slash: read from the start of the word, once, so that a long run of labels costs a pass.
+    re.compile(r"(?<![a-z0-9-])(?<![a-z0-9-]\.)(?:[a-z0-9-]++\.)++[a-z]{2,}+/", re.IGNORECASE),
     re.compile(r"`|\b(?:shell|terminal|apple_?script|osascript|browser_eval|command[ -]line)", re.IGNORECASE),
     re.compile(r"\$\(|\$\{|\$[A-Z_]{2,}\b|\|\s*\S|&&|(?:^|\s)--?[A-Za-z]"),
     re.compile(
@@ -183,6 +194,9 @@ _WITHHELD: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?<![\w/.~])~(?:[A-Za-z_][\w.-]*)?(?=/|\s|$|[)\"'.,;:])|/Users/"),
     re.compile(r"(?<![\w.])/(?:tmp|private|var|etc|opt|usr|Library|System|Volumes|Applications)/"),
 )
+# The longest line of a skill that is read for what it withholds: a step is a line of a hundred characters or so, and
+# a longer one is withheld unread, so that no line can hold the loop that reads it (item 587).
+_MAX_LINE: int = 2000
 # The sections of a learned skill's instructions that the review model wrote (the others are Dot's own words).
 _HEADING: re.Pattern[str] = re.compile(r"##\s+(.*?)\s*")
 _STEPS: str = "Steps"
@@ -193,11 +207,16 @@ _FENCE: str = "```"
 # with.
 _THIRD_PARTY: str = "learned from third-party content"
 _UNKNOWN_ORIGIN: str = "its origin is unknown"
+_HIDDEN_CHARACTER: str = "it holds a character that does not print"
 _WITHHELD_LINES: str = (
     "Its lines that name a web address, an e-mail address or an account, run a command or reach a path in the home "
     "folder or in the Mac's own folders are withheld; work those steps out from the task in front of you."
 )
 _THIRD_PARTY_WARNING: str = f"Warning: learned from a run that read third-party content. {_WITHHELD_LINES}"
+_HIDDEN_WARNING: str = (
+    "Warning: a line of this skill holds a character that does not print, which nobody could read. It is withheld; "
+    "work that step out from the task in front of you."
+)
 _UNKNOWN_WARNING: str = (
     "Warning: learned before Dot recorded whether a run read third-party content, so it is offered as if one did. "
     f"{_WITHHELD_LINES}"
@@ -680,11 +699,23 @@ def offered_to(meta: PlaybookMeta, agent_id: str | None) -> bool:
     return meta.shared or meta.agent_id is None or meta.agent_id == agent_id
 
 
-def withholds(text: str) -> bool:
+def withholds(text: str, *, naming: bool = True) -> bool:
     """Whether a line of a skill that may come from content third parties can author is withheld when a run is offered
-    it: it names a web address, an e-mail address or an account, runs a command or reaches a path in the home folder
-    (:data:`_WITHHELD`)."""
-    return any(pattern.search(text) is not None for pattern in _WITHHELD)
+    it: it holds what the gate for learned texts refuses (:mod:`dotagent.core.learned_text`: a character that does not
+    print, a web address, an e-mail address, an account, a path in somebody's home folder), or it runs a command or
+    reaches the owner's own home folder or the Mac's own folders (:data:`_WITHHELD`). A step that names a host bare
+    sends the run there; ``naming=False`` (the description of a skill) lets a site be named. A line longer than
+    :data:`_MAX_LINE` characters is withheld without being read, and the owner's mark is withheld in any spelling."""
+    return (
+        len(text) > _MAX_LINE
+        or hidden_character(text) is not None
+        or finds_link(text, naming=naming)
+        or finds_email(text)
+        or finds_handle(text)
+        or finds_home_path(text)
+        or wears(text, OWNER_MARK)
+        or any(pattern.search(text) is not None for pattern in _WITHHELD)
+    )
 
 
 def withheld_body(body: str, why: str, warning: str) -> str:
@@ -711,20 +742,59 @@ def withheld_body(body: str, why: str, warning: str) -> str:
         else:
             lines.append(line)
         fenced = fenced != fence
+    return _with_warning(lines, warning)
+
+
+def _with_warning(lines: list[str], warning: str) -> str:
+    """``lines`` joined, with ``warning`` after the title (the first line that starts with ``# ``)."""
     title: int = next((index for index, line in enumerate(lines) if line.startswith("# ")), -1)
     return "\n".join((*lines[: title + 1], *([""] if title >= 0 else []), warning, *lines[title + 1 :]))
 
 
+def hidden_lines_withheld(body: str, why: str, warning: str) -> str:
+    """``body``, the instructions of a skill that a clean run wrote or that the owner trusts or taught, with each line
+    that holds a character that does not print withheld in its place (``[step withheld: <why>]`` in the steps,
+    ``[withheld: <why>]`` elsewhere; a numbered or bulleted line keeps its number or bullet), and ``warning`` after its
+    title. Nothing else is withheld: such a skill stands as it was written but for the line nobody could read (a
+    warning sign with its variation selector is one), and the commands around it stand (item 587)."""
+    lines: list[str] = []
+    section: str | None = None
+    for line in body.split("\n"):
+        heading: re.Match[str] | None = _HEADING.fullmatch(line)
+        if heading is not None:
+            section = heading.group(1)
+        if hidden_character(line) is None:
+            lines.append(line)
+            continue
+        item: re.Match[str] | None = _LIST_ITEM.match(line)
+        what: str = "step withheld" if section == _STEPS else "withheld"
+        lines.append(f"{item.group(0) if item is not None else ''}[{what}: {why}]")
+    return _with_warning(lines, warning)
+
+
 def presented(skill: Skill, meta: PlaybookMeta) -> Skill:
     """The learned skill ``skill`` as a run is offered it, by its record ``meta``: as written when the run whose steps
-    it holds read no content third parties can author, or the owner trusts it; else, its record saying so or older
-    than the mark (``tainted`` ``None``), with the lines that could carry that content's instructions withheld
-    (:func:`withheld_body`) and its description marked, withheld too when it names what a line is withheld for."""
+    it holds read no content third parties can author, or the owner trusts or taught it, but for a line that holds a
+    character that does not print (:func:`hidden_lines_withheld`), withheld whoever vouches for the skill, and the
+    description when it holds one itself (item 587): what nobody could read is not followed, and the rest of the skill
+    stands. Else, its record saying content third parties can author was read, or older than the mark (``tainted``
+    ``None``), with the lines that could carry that content's instructions withheld (:func:`withheld_body`) and its
+    description marked, withheld too when it names what a line is withheld for."""
     if meta.tainted is False:
-        return skill
+        if hidden_character(f"{skill.description}\n{skill.body}") is None:
+            return skill
+        described: str = (
+            f"[withheld: {_HIDDEN_CHARACTER}]" if hidden_character(skill.description) is not None else skill.description
+        )
+        body: str = (
+            hidden_lines_withheld(skill.body, _HIDDEN_CHARACTER, _HIDDEN_WARNING)
+            if hidden_character(skill.body) is not None
+            else skill.body
+        )
+        return skill.model_copy(update={"description": described, "body": body})
     why: str = _THIRD_PARTY if meta.tainted else _UNKNOWN_ORIGIN
     warning: str = _THIRD_PARTY_WARNING if meta.tainted else _UNKNOWN_WARNING
-    description: str = f"[withheld: {why}]" if withholds(skill.description) else skill.description
+    description: str = f"[withheld: {why}]" if withholds(skill.description, naming=False) else skill.description
     return skill.model_copy(
         update={"description": f"({why}) {description}", "body": withheld_body(skill.body, why, warning)}
     )

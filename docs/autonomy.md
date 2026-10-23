@@ -291,7 +291,10 @@ went wrong, the
 answer and the saved notes that fit the goal, and writes at most three lessons of one sentence: know-how that a later
 run could use from the start, such as that `pdftotext` keeps the columns of a table only with `-layout`. A lesson of
 more than one line, of fewer than 20 or more than 300 characters (or `[memory] max_chars`), with a secret, an e-mail
-address or a path in a home folder, or that says what the goal, another lesson or a saved note already says, is dropped;
+address or a path in a home folder (found in the forms a page may write them in: fullwidth, look-alike letters,
+`ada[at]example[.]org`, `~ada/`, doubled slashes; item 587), a character that does not print, the mark `(you said)`
+that is yours alone, or a line that starts like a heading of the prompt or a note of the system, or that says what the
+goal, another lesson or a saved note already says, is dropped;
 one that says not to do what a saved note says to do (or the other way round) is no repeat of it, however alike their
 words and meaning are (`not`, `never`, `n't`, the Turkish `değil`, `yok`, `asla`; the suffix `-ma`/`-me` is not
 recognised). With `auto` nobody is asked: each lesson gets a second look first, one more call of the review model that
@@ -299,8 +302,9 @@ is shown the goal and the lessons and nothing the run read, so that a page the r
 only know-how about how a tool, a command, a site, an application or a file format behaves, and leaves out a lesson
 that tells the agent to send, post, buy, sign in, contact someone, change a setting or go to an address, to trust some
 content or to skip a check, or that holds private data; when in doubt it leaves it out. After a run that read content
-others can write (web pages, mail, downloads), a lesson with a link or an account name in it, which such content may
-have planted, is left out before it is asked. The kept lessons are saved as notes tagged `lesson` whose source is the
+others can write (web pages, mail, downloads), a lesson with an address to go to (a scheme, a path, `//host`, `data:`,
+`javascript:`; a site named bare is know-how and stays) or an account name in it, which such content may have planted,
+is left out before it is asked. The kept lessons are saved as notes tagged `lesson` whose source is the
 run, and "Lessons from this run" on the run's page says "Saved on its own" with Undo, which forgets the note (a note
 that was there before, or that was rewritten since, stays); a lesson left out says why, with Save anyway. With `propose`
 the lessons wait on that card: Save to memory keeps one, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save`,
@@ -345,19 +349,20 @@ it `rest`, after which searches skip it while `dotx memory list` and the Memory 
 its first and last day when it read more than a day and a quarter, after a daemon that was off ("From 2026-10-08 to
 2026-10-12 I worked on …"). The journal names the lessons that were saved, not the ones the second look left out nor
 the proposals that wait for you, which later runs would otherwise be handed through the note (item 557). The
-reflection touches only the notes Dot wrote, never yours. It also keeps what Dot knows
-about you (see Memory): after a day with runs, one call of the review model rewrites Dot's lines of that section from
-the section as it stands, your own lines, your notes and the day's goals, at most `[memory] owner_chars` (1500)
-characters. A night the Mac slept through is caught up once when it wakes. A daemon that was off at that time, or whose
-stop cut the reflection (a stop does not wait for one, and it records nothing until its end), reflects at the next
-`reflection_time` on everything since the last reflection. The home's Today strip lists the reflection among what ended
-today;
-`dotx reflect` runs one now. A reflection that fails is kept: the strip shows "The nightly review failed" with why until
-one after it is done, and `dotx stats` says when the reflection was last done and the failure since. Learning does not
-stop unseen at a run's end either: lessons that could not be drawn leave `lessons_failed` with why on the run's page,
-skill work that failed `playbook_failed`, and `dotx stats` counts the runs of each. The card of a run's lessons arrives
-folded (item 374); its head says "could not be drawn" in red, or how many lessons wait for your decision in amber,
-else how many there are, and opened it shows why, or the lessons.
+reflection touches only the notes Dot wrote, never yours. It also keeps what Dot knows about you (see Memory): after a
+day with runs, one call of the review model rewrites Dot's lines of that section from the section as it stands, your own
+lines, your notes and the day's goals, at most `[memory] owner_chars` (1500) characters. A line of them that the one
+gate for learned texts refuses (a link, which a site named by its domain is, an address, an account name, a secret, a
+character that does not print, the mark `(you said)`) is dropped and logged, and a night in which every line is refused
+keeps the lines of the nights before (see Memory). A night the Mac slept through is caught up once when it wakes. A
+daemon that was off at that time, or whose stop cut the reflection (a stop does not wait for one, and it records nothing
+until its end), reflects at the next `reflection_time` on everything since the last reflection. The home's Today strip
+lists the reflection among what ended today; `dotx reflect` runs one now. A reflection that fails is kept: the strip
+shows "The nightly review failed" with why until one after it is done, and `dotx stats` says when the reflection was
+last done and the failure since. Learning does not stop unseen at a run's end either: lessons that could not be drawn
+leave `lessons_failed` with why on the run's page, skill work that failed `playbook_failed`, and `dotx stats` counts the
+runs of each. The card of a run's lessons arrives folded (item 374); its head says "could not be drawn" in red, or how
+many lessons wait for your decision in amber, else how many there are, and opened it shows why, or the lessons.
 
 **The reflection tidies the notes and forgets none (item 584).** In the same night it rests the lessons that say what
 a rule of the adopted habits or tool guidance says already (log line `lesson_retired`, reason `habit`); it shows the

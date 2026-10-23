@@ -457,7 +457,7 @@ function buildForm(onWritten) {
           ? "Once a time of day is set for the nightly learning ([harness] step_time in the config file), Dot reads what its runs did each night and proposes versions by itself."
           : `Each night at ${view.step_time} Dot reads what its runs did and proposes versions by itself.`;
       intro.textContent = `Optional: you need not write anything here. ${nightly} They appear under Versions for you to use. Write one yourself only when you want every run to keep a way of working you choose.`;
-      bounds.textContent = `At most ${view.habits_chars} characters of habits and ${view.tool_guidance_chars} of tool guidance, ${view.component_lines} lines each, no line past 300 characters; no secret, link, e-mail address, home path or account name: a version with one is refused.`;
+      bounds.textContent = `At most ${view.habits_chars} characters of habits and ${view.tool_guidance_chars} of tool guidance, ${view.component_lines} lines each, no line past 300 characters; no secret, link, e-mail address, home path or account name, no character that prints nothing, no line that starts like a heading or a note of the system: a version with one is refused.`;
     },
   };
 }

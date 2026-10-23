@@ -98,6 +98,8 @@ ignore = ["RUF001", "RUF002", "RUF003", "PLW0603"]
 "src/dotagent/web/client.py" = ["ASYNC109"]
 # The stop words are kept as one block of text that is split into words once.
 "src/dotagent/memory/words.py" = ["SIM905"]
+# So are the top-level domains that the gate for learned texts knows hosts by.
+"src/dotagent/core/learned_text.py" = ["SIM905"]
 
 [tool.mypy]
 python_version = "3.13"

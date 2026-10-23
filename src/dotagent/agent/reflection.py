@@ -94,11 +94,13 @@ from dotagent.memory.service import (
     recent_scores,
     save_memory,
     set_owner_section,
+    vetted_dot_lines,
 )
 from dotagent.memory.words import search_terms
 from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.scheduler.timing import next_firing
+from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, MemoryRecord, MemoryScore, RunRecord, RunStatus
 
@@ -638,9 +640,19 @@ async def _describe_owner(runtime: Runtime, runs: Sequence[RunRecord], now: floa
             goals=tuple(redact_secrets(" ".join(run.goal.split())) for run in runs[:_OWNER_GOALS]),
         )
     )
-    lines: tuple[str, ...] = owner_lines_within(
-        [redact_secrets(line) for line in draft.lines], runtime.config.memory.owner_chars
-    )
+    # What the model wrote of the owner stands unfenced at the end of every prompt, so it goes through the one gate for
+    # learned texts first (item 587): a line that holds a secret, a link, an address, a character that prints nothing
+    # or the owner's own mark is dropped and logged, and the night goes on.
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    vetted, refused = vetted_dot_lines(draft.lines, secrets)
+    for number, problem in refused:
+        log.warning("owner_line_refused", line=number, problem=problem)
+    if draft.lines and not vetted:
+        # A night in which every line is refused (a page the day's goals came from steered the writer) is no night of an
+        # empty section: the lines of the nights before stay.
+        log.warning("owner_lines_all_refused", refused=len(refused), kept=len(before.dot_lines))
+        return False
+    lines: tuple[str, ...] = owner_lines_within(vetted, runtime.config.memory.owner_chars)
     if lines == before.dot_lines:
         return False
     await set_owner_section(

@@ -588,16 +588,21 @@ fails, or a folder that cannot be written, leaves a `playbook_failed` event on t
 whether it worked, never what it returned nor the run's answer, so nothing a page says reaches the skill as a step. The
 skill's record says where it comes from (`tainted`, and the runs in `tainted_runs`, which `dotx playbooks show` and
 the API show), and it is offered with some of its lines withheld, as below. The model is told never to put a secret, a
-one-time code, an e-mail address or a home path in a skill, but only secrets are checked for: the values Dot holds, the
-value of a key that names a secret and the keys and tokens of known forms are masked before the skill is written, and
-an e-mail address or a home path the model writes anyway is kept as written (a skill from a clean run is offered whole;
-one from a run that read outside content has such lines withheld). Customize › Skills lists the learned skills
+one-time code, an e-mail address or a home path in a skill, but only secrets are checked for when it is written: the
+values Dot holds, the value of a key that names a secret and the keys and tokens of known forms are masked before the
+skill is written, and an e-mail address or a home path the model writes anyway is kept as written (a skill from a clean
+run is offered whole; one from a run that read outside content has such lines withheld, found by the one gate for
+learned texts, [The harness](harness.md#one-gate-for-every-text-dot-learns)). Customize › Skills lists the learned skills
 under Learned (kind, where, the runs, how they fared, Retired on a retired one, an agent's with its name and Share)
 with Drop; `dotx playbooks list` shows them with
 their use, `dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired. A run is
-offered a skill learned from third-party content, or of unknown origin, with its lines that name an address, run a
+offered a skill learned from third-party content, or of unknown origin, with its lines that name an address (a step
+that names a host bare too; the description of a skill may name a site), hold a character that does not print, run a
 command or reach a path in the home folder or the Mac's own folders withheld; `dotx playbooks trust NAME` offers one
-with all its steps, until a run that reads third-party content rewrites them. The names that start with `learned-`,
+with all its steps, until a run that reads third-party content rewrites them. A line with a character that does not
+print is withheld in every learned skill, a trusted one, a taught one and one from a clean run too, and no other line
+is: the rest of the skill stands as it was written (a line of more than 2,000 characters is withheld unread in a skill
+that may carry outside content): what nobody could read is not followed. The names that start with `learned-`,
 `taught-` or `playbook-` are Dot's alone: a skill of any other folder (yours, a plugin's, one of `[skills] dirs`) with
 such a name is left out and reported, since a run is told that a `taught-` skill is the owner's own instruction (item
 557).

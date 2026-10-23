@@ -6,9 +6,10 @@ call of the same tool and target worked or not, the progress watchdog raised an 
 its answer named paths that did not exist. Once the run has ended, the review model reads a digest of it, what went
 wrong, its answer and the saved notes that fit its goal, and returns at most three lessons
 (:func:`dotagent.agent.review.lesson_writer_for`). :func:`kept_lessons` drops what is not one: more than one line, too
-short or too long, a secret, an e-mail address, a path in a home folder, a repeat of the goal, of another lesson or of a
-saved note. A saved note that the memory search finds for a lesson and that says the same (by its words or, with
-embeddings, by its meaning) drops the lesson too.
+short or too long, and what the one gate for learned texts refuses (:mod:`dotagent.core.learned_text`: a character that
+does not print, a secret, an e-mail address, a path in a home folder, a line that imitates the prompt), a repeat of the
+goal, of another lesson or of a saved note. A saved note that the memory search finds for a lesson and that says the
+same (by its words or, with embeddings, by its meaning) drops the lesson too.
 
 With ``propose`` the lessons stay on the run (a ``lessons_proposed`` event), and the run's page saves each to memory or
 dismisses it. With ``auto`` (the default, item 302) nobody is asked: each lesson gets a second look first
@@ -52,8 +53,9 @@ from dotagent.agent.sites import site_tags
 from dotagent.agent.verify import CallFact
 from dotagent.config import LessonsMode
 from dotagent.core.errors import DotError, InvalidValueError, NotFoundError, RunConflict
+from dotagent.core.learned_text import finds_handle, finds_link, finds_secret, gate
 from dotagent.core.logs import get_logger
-from dotagent.core.text import fold_search, redact_known, redact_secrets
+from dotagent.core.text import fold_search, redact_secrets
 from dotagent.core.types import FrozenModel
 from dotagent.harness.components import rules_of
 from dotagent.harness.service import adopted_text
@@ -92,12 +94,6 @@ _LIKE_NOTES: int = 5
 # The events of one kind that are read; more alerts or send-backs than this tell nothing new.
 _EVENTS_READ: int = 20
 _SIGNAL_CHARS: int = 300
-_EMAIL: re.Pattern[str] = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-# A path in someone's home folder, in any case as macOS finds it; /Users/Shared belongs to nobody.
-_HOME_PATH: re.Pattern[str] = re.compile(r"/(?:Users|home)/(?!Shared(?:/|\b))[^/\s]+", re.IGNORECASE)
-# What content third parties author may slip into a lesson to send a later run somewhere: a link, an account name.
-_LINK: re.Pattern[str] = re.compile(r"\b(?:[a-z][a-z0-9+.-]*://|www\.)\S", re.IGNORECASE)
-_HANDLE: re.Pattern[str] = re.compile(r"(?<![\w.@])@[A-Za-z0-9_]{2,}")
 
 type LessonState = Literal["proposed", "saved", "dismissed"]
 type SavedBy = Literal["auto", "owner"]
@@ -245,34 +241,36 @@ def run_signals(
 def contains_secret(text: str, secrets: Sequence[str]) -> bool:
     """Whether ``text`` holds a secret (review Y3): one of ``secrets``, the values Dot holds
     (:func:`dotagent.secrets.known_secrets`), word for word, the value of a key that names a secret, or a key or a
-    token of a known form; "task-management" and "risk-free" are no ``sk-`` key (review Y4)."""
-    return redact_known(text, secrets) != text
+    token of a known form, as the text is written or folded to its compatibility characters, its look-alike letters and
+    its defanged spellings (:func:`dotagent.core.learned_text.finds_secret`); "task-management" and "risk-free" are no
+    ``sk-`` key (review Y4)."""
+    return finds_secret(text, secrets)
 
 
 def lesson_problem(text: str, max_chars: int, secrets: Sequence[str]) -> str | None:
     """Why ``text`` is not a lesson by itself, or ``None`` when it may be one. ``max_chars`` is the longest a lesson may
-    be; ``secrets`` are the values Dot holds (:func:`contains_secret`)."""
+    be; ``secrets`` are the values Dot holds. Past its shape (one line of :data:`_MIN_CHARS` to ``max_chars``
+    characters) a lesson is asked what every learned text is (:func:`dotagent.core.learned_text.gate`, item 587): a
+    character that does not print, a secret, an e-mail address, a path in a home folder, a line that imitates the
+    prompt. A link and an account name are asked of a lesson of a run that read outside content alone
+    (:func:`outside_problem`): a lesson of a clean run may name a site."""
     if "\n" in text.strip():
         return "more than one line"
     if len(text) < _MIN_CHARS:
         return "too short"
     if len(text) > max_chars:
         return "too long"
-    if contains_secret(text, secrets):
-        return "a secret"
-    if _EMAIL.search(text) is not None:
-        return "an e-mail address"
-    if _HOME_PATH.search(text) is not None:
-        return "a path in a home folder"
-    return None
+    return gate(text, secrets, addresses=False)
 
 
 def outside_problem(text: str) -> str | None:
     """Why a lesson of a run that read content third parties can author is not saved on its own, or ``None``: a link
-    or an account name in it may be one such content put there to send a later run to it."""
-    if _LINK.search(text) is not None:
+    or an account name in it may be one such content put there to send a later run to it. A site named bare (``On
+    x.com the counts are not in the page``) is know-how and no link; an address to go to is (a scheme, a path, a port,
+    ``//host``, ``data:``: :func:`dotagent.core.learned_text.finds_link`)."""
+    if finds_link(text, naming=False):
         return "a link, which a page the run read may have put there"
-    if _HANDLE.search(text) is not None:
+    if finds_handle(text):
         return "an account name, which a page the run read may have put there"
     return None
 
@@ -357,7 +355,8 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
     a line of tool guidance the adopted harness gives every run (item 584). A review model or an embedding service that
     fails raises its error."""
     agent_id: str | None = await _agent_of(runtime.store, case.run_id)
-    habits: tuple[str, ...] = rules_of((await adopted_text(runtime.store))[0])
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    habits: tuple[str, ...] = rules_of((await adopted_text(runtime.store, held))[0])
     # A note saved while reading outside content is not shown to the model that writes the lessons (item 384), so its
     # words cannot pass into a lesson of a clean run, which would be saved unmarked.
     known: tuple[str, ...] = tuple(
@@ -388,7 +387,7 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
         proposal.lessons,
         (case.goal, *known, *habits),
         min(_MAX_CHARS, runtime.config.memory.max_chars),
-        await asyncio.to_thread(known_secrets),
+        held,
     )
     threshold: float = runtime.config.memory.similar_threshold
     said: dict[str, str] = await repeating_rules(runtime, kept, habits)
