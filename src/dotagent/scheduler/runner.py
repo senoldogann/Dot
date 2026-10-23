@@ -17,6 +17,7 @@ from dotagent.agent.learning_health import (
 from dotagent.agent.manager import RunManager, thread_title
 from dotagent.agent.reflection import last_reflection, record_reflection_failure, reflection_due
 from dotagent.agent.reflection_record import REFLECTION_OFF, Reflection, summary_line
+from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import DotError, NotFoundError, RunConflict, StoreError
 from dotagent.core.logs import get_logger
@@ -50,6 +51,7 @@ from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.timing import format_local, next_firing
 from dotagent.store.db import Store
 from dotagent.store.models import (
+    WORKING_STATUSES,
     AgentRecord,
     EventRecord,
     HarnessStep,
@@ -407,6 +409,7 @@ class Scheduler:
             failure: FiringFailure | None = await firing_failure(store, record.id)
             if failure is not None and failure.last_failure_at >= record.next_run_at and now < retry_after(failure):
                 return
+        await self._adopt_resumed(record)
         if record.id in self._in_flight or record.id in self._starting:
             if one_time:
                 # Only a run by hand is at work while a one-time schedule is still due (item 455): the schedule waits,
@@ -417,7 +420,8 @@ class Scheduler:
             return
         if late and not one_time:
             log.warning("schedule_skipped_overdue", schedule_id=record.id, overdue_s=round(overdue_s))
-            overdue: str = f"skipped: {round(overdue_s / 60)} minutes overdue (the daemon was not running)"
+            # The daemon was off or the Mac slept past the grace: the clock cannot tell which (item 553).
+            overdue: str = f"skipped: {round(overdue_s / 60)} minutes overdue (the daemon was off or the Mac slept)"
             await store.record_schedule_skip(record.id, following, overdue)
             await self._tell_missed(record, overdue)
             return
@@ -426,6 +430,30 @@ class Scheduler:
             await self._start_due(record, record.next_run_at, now, zone, following, late, overdue_s)
         finally:
             self._starting.discard(record.id)
+
+    async def _adopt_resumed(self, record: ScheduleRecord) -> None:
+        """Keep as the schedule's run at work one that was resumed by hand (item 553): the daemon's end cut a firing's
+        run, the owner pressed Resume, and the run that goes on from it works in the schedule's chat though this
+        scheduler did not start it. Left alone, the schedule fires beside it and its end never reaches the schedule.
+        Only a run that resumes one of a firing counts: the resumed follow-up of the owner's is not the schedule's."""
+        if record.id in self._in_flight or record.thread_id is None:
+            return
+        store: Store = self._runtime.store
+        newest: list[RunRecord] = await store.list_runs(1, record.thread_id)
+        if not newest or newest[0].source != RESUME_SOURCE or newest[0].status not in WORKING_STATUSES:
+            return
+        resumed: EventRecord | None = await store.last_event(newest[0].id, RESUMED_EVENT)
+        origin: object = None if resumed is None else resumed.data.get("from_run_id")
+        if not isinstance(origin, str):
+            return
+        try:
+            earlier: RunRecord = await store.get_run(origin)
+        except NotFoundError:
+            return
+        if earlier.source not in (SCHEDULE_SOURCE, RESUME_SOURCE):
+            return
+        log.info("schedule_resumed_run_followed", schedule_id=record.id, run_id=newest[0].id)
+        await self._track(record.id, newest[0], self._level(record))
 
     async def _paused_agent(self, record: ScheduleRecord) -> AgentRecord | None:
         """The agent ``record`` runs as when the owner paused it (item 465), else ``None``. An agent that cannot be read
@@ -517,6 +545,7 @@ class Scheduler:
         record: ScheduleRecord = await store.get_schedule(schedule_id)
         if await _emergency_stop_engaged():
             raise RunConflict("no schedule starts while the emergency stop is engaged", {"schedule_id": schedule_id})
+        await self._adopt_resumed(record)
         if schedule_id in self._in_flight or schedule_id in self._starting:
             raise RunConflict(
                 "a run of this schedule is already working",

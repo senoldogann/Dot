@@ -181,11 +181,11 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             {
                 "schedule_id": "sch-1",
                 "name": "Morning digest",
-                "status": "skipped: 125 minutes overdue (the daemon was not running)",
+                "status": "skipped: 125 minutes overdue (the daemon was off or the Mac slept)",
             },
             PushMessage(
                 title="A schedule did not run",
-                body="Morning digest: skipped: 125 minutes overdue (the daemon was not running)",
+                body="Morning digest: skipped: 125 minutes overdue (the daemon was off or the Mac slept)",
                 route="#/schedules",
                 state="failed",
             ),

@@ -426,8 +426,10 @@ ran, and nothing it printed, which the run reads with `terminal_read`, as untrus
 untrusted mark and is no instruction of the owner. When no run works on the chat, a run is started to tell it, with the
 chat's choices, as the end of a run starts its queue's next message; its goal says the same words, Dot wrote them, so it
 opens as a note and starts as untrusted as the chat's last run ended. That run starts only when nothing waits in the
-chat's queue and the queue is not held; otherwise the run that starts next, a queued message's, or yours after a stop or
-a failed run, is told at its first step, so your queued messages and their order stay as they were. Right above the
+chat's queue and the queue is not held, the chat's last run ended done and the emergency stop is not engaged (item
+553: a command that ends after you stopped the chat, or while the stop is engaged, starts nothing); otherwise the run
+that starts next, a queued message's, or yours after a stop or a failed run, is told at its first step, so your queued
+messages and their order stay as they were. Right above the
 composer, the chat's page shows each of its commands at work, with the time it has run and a Stop; the dot of a command
 in the background pulses, as its end will wake Dot. A command stopped there, closed by the run or ended by the daemon's
 stop tells nothing, and neither does one whose end a run has read itself with `terminal_read` before it was told (item
@@ -497,8 +499,10 @@ Several calls in one turn run side by side (up to `parallel_tools`), which is ho
 same time; `step` names the plan step the part is, and the report closes it (see the plan above). A delegated run cannot
 delegate again (the depth is one), ask you a question (its approvals still come to you) or consult a helper, does not
 take one of the `max_concurrent_runs` slots, starts as untrusted as its parent, and ends when the parent is cancelled.
-The parent's result names the model the delegated run ended on. The delegated run takes its parent's mode, which the
-model cannot choose: a task run's helper can do what the task run can, a research run's helper only reads. A step it
+The parent's result names the model the delegated run ended on. The model cannot choose the delegated run's mode: a
+research run's helper does research and only reads, and any other run's helper, a chat's too, is a task run. The helper
+of a run of one of your agents carries the agent's id (item 553): its tools are those the agent is bound to, as its
+parent's are, and its prompt holds the agent's instructions. A step it
 hands to you, or a question for your yes, that nobody answers in time is kept where its parent keeps them, with
 `[policy] unanswered = "park"` (item 485, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 your answer goes to the parent, or to a run that goes on from it.

@@ -4289,8 +4289,10 @@ class Store:
 
     @_writing
     async def delete_campaign(self, campaign_id: str) -> None:
-        """Delete a campaign and its ledger; its sessions stay as runs of their threads."""
+        """Delete a campaign and its ledger; its sessions stay as runs of their threads, no longer the campaign's: a run
+        that named a campaign that is gone would 404 on its page and keep its chat's queue refused (item 553)."""
         await self._db.execute("DELETE FROM campaign_entries WHERE campaign_id = ?", (campaign_id,))
+        await self._db.execute("UPDATE runs SET campaign_id = NULL WHERE campaign_id = ?", (campaign_id,))
         await self._db.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
         await self._db.commit()
 

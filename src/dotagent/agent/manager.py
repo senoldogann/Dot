@@ -1,11 +1,13 @@
 """Run lifecycle: start, queue, steer, cancel and finish agent runs, each in its own asyncio task."""
 
 import asyncio
+import json
 import sqlite3
 import time
 from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterator, Sequence
 from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 from pydantic import JsonValue
@@ -144,6 +146,11 @@ COMMAND_CHECK_S: float = 30.0
 # (:meth:`RunManager._answer_asks`).
 RELAY_S: float = 0.5
 ASK_CHECK_S: float = 0.5
+# The key of the store that names the runs of other processes the owner's emergency stop asked to stop, with when it
+# asked (:meth:`RunManager.emergency_stop`): the process that reads such an ask ends the run as the emergency stop
+# (item 553), as a plain ask ends it as a stop. A mark nobody answered, its process gone, lapses after a day.
+EMERGENCY_ASKS_KEY: str = "emergency_stop_asks"
+_EMERGENCY_MARK_S: float = 86_400.0
 # The most stored events one relay tells; the rest follow with the next.
 _RELAY_PAGE: int = 500
 # Why a pending approval expired: its run was closed when the daemon started, or when its dotx command was found dead.
@@ -281,6 +288,34 @@ async def _to_its_end[T](work: Coroutine[object, object, T]) -> T:
                 raise
 
 
+def _emergency_marks(raw: str | None) -> dict[str, float]:
+    """The runs the emergency stop asked other processes to end (:data:`EMERGENCY_ASKS_KEY`), with when it asked; what
+    does not read as that is no mark."""
+    if raw is None:
+        return {}
+    try:
+        marks: object = json.loads(raw)
+    except ValueError:
+        return {}
+    if not isinstance(marks, dict):
+        return {}
+    return {str(run_id): float(at) for run_id, at in marks.items() if isinstance(at, int | float)}
+
+
+def _marked(raw: str | None, run_ids: Sequence[str], now: float) -> str:
+    """``raw``, the marks, with ``run_ids`` marked as asked at ``now``, and the marks that nobody answered for a day
+    gone."""
+    kept: dict[str, float] = {
+        run_id: at for run_id, at in _emergency_marks(raw).items() if now - at < _EMERGENCY_MARK_S
+    }
+    return json.dumps({**kept, **dict.fromkeys(run_ids, now)})
+
+
+def _unmarked(raw: str | None, run_ids: Sequence[str]) -> str:
+    """``raw``, the marks, without those of ``run_ids``, whose process answered."""
+    return json.dumps({run_id: at for run_id, at in _emergency_marks(raw).items() if run_id not in run_ids})
+
+
 class RunManager:
     """Owns the live runs of one process. At most ``max_concurrent_runs`` execute at the same time.
 
@@ -293,8 +328,6 @@ class RunManager:
         self._runtime: Runtime = runtime
         self._slots: asyncio.Semaphore = asyncio.Semaphore(runtime.config.agent.max_concurrent_runs)
         self._handles: dict[str, RunHandle] = {}
-        # What the owner did from the screen on the page of each run they hold (item 470), counts only, and the lock
-        # that orders a batch of their input with the run's hand-back: a batch under way ends before it.
         # The hold of each run the owner holds, whose page they may use from the screen (items 470 and 479), and the
         # releases of what their input left pressed, under way.
         self._holds: dict[str, _Hold] = {}
@@ -1010,7 +1043,8 @@ class RunManager:
         delegates research) and cannot delegate again. It answers the policy's questions the way its parent does and
         takes the parent's instructions as its own; the parent checks its result, so goal mode is not applied to it
         again. It is stopped when the waiting caller is cancelled, and the cancellation goes on once its end is stored,
-        so that the end of a run is stored after the ends of the runs it delegated (item 197). With ``agent_id`` (item
+        so that the end of a run is stored after the ends of the runs it delegated (item 197). A run of one of the
+        owner's agents delegates helpers that carry its id and are bound as it is (item 553). With ``agent_id`` (item
         87, a message to an agent) the run is the agent's: its source is ``team``, it carries the agent's id, the
         agent's own model and effort bound it where the agent names them, the parent's where it does not, and it
         answers the policy's questions the stricter way of the agent's and the parent's (item 135). A delegated run
@@ -1026,6 +1060,10 @@ class RunManager:
         if parent.mode == "research" and mode != "research":
             raise RunConflict("a research run can only delegate research", {"run_id": parent.id, "mode": mode})
         own_model: str = parent.model if model is None else model
+        # The helper of an agent's run is bound as the agent is (item 553): it carries the agent's id, so its tools are
+        # the ones the agent is bound to and its prompt holds the agent's instructions, though its source, its model
+        # and its approvals stay a delegation's. With ``agent_id`` (a message to an agent) the run is that agent's.
+        helper_of: str | None = parent.agent_id if agent_id is None else agent_id
         _, handle = await self._launch(
             goal,
             mode,
@@ -1041,7 +1079,7 @@ class RunManager:
             False,
             RunOpening(text=goal, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS),
             None,
-            agent_id,
+            helper_of,
         )
         try:
             await handle.finished.wait()
@@ -1339,12 +1377,19 @@ class RunManager:
                 await asyncio.sleep(ASK_CHECK_S)
                 try:
                     asked: list[str] = await store.stops_asked(self.active_run_ids())
+                    # The runs the owner's emergency stop asked to end as one (item 553), among those asked to stop.
+                    marked: set[str] = set(_emergency_marks(await store.kv_get(EMERGENCY_ASKS_KEY))) if asked else set()
                     for run_id in asked:
-                        if run_id in self._handles:
+                        if run_id in self._handles and run_id in marked:
+                            log.info("run_ended_by_the_emergency_stop_as_asked", run_id=run_id)
+                            self.end_by_emergency_stop(run_id)
+                        elif run_id in self._handles:
                             log.info("run_stopped_as_asked", run_id=run_id)
                             self.cancel(run_id)
                     if asked:
                         await store.forget_stops(asked)
+                        if marked & set(asked):
+                            await store.kv_update(EMERGENCY_ASKS_KEY, partial(_unmarked, run_ids=tuple(asked)))
                     await self._runtime.approvals.take_stored_decisions()
                 except DotError as exc:
                     log.warning("asks_not_read", error=exc.message, context=exc.context)
@@ -1353,15 +1398,36 @@ class RunManager:
         finally:
             self._asks = None
 
-    def emergency_stop(self) -> list[str]:
+    async def emergency_stop(self) -> list[str]:
         """Stop every active run as the owner's emergency stop: each ends with :data:`RESULT_EMERGENCY_STOPPED`, so
         the campaign of a session stops instead of planning the next one; a run being launched meanwhile ends so once it
-        is registered (:meth:`_launch`). Returns the ids of the runs stopped."""
+        is registered (:meth:`_launch`). The runs of this process end at once; those of the ``dotx`` commands that
+        drive runs in other processes (:meth:`elsewhere_run_ids`) are asked to end so, and their process does within
+        ``ASK_CHECK_S`` (:meth:`_answer_asks`, item 553). Returns the ids of the runs stopped or asked to stop."""
         self._stops += 1
         active: list[str] = self.active_run_ids()
         for run_id in active:
             self.end_by_emergency_stop(run_id)
-        return active
+        elsewhere: list[str] = [run_id for run_id in self.elsewhere_run_ids() if run_id not in self._handles]
+        await self._ask_to_end_by_emergency_stop(elsewhere)
+        return [*active, *elsewhere]
+
+    async def _ask_to_end_by_emergency_stop(self, run_ids: Sequence[str]) -> None:
+        """Ask the processes that drive ``run_ids`` to end them as the emergency stop: the runs are marked
+        (:data:`EMERGENCY_ASKS_KEY`) before they are asked to stop, so that the ask is never read without its mark. A
+        store that refuses is logged, and the plain Stop of the owner's pages is what is left."""
+        if not run_ids:
+            return
+        store: Store = self._runtime.store
+        now: float = time.time()
+        try:
+            await store.kv_update(EMERGENCY_ASKS_KEY, lambda raw: _marked(raw, run_ids, now))
+            for run_id in run_ids:
+                await store.ask_stop(run_id)
+        except DotError as exc:
+            log.error("emergency_stop_not_asked", run_ids=list(run_ids), error=exc.message, context=exc.context)
+        except sqlite3.Error as exc:
+            log.error("emergency_stop_not_asked", run_ids=list(run_ids), error=str(exc), error_type=type(exc).__name__)
 
     def end_by_emergency_stop(self, run_id: str) -> None:
         """End the run ``run_id`` as the owner's emergency stop, when it is still active."""
@@ -2081,7 +2147,19 @@ class RunManager:
         them, so two sends to one thread cannot both pass: the second meets the claim of the first, or its handle."""
         if thread_id in self._claimed or any(handle.thread_id == thread_id for handle in self._handles.values()):
             raise RunConflict("a run is already active on this thread", {"thread_id": thread_id})
+        if self._ending_on(thread_id):
+            raise RunConflict(
+                "the last run of this thread has ended, and its end is stored as soon as the database takes it: try "
+                "again in a moment",
+                {"thread_id": thread_id},
+            )
         self._claimed.add(thread_id)
+
+    def _ending_on(self, thread_id: str) -> bool:
+        """Whether a run of ``thread_id`` has ended in this process but is still at work in the store, its end refused
+        and waiting to be stored (:meth:`store_left_ends`): a run started beside it would work on the chat with it, and
+        its late end would move the chat's queue and campaign as if it had just ended (item 553)."""
+        return any(left.run.thread_id == thread_id for left in self._left_ends.values())
 
     async def _starts_tainted(self, parent: RunHandle | None, thread_id: str, source: str, opening: RunOpening) -> bool:
         """Whether a run starts tainted, as the run it goes on from is (item 243): a delegated run as its parent is now,
@@ -2482,8 +2560,13 @@ class RunManager:
             self._left_ends[run.id] = _LeftEnd(run=run, status=status, result=clean, needs=needs, data=data)
             raise
         runtime.bus.publish(ended)
-        if run.campaign_id is not None and not self._stopping:
-            await self._follow_session(run, run.campaign_id, classify_ending(status, clean), needs)
+        # A session the daemon's own end cut off is planned by :meth:`resume_campaigns` when it starts again; any other
+        # end that comes as the daemon stops (a session that ended done as the shutdown began, or at the owner's
+        # emergency stop) is followed as it is at any time, so that what its end asks holds across the restart (item
+        # 553).
+        ending: Ending = classify_ending(status, clean)
+        if run.campaign_id is not None and ending != "daemon_shutdown":
+            await self._follow_session(run, run.campaign_id, ending, needs)
 
     async def _follow_queue(self, run: RunRecord, status: RunStatus) -> None:
         """Move the queue of a run's chat on as the run ends: an end done starts its next message (:meth:`_drain`), or,
@@ -2511,7 +2594,12 @@ class RunManager:
         queue, and the pages are told why. A cancellation waits for the claim to end (:func:`_uncancelled`): a claim
         left open would keep the chat's queue from moving."""
         async with self._draining:
-            if self._stopping or thread_id in self._claimed or self._active_on(thread_id) is not None:
+            if (
+                self._stopping
+                or thread_id in self._claimed
+                or self._active_on(thread_id) is not None
+                or self._ending_on(thread_id)
+            ):
                 return
             run: RunRecord | None = await _uncancelled(self._start_next(thread_id))
         if run is not None:
@@ -2640,15 +2728,20 @@ class RunManager:
         and the source :data:`BACKGROUND_SOURCE`: its goal says what Dot saw and nothing the commands printed
         (:func:`ended_notices`). It starts only when no run works on the chat, in any process, nothing waits in its
         queue and the queue is not held; any other chat is told by its next run, at its first step (the run at work, a
-        queued message that starts, a message of the owner after a stop), and the queue is never touched. A chat that
-        a rewind emptied (item 282) is not told: the turn that started the command is gone from it. A run that another
-        start of the chat beat to it leaves the news to that run. The pages hear that the run started as they hear of
-        a queued message's (:meth:`_queue_changed`)."""
+        queued message that starts, a message of the owner after a stop), and the queue is never touched. A chat whose
+        newest run did not end done (the owner stopped it, or it failed) is told by the owner's next run, as the queue
+        of such a chat waits for them, and none starts while the emergency stop is engaged (item 553): what the owner
+        stopped is not started again by a command that ends. A chat that a rewind emptied (item 282) is not told: the
+        turn that started the command is gone from it. A run that another start of the chat beat to it leaves the news
+        to that run. The pages hear that the run started as they hear of a queued message's
+        (:meth:`_queue_changed`)."""
         if self._stopping or self._leaves_queues or not self._runtime.terminals.has_untold_ends(thread_id):
+            return
+        if await asyncio.to_thread(failsafe_path().exists):
             return
         store: Store = self._runtime.store
         async with self._draining:
-            if thread_id in self._claimed or self._active_on(thread_id) is not None:
+            if thread_id in self._claimed or self._active_on(thread_id) is not None or self._ending_on(thread_id):
                 return
             runs: list[RunRecord] = await store.list_runs(1, thread_id)
             if not runs:
@@ -2656,6 +2749,9 @@ class RunManager:
                 return
             newest: RunRecord = runs[0]
             if newest.status in WORKING_STATUSES or newest.parent_run_id is not None or newest.campaign_id is not None:
+                return
+            # Only the end of a run that ended done starts it, as only that end moves the queue (:meth:`_follow_queue`).
+            if newest.status != "done":
                 return
             if await store.queue_held(thread_id) or await store.list_queued(thread_id):
                 return

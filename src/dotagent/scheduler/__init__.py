@@ -10,8 +10,8 @@ SCHEDULE_SOURCE: str = "schedule"
 DAEMON_NOTE: str = "Schedules start their runs only while the Dot daemon is running (dotx daemon)."
 
 # The live event, of Dot itself (``dotagent.events.SYSTEM_RUN_ID``), of a firing a schedule missed for good where
-# nobody saw it: one the daemon was not running for, or one whose run could not start. Sent when the schedule's status
-# changes to it, so a schedule that keeps failing the same way is told once.
+# nobody saw it: one the daemon was off or the Mac slept for, or one whose run could not start. Sent when the
+# schedule's status changes to it, so a schedule that keeps failing the same way is told once.
 SCHEDULE_MISSED_EVENT: str = "schedule_missed"
 
 
