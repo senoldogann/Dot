@@ -1,16 +1,19 @@
 """Tools of MCP servers: each tool a connected server offers becomes a tool named ``mcp__<server>__<tool>``."""
 
+import functools
 import re
 import secrets
 
 from mcp.types import CallToolResult
+from pydantic import JsonValue
 
-from dotagent.config import AppConfig
-from dotagent.core.errors import McpRejected
+from dotagent.config import AppConfig, load_default_config
+from dotagent.core.errors import McpRejected, ToolInputError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolSpec
+from dotagent.mcp.builtin import address_arguments, reads_found_pages, search_arguments
 from dotagent.mcp.hub import McpHub, tool_parameters
 from dotagent.mcp.naming import PREFIX
 from dotagent.mcp.types import McpTool
@@ -28,6 +31,7 @@ from dotagent.tools.context import ToolContext
 from dotagent.tools.mcp_result import FENCE_OVERHEAD_CHARS, fence_mcp, render_call_result
 from dotagent.tools.registry import ToolRegistry
 from dotagent.tools.third_party import MCP_FOLDER
+from dotagent.tools.web import checked_address, search_flags
 
 _NONCE_BYTES: int = 8
 _DESCRIPTION_CHARS: int = 1200
@@ -96,6 +100,88 @@ def classify_mcp_call(tool: McpTool, arguments: JsonObject) -> ActionInfo:
     )
 
 
+@functools.cache
+def _packaged_blocked_hosts() -> frozenset[str]:
+    """The hosts ``[browser] blocked_hosts`` names as Dot ships it: the cloud metadata addresses, which the server
+    refuses itself."""
+    return frozenset(host.lower() for host in load_default_config().browser.blocked_hosts)
+
+
+def host_lists_set(config: AppConfig) -> bool:
+    """Whether the owner has set a list of hosts: an ``allowed_hosts`` at all, or ``blocked_hosts`` beyond those Dot
+    ships (the cloud metadata addresses, so that the list as shipped is not a list the owner set)."""
+    own: set[str] = {host.lower() for host in config.browser.blocked_hosts} - _packaged_blocked_hosts()
+    return bool(config.browser.allowed_hosts) or bool(own)
+
+
+def _words(value: JsonValue) -> list[str]:
+    """The strings an argument holds: the text itself, or those among the items of a list. The server refuses an
+    argument of any other shape before it sends anything."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    return []
+
+
+def checked_builtin_call(
+    tool: McpTool, arguments: JsonObject, config: AppConfig
+) -> tuple[JsonObject, tuple[Flag, ...]]:
+    """What Dot checks of a call to a tool of the server that comes with it (item 583), whose tools it knows
+    (:mod:`dotagent.mcp.builtin` says which argument is which): each is judged by the rules of the tool of Dot's own
+    that does the same, in the very functions those tools use, so that a rule added to them binds these too.
+
+    - The words of a search (the ``query`` of ``web_search``, and its ``sites`` and ``exclude_sites``, which the server
+      makes words of the query it sends) are judged as the query of Dot's ``web_search`` is
+      (:func:`dotagent.tools.web.search_flags`): refused beyond its length, and a key in them earns the flag
+      ``exfiltration``.
+    - The addresses (``url`` or ``urls`` of ``web_scrape``, and ``url`` of ``web_extract``, ``web_map`` and
+      ``web_crawl_start``) are judged as the address of ``web_fetch`` and ``web_crawl`` is
+      (:func:`dotagent.tools.web.checked_address`): refused when ``[browser] allowed_hosts`` and ``blocked_hosts`` or
+      the places Dot refuses leave them out, and a long one, or one with a key in it, earns ``exfiltration``. The call
+      is handed on with each address as it was checked, so that the server reads what Dot judged and not what it might
+      read otherwise.
+    - A search that asks the server to read the pages it found (``read``) is refused while the owner has set a host
+      list (:func:`host_lists_set`): those are addresses the server picks, and the lists would not bind them. Dot's
+      ``web_search`` has no such argument, so this is the one rule that is the server's own.
+
+    The kind and the risk of the action stay those of :func:`classify_mcp_call`, a read or a call that may reach out,
+    low or medium: never lower than those of Dot's own web tools, a network read of low risk. Raises ToolInputError for
+    a call that is refused.
+
+    Not checked, and said in docs/extending.md: a redirect the server follows to another host, the links a crawl
+    follows on the site it starts on, the search engines a search asks, and a secret that no rule of Dot's own tools
+    knows."""
+    if reads_found_pages(tool.remote_name, arguments) and host_lists_set(config):
+        raise ToolInputError(
+            "web_search with read asks the web-research server to read the pages the search chose, and Dot cannot "
+            "check those addresses against the lists [browser] allowed_hosts and blocked_hosts, which are set: search "
+            "without read, then read the pages you choose with web_scrape, which Dot checks",
+            {"tool": tool.exposed_name, "read": arguments.get("read")},
+        )
+    checked: JsonObject = dict(arguments)
+    flags: list[Flag] = []
+    words: list[str] = [text for name in search_arguments(tool.remote_name) for text in _words(arguments.get(name))]
+    if words:
+        flags.extend(search_flags(*words))
+    for name in address_arguments(tool.remote_name):
+        value: JsonValue = arguments.get(name)
+        if isinstance(value, str):
+            checked[name], found = checked_address(value, config)
+            flags.extend(found)
+        elif isinstance(value, list):
+            urls: list[JsonValue] = []
+            for item in value:
+                if isinstance(item, str):
+                    url, found = checked_address(item, config)
+                    urls.append(url)
+                    flags.extend(found)
+                else:
+                    urls.append(item)
+            checked[name] = urls
+    return checked, tuple(dict.fromkeys(flags))
+
+
 def _text_budget(output_chars: int) -> int:
     return max(output_chars - FENCE_OVERHEAD_CHARS, _MIN_TEXT_CHARS)
 
@@ -119,12 +205,18 @@ def _register(hub: McpHub, tool: McpTool) -> RegisteredTool:
     parameters: JsonObject = tool_parameters(tool)
 
     async def prepare(raw: JsonObject, ctx: ToolContext) -> PreparedCall:
-        action: ActionInfo = classify_mcp_call(tool, raw)
+        arguments: JsonObject = raw
+        flags: tuple[Flag, ...] = ()
+        if tool.server in ctx.runtime.builtin_names:
+            arguments, flags = checked_builtin_call(tool, raw, ctx.runtime.config)
+        action: ActionInfo = classify_mcp_call(tool, arguments)
+        if flags:
+            action = action.model_copy(update={"flags": tuple(dict.fromkeys((*action.flags, *flags)))})
 
         async def run(context: ToolContext) -> ToolResult:
             nonce: str = secrets.token_hex(_NONCE_BYTES)
             try:
-                answered: CallToolResult = await hub.call(tool, raw)
+                answered: CallToolResult = await hub.call(tool, arguments)
             except McpRejected as error:
                 rejection: ToolResult | None = _rejection(tool, error, nonce)
                 if rejection is None:

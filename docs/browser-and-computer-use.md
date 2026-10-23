@@ -231,7 +231,10 @@ Both modes share what follows.
   tabs go with it. Dot's Chrome is the Google Chrome application, so while it runs macOS takes it for yours: a click on
   Chrome in the Dock brings Dot's forward instead of opening yours. Once Dot's has closed, the Dock opens yours again;
   while a run works in its browser, the mode `attach` lets Dot work in your own Chrome instead.
-- `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
+- `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`, and the
+  addresses a call of the web-research server's tools holds (`web_scrape`, `web_extract`, `web_map` and
+  `web_crawl_start`, item 583: checked as `web_fetch`'s is, and a long one is flagged as it is, see
+  [MCP servers](extending.md#mcp-servers) for what they do not reach); a host also
   matches its subdomains, and an empty `allowed_hosts` means every site. An entry is read as a host is, so that one
   spelling names a host in all of them: an international name written in Unicode or in punycode, with the dot of an
   absolute name, or as a numeric address (item 554). The blocked list starts with the cloud-metadata hosts. Dot's own

@@ -46,6 +46,7 @@ from dotagent.core.paths import (
     token_path,
     undo_dir,
     vapid_path,
+    web_research_dir,
     workspace_dir,
 )
 from dotagent.desktop.session import DesktopSession
@@ -58,6 +59,7 @@ from dotagent.launchd import launch_agent_path
 from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
 from dotagent.llm.roles import ModelRoles
 from dotagent.llm.router import ModelRouter
+from dotagent.mcp.builtin import builtin_servers
 from dotagent.mcp.connected import ConnectedServers, read_connected
 from dotagent.mcp.hub import McpHub, open_hub
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
@@ -159,6 +161,9 @@ class Runtime:
     # auto) and ANTHROPIC_API_KEY (or the configured variable: the Anthropic rung joins the ladder with it) are set.
     search_keys: SearchKeys
     mcp: McpHub
+    # The names of the MCP servers that came with Dot at its start, switched on or off (item 583); a server of the same
+    # name that someone else set up is not among them.
+    builtin_names: frozenset[str]
     memory: MemoryIndex
     # SnapShots (item 405): the watch of the Command key and the captures waiting for a composer.
     snapshots: SnapshotService
@@ -272,13 +277,15 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     its own file tools once the user agrees (item 398):
     its own code, which the daemon runs at its next start, its plugins and their own files, whose MCP servers start
     with the daemon and are given keys from the key store, and so does each server of its record of those added from
-    other agents (item 165) and of its record of those added on Customize › Connectors, the home of the OpenCode server
-    it starts (its config says what OpenCode's agent may do), its skills (the copies of those added from other agents
-    too) and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
+    other agents (item 165) and of its record of those added on Customize › Connectors, the data of the web-research
+    server that comes with Dot, which starts with the daemon and reads it back (item 583), the home of the OpenCode
+    server it starts (its config says what OpenCode's agent may do), its skills (the copies of those added from other
+    agents too) and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
     return (
         *_own_code(),
         *plugin_roots(config.plugins),
         plugins_data_dir(),
+        web_research_dir(),
         added_servers_path(),
         connected_servers_path(),
         opencode_dir(),
@@ -434,7 +441,12 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
         connected: tuple[McpServerConfig, ...] = await asyncio.to_thread(
             _connected_servers, frozenset(server.name for server in others)
         )
-        mcp: McpHub = await open_hub([*others, *connected], login_env)
+        # The servers that come with Dot start last, and a server of any other place with the name of one replaces it
+        # (item 583).
+        bundled: tuple[McpServerConfig, ...] = builtin_servers(
+            config, frozenset(server.name for server in (*others, *connected))
+        )
+        mcp: McpHub = await open_hub([*others, *connected, *bundled], login_env)
         cleanup.push_async_callback(mcp.close)
         memory: MemoryIndex = await open_memory_index(store, config)
         cleanup.push_async_callback(close_memory_index, memory)
@@ -472,6 +484,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
             search_keys=search_keys,
             mcp=mcp,
+            builtin_names=frozenset(server.name for server in bundled),
             memory=memory,
             snapshots=SnapshotService(config.snapshots, bus),
             help_vectors=(

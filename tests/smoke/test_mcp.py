@@ -102,6 +102,11 @@ class CliOutcome:
     err: str
 
 
+# A ``dotx`` or a daemon these tests start has the web-research server that comes with Dot (item 583), which would start
+# beside the fixture and be counted with it: the homes switch it off.
+NO_BUILTIN: str = "[builtin_mcp]\nweb_research = false\n\n"
+
+
 def _server_table(name: str, extra: str) -> str:
     return "\n".join(
         [
@@ -125,7 +130,9 @@ def home(tmp_path_factory: pytest.TempPathFactory) -> Path:
     fixture_server: str = _server_table(
         "fixture", 'env = { GREETING = "hello", FROM_SECRET = "${DOT_TEST_MCP_VALUE}" }\ncall_timeout_s = 3\n'
     )
-    return _home_with(tmp_path_factory.mktemp("home"), f'[models]\nmain = "ollama:{MODEL}"\n\n{fixture_server}')
+    return _home_with(
+        tmp_path_factory.mktemp("home"), f'{NO_BUILTIN}[models]\nmain = "ollama:{MODEL}"\n\n{fixture_server}'
+    )
 
 
 @pytest.fixture(scope="module")
@@ -647,7 +654,7 @@ async def test_mcp_list_shows_the_tools_of_a_working_server(home: Path) -> None:
 
 async def test_a_broken_server_is_reported_by_mcp_list_and_named_before_a_run(tmp_path: Path) -> None:
     broken: Path = _home_with(
-        tmp_path / "broken-home", '[[mcp]]\nname = "ghost"\ncommand = "dot-no-such-server-binary"\n'
+        tmp_path / "broken-home", f'{NO_BUILTIN}[[mcp]]\nname = "ghost"\ncommand = "dot-no-such-server-binary"\n'
     )
     listed: CliOutcome = await _dotx(broken, ["mcp", "list"])
     assert listed.code == 1, listed
@@ -675,7 +682,7 @@ async def test_the_daemon_starts_without_a_server_that_cannot_start_and_names_it
         tmp_path / "home",
         "\n".join(
             [
-                f"[server]\nport = {port}\n",
+                f"{NO_BUILTIN}[server]\nport = {port}\n",
                 '[[mcp]]\nname = "ghost"\ncommand = "dot-no-such-server-binary"\n',
                 _server_table("fixture", ""),
             ]

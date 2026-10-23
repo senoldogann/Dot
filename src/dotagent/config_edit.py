@@ -4,9 +4,10 @@ raised), the default model, ``[models] main`` (item 199), a model of Dot's own w
 context size of a model, a key of ``[models.context]`` (item 250), whether the typed judge answers, ``[judge] provider``
 (item 255), whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), or the names the
 daemon answers to and whether it keeps the Mac awake, ``[server] reach`` and ``keep_awake`` (item 271), or whether the
-notes are found by meaning, ``[memory] embed_enabled`` (item 558), or whether a messaging app of the owner reaches Dot,
-``[channels] imessage`` (item 572), or what a reaction on Dot's message does once its run has ended, ``[reactions]``
-(item 586), so the comments and the other settings stay as written."""
+notes are found by meaning, ``[memory] embed_enabled`` (item 558), whether a messaging app of the owner reaches Dot,
+``[channels] imessage`` (item 572), what a reaction on Dot's message does once its run has ended, ``[reactions]``
+(item 586), or whether an MCP server that comes with Dot is started, a switch of ``[builtin_mcp]`` (item 583), so the
+comments and the other settings stay as written."""
 
 import os
 import re
@@ -38,6 +39,7 @@ type ConfigTable = Literal[
     "agent",
     "assistant",
     "browser",
+    "builtin_mcp",
     "channels",
     "judge",
     "memory",
@@ -63,6 +65,7 @@ type BrowserSetting = Literal[
     "appearance",
     "zoom",
 ]
+type BuiltinMcpSetting = Literal["web_research"]
 type JudgeSetting = Literal["provider"]
 type MemorySetting = Literal["embed_enabled"]
 type ModelsSetting = Literal["main", "fast", "review", "vision", "standby"]
@@ -74,6 +77,7 @@ type SettingKey = (
     AgentSetting
     | AssistantSetting
     | BrowserSetting
+    | BuiltinMcpSetting
     | ChannelsSetting
     | JudgeSetting
     | MemorySetting
@@ -333,6 +337,12 @@ def set_judge_provider(path: Path, provider: JudgeProvider) -> None:
     """Write ``[judge] provider``, whether the typed judge answers through TypeSafe or answers nothing, into the config
     file at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "judge", "provider", provider)
+
+
+def set_builtin_server(path: Path, switch: BuiltinMcpSetting, on: bool) -> None:
+    """Write a switch of ``[builtin_mcp]``, whether an MCP server that comes with Dot is started (item 583), into the
+    config file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "builtin_mcp", switch, on)
 
 
 def set_shell_sandbox(path: Path, on: bool) -> None:

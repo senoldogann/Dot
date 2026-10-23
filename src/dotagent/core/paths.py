@@ -175,6 +175,12 @@ def plugins_data_dir() -> Path:
     return dot_home() / "plugins-data"
 
 
+def web_research_dir() -> Path:
+    """Where the web-research server that comes with Dot keeps its data (item 583): its crawl jobs, which a restart of
+    the server does not lose. Its ``WEB_TOOLS_DATA_DIR``; the server makes the folder when it first needs it."""
+    return dot_home() / "web-research"
+
+
 def ensure_layout() -> None:
     """Create the private directory tree (mode 0700) if it does not exist yet."""
     for directory in (

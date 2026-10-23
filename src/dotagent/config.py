@@ -728,6 +728,16 @@ class McpServerConfig(FrozenModel):
         return self
 
 
+class BuiltinMcpConfig(FrozenModel):
+    """The MCP servers that come with Dot (``[builtin_mcp]``, item 583), a switch for each, named for its server with
+    an underscore for the hyphen: ``web_research`` is the server ``web-research``, which searches the web and reads
+    pages (the package ``dotagent-web-research``). Dot starts one that is on with the servers of ``[[mcp]]``, unless
+    its package is not installed or another server has its name: a ``[[mcp]]`` table named ``web-research`` replaces
+    it. The table is not ``[mcp]``, which TOML cannot have beside the ``[[mcp]]`` tables."""
+
+    web_research: bool
+
+
 class SkillsConfig(FrozenModel):
     """Where skills are looked for besides ``<home>/skills`` and the ``skills/`` folder of each plugin (``[skills]``).
     Each entry is a directory whose children are skill folders (``<name>/SKILL.md``); ``~`` expands. ``elsewhere``:
@@ -777,6 +787,7 @@ class JudgeConfig(FrozenModel):
 
 class AppConfig(FrozenModel):
     mcp: list[McpServerConfig]
+    builtin_mcp: BuiltinMcpConfig
     server: ServerConfig
     store: StoreConfig
     models: ModelsConfig

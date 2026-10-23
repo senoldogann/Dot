@@ -506,6 +506,17 @@ export function createCatalogue(onChange) {
     });
   }
 
+  /** Switch `server`, one that comes with Dot (item 583), on or off: on starts it and its tools go to the runs that
+   * start after, off stops it; the config file keeps the switch. The page shows the listing the daemon answers with. */
+  function switchServer(server, on) {
+    return busyWith(`server:${server.name}`, async () => {
+      const now = await api.put(`/mcp/servers/${encodeURIComponent(server.name)}/switch`, { on });
+      if (!disposed) {
+        servers = now;
+      }
+    });
+  }
+
   /** Choose the tools of `server`: they become its allow list (none with every one chosen), and Dot connects it again
    * with them. */
   async function chooseTools(server) {
@@ -632,6 +643,7 @@ export function createCatalogue(onChange) {
     takeStep,
     add,
     connectAgain,
+    switchServer,
     chooseTools,
     remove,
     removePlugin,
