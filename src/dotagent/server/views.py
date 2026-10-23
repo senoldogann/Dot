@@ -779,13 +779,18 @@ class LearningHealthView(FrozenModel):
 
 class HarnessView(FrozenModel):
     """``GET /api/harness`` (item 389, docs/harness.md): the adopted version, ``None`` while a run's prompt is Dot's
-    own text alone, every version the newest first, the bounds a component keeps to, and how the nightly step is set
-    (item 393): when it runs ("off" never), the scoring and final sets, the repeats, and who adopts a version the probe
-    showed better; and how many steps and experiences there are in all (item 527), as their lists stop at the
-    newest."""
+    own text alone, every version the newest first, which of these (the adopted one included) come from content
+    others can author and why (``from_outside``, by version id: the notes of a version and of the ones it was
+    composed of, item 588) and which hold a text the gate for learned texts refuses now (``refused``, by version
+    id, in words: such a version is not adopted and a prompt leaves the component out, item 587), the bounds a
+    component keeps to, and how the nightly step is set (item 393): when it runs ("off" never), the scoring and
+    final sets, the repeats, and who adopts a version the probe showed better; and how many steps and experiences
+    there are in all (item 527), as their lists stop at the newest."""
 
     adopted: HarnessVersion | None
     versions: tuple[HarnessVersion, ...]
+    from_outside: dict[str, tuple[str, ...]]
+    refused: dict[str, str]
     habits_chars: int
     tool_guidance_chars: int
     component_lines: int

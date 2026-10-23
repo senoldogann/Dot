@@ -511,6 +511,7 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         campaign_id=row["campaign_id"],
         agent_id=row["agent_id"],
         rewindable=row["history_version"] is not None and row["history_seq"] is not None,
+        harness_version=row["harness_version"],
     )
 
 
@@ -1371,17 +1372,68 @@ class Store:
 
     @_writing
     async def set_harness_state(self, version_id: str, state: HarnessState) -> HarnessVersion:
-        """Mark a version ``probed`` or ``candidate``; adopting and retiring are :meth:`adopt_harness`'s and
-        :meth:`retire_harness`'s, which keep the adopted key with the state."""
+        """Mark a version ``probed`` or ``candidate``, and only a version that is one of the two: one the owner adopted
+        or put aside meanwhile is left as it is (item 588), and the version is returned as it stands. Adopting and
+        retiring are :meth:`adopt_harness`'s and :meth:`retire_harness`'s, which keep the adopted key with the state."""
         if state in ("adopted", "retired"):
             raise InvalidValueError("adopt_harness and retire_harness set these states", {"state": state})
-        cursor: aiosqlite.Cursor = await self._db.execute(
-            "UPDATE harness_versions SET state = ? WHERE id = ?", (state, version_id)
+        await self._db.execute(
+            "UPDATE harness_versions SET state = ? WHERE id = ? AND state IN ('candidate', 'probed')",
+            (state, version_id),
         )
         await self._db.commit()
-        if cursor.rowcount == 0:
-            raise NotFoundError("harness version not found", {"version_id": version_id})
         return await self.get_harness_version(version_id)
+
+    @_writing
+    async def retire_unadopted_harness(self, version_id: str, now: float) -> bool:
+        """Put a version aside only if it is still a candidate or a probed one (item 588): the improvement loop retires
+        the versions it beat, and one the owner adopted while it ran stays in use. Whether it was retired."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE harness_versions SET state = 'retired', retired_at = ? WHERE id = ?"
+            " AND state IN ('candidate', 'probed')",
+            (now, version_id),
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    async def adopt_harness_replacing(
+        self, version_id: str, replacing: str | None, now: float
+    ) -> HarnessVersion | None:
+        """As :meth:`adopt_harness`, but only if the version adopted is still ``replacing`` (``None``: none) and
+        ``version_id`` is still a candidate or a probed version (item 588): the improvement loop adopts a survivor it
+        compared with the version in use when it began, never over what the owner chose or set aside since. One unit,
+        so that the owner's own click lands before or after it. ``None`` when it was not adopted."""
+
+        async def statements() -> HarnessVersion | None:
+            current: aiosqlite.Row | None = await self._one(
+                "SELECT value FROM kv WHERE key = ?", (HARNESS_ADOPTED_KEY,)
+            )
+            if (None if current is None else str(current["value"])) != replacing:
+                return None
+            row: aiosqlite.Row | None = await self._one("SELECT * FROM harness_versions WHERE id = ?", (version_id,))
+            if row is None:
+                raise NotFoundError("harness version not found", {"version_id": version_id})
+            if row["state"] not in ("candidate", "probed"):
+                return None
+            await self._db.execute(
+                "UPDATE harness_versions SET state = 'retired', retired_at = ? WHERE state = 'adopted' AND id != ?",
+                (now, version_id),
+            )
+            await self._db.execute(
+                "UPDATE harness_versions SET state = 'adopted', adopted_at = ?, retired_at = NULL WHERE id = ?",
+                (now, version_id),
+            )
+            await self._db.execute(
+                "INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (HARNESS_ADOPTED_KEY, version_id),
+            )
+            adopted: aiosqlite.Row | None = await self._one(
+                "SELECT * FROM harness_versions WHERE id = ?", (version_id,)
+            )
+            assert adopted is not None
+            return _harness_version(adopted)
+
+        return await self._unit(statements)
 
     @_writing
     async def set_harness_notes(self, version_id: str, notes: str) -> None:
@@ -1527,9 +1579,17 @@ class Store:
         )
         return [_harness_experience(row) for row in rows]
 
-    async def list_harness_experiences(self, limit: int) -> list[HarnessExperience]:
-        """The newest ``limit`` experiences, the newest first."""
-        rows = await self._all("SELECT * FROM harness_experiences ORDER BY created_at DESC, id DESC LIMIT ?", (limit,))
+    async def list_harness_experiences(
+        self, limit: int, *, untainted: bool = False, offset: int = 0
+    ) -> list[HarnessExperience]:
+        """The newest ``limit`` experiences after the first ``offset``, the newest first. With ``untainted``, the ones
+        written from a run that read content third parties can author are left out before the newest are taken (item
+        588), so that a run of tainted nights does not hide the clean experience before them."""
+        where: str = " WHERE tainted = 0" if untainted else ""
+        rows = await self._all(
+            f"SELECT * FROM harness_experiences{where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        )
         return [_harness_experience(row) for row in rows]
 
     async def count_harness_experiences(self) -> int:
@@ -2764,6 +2824,25 @@ class Store:
             (run_id, *kinds, *channels),
         )
         return row is not None and bool(row[0])
+
+    async def outside_reads(self, run_id: str, kinds: Sequence[str], channels: Sequence[str]) -> tuple[str, ...]:
+        """What made a run one that read content third parties can author (:meth:`read_outside`), each once and sorted:
+        the ones of ``kinds`` and of ``channels`` its tool results were, and ``tainted`` for a result made while the run
+        was tainted already that is neither. Empty when the run read none."""
+        kind_marks: str = ",".join("?" for _ in kinds)
+        channel_marks: str = ",".join("?" for _ in channels)
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT DISTINCT json_extract(data, '$.kind'), json_extract(data, '$.channel') FROM events"
+            " WHERE run_id = ? AND kind = 'tool_result' AND (json_extract(data, '$.tainted') = 1"
+            f" OR json_extract(data, '$.kind') IN ({kind_marks})"
+            f" OR json_extract(data, '$.channel') IN ({channel_marks}))",
+            (run_id, *kinds, *channels),
+        )
+        found: set[str] = set()
+        for kind, channel in rows:
+            named: set[str] = ({kind} if kind in kinds else set()) | ({channel} if channel in channels else set())
+            found |= named or {"tainted"}
+        return tuple(sorted(found))
 
     async def model_profile(self, model: str, runs: int) -> ModelProfile:
         """How reliably ``model`` worked in its newest ``runs`` finished runs, read on a read-only connection."""

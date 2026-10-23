@@ -62,6 +62,20 @@ def normalized(text: str) -> str:
     return "\n".join(kept)
 
 
+def names_a_task(text: str, task_ids: Sequence[str]) -> str | None:
+    """The first of ``task_ids`` (the eval tasks of the scoring set and of the final set) that ``text`` names, or
+    ``None``: the id as the catalog writes it (``bump-version``), in any case, as a token of its own (item 588). What a
+    candidate is judged on is never shown to the model that writes it, so an experience that names such a task cannot
+    stand in the library the proposer reads; the words of its description are no name (``bump version``, ``report
+    failing tests`` and ``read config port`` are what an experience may say of a version, a test run and a port), and
+    an experience is never refused for them."""
+    flat: str = text.casefold()
+    for task_id in task_ids:
+        if task_id and re.search(rf"(?<![\w-]){re.escape(task_id.casefold())}(?![\w-])", flat):
+            return task_id
+    return None
+
+
 def description_problem(text: str, secrets: Sequence[str]) -> str | None:
     """Why ``text``, which a model wrote about a step of the improvement loop (a moment of a run, a decision of the
     composer, the summary of a version), cannot be recorded, or ``None`` (item 587, review round 1). These describe what

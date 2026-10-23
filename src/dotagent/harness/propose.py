@@ -5,20 +5,21 @@ it reads."""
 
 import asyncio
 import json
+from collections.abc import Sequence
 
 from dotagent.agent.lessons import LessonCase, stored_signals
 from dotagent.agent.reflection import stored_case
 from dotagent.agent.review import HarnessBounds, HarnessProposal, ProposalRequest, ProposalScope
 from dotagent.config import HarnessConfig
 from dotagent.core.logs import get_logger
-from dotagent.harness.components import HarnessText
+from dotagent.harness.components import HarnessText, names_a_task
 from dotagent.harness.roles import proposer_of
 from dotagent.harness.service import adopted_text, create_version
 from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, HarnessVersion, RunRecord
+from dotagent.store.models import EventRecord, HarnessExperience, HarnessVersion, RunRecord
 
 log = get_logger(__name__)
 
@@ -46,31 +47,52 @@ async def case_of(runtime: Runtime, run_id: str) -> LessonCase:
     return stored_case(run, events, tainted)
 
 
-def notes_of(case: LessonCase, scope: ProposalScope, proposal: HarnessProposal, parent: str | None) -> str:
+def notes_of(
+    case: LessonCase, scope: ProposalScope, proposal: HarnessProposal, parent: str | None, read: Sequence[str] = ()
+) -> str:
     """What a candidate's notes keep of its proposal: the run and its scope, the moments behind the change, whether the
-    run had read content third parties can author, and the version it was written from."""
+    run had read content third parties can author and what (``read``: the kinds and channels of what it read, which the
+    owner is told when they adopt the version, item 588), and the version it was written from."""
     return json.dumps(
         {
             "from_run": case.run_id,
             "scope": scope,
             "moments": list(proposal.moments),
             "tainted": case.tainted,
+            **({"tainted_by": list(read)} if read else {}),
             "parent": parent,
         },
         ensure_ascii=False,
     )
 
 
-async def experience_lines(store: Store, limit: int) -> tuple[str, ...]:
+def withheld_tasks(config: HarnessConfig) -> tuple[str, ...]:
+    """The tasks no model that writes a candidate is shown (item 588): the scoring set, which judges the candidates,
+    and the final set, which is played once after a version is in use."""
+    return (*config.scoring_tasks, *config.final_tasks)
+
+
+async def experience_lines(store: Store, limit: int, task_ids: Sequence[str] = ()) -> tuple[str, ...]:
     """The index of the experience library as the proposer reads it: the newest ``limit`` experiences, a line each of
     the cue, the lesson and the confidence, without the ones written from a run that had read content third parties
-    can author (``tainted``, as a tainted note is kept from the lesson writer, item 384). The secrets Dot holds are
-    masked with the rest of the question (:mod:`dotagent.agent.review`)."""
-    return tuple(
-        f"{experience.cue}: {experience.lesson} ({experience.confidence})"
-        for experience in await store.list_harness_experiences(limit)
-        if not experience.tainted
-    )
+    can author (``tainted``, as a tainted note is kept from the lesson writer, item 384) and without the ones that name
+    a task of ``task_ids`` (the scoring and the final set, which the proposer never sees: item 588, for an experience
+    written before it was refused), both left out before the newest are taken. The secrets Dot holds are masked with
+    the rest of the question (:mod:`dotagent.agent.review`)."""
+    lines: list[str] = []
+    # Taken a page at a time, as the ones that name a task are found in the lines, not in the store.
+    offset: int = 0
+    while len(lines) < limit:
+        page: list[HarnessExperience] = await store.list_harness_experiences(limit, untainted=True, offset=offset)
+        if not page:
+            break
+        offset += len(page)
+        lines.extend(
+            f"{experience.cue}: {experience.lesson} ({experience.confidence})"
+            for experience in page
+            if names_a_task(f"{experience.cue} {experience.lesson} {experience.evidence}", task_ids) is None
+        )
+    return tuple(lines[:limit])
 
 
 async def propose_from_run(runtime: Runtime, run_id: str, scope: ProposalScope) -> HarnessVersion | None:
@@ -89,7 +111,7 @@ async def propose_from_run(runtime: Runtime, run_id: str, scope: ProposalScope) 
         reached_goal=case.reached_goal,
         habits=current.habits,
         tool_guidance=current.tool_guidance,
-        experience=await experience_lines(runtime.store, EXPERIENCES_SHOWN),
+        experience=await experience_lines(runtime.store, EXPERIENCES_SHOWN, withheld_tasks(runtime.config.harness)),
         scope=scope,
         bounds=bounds_of(runtime.config.harness),
     )
@@ -101,13 +123,14 @@ async def propose_from_run(runtime: Runtime, run_id: str, scope: ProposalScope) 
         habits=current.habits if proposal.habits is None else proposal.habits,
         tool_guidance=current.tool_guidance if proposal.tool_guidance is None else proposal.tool_guidance,
     )
+    read: tuple[str, ...] = await runtime.store.outside_reads(run_id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS))
     version: HarnessVersion = await create_version(
         runtime.store,
         runtime.config.harness,
         text,
         proposal.summary,
         PROPOSER,
-        notes_of(case, scope, proposal, parent),
+        notes_of(case, scope, proposal, parent, read),
         held,
     )
     log.info("harness_proposed", run_id=run_id, scope=scope, version=version.id, moments=len(proposal.moments))

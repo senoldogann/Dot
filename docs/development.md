@@ -352,8 +352,11 @@ check; blocked: HTTP 401 or 403; in transit; other); the calls of any tool **ref
 (a turn lost each, on top of the calls whose arguments were not valid JSON); the **delegated runs** and the seconds
 the run waited for them; and the step line adds the median input tokens a step sent per band, the growth of the
 context. **`dotx stats --run ID`** prints the same for one run: its minutes of wall time (to now while it works), its
-tool calls' seconds and the part spent at the gate, then the lines above and its tools. The daemon serves the same as
-`GET /api/runs/{id}/stats`.
+tool calls' seconds and the part spent at the gate, the version of [the harness](harness.md) it took (or Dot's own
+text), then the lines above and its tools. The daemon serves the same as `GET /api/runs/{id}/stats`. A **Harness**
+table follows the learning lines (item 588): the finished runs of the window by the version of the harness they took,
+the busiest first, with the share that ended done and the runs on Dot's own text beside them, which is how a
+version's effect on its runs is read.
 
 **`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its
 own: file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, a goal that

@@ -129,8 +129,31 @@ A version is one of:
 - `retired`: put aside, kept for the record and to come back to.
 
 Adopting a version retires the adopted one; adopting an earlier version again is how a change is taken back. A run
-records the version it took (`harness_version` on the run), so what a version did for the runs that had it can be
-read later. With no adopted version, a run's prompt is Dot's own text alone, as before item 389.
+records the version it took (`harness_version` on the run, in `GET /api/runs` and `GET /api/runs/{id}` and in
+`GET /api/runs/{id}/stats`), and `dotx stats` counts the finished runs of its window per version, with the share that
+ended done and the runs on Dot's own text beside them, so that what a version did for the runs that had it can be read
+(item 588). With no adopted version, a run's prompt is Dot's own text alone, as before item 389.
+
+What you do stands while a step runs (item 588). A step plays up to `[harness] step_minutes`, and the page lists its
+candidates from the moment they are written, so you may adopt or set aside a version before it ends. A version changes
+state only from `candidate` or `probed`, in the store's own statement: the step marks its survivor `probed` and retires
+the versions it beat only while they are still one of the two, so a version you adopted meanwhile stays in use (and is
+not called beaten), and one you set aside stays set aside. With `adopt = "auto"` the step adopts its survivor only over
+the version that was in use when the step began, and only if the survivor is still open: if you adopted another or
+set aside the base meanwhile, the survivor is left to you and the step's decision says so.
+
+A version written from a run that read content third parties can author is marked (`tainted` in its notes, and
+`tainted_by`, what the run read: a page in the browser, a web address, what the screen showed, an answer of a tool
+server). A version the composer merged is as tainted as any of the versions it was composed of, even one composed before
+the notes carried the mark (the check follows `composed_of`), and a version whose notes cannot be read, or one of whose
+parts is gone, is never read as clean (item 588). Adopting one is a choice with a warning that says what tainted it: `dotx
+harness adopt` prints it (`a line in this version may come from content others can author: its run read a page in the
+browser`) and asks `Adopt it anyway? [y/N]` (`--yes` adopts without the question; with no terminal to ask on it does not
+adopt and says so), the page's **Use** says it in its question and asks first, as **Set aside** does, and its row and the
+card of the version in use wear a *From outside content* pill, with the reasons on a hover (`GET /api/harness` gives them
+in `from_outside`, by version id). `POST /api/harness/{id}/adopt` itself does not ask: the question belongs to the command
+line and the page. What it does refuse is a version whose text the gate refuses now (above): the page lists it as
+*Refused* (`refused`, by version id) and does not offer **Use**.
 
 You write a version yourself with `dotx harness set` (a component from a file or standard input, the other kept from the
 adopted version, `--adopt` to take it at once) or `POST /api/harness`, and manage them with `dotx harness list`, `show`,
@@ -141,8 +164,9 @@ adopted version, `--adopt` to take it at once) or `POST /api/harness`, and manag
 
 What a candidate is judged on is never shown to the model that writes it. The proposer reads one run; the probe runs the
 candidate on a *scoring set* it has not seen: the eval tasks that are safe to repeat (`[harness] scoring_tasks`); runs
-of yours kept as tests are left for later (see What is built so far). A second, smaller *final set* is never used to choose between candidates: `dotx harness final` runs it once,
-after a version is adopted, and reports it as it comes out, so that the score you read was not optimized against. The
+of yours kept as tests are left for later (see What is built so far). A second, smaller *final set* is never used to
+choose between candidates: `dotx harness final` runs it once, after a version is adopted, and reports it as it comes
+out, so that the score you read was not optimized against. The
 owner writes the questions, never the program; that, and adopting, is the human's part (Wei et al., "The End of Harness
 Engineering", 2026, make the same cut: an execution report the run writes, candidates a small model writes, a scoring
 set the operator writes and the proposer never sees, and a final set used once).
@@ -150,6 +174,17 @@ set the operator writes and the proposer never sees, and a final set used once).
 Selection is by score first: a candidate that does better on at least one task of the scoring set and worse on none
 survives, one that does worse on any is dropped. The composer merges edits only when candidates do not conflict and
 each earns its place, or explains why the base is kept.
+
+The scores reach the models as counts and never as tasks (item 588). The composer and the experience writer are told
+how many of the tasks a candidate did better and worse on (`better on 2 of 8 tasks, worse on 0, tokens +120`), not
+which tasks nor how each went; the task by task contrast (`write-todo-note: better (2/2 passed against 0/2)`) stays in a
+version's notes and in the step's record, for you to read on the page and with `dotx harness show`. The proposer reads
+the experience library, and so an experience that names a task of the scoring set or of the final set (by its id as the
+catalog writes it, `bump-version`, in any case; the words of its description, `bump version`, name nothing) is
+refused: the writer is asked again, without being told which task, and a writer that names one again fails the step.
+An experience stored before is left out of what the proposer reads, as is one written from a run that read content
+third parties can author, and both are left out before the newest twelve are taken, so that twelve such nights in a
+row do not hide the experience before them.
 
 ## How a change comes about
 
@@ -172,8 +207,8 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    its notes; else the best candidate does.
 4. **Adopt.** You adopt it, or not, on the Self-improvement page or with `dotx harness adopt`. `[harness] adopt =
    "auto"` (off by default) adopts on its own only a version its own probe showed better on a task and worse on none,
-   with two repeats, and never one written from a run that had read content third parties can author: that decision is
-   yours.
+   with two repeats, never one written from a run that had read content third parties can author, never one from a step
+   that failed, and never over a version you adopted after the step began: that decision is yours.
 
 5. **Reflect.** After the step, a reflector writes what each edit did (helped, hurt, no observed effect, confounded)
    and, when the evidence supports one, an *experience*: the cue (the shape of situation), the lesson, the evidence
@@ -220,11 +255,12 @@ budget is ended, and a probe cut short leaves its candidate `unclear`, which nev
 harness step` prints it), and counts in how learning fares with the reflection. `adopt = "auto"` adopts the survivor on
 its own when it did better on a task and worse on none with `step_repeats` of at least 2, and never from a run that had
 read content third parties can author; `"owner"`, the default, leaves it to you. A role that fails after the probes (the
-composer, the experience writer) leaves the step `failed` with the error, the survivor probed all the same, and how
-learning fares counts the failure; a scripted check is recorded and marked `scripted`, and does not move the window the
-next step learns from. `--scripted` plays the references through the scripted model and has the roles answer from a
-script (the proposer proposes one habit and keeps the other scopes, the experience writer saw no effect): the whole
-step, at no model's cost, as a check of the loop.
+composer, the experience writer) leaves the step `failed` with the error, the survivor probed all the same and adopted
+by nobody, whatever `adopt` says (the decision says it was left to you), and how learning fares counts the failure; a
+scripted check is recorded and marked `scripted`, and does not move the window the next step learns from. `--scripted`
+plays the references through the scripted model and has the roles answer from a script (the proposer proposes one habit
+and keeps the other scopes, the experience writer saw no effect): the whole step, at no model's cost, as a check of the
+loop.
 
 `dotx harness final [ID]` plays the final set (`final_tasks`) once under the adopted version, or the one named, apart
 from the daemon, keeps the report in the version's notes (the end of `dotx harness show`), and prints it as it comes
@@ -256,7 +292,11 @@ Settings › *Self-improvement* is the harness's page, in plain words (item 503)
 from its own runs how to work better on this Mac, that every run follows two short texts besides Dot's built-in
 instructions, that each night Dot can propose a new version and try it on test tasks first, and that you choose the
 version it follows and never have to write one. Its words for the states are *new* (`candidate`), *tried* (`probed`),
-*in use* (`adopted`) and *set aside* (`retired`); **Use** adopts and **Set aside** retires.
+*in use* (`adopted`) and *set aside* (`retired`); **Use** adopts and **Set aside** retires. A version Dot wrote after
+a run that read content others can write, or that a version it was combined from came from, wears a *From outside
+content* pill, in its row and in the card of the version in use, with why on a hover, and **Use** asks first and says
+why (item 588); one that the checks refuse now wears *Refused* and is not offered for use, and in the card of the
+version in use it says that the part that fails is left out of every run (item 587).
 
 A row of four tiles in one card comes first (items 527 and 566): what is in use (*Built-in*, or *A version* with its
 summary), the number of versions with how many are in each state, the steps of learning, nightly and by hand, with the
@@ -275,13 +315,13 @@ examples in the empty fields and **Start from an example**, which puts them in; 
 candidate and **Save and use** adopts it at once; what cannot be a component is refused with why. *Versions* lists every
 version, the one in use first and the others the newest first, with its state, who made it (you, or Dot's proposer or
 composer) and when, its texts and notes (what a proposal is about and the moments of the run it answers, the trial's
-contrast, the decisions of a composition) under *Texts and notes*, **Use** on each version not in use and **Set aside**
-on a new or tried one; the version in use is set aside from *What Dot follows now*, and setting a version aside asks
-first. *Nightly learning*, under *Versions*, opens with when the step runs (every night at its time, with the next one,
-or that it is off and which setting turns it on); it and *Lessons learned* list the newest steps and experiences, a step
-with the run it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and
-the final check (the final set), who chooses, and the limits. On a phone the page is a row of the settings list under
-*How Dot works*, which says *built-in* or *changed*.
+contrast, the decisions of a composition) under *Texts and notes*, **Use** on each version not in use (it asks first for
+one from outside content) and **Set aside** on a new or tried one; the version in use is set aside from *What Dot
+follows now*, and setting a version aside asks first. *Nightly learning*, under *Versions*, opens with when the step
+runs (every night at its time, with the next one, or that it is off and which setting turns it on); it and *Lessons
+learned* list the newest steps and experiences, a step with the run it learned from and what it decided. *How it
+learns*, a fold, says the test tasks (the scoring set) and the final check (the final set), who chooses, and the limits.
+On a phone the page is a row of the settings list under *How Dot works*, which says *built-in* or *changed*.
 
 ## What is built so far
 

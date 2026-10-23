@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-from dotagent.cli_stats import render_learning, render_run_costs, render_stats
+from dotagent.cli_stats import render_harness, render_learning, render_run_costs, render_stats
 from dotagent.core.errors import StoreError
 from dotagent.core.types import JsonObject
 from dotagent.llm.calls import CALL_EVENT
@@ -20,6 +20,7 @@ from dotagent.store.models import MemoryScore, RunRecord, RunStatus
 from dotagent.store.stats import (
     ActStats,
     DayOutcomes,
+    HarnessUse,
     LearningStats,
     ModelStats,
     NoteScore,
@@ -34,6 +35,7 @@ from dotagent.store.stats import (
     collect_statistics,
     day_outcomes,
     failure_cause,
+    harness_use,
     nearest_rank,
     site_outcomes,
 )
@@ -530,3 +532,65 @@ async def test_the_scores_of_the_notes_a_run_was_handed_are_kept_with_its_end_or
     await store.end_run(run.id, "done", "answer", {"status": "done", "result": "answer"})
     assert await store.memory_scores([note.id], 0.0) == {note.id: MemoryScore(handed=1, done=1, failed=0)}
     await store.close()
+
+
+def _row(status: str, finished: float | None, version: str | None) -> tuple[object, ...]:
+    """A row of the runs' query: model, status, result, steps, tokens, id, created_at, finished_at, harness version."""
+    return ("ollama:a", status, "", 1, 1, 1, "run", 1.0, finished, version)
+
+
+def test_the_finished_runs_are_counted_by_the_version_of_the_harness_they_took() -> None:
+    """Item 588 (M9): a run records the version it took, and the statistics say what each version's runs came to."""
+    rows: list[tuple[object, ...]] = [
+        _row("done", 2.0, "hrn_b"),
+        _row("failed", 2.0, "hrn_b"),
+        _row("done", 2.0, "hrn_b"),
+        _row("done", 2.0, "hrn_a"),
+        _row("done", 2.0, None),
+        _row("failed", 2.0, None),
+        _row("running", None, "hrn_a"),
+    ]
+    assert harness_use(rows) == (
+        HarnessUse(version="hrn_b", runs=3, done=2),
+        HarnessUse(version=None, runs=2, done=1),
+        HarnessUse(version="hrn_a", runs=1, done=1),
+    )
+    assert harness_use([]) == ()
+    lines: list[str] = render_harness(harness_use(rows))
+    assert lines[0].startswith("Harness, the finished runs by the version of the harness they took")
+    assert [line.split() for line in lines[2:]] == [
+        ["hrn_b", "3", "67", "%"],
+        ["Dot's", "own", "text", "2", "50", "%"],
+        ["hrn_a", "1", "100", "%"],
+    ]
+    assert render_harness(harness_use([_row("done", 2.0, None)])) == [
+        "Harness: no finished run took a version of the harness (Dot's own text alone)."
+    ]
+    assert render_harness(()) == render_harness(harness_use([]))
+
+
+async def test_the_statistics_and_the_costs_of_a_run_carry_the_version_it_took(tmp_path: Path) -> None:
+    database: Path = tmp_path / "dot.sqlite3"
+    store: Store = await Store.open(database, tmp_path / "screenshots")
+    try:
+        thread = await store.create_thread("t", "test")
+        version = await store.create_harness_version(None, "owner", "A habit", "- Read first.", "", "")
+        took: RunRecord = await _run(store, thread.id, "ollama:a", "done", "ok", 3, 100)
+        await store.set_run_harness(took.id, version.id)
+        await _run(store, thread.id, "ollama:a", "done", "ok", 2, 100)
+    finally:
+        await store.close()
+    stats: RunStatistics = collect_statistics(database, 0.0)
+    assert stats.harness == (HarnessUse(version=None, runs=1, done=1), HarnessUse(version=version.id, runs=1, done=1))
+    assert any(line.startswith(f"  {version.id}") for line in render_stats(stats, 30, "all"))
+    assert not any(line.startswith("Harness") for line in render_stats(stats, 30, "site"))
+    costs: RunCosts = collect_run_costs(database, took.id, time.time())
+    assert costs.harness_version == version.id
+    assert f"  harness: {version.id}" in render_run_costs(costs)
+    other: RunCosts = collect_run_costs(database, (await _runs_of(database))[0], time.time())
+    assert "  harness: Dot's own text" in render_run_costs(other)
+
+
+async def _runs_of(database: Path) -> list[str]:
+    with sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True) as connection:
+        return [row[0] for row in connection.execute("SELECT id FROM runs WHERE harness_version IS NULL").fetchall()]

@@ -55,7 +55,8 @@ _SINCE_SCOPE: str = "r.created_at >= ?"
 _RUN_SCOPE: str = "r.id = ?"
 
 _RUNS_SQL: str = """
-SELECT r.model, r.status, r.result, r.steps, r.input_tokens, r.output_tokens, r.id, r.created_at, r.finished_at
+SELECT r.model, r.status, r.result, r.steps, r.input_tokens, r.output_tokens, r.id, r.created_at, r.finished_at,
+       r.harness_version
 FROM runs r WHERE {scope}
 """
 # One row per model call of the runs: the model of its run, the run, what the call was for, its seconds, the tokens the
@@ -406,7 +407,7 @@ class ModelStats(FrozenModel):
 class RunCosts(FrozenModel):
     """What one run cost and where it went: its minutes of wall time (to its end, or to now while it works), the numbers
     of its model (as :class:`ModelStats` counts them for one run), its tool calls' seconds and the part spent at the
-    gate, and its tools, the slowest first."""
+    gate, and its tools, the slowest first; and the version of the harness it took (``None``: Dot's own text alone)."""
 
     run_id: str
     status: RunStatus
@@ -415,6 +416,16 @@ class RunCosts(FrozenModel):
     tool_seconds: float
     waited_s: float
     tools: tuple[ToolStats, ...]
+    harness_version: str | None = None
+
+
+class HarnessUse(FrozenModel):
+    """The finished runs of the window that took one version of the harness (``None``: Dot's own text alone), and how
+    many of them ended done (item 588): what a version did for the runs that had it, to be read beside the others."""
+
+    version: str | None
+    runs: int
+    done: int
 
 
 class NoteScore(FrozenModel):
@@ -470,6 +481,7 @@ class RunStatistics(FrozenModel):
     days: tuple[DayOutcomes, ...]
     channels: tuple[ChannelStats, ...]
     learning: LearningStats
+    harness: tuple[HarnessUse, ...] = ()
 
 
 class _EventCounts(FrozenModel):
@@ -1099,6 +1111,22 @@ def learning_stats(rows: _Rows) -> LearningStats:
     )
 
 
+def harness_use(runs: Sequence[tuple[object, ...]]) -> tuple[HarnessUse, ...]:
+    """The finished runs among ``runs`` (rows of ``_RUNS_SQL``) by the version of the harness they took, the busiest
+    first; Dot's own text alone is ``None``."""
+    counts: dict[str | None, list[int]] = {}
+    for run in runs:
+        if run[8] is None:
+            continue
+        entry: list[int] = counts.setdefault(None if run[9] is None else str(run[9]), [0, 0])
+        entry[0] += 1
+        entry[1] += 1 if run[1] == "done" else 0
+    return tuple(
+        HarnessUse(version=version, runs=found[0], done=found[1])
+        for version, found in sorted(counts.items(), key=lambda item: (-item[1][0], item[0] or ""))
+    )
+
+
 def _statistics(rows: _Rows) -> RunStatistics:
     runs: list[tuple[object, ...]] = rows.runs
     counts: dict[str, _EventCounts] = _counts_by_model(rows.events)
@@ -1126,6 +1154,7 @@ def _statistics(rows: _Rows) -> RunStatistics:
         days=day_outcomes(runs, rows.run_acts),
         channels=channel_stats(tools),
         learning=learning_stats(rows),
+        harness=harness_use(runs),
     )
 
 
@@ -1222,4 +1251,5 @@ def collect_run_costs(database: Path, run_id: str, now: float) -> RunCosts:
         tool_seconds=sum(sample.seconds for sample in tools),
         waited_s=sum(sample.waited_s for sample in tools),
         tools=statistics_of_run.tools,
+        harness_version=None if run[9] is None else str(run[9]),
     )

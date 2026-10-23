@@ -5,6 +5,7 @@ that both did are merged by the composer and the merge is played in its turn; wh
 experience; the probed version waits for the owner, or is adopted when ``[harness] adopt`` says so. The step records
 what it did, and the probes run apart from the daemon."""
 
+import asyncio
 import json
 import time
 from collections.abc import Sequence
@@ -31,11 +32,19 @@ from dotagent.core.types import FrozenModel
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.harness.components import COMPONENTS, NO_HARNESS, HarnessText
-from dotagent.harness.contrast import Contrast, choose, contrast, contrast_text
+from dotagent.harness.contrast import Contrast, choose, contrast, contrast_detail, contrast_text
 from dotagent.harness.probe import BASE, ProbeAsk, Prober, ProbeReport, nothing_played, over_budget
-from dotagent.harness.propose import bounds_of, case_of, propose_from_run
+from dotagent.harness.propose import bounds_of, case_of, propose_from_run, withheld_tasks
 from dotagent.harness.roles import composer_of, experience_writer_of
-from dotagent.harness.service import adopt, adopted, create_version, notes_of, notes_with, step_facts, text_of
+from dotagent.harness.service import (
+    adopt_replacing,
+    adopted,
+    create_version,
+    notes_of,
+    notes_with,
+    step_facts,
+    text_of,
+)
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
@@ -45,6 +54,8 @@ log = get_logger(__name__)
 
 # Who made a version the composer wrote.
 COMPOSER: str = "composer"
+# What the owner did with the survivor of a step while it ran, in the words of its decision (item 588).
+_OWNER_WORDS: dict[str, str] = {"adopted": "in use", "retired": "set aside"}
 # How far back the step looks for a run to learn from when no step came before.
 _LOOKBACK_S: float = 24 * 3600.0
 _SESSION: str = "harness:step"
@@ -118,20 +129,24 @@ class _Outcome(FrozenModel):
     error: str | None
 
 
-def adopts_on_its_own(adopt: str, survivor: Contrast, repeats: int, tainted: bool) -> bool:
+def adopts_on_its_own(adopt: str, survivor: Contrast, repeats: int, tainted: bool, *, failed: bool = False) -> bool:
     """Whether the step adopts the survivor itself: ``[harness] adopt = "auto"``, a contrast better on a task and worse
-    on none over at least two repeats, and a run that had read no content third parties can author (``tainted``): a
-    text written from such a run is left to the owner, whatever its score."""
-    return adopt == "auto" and survivor.worse == 0 and survivor.better > 0 and repeats >= 2 and not tainted
+    on none over at least two repeats, a run that had read no content third parties can author (``tainted``: a text
+    written from such a run is left to the owner, whatever its score), and a step that did not fail (``failed``: a role
+    that failed after the probes leaves the step recorded as failed, and a failed step adopts nothing, item 588)."""
+    return (
+        adopt == "auto" and survivor.worse == 0 and survivor.better > 0 and repeats >= 2 and not tainted and not failed
+    )
 
 
 async def _retire(store: Store, versions: Sequence[HarnessVersion], now: float, why: str) -> None:
     """Retire ``versions`` with ``why`` added to their notes as the store holds them now (a probe wrote to them since
-    they were read)."""
+    they were read). A version that is no longer a candidate or a probed one, because the owner adopted it or set it
+    aside while the step ran, is left as they chose (item 588)."""
     for version in versions:
-        current: HarnessVersion = await store.get_harness_version(version.id)
-        await store.set_harness_notes(version.id, notes_with(current.notes, {"retired": why}))
-        await store.retire_harness(version.id, now)
+        if await store.retire_unadopted_harness(version.id, now):
+            current: HarnessVersion = await store.get_harness_version(version.id)
+            await store.set_harness_notes(version.id, notes_with(current.notes, {"retired": why}))
 
 
 async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober: Prober, now: float) -> _Outcome:
@@ -195,7 +210,7 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
         contrasts.append(found)
         by_label[candidate.id] = candidate
         await store.set_harness_notes(
-            candidate.id, notes_with(candidate.notes, {"contrast": contrast_text(found), "step": step.id})
+            candidate.id, notes_with(candidate.notes, {"contrast": contrast_detail(found), "step": step.id})
         )
         return found
 
@@ -206,7 +221,7 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
         return {
             "from_run": from_run,
             "candidates": [candidate.id for candidate in candidates],
-            "contrasts": {found.label: contrast_text(found) for found in contrasts},
+            "contrasts": {found.label: contrast_detail(found) for found in contrasts},
             "tokens": spent,
             "tainted": case.tainted,
             "errors": list(errors),
@@ -250,7 +265,13 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
                 )
             else:
                 decision = f"{decision}; the composition {composed.id} came out {merged.verdict}"
+    # The probes took long (up to `step_minutes`): the owner may have adopted or set aside a version since (item 588).
+    # The survivor and the versions it beat change state only while they are candidates or probed ones, and an
+    # adoption of the step's own replaces only the version it compared them with.
     probed: HarnessVersion = await store.set_harness_state(survivor.label, "probed")
+    decided: bool = probed.state != "probed"
+    if decided:
+        decision = f"{decision}; {probed.id} is {_OWNER_WORDS[probed.state]}, as you left it while the step ran"
     await _retire(
         store,
         [candidate for candidate in candidates if candidate.id != probed.id],
@@ -258,13 +279,20 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
         f"beaten by {probed.id} on the scoring set",
     )
     await write_experience(probed)
-    if adopts_on_its_own(config.adopt, survivor, plan.repeats, case.tainted):
-        await adopt(store, probed.id, time.time())
-        adopted_now: bool = True
-    else:
-        adopted_now = False
-        if config.adopt == "auto" and case.tainted:
+    adopted_now: bool = False
+    # The owner already decided about the survivor while the step ran: nothing is left to adopt or to leave to them.
+    if not decided and adopts_on_its_own(config.adopt, survivor, plan.repeats, case.tainted, failed=bool(errors)):
+        replaced: HarnessVersion | None = await adopt_replacing(
+            store, probed.id, None if base is None else base.id, time.time(), await asyncio.to_thread(known_secrets)
+        )
+        adopted_now = replaced is not None
+        if not adopted_now:
+            decision = f"{decision}; left to you: what is in use changed while the step ran"
+    elif not decided and config.adopt == "auto":
+        if case.tainted:
             decision = f"{decision}; left to you: the run had read content others can author"
+        elif errors:
+            decision = f"{decision}; left to you: the step failed after the probes"
     facts: dict[str, JsonValue] = {**facts_now(), "decision": decision, "probed": probed.id}
     if adopted_now:
         facts["adopted"] = True
@@ -316,6 +344,10 @@ async def _compose(
                 "from_run": from_run,
                 "step": step.id,
                 "composed_of": [candidate.id for candidate in winners],
+                # Taint is the OR of the parts (item 588): a composition of text a page may have written is such text,
+                # and what its parts read is what it says.
+                "tainted": any(notes_of(candidate).get("tainted") is True for candidate in winners),
+                "tainted_by": sorted(_read_by(winners)),
                 "decisions": [decision.model_dump() for decision in composition.decisions],
             },
             ensure_ascii=False,
@@ -323,6 +355,16 @@ async def _compose(
         known_secrets(),
     )
     return composed
+
+
+def _read_by(versions: Sequence[HarnessVersion]) -> set[str]:
+    """What the runs the ``versions`` were written from read (``tainted_by`` of their notes), together."""
+    found: set[str] = set()
+    for version in versions:
+        read: JsonValue = notes_of(version).get("tainted_by")
+        if isinstance(read, list):
+            found |= {item for item in read if isinstance(item, str)}
+    return found
 
 
 def _scope_of(version: HarnessVersion) -> ProposalScope:
@@ -395,6 +437,7 @@ async def _write_experience(
         edits=edits,
         adopted=probed is not None,
         summary=f"step {step.id}: {len(candidates)} candidate(s) probed against the base",
+        withheld=withheld_tasks(runtime.config.harness),
     )
     draft: ExperienceDraft = await experience_writer_of(runtime, _SESSION, from_run)(request)
     if draft.entry is not None:

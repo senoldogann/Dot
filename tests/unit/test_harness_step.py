@@ -8,7 +8,7 @@ from dotagent.agent.review import EXPERIENCE_TOOL, PROPOSE_TOOL
 from dotagent.config import load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.harness.components import NO_HARNESS, HarnessText, component_problem
-from dotagent.harness.contrast import Contrast, choose, contrast, contrast_text, scores_of
+from dotagent.harness.contrast import Contrast, choose, contrast, contrast_detail, contrast_text, scores_of
 from dotagent.harness.probe import (
     BASE,
     ProbeAsk,
@@ -76,8 +76,11 @@ def test_a_candidate_is_better_when_it_passes_more_on_a_task_and_less_on_none() 
     # A probe cut short before a task was played twice cannot be judged on it.
     cut = contrast(BASE_REPORT, _report("c4", [_card("a", 1, True), _card("a", 2, True), _card("b", 1, True)]))
     assert (cut.verdict, [task.verdict for task in cut.tasks]) == ("unclear", ["better", "unclear"])
-    assert "a: better (2/2 passed against 1/2" in contrast_text(better)
-    assert contrast_text(better).startswith("In all better: better on 1, worse on 0, tokens +0.")
+    assert "a: better (2/2 passed against 1/2" in contrast_detail(better)
+    assert contrast_text(better) == "In all better: better on 1 of 2 tasks, worse on 0, tokens +0."
+    assert contrast_text(cut) == (
+        "In all unclear: better on 1 of 2 tasks, worse on 0, not played enough to judge on 1, tokens +0."
+    )
 
 
 def test_the_candidate_better_on_the_most_tasks_then_the_cheapest_survives() -> None:

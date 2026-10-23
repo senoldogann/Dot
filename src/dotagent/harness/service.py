@@ -142,6 +142,27 @@ async def adopt(store: Store, version_id: str, now: float, secrets: Sequence[str
     return version
 
 
+async def adopt_replacing(
+    store: Store, version_id: str, replacing: str | None, now: float, secrets: Sequence[str] = ()
+) -> HarnessVersion | None:
+    """Make ``version_id`` the version every run takes, but only if the version in use is still ``replacing`` (``None``:
+    none) and ``version_id`` is still a candidate or a probed one (item 588): what the improvement loop does, since it
+    compared the version with the one in use when its step began and never replaces what the owner chose or set aside
+    since, and never one whose text the gate for learned texts refuses now (:func:`check_adoptable`; ``secrets`` are
+    the values Dot holds). ``None`` when it did not adopt."""
+    try:
+        check_adoptable(await store.get_harness_version(version_id), secrets)
+    except InvalidValueError:
+        log.warning("harness_adopt_refused", version=version_id, replacing=replacing)
+        return None
+    version: HarnessVersion | None = await store.adopt_harness_replacing(version_id, replacing, now)
+    if version is None:
+        log.info("harness_adopt_skipped", version=version_id, replacing=replacing)
+    else:
+        log.info("harness_adopted", version=version.id, replacing=replacing)
+    return version
+
+
 async def retire(store: Store, version_id: str, now: float) -> HarnessVersion:
     """Put ``version_id`` aside; when it was adopted, a run's prompt is Dot's own text alone from now on."""
     version: HarnessVersion = await store.retire_harness(version_id, now)
@@ -228,6 +249,65 @@ def notes_of(version: HarnessVersion) -> dict[str, JsonValue]:
     """A version's notes as the JSON object Dot writes them as (``{}`` for none: a version of the owner's). Notes that
     are not one are a fault, raised as :class:`InvalidValueError`, never read around."""
     return _parsed_notes(version.notes, {"version": version.id})
+
+
+# What a run read, in words, by the kind or the channel that marks a run as one that read content third parties can
+# author (:data:`dotagent.policy.types.TAINTING_KINDS` and ``OUTSIDE_CHANNELS``; ``tainted`` is a result made while the
+# run was tainted already): what a version written from it says of where its text may come from (item 588).
+READ_AS: dict[str, str] = {
+    "network": "a web address",
+    "browser_read": "a page in the browser",
+    "browser_navigate": "a page in the browser",
+    "desktop_observe": "what the screen showed",
+    "mcp": "an answer of a tool server",
+    "mcp_read": "an answer of a tool server",
+    "web": "a web page",
+    "browser": "a page in the browser",
+    "tainted": "content it had read before",
+}
+_READ_UNKNOWN: str = "content others can author (which, was not recorded)"
+
+
+async def taint_of(store: Store, version: HarnessVersion, seen: frozenset[str] = frozenset()) -> tuple[str, ...]:
+    """What tainted ``version``, in words, none when nothing did (item 588, review round 1): the run it was written
+    from read content third parties can author (its notes say so, ``tainted``, and what, ``tainted_by``), or a version
+    it was composed of (``composed_of``) was written from such a run, whatever its own notes say: a version composed
+    before they carried the taint is as tainted as its parts. A version whose notes cannot be read, or whose part is
+    gone, is never shown clean: that is a taint too, and says so. ``seen`` are the versions on the way here."""
+    if version.id in seen:
+        return ()
+    try:
+        notes: dict[str, JsonValue] = notes_of(version)
+    except InvalidValueError:
+        return ("its notes cannot be read",)
+    reasons: list[str] = []
+    if notes.get("tainted") is True:
+        by: JsonValue = notes.get("tainted_by")
+        read: list[str] = (
+            sorted({READ_AS.get(item, item) for item in by if isinstance(item, str)}) if isinstance(by, list) else []
+        )
+        reasons.extend(f"its run read {words}" for words in read or [_READ_UNKNOWN])
+    parts: JsonValue = notes.get("composed_of")
+    for part_id in parts if isinstance(parts, list) else []:
+        if not isinstance(part_id, str):
+            continue
+        try:
+            part: HarnessVersion = await store.get_harness_version(part_id)
+        except NotFoundError:
+            reasons.append(f"a version it was composed of ({part_id}) is gone")
+            continue
+        # A reason says in which version the run read it: the nearest one to where it happened.
+        reasons.extend(
+            reason if "(in " in reason else f"{reason} (in {part_id})"
+            for reason in await taint_of(store, part, seen | {version.id})
+        )
+    return tuple(dict.fromkeys(reasons))
+
+
+async def is_tainted(store: Store, version: HarnessVersion) -> bool:
+    """Whether :func:`taint_of` finds anything that tainted ``version``: its text may come from content third parties
+    can author."""
+    return bool(await taint_of(store, version))
 
 
 def notes_with(notes: str, more: dict[str, JsonValue]) -> str:

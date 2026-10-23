@@ -33,7 +33,7 @@ from dotagent.core.errors import (
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.harness.components import component_problem, description_problem, normalized
+from dotagent.harness.components import component_problem, description_problem, names_a_task, normalized
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import (
@@ -986,10 +986,15 @@ class EditOutcome(FrozenModel):
 
 
 class ExperienceRequest(FrozenModel):
+    """What the experience writer is asked: the run's goal, the edits with what was observed (in counts, never by task:
+    item 588), whether the composed version was adopted, and ``withheld``, the ids of the tasks the candidates are
+    judged on, which no experience may name and which the writer is never shown."""
+
     goal: str
     edits: tuple[EditOutcome, ...]
     adopted: bool
     summary: str
+    withheld: tuple[str, ...] = ()
 
 
 class EditEffect(FrozenModel):
@@ -2055,7 +2060,8 @@ def experience_check(request: ExperienceRequest, held: Sequence[str]) -> Callabl
     """The check of an experience draft for ``request``: one effect for each edit, each naming another, and an entry
     only when an edit helped or hurt, whose cue, lesson and evidence are lines that may stand in a prompt (no secret
     among ``held``, no link, e-mail address, home path or account name, nothing that does not print, no line that
-    imitates the prompt: the one gate for learned texts), since the library is shown to the proposer."""
+    imitates the prompt: the one gate for learned texts), and that names none of the tasks in ``request.withheld``
+    (item 588), since the library is shown to the proposer."""
 
     def check(draft: ExperienceDraft) -> ExperienceDraft:
         _numbers_checked([effect.edit for effect in draft.effects], len(request.edits), "edit")
@@ -2077,6 +2083,13 @@ def experience_check(request: ExperienceRequest, held: Sequence[str]) -> Callabl
                 if problem is not None:
                     raise ProviderProtocolError(
                         f"the experience's {name} cannot stand in the library: {problem}", {name: problem}
+                    )
+                # The task is not named in the answer back to the model, which is never shown the scoring set.
+                if names_a_task(text, request.withheld) is not None:
+                    raise ProviderProtocolError(
+                        f"the experience's {name} names a task the candidates are judged on, which the library never "
+                        "holds: say what the edit did, not on which task",
+                        {name: "names a task of the scoring set"},
                     )
         return draft
 
