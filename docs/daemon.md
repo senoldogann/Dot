@@ -392,8 +392,8 @@ and 544), closed the first time and as the browser last left it after: the statu
 model and its reasoning level, the approval mode, goal mode when it is on, the campaign of a session, the tool calls
 (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as compactions,
 reviews and the goal check), the compactions once there is one, the duration, and the run's mode, its start and its id
-(with a copy button); its other tabs hold the plan, the
-actions, the agents of the chat and the latest screenshots. Each tab wears its icon, and where the strip has no room for
+(with a copy button); its other tabs hold the files the chat changed (Changes), the
+plan, the agents of the chat and the screen (Dot's computer and the latest screenshots). Each tab wears its icon, and where the strip has no room for
 every name, the tabs not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs
 the chat's runs handed work to: five at first and the rest on **Show N more**, each with its face and goal, its
 provider's mark, model and state, what it does now (or did last, from the conversation on the page) and how long it
