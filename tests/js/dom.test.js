@@ -76,6 +76,37 @@ test("repeatsAnswer keeps a reply that says one thing more than the answer", () 
   assert.equal(repeatsAnswer(`${long}\n${warning}`, long), false);
 });
 
+// A finish that edits a few lines of the reply on the way (item 569), as a run of 2026-10-23 did: a path written out
+// whole and a comma made a semicolon, in a plan of 9,590 characters that the chat then showed twice.
+const PLAN = Array.from({ length: 12 }, (_, at) => `Week ${at + 1}: run the campaign for the cafés of Oulu and read the costs on Friday.`).join("\n");
+
+test("repeatsAnswer finds the answer said again with a few lines edited, or with a line more", () => {
+  const reply = `**Full report:** \`.../oulu-meta-ads-plan-2026-10.md\`\n> No data from yesterday, the plan is an estimate, the first report in seven days.\n${PLAN}`;
+  const answer = `**Full report:** \`/Users/dogan/Library/Application Support/Dot/workspace/oulu-meta-ads-plan-2026-10.md\`\n> No data from yesterday, the plan is an estimate; the first report in seven days.\n${PLAN}`;
+  assert.equal(repeatsAnswer(reply, answer), true);
+  assert.equal(repeatsAnswer(`Plan:\n${PLAN}`, `Plan:\n${PLAN}\nTell me if a week should move.`), true);
+  assert.equal(repeatsAnswer(`Plan:\n${PLAN}`, `Here is the plan you asked for.\nPlan:\n${PLAN}`), true);
+});
+
+test("repeatsAnswer keeps a reply whose edited line says something else, or that is a small part of the answer", () => {
+  assert.equal(repeatsAnswer(`Plan:\n${PLAN.replace("Week 3: run", "Week 3: do not run")}`, `Plan:\n${PLAN}`), false);
+  assert.equal(repeatsAnswer(`Plan:\n${PLAN.replace("Week 3:", "Week 30:")}`, `Plan:\n${PLAN}`), false);
+  assert.equal(repeatsAnswer(`Plan:\n${PLAN.replace("cafés of Oulu", "cafés of Turku")}`, `Plan:\n${PLAN}`), false);
+  assert.equal(repeatsAnswer(`Plan:\n${PLAN}`, `Plan:\n${PLAN}\n${PLAN.replaceAll("Week", "Then week")}`), false);
+  // A sign, a unit or a currency is part of a word; words that trade places, or a "not" that moves, say something else.
+  const line = (said) => `Plan:\n${PLAN}\n${said}`;
+  assert.equal(repeatsAnswer(line("Revenue -5% on the week before."), line("Revenue 5% on the week before.")), false);
+  assert.equal(repeatsAnswer(line("Budget 200 €, spent 300 € so far."), line("Budget 300 €, spent 200 € so far.")), false);
+  assert.equal(repeatsAnswer(line("A does not fail, B fails."), line("A fails, B does not fail.")), false);
+  // A path cut short stands only for a path that ends as it does.
+  assert.equal(repeatsAnswer(line("Saved as `.../plan.md` today."), line("Saved as `/old/plan.md.bak` today.")), false);
+  // The reply's first line is the answer's own reworded, not one of the lines the answer added before it.
+  assert.equal(
+    repeatsAnswer(`The plan for the cafés, as it stands:\n${PLAN}`, `Here it is.\nThe plan for the cafés, as I would run it:\n${PLAN}`),
+    false,
+  );
+});
+
 test("nextNight says tonight for an evening still to come and tomorrow once it passed", () => {
   const at = (hours, minutes) => new Date(2026, 9, 23, hours, minutes);
   assert.equal(nextNight("21:00", at(20, 0)), "Next: tonight, 21:00");
