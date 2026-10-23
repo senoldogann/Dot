@@ -1882,6 +1882,27 @@ a.pill:hover {
   max-width: none;
 }
 
+/* Dot's own icon (item 581), which a server of no service wears (marks.js): its own tile, as an application's icon is,
+   filling the tile's place within the tile's corners, on no ground and no ring. */
+:is(.plugin-mark[data-icon="dot"], .slash-mark[data-mark="dot"], .pick-mark[data-mark="dot"]) {
+  background: none;
+  box-shadow: none;
+}
+
+:is(.plugin-mark, .slash-mark, .pick-mark) > .plugin-logo.dot-mark {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.pick-mark[data-mark="dot"] {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-xs);
+}
+
 /* A mark that is no logo (item 542): a connector's icon, the plug of one with no mark of its own and a gallery plugin's
    puzzle piece, light on a tile of its colour lit from its top left, as an application's icon is (a mark with no colour
    of its own takes one of six by its id, marks.js). On a colour too light for a light icon the icon takes the ink. */

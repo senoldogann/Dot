@@ -12,7 +12,7 @@ import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
 import { icon } from "./icons.js";
-import { markContent, markInk } from "./marks.js";
+import { markContent, markInk, wearsDot } from "./marks.js";
 import { touchFirst, trackHeight } from "./layout.js";
 import { openMenu } from "./menu.js";
 import { markdownMirror } from "./mirror.js";
@@ -101,11 +101,12 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
 
   function itemMark(item) {
     // An MCP server, and each of its tools, wear the mark of its service as the service's Customize tile wears it, on
-    // that tile's light ground, or the plug for a server of no service (items 447 and 477); an account its provider's
-    // (item 496).
+    // that tile's light ground, or Dot's own icon for a server of no service (items 447, 477 and 581); an account its
+    // provider's (item 496).
     if (item.kind === "plugin" || item.kind === "tool" || item.kind === "account") {
       const mark = item.mark ?? null;
-      const span = el("span", { class: "slash-mark", dataset: { kind: item.kind, mark: "service" } }, markContent(mark));
+      const ground = wearsDot(mark) ? "dot" : "service";
+      const span = el("span", { class: "slash-mark", dataset: { kind: item.kind, mark: ground } }, markContent(mark));
       const ink = mark === null ? null : markInk(mark.colour);
       if (ink !== null) {
         span.style.setProperty("--plugin-ink", ink);

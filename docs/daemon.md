@@ -168,53 +168,57 @@ Escape closes. The menu stands in sections with a hairline between them and no t
 hears each by name: Commands, Skills, MCP tools): a row is a line icon, the name and under it its words, cut by an
 ellipsis rather than wrapped (item 537, after Qoder's menu: a terminal in a box for a command, the arrows of a loop for
 `/loop`, a puzzle piece for a skill), and under the list stands what the keys do (a touch screen has none, so it has
-no such line). A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the
-slash word goes; a command does its work. `@` at the start of a word opens the menu of the servers and plugins alone
-(item 367, and the owner's word of 2026-10-21, item 447) — the group the menu titles **MCP servers**, the plugins: each
-one by its name and the number of its tools, filtered by the letters after it — the skills and the servers' tools,
-which the slash menu carries, are not there; a pick is a chip and the at word goes. In both menus a server, and each of
-its tools, wears the mark its service's Customize tile wears, on that tile's light ground: the service's logo, else its
-icon or its letters (DeepWiki's magnifier, Context7's C7), the plug for a server of no service; and a skill wears the
-puzzle piece, here and as a chip and as the row of a call to the `skill` tool, plain in the ink of the text (item 537;
-the Customize cards keep the marks of item 477: the download arrow of an imported skill, the brain of a learned one; the
-daemon's palette says which server is of which service). An `@` inside a
-word, as in an address, opens nothing. On a phone either menu takes the room the keyboard leaves above the composer and
-scrolls inside it. A run that waits
-for your approval is listed under Waits for you, below the composer, and leads to its chat: the card stands there alone
-(item 434). Once you allow it, the card leaves the chat with the line that asked for it, as the page opens again too;
-refused, it stays and says so, and a question keeps its answer.
+no such line). An MCP tool is named in words, its server's first, as the row of a call to it is ("Web Research · Web
+crawl results", not `web-research / mcp__web-research__web_crawl_results`; item 581), and the letters find it by those
+words or by the names the model calls it by. A skill picked is a chip under the box, a tool the chip of its server, as
+from the **+** (below), and the slash word goes; a command does its work. `@` at the start of a word opens the menu of
+the servers and plugins alone (item 367, and the owner's word of 2026-10-21, item 447) — the group the menu titles **MCP
+servers**, the plugins: each one by its name and the number of its tools, filtered by the letters after it — the skills
+and the servers' tools, which the slash menu carries, are not there; a pick is a chip and the at word goes. In both
+menus a server, and each of its tools, wears the mark its service's Customize tile wears, on that tile's light ground:
+the service's logo, else its icon or its letters (DeepWiki's magnifier, Context7's C7), the plug for a service with no
+mark of its own, and Dot's own icon, its own tile as an application's is, for a server of no service (web-research, a
+server added by hand; item 581, on its Customize tile and its chip too); and a skill wears the puzzle piece, here and as
+a chip and as the row of a call to the `skill` tool, plain in the ink of the text (item 537; the Customize cards keep
+the marks of item 477: the download arrow of an imported skill, the brain of a learned one; the daemon's palette says
+which server is of which service). An `@` inside a word, as in an address, opens nothing. On a phone either menu takes
+the room the keyboard leaves above the composer and scrolls inside it. A run that waits for your approval is listed
+under Waits for you, below the composer, and leads to its chat: the card stands there alone (item 434). Once you allow
+it, the card leaves the chat with the line that asked for it, as the page opens again too; refused, it stays and says
+so, and a question keeps its answer.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens the file picker at once (documents, photos and
 screenshots alike; a phone opens its own sheet). The slash menu picks **Plugins** (the MCP servers with tools) and
 **Skills**, as `GET /api/palette` lists them; the at menu picks the plugins and the Google and Microsoft accounts signed
 in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
-model; one that is no longer signed in is refused). A plugin, an account or a skill picked is a chip under the box in a colour of
-its name, which its × takes away; the chip of a server wears its service's mark as the menus do (item 530: the logo, the
-icon or the letters, on the tile's light ground), the plug for a server of no service, and for any server until the
-daemon's palette has named it (a draft kept, a message sent); Plan first is a chip too, and a chat has neither it nor goal mode nor Keep going; all
-three switches stand in the **Options** menu's Execution group, under the approvals (item 353). The picks go with the
-message (`plugins`, `skills`, `accounts` and `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is
-sent they stand under it as chips (the run's `picks` event); a message that steers the run under way leaves them for the
-next one, and the page says so, and a queued message with picks is not steered into the run at work: it stays queued to
-start a run of its own. A run sent with picks starts with each picked server's tool group on from its first step when
-its tools are grouped (with every tool offered they are on anyway), and its first message is your words, then a line
-that names the servers to use, Plan first's (write the plan with `update_plan`, then ask with `ask_user` and act once
-you agree: the run's questions wait for your answer, item 508, and the prompt asks the rest; nothing holds the run's
-tools back), and each picked skill's instructions as the `skill`
-tool gives them; the run's goal stays your words. Picks a run cannot start with are refused, with why, and nothing
-starts: a server that is not connected, or none of whose tools a run of its mode may use (a chat's, when the server's
-tools all act), each in its own words, a skill it is not offered, Plan first in a chat or under YOLO (a YOLO run does
-not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is OpenCode's own agent. A
-server picked for a message is open to its run whatever the agent's tools are (item 415): the owner's word for the
-message widens the agent's bounds, and a server picked for an earlier message of the chat stays open to the agent's
-later runs in it (the runs' picks events say which; a server the model only called opens nothing); before, a pick for an
-agent whose tools named no MCP tool was refused as if the server were not connected. A run that goes on from another
-(Resume, or an answer that came after its run ended) starts without the picks: the first message, with their lines and
-skills, stays in the chat, and with grouped tools `use_tools` turns a picked server's group on. **Save from a chat**, on
-the Skills page (`POST /api/runs/{id}/skill`), has the review model write the skill of a chat's last run as a learned
-skill, as one is written when a run ends, also after fewer acting steps than `[agent] skill_min_steps`; it is refused
-while learned skills are off, and for a run that did not end done or took no acting step, a delegated run, an eval's and
-one of OpenCode's agent. The box of a run held it as **Save skill**, under a **More** button, until item 406.
+model; one that is no longer signed in is refused). A plugin, an account or a skill picked is a chip under the box in a
+colour of its name, which its × takes away; the chip of a server wears its service's mark as the menus do (item 530: the
+logo, the icon or the letters, on the tile's light ground), Dot's own icon for a server of no service, and for any
+server until the daemon's palette has named it (a draft kept, a message sent; the plug before item 581); Plan first is a
+chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **Options** menu's
+Execution group, under the approvals (item 353). The picks go with the message (`plugins`, `skills`, `accounts` and
+`plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is sent they stand under it as chips
+(the run's `picks` event); a message that steers the run under way leaves them for the next one, and the page says so,
+and a queued message with picks is not steered into the run at work: it stays queued to start a run of its own. A run
+sent with picks starts with each picked server's tool group on from its first step when its tools are grouped (with
+every tool offered they are on anyway), and its first message is your words, then a line that names the servers to use,
+Plan first's (write the plan with `update_plan`, then ask with `ask_user` and act once you agree: the run's questions
+wait for your answer, item 508, and the prompt asks the rest; nothing holds the run's tools back), and each picked
+skill's instructions as the `skill` tool gives them; the run's goal stays your words. Picks a run cannot start with are
+refused, with why, and nothing starts: a server that is not connected, or none of whose tools a run of its mode may use
+(a chat's, when the server's tools all act), each in its own words, a skill it is not offered, Plan first in a chat or
+under YOLO (a YOLO run does not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is
+OpenCode's own agent. A server picked for a message is open to its run whatever the agent's tools are (item 415): the
+owner's word for the message widens the agent's bounds, and a server picked for an earlier message of the chat stays
+open to the agent's later runs in it (the runs' picks events say which; a server the model only called opens nothing);
+before, a pick for an agent whose tools named no MCP tool was refused as if the server were not connected. A run that
+goes on from another (Resume, or an answer that came after its run ended) starts without the picks: the first message,
+with their lines and skills, stays in the chat, and with grouped tools `use_tools` turns a picked server's group on.
+**Save from a chat**, on the Skills page (`POST /api/runs/{id}/skill`), has the review model write the skill of a chat's
+last run as a learned skill, as one is written when a run ends, also after fewer acting steps than `[agent]
+skill_min_steps`; it is refused while learned skills are off, and for a run that did not end done or took no acting
+step, a delegated run, an eval's and one of OpenCode's agent. The box of a run held it as **Save skill**, under a
+**More** button, until item 406.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it

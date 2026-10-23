@@ -624,9 +624,10 @@ async def test_an_at_word_picks_a_server_and_no_skill_and_the_slash_word_the_ski
                     await expect(server.locator(".slash-hint")).to_have_text("10 tools")
                     await expect(menu.locator("[role=group][aria-label='Skills']")).to_have_count(0)
                     await expect(menu.locator("[role=group][aria-label='Commands']")).to_have_count(0)
-                    # A server added by hand has no service behind it: the plug, as its Customize tile has (item 408).
-                    await expect(server.locator("img.plugin-logo")).to_have_count(0)
-                    await expect(server.locator(".slash-mark svg")).to_have_count(1)
+                    # A server added by hand has no service behind it: Dot's own icon, as its Customize tile has (items
+                    # 408 and 581).
+                    await expect(server.locator("img.plugin-logo.dot-mark")).to_have_count(1)
+                    await expect(server.locator(".slash-mark svg")).to_have_count(0)
                     # The menu keeps inside the window, its top too; and a phone's keyboard, which pans the page without
                     # resizing it, leaves it the band `--seen-top`..`--seen-bottom` above the dock (item 447).
                     box: dict[str, float] | None = await menu.bounding_box()
@@ -717,6 +718,15 @@ def _write_copied_skill(home: Path, theirs: Path) -> None:
     (copied / ADDED_MARKER).write_text(made.model_dump_json(), encoding="utf-8")
 
 
+# Dot's own icon, which a server of no service wears (item 581).
+DOT_MARK: str = "logo:/icons/icon-96.png"
+
+
+def _titled(server: str) -> str:
+    """A server's name as the menu's row titles it (tools.js `titled`): `microsoft-learn` reads "Microsoft Learn"."""
+    return " ".join(word[0].upper() + word[1:] for word in re.split(r"[_-]+", server) if word != "")
+
+
 async def _mark_of(mark: Locator) -> str:
     """What a mark shows, as the page drew it: its picture's file or its icon's name."""
     shown: str = await mark.evaluate(
@@ -736,10 +746,11 @@ async def _mark_of(mark: Locator) -> str:
 async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict[str, str], tmp_path: Path) -> None:
     """Items 447 and 477: a server of the at menu, and each of its tools in the slash menu, wear the mark its service's
     Customize tile wears — a logo, an icon (DeepWiki's) or the plug (Context7's, item 542) — on a light ground, and a
-    server of no service the plug; a skill wears its Customize card's mark: an imported one's, a learned one's, else its
-    own. The daemon says which skill is a copy and which server is of which service, and a server of the config at a
-    service's address wears the service's mark on its own tile too. The menus' palette names the catalogue's servers,
-    with the directory's marks, since none answers offline. Wide and light, and on a phone and dark."""
+    server of no service Dot's own icon (item 581); a skill wears its Customize card's mark: an imported one's, a
+    learned one's, else its own. The daemon says which skill is a copy and which server is of which service, and a
+    server of the config at a service's address wears the service's mark on its own tile too. The menus' palette names
+    the catalogue's servers, with the directory's marks, since none answers offline. Wide and light, and on a phone and
+    dark."""
     with scratch_home() as home, eval_environment(home, {}):
         _write_skill(home)
         _write_copied_skill(home, tmp_path / "theirs")
@@ -771,7 +782,7 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                 "servers": [
                     {
                         "name": name,
-                        "tools": [{"name": f"{name}_lookup", "description": "Look it up."}],
+                        "tools": [{"name": f"mcp__{name}__lookup", "description": "Look it up."}],
                         "mark": None if (found := mark_of_service(name)) is None else found.model_dump(),
                     }
                     for name in (*MARKED, SERVER)
@@ -805,6 +816,11 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     await page.get_by_role("button", name=re.compile(r"^Connected \d+$")).click()
                     own_tile: str = await _mark_of(page.locator(f".plugin-server[data-server='{WIKI}'] .plugin-mark"))
                     assert own_tile == tiles["deepwiki"], own_tile
+                    # A server of no service wears Dot's own icon as its own tile, on no ground (item 581).
+                    fixture_tile: Locator = page.locator(f".plugin-server[data-server='{SERVER}'] .plugin-mark")
+                    assert await _mark_of(fixture_tile) == DOT_MARK
+                    await expect(fixture_tile).to_have_attribute("data-icon", "dot")
+                    await expect(fixture_tile).not_to_have_attribute("data-tint", "")
                     await page.route("**/api/palette", lambda route: route.fulfill(json=menus))
                     await page.goto(f"{address}/#/customize/skills")
                     cards: dict[str, str] = {
@@ -828,16 +844,16 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                         ground: str = await mark.evaluate("(node) => getComputedStyle(node).backgroundColor")
                         assert ground == "rgb(255, 255, 255)", (name, ground)
                     fixture: Locator = menu.get_by_role("option").filter(has_text=SERVER).locator(".slash-mark")
-                    assert await _mark_of(fixture) == "icon:plug"
+                    assert await _mark_of(fixture) == DOT_MARK
                     await page.screenshot(path=str(tmp_path / f"at-marks-{width}-{scheme}.png"), animations="disabled")
                     # Picked for the message, a server's chip wears the same mark (item 530): its service's, on the
-                    # tile's ground, or the plug for a server of no service.
+                    # tile's ground, or Dot's own icon for a server of no service (item 581).
                     for name in (*MARKED, SERVER):
                         await goal.fill("")
                         await goal.type(f"@{name}")
                         await menu.get_by_role("option").filter(has_text=name).first.click()
                         chip_mark: Locator = page.locator(f".composer .pick-chip[data-name='{name}'] .pick-mark")
-                        assert await _mark_of(chip_mark) == (tiles[name] if name in MARKED else "icon:plug"), name
+                        assert await _mark_of(chip_mark) == (tiles[name] if name in MARKED else DOT_MARK), name
                         chip_ground: str = await chip_mark.evaluate("(node) => getComputedStyle(node).backgroundColor")
                         assert (chip_ground == "rgb(255, 255, 255)") == (name in MARKED), (name, chip_ground)
                     await page.screenshot(path=str(tmp_path / f"chips-{width}-{scheme}.png"), animations="disabled")
@@ -847,7 +863,9 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     await goal.type("/")
                     for name in MARKED:
                         tool: Locator = (
-                            menu.get_by_role("option").filter(has_text=f"{name}_lookup").locator(".slash-mark")
+                            menu.get_by_role("option")
+                            .filter(has_text=f"{_titled(name)} · Lookup")
+                            .locator(".slash-mark")
                         )
                         assert await _mark_of(tool) == tiles[name], name
                     skill_marks: dict[str, str] = {
@@ -868,11 +886,12 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
 
 
 @pytest.mark.browser
-async def test_a_server_chip_drawn_before_the_palette_arrives_wears_the_plug_and_then_the_mark(
+async def test_a_server_chip_drawn_before_the_palette_arrives_wears_dots_icon_and_then_the_mark(
     login_env: dict[str, str],
 ) -> None:
     """Item 530: a draft kept, or a message sent, names its servers before the menu that lists them has been opened, so
-    the chip of a server is drawn with the plug, asks for the palette, and wears the service's mark as it arrives."""
+    the chip of a server is drawn with Dot's own icon (the plug before item 581), asks for the palette, and wears the
+    service's mark as it arrives; a server of no service keeps Dot's."""
     with scratch_home() as home, eval_environment(home, {}):
         learn: ServiceMark | None = mark_of_service("microsoft-learn")
         assert learn is not None
@@ -911,13 +930,13 @@ async def test_a_server_chip_drawn_before_the_palette_arrives_wears_the_plug_and
                 await page.goto(f"{address}/#/runs")
                 marks: Locator = page.locator(".composer .pick-list .pick-chip[data-kind='plugin'] .pick-mark")
                 await expect(marks).to_have_count(2)
-                assert [await _mark_of(marks.nth(at)) for at in range(2)] == ["icon:plug", "icon:plug"]
+                assert [await _mark_of(marks.nth(at)) for at in range(2)] == [DOT_MARK, DOT_MARK]
                 arrived.set()
                 served: Locator = page.locator(".composer .pick-chip[data-name='microsoft-learn'] .pick-mark")
                 await expect(served.locator("img.plugin-logo")).to_have_count(1)
                 assert await _mark_of(served) == "logo:/icons/plugins/microsoft-icon.svg"
                 assert await served.evaluate("(node) => getComputedStyle(node).backgroundColor") == "rgb(255, 255, 255)"
                 of_no_service: Locator = page.locator(f".composer .pick-chip[data-name='{SERVER}'] .pick-mark")
-                assert await _mark_of(of_no_service) == "icon:plug"
+                assert await _mark_of(of_no_service) == DOT_MARK
             finally:
                 await browser.close()

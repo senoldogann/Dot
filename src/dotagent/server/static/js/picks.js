@@ -7,7 +7,7 @@
 
 import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
-import { markContent, markInk } from "./marks.js";
+import { markContent, markInk, wearsDot } from "./marks.js";
 import { onServerMarks, serverMark, wantServerMarks } from "./palette.js";
 import { toast } from "./ui.js";
 
@@ -44,15 +44,14 @@ function tint(node, name) {
 }
 
 /** Draw the mark of the chip of the MCP server `name` into `holder` (its `.pick-mark`): its service's mark as the at menu
- * draws it, on the tile's ground, light in both colour schemes (item 530); the plug in the chip's colour for a server of
- * no service, and for one the palette has not named yet. */
+ * draws it, on the tile's ground, light in both colour schemes (item 530); Dot's own icon for a server of no service,
+ * and for one the palette has not named yet (item 581). */
 function paintServerMark(holder, name) {
   const mark = serverMark(name);
   holder.replaceChildren(markContent(mark));
-  if (mark === null) {
-    delete holder.dataset.mark;
+  if (wearsDot(mark)) {
+    holder.dataset.mark = "dot";
     holder.style.removeProperty("--plugin-ink");
-    tint(holder, name);
     return;
   }
   holder.dataset.mark = "service";
@@ -64,7 +63,7 @@ function paintServerMark(holder, name) {
   }
 }
 
-// A chip drawn before the palette arrived wears the plug: each chip that names a server is drawn again as the palette
+// A chip drawn before the palette arrived wears Dot's icon: each chip that names a server is drawn again as the palette
 // gives the marks, the chips under a sent message too.
 onServerMarks(() => {
   for (const chip of document.querySelectorAll(".pick-chip[data-kind='plugin']")) {
