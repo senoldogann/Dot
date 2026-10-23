@@ -180,7 +180,9 @@ composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the 
 The **Morning brief** (item 570) is a schedule too, set on a card at the head of the page and labelled **Brief** in the
 list: a read-only run (`research`) at the time you set whose goal Dot builds each time it fires, from what it knows of
 itself, and whose first line goes to your phone. It counts against `max_schedules` while it is on, switches off in the
-list and fires, skips and fails as any schedule does (see [Dot comes to you](proactive.md)).
+list and fires, skips and fails as any schedule does (see [Dot comes to you](proactive.md)). The **Watchers** panel
+under it (item 571) is not a schedule: it looks at mail, calendar events and GitHub notifications and tells you of what
+you care about.
 
 On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task or research: a chat that only talks

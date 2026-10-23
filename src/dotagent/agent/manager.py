@@ -86,6 +86,7 @@ from dotagent.llm.types import ONE_MESSAGE_LEVELS, Effort, ModelInfo, OneMessage
 from dotagent.memory.service import SavedMemory
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
+from dotagent.proactive import NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
@@ -803,6 +804,87 @@ class RunManager:
             agent_id,
         )
         return run
+
+    async def start_alert(self, goal: str, opening: str, thread_id: str) -> RunRecord:
+        """Queue the run a watcher starts for an item that came in (item 571), in the chat ``thread_id``. ``goal`` is
+        the owner's own words, which the run keeps, its reviewer takes as the owner's instruction and its chat shows;
+        ``opening`` is its first message to the model: the item, fenced, with where it came from, and the goal. The
+        run is a task, nobody watches it (the source :data:`WATCHER_SOURCE`, which asks no question of anyone), it
+        takes the configured model and approvals, and it starts tainted: the item was written by a third party, so
+        what reaches other people or lasts asks first."""
+        run, _ = await self._launch(
+            goal,
+            "task",
+            None,
+            thread_id,
+            WATCHER_SOURCE,
+            None,
+            None,
+            "standard",
+            None,
+            None,
+            RunOpening(text=opening, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS, tainted=True),
+            None,
+            None,
+        )
+        return run
+
+    async def keep_notice(self, thread_id: str, goal: str, text: str) -> RunRecord:
+        """Keep a line in the chat ``thread_id`` that no model wrote (item 571, the tells of the watchers): a run of
+        the source :data:`NOTICE_SOURCE`, in chat mode, stored as it ends done, whose ``goal`` is Dot's own words and
+        whose result is ``text``. Its ``goal`` holds nothing a third party wrote, since a later run in the chat takes
+        the goals of the chat's runs as what the owner told it; ``text`` may, so the run is marked tainted. Its end is
+        not published, as the end of a run is, for the push and the desktop would tell it a second time: what keeps
+        the line tells it once. Its start is, after it ended, so that the pages list it. Raises :class:`RunConflict`
+        while a run works in the chat."""
+        runtime: Runtime = self._runtime
+        model: str = self._main_model
+        approvals: ApprovalMode = runtime.config.policy.approvals
+
+        async def stored() -> RunRecord:
+            return await runtime.store.create_run(
+                thread_id,
+                goal,
+                "chat",
+                model,
+                None,
+                NOTICE_SOURCE,
+                runtime.config.models.effort,
+                "standard",
+                None,
+                approvals,
+                False,
+                None,
+                None,
+                self._owner_id(),
+            )
+
+        run: RunRecord = await self._stored_run(stored)
+        queued: EventRecord = await runtime.store.add_event(
+            run.id,
+            "run_queued",
+            {
+                "goal": goal,
+                "mode": "chat",
+                "model": model,
+                "effort": runtime.config.models.effort,
+                "speed": "standard",
+                "approvals": approvals,
+                "goal_mode": False,
+                "parent_run_id": None,
+                "agent_id": None,
+                "tainted": True,
+                "models": {
+                    "steps": model,
+                    "compaction": model,
+                    "review": runtime.roles.review(),
+                    "vision": runtime.roles.vision(),
+                },
+            },
+        )
+        await runtime.store.end_run(run.id, "done", text, {"status": "done", "result": text, "needs": ""})
+        runtime.bus.publish(queued)
+        return await runtime.store.get_run(run.id)
 
     async def start_for_agent(
         self,
@@ -2187,8 +2269,11 @@ class RunManager:
         for the same reason: a schedule's firing, from the earlier runs whose words it reads (item 257); the run a kept
         step's answer starts, from the run that kept it, the run at the top of its delegations and the chat's last run
         (items 482, 485); and the run the answer to a question of a run the owner watched starts, from the run that
-        asked and the chat's last run (item 508). Any other run starts untainted. Asked before the run's record is made:
-        the chat's last run is the one before it."""
+        asked and the chat's last run (item 508). The run a watcher starts (``opening.tainted``, item 571) starts
+        tainted whatever it goes on from: a third party's words set it off. Any other run starts untainted. Asked
+        before the run's record is made: the chat's last run is the one before it."""
+        if opening.tainted:
+            return True
         if parent is not None:
             return parent.gate.tainted
         if opening.resumed is not None:

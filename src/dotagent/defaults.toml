@@ -830,6 +830,21 @@ stop_after_failures = 0
 # Schedules row still say it); a schedule may choose its own, and a run you start by hand is always told.
 notify = "always"
 
+[watchers]
+# Watchers (item 571, docs/proactive.md): the daemon looks at the mail, the calendar and the GitHub notifications you ask
+# it to watch, and tells you when something you care about comes. false: no watcher looks.
+enabled = true
+# How often the daemon sees which watcher is due. A watcher looks at its own interval (5 minutes for mail and GitHub, by
+# default; for the calendar, how many minutes before an event it tells), not at this one.
+tick_s = 15.0
+# The most tells one watcher makes in an hour; what comes past it that hour is said in one line ("and 7 more").
+tells_per_hour = 20
+# The most runs one watcher starts in an hour (a watcher set to start a run); a tell past it goes out without a run.
+runs_per_hour = 5
+# The most mails or notifications of one look that are judged against your words; the rest of a flood is left unjudged
+# and not told (the watcher's row says how many).
+judged_per_look = 25
+
 [skills]
 # Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML
 # frontmatter (name, description) and optional scripts/, references/ and assets/. The agent sees "name: description" for

@@ -21,6 +21,7 @@ from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel
 from dotagent.evals import EVAL_SOURCE
 from dotagent.policy.types import ApprovalMode, QuestionMode
+from dotagent.proactive import WATCHER_SOURCE
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.store.endings import PREFIX_STALLED
 from dotagent.tools.context import AskMode
@@ -42,7 +43,7 @@ _STOP_ACTIONS: int = 8
 _STOP_TOUCHED: int = 10
 _STOP_PLAN_CHARS: int = 1500
 # Runs that nobody watches: nobody can answer a question there.
-_UNATTENDED_SOURCES: frozenset[str] = frozenset({SCHEDULE_SOURCE, DELEGATE_SOURCE, EVAL_SOURCE})
+_UNATTENDED_SOURCES: frozenset[str] = frozenset({SCHEDULE_SOURCE, WATCHER_SOURCE, DELEGATE_SOURCE, EVAL_SOURCE})
 
 _FULL_PATTERNS: tuple[Pattern, ...] = ("repeat", "cycle", "failures", "revisiting")
 _PLAIN_PATTERNS: tuple[Pattern, ...] = ("repeat",)

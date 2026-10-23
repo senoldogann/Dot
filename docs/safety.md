@@ -48,12 +48,20 @@ shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, s
   campaigns at work and the schedules of the day, as lines cut to 160 characters with their secrets masked, and what
   its mail and calendar reads return; it goes to the model the run runs on, as the rest of a run's conversation does. It
   is a `research` run, which cannot send, change or delete anything. No other service is asked.
+- **To the fast model, for a watcher that has your words: each new mail or notification.** A mail watcher (and a GitHub
+  watcher you gave words, item 571, see [Dot comes to you](proactive.md#watchers)) asks the `fast` model one question
+  for each new mail or notification, with your words: a mail's sender, recipients, subject and first lines, or a
+  notification's repository, kind, reason and title, in the fence of the mail tools. A calendar watcher, and a GitHub
+  watcher without words, ask no model. A mail that cannot be judged is told to you, so it is not dropped.
+- **To GitHub, for a GitHub watcher: the request for your notifications.** `api.github.com/notifications` with your
+  personal access token, every few minutes, as a conditional request; it carries nothing else of yours.
 - **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; none is
   set up by default (see [MCP servers](extending.md#mcp-servers)).
 - **To your Google and Microsoft accounts, once you sign one in: what the mail and calendar tools ask.** `mail_search`,
   `mail_read` and `calendar_events` ask Gmail and Google Calendar (`googleapis.com`) or Microsoft Graph
   (`graph.microsoft.com`) for your messages and events, with the words of a search (see
-  [Mail and calendars](runs.md#mail-and-calendars)).
+  [Mail and calendars](runs.md#mail-and-calendars)); a mail or calendar watcher asks them for the newest mail of the
+  inbox or the events of the next minutes every few minutes (item 571).
 - **To 1Password, once you connect it: the requests of `op`.** Its service account reads the vault you shared with Dot
   through 1Password's servers (see [1Password](extending.md#1password)).
 - **To GitHub, when you install a plugin of the gallery: the request for its archive.** It names the plugin's
@@ -303,10 +311,13 @@ answers what the run asked rather than sending it on its way: the run it reaches
 once that run has ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a
 resumed run as the run it resumes was when it was cut off, and the run that tells a chat that its command in the
 background ended as the chat's last run ended: that message is Dot's, not yours, and so is the note that tells a run at
-work of such an end, which clears nothing. A message you send starts a run unmarked. A note a run saved while it was
-marked keeps that origin (`tainted`): it is never among the notes a run starts with, is handed while it works or as a
-site's lessons (item 384), a `memory_search` that returns one marks the run that read it, so its next save asks again,
-and Settings › Memory and `dotx memory list` say of such a note that it was saved while reading outside content.
+work of such an end, which clears nothing. The run a watcher starts for a mail, an event or a notification (item 571,
+see [Dot comes to you](proactive.md#watchers)) starts untrusted whatever it goes on from, since what a stranger wrote
+set it off: its goal is your own words and the item stands in its first message, in a fence. A message you send starts
+a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`): it is never among the notes a run
+starts with, is handed while it works or as a site's lessons (item 384), a `memory_search` that returns one marks the
+run that read it, so its next save asks again, and Settings › Memory and `dotx memory list` say of such a note that it
+was saved while reading outside content.
 
 **Outside content in yolo** (item 525). A `yolo` run asks nothing, and a run marked untrusted may be steered by what a
 stranger wrote. Two checks hold for such a run, and neither asks you:
