@@ -185,6 +185,12 @@ function proven() {
   return proving;
 }
 
+/** The event the page sends once a request of it changed a schedule (item 580): the daemon tells of no change of one,
+ * and the sidebar marks the chats a loop goes on in. */
+export const SCHEDULES_CHANGED_EVENT = "dot:schedules-changed";
+// A request that changes a schedule: one of /schedules, or a chat's new loop (/runs/{id}/loop).
+const SCHEDULE_CHANGE = /^\/(schedules(\/|$|\?)|runs\/[^/]+\/loop$)/;
+
 export async function request(method, path, body) {
   await proven();
   const headers = authHeaders();
@@ -201,6 +207,9 @@ export async function request(method, path, body) {
   }
   if (!response.ok) {
     throw await errorOf(response, path);
+  }
+  if (method !== "GET" && SCHEDULE_CHANGE.test(path)) {
+    window.dispatchEvent(new CustomEvent(SCHEDULES_CHANGED_EVENT));
   }
   const text = await response.text();
   if (text === "") {

@@ -438,7 +438,14 @@ def _summary(row: aiosqlite.Row) -> ThreadSummary:
         actor_id=row["actor_id"],
         last_message=answer if answer != "" else plain_line(row["latest_goal"], _LAST_MESSAGE_CHARS),
         last_role="assistant" if answer != "" else "user",
+        loop_cron=row["loop_cron"],
+        loop_next_at=row["loop_next_at"],
     )
+
+
+# A chat's loop (item 580): a switched-on repeating schedule of the chat ``t`` whose runs go on in it, by its own choice
+# or by ``[scheduler] same_chat`` (the one parameter) when it makes none.
+_CHAT_LOOP: str = "s.thread_id = t.id AND s.enabled = 1 AND s.cron IS NOT NULL AND COALESCE(s.same_chat, ?) = 1"
 
 
 # The runs "while you were away" reads (item 466): of the scheduler's source, no helper's, still in their chat, ended at
@@ -1510,12 +1517,13 @@ class Store:
         )
         await self._db.commit()
 
-    async def list_thread_summaries(self, limit: int) -> list[ThreadSummary]:
+    async def list_thread_summaries(self, limit: int, same_chat: bool = False) -> list[ThreadSummary]:
         """The chats, the pinned ones first (the last pinned first, so they are listed however old), then the latest
         activity first: every thread with a run a person started on it, with the latest of those runs. Threads holding
         only delegated runs are left out, and so are the threads of a campaign's sessions after the first, which start
         in threads of their own: the campaign's page lists them, and the campaign's conversation stays a chat. The
-        runs a rewind took out of their chat (item 282) are not counted."""
+        runs a rewind took out of their chat (item 282) are not counted. Each chat says its loop (item 580), the
+        schedules that make none of their own going on in their chat when ``same_chat`` (``[scheduler] same_chat``)."""
         rows: list[aiosqlite.Row] = await self._all(
             "WITH ranked AS ("
             " SELECT thread_id, id, status, mode, created_at, finished_at,"
@@ -1528,11 +1536,14 @@ class Store:
             "  r.created_at AS latest_created_at,"
             "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread,"
             "  COALESCE(latest.agent_id, latest.campaign_id) AS actor_id,"
-            "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result"
+            "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result,"
+            f"  (SELECT s.cron FROM schedules AS s WHERE {_CHAT_LOOP}"
+            "   ORDER BY s.next_run_at IS NULL, s.next_run_at LIMIT 1) AS loop_cron,"
+            f"  (SELECT MIN(s.next_run_at) FROM schedules AS s WHERE {_CHAT_LOOP}) AS loop_next_at"
             " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
             " JOIN runs AS latest ON latest.id = r.id"
             " ORDER BY t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?",
-            (_LAST_MESSAGE_READ_CHARS, _LAST_MESSAGE_READ_CHARS, limit),
+            (_LAST_MESSAGE_READ_CHARS, _LAST_MESSAGE_READ_CHARS, int(same_chat), int(same_chat), limit),
         )
         return [_summary(row) for row in rows]
 

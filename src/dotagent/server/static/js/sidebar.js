@@ -8,14 +8,15 @@
 // read. Each chat stands once (item 202): a chat at work stands under Working, wearing the faces of the runs it delegated
 // (item 507), and goes back among the days once it rests; a pinned one stays under Pinned, with the same faces.
 
-import { ApiError, api, request } from "./api.js";
-import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
+import { ApiError, api, request, SCHEDULES_CHANGED_EVENT } from "./api.js";
+import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, hourMinute, keepChildren, plural, setText, workingFor } from "./dom.js";
 import { icon } from "./icons.js";
 import { actorFace, lookOf } from "./actors.js";
 import { onAssistant } from "./assistant.js";
 import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
+import { loopRhythm } from "./loops.js";
 import { markContent, markInk } from "./marks.js";
 import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows } from "./nesting.js";
@@ -197,13 +198,40 @@ function chatText(chat, children) {
   return el("span", { class: "side-chat-text" }, el("span", { class: "side-run-goal" }, clip(chat.title, 120)), under);
 }
 
+/** What a chat's loop says of itself (item 580): how often it asks again and when next ("Loops every 30 minutes, next
+ * 15:30"), or null for a chat with no loop. A daemon from before item 580 sends none. */
+function loopWords(chat) {
+  const cron = chat.loop_cron ?? null;
+  if (cron === null) {
+    return null;
+  }
+  const next = chat.loop_next_at ?? null;
+  const rhythm = `Loops ${loopRhythm(cron) ?? "on its schedule"}`;
+  return next === null ? rhythm : `${rhythm}, next ${hourMinute(next)}`;
+}
+
+/** A chat's creature, with the mark of its loop at its foot (item 580): arrows that turn slowly in a glow, so that a
+ * chat that asks again by itself stands out in the list. The row's name says the loop to a screen reader. */
+function loopFace(face, words) {
+  if (words === null) {
+    return face;
+  }
+  return el("span", { class: "side-face" }, face, el("span", { class: "side-loop", title: words, "aria-hidden": "true" }, icon("refresh")));
+}
+
 /** A chat as a link: it opens on the latest run a person started on it. Its creature (`face`, item 277) stands at its
- * left, its name over its last line, where the faces of the runs it delegated stand instead of its last words while they
- * work (item 507); at its right its last activity in the fewest characters (item 121), or, while its latest run works,
- * Working and for how long (item 122), over the accent dot of a chat that is unread (item 131). A daemon from before
- * item 131 sends no `unread`, and its chats are read. */
+ * left, with the mark of its loop when it has one (item 580), its name over its last line, where the faces of the runs
+ * it delegated stand instead of its last words while they work (item 507); at its right its last activity in the
+ * fewest characters (item 121), or, while its latest run works, Working and for how long (item 122), over the accent
+ * dot of a chat that is unread (item 131). A daemon from before item 131 sends no `unread`, and its chats are read. */
 function chatLink(chat, onNavigate, face, children) {
-  const word = [STATUS_WORD[chat.latest_status], helperWords(children), chat.unread === true ? "unread" : undefined]
+  const loop = loopWords(chat);
+  const word = [
+    STATUS_WORD[chat.latest_status],
+    helperWords(children),
+    chat.unread === true ? "unread" : undefined,
+    loop === null ? undefined : loop.toLowerCase(),
+  ]
     .filter((part) => part !== undefined && part !== "")
     .join(", ");
   const title = clip(chat.title, 120);
@@ -216,7 +244,7 @@ function chatLink(chat, onNavigate, face, children) {
       "aria-label": word === "" ? null : `${title} (${word})`,
       onclick: onNavigate,
     },
-    face,
+    loopFace(face, loop),
     chatText(chat, children),
     el(
       "span",
@@ -1046,6 +1074,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
   });
   const stopStream = onStreamBack(reloadSoon);
+  // The daemon tells of no change of a schedule: a page that made one says so, and the marks of the loops follow.
+  window.addEventListener(SCHEDULES_CHANGED_EVENT, reloadSoon);
   document.addEventListener("visibilitychange", onBackInView);
   window.addEventListener("focus", onBackInView);
 
@@ -1293,6 +1323,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       clearInterval(marksTicker);
       stopLifecycle();
       stopStream();
+      window.removeEventListener(SCHEDULES_CHANGED_EVENT, reloadSoon);
       document.removeEventListener("visibilitychange", onBackInView);
       window.removeEventListener("focus", onBackInView);
       window.removeEventListener("keydown", onEscape);

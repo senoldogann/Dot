@@ -283,3 +283,51 @@ async def test_slash_loop_in_a_new_chat_starts_it_with_its_loop(tmp_path: Path) 
                 await page.close()
         finally:
             await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_stops(tmp_path: Path) -> None:
+    """Item 580: a chat with a loop wears its mark at the foot of its creature in the sidebar, turning slowly in a glow
+    that breathes (still under reduced motion), and its row says the loop to a screen reader; the loop stopped, the mark
+    goes without the page being read again. A chat without a loop wears none."""
+    turns: tuple[ScriptedTurn, ...] = tuple(_finish(f"Answer {number}.") for number in range(1, 6))
+    async with _daemon(turns) as (manager, address), async_playwright() as playwright:
+        run: RunRecord = await _first_run(manager)
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            for scheme, motion in (("light", "no-preference"), ("dark", "reduce")):
+                page: Page = await browser.new_page(
+                    viewport={"width": 1280, "height": 900}, color_scheme=scheme, reduced_motion=motion
+                )
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs/{run.id}")
+                sidebar: Locator = page.get_by_role("complementary", name="Sidebar")
+                # The chat's row, which leads to its latest run: the first run's, or the one the last loop sent.
+                row: Locator = sidebar.locator(".side-run", has_text="Say hello")
+                await expect(row).to_be_visible()
+                await expect(row.locator(".side-loop")).to_have_count(0)
+                box: Locator = page.locator(".dock textarea")
+                await box.fill("/loop 30m check the build")
+                await box.press("Enter")
+                await expect(page.get_by_role("region", name="Loops of this chat")).to_be_visible()
+                # The loop's message went at once as the chat's next run, which is the row's now.
+                looping: Locator = sidebar.locator(".side-run", has=page.locator(".side-loop"))
+                await expect(looping).to_have_count(1)
+                await expect(looping).to_have_attribute("aria-label", re.compile(r"loops every 30 minutes, next \d"))
+                mark: Locator = looping.locator(".side-loop")
+                await expect(mark).to_have_attribute("title", re.compile(r"^Loops every 30 minutes, next \d"))
+                face = await looping.locator(".side-face .avatar").bounding_box()
+                badge = await mark.bounding_box()
+                assert face is not None and badge is not None
+                # At the creature's foot, on its right.
+                assert badge["x"] + badge["width"] > face["x"] + face["width"] - 1
+                assert badge["y"] + badge["height"] > face["y"] + face["height"] - 1
+                animation: str = await mark.evaluate("node => getComputedStyle(node).animationName")
+                assert animation == ("none" if motion == "reduce" else "loop-glow"), animation
+                await sidebar.screenshot(path=tmp_path / f"loop-mark-{scheme}.png")
+                await page.get_by_role("button", name="Stop the loop check the build").click()
+                await page.get_by_role("dialog").get_by_role("button", name="Stop").click()
+                await expect(sidebar.locator(".side-loop")).to_have_count(0)
+                await page.close()
+        finally:
+            await browser.close()
