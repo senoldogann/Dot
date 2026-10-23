@@ -40,7 +40,8 @@ export function loopRhythm(cron) {
   return hours !== null ? `every ${hours[1]} hours` : null;
 }
 
-/** How often a loop asks again, in words; another schedule of the chat (one a run made) is said as the daemon says it. */
+/** How often a loop asks again, in words; another schedule of the chat (one a run made) is said as the daemon says
+ * it. */
 function rhythmWords(view) {
   return loopRhythm(view.record.cron ?? "") ?? view.when;
 }

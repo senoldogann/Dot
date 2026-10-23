@@ -6,10 +6,10 @@ import { api } from "./api.js";
 
 /** A palette read by `read()` (a promise of `GET /palette`'s answer): `loadPalette()` asks once and keeps the answer, a
  * failure is not kept, so that the next ask tries again; `serverMark(name)` is the mark of an MCP server the palette
- * lists (`{ logo, glyph, colour }`, or null for a server of no service and for one it has not named yet, which
- * wear the plug); `wantServerMarks()` asks for the palette, once, for the chips that name a server before any menu that
- * lists them has been opened (a draft kept, a message sent); `onServerMarks(listener)` runs `listener()` each time the
- * palette arrives and its marks are remembered. */
+ * lists (`{ logo, glyph, colour }`, or null for a server of no service and for one it has not named yet, which wear
+ * Dot's own icon, item 581); `wantServerMarks()` asks for the palette, once, for the chips that name a server before
+ * any menu that lists them has been opened (a draft kept, a message sent); `onServerMarks(listener)` runs `listener()`
+ * each time the palette arrives and its marks are remembered. */
 export function createPalette(read) {
   let paletteLoad = null;
   let wanted = false;
@@ -45,7 +45,7 @@ export function createPalette(read) {
   return {
     loadPalette,
     serverMark: (name) => serverMarks.get(name) ?? null,
-    // A failure is told in the console and the chips keep the plug; the menu says it to the owner when it is opened.
+    // A failure is told in the console and the chips keep Dot's icon; the menu says it to the owner when it is opened.
     wantServerMarks: () => {
       if (wanted) {
         return;
@@ -64,7 +64,7 @@ const shared = createPalette(() => api.get("/palette"));
 /** The palette of the page, asked for once and kept (see `createPalette`). */
 export const loadPalette = shared.loadPalette;
 /** The mark of the MCP server `name` as the palette lists it, or null for a server of no service and for one the
- * palette has not named (yet), which wear the plug. */
+ * palette has not named (yet), which wear Dot's own icon (item 581). */
 export const serverMark = shared.serverMark;
 /** Ask for the palette, once, for the marks of the servers a chip names. */
 export const wantServerMarks = shared.wantServerMarks;

@@ -1,7 +1,7 @@
 // The marks things wear wherever they are listed (item 477): a service's mark on its Customize tile and on a server of
-// it in the composer's menus, the plug on a server of no service and on a service with no mark of its own (item 542),
-// and a skill's on its Customize card and in the slash menu. The pages draw them from here, so that a mark is the same
-// in both places.
+// it in the composer's menus, the plug on a service with no mark of its own (item 542), Dot's own icon on a server of
+// no service (item 581), and a skill's on its Customize card and in the slash menu. The pages draw them from here, so
+// that a mark is the same in both places.
 
 import { el } from "./dom.js";
 import { hashId } from "./hues.js";
@@ -26,6 +26,10 @@ function luminance(hex) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+// Dot's own icon (item 581), which a server of no service wears: web-research, which comes with Dot, and the servers
+// added by hand. A service of the catalogue keeps its own mark, or the plug: its name is no one else's to draw.
+const DOT_ICON = "/icons/icon-96.png";
+
 /** A logo of `static/icons/plugins` as a picture, in its own colours. */
 function logoPicture(file) {
   return el("img", { class: "plugin-logo", src: `/icons/plugins/${file}`, alt: "" });
@@ -37,12 +41,18 @@ export function markInk(colour) {
   return colour !== null && luminance(colour) <= LIGHTEST_INK ? `#${colour}` : null;
 }
 
+/** Whether the mark `mark` (`{ logo, glyph }`, a listing's or a server's) is a server's of no service (`null`), which
+ * wears Dot's own icon (item 581). */
+export function wearsDot(mark) {
+  return mark === null;
+}
+
 /** What a tile shows of a service's mark (`{ logo, glyph }`, a listing's or a server's `mark`): its logo, else the
- * interface's icon, else the plug, which every connector without a mark of its own wears (item 542), and a server of
- * no service (`null`) too. */
+ * interface's icon, else the plug, which every connector without a mark of its own wears (item 542); a server of no
+ * service (`null`) wears Dot's own icon (item 581), which is its own tile (`markTile`). */
 export function markContent(mark) {
-  if (mark === null) {
-    return icon("plug");
+  if (wearsDot(mark)) {
+    return el("img", { class: "plugin-logo dot-mark", src: DOT_ICON, alt: "" });
   }
   if (mark.logo !== null) {
     return logoPicture(mark.logo);
@@ -70,6 +80,17 @@ export function tintMark(node, mark, id) {
     return;
   }
   node.style.setProperty("--plugin-hue", `var(--mark-${MARK_HUES[hashId(id) % MARK_HUES.length]})`);
+}
+
+/** Dress the tile `node` of the mark of a service or a server (`mark`, null for a server of no service; `id` its
+ * name): Dot's icon is its own tile, as an application's icon is (item 581); a mark that is no logo stands on a tile of
+ * its colour (`tintMark`). */
+export function markTile(node, mark, id) {
+  if (wearsDot(mark)) {
+    node.dataset.icon = "dot";
+    return;
+  }
+  tintMark(node, mark, id);
 }
 
 /** The icon a skill of the palette wears, as its Customize card does: a learned one's, an imported one's, else its own

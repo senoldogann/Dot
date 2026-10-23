@@ -1125,7 +1125,7 @@ class PaletteTool(FrozenModel):
 
 class PaletteServer(FrozenModel):
     """An MCP server of the palette: its name, the tools it lists, and the mark of its service as its Customize tile
-    wears it (items 408 and 477), or ``None`` for a server of no service, which wears the plug."""
+    wears it (items 408 and 477), or ``None`` for a server of no service, which wears Dot's own icon (item 581)."""
 
     name: str
     tools: tuple[PaletteTool, ...]

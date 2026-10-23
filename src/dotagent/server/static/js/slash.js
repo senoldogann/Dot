@@ -1,8 +1,11 @@
 // The words of the composer's menu, without the page: which word of the composer opens it, what the menu offers for it
 // and what a pick puts into the text, or picks for the message (item 318). A slash word opens the commands, the skills
 // and the MCP tools; an at word the MCP servers and the plugins, to pick for the message (items 367 and 447). A server
-// and each of its tools wear the mark its Customize tile wears, and a skill its Customize card's (item 477).
+// and each of its tools wear the mark its Customize tile wears, and a skill its Customize card's (item 477). A tool is
+// named in words, as a run's row names it (item 581): "Web Research · Web search", not "mcp__web-research__web_search".
 // composer.js draws the menu and listens to the keys.
+
+import { toolWords } from "./tools.js";
 
 /** The word the caret is in when it opens the menu: `{ start, word, trigger }`, `trigger` "/" or "@" and `word` what
  * follows it (may be empty), or null. Such a word starts the text or follows white space, so a slash inside a path or
@@ -52,8 +55,10 @@ export function paletteGroups(commands, palette) {
         kind: "plugin",
         items: server.tools.map((tool) => ({
           id: `tool-${tool.name}`,
-          // The server stands before its tool as the tool's row names them, so that tools of many servers read apart.
-          label: tool.name.toLowerCase().startsWith(server.name.toLowerCase()) ? tool.name : `${server.name} / ${tool.name}`,
+          // The server stands before what its tool does, as a run's row names them (item 581), so that tools of many
+          // servers read apart; the names as the model calls them still find it.
+          label: toolWords(tool.name),
+          find: `${server.name} ${tool.name}`,
           hint: tool.description,
           kind: "tool",
           serverName: server.name,
@@ -125,9 +130,8 @@ export function menuSections(groups) {
 /** The groups with only the items whose label holds `word` (case folded), and no empty group. */
 export function filterGroups(groups, word) {
   const needle = word.toLowerCase();
-  return groups
-    .map((group) => ({ ...group, items: group.items.filter((item) => item.label.toLowerCase().includes(needle)) }))
-    .filter((group) => group.items.length > 0);
+  const finds = (item) => item.label.toLowerCase().includes(needle) || (item.find ?? "").toLowerCase().includes(needle);
+  return groups.map((group) => ({ ...group, items: group.items.filter(finds) })).filter((group) => group.items.length > 0);
 }
 
 /** The text with the menu's word at `start` (through `caret`) replaced by `insert`, and where the caret lands. */

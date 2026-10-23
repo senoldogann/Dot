@@ -14,7 +14,7 @@ import { createCatalogue, MCP_STATE_TONES, MCP_STATE_WORDS, pluginMark, serviceW
 import { customizeHead } from "../customizehead.js";
 import { el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { markContent, tintMark } from "../marks.js";
+import { markContent, markTile } from "../marks.js";
 import { emptyPanel, errorPanel, field, loadingPanel, segmented } from "../panels.js";
 import { attempt } from "../ui.js";
 
@@ -304,10 +304,10 @@ export function mount(root, ctx) {
   }
 
   /** The mark of a server added by hand: the mark of the service it is one of, by its address or its command, as the
-   * service's tile wears it (items 408 and 477), else the plug. */
+   * service's tile wears it (items 408 and 477), else Dot's own icon (item 581). */
   function serverMark(server) {
     const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent(server.mark));
-    tintMark(mark, server.mark, server.name);
+    markTile(mark, server.mark, server.name);
     return mark;
   }
 

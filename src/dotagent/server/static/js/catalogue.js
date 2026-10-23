@@ -8,7 +8,7 @@
 import { api, blobUrl } from "./api.js";
 import { clip, el, plural } from "./dom.js";
 import { icon } from "./icons.js";
-import { markContent, tintMark } from "./marks.js";
+import { markContent, markTile } from "./marks.js";
 import { field } from "./panels.js";
 import { attempt, confirmDialog } from "./ui.js";
 
@@ -44,7 +44,7 @@ const MCP_POLL_MS = 2000;
  */
 export function pluginMark(plugin, appIcon) {
   const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent(plugin));
-  tintMark(mark, plugin, plugin.id);
+  markTile(mark, plugin, plugin.id);
   if (appIcon !== null) {
     appIcon.then(
       (url) => {
