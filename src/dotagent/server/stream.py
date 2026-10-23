@@ -20,6 +20,7 @@ from dotagent.agent.rewind import CHAT_REWOUND_EVENT
 from dotagent.browser.types import Frame
 from dotagent.drafts.service import DRAFT_CREATED_EVENT, DRAFT_DECIDED_EVENT
 from dotagent.events import SNAPSHOT_EVENT, SNAPSHOT_FAILED_EVENT, EventBus
+from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_RUN_ENDED_EVENT, SCHEDULE_STOPPED_EVENT
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_data import RULES_CHANGED_EVENT
@@ -38,9 +39,10 @@ FRAME_EVENT: str = "frame"
 # a takeover moves a run between them; a chat's queue and its terminal sessions; the rules), what becomes of the lessons
 # of a run, which are drawn once its own stream has ended, and what else the page tells as a desktop notification, as
 # the phone hears it (``notify/push.py``): a question a run left, a draft written for the owner to send (item 314), a
-# campaign that ended by itself, a firing a schedule missed, learning that has stopped; a chat rewound (item 282); and
-# a draft sent or discarded, which may come after its run's stream has ended (item 314). A restart after an unexpected
-# stop is pushed only: it happens before any page is back on the stream.
+# campaign that ended by itself, a firing a schedule missed, learning that has stopped, what Dot tells the owner on its
+# own (the morning brief and the watchers, items 570 and 571); a chat rewound (item 282); and a draft sent or discarded,
+# which may come after its run's stream has ended (item 314). A restart after an unexpected stop is pushed only: it
+# happens before any page is back on the stream.
 LIFECYCLE_KINDS: frozenset[str] = frozenset(
     {
         "run_queued",
@@ -61,6 +63,7 @@ LIFECYCLE_KINDS: frozenset[str] = frozenset(
         SCHEDULE_STOPPED_EVENT,
         SCHEDULE_RUN_ENDED_EVENT,
         LEARNING_STALLED_EVENT,
+        OWNER_TOLD_EVENT,
         RULES_CHANGED_EVENT,
         CHAT_REWOUND_EVENT,
         SNAPSHOT_EVENT,

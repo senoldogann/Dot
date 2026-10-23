@@ -40,7 +40,14 @@ shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, s
   brought back, with the secrets Dot holds and keys of a known form masked (item 551).
 - **To a phone, once you turn its notifications on: a line.** A title, up to 140 characters of the question, of a
   draft's recipients and subject (a message's words, item 314) or of the result, and the page to open, encrypted for
-  that phone's browser and carried by its maker's push service (see [Dot on the phone](phone.md#dot-on-the-phone)).
+  that phone's browser and carried by its maker's push service (see [Dot on the phone](phone.md#dot-on-the-phone)). The
+  first line of the morning brief goes the same way (item 570): the model wrote it from what the run read, mail of
+  others among it, so it may repeat what a sender wrote.
+- **To the model, for the morning brief: Dot's record of itself.** The brief's run (item 570, see
+  [Dot comes to you](proactive.md)) is given what waits for you, the runs that failed since the last brief, the
+  campaigns at work and the schedules of the day, as lines cut to 160 characters with their secrets masked, and what
+  its mail and calendar reads return; it goes to the model the run runs on, as the rest of a run's conversation does. It
+  is a `research` run, which cannot send, change or delete anything. No other service is asked.
 - **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; none is
   set up by default (see [MCP servers](extending.md#mcp-servers)).
 - **To your Google and Microsoft accounts, once you sign one in: what the mail and calendar tools ask.** `mail_search`,

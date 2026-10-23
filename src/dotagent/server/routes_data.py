@@ -28,6 +28,7 @@ from dotagent.memory.service import (
     update_memory_note,
 )
 from dotagent.policy.drafting import DraftedRule
+from dotagent.proactive.brief import read_state
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import (
     ScheduleRequest,
@@ -104,8 +105,11 @@ _INPUT_MOMENT: str = "%Y-%m-%dT%H:%M"
 RULES_CHANGED_EVENT: str = "rules_changed"
 
 
-def _schedule_view(record: ScheduleRecord, zone: ZoneInfo, agents: dict[str, AgentRecord]) -> ScheduleView:
-    """``record`` as the UI shows it, with the agent of ``agents`` its runs run as (item 462)."""
+def _schedule_view(
+    record: ScheduleRecord, zone: ZoneInfo, agents: dict[str, AgentRecord], brief_id: str | None
+) -> ScheduleView:
+    """``record`` as the UI shows it, with the agent of ``agents`` its runs run as (item 462); ``brief_id`` is the
+    schedule that is the morning brief (item 570)."""
     agent: AgentRecord | None = None if record.options.agent_id is None else agents.get(record.options.agent_id)
     return ScheduleView(
         record=record,
@@ -121,6 +125,7 @@ def _schedule_view(record: ScheduleRecord, zone: ZoneInfo, agents: dict[str, Age
         else ScheduleAgent(
             id=agent.id, name=agent.name, look=agent.look, approvals=agent.approvals, paused_at=agent.paused_at
         ),
+        brief=record.id == brief_id,
     )
 
 
@@ -285,13 +290,19 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
         return {agent.id: agent for agent in await store.list_agents()}
 
     async def view_of(record: ScheduleRecord) -> ScheduleView:
-        return _schedule_view(record, await schedule_zone(record.options, zone), await agents_by_id())
+        return _schedule_view(
+            record,
+            await schedule_zone(record.options, zone),
+            await agents_by_id(),
+            (await read_state(store)).schedule_id,
+        )
 
     @router.get("/schedules")
     async def list_schedules() -> list[ScheduleView]:
         agents: dict[str, AgentRecord] = await agents_by_id()
+        brief_id: str | None = (await read_state(store)).schedule_id
         return [
-            _schedule_view(record, await schedule_zone(record.options, zone), agents)
+            _schedule_view(record, await schedule_zone(record.options, zone), agents, brief_id)
             for record in sorted(await store.list_schedules(), key=schedule_order)
         ]
 

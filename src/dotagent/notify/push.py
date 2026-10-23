@@ -2,7 +2,8 @@
 the send to a subscription's push service, and the watcher that sends every subscription what the web UI's desktop
 notifications say: an approval or a question a run asked or left, a draft written for the owner to send, the end of a
 run, a campaign that ended by itself, a firing a schedule missed, a start of the daemon after the one before it did not
-end cleanly. The subscriptions come
+end cleanly, and what Dot tells the owner on its own: the morning brief and the watchers (``notify/owner.py``). The
+subscriptions come
 from the web UI (``POST /api/push/subscriptions``, which refuses keys that cannot encrypt a message) and live in the
 store; one whose push service says it is gone, or whose keys cannot encrypt a message, is deleted."""
 
@@ -26,6 +27,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.drafts.service import DRAFT_CREATED_EVENT
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
 from dotagent.notify.keys import keys_problem
+from dotagent.notify.owner import OWNER_TOLD_EVENT, OwnerTold
 from dotagent.scheduler import (
     SCHEDULE_MISSED_EVENT,
     SCHEDULE_RUN_ENDED_EVENT,
@@ -70,6 +72,7 @@ PUSH_KINDS: frozenset[str] = frozenset(
         SCHEDULE_RUN_ENDED_EVENT,
         DAEMON_RESTARTED_EVENT,
         LEARNING_STALLED_EVENT,
+        OWNER_TOLD_EVENT,
     }
 )
 
@@ -189,7 +192,10 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
 def notice_message(event: EventRecord) -> PushMessage | None:
     """The message an event of Dot itself (``SYSTEM_RUN_ID``) is worth, or ``None``: a firing a schedule missed, a
     schedule switched off after its runs failed in a row, a start of the daemon after the one before it did not end
-    cleanly, and learning that has stopped."""
+    cleanly, learning that has stopped, and what Dot tells the owner on its own (items 570 and 571)."""
+    if event.kind == OWNER_TOLD_EVENT:
+        owner: OwnerTold = OwnerTold.model_validate(event.data)
+        return PushMessage(title=owner.title, body=_shorten(owner.text), route=owner.url, state="idle")
     if event.kind == LEARNING_STALLED_EVENT:
         stalled: LearningStalled = LearningStalled.model_validate(event.data)
         return PushMessage(
