@@ -2,11 +2,12 @@
 // sidebar above Customize. Each schedule keeps how its runs start (mode, approvals, goal mode, model, reasoning level,
 // time zone) and can be changed later. Run now starts one of its runs by hand, switched on or off, and its Firings
 // list its last runs, at its time and by hand (item 455). The Morning brief card is at its head (item 570): the brief is
-// a schedule of its own, labelled in the list, which its card sets.
+// a schedule of its own, labelled in the list, which its card sets. Under it are the Watchers (item 571).
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
 import { mountBrief } from "../briefcard.js";
+import { mountWatchers } from "../watcherspanel.js";
 import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
@@ -680,6 +681,8 @@ export function mount(root, ctx) {
   const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "The scheduler is not running, so nothing fires until the daemon restarts."));
   // The brief's card reads again whenever the list does: a switch in the list, a run's end, a failure that switched it off.
   const brief = mountBrief(ctx, () => reload());
+  // The watchers (item 571) sit under it: what Dot tells you of when it happens.
+  const watchers = mountWatchers();
 
   function paint() {
     if (views === null || editing !== null) {
@@ -844,6 +847,7 @@ export function mount(root, ctx) {
     ),
     schedulerNote,
     brief.element,
+    watchers.element,
     formSlot,
     el(
       "section",
@@ -863,6 +867,7 @@ export function mount(root, ctx) {
   return () => {
     disposed = true;
     brief.dispose();
+    watchers.dispose();
     stopLifecycle();
     stopBack();
   };

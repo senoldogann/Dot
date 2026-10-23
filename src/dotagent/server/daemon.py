@@ -26,6 +26,7 @@ from dotagent.desktop.flight import FlightOverlay
 from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
+from dotagent.proactive.watching import watch_loop
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler.runner import Scheduler
 from dotagent.server.app import create_app
@@ -169,6 +170,14 @@ def _log_backups_end(backups: asyncio.Task[None]) -> None:
     log.error("backups_ended", error=repr(backups.exception()))
 
 
+def _log_watchers_end(watching: asyncio.Task[None]) -> None:
+    """The loop of the watchers (item 571) that stops before the daemon does is logged: no watcher looks until the
+    daemon starts again."""
+    if watching.cancelled() or watching.exception() is None:
+        return
+    log.error("watchers_ended", error=repr(watching.exception()))
+
+
 def _log_relay_end(relay: asyncio.Task[None]) -> None:
     """A relay of the runs of dotx commands that stops before the daemon does is logged: the pages see those runs only
     as they are stored, and their chats' queues wait, until the daemon starts again."""
@@ -284,6 +293,13 @@ async def run_daemon(config: AppConfig) -> int:
             # A session is never resumed as a run: a campaign whose session the daemon cut off goes on with a new one.
             campaigns: int = await manager.resume_campaigns()
             scheduler_loop: asyncio.Task[None] = await scheduler.start()
+            # The watchers (item 571) look beside the scheduler, from the daemon's own clock: no inbound webhook.
+            if config.watchers.enabled:
+                watching: asyncio.Task[None] = asyncio.create_task(
+                    watch_loop(runtime, manager, stopping), name="watchers"
+                )
+                watching.add_done_callback(_log_watchers_end)
+                cleanup.push_async_callback(_cancelled, watching)
             context: ServerContext = ServerContext(
                 runtime=runtime,
                 manager=manager,

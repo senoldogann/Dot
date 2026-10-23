@@ -133,7 +133,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Dot on the phone](docs/phone.md)
 - [Browser and computer use](docs/browser-and-computer-use.md)
 - [Memory and schedules](docs/memory-and-schedules.md)
-- [Dot comes to you](docs/proactive.md): the morning brief
+- [Dot comes to you](docs/proactive.md): the morning brief and the watchers
 - [Agents and campaigns](docs/agents-and-campaigns.md)
 - [Apps, MCP servers, skills and plugins](docs/extending.md)
 - [Configuration](docs/configuration.md)

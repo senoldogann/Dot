@@ -396,7 +396,9 @@ class RunOpening(FrozenModel):
     257), whose taint it starts with, and ``picks`` what the owner picked in the composer for the message (item 318),
     which the manager checked (``RunManager._check_picks``). A run that goes on from another (resumed, or started by an
     answer that came after its run ended) opens without picks: the first run's message, with the picks' lines and
-    skills, stays in the chat's history, and with grouped tools ``use_tools`` turns a picked server's group on."""
+    skills, stays in the chat's history, and with grouped tools ``use_tools`` turns a picked server's group on.
+    ``tainted`` starts the run untrusted whatever it goes on from: the run a watcher starts (item 571) is set off by
+    what a third party wrote."""
 
     text: str
     files: tuple[StoredAttachment, ...]
@@ -404,6 +406,7 @@ class RunOpening(FrozenModel):
     once: OneMessage | None
     carried: tuple[str, ...]
     picks: RunPicks
+    tainted: bool = False
 
 
 @dataclass(frozen=True)

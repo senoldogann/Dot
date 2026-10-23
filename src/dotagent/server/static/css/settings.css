@@ -2886,6 +2886,56 @@
   justify-content: flex-end;
 }
 
+/* ---------- The Watchers panel (item 571) under the brief: a row for each watcher, the form that makes one when it is
+   asked for, and the failure of a look written on the row it belongs to. ---------- */
+
+.watcher-lead {
+  margin: 0;
+  padding: var(--space-2) var(--space-4) 0;
+}
+
+.watcher-form-slot {
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.watcher-list {
+  padding-bottom: var(--space-2);
+}
+
+.watcher-list > .list-row {
+  padding-block: var(--space-2);
+}
+
+.watcher-list > .list-row:first-child {
+  border-top: 0;
+}
+
+.watcher-mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+
+.watcher-list .row-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.watcher-error {
+  margin-top: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+/* On a phone a watcher's row gives its mark back to the words, as a schedule's gives its face: the switch says whether it
+   looks. */
+@media (max-width: 720px) {
+  .watcher-list .list-row > .watcher-mark {
+    display: none;
+  }
+}
+
 /* ---------- Rules (items 373 and 565): what is always on, the sandbox, the rules checked in order and what a rule can
    answer, in cards of the settings' look; the ways to write one wait for New rule. ---------- */
 

@@ -39,6 +39,9 @@ type CallPurpose = Literal[
     "harness_compose",
     "harness_select",
     "harness_experience",
+    # A watcher's question of the fast model, whether one new mail or notification is one the owner wants to hear of
+    # (item 571).
+    "watch",
 ]
 
 CALL_EVENT: str = "model_call"

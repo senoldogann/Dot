@@ -631,6 +631,17 @@ class SchedulerConfig(FrozenModel):
     notify: NotifyLevel
 
 
+class WatchersConfig(FrozenModel):
+    """The watchers (item 571, docs/proactive.md): whether they look at all, how often the daemon sees which is due, and
+    the limits that keep a flood of mail or a spam run from becoming a flood of tells, model calls and runs."""
+
+    enabled: bool
+    tick_s: float = Field(gt=0, allow_inf_nan=False)
+    tells_per_hour: int = Field(ge=1, le=200)
+    runs_per_hour: int = Field(ge=0, le=100)
+    judged_per_look: int = Field(ge=1, le=200)
+
+
 type McpTransport = Literal["stdio", "http", "sse"]
 
 # A lower-case letter, then lower-case letters, digits and hyphens; at most 24 characters. Plugin servers follow it too.
@@ -751,6 +762,7 @@ class AppConfig(FrozenModel):
     memory: MemoryConfig
     harness: HarnessConfig
     scheduler: SchedulerConfig
+    watchers: WatchersConfig
     skills: SkillsConfig
     plugins: PluginsConfig
 
