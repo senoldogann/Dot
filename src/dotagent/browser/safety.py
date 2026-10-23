@@ -11,6 +11,7 @@ from collections.abc import Collection, Sequence
 from typing import get_args
 from urllib.parse import unquote, urlsplit
 
+from dotagent.agent.pages import PAGES_PREFIX
 from dotagent.browser.snapshot import SnapshotLine, parse_snapshot
 from dotagent.browser.types import SecretField, SecretKind, Step, StepAction
 from dotagent.config import ServerConfig
@@ -35,6 +36,8 @@ _ALLOWED_SCHEMES: frozenset[str] = frozenset({"http", "https"})
 _PAGE_OWN_SCHEMES: frozenset[str] = frozenset({"blob", "data"})
 _DEFAULT_PORTS: dict[str, int] = {"http": 80, "https": 443}
 _LOOPBACK_NAME: str = "localhost"
+# The path of a page a run showed (item 601): the store's ids are "page_" and URL-safe letters.
+_SHOWN_PAGE_PATH: re.Pattern[str] = re.compile(rf"{re.escape(PAGES_PREFIX)}page_[A-Za-z0-9_-]+")
 _MAX_URL_CHARS: int = 2000
 _SCHEME: re.Pattern[str] = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 _HOST_LIKE: re.Pattern[str] = re.compile(r"^(localhost|[\w-]+(\.[\w-]+)+|\d{1,3}(\.\d{1,3}){3})(:\d+)?([/?#].*)?$")
@@ -210,11 +213,33 @@ def forbidden_target(url: str, blocked_hosts: Sequence[str], server: ServerConfi
     return verdict
 
 
+def shown_page(url: str, server: ServerConfig) -> bool:
+    """Whether ``url`` is a page a run showed (item 601): ``/pages/<id>`` exactly, on this Mac at the daemon's port, the
+    address show_page gives the run so that it may look at what it showed. It is served without the token to whoever
+    names its id, which cannot be guessed, and sandboxed wherever it opens (``PAGE_HEADERS``): its origin is opaque, so
+    its scripts reach neither the API nor the UI, and a navigation from it to the interface is refused. Nothing else
+    of the interface passes, nor an address a browser reads otherwise than Python (:func:`_backslashed`)."""
+    if _backslashed(url):
+        return False
+    try:
+        parts = urlsplit(url)
+        port: int | None = parts.port
+    except ValueError:
+        return False
+    if parts.scheme not in _ALLOWED_SCHEMES or parts.query or not _SHOWN_PAGE_PATH.fullmatch(parts.path):
+        return False
+    host: str = (browser_host(parts.hostname or "") or "").removesuffix(".")
+    reached: int = port if port is not None else _DEFAULT_PORTS[parts.scheme]
+    return reached == server.port and _is_loopback(host)
+
+
 def check_browser_url(
     url: str, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str], server: ServerConfig
 ) -> UrlVerdict:
-    """What the browser may open as a page: no :func:`forbidden_target`, and a host of ``allowed_hosts`` when that is
-    set."""
+    """What the browser may open as a page: a page a run showed (:func:`shown_page`), or no :func:`forbidden_target`
+    and a host of ``allowed_hosts`` when that is set."""
+    if shown_page(url, server):
+        return UrlVerdict(allowed=True, reason="a page a run showed")
     verdict: UrlVerdict = forbidden_target(url, blocked_hosts, server)
     if not verdict.allowed or url == "about:blank" or not allowed_hosts:
         return verdict

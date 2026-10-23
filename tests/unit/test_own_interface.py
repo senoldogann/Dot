@@ -148,6 +148,56 @@ def test_nothing_else_of_dots_interface_opens_with_the_way_back(url: str) -> Non
     assert not request_verdict(url, True, (), (), SERVER).allowed
 
 
+# A page a run showed, as show_page names it (item 601).
+_SHOWN: str = "/pages/page_Ab3-_x9QkLmN0pQrStUvWxYz"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"http://127.0.0.1:8765{_SHOWN}",
+        f"http://localhost:8765{_SHOWN}",
+        f"http://[::1]:8765{_SHOWN}#top",
+        f"http://127.0.0.1.:8765{_SHOWN}",
+    ],
+)
+def test_a_page_a_run_showed_opens_in_the_browser_as_a_page_and_a_frame(url: str) -> None:
+    """Item 601: show_page gives the run the page's address so that its browser may look at what it showed; it opens
+    whatever the lists say, as the page and as a frame of one, and the model's own open of it passes."""
+    assert check_browser_url(url, (), (), SERVER).allowed
+    assert check_browser_url(url, ("example.com",), ("127.0.0.1", "localhost"), SERVER).allowed
+    assert request_verdict(url, True, (), (), SERVER).allowed
+    # Loaded by a page (a fetch, a script), it stays Dot's interface.
+    assert not request_verdict(url, False, (), (), SERVER).allowed
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1:8765/pages/",
+        "http://127.0.0.1:8765/pages/page_",
+        f"http://127.0.0.1:8765{_SHOWN}/",
+        f"http://127.0.0.1:8765{_SHOWN}/../../api/approvals",
+        f"http://127.0.0.1:8765{_SHOWN}?next=/api/approvals",
+        f"http://127.0.0.1:8765{_SHOWN}%2F..%2F..%2Fapi",
+        "http://127.0.0.1:8765/pages/look_abc",
+        "http://127.0.0.1:8765/PAGES/page_abc",
+        "http://127.0.0.1:8765/api/pages/page_abc",
+        f"https://mac.tail1234.ts.net{_SHOWN}",
+        f"http://evil.example\\@127.0.0.1:8765{_SHOWN}",
+    ],
+)
+def test_nothing_else_of_dots_interface_opens_with_a_shown_page(url: str) -> None:
+    assert not check_browser_url(url, (), (), SERVER).allowed
+    assert not request_verdict(url, True, (), (), SERVER).allowed
+
+
+def test_a_shown_page_on_another_port_is_any_server_of_this_mac() -> None:
+    """Another port is no page of Dot's: it is judged as any server of this Mac, open as any site."""
+    verdict: UrlVerdict = check_browser_url(f"http://127.0.0.1:9000{_SHOWN}", (), (), SERVER)
+    assert verdict.allowed and verdict.reason == "allowed"
+
+
 def _refusal(url: str, config: AppConfig) -> str:
     with pytest.raises(ToolInputError) as refused:
         checked_url(url, config)

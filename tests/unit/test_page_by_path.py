@@ -47,7 +47,13 @@ def _context(home: Path, protected: tuple[Path, ...] = ()) -> SimpleNamespace:
     return SimpleNamespace(
         workspace=home / "workspace",
         run_id="run_1",
-        runtime=SimpleNamespace(protected=protected, dot_paths=(), store=_Store(), bus=_Bus()),
+        runtime=SimpleNamespace(
+            protected=protected,
+            dot_paths=(),
+            store=_Store(),
+            bus=_Bus(),
+            config=SimpleNamespace(server=SimpleNamespace(host="127.0.0.1", port=8765)),
+        ),
     )
 
 
@@ -81,6 +87,8 @@ async def test_a_page_made_in_the_workspace_is_shown_by_its_path_as_a_read_of_it
     result: ToolResult = await prepared.run(ctx)  # type: ignore[arg-type]
     assert not result.is_error
     assert ctx.runtime.store.kept == {"AI Herald": PAGE}
+    # The page's address on this Mac, which the run's browser may open to see it (item 601).
+    assert "It is at http://127.0.0.1:8765/pages/page_x, which your browser may open" in result.text
     # A drawing in SVG by its absolute path, and a page given as HTML as before.
     await _shown(ctx, {"title": "Chart", "path": str(home / "workspace" / "chart.svg")})
     await _shown(ctx, {"title": "Sales", "html": "<p>Sales</p>"})
