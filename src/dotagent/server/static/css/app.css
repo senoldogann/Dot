@@ -1275,14 +1275,15 @@ a.pill:hover {
 
 /* On a phone a card's name stands over the card, out of its surface, as a group's name over its rows: in the
    settings' tabs (item 330), on Customize's pages and the agent's editor (item 332). Each such card has one body,
-   whose ground the card's is. */
+   whose ground the card's is. A card that folds keeps its head on its ground (item 576): folded, the head is all
+   there is of it, a row of the page as a group of the health checks is. */
 @media (max-width: 720px) {
-  :is(.settings-pane .card, .connect-section, .agent-editor):has(> .card-head) {
+  :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor):has(> .card-head) {
     border: 0;
     background: none;
   }
 
-  :is(.settings-pane .card, .connect-section, .agent-editor) > .card-head {
+  :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor) > .card-head {
     padding: 0 16px 8px;
     border-bottom: 0;
     color: var(--muted);
@@ -1290,11 +1291,11 @@ a.pill:hover {
     font-weight: var(--weight-text);
   }
 
-  :is(.settings-pane .card, .connect-section, .agent-editor) > .card-head > .fold-toggle {
+  :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor) > .card-head > .fold-toggle {
     font-weight: var(--weight-text);
   }
 
-  :is(.settings-pane .card, .connect-section, .agent-editor) > .card-head + * {
+  :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor) > .card-head + * {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);

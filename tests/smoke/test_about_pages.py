@@ -151,13 +151,25 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                         re.compile(r"^(all granted|missing: .+)$")
                     )
                     await expect(_fold(page, "Permissions").locator(".fold-body")).not_to_contain_text("null")
-                    for title in ("Daemon", "Permissions", "About this Dot"):
+                    for title in ("Daemon", "Permissions", "About this Dot", "Health checks"):
                         await expect(_fold(page, title)).to_have_count(1)
-                    # The emergency stop and the health checks are no folds: a card, and a section of grouped rows
-                    # (item 564), with three tiles over them that say how the daemon, the permissions and the checks
-                    # stand.
+                    # The emergency stop is a card (item 564) and the health checks fold as the cards under them do,
+                    # their head saying how they stand (item 576), with three tiles over them that say how the daemon,
+                    # the permissions and the checks stand.
                     await expect(page.get_by_role("region", name="Emergency stop")).to_contain_text("Stop everything")
-                    await expect(page.get_by_role("heading", name="Health checks")).to_be_visible()
+                    await expect(_fold(page, "Health checks").locator(".fold-summary")).to_have_text(
+                        re.compile(r"^\d+ of \d+ ok$")
+                    )
+                    # A card that folds keeps its head on its ground, on a phone and wide (item 576): folded, it is a
+                    # row with the card's ground, not a bare line of the page.
+                    for title in ("Daemon", "Permissions", "About this Dot", "Health checks"):
+                        card = _fold(page, title)
+                        ground: str = await card.evaluate("(card) => getComputedStyle(card).backgroundColor")
+                        assert ground not in ("rgba(0, 0, 0, 0)", "transparent"), (title, ground)
+                        card_box = await card.bounding_box()
+                        head_box = await card.locator(".card-head").bounding_box()
+                        assert card_box is not None and head_box is not None, title
+                        assert head_box["y"] >= card_box["y"] and head_box["x"] >= card_box["x"], (title, card_box)
                     await expect(page.get_by_role("group", name="Daemon")).to_contain_text("Running")
                     await expect(page.get_by_role("group", name="Health")).to_contain_text(re.compile(r"\d+ of \d+ ok"))
                     await _fold(page, "Daemon").locator(".fold-toggle").click()
@@ -234,7 +246,48 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                 await failing.goto(f"{address}/#/settings/system")
                 await expect(failing.get_by_role("group", name="Health")).to_contain_text("Could not run")
                 await expect(failing.get_by_role("group", name="Permissions")).to_contain_text("Could not read")
-                await expect(failing.get_by_role("heading", name="Health checks")).to_be_visible()
+                # Their fold says so at its head too, where a folded card would show a count of an earlier run.
+                await expect(_fold(failing, "Health checks").locator(".fold-summary")).to_have_text("could not run")
                 await failing.close()
+                # A finding that says much shows its first two lines and a button for the rest (item 576): the skills
+                # check of the owner's Mac named every skill, more than a hundred, and filled the page.
+                long: str = "132 skill(s) (" + ", ".join(f"skill-{index}-of-the-plugins" for index in range(132)) + ")"
+
+                async def with_long_skills(route) -> None:
+                    answer = await route.fetch()
+                    checks = [check for check in await answer.json() if check["name"] != "skills"]
+                    checks.insert(0, {"name": "skills", "ok": False, "required": False, "detail": long})
+                    await route.fulfill(response=answer, json=checks)
+
+                wordy: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await wordy.goto(ui_url(host, port, TOKEN))
+                await wordy.route("**/api/doctor", with_long_skills)
+                await wordy.goto(f"{address}/#/settings/system")
+                skills: Locator = wordy.locator('.health-row[data-check="skills"]')
+                detail: Locator = skills.locator(".health-detail")
+                await expect(detail).to_have_class(re.compile(r"\bclipped\b"))
+                clipped = await detail.bounding_box()
+                more: Locator = skills.get_by_role("button", name="Show all")
+                await more.click()
+                await expect(skills.get_by_role("button", name="Show less")).to_have_attribute("aria-expanded", "true")
+                opened = await detail.bounding_box()
+                assert clipped is not None and opened is not None
+                assert clipped["height"] < 60 < opened["height"], (clipped, opened)
+                # Folded, the checks are one row whose head says how they stand, and stay folded after a reload.
+                await _fold(wordy, "Health checks").locator(":scope > .card-head > .fold-toggle").click()
+                await expect(_fold(wordy, "Health checks")).to_have_attribute("data-open", "false")
+                await expect(skills).to_be_hidden()
+                await wordy.reload()
+                await expect(_fold(wordy, "Health checks")).to_have_attribute("data-open", "false")
+                # Run again that fails says so at the head of the folded checks, not the count of the run before.
+                summary: Locator = _fold(wordy, "Health checks").locator(".fold-summary")
+                await expect(summary).to_have_text(re.compile(r"^\d+ of \d+ ok$"))
+                await wordy.unroute("**/api/doctor")
+                await wordy.route(
+                    "**/api/doctor", lambda route: route.fulfill(status=500, json={"detail": "refused by the test"})
+                )
+                await wordy.get_by_role("button", name="Run again").click()
+                await expect(summary).to_have_text("could not run")
+                await wordy.close()
             finally:
                 await browser.close()

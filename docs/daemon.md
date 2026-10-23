@@ -522,10 +522,12 @@ harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pai
 **System** (item 564: three tiles say how the daemon, the permissions and the health checks stand; the **Emergency
 stop** is a card with **Stop everything**, or **Release** once it is engaged; the **Health checks** are what needs a
 look first, then the checks that passed in their groups (setup, desktop control, providers and models, browser, memory,
-tools and plugins), with a filter and **Run again**; below them the daemon's facts in four groups each named over its
-rows of a label and a value (item 378: this Dot, how it acts, what it works with and its models), the permissions and
-the ways to **Diagnostics** and **Open source licences**, pages of their own). Which folds are open is kept in the
-browser.
+tools and plugins), with a filter and **Run again**, a card that folds and says how many checks passed at its head
+(item 576), a finding of more than 180 characters shown in its first two lines with **Show all**; below them the
+daemon's facts in four groups each named over its rows of a label and a value (item 378: this Dot, how it acts, what
+it works with and its models), the permissions and the ways to **Diagnostics** and **Open source licences**, pages of
+their own). Which folds are open is kept in the browser. A card that folds keeps its head on its ground, so that
+folded it is a row of the page, as a group of the health checks is (item 576).
 In a Mac's window the sidebar is the settings' nav while they are open (item 562):
 **Back to chats** (to the chat last open), the tabs in four groups (Interface, Models, How Dot works, This Mac), each
 with what it holds at its right (the main model, how many providers have a key, how many notes Dot keeps, a green dot

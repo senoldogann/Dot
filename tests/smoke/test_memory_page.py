@@ -229,3 +229,43 @@ async def test_the_memory_page_fits_a_phone(browser: Browser, address: str, runt
             await page.screenshot(path=tmp_path / f"memory-{width}.png", full_page=True)
         finally:
             await page.close()
+
+
+async def test_on_a_touch_phone_the_tags_are_labels_and_remember_stands_at_the_right(
+    browser: Browser, address: str, runtime: Runtime, tmp_path: Path
+) -> None:
+    """On a touch screen (item 576): a note's tags keep the height of their words, the badge's beside them, not the
+    thumb's 36 px of a chip; the box's key is not offered, there being no keyboard; Remember stands at the right of the
+    line under the tags; and the four choices keep one line."""
+    await _seed(runtime)
+    page: Page = await browser.new_page(
+        viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, reduced_motion="reduce"
+    )
+    try:
+        await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+        await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+        await page.goto(f"{address}/#/settings/memory")
+        assert await page.evaluate("matchMedia('(pointer: coarse)').matches")
+        await _choice(page, "From outside content").click()
+        outside: Locator = page.locator("[data-memory]", has=page.locator(".badge.b-warn")).first
+        await expect(outside).to_be_visible()
+        tag = await outside.locator(".chip").first.bounding_box()
+        badge = await outside.locator(".badge.b-warn").bounding_box()
+        assert tag is not None and badge is not None
+        assert tag["height"] <= 28 and abs(tag["height"] - badge["height"]) <= 4, (tag, badge)
+        await expect(page.locator(".note-compose-hint")).to_have_text("One fact per note · ⌘↵")
+        await expect(page.locator(".note-compose-keys")).to_be_hidden()
+        tags = await page.get_by_placeholder("work, preferences").bounding_box()
+        remember = await page.get_by_role("button", name="Remember").bounding_box()
+        assert tags is not None and remember is not None
+        assert remember["y"] >= tags["y"] + tags["height"], (tags, remember)
+        assert abs((remember["x"] + remember["width"]) - (tags["x"] + tags["width"])) <= 2, (tags, remember)
+        tops = {
+            round((await choice.bounding_box() or {"y": -1})["y"])
+            for choice in await page.get_by_role("group", name="Show notes").get_by_role("button").all()
+        }
+        assert len(tops) == 1, tops
+        assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        await page.screenshot(path=tmp_path / "memory-touch-390.png")
+    finally:
+        await page.close()

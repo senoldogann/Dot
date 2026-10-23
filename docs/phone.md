@@ -86,8 +86,9 @@ sizes. Where a page names a setting of the config file, it says what it is in wo
 On a phone the settings open on a list of their pages in groups (item 330): Interface, Models, How Dot works and This
 Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes there are, whether a
 version of the harness is in use). A row opens its page on its own, the bar naming it, and a card's name stands over the
-card. In a Mac's window the sidebar is the settings' nav while they are open, the tabs in the same four groups (item
-562); see [the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
+card, as a section's title does on the redrawn tabs (item 576); a card that folds keeps its name on its ground. In a
+Mac's window the sidebar is the settings' nav while they are open, the tabs in the same four groups (item 562); see
+[the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
 Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px
 (item 331). A service's page of Customize › Connectors and an agent's editor name their cards the same way, a row of the
 home's Today strip keeps its facts to one line that fades where it runs out of room, and Team's empty page says what

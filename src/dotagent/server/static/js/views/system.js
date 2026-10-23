@@ -449,6 +449,26 @@ function needsLook(check) {
   return !check.ok;
 }
 
+// A check's finding longer than this shows its first two lines, the rest a button away (item 576): the skills check
+// names every skill, more than a hundred of them, and filled the page.
+const DETAIL_SHOWN = 180;
+
+/** What a check found, its first lines alone when it says much, with the button that shows the rest. */
+function healthDetail(text) {
+  const detail = el("span", { class: "health-detail" }, text);
+  if (text.length <= DETAIL_SHOWN) {
+    return detail;
+  }
+  detail.classList.add("clipped");
+  const more = el("button", { class: "btn ghost sm health-more", type: "button", "aria-expanded": "false" }, "Show all");
+  more.addEventListener("click", () => {
+    const open = detail.classList.toggle("clipped") === false;
+    more.textContent = open ? "Show less" : "Show all";
+    more.setAttribute("aria-expanded", String(open));
+  });
+  return el("span", { class: "health-detail-box" }, detail, more);
+}
+
 function healthRow(check) {
   let result = el("span", { class: "health-ok" }, icon("check"), "ok");
   if (!check.ok) {
@@ -458,7 +478,7 @@ function healthRow(check) {
     "div",
     { class: "set-row health-row", dataset: { check: check.name } },
     el("span", { class: "health-name" }, check.name),
-    el("span", { class: "health-detail" }, check.detail),
+    healthDetail(check.detail),
     result,
   );
 }
@@ -478,9 +498,10 @@ function doctorSummary(checks) {
 }
 
 /** The Health checks (item 564): what needs a look first, then the checks that passed in their groups; the filter keeps the
- * first alone. `onChecks(checks)` says what the checks found once they ran, or gets null when they could not run. */
+ * first alone. They fold as the cards under them do (item 576), their head saying how they stand. `onChecks(checks)`
+ * says what the checks found once they ran, or gets null when they could not run. */
 function buildDoctor(isDisposed, onChecks) {
-  const card = el("div", { class: "set-card health" }, inlineLoading());
+  const card = el("div", { class: "health" }, inlineLoading());
   const filterHolder = el("div", { class: "set-filter" });
   const again = el(
     "button",
@@ -488,7 +509,14 @@ function buildDoctor(isDisposed, onChecks) {
     icon("refresh"),
     el("span", { class: "label" }, "Run again"),
   );
-  const element = setSection({ title: "Health checks", actions: el("div", { class: "set-actions" }, filterHolder, again), body: card });
+  const fold = foldCard({
+    id: "system-health",
+    title: "Health checks",
+    actions: el("div", { class: "set-actions" }, filterHolder, again),
+    body: card,
+    openByDefault: true,
+  });
+  const element = fold.element;
   let checks = null;
   let only = "all";
 
@@ -549,18 +577,23 @@ function buildDoctor(isDisposed, onChecks) {
   async function run() {
     card.replaceChildren(inlineLoading());
     filterHolder.replaceChildren();
+    // The head of the fold says what the checks found this time: never the count of an earlier run, which a folded card
+    // would show over a failure it hides (item 576).
+    fold.setSummary(el("span", { class: "muted" }, "checking…"));
     try {
       checks = await api.get("/doctor");
       if (isDisposed()) {
         return;
       }
       onChecks(checks);
+      fold.setSummary(el("span", { class: "muted" }, doctorSummary(checks).word));
       paintFilter();
       paint();
     } catch (error) {
       if (!isDisposed()) {
         console.error("the health checks failed", error);
         onChecks(null);
+        fold.setSummary(el("span", { class: "badge b-bad" }, "could not run"));
         card.replaceChildren(inlineError(error, () => attempt(run)));
       }
     }
