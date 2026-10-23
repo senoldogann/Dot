@@ -26,4 +26,5 @@ worth a report.
 
 ## Supported versions
 
-Dot is developed on `main`, and fixes land there; there are no releases or release branches to patch.
+Dot is developed on `main`, and fixes land there. Only the latest release is supported: a fix ships as a new version,
+which the desktop app's updater offers, and older versions get no backports.

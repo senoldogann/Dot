@@ -14,8 +14,9 @@ shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, s
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
   playbooks and the nightly reflection to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
   OpenCode Go, Anthropic and OpenRouter get it only when a role, a helper or a standby model names one of their models;
-  OpenRouter passes each call on to the lab whose model it is (see
-  [Models and providers](models.md#models-and-providers)).
+  OpenRouter passes each call on to the lab whose model it is. OpenCode Zen's free models (`opencode:`) get the whole
+  conversation of a run that runs on one, through OpenCode's own agent, and the providers of some of them may use what
+  they get to improve their models (see [Models and providers](models.md#models-and-providers)).
 - **To the embedding model: each note and each search of the memory.** It is Ollama's `bge-m3` on this Mac by default;
   with `[memory] embed_provider = "openai"` the texts go to OpenAI (see [Memory](memory-and-schedules.md#memory)).
 - **To the search engines: the query.** The `[web] search_backend` ladder asks the owner's SearXNG instance when
@@ -42,6 +43,15 @@ shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, s
   that phone's browser and carried by its maker's push service (see [Dot on the phone](phone.md#dot-on-the-phone)).
 - **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; none is
   set up by default (see [MCP servers](extending.md#mcp-servers)).
+- **To your Google and Microsoft accounts, once you sign one in: what the mail and calendar tools ask.** `mail_search`,
+  `mail_read` and `calendar_events` ask Gmail and Google Calendar (`googleapis.com`) or Microsoft Graph
+  (`graph.microsoft.com`) for your messages and events, with the words of a search (see
+  [Mail and calendars](runs.md#mail-and-calendars)).
+- **To 1Password, once you connect it: the requests of `op`.** Its service account reads the vault you shared with Dot
+  through 1Password's servers (see [1Password](extending.md#1password)).
+- **To GitHub, when you install a plugin of the gallery: the request for its archive.** It names the plugin's
+  repository and the commit the gallery pins, and carries nothing of yours (see
+  [Customize › Plugins](extending.md#customize--plugins)).
 
 The record of the runs, the notes, the logs and the screenshots stay on this Mac in Dot's folders (see
 [Configuration](configuration.md#configuration)), and a key goes only to its own service. To keep a run's conversation here too, give
@@ -103,11 +113,12 @@ currency, so list sites that bill in one currency. Empty by default.
    that pays is the one handed to you (item 522).
 5. *The guard* (item 429): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
-   mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode that asks,
-   whatever your rules say; only a rule that hands the step to you is stricter. A rule that allows it does not answer for
-   you. A login filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, and in `auto` you
-   answer it, not the review model. A `yolo` run asks nothing and makes the step, its record keeping the reason it would
-   have asked for (item 443).
+   mailer of the command line) and a post in your name (`public_post`) wait for a yes in every mode that asks, whatever
+   your rules say: yours in `supervised` and `ask`, the review model's in `auto`, where it answers the policy's
+   questions; only a rule that hands the step to you is stricter. A rule that allows it does not answer for you. A login
+   filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, except that in `auto` you answer
+   it, not the review model. A `yolo` run asks nothing and makes the step, its record keeping the reason it would have
+   asked for (item 443).
    What the policy cannot tell for a message is not guarded: a key that sends in a web page's chat box, a page's own script
    (`browser_eval`), a program of the shell that talks to a mail server or a chat's API itself (`curl`, a script).
 6. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
@@ -359,8 +370,10 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   "pb''paste"`, a script in a file, `osascript r.applescript`, a script typed into a session, `osascript -i`).
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts and from the `osascript` of the AppleScript
-  tool, whose `do shell script` starts a shell with the same environment (item 555), `SSH_AUTH_SOCK` among them, so
-  commands do not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
+  tool, whose `do shell script` starts a shell with the same environment (item 555), `SSH_AUTH_SOCK` among them, so a
+  command is not told where your SSH agent listens (`[shell] pass_env` lists exceptions). The agent's socket is a file
+  in a fixed place under `/private/var/run`, which the sandbox does not close: a command that looks for it there still
+  reaches the keys the agent holds unlocked.
 - Outside a `yolo` run (which may, without asking, item 433) the agent can neither read nor change `~/.ssh`,
   `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
   `~/.config/gcloud`, the tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`,
@@ -375,6 +388,10 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   database, the copies of the database (`[store] backup_dir`, and `<home>/backups-partial` while one is made, item
   526) and journals of file changes. The configuration holds the policy and the MCP servers, the database the rules,
   a copy all of the database and what you go back to, the journals what `dotx undo` writes back.
+  For the locations of `[policy] protected_paths` this holds as far as the policy sees: the file tools refuse them, and
+  the shell guard refuses a command line whose words reach one. What a script or a program reaches by itself is not
+  seen (see "The shell guardrail is best-effort" below), and the sandbox closes only the sealed stores and Dot's own
+  files to a command.
   In any mode, a tool that names files (the file tools, `web_extract`, `browser_upload`) looks at them again as it
   starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
   and called again it is decided for where the path leads now. A path is judged by the place it names (item 399):
@@ -529,8 +546,9 @@ nobody answered are not; and an action whose card shows less than all of it is a
 what it writes or types (a file's text, a field's), and a card that cut its text (`…`, an MCP call's long arguments
 among them), told a text by its length (`(42 chars)`) or masked a secret (`***`), since two actions such a card cannot
 tell apart are not one. This is the default approval mode, `ask`, and `supervised` asks before every change as well; in
-`auto` the questions of the policy are answered for you, and a `yolo` run asks nothing at all (item 443). What is yours
-in every mode that asks (item 429) — money, credentials, messages and posts in your name — is a card in the chat there.
+`auto` the questions of the policy are answered for you, and a `yolo` run asks nothing at all (item 443). In every mode
+that asks (item 429), money and credentials are handed to you on a card in the chat, and a message or a post in your
+name waits there for your yes in `supervised` and `ask`, for the review model's in `auto`.
 A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer; one it can
 go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with

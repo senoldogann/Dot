@@ -20,8 +20,12 @@ it). Two environment variables of the process move things: `DOT_HOME` (the home 
 | `.env`                                           | API keys (mode 0600)                                                 |
 | `dot.sqlite3`                                    | runs, events, conversations, notes, schedules, rules, approvals      |
 | `api-token`                                      | the bearer token of the web UI and the API (mode 0600)               |
+| `vapid-key.pem`                                  | the daemon's web push key pair, made on its first start (see [Dot on the phone](phone.md#dot-on-the-phone)) |
 | `workspace/`                                     | the working directory of the shell and the file tools                |
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |
+| `plugins-data/`                                  | each plugin's own files, its `${CLAUDE_PLUGIN_DATA}` (`plugins-data/<name>`) |
+| `playbooks/`                                     | the skills Dot learned (`learned-<kind>`) and those you taught it (`taught-<kind>`), the retired ones under `.retired` |
+| `evals/`                                         | the reports of eval runs, one file each                              |
 | `added-servers.json`                             | the MCP servers you added from other agents, by name and fingerprint |
 | `connected-servers.json`                         | the MCP servers you added in Customize, by address or command        |
 | `mcp-sign-ins/`                                  | what signing in to those servers gave: tokens and client (mode 0600) |
@@ -34,6 +38,7 @@ it). Two environment variables of the process move things: `DOT_HOME` (the home 
 | `screenshots/`, `downloads/`                     | what the tools capture and download                                  |
 | `undo/`                                          | journals of the file changes of runs, for `dotx undo`                |
 | `daemon.pid`                                     | held while a daemon runs; a second daemon is refused                 |
+| `daemon.running`                                 | left while a daemon runs and removed when it ends without an error   |
 | `STOP`                                           | exists while the emergency stop is engaged                           |
 | `run-owners/`                                    | one lock per process that drives runs (the daemon, `dotx run`)       |
 | `backups/`                                       | the copies of the database, unless `[store] backup_dir` names a folder |

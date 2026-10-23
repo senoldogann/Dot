@@ -21,7 +21,8 @@ for. See [Autonomy](docs/autonomy.md). Read
 **With the default models, what a run reads leaves this Mac.** They are cloud models of Ollama: the Ollama server on
 this Mac passes each call on to Ollama's servers, with the goal, the messages, the text of the files and pages the run
 read, what its commands printed and its screenshots. To keep a run's conversation on this Mac, choose a local model for
-each role in Settings › Models: the default model, and the fast, review and vision models.
+each role in Settings › Models (the default model, and the fast, review and vision models), leave the helpers and the
+standby models empty or local, and keep the memory's embeddings on Ollama.
 [What leaves this Mac](docs/safety.md#what-leaves-this-mac) lists everything that goes out.
 
 <p align="center">
@@ -41,9 +42,11 @@ The pictures show a run of Dot's scripted test model, under the name of a real o
 - The models of one provider at least:
   - [Ollama](https://ollama.com), running. Cloud models (their tag is `cloud` or ends in `-cloud`) need `ollama signin`
     once.
-    Searching the memory by meaning needs an embedding model: `ollama pull bge-m3`
   - an API key for OpenAI, OpenCode Go, Anthropic or OpenRouter
   - [OpenCode](https://opencode.ai), for Zen's free models (no key)
+- An embedding model for the memory, whichever provider runs the models: Ollama's `bge-m3` by default (Ollama running,
+  and `ollama pull bge-m3`), or OpenAI's with `[memory] embed_provider = "openai"`. Without one, saving a note fails
+  and `dotx doctor` says so; `[memory] embed_enabled = false` searches the notes by their words alone.
 
 ## Install
 

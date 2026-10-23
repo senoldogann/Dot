@@ -54,8 +54,8 @@ adopted version, `--adopt` to take it at once) or `POST /api/harness`, and manag
 ## The scoring set is the owner's
 
 What a candidate is judged on is never shown to the model that writes it. The proposer reads one run; the probe runs the
-candidate on a *scoring set* it has not seen: the eval tasks that are safe to repeat, and the runs of yours you mark as
-tests. A second, smaller *final set* is never used to choose between candidates: `dotx harness final` runs it once,
+candidate on a *scoring set* it has not seen: the eval tasks that are safe to repeat (`[harness] scoring_tasks`); runs
+of yours kept as tests are left for later (see What is built so far). A second, smaller *final set* is never used to choose between candidates: `dotx harness final` runs it once,
 after a version is adopted, and reports it as it comes out, so that the score you read was not optimized against. The
 owner writes the questions, never the program; that, and adopting, is the human's part (Wei et al., "The End of Harness
 Engineering", 2026, make the same cut: an execution report the run writes, candidates a small model writes, a scoring
@@ -101,8 +101,9 @@ it; drawing it on the page is left for later).
 
 ## The roles
 
-Four roles play the step, each a model asked one question that it answers with one tool call (as the review model
-answers Dot's other questions), each shown digests and texts inside fences it reads as data and never follows, with
+Four roles are built for the step, and three of them play it today: the step chooses between candidates by their
+passes, so it does not call the selector yet, and `[harness] selector` has no effect until it does. Each role is a model
+asked one question that it answers with one tool call (as the review model answers Dot's other questions), each shown digests and texts inside fences it reads as data and never follows, with
 the secrets Dot holds masked: the **proposer** (`propose_harness`: a candidate's whole texts within the bounds, the
 moments of the run behind each change, or keep), the **composer** (`compose_harness`: one version of the candidates,
 a decision with its evidence for each change, or the base kept), the **selector** (`select_answer`: the best of

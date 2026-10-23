@@ -34,8 +34,8 @@ The gallery (`plugins/gallery_list.py`) holds 22 plugins of 201 skills, each fro
   Max, Frontend Design, Product Design, Product Management and Engineering;
 - Anthropic's too: Skill Creator, Data Analysis, Marketing, Sales, Finance, Customer Support, Creative Design, Web App
   Builder, MCP Builder and Internal Comms;
-- from the makers of what they are about, with their logos: Apollo GraphQL, Redis, MongoDB, Supabase, Cloudflare and
-  Hugging Face.
+- from the makers of what they are about: Apollo GraphQL, MongoDB, Supabase, Cloudflare and Hugging Face with their
+  logos, and Redis.
 
 Left out: Vercel's skills (their repository names no licence), Anthropic's document skills (docx, pptx, xlsx and pdf,
 whose licence lets them be used, not passed on) and the plugins of Qoder's page that are Qoder's own (Architecture
@@ -206,8 +206,8 @@ The ways a service connects:
   one added from another agent of this Mac back from Dot, stopped at once (item 497; the agent keeps it). A server of a
   plugin goes with its plugin: **Remove plugin** stops the plugin's servers now, its skills leave the runs that start
   after, and its folder in Dot's plugins goes to the Trash, from which it can be put back
-  (`DELETE /api/installed-plugins/{name}`); a plugin read from a folder of `[plugins] dirs` is taken out of the config
-  instead. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts again, and
+  (`DELETE /api/installed-plugins/{name}`); a plugin read from a folder of `[plugins] dirs` is refused (409), and is
+  yours to take out of `[plugins] dirs` in `config.toml`. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts again, and
   Remove plugin then stops them; a server of the same name added since is the owner's, not the plugin's. A server of
   Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
   The sign-in file is named for the server, so a server added again under the name of one that is connected, at
@@ -353,8 +353,8 @@ data, and the run is marked untrusted (item 551). An answer longer than one resu
 inside the fence, and then says where the file is, how long it is and the line to read on from with `read_file`. The
 stderr of a stdio server goes to `<logs>/mcp-<name>.log`. A tool whose name's first verb
 sends or posts (`send_email`, `slack_post_message`, `reply_to_thread`, `create_post`) is a message for you whatever its
-server declares (`external_send` and `message_send`): it waits for your yes in every mode that asks, and no rule of
-yours turns that off (item 429); a `yolo` run asks nothing and sends it, its record keeping the reason (item 443). Any other tool that its server declares read-only (`readOnlyHint`) is taken at its word and runs
+server declares (`external_send` and `message_send`): it waits for a yes in every mode that asks (yours, the review
+model's in `auto`), and no rule of yours turns that off (item 429); a `yolo` run asks nothing and sends it, its record keeping the reason (item 443). Any other tool that its server declares read-only (`readOnlyHint`) is taken at its word and runs
 as a read, with no flag; any other counts as one that may change things (`destructive`) and send to the world
 (`external_send`), unless its server says it does not.
 

@@ -150,6 +150,13 @@ the phone is at hand, and a phone that the code then refuses means that someone 
 gives a code, `GET /api/phone` the addresses. Neither the code nor the token is logged. The phone reaches Dot while the
 Mac is on and awake.
 
+A phone that is lost, or that should no longer reach Dot: the token it holds is the installation's own, which does not
+expire (a token of its own for each phone is left for later). Take the phone off your tailnet in Tailscale's admin
+console, which cuts it off at once. To make the token it holds worthless too, delete `<home>/api-token` and run `dotx
+service restart`: the daemon makes a new token, every browser and phone signs in or pairs again (`dotx open` opens the
+web UI signed in), and the desktop app reads the new one from the file. `tailscale serve reset` stops presenting Dot on
+the tailnet, and taking the name out of `[server] reach`, then restarting the daemon, stops it answering to that name.
+
 Added to the home screen, the app carries its manifest: `id` `/`, so that a phone that adds it again keeps one app and
 not two, and the light scheme's own ground, `#f8f7f4`, as its `theme_color` and `background_color` (the bar and the
 screen between the tap and the first frame, the colour the page gives the browser in the light scheme), so that no white
