@@ -51,7 +51,7 @@ from dotagent.core.paths import (
 )
 from dotagent.desktop.session import DesktopSession
 from dotagent.desktop.snapshots import SnapshotService
-from dotagent.dot_app import app_path, build_path
+from dotagent.dot_app import app_path, build_path, runtime_path
 from dotagent.events import EventBus
 from dotagent.help.added import AddedServers, added_server_configs, read_added_servers
 from dotagent.help.meaning import HelpVectors
@@ -259,9 +259,10 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
 def _own_code() -> tuple[Path, ...]:
     """The code Dot itself runs: the folder its package is imported from, the Python environment it runs in and the
     Python under that, the file of the launchd job that starts the daemon, and the program the job starts it with
-    (Dot.app in Dot's home, and the folder it is built in; item 561). A program a command put there would run outside
-    the sandbox at the daemon's next start, which a command can bring about itself by ending the daemon: launchd keeps
-    its job."""
+    (Dot.app in Dot's home, and the folder it is built in; item 561), and the runtime folder the desktop app installs
+    Dot in (item 575): the programs, the cache and the marker the app runs and trusts at its own start, outside the
+    sandbox. A program a command put there would run outside the sandbox at the daemon's next start, which a command
+    can bring about itself by ending the daemon: launchd keeps its job."""
     return (
         Path(__file__).resolve().parent.parent,
         Path(sys.prefix),
@@ -269,6 +270,7 @@ def _own_code() -> tuple[Path, ...]:
         launch_agent_path(Path.home()),
         app_path(dot_home()),
         build_path(dot_home()),
+        runtime_path(dot_home()),
     )
 
 

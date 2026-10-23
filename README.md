@@ -35,10 +35,13 @@ The pictures show a run of Dot's scripted test model, under the name of a real o
 ## Requirements
 
 - macOS 15.2 or later (developed and tested on macOS 26, Apple silicon)
-- Python 3.13 and [uv](https://docs.astral.sh/uv/)
-- [ripgrep](https://github.com/BurntSushi/ripgrep): `brew install ripgrep`
-- Google Chrome, which the browser tools drive through Playwright
-- Xcode's Command Line Tools (`xcode-select --install`), with which the service builds the small app that runs Dot
+- Google Chrome, which the browser tools drive through Playwright (the install goes on without it; the browser tools
+  need it)
+- From a checkout only, which the desktop app does without (it brings its own Python, `uv`, ripgrep and the small app
+  that runs Dot):
+  - Python 3.13 and [uv](https://docs.astral.sh/uv/)
+  - [ripgrep](https://github.com/BurntSushi/ripgrep): `brew install ripgrep`
+  - Xcode's Command Line Tools (`xcode-select --install`), with which the service builds the small app that runs Dot
 - The models of one provider at least:
   - [Ollama](https://ollama.com), running. Cloud models (their tag is `cloud` or ends in `-cloud`) need `ollama signin`
     once.
@@ -50,16 +53,39 @@ The pictures show a run of Dot's scripted test model, under the name of a real o
 
 ## Install
 
+### With the app (no terminal)
+
+1. Download `Dot_<version>_universal.dmg` from the [latest release](https://github.com/senoldogann/Dot/releases/latest),
+   open it, drag Dot to Applications and open Dot from there.
+2. With no Dot on the Mac, the window shows **Set up Dot**:
+   - It checks what the Mac has: macOS 15.2 or later, and [Google Chrome](https://www.google.com/chrome/). A Mac with
+     no Chrome is offered Chrome's download page, and the setup goes on; the browser tools need Chrome.
+   - It asks where Dot's models come from: Ollama, when it answers on this Mac (a cloud model needs `ollama signin`
+     once), or an API key of OpenAI, Anthropic, OpenRouter or OpenCode Go.
+   - One button installs: Python and Dot's package at the app's own version (with the `uv` the app carries), the model
+     and the key (`dotx setup`), and the service that starts Dot at every login (`dotx service install`, with the small
+     app that runs Dot already built and signed in the app). Homebrew, ripgrep and Xcode's Command Line Tools are not
+     needed: the app carries what it needs.
+   - Each step is listed; what it printed is kept in `~/Library/Logs/Dot/installer.log` (the key hidden). A step that
+     fails says which, what it printed and what to do, and **Try again** goes on from it.
+3. When Dot answers, the window opens the web UI by itself, and Dot is in the menu bar and answers ⌘⇧Space.
+
+The app is signed and notarized, and keeps itself up to date: when it updates, it upgrades the package it installed to
+the same version and the daemon restarts once no run works (see [the desktop shell](docs/daemon.md#the-desktop-shell)).
+It never installs over another Dot: where a Dot service, a daemon that answers or a `config.toml` is, it shows what it
+always showed. An install of the app keeps `dotx` in `~/Library/Application Support/Dot/runtime/bin`: add that folder to
+your `PATH` to use the command line.
+
+### From a checkout (for development)
+
 1. Install the tools Dot uses: `brew install uv ripgrep`, [Google Chrome](https://www.google.com/chrome/), and
    Xcode's Command Line Tools (`xcode-select --install`).
 2. Get Dot: `git clone https://github.com/senoldogann/Dot.git`, then `cd Dot`.
 3. Install its packages: `uv sync`.
 4. Set it up: `uv run dotx setup`.
 5. Open it: `uv run dotx open` opens the web UI in your browser, signed in.
-6. If you want Dot in a window of its own, with a menu bar item and ⌘⇧Space: download `Dot_<version>_universal.dmg`
-   from the [latest release](https://github.com/senoldogann/Dot/releases/latest), open it and drag Dot to
-   Applications. The app is signed and notarized, and keeps itself up to date (see
-   [the desktop shell](docs/daemon.md#the-desktop-shell)).
+6. If you want Dot in a window of its own, with a menu bar item and ⌘⇧Space, install the app as above: it finds the
+   Dot of the checkout (its service, its `config.toml`) and shows its web UI.
 
 `dotx setup` does the following, then installs the service and gives the address of the web UI:
 

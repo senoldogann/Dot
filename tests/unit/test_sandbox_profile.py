@@ -13,7 +13,7 @@ import pytest
 from dotagent.config import load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.paths import web_research_dir
-from dotagent.dot_app import app_path, app_program, build_path
+from dotagent.dot_app import app_path, app_program, build_path, runtime_path
 from dotagent.policy.paths import expand_protected
 from dotagent.policy.sandbox import (
     CLIPBOARD_SERVICES,
@@ -295,6 +295,65 @@ def test_macos_keeps_a_command_from_changing_what_the_web_research_server_reads_
     assert sorted(path.name for path in folder.iterdir()) == ["crawl-jobs.sqlite3"]
     read: subprocess.CompletedProcess[str] = run(f"cat {jobs}; echo note > {home}/note.txt")
     assert (read.returncode, read.stdout) == (0, "jobs")
+    assert (home / "note.txt").read_text(encoding="utf-8") == "note\n"
+
+
+def test_dots_own_code_names_the_runtime_folder_the_desktop_app_installs_dot_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 575: the desktop app runs uv from its own bundle and Dot's Python from this folder at its start, outside
+    the sandbox, and the daemon runs from it: a program, a cache or a marker a command put there would be run."""
+    home: Path = tmp_path / "home"
+    monkeypatch.setenv("DOT_HOME", str(home))
+    assert runtime_path(home) == home / "runtime"
+    assert runtime_path(home) in _own_code()
+    assert runtime_path(home) in _dot_paths(load_default_config())
+
+
+def test_macos_keeps_a_command_from_changing_what_the_desktop_app_runs_at_its_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 575: a command that planted a program, a link or a file uv unpacks in the runtime folder, or the marker the
+    app trusts, would have it run outside the sandbox with the owner's rights at the app's next start. The profile of a
+    run's commands, built from the paths of Dot's own code as the runtime builds it, refuses each, whether the folder is
+    there or not yet, and lets the command read it and write elsewhere in Dot's home."""
+    home: Path = Path(os.path.realpath(tmp_path)) / "home"
+    home.mkdir()
+    monkeypatch.setenv("DOT_HOME", str(home))
+    words: tuple[str, ...] = build_sandbox((), (), expand_protected([], _own_code()), home / "agents").commands
+    runtime: Path = runtime_path(home)
+
+    def run(line: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([*words, "/bin/zsh", "-c", line], capture_output=True, text=True, check=False)
+
+    # Not there yet: a command can make neither the folder nor anything in it.
+    refused: list[subprocess.CompletedProcess[str]] = [
+        run(f"mkdir {runtime}"),
+        run(f"mkdir -p {runtime}/bin && echo planted > {runtime}/bin/dotx"),
+        run(f"mkdir -p {runtime}/cache/archive-v0 && echo planted > {runtime}/cache/archive-v0/wheel"),
+    ]
+    assert [(done.returncode != 0, "not permitted" in done.stderr) for done in refused] == [(True, True)] * 3
+    assert not runtime.exists()
+    # Made as the app makes it, outside the sandbox: it is read, and nothing in it is changed, made or moved.
+    (runtime / "bin").mkdir(parents=True)
+    marker: Path = runtime / "app-install.json"
+    marker.write_text('{"version": "0.1.0", "complete": true}', encoding="utf-8")
+    program: Path = runtime / "bin" / "dotx"
+    program.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    refused = [
+        run(f"echo planted > {marker}"),
+        run(f"printf planted >> {program}"),
+        run(f"echo planted > {runtime}/uv.toml"),
+        run(f"ln -s /tmp {runtime}/app-tools"),
+        run(f"mv {program} {program}.moved"),
+        run(f"mv {runtime} {runtime}.moved"),
+    ]
+    assert [(done.returncode != 0, "not permitted" in done.stderr) for done in refused] == [(True, True)] * 6
+    assert marker.read_text(encoding="utf-8") == '{"version": "0.1.0", "complete": true}'
+    assert program.read_text(encoding="utf-8") == "#!/bin/sh\nexit 0\n"
+    assert sorted(path.name for path in runtime.iterdir()) == ["app-install.json", "bin"]
+    read: subprocess.CompletedProcess[str] = run(f"cat {marker}; echo note > {home}/note.txt")
+    assert (read.returncode, read.stdout) == (0, '{"version": "0.1.0", "complete": true}')
     assert (home / "note.txt").read_text(encoding="utf-8") == "note\n"
 
 

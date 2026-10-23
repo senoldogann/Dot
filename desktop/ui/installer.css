@@ -1,0 +1,66 @@
+/* The page the shell shows on a Mac that has no Dot (item 575): Dot's wordmark and the steps of the install, in the
+   colours of the down page and the web UI's neutral look. The window has no title bar of its own: the traffic lights sit
+   over the page, and the empty band at the top drags the window. */
+html, body { margin: 0; min-height: 100%; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; color: #1c1b19; background: #f8f7f4; }
+header { position: fixed; inset: 0 0 auto 0; height: 52px; }
+main { box-sizing: border-box; max-width: 520px; margin: 0 auto; padding: 56px 20px 32px; display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
+.wordmark { display: block; overflow: visible; align-self: center; }
+h1 { margin: 8px 0 0; text-align: center; font-size: 22px; font-weight: 650; letter-spacing: -0.015em; }
+h2 { margin: 6px 0 0; font-size: 17px; font-weight: 650; }
+h3 { margin: 0; font-size: 15px; font-weight: 650; }
+p { margin: 0; }
+section { display: flex; flex-direction: column; gap: 12px; }
+section[hidden], [hidden] { display: none; }
+.muted { color: #696864; font-size: 13px; }
+.problem { color: #a4321f; font-size: 13px; }
+.letter { fill: none; stroke: currentColor; stroke-width: 34; stroke-linecap: round; stroke-linejoin: round; }
+.disc { fill: #ffcd3c; }
+.eye { fill: #1c1b19; }
+
+.rows, .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.row, .step { display: grid; grid-template-columns: 22px 1fr auto; align-items: start; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #f3f2ee; }
+.row .mark, .step .mark { text-align: center; font-weight: 700; }
+.row[data-state="ok"] .mark, .step[data-state="done"] .mark { color: #2d7a3d; }
+.row[data-state="warn"] .mark { color: #a0690f; }
+.row[data-state="block"] .mark, .step[data-state="failed"] .mark { color: #a4321f; }
+.step[data-state="waiting"] { color: #696864; }
+.step[data-state="running"] .mark { animation: pulse 1.2s ease-in-out infinite; }
+.step .lines { grid-column: 2 / 4; margin: 0; font: 12px/1.45 ui-monospace, "SF Mono", Menlo, monospace; color: #696864; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow: auto; }
+.step .lines:empty { display: none; }
+
+.providers { display: flex; flex-direction: column; gap: 8px; }
+.provider { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 10px; background: #f3f2ee; cursor: pointer; border: 1.5px solid transparent; }
+.provider:has(input:checked) { border-color: #1c1b19; }
+.provider input { margin: 3px 0 0; }
+.provider .name { font-weight: 650; }
+.provider .needs { color: #696864; font-size: 13px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #696864; }
+.field input { font: 14px ui-monospace, "SF Mono", Menlo, monospace; padding: 9px 10px; border-radius: 8px; border: 1px solid #d6d4cd; background: #fff; color: #1c1b19; }
+
+.failure { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 10px; border: 1.5px solid #a4321f; }
+.failure pre { margin: 0; padding: 8px 10px; border-radius: 8px; background: #f3f2ee; font: 12px/1.45 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+.failure pre:empty { display: none; }
+
+.buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+button { font: inherit; font-weight: 600; padding: 8px 16px; border-radius: 9px; border: 1px solid transparent; cursor: pointer; }
+button.primary { background: #ffcd3c; color: #1c1b19; }
+button.secondary { background: transparent; color: inherit; border-color: #d6d4cd; }
+button.link { padding: 4px 10px; font-size: 13px; background: transparent; border-color: #d6d4cd; color: inherit; }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, input:focus-visible { outline: 2px solid #3b6fe0; outline-offset: 2px; }
+
+@keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .step[data-state="running"] .mark { animation: none; } }
+@media (prefers-color-scheme: dark) {
+  html, body { color: #ecebe6; background: #1b1a18; }
+  .row, .step, .provider, .failure pre { background: #2a2927; }
+  .muted, .provider .needs, .step[data-state="waiting"], .step .lines, .field { color: #a19f98; }
+  .problem { color: #f08a78; }
+  .provider:has(input:checked) { border-color: #ecebe6; }
+  .field input { background: #232220; border-color: #403e3a; color: #ecebe6; }
+  button.secondary, button.link { border-color: #403e3a; }
+  .row[data-state="ok"] .mark, .step[data-state="done"] .mark { color: #6fcf86; }
+  .row[data-state="warn"] .mark { color: #e0a84a; }
+  .row[data-state="block"] .mark, .step[data-state="failed"] .mark { color: #f08a78; }
+  .failure { border-color: #f08a78; }
+}

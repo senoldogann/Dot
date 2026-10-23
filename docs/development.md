@@ -141,7 +141,9 @@ with its section `## <version> (<date>)` in `CHANGELOG.md`, which `uv run python
 <date>` writes from the entries under Unreleased and the files of `changes/` (and removes those), in the commit that
 raises the version. It is made from one commit of `main`, in two parts: the
 desktop app, built on a Mac, and the Python package, which the release's tag publishes on PyPI. A version is released
-once: the next release raises it in the five files first.
+once: the next release raises it in the five files first. The desktop app installs the Python package of its own
+version from PyPI (item 575), so the package comes first: the tag, then PyPI listing the version, then the release that
+publishes the app (the order is below, and `desktop/release.sh` ends with it).
 
 ### The package, and what it depends on that PyPI must have first
 
@@ -173,11 +175,45 @@ name, under the owner's own account before 0.2.0 is published, the earlier the b
   for both kinds of Mac;
 - `notes.md`, the version's section of the changelog, the release's notes.
 
+The app carries three programs in its Resources (`Contents/Resources/tools`), which the installer uses on a Mac that
+has no Dot and the service's `PATH` names (item 575). `desktop/fetch-tools.sh` makes them before the app is built, and
+`release.sh` runs it with `--sign`:
+
+- `uv` and `rg`, each one universal program joined from the archives of both kinds of Mac that `desktop/tools.lock`
+  pins (version, address, the SHA-256 of the archive and the SHA-256 of the program in it). The script reads each
+  archive once, so that the bytes hashed are the bytes unpacked, and stops unless both hashes are the pinned ones (an
+  archive swapped after its check gives another program, which the program's pin catches); the two halves of the joined
+  program are checked against the pins again before anything is signed;
+- `dot-launcher`, the program of Dot.app, built for both from `src/dotagent/dot_app.c`, which `dotx service install
+  --launcher` copies in place of the clang build.
+
+Each is signed with the Developer ID, the hardened runtime and a secure timestamp before the app is signed, since
+Apple's notary service asks it of every program inside an app, and `release.sh` checks the three in the built app.
+
+The folder of the tools is the one door by which a program could reach every user's daemon: the app carries it, and the
+service's `PATH` begins with links to two of its programs. So three locks hold on it, one behind the other (the review
+of item 575). `tauri.conf.json` names the three programs one by one (`bundle.resources` has no glob), so a file that
+lies in `desktop/src-tauri/resources/tools` is not bundled. `fetch-tools.sh` empties that folder of everything but its
+README before it writes the three, and refuses a folder that has no such README, so that a wrong `--out` costs nobody
+their files. And `release.sh` asks `fetch-tools.sh --check-bundle` of the app it built: the app's tools folder holds
+exactly `dot-launcher`, `rg` and `uv`, each a program of its own that can be run, and the release stops otherwise. A
+build that has not fetched the tools (a plain `npm run build`, the tests) gets three empty stand-ins from `build.rs`,
+which are no programs: the app then has no installer.
+
+`desktop/release.sh --check-tools` only fetches, unpacks and checks the archives and their programs (no signing, nothing
+built: it runs without your Developer ID, and `tests/smoke/test_fetch_tools.py` runs it against the real releases at
+night), which tells you whether a pinned release was moved. To raise a tool, change its version, address and both
+SHA-256s for both kinds of Mac together in `tools.lock` (uv and ripgrep each publish a `.sha256` of their archives; the
+program's is `shasum -a 256` of the file you unpack from the archive you checked), then run that check. The
+suggested models of the page (`desktop/src-tauri/providers.json`) are the ids the providers' own lists give: look them
+over at each release, since a model a provider retired fails the install with words, not silently.
+
 It stops at the first check that fails, and says which: files not committed, a commit that is not on GitHub's `main`,
-versions that differ, a tag that is on GitHub already, a changelog with no section for the version, the app's signature
-(the Developer ID, the hardened runtime, a secure timestamp, both architectures), the app's reasons for the microphone
-and speech recognition and its microphone entitlement (item 594), and a verdict of Apple's notary service other than
-Accepted, with the log of what it found.
+versions that differ, a tag that is on GitHub already, a changelog with no section for the version, a tool that is not
+the pinned one, the app's signature (the Developer ID, the hardened runtime, a secure timestamp, both architectures),
+the app's reasons for the microphone and speech recognition and its microphone entitlement (item 594), a tools folder
+in the app that does not hold exactly the three programs, the signature of the three in it, and a verdict of Apple's
+notary service other than Accepted, with the log of what it found.
 
 Once, on the Mac that builds releases:
 
@@ -200,17 +236,48 @@ Then, on a clean checkout of the commit to release:
 desktop/release.sh
 ```
 
-The script publishes nothing. It ends with the command that does, with the commit and the files, of this form:
+The script publishes nothing. It ends with the commands that do, with the commit and the files, in the order the app
+needs. The app installs `dotagent-macos==<its version>` from PyPI, on a Mac that installs Dot from the image and on one
+whose app has just updated itself, so a version of the app that is published before its package is on PyPI fails every
+install and every update until it is. The order, then: the tag (which publishes the package), a wait for PyPI, and only
+then the release (which publishes the app, its update and `latest.json`):
 
 ```bash
-gh release create v0.1.0 --target <commit> --title "Dot 0.1.0" --notes-file desktop/dist/0.1.0/notes.md \
+git tag v0.1.0 <commit> && git push origin v0.1.0
+until curl -fsS https://pypi.org/pypi/dotagent-macos/0.1.0/json >/dev/null; do sleep 30; done
+gh release create v0.1.0 --verify-tag --title "Dot 0.1.0" --notes-file desktop/dist/0.1.0/notes.md \
   desktop/dist/0.1.0/Dot_0.1.0_universal.dmg desktop/dist/0.1.0/Dot_0.1.0_universal.app.tar.gz \
   desktop/dist/0.1.0/latest.json
 ```
 
-Once that release is the latest, each installed shell finds it as it starts or from Check for Updates… (see
-[the desktop shell](daemon.md#the-desktop-shell)). The release's tag also publishes the Python package, once the gate
-passes again on its commit (below).
+`--verify-tag` stops the release unless the tag is on GitHub already. The tag publishes the package once the gate passes
+again on its commit (below); a run that fails publishes nothing, and then the release is not made: fix `main` and
+release the next version. Once the release is the latest, each installed shell finds it as it starts or from Check for
+Updates… (see [the desktop shell](daemon.md#the-desktop-shell)), and upgrades the package it installed to the same
+version.
+
+### Trying a release on a Mac with no Dot
+
+The installer cannot be tried on a Mac that has Dot (it shows what it always showed there), and building and notarizing
+the image is the owner's step, so a release is tried on a new macOS user account of the Mac that built it, or on
+another Mac, before it is announced:
+
+1. Make a user (System Settings › Users & Groups), sign in as it, and open `Dot_<version>_universal.dmg`; drag Dot to
+   Applications and open it from there. The window shows **Set up Dot**, and the first step lists the macOS version
+   and Chrome.
+2. Choose a provider (a key of your own, or Ollama if it runs on that Mac), press **Install Dot**, and watch the four
+   steps. Afterwards `~/Library/Application Support/Dot/runtime` holds the environment (`uv-tools`, `python`, `cache`,
+   `app-tools` and `app-install.json`), `~/Library/Logs/Dot/installer.log` the steps' output (no key in it), and
+   `launchctl print gui/$(id -u)/dev.dotagent.dot` the job, whose `PATH` begins with `.../runtime/app-tools`.
+3. The window opens the web UI by itself. Run a goal that searches files (it needs `rg`, which Homebrew does not give
+   this user).
+4. Quit Dot, open it again: it shows the UI. Close it in the middle of an install, or press Try again after a failure (a
+   wrong key, a model the provider does not list): the installer comes back at the step that stopped (after the models,
+   at the service, with no question and no second `dotx setup`). Once the service is installed the install is complete:
+   quit Dot while it waits for the daemon, open it again, and it shows the UI, or the page that says Dot is down, never
+   Set up Dot.
+5. Install the next release's app over it (or press Check for Updates…): the package follows, and `dotx service status`
+   (`runtime/bin/dotx`) shows the daemon of the new version once no run works.
 
 ### The Python package on PyPI
 
@@ -218,8 +285,9 @@ Dot is published on PyPI as `dotagent-macos` (`dotagent` was taken; the package 
 the command `dotx`), by `.github/workflows/release.yml` (item 348) through trusted publishing, so no token is kept
 anywhere. Once, on pypi.org, with two-factor authentication on: Account settings › Publishing › Add a new pending
 publisher › GitHub, with the project name `dotagent-macos`, the owner `senoldogann`, the repository `Dot`, the workflow
-`release.yml` and the environment `pypi`. Then any tag `v<version>` pushed to GitHub, the one `gh release create`
-makes too, publishes the package; on its own:
+`release.yml` and the environment `pypi`. Then any tag `v<version>` pushed to GitHub publishes the package (a release
+is made after it, `gh release create --verify-tag`, so that the app, which installs the package of its own version, is
+never out before the package; see above); on its own:
 
 ```bash
 git tag v0.1.0
@@ -230,9 +298,10 @@ The workflow publishes only what the gate passed again (item 457): a first job c
 of `main` and that the tag and the version agree, the whole gate then runs again on that commit (`gate.yml` is called,
 whatever the change), the core of the browser tests with it (item 486), and only when both passed does the last job
 build the source distribution and the wheel with `uv build` and upload them with `uv publish`; a failed or cancelled job
-before it skips it, and nothing reaches PyPI. A tag to publish is about eight minutes from PyPI; the GitHub release made
-with it, which the desktop shell's updater reads, is out at once. When the run is red, fix it on `main` and make the
-release again with the next version: PyPI takes a version once, and the tag that failed published nothing. These checks
+before it skips it, and nothing reaches PyPI. A tag to publish is about eight minutes from PyPI, and the GitHub release,
+which the desktop shell's updater reads and is out at once, waits for it (above). When the run is red, fix it on `main`
+and make the release again with the next version: PyPI takes a version once, and the tag that failed published nothing,
+and no release was made on it. These checks
 stop a mistake, not someone who holds a token that can push tags (a leaked one, or an agent working under your login):
 the workflow that runs is the tagged commit's own, which such a token can write too. Two settings of the repository,
 yours to set, close that: yourself as the required reviewer of the environment `pypi` (Settings › Environments › pypi),

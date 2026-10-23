@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from dotagent.dot_app import BUNDLE_ID, app_path, ensure_app
+from dotagent.dot_app import BUNDLE_ID, SOURCE, app_path, ensure_app
 
 XCRUN: str = "/usr/bin/xcrun"
 CODESIGN: str = "/usr/bin/codesign"
@@ -107,3 +107,38 @@ def test_dot_app_is_built_once_and_macos_holds_it_responsible_for_the_daemon(tmp
     finally:
         waiting.kill()
         waiting.wait(WAIT_S)
+
+
+def test_dot_app_made_from_a_prebuilt_launcher_is_signed_and_runs_as_the_one_clang_builds(tmp_path: Path) -> None:
+    """Item 575: the desktop app carries Dot.app's program built and signed, and ``dotx service install`` copies it in
+    place of the clang build. Here the program is built and signed (ad hoc, where a release signs with the Developer
+    ID) outside the app, as a release builds it; the bundle made from it verifies under Dot's bundle identifier, starts
+    its child and ends as its child ended, and asked again is left as it is."""
+    launcher: Path = tmp_path / "dot-launcher"
+    compiled: subprocess.CompletedProcess[str] = subprocess.run(
+        [XCRUN, "clang", "-O2", "-Wall", "-Wextra", "-Werror", "-o", str(launcher), str(SOURCE)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert compiled.returncode == 0, compiled.stderr
+    signed: subprocess.CompletedProcess[str] = subprocess.run(
+        [CODESIGN, "--force", "--sign", "-", str(launcher)], capture_output=True, text=True, check=False
+    )
+    assert signed.returncode == 0, signed.stderr
+    home: Path = tmp_path / "home"
+    home.mkdir()
+    program: Path = ensure_app(home, launcher)
+    app: Path = app_path(home)
+    verified: subprocess.CompletedProcess[str] = subprocess.run(
+        [CODESIGN, "--verify", "--strict", str(app)], capture_output=True, text=True, check=False
+    )
+    assert verified.returncode == 0, verified.stderr
+    shown: subprocess.CompletedProcess[str] = subprocess.run(
+        [CODESIGN, "--display", "--verbose", str(app)], capture_output=True, text=True, check=False
+    )
+    assert f"Identifier={BUNDLE_ID}" in shown.stderr and "Signature=adhoc" in shown.stderr, shown.stderr
+    assert subprocess.run([str(program), "/bin/sh", "-c", "exit 3"], check=False).returncode == 3
+    made: os.stat_result = program.stat()
+    assert ensure_app(home, launcher) == program
+    assert (program.stat().st_ino, program.stat().st_mtime_ns) == (made.st_ino, made.st_mtime_ns)

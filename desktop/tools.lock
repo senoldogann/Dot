@@ -1,0 +1,14 @@
+# The tools the desktop app carries (item 575), pinned: uv installs Dot's Python package on a Mac that has no terminal
+# setup, and ripgrep is what Dot's search runs. desktop/fetch-tools.sh downloads each archive, reads it once (the same
+# bytes are hashed and unpacked) and stops unless the SHA-256 of the archive is the one pinned here AND the SHA-256 of
+# the program unpacked from it is the one pinned here, and makes one universal program of the two architectures, each
+# half of which must still be that program. To raise a version: change the version, the address and both SHA-256s of
+# both architectures together (each project publishes a .sha256 of its archives beside them; the program's is
+# `shasum -a 256` of the file unpacked from the archive you checked), run `desktop/release.sh --check-tools`, and say
+# why in the commit.
+#
+# tool  version  architecture  SHA-256 of the archive  address of the archive  the program inside the archive  SHA-256 of that program
+uv  0.13.4  aarch64  e0b1d4743ce64c55d9f0f4a444afa6b81125680070ee04e853fcd0f6c1ebf8f1  https://github.com/astral-sh/uv/releases/download/0.13.4/uv-aarch64-apple-darwin.tar.gz  uv-aarch64-apple-darwin/uv  cd510bf93fddcbf0799eb0b7bd9aae87e850a5596aeb4594c12aba72fd4e388b
+uv  0.13.4  x86_64   7be2dcd316122f4b3e5a0a7889f6248266c14425374e105ff7dc9779184603a6  https://github.com/astral-sh/uv/releases/download/0.13.4/uv-x86_64-apple-darwin.tar.gz  uv-x86_64-apple-darwin/uv  fefe521430a02cc6a2e07da9b870b9a516d7fa42e6586d8bf5dcfb85b6bcaf39
+rg  15.2.0  aarch64  3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4  https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-apple-darwin.tar.gz  ripgrep-15.2.0-aarch64-apple-darwin/rg  a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e
+rg  15.2.0  x86_64   af7825fcc69a2afc7a7aea55fc9af90e26421d8f20fe59df32e233c0b8a231c1  https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-apple-darwin.tar.gz  ripgrep-15.2.0-x86_64-apple-darwin/rg  0c9a0066db0d26b640777db88045b0ccdd58509a746700e43e1c4ff8707a5ed0

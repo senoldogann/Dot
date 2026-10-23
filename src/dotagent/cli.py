@@ -478,7 +478,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     service = commands.add_parser("service", help="keep the daemon running in the background (a launchd job)")
     service_commands = service.add_subparsers(dest="service_action", required=True)
-    service_commands.add_parser("install", help="start the daemon at every login and after a crash; also restarts it")
+    install = service_commands.add_parser(
+        "install", help="start the daemon at every login and after a crash; also restarts it"
+    )
+    install.add_argument(
+        "--launcher",
+        metavar="PATH",
+        default=None,
+        help=(
+            "the full path of a prebuilt, signed program for Dot.app (the desktop app carries one), copied in place of "
+            "the one built with clang, so that Xcode's Command Line Tools are not needed; DOT_APP_LAUNCHER names it "
+            "too, and left out, an app made from one is made again from the program it keeps"
+        ),
+    )
     service_commands.add_parser("uninstall", help="stop the daemon and remove the launchd job")
     service_commands.add_parser("status", help="show whether the job is loaded and the daemon answers")
     service_commands.add_parser(

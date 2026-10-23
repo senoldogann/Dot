@@ -21,11 +21,21 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1.1"
 getrandom = "0.4"
+# O_NOFOLLOW and ELOOP, for the files the installer makes (a link left at their name is refused).
+libc = "0.2"
 hex = "0.4"
 hmac = "0.13"
 sha2 = "0.11"
 ureq = { version = "3", features = ["json"] }
 url = "2"
+# The launchd job's property list, read as launchd reads it (the label and the program the job runs), not as text:
+# tauri already uses it, so that the lock gains no package.
+plist = { version = "1", default-features = false }
 tauri-plugin-updater = "2"
 # The updater's questions as the system's dialogs, shown from Rust (tauri-plugin-dialog gives each page a script).
 rfd = { version = "0.17", default-features = false }
+
+[dev-dependencies]
+# The tests of the installer run the app with its real capabilities against Tauri's mock runtime, and ask each command
+# from the pages that must be refused (installer/tests.rs).
+tauri = { version = "2", features = ["test"] }

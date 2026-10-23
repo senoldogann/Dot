@@ -300,7 +300,7 @@ async def cmd_setup(command: SetupCommand) -> int:
         )
         return 0
     sys.stdout.write("\nService\n")
-    return await cmd_service_install(ServiceInstallCommand(name="service-install"))
+    return await cmd_service_install(ServiceInstallCommand(name="service-install", launcher=None))
 
 
 async def dispatch(command: Command) -> int:

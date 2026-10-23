@@ -24,6 +24,7 @@ it). Two environment variables of the process move things: `DOT_HOME` (the home 
 | `workspace/`                                     | the working directory of the shell and the file tools                |
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |
 | `plugins-data/`                                  | each plugin's own files, its `${CLAUDE_PLUGIN_DATA}` (`plugins-data/<name>`) |
+| `runtime/`                                       | what the desktop app installs: Dot's package, the Python it runs on, uv's cache, the links to the tools the app carries and the marker of the install (item 575; a run's commands cannot change it) |
 | `web-research/`                                  | the crawl jobs of the web-research server that comes with Dot (a run's commands cannot change them) |
 | `playbooks/`                                     | the skills Dot learned (`learned-<kind>`) and those you taught it (`taught-<kind>`), the retired ones under `.retired` |
 | `evals/`                                         | the reports of eval runs, one file each                              |

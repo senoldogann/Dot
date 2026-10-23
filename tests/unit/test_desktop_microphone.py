@@ -30,15 +30,21 @@ def test_the_hardened_runtime_stays_on_with_the_microphone_its_one_exception() -
     assert entitlements == {"com.apple.security.device.audio-input": True}
 
 
-def test_the_one_window_asks_the_shell_before_it_gives_a_page_anything() -> None:
+def test_each_window_asks_the_shell_before_it_gives_a_page_anything() -> None:
     """The independent security review of item 594: without the handler, wry grants every request no one answers, the
-    microphone of a page a link led the window to among them, and no test of `permission_for` alone would fail."""
+    microphone of a page a link led the window to among them, and no test of `permission_for` alone would fail. The
+    shell makes two windows: the UI's, which asks `permission_for`, and the installer's (item 575), whose page is given
+    nothing it asks."""
     source: str = (_SHELL / "src" / "lib.rs").read_text(encoding="utf-8")
-    assert source.count("WebviewWindowBuilder::new(") == 1
-    built: str = source[source.index("fn window(") :]
-    built = built[: built.index(".build()")]
-    assert ".on_permission_request(|webview, kind| {" in built
-    assert "permission_for(page.as_ref(), kind, &addresses)" in built
+    assert source.count("WebviewWindowBuilder::new(") == 2
+
+    def built(maker: str) -> str:
+        made: str = source[source.index(f"fn {maker}(") :]
+        return made[: made.index(".build()")]
+
+    assert ".on_permission_request(|webview, kind| {" in built("window")
+    assert "permission_for(page.as_ref(), kind, &addresses)" in built("window")
+    assert ".on_permission_request(|_webview, _kind| PermissionResponse::Deny)" in built("installer_window")
 
 
 def test_every_frame_of_the_ui_is_sandboxed_and_given_no_permission() -> None:

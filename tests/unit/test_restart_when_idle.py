@@ -392,7 +392,7 @@ def test_a_command_a_run_starts_carries_the_mark_of_a_run() -> None:
     "command",
     [
         ServiceRestartCommand(name="service-restart", when_idle=False),
-        ServiceInstallCommand(name="service-install"),
+        ServiceInstallCommand(name="service-install", launcher=None),
         ServiceUninstallCommand(name="service-uninstall"),
     ],
 )

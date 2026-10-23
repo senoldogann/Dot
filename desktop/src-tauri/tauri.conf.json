@@ -27,6 +27,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "resources/tools/uv": "tools/uv",
+      "resources/tools/rg": "tools/rg",
+      "resources/tools/dot-launcher": "tools/dot-launcher"
+    },
     "macOS": {
       "minimumSystemVersion": "13.0",
       "hardenedRuntime": true,

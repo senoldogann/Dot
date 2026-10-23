@@ -4,9 +4,27 @@
 # updater's archive of that app, signed with the updater's key and bound to its version; the disk image (the app and a
 # link to Applications), signed, notarized and stapled; and latest.json, which the shell's updater reads from the latest
 # release. They land in desktop/dist/<version>/, which git ignores. What a release needs once, and how it is published,
-# is in docs/development.md (Releasing). The script publishes nothing: it prints the command that does, since a v* tag
-# also publishes the Python package to PyPI (.github/workflows/release.yml), once the whole gate passes again on it.
+# is in docs/development.md (Releasing). The script publishes nothing: it prints the commands that do, in the order the
+# app needs. The app installs the Python package of its own version from PyPI (item 575), and a v* tag publishes that
+# package (.github/workflows/release.yml), once the whole gate passes again on it: so the tag goes first, PyPI lists the
+# version, and only then is the release made, which is what puts the app (and the updater's latest.json) in front of
+# anyone. The app also carries uv, ripgrep and the launcher of Dot.app (desktop/fetch-tools.sh, pinned in
+# desktop/tools.lock): they are signed here, before the app is, since Apple's notary service asks it of every program
+# inside an app. `release.sh --check-tools [--lock FILE]` only checks that the pinned archives are still the ones pinned.
 set -euo pipefail
+
+if [ "${1:-}" = --check-tools ]; then
+  # Only a lock file of another name may be given, to look at a change of the lock before it is committed. Nothing else
+  # is passed on: a switch of fetch-tools.sh (the file addresses its tests take) cannot be given through this script.
+  case $# in
+    1) exec "$(dirname "$0")/fetch-tools.sh" --dry-run ;;
+    3) if [ "$2" = --lock ]; then
+         exec "$(dirname "$0")/fetch-tools.sh" --dry-run --lock "$3"
+       fi ;;
+  esac
+  echo "release: --check-tools takes no argument but --lock FILE" >&2
+  exit 1
+fi
 
 desktop=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$desktop")
@@ -102,6 +120,9 @@ name=Dot_${version}_universal
 
 echo "release: building Dot $version, signed by $identity"
 cd "$desktop"
+# The tools the app carries, fetched against their pinned SHA-256s and signed with the Developer ID, the hardened
+# runtime and a secure timestamp before the app, which then holds them in its Resources, is signed.
+./fetch-tools.sh --sign "$identity"
 npm ci --no-audit --no-fund
 # Tauri notarizes only with an Apple ID or an API key in its environment: the notary service is asked below with the
 # saved profile, so the bundle Tauri makes is only signed.
@@ -130,6 +151,22 @@ entitled=$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.device.audio-in
 archs=$(lipo -archs "$app/Contents/MacOS/$(plutil -extract CFBundleExecutable raw -o - "$app/Contents/Info.plist")")
 [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]] ||
   fail "Dot.app is built for $archs, not for both Apple silicon and Intel"
+# The tools folder of the app holds the three programs and nothing else: not a file that was lying in the source folder,
+# not a link. It is first on the PATH of the service, which holds the keys of the owner's accounts, so what is in it
+# is a program every user's daemon may run. (tauri.conf.json names the three one by one and fetch-tools.sh empties the
+# source folder: this is the lock after those two, on the app that was built.)
+"$desktop/fetch-tools.sh" --check-bundle "$app/Contents/Resources/tools"
+for tool in uv rg dot-launcher; do
+  program=$app/Contents/Resources/tools/$tool
+  [ -x "$program" ] || fail "$tool is not in the app's Resources: the installer would have nothing to install with"
+  codesign --verify --strict "$program"
+  signature=$(codesign --display --verbose=4 "$program" 2>&1)
+  grep -qF "Authority=$identity" <<<"$signature" || fail "$tool in the app is not signed by $identity"
+  grep -q 'flags=0x10000(runtime)' <<<"$signature" || fail "$tool in the app is not signed with the hardened runtime"
+  grep -q '^Timestamp=' <<<"$signature" || fail "the signature of $tool in the app has no secure timestamp"
+  archs=$(lipo -archs "$program")
+  [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]] || fail "$tool in the app is built for $archs only"
+done
 
 ditto -c -k --keepParent "$app" "$work/Dot.zip"
 notarize "$work/Dot.zip"
@@ -180,12 +217,21 @@ cat <<EOF
 release: Dot $version is ready in desktop/dist/$version:
 $(cd "$out" && ls -1)
 
-Publish it, from this commit ($(git -C "$root" rev-parse --short HEAD)), with:
+Publish it, from this commit ($(git -C "$root" rev-parse --short HEAD)), in this order: the app installs the Python
+package of its own version from PyPI, so the package must be there before the app is anywhere anyone can get it.
 
-  gh release create $tag --target $(git -C "$root" rev-parse HEAD) --title "Dot $version" \\
-    --notes-file desktop/dist/$version/notes.md \\
-    desktop/dist/$version/$name.dmg desktop/dist/$version/$name.app.tar.gz desktop/dist/$version/latest.json
+  1. Tag the commit. The tag publishes dotagent-macos $version to PyPI (.github/workflows/release.yml) once the whole
+     gate passes again on it, some eight minutes later (more, if the environment pypi waits for your click):
 
-The tag $tag also publishes the Python package dotagent-macos $version to PyPI (.github/workflows/release.yml), once
-the whole gate passes again on it, some eight minutes later: watch that run before you announce the release.
+       git tag $tag $(git -C "$root" rev-parse HEAD) && git push origin $tag
+
+  2. Wait until PyPI lists the version (a run that fails publishes nothing: fix main and release the next version):
+
+       until curl -fsS https://pypi.org/pypi/dotagent-macos/$version/json >/dev/null; do sleep 30; done
+
+  3. Only then make the release, which publishes the app, its update and latest.json:
+
+       gh release create $tag --verify-tag --title "Dot $version" \\
+         --notes-file desktop/dist/$version/notes.md \\
+         desktop/dist/$version/$name.dmg desktop/dist/$version/$name.app.tar.gz desktop/dist/$version/latest.json
 EOF

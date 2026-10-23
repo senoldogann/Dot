@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/Users/someone/Library/Application Support/Dot/runtime/app-tools:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>ExitTimeOut</key>
+	<integer>30</integer>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>Label</key>
+	<string>dev.dotagent.dot</string>
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/someone/Library/Application Support/Dot/Dot.app/Contents/MacOS/Dot</string>
+		<string>/Users/someone/Library/Application Support/Dot/runtime/uv-tools/dotagent-macos/bin/python</string>
+		<string>-P</string>
+		<string>-m</string>
+		<string>dotagent</string>
+		<string>daemon</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/Users/someone/Library/Logs/Dot/daemon.err.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/someone/Library/Logs/Dot/daemon.out.log</string>
+	<key>ThrottleInterval</key>
+	<integer>30</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/someone/Library/Application Support/Dot</string>
+</dict>
+</plist>

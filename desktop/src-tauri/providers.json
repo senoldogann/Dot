@@ -1,0 +1,37 @@
+[
+  {
+    "provider": "ollama",
+    "label": "Ollama",
+    "needs": "local models, and cloud models with an Ollama account",
+    "key": false,
+    "models": ["minimax-m2.7:cloud"]
+  },
+  {
+    "provider": "openai",
+    "label": "OpenAI",
+    "needs": "an OpenAI API key",
+    "key": true,
+    "models": ["gpt-5.5"]
+  },
+  {
+    "provider": "anthropic",
+    "label": "Anthropic",
+    "needs": "an Anthropic API key (the Claude models)",
+    "key": true,
+    "models": ["claude-opus-5-5", "claude-haiku-5-5"]
+  },
+  {
+    "provider": "opencode_go",
+    "label": "OpenCode Go",
+    "needs": "an OpenCode Go API key",
+    "key": true,
+    "models": []
+  },
+  {
+    "provider": "openrouter",
+    "label": "OpenRouter",
+    "needs": "an OpenRouter API key (the models of many labs)",
+    "key": true,
+    "models": ["anthropic/claude-sonnet-5.5", "openai/gpt-5.6-luna"]
+  }
+]

@@ -5,7 +5,10 @@
 //! just proven it holds it (`GET /api/proof`), so a program that took the daemon's port is sent nothing. The pages of
 //! the daemon's own address are the only remote pages that may use the shell's commands (`grant`). While the daemon is
 //! down the window shows the page that says how to start it, or which of the daemon's files the shell could not read
-//! and why (`Unread`), and opens the UI by itself when the daemon answers.
+//! and why (`Unread`), and opens the UI by itself when the daemon answers. On a Mac that has no Dot at all, a window of
+//! its own shows the installer instead (`installer`, item 575): the only page that may call the install commands.
+
+mod installer;
 
 use std::collections::HashSet;
 use std::env;
@@ -168,10 +171,12 @@ struct Daemon {
     token: String,
 }
 
-/// The page the window shows (`watch`): the UI, or the down page at the address that says why (`down_url`).
+/// The page the window shows (`watch`): the UI, or the down page at the address that says why (`down_url`), or, on a
+/// Mac that has no Dot, the installer's own window (`installer`).
 enum Shown {
     Ui,
     Down(String),
+    Installer,
 }
 
 /// The daemon's home: `DOT_HOME`, else `~/Library/Application Support/Dot` (`dotagent.core.paths`).
@@ -222,9 +227,10 @@ fn toml_error(text: &str, error: &toml::de::Error) -> String {
     }
 }
 
-/// Where the daemon of `home` listens and its token, read as the daemon reads them: without a config.toml it keeps
-/// its defaults. What the shell could not read is told (`Unread`), and no address is guessed in its place.
-fn read_daemon(home: &Path) -> Result<Daemon, Unread> {
+/// Where the daemon of `home` listens, read as the daemon reads it: without a config.toml it keeps its defaults. What
+/// the shell could not read is told (`Unread`), and no address is guessed in its place. The installer asks it too
+/// (item 575), before there is a token.
+fn read_base(home: &Path) -> Result<String, Unread> {
     let config_path = home.join(CONFIG_FILE);
     let config: ConfigFile = match read_file(&config_path) {
         Ok(None) => ConfigFile::default(),
@@ -242,6 +248,18 @@ fn read_daemon(home: &Path) -> Result<Daemon, Unread> {
     let server = config.server.unwrap_or_default();
     let host = server.host.unwrap_or_else(|| DEFAULT_HOST.to_string());
     let port = server.port.unwrap_or(DEFAULT_PORT);
+    // An IPv6 host goes in brackets, as `dotagent.server.links.base_url` writes it.
+    let bracketed = if host.contains(':') {
+        format!("[{host}]")
+    } else {
+        host
+    };
+    Ok(format!("http://{bracketed}:{port}"))
+}
+
+/// Where the daemon of `home` listens and its token (`read_base`). The token file must be there and not empty.
+fn read_daemon(home: &Path) -> Result<Daemon, Unread> {
+    let base = read_base(home)?;
     let token_path = home.join(TOKEN_FILE);
     let token = match read_file(&token_path) {
         Ok(None) => return Err(Unread::NoToken { path: token_path }),
@@ -259,16 +277,7 @@ fn read_daemon(home: &Path) -> Result<Daemon, Unread> {
             error: EMPTY_TOKEN.to_string(),
         });
     }
-    // An IPv6 host goes in brackets, as `dotagent.server.links.base_url` writes it.
-    let bracketed = if host.contains(':') {
-        format!("[{host}]")
-    } else {
-        host
-    };
-    Ok(Daemon {
-        base: format!("http://{bracketed}:{port}"),
-        token,
-    })
+    Ok(Daemon { base, token })
 }
 
 /// What the pages of the daemon's own address may do through the shell (`PAGE_PERMISSIONS`). A page that another
@@ -497,8 +506,45 @@ fn open_outside(url: url::Url) {
     );
 }
 
+/// The installer's window, made on a Mac that has no Dot (item 575). Its page is the app's own `installer.html` and
+/// nothing else: the window refuses every other address and every new window, so that no link or script can take it
+/// to a page that is not bundled. Only this label has the install commands (`capabilities/installer.json`). Its page
+/// asks the web view for nothing, and is given nothing it asks (the microphone, the camera, where the Mac is): wry
+/// grants every request no one answers (item 594).
+fn installer_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    if let Some(existing) = app.get_webview_window(installer::WINDOW) {
+        return Ok(existing);
+    }
+    WebviewWindowBuilder::new(
+        app,
+        installer::WINDOW,
+        WebviewUrl::App(installer::PAGE.into()),
+    )
+    .title("Set up Dot")
+    .title_bar_style(TitleBarStyle::Overlay)
+    .hidden_title(true)
+    .traffic_light_position(TRAFFIC_LIGHTS)
+    .inner_size(640.0, 780.0)
+    .min_inner_size(420.0, 600.0)
+    .disable_drag_drop_handler()
+    .on_navigation(installer::is_installer_page)
+    .on_new_window(|_url, _features| NewWindowResponse::Deny)
+    .on_permission_request(|_webview, _kind| PermissionResponse::Deny)
+    .build()
+}
+
+/// Close the installer's window for good: the install is over and the UI takes its place.
+fn close_installer(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(installer::WINDOW) {
+        let _ = window.destroy();
+    }
+}
+
 fn show(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(WINDOW) {
+    let window = app
+        .get_webview_window(WINDOW)
+        .or_else(|| app.get_webview_window(installer::WINDOW));
+    if let Some(window) = window {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
@@ -541,12 +587,25 @@ fn open(app: &AppHandle, target: &str) {
     }
 }
 
-/// Open the UI of a daemon that has just proven itself (`look`), once its pages have the shell's commands.
+/// Open the UI of a daemon that has just proven itself (`look`), once its pages have the shell's commands: in the
+/// window that shows the down page, or, when the installer was all there was, in the window made for it.
 fn open_ui(app: &AppHandle, daemon: &Daemon) {
     if let Err(error) = grant(app, daemon) {
         eprintln!("dot-shell: the daemon's pages could not be given the shell's commands: {error}");
     }
-    open(app, &ui_url(daemon));
+    let target = ui_url(daemon);
+    if app.get_webview_window(WINDOW).is_some() {
+        open(app, &target);
+        return;
+    }
+    match url::Url::parse(&target) {
+        Ok(page) => {
+            if let Err(error) = window(app, WebviewUrl::External(page)) {
+                eprintln!("dot-shell: the window of the UI could not be made: {error}");
+            }
+        }
+        Err(error) => eprintln!("dot-shell: the daemon's address is not an address: {error}"),
+    }
 }
 
 /// Whether the window leaves the UI for the down page after `misses` polls in a row that did not count.
@@ -577,6 +636,7 @@ fn watch(app: AppHandle, shown: Shown) {
                     None
                 });
                 let tip = match &seen {
+                    _ if matches!(shown, Shown::Installer) => "Dot · being set up".to_string(),
                     Seen::Counted(_) => {
                         format!("Dot · {waiting} waiting for you · {working} working")
                     }
@@ -589,6 +649,16 @@ fn watch(app: AppHandle, shown: Shown) {
                 let _ = tray.set_tooltip(Some(tip));
             }
             shown = match (shown, daemon) {
+                // The installer's window gives way once the daemon answers and the install is not at work: the
+                // daemon the install's last step waited for, late or not, or a Dot that is not of this install. The
+                // answer decides nothing about the install: it is complete when its service is installed, which the
+                // marker records as that step ends (`installer::record`), so that no start depends on this poll.
+                (Shown::Installer, Some(daemon)) if counted && !installing(&app) => {
+                    close_installer(&app);
+                    open_ui(&app, &daemon);
+                    Shown::Ui
+                }
+                (Shown::Installer, _) => Shown::Installer,
                 (Shown::Ui, _) if !leaves_ui(misses) => Shown::Ui,
                 (Shown::Down(_), Some(daemon)) if counted => {
                     open_ui(&app, &daemon);
@@ -813,27 +883,77 @@ fn shortcut(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Whether the install is at work now.
+fn installing(app: &AppHandle) -> bool {
+    app.try_state::<installer::Installer>()
+        .is_some_and(|installer| installer.running())
+}
+
+/// With an install the app made, look at every start whether the package it installed is older than the app (the app
+/// updated itself), and upgrade it (`installer::keep_in_step`). It says so only when it could not.
+fn keep_package_in_step(app: &AppHandle) {
+    let Some(ctx) = app.state::<installer::Installer>().context() else {
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        match tauri::async_runtime::spawn_blocking(move || installer::keep_in_step(&ctx)).await {
+            Ok(Ok(Some(said))) => eprintln!("dot-shell: {said}"),
+            Ok(Ok(None)) => {}
+            Ok(Err(words)) => {
+                eprintln!("dot-shell: {words}");
+                tell(MessageLevel::Warning, words).await;
+            }
+            Err(error) => eprintln!("dot-shell: the check of Dot's engine did not end: {error}"),
+        }
+    });
+}
+
+/// The app, built from `builder` with the commands of the installer's page (item 575) and the capabilities of this crate
+/// (`capabilities/`): Tauri's ACL lets only that window's own page call the commands. It is the one place
+/// `generate_context!` is written, which embeds symbols a second use would define twice, so the tests build the app the
+/// same way, with the mock runtime, and ask it for the commands from the pages that must be refused.
+fn build_app<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::App<R> {
+    builder
+        .invoke_handler(tauri::generate_handler![
+            installer::installer_inspect,
+            installer::installer_status,
+            installer::installer_start,
+            installer::installer_retry,
+            installer::installer_open,
+        ])
+        .build(tauri::generate_context!())
+        .expect("the desktop shell could not start")
+}
+
 pub fn run() {
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Granted::default())
         .setup(|app| {
             let handle = app.handle().clone();
-            let (seen, daemon) = poll(&dot_home());
-            let shown = match daemon {
-                Some(daemon) if matches!(seen, Seen::Counted(_)) => {
-                    grant(&handle, &daemon)?;
-                    window(
-                        &handle,
-                        WebviewUrl::External(url::Url::parse(&ui_url(&daemon))?),
-                    )?;
-                    Shown::Ui
-                }
-                _ => {
-                    let page = down_url(&seen);
-                    window(&handle, WebviewUrl::External(url::Url::parse(&page)?))?;
-                    Shown::Down(page)
+            let context = installer::context_of(&handle, dot_home());
+            let installing = context.as_ref().is_some_and(installer::wanted);
+            app.manage(installer::Installer::new(context));
+            let shown = if installing {
+                installer_window(&handle)?;
+                Shown::Installer
+            } else {
+                let (seen, daemon) = poll(&dot_home());
+                match daemon {
+                    Some(daemon) if matches!(seen, Seen::Counted(_)) => {
+                        grant(&handle, &daemon)?;
+                        window(
+                            &handle,
+                            WebviewUrl::External(url::Url::parse(&ui_url(&daemon))?),
+                        )?;
+                        Shown::Ui
+                    }
+                    _ => {
+                        let page = down_url(&seen);
+                        window(&handle, WebviewUrl::External(url::Url::parse(&page)?))?;
+                        Shown::Down(page)
+                    }
                 }
             };
             // Another app may hold the shortcut: the shell then goes on without it, and its menu says so.
@@ -846,6 +966,9 @@ pub fn run() {
             };
             tray(&handle, shortcut_taken)?;
             check_for_update(handle.clone(), UpdateCheck::AtStart);
+            if !installing {
+                keep_package_in_step(&handle);
+            }
             watch(handle, shown);
             Ok(())
         })
@@ -855,13 +978,17 @@ pub fn run() {
                 api.prevent_close();
                 let _ = window.hide();
             }
-        })
-        .build(tauri::generate_context!())
-        .expect("the desktop shell could not start");
-    app.run(|app, event| {
-        if let RunEvent::Reopen { .. } = event {
-            show(app);
+        });
+    let app = build_app(builder);
+    app.run(|app, event| match event {
+        RunEvent::Reopen { .. } => show(app),
+        // An install that is at work ends with the app: its program is stopped, not left to run on alone.
+        RunEvent::Exit => {
+            if let Some(installer) = app.try_state::<installer::Installer>() {
+                installer.stop();
+            }
         }
+        _ => {}
     });
 }
 

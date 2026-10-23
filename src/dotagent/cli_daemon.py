@@ -6,6 +6,7 @@ import os
 import secrets
 import sys
 import time
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 
@@ -29,7 +30,7 @@ from dotagent.core.paths import dot_home, log_dir, token_path
 from dotagent.core.runenv import started_by_a_run
 from dotagent.daemon_failure import DaemonFailure, daemon_failure_in, failure_text
 from dotagent.desktop.perms import Pane, open_settings, settings_url
-from dotagent.dot_app import app_path, ensure_app
+from dotagent.dot_app import LAUNCHER_ENV, app_path, ensure_app
 from dotagent.launchd import (
     LABEL,
     RESTART_LABEL,
@@ -315,6 +316,14 @@ def _refused_in_a_run(
         raise ServiceError(f"a run cannot {what}: the daemon would stop under it, cutting the run off", {"fix": fix})
 
 
+def prebuilt_launcher(command: ServiceInstallCommand, environ: Mapping[str, str]) -> Path | None:
+    """The prebuilt program for Dot.app that the person named: ``--launcher``, else ``DOT_APP_LAUNCHER`` (item 575),
+    else ``None``: a Dot.app made from a prebuilt program is then made again from the one it keeps
+    (:func:`dotagent.dot_app.ensure_app`), and any other is built with clang. An empty name is none."""
+    named: str = command.launcher if command.launcher is not None else environ.get(LAUNCHER_ENV, "")
+    return Path(named) if named != "" else None
+
+
 async def cmd_service_install(command: ServiceInstallCommand) -> int:
     _refused_in_a_run("install the service, which restarts the daemon at once")
     config: AppConfig = load_user_config()
@@ -328,7 +337,7 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
             "a Dot daemon that is not the service already answers at the address",
             {"url": url, "fix": "stop it (Ctrl-C in its terminal), then install the service again"},
         )
-    launcher: Path = await asyncio.to_thread(ensure_app, dot_home())
+    launcher: Path = await asyncio.to_thread(ensure_app, dot_home(), prebuilt_launcher(command, os.environ))
     agent: LaunchAgent = build_launch_agent(str(launcher), sys.executable, dot_home(), log_dir(), os.environ)
     replaced: bool = await install_job(plist, render_launch_agent(agent), uid)
     sys.stdout.write(f"{'Replaced' if replaced else 'Installed'} the launchd job {LABEL}: {plist}\n")
