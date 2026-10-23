@@ -237,10 +237,11 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   and goal mode, and as its agent in a chat with one of yours, item 463). Each run of it is told how the loop ends: it
   deletes its schedule (`schedule_delete`) once the work is done for good. Right above the composer, in the bar that
   also says how long the run has worked and how its helpers stand (one pane of glass on a phone, item 401), a line shows
-  each loop of the chat, how often it asks again, when next, and a Stop that deletes it. A rhythm a cron expression
-  cannot keep exactly, or one shorter than `[scheduler] min_interval_s`, is refused (422); a new chat then starts
-  nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going, whose
-  campaign goes on by itself.
+  each loop of the chat, how often it asks again ("every 30 minutes", and "every day at 10:00" for a schedule a run of
+  it made, where it read `cron 0 10 * * *` before item 590), when next, and a Stop that deletes it. A rhythm a cron
+  expression cannot keep exactly, or one shorter than `[scheduler] min_interval_s`, is refused (422); a new chat then
+  starts nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going,
+  whose campaign goes on by itself.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
   each). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
   thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into
