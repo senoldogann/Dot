@@ -28,6 +28,7 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 from dotagent.agent.manager import BACKGROUND_SOURCE, QUEUE_CHANGED_EVENT, TERMINALS_CHANGED_EVENT, RunManager
 from dotagent.config import load_default_config
 from dotagent.core.errors import RunConflict
+from dotagent.core.paths import failsafe_path
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -369,6 +370,71 @@ async def test_a_stop_after_the_end_of_a_command_holds_no_queue_and_the_next_run
         [said] = _notes(owners_first)
         assert _TOLD.fullmatch(said.removeprefix(_SYSTEM_NOTE).split("\n", 1)[0]) is not None, said
         assert session.told is True
+
+
+async def _command_at_work(runtime: Runtime, run: RunRecord) -> TerminalSession:
+    """The command of the chat of ``run``, once it is open and has not ended."""
+    async with asyncio.timeout(WAIT_S):
+        while True:
+            sessions: list[TerminalSession] = runtime.terminals.sessions(run.thread_id)
+            if sessions and sessions[0].exit_status is None:
+                return sessions[0]
+            await asyncio.sleep(0.05)
+
+
+async def _command_over(session: TerminalSession) -> None:
+    """Wait until ``session`` has ended by itself."""
+    async with asyncio.timeout(WAIT_S):
+        while True:
+            if session.exit_status is not None:
+                return
+            await asyncio.sleep(0.05)
+
+
+async def test_a_command_that_ends_after_the_owner_stopped_the_chat_starts_no_run_of_its_own(
+    login_env: dict[str, str],
+) -> None:
+    """Item 553: Stop stops the chat. The command it left at work ends by itself afterwards (the order of the test
+    before this one reversed), and no run of Dot's own starts in the chat the owner stopped: the notice waits for the
+    owner's next run, whose first step is told."""
+    model: _Recording = _Recording(_PROVIDER, [_open(_SHORT), _wait(12), _FINISH])
+    async with _session(login_env, model) as (runtime, manager), _nothing_queued(runtime):
+        run: RunRecord = await _start(manager)
+        session: TerminalSession = await _command_at_work(runtime, run)
+        manager.cancel(run.id)
+        assert (await _ended(manager, run.id)).status == "cancelled"
+        await _command_over(session)
+        await asyncio.sleep(1.5)
+        assert [r.id for r in await runtime.store.list_runs(10, run.thread_id)] == [run.id]
+        assert session.told is False and not await runtime.store.queue_held(run.thread_id)
+        owners: RunRecord = await _message(manager, run.thread_id)
+        assert (await _ended(manager, owners.id)).status == "done"
+        assert [r.source for r in await runtime.store.list_runs(10, run.thread_id)] == [UI_SOURCE, UI_SOURCE]
+        [said] = _notes(model.asked[-1])
+        assert _TOLD.fullmatch(said.removeprefix(_SYSTEM_NOTE).split("\n", 1)[0]) is not None, said
+        assert session.told is True
+
+
+async def test_the_end_of_a_command_starts_no_run_while_the_emergency_stop_is_engaged(
+    login_env: dict[str, str],
+) -> None:
+    """Item 553: the emergency stop is engaged while a run works (its file exists), and the command ends before the run
+    does. The end of the run does not start the run that tells it, as it does when the stop is not engaged (the test
+    of the last step): nothing of Dot's own starts under the stop."""
+    last: ScriptedTurn = ScriptedTurn(
+        text="",
+        calls=(_sleep(6), ScriptedCall(tool="finish", arguments={"answer": "Done.", "success": True})),
+    )
+    model: ScriptedProvider = ScriptedProvider(_PROVIDER, [_open(_SHORT), last, _FINISH])
+    async with _session(login_env, model) as (runtime, manager), _nothing_queued(runtime):
+        first: RunRecord = await _start(manager)
+        session: TerminalSession = await _command_at_work(runtime, first)
+        await asyncio.to_thread(failsafe_path().touch)
+        assert (await _ended(manager, first.id)).status == "done"
+        await _command_over(session)
+        await asyncio.sleep(1.5)
+        assert [r.id for r in await runtime.store.list_runs(10, first.thread_id)] == [first.id]
+        assert session.told is False
 
 
 async def _command_ended(runtime: Runtime, changes: asyncio.Queue[EventRecord], run: RunRecord) -> TerminalSession:

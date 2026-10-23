@@ -297,7 +297,7 @@ async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
             missed: ScheduleMissed = ScheduleMissed(
                 schedule_id="sch-1",
                 name="Morning digest",
-                status="skipped: 125 minutes overdue (the daemon was not running)",
+                status="skipped: 125 minutes overdue (the daemon was off or the Mac slept)",
             )
             await runtime.bus.emit(SYSTEM_RUN_ID, SCHEDULE_MISSED_EVENT, missed.model_dump(), False)
             notes = await _told(page, 4)
@@ -309,7 +309,7 @@ async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
                 ),
                 (
                     "A schedule did not run",
-                    "Morning digest: skipped: 125 minutes overdue (the daemon was not running)",
+                    "Morning digest: skipped: 125 minutes overdue (the daemon was off or the Mac slept)",
                     "schedule-sch-1",
                 ),
             ]

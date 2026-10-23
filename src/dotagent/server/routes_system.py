@@ -636,7 +636,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         """Block desktop control, stop every run that is going on as an emergency stop (their campaigns stop with them)
         and hold the scheduler until the stop is released."""
         await asyncio.to_thread(failsafe_path().touch)
-        return FailsafeView(engaged=True, cancelled_runs=ctx.manager.emergency_stop())
+        return FailsafeView(engaged=True, cancelled_runs=await ctx.manager.emergency_stop())
 
     @router.delete("/failsafe")
     async def release_failsafe() -> FailsafeView:

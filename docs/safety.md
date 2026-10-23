@@ -538,7 +538,8 @@ event and approval.
 - the **Emergency stop** button of the web UI (Settings › System; or `POST /api/failsafe`; a chat's own run stops with
   the stop button of its composer) creates the `STOP` file in the home
   directory and ends every run as an emergency stop, a run that was starting at that moment too (a campaign whose
-  session it ends stops too); the page shows a banner with a button that releases it
+  session it ends stops too), and the run of a `dotx` command that works in its own terminal: the command asks its
+  process to end it so, which it does within a second (item 553); the page shows a banner with a button that releases it
 - `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way, without ending a run; delete the
   file to allow it again
 - while the `STOP` file exists, no schedule fires (a firing due then is skipped to its next time, saying why; a

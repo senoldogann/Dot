@@ -1,10 +1,12 @@
 """Routes for campaigns: goals that Dot keeps working on in sessions until their outcome is verified."""
 
+import contextlib
 import time
 
 from fastapi import APIRouter
 
 from dotagent.agent.campaign_control import mark_achieved, resume_campaign, stop_campaign
+from dotagent.core.errors import RunConflict
 from dotagent.scheduler.timing import format_local
 from dotagent.server.context import ServerContext
 from dotagent.server.views import CampaignDetail, CampaignSummary
@@ -62,10 +64,15 @@ def campaigns_router(ctx: ServerContext) -> APIRouter:
         )
 
     async def stop_session(campaign_id: str) -> None:
-        """Stop the campaign's session that is working in the daemon, if one is."""
+        """Stop the campaign's session that is working, in the daemon or in the process of a ``dotx`` command that
+        drives it (the opening session of ``dotx run --standing``): that process is asked to stop it (item 553)."""
         working: str | None = _working(await store.campaign_sessions(campaign_id))
-        if working is not None and working in ctx.manager.active_run_ids():
-            ctx.manager.cancel(working)
+        if working is None:
+            return
+        if working in ctx.manager.active_run_ids() or working in ctx.manager.elsewhere_run_ids():
+            # A session that ended meanwhile is as stopped as it need be.
+            with contextlib.suppress(RunConflict):
+                await ctx.manager.stop(working)
 
     @router.get("/campaigns")
     async def list_campaigns() -> list[CampaignSummary]:
@@ -77,7 +84,7 @@ def campaigns_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/campaigns/{campaign_id}/stop")
     async def stop(campaign_id: str) -> CampaignDetail:
-        """Stop the campaign, and its session that is working in the daemon."""
+        """Stop the campaign, and its session that is working, in the daemon or in a ``dotx`` command."""
         await stop_campaign(store, campaign_id)
         await stop_session(campaign_id)
         return await detail(campaign_id)
@@ -90,7 +97,8 @@ def campaigns_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/campaigns/{campaign_id}/achieved")
     async def achieved(campaign_id: str) -> CampaignDetail:
-        """Mark the campaign achieved on the owner's word, and stop its session that is working in the daemon."""
+        """Mark the campaign achieved on the owner's word, and stop its session that is working, in the daemon or in a
+        ``dotx`` command."""
         await mark_achieved(store, campaign_id)
         await stop_session(campaign_id)
         return await detail(campaign_id)

@@ -26,6 +26,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.attachments import RunInbox
 from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT, Brief
 from dotagent.agent.campaign_control import stop_campaign
 from dotagent.agent.loop import CAMPAIGN_TARGETS_EVENT, RunOpening
@@ -33,7 +34,7 @@ from dotagent.agent.manager import RunHandle, RunManager, thread_title
 from dotagent.agent.reflection import REFLECTION_OFF
 from dotagent.agent.review import GOAL_TOOL
 from dotagent.config import AppConfig, load_default_config
-from dotagent.core.errors import BrowserError
+from dotagent.core.errors import BrowserError, StoreError
 from dotagent.core.paths import db_path, failsafe_path
 from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
@@ -50,7 +51,7 @@ from dotagent.scheduler.runner import Scheduler
 from dotagent.server import UI_SOURCE
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
-from dotagent.store.endings import RESULT_EMERGENCY_STOPPED
+from dotagent.store.endings import RESULT_EMERGENCY_STOPPED, RESULT_SHUTDOWN
 from dotagent.store.models import (
     WORKING_STATUSES,
     ApprovalRecord,
@@ -59,6 +60,7 @@ from dotagent.store.models import (
     EventRecord,
     RunMode,
     RunRecord,
+    RunStatus,
     ScheduleOptions,
     ScheduleRecord,
     ThreadRecord,
@@ -635,6 +637,41 @@ async def test_the_owner_starts_stops_lets_go_on_and_marks_a_campaign_achieved_t
     assert missing.status_code == 404
 
 
+@pytest.mark.parametrize("route", ["stop", "achieved"])
+async def test_the_stop_and_the_achieved_of_a_campaign_ask_the_command_that_drives_its_session_to_stop_it(
+    login_env: dict[str, str], route: str
+) -> None:
+    """Item 553: the opening session of ``dotx run --standing`` works in the command's process. The campaign page's Stop
+    and Mark achieved (which docs say stop the session working then) left it going until it ended by itself; they ask
+    the command's process to stop it, as the Stop of the session's own page does."""
+    model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, []))
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, _):
+        manager: RunManager = RunManager(runtime)
+        store = runtime.store
+        thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
+        campaign: CampaignRecord = await store.create_campaign(
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+        )
+        # The session's run is at work in the store; no handle of this process holds it.
+        session: RunRecord = await store.create_run(
+            thread.id, GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, "medium", "standard", None, "ask", False,
+            campaign.id, None, "another-process",
+        )  # fmt: skip
+        # The daemon sees it as the run of a live command, as its relay does (``RunManager.relay_elsewhere``).
+        manager._elsewhere = frozenset({session.id})
+        try:
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=create_app(_context(runtime, manager))),
+                base_url=BASE,
+                headers={"Authorization": f"Bearer {TOKEN}"},
+            ) as client:
+                answered: httpx.Response = await _post(client, f"/campaigns/{campaign.id}/{route}", None)
+            assert answered.status_code == 200, answered.text
+            assert await store.stops_asked([session.id]) == [session.id]
+        finally:
+            await manager.shutdown()
+
+
 async def test_the_owner_deletes_a_campaign_with_its_sessions_and_its_conversation_stays_a_chat(
     login_env: dict[str, str],
 ) -> None:
@@ -851,7 +888,7 @@ class _EmergencyWhileBriefing(RunManager):
         brief: Brief = await super()._brief(campaign, sessions, number, now)
         if not await asyncio.to_thread(failsafe_path().exists):
             await asyncio.to_thread(failsafe_path().touch)
-            self.emergency_stop()
+            await self.emergency_stop()
         return brief
 
 
@@ -911,7 +948,7 @@ class _EmergencyWhileLaunching(RunManager):
     async def _instructions_for(
         self, goal: str, thread_id: str, parent_run_id: str | None, parent: RunHandle | None
     ) -> tuple[str, ...]:
-        self.emergency_stop()
+        await self.emergency_stop()
         return await super()._instructions_for(goal, thread_id, parent_run_id, parent)
 
 
@@ -1084,6 +1121,74 @@ async def test_a_campaign_whose_opening_session_could_not_start_in_any_way_is_no
             assert await asyncio.to_thread(_threads, db_path()) == threads
         finally:
             await manager.shutdown()
+
+
+async def test_a_campaign_whose_opening_session_failed_after_its_run_was_stored_leaves_its_chat_no_campaign(
+    login_env: dict[str, str],
+) -> None:
+    """Item 553: Keep going on a follow-up in an existing chat stores the run first; a start that fails after that
+    forgets the campaign, and the run, failed, named a campaign that was gone: its page was a 404 and its chat took no
+    queue. A run that was the campaign's is no longer."""
+    model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, []))
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, _):
+        manager: RunManager = RunManager(runtime)
+        chat: ThreadRecord = await runtime.store.create_thread("A follow-up", UI_SOURCE)
+        emit = runtime.bus.emit
+
+        async def failing(run_id: str, kind: str, data: JsonObject, persist: bool) -> EventRecord:
+            if kind == "run_queued":
+                raise StoreError("the disk is full", {})
+            return await emit(run_id, kind, data, persist)
+
+        runtime.bus.emit = failing  # type: ignore[method-assign]
+        try:
+            with pytest.raises(StoreError, match="the disk is full"):
+                await manager.start_campaign(
+                    GOAL, "task", SCRIPTED_MODEL, chat.id, UI_SOURCE, None, "standard", None, "ask", None, (), None
+                )
+        finally:
+            runtime.bus.emit = emit  # type: ignore[method-assign]
+            await manager.shutdown()
+        assert await runtime.store.list_campaigns() == []
+        assert [(run.status, run.campaign_id) for run in await runtime.store.list_runs(10, chat.id)] == [
+            ("failed", None)
+        ]
+
+
+@pytest.mark.parametrize(
+    ("status", "result", "campaign_status"),
+    [("done", "Done.", "stopped"), ("cancelled", RESULT_SHUTDOWN, "active")],
+    ids=["ended-done", "cut-off-by-the-shutdown"],
+)
+async def test_a_session_that_ends_as_the_daemon_stops_is_followed_unless_the_shutdown_cut_it_off(
+    login_env: dict[str, str], status: RunStatus, result: str, campaign_status: str
+) -> None:
+    """Item 553: a session that ended done as the shutdown began was never followed, and the restart planned the next
+    one at once, past the session limit it was the last of. Only the session the shutdown cut off is left to
+    ``resume_campaigns``, which plans it when the daemon starts again."""
+    config: AppConfig = _config(60)
+    one_session: AppConfig = config.model_copy(
+        update={"agent": config.agent.model_copy(update={"campaign_max_sessions": 1})}
+    )
+    model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, []))
+    async with _session(one_session, login_env, model, Notices()) as (runtime, _):
+        manager: RunManager = RunManager(runtime)
+        store = runtime.store
+        thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
+        campaign: CampaignRecord = await store.create_campaign(
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+        )
+        session: RunRecord = await store.create_run(
+            thread.id, GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, "medium", "standard", None, "ask", False,
+            campaign.id, None, None,
+        )  # fmt: skip
+        manager._stopping = True
+        try:
+            await manager._record_end(session, status, result, "", None, RunInbox())
+        finally:
+            manager._stopping = False
+            await manager.shutdown()
+        assert (await store.get_campaign(campaign.id)).status == campaign_status
 
 
 async def test_a_session_that_could_not_start_in_any_way_is_tried_again_after_the_gap(

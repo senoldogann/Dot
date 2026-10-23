@@ -26,7 +26,7 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
-from dotagent.agent.manager import QUEUE_CHANGED_EVENT, RunManager
+from dotagent.agent.manager import EMERGENCY_ASKS_KEY, QUEUE_CHANGED_EVENT, RunManager, _emergency_marks
 from dotagent.config import load_default_config
 from dotagent.core.errors import StoreError
 from dotagent.core.paths import workspace_dir
@@ -43,6 +43,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.db import Store
+from dotagent.store.endings import classify_ending
 from dotagent.store.models import NO_PICKS, ApprovalRecord, EventRecord, RunRecord, ThreadRecord, WorkingRun
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 from dotagent.tools.shell import read_login_env
@@ -254,6 +255,25 @@ async def test_the_stop_of_a_command_run_on_its_page_stops_it_in_the_command(log
                 await _relayed(relayed, run_id, "run_finished")
             assert (await runtime.store.get_run(run_id)).status == "cancelled"
             assert await runtime.store.stops_asked([run_id]) == []
+
+
+async def test_the_emergency_stop_ends_the_run_of_a_command_as_one(login_env: dict[str, str]) -> None:
+    """Item 553: before, the emergency stop ended the runs of the daemon only, and the command went on with its steps,
+    of which the STOP file holds back the desktop's alone. The command is asked to end its run as the emergency stop
+    (and a campaign session of it would stop the campaign), and the ask and its mark are gone once it has."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env) as (runtime, _manager, address), _api(address) as api:
+            async with runtime.bus.subscribe(None) as relayed, _command(home, "yolo", "", [_WAITING, _FINISH]) as child:
+                run_id: str = await _working(child, relayed)
+                engaged: httpx.Response = await api.post("/api/failsafe")
+                assert engaged.status_code == 200, engaged.text
+                assert engaged.json()["cancelled_runs"] == [run_id]
+                assert await _said(child, "ended") == "cancelled"
+                await _relayed(relayed, run_id, "run_finished")
+            ended: RunRecord = await runtime.store.get_run(run_id)
+            assert (ended.status, classify_ending(ended.status, ended.result)) == ("cancelled", "emergency_stop")
+            assert await runtime.store.stops_asked([run_id]) == []
+            assert _emergency_marks(await runtime.store.kv_get(EMERGENCY_ASKS_KEY)) == {}
 
 
 async def test_a_question_of_a_command_run_answered_on_its_page_reaches_the_command_at_once(

@@ -164,7 +164,8 @@ composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the 
 `[agent] reflection_time` (see Reflection above); it is not a schedule and does not count against `max_schedules`.
 
 On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
-whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task, chat, research), model, reasoning
+whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task or research: a chat that only talks
+schedules tasks), model, reasoning
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat, when its failures switch it
 off, how the end of its runs is told, the agent it runs as and whether it is on (`history_runs`, `same_chat`,
 `stop_after_failures`, `notify`, `agent_id` and `speed` in `POST` and `PATCH /api/schedules`, left out for the
@@ -190,6 +191,10 @@ its answer (`GET /api/schedules/<id>/firings?limit=`, up to 50); a later firing'
 earlier runs.
 
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
+- A run of a schedule that the daemon's end cut off and you resumed (Resume on its page) counts as the schedule's run
+  at work when the schedule comes due beside it (item 553): a repeating schedule is skipped, as for any run still
+  going, and the end of that run is written to the schedule. One that ends before the schedule is due again writes
+  nothing to it.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)
   is skipped and waits for the next; you are told, as you are when a firing's run cannot start (see the notifications
   under the web UI). A one-time schedule has no next time and is never dropped: overdue, it fires late, and its run
