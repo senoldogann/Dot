@@ -4,12 +4,13 @@ retired; adopting an earlier version again takes a change back."""
 
 import difflib
 import json
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 
 from pydantic import JsonValue
 
 from dotagent.config import HarnessConfig
 from dotagent.core.errors import InvalidValueError, NotFoundError
+from dotagent.core.learned_text import gate
 from dotagent.core.logs import get_logger
 from dotagent.harness.components import (
     COMPONENTS,
@@ -17,8 +18,8 @@ from dotagent.harness.components import (
     Component,
     HarnessText,
     component_problem,
+    description_problem,
     normalized,
-    unprintable,
 )
 from dotagent.store.db import Store
 from dotagent.store.models import HarnessStep, HarnessVersion
@@ -31,8 +32,59 @@ SUMMARY_CHARS: int = 200
 OWNER: str = "owner"
 
 
+def _strings(value: JsonValue) -> Iterator[str]:
+    """Every text in a JSON value, at any depth."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, list):
+        for item in value:
+            yield from _strings(item)
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _strings(item)
+
+
+def _notes_texts(notes: str) -> tuple[str, ...]:
+    """The texts a version's ``notes`` hold: every string of the JSON they are, or the notes as one text when they are
+    not JSON."""
+    try:
+        return tuple(_strings(json.loads(notes)))
+    except ValueError:
+        return (notes,)
+
+
 def text_of(version: HarnessVersion) -> HarnessText:
     return HarnessText(habits=version.habits, tool_guidance=version.tool_guidance)
+
+
+def refusals(text: HarnessText, secrets: Sequence[str] = ()) -> dict[str, str]:
+    """What the one gate for learned texts says of each component of ``text`` as it stands now, by its name; empty when
+    it refuses none (item 587, review round 1). The gate is asked of a version when it is written, and again whenever
+    its text is used: a version written before the gate was as strict (or by a hand that never asked it) is not
+    adopted, and a prompt never takes a component it refuses. The limits of size are not asked again: a limit the owner
+    lowered since is for what is written from then on."""
+    return {name: problem for name in COMPONENTS if (problem := gate(text.component(name), secrets)) is not None}
+
+
+def refusal_words(refused: dict[str, str]) -> str:
+    """``refused`` (:func:`refusals`) as a phrase: ``its habits hold a link; its tool guidance holds a secret``."""
+    return "; ".join(
+        f"its {name.replace('_', ' ')} {'hold' if name == 'habits' else 'holds'} {problem}"
+        for name, problem in refused.items()
+    )
+
+
+def check_adoptable(version: HarnessVersion, secrets: Sequence[str] = ()) -> None:
+    """Raise :class:`InvalidValueError` unless the gate for learned texts accepts both texts of ``version`` as they
+    stand: what a run follows is never a text that the gate would refuse to write, however the version came to be
+    (item 587, review round 1). The message says how to set the version aside."""
+    refused: dict[str, str] = refusals(text_of(version), secrets)
+    if refused:
+        raise InvalidValueError(
+            f"{version.id} cannot be adopted: {refusal_words(refused)}. Set it aside "
+            f"(dotx harness retire {version.id}, or Set aside on the Harness page) and write a new version.",
+            {"version": version.id, "problems": {name: problem for name, problem in refused.items()}},
+        )
 
 
 def problems(text: HarnessText, config: HarnessConfig, secrets: Sequence[str]) -> dict[str, str]:
@@ -57,7 +109,9 @@ async def create_version(
 ) -> HarnessVersion:
     """A new candidate from ``text``, normalized (:func:`normalized`), made from the adopted version. A component that
     cannot be one (:func:`problems`) raises :class:`InvalidValueError` naming each problem, as does a summary that is
-    not one line of 1 to :data:`SUMMARY_CHARS` characters or has a character that does not print."""
+    not one line of 1 to :data:`SUMMARY_CHARS` characters, and a summary or a text in the ``notes`` (the moments and the
+    decisions a model wrote) that the gate refuses (:func:`description_problem`, item 587): whoever the maker, nothing a
+    model wrote into the harness is stored unread."""
     clean: HarnessText = HarnessText(habits=normalized(text.habits), tool_guidance=normalized(text.tool_guidance))
     found: dict[str, str] = problems(clean, config, secrets)
     if found:
@@ -66,9 +120,10 @@ async def create_version(
     line: str = summary.strip()
     if line == "" or len(line) > SUMMARY_CHARS or "\n" in line or "\t" in line:
         raise InvalidValueError(f"the summary is one line of 1 to {SUMMARY_CHARS} characters", {"length": len(line)})
-    hidden: str | None = unprintable(line)
-    if hidden is not None:
-        raise InvalidValueError("the summary has a character that does not print", {"character": hidden})
+    for what, written in (("summary", line), *(("notes", each) for each in _notes_texts(notes))):
+        refused: str | None = description_problem(written, secrets)
+        if refused is not None:
+            raise InvalidValueError(f"the {what} cannot be recorded: {refused}", {"problem": refused})
     parent: str | None = await store.adopted_harness_id()
     version: HarnessVersion = await store.create_harness_version(
         parent, made_by, line, clean.habits, clean.tool_guidance, notes
@@ -77,8 +132,11 @@ async def create_version(
     return version
 
 
-async def adopt(store: Store, version_id: str, now: float) -> HarnessVersion:
-    """Make ``version_id`` the version every run takes from now on; the one adopted before is retired."""
+async def adopt(store: Store, version_id: str, now: float, secrets: Sequence[str] = ()) -> HarnessVersion:
+    """Make ``version_id`` the version every run takes from now on; the one adopted before is retired. A version whose
+    text the gate for learned texts refuses now (:func:`check_adoptable`; ``secrets`` are the values Dot holds) is not
+    adopted, and raises :class:`InvalidValueError` saying why."""
+    check_adoptable(await store.get_harness_version(version_id), secrets)
     version: HarnessVersion = await store.adopt_harness(version_id, now)
     log.info("harness_adopted", version=version.id)
     return version
@@ -108,10 +166,31 @@ async def adopted(store: Store) -> HarnessVersion | None:
     return version
 
 
-async def adopted_text(store: Store) -> tuple[HarnessText, str | None]:
-    """What a run starting now takes from the harness, and the id of the version it is, ``None`` with none adopted."""
+# The components of the adopted version that were left out of a prompt, which are logged once each, not at every run.
+_LEFT_OUT: set[tuple[str, str]] = set()
+
+
+async def adopted_text(store: Store, secrets: Sequence[str] = ()) -> tuple[HarnessText, str | None]:
+    """What a run starting now takes from the harness, and the id of the version it is, ``None`` with none adopted. A
+    component that the gate for learned texts refuses now (:func:`refusals`: a version written before the gate was as
+    strict, or by a hand that never asked it; ``secrets`` are the values Dot holds, which a caller reads as the
+    write-time check does) is left out of the text, and logged once; the Harness page shows the version as refused
+    (item 587)."""
     version: HarnessVersion | None = await adopted(store)
-    return (NO_HARNESS, None) if version is None else (text_of(version), version.id)
+    if version is None:
+        return NO_HARNESS, None
+    text: HarnessText = text_of(version)
+    refused: dict[str, str] = refusals(text, secrets)
+    for name, problem in refused.items():
+        if (version.id, name) not in _LEFT_OUT:
+            _LEFT_OUT.add((version.id, name))
+            log.warning("harness_component_left_out", version=version.id, component=name, problem=problem)
+    if refused:
+        text = HarnessText(
+            habits="" if "habits" in refused else text.habits,
+            tool_guidance="" if "tool_guidance" in refused else text.tool_guidance,
+        )
+    return text, version.id
 
 
 def diff_text(before: HarnessText, after: HarnessText, before_name: str, after_name: str) -> str:

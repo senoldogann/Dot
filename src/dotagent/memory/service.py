@@ -20,6 +20,7 @@ from pydantic import ValidationError
 
 from dotagent.config import AppConfig, MemoryConfig
 from dotagent.core.errors import InvalidValueError, StoreError
+from dotagent.core.learned_text import OWNER_MARK, gate
 from dotagent.core.text import estimate_text_tokens
 from dotagent.core.types import FrozenModel
 from dotagent.memory.embedder import Embedder, build_embedder
@@ -40,6 +41,8 @@ REFLECTION_SOURCE: str = "reflection"
 SEPARATE_TAG: str = "keep-separate"
 # The kv key of the owner section (item 93): what Dot knows about the owner, kept by the nightly reflection.
 OWNER_KEY: str = "owner.section"
+# The mark the prompt puts before a line that is the owner's own, and says outranks the others (item 93), is
+# :data:`dotagent.core.learned_text.OWNER_MARK`: the gate refuses it in every text Dot learns (item 587).
 # The most lines Dot's part of the owner section holds.
 OWNER_LINES: int = 12
 _MODEL_KEY: str = "memory.embed_model"
@@ -387,9 +390,39 @@ def owner_lines_within(lines: Sequence[str], owner_chars: int) -> tuple[str, ...
     return tuple(kept)
 
 
-def owner_prompt_lines(section: OwnerSection) -> tuple[str, ...]:
-    """The section as the prompt lists it: the owner's own lines first, marked as theirs, then Dot's."""
-    return (*(f"(you said) {line}" for line in section.owner_lines), *section.dot_lines)
+def dot_line_problem(line: str, secrets: Sequence[str]) -> str | None:
+    """Why ``line`` may not stand among Dot's lines of the owner section, or ``None`` (item 587): it holds what the one
+    gate for learned texts refuses (:func:`dotagent.core.learned_text.gate`), the owner's mark among it
+    (:data:`OWNER_MARK`, which the prompt says outranks the other lines). ``secrets`` are the values Dot holds."""
+    return gate(line, secrets)
+
+
+def vetted_dot_lines(
+    lines: Sequence[str], secrets: Sequence[str]
+) -> tuple[tuple[str, ...], tuple[tuple[int, str], ...]]:
+    """The lines of ``lines`` that may stand among Dot's lines of the owner section, and each that may not with its
+    number (from 1) and why (:func:`dot_line_problem`). The section stands unfenced at the end of every prompt, and what
+    the reflection's model writes of the owner comes from their notes and the day's goals, which a page may have
+    reached: a line that is refused is dropped, and the rest are kept."""
+    kept: list[str] = []
+    refused: list[tuple[int, str]] = []
+    for number, line in enumerate(lines, start=1):
+        problem: str | None = dot_line_problem(line, secrets)
+        if problem is None:
+            kept.append(line)
+        else:
+            refused.append((number, problem))
+    return tuple(kept), tuple(refused)
+
+
+def owner_prompt_lines(section: OwnerSection, secrets: Sequence[str] = ()) -> tuple[str, ...]:
+    """The section as the prompt lists it: the owner's own lines first, marked as theirs, then Dot's. A line of Dot's
+    that the gate refuses (:func:`dot_line_problem`, with ``secrets``, the values Dot holds) is left out here too, also
+    one written before the gate was: the prompt says a line with the owner's mark outranks the others."""
+    return (
+        *(f"{OWNER_MARK} {line}" for line in section.owner_lines),
+        *(line for line in section.dot_lines if dot_line_problem(line, secrets) is None),
+    )
 
 
 class Remembered(FrozenModel):

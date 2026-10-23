@@ -3,6 +3,7 @@
 earlier steps, and writes a candidate version, or keeps. The scoring set that judges a candidate is never among what
 it reads."""
 
+import asyncio
 import json
 
 from dotagent.agent.lessons import LessonCase, stored_signals
@@ -78,7 +79,8 @@ async def propose_from_run(runtime: Runtime, run_id: str, scope: ProposalScope) 
     error."""
     case: LessonCase = await case_of(runtime, run_id)
     signals: tuple[str, ...] = await stored_signals(runtime.store, case)
-    current, parent = await adopted_text(runtime.store)
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    current, parent = await adopted_text(runtime.store, held)
     request: ProposalRequest = ProposalRequest(
         goal=case.goal,
         digest=case.digest,
@@ -106,7 +108,7 @@ async def propose_from_run(runtime: Runtime, run_id: str, scope: ProposalScope) 
         proposal.summary,
         PROPOSER,
         notes_of(case, scope, proposal, parent),
-        known_secrets(),
+        held,
     )
     log.info("harness_proposed", run_id=run_id, scope=scope, version=version.id, moments=len(proposal.moments))
     return version

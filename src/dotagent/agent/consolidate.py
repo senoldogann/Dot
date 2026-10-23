@@ -44,6 +44,7 @@ from dotagent.memory.lifecycle import merge_notes
 from dotagent.memory.ranking import Vector
 from dotagent.memory.service import CORE_TAG, JOURNAL_TAG, REFLECTION_SOURCE, REST_TAG, SEPARATE_TAG
 from dotagent.runtime import Runtime
+from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord
 
@@ -274,7 +275,7 @@ async def rest_repeating_habits(runtime: Runtime, owner_saved: Set[str], now: fl
     the lessons found to repeat no rule. A night with no lesson that is new or rewritten since, on the same basis, asks
     the embedding service for nothing; a lesson that changed, or a new version of the harness, is checked again. An
     embedding service that fails raises its error, and nothing is remembered of that night."""
-    text, version = await adopted_text(runtime.store)
+    text, version = await adopted_text(runtime.store, await asyncio.to_thread(known_secrets))
     rules: tuple[str, ...] = rules_of(text)
     if not rules or version is None:
         return 0

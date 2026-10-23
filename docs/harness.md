@@ -21,15 +21,98 @@ the evidence behind it. Every run's system prompt takes the texts of the one ado
 | **Tool guidance** | After the tools and the rules of communication | What earlier runs learned of the tools on this Mac: a flag a command wants, a site that needs a slower pace. Always on. |
 
 Both are plain text you can read on one screen, at most `[harness] habits_chars` and `tool_guidance_chars` characters
-(1,200 and 1,500) in at most `component_lines` lines (16), no line past 300 characters. A text with a secret, a link, an
-e-mail address, a path in a home folder or an account name is refused (a page a run read may have put any of them into a
-proposal, and a prompt is forever), and so is one with a character that does not print (a control, a zero-width or a
-bidi character), which could hide a line from you. The learned skills (`<home>/playbooks`, [Memory and
+(1,200 and 1,500) in at most `component_lines` lines (16), no line past 300 characters; a line ends at a newline, a
+carriage return, a line separator or a paragraph separator. A text with a secret, a link, an e-mail address, a path in a
+home folder or an account name is refused (a page a run read may have put any of them into a proposal, and a prompt is
+forever), and so is one with a character that does not print, which could hide a line from you, and a line that starts
+like a heading of the prompt (`# Trust and safety`) or like a note of the system (`[system note]`, `System:`), which
+would pass for a section of the prompt or for what the system said, and one that wears `(you said)`, the mark that is
+yours alone. The learned skills (`<home>/playbooks`, [Memory and
 schedules](memory-and-schedules.md)) and the notes are harness components too; they keep their own paths, which already
 validate what is written. A lesson that repeats a rule of the adopted habits or tool guidance is not drawn, and one
 saved before the rule was adopted rests at night (item 584): the rules are in every prompt already. A learned skill
 keeps its versions, rests when no run reads it and is merged with another only when you say yes (item 585); none of
 that changes the adopted version.
+
+### One gate for every text Dot learns
+
+What a page can put into a proposal it can put into a lesson, into a line of the owner section and into a learned
+skill, so the same questions are asked of all of them in one place (`core/learned_text.py`, item 587), of the text in
+up to six forms: as written; with its compatibility characters folded (a fullwidth `ｈｔｔｐｓ` is `https`); with the
+Cyrillic and Greek letters that look like Latin ones put for them (a Cyrillic *er* in `http`), the ideographic full
+stops read as the dot a browser reads in a host (`evil。example`), the digits of other scripts as ASCII ones and the
+characters that print nothing left out; with the spellings that defang an address put back (`hxxp[:]//evil[.]example`,
+`ada[at]example.org`); and the last two again with every combining mark taken off its letter, since a mark between the
+letters of `https` or after a dot keeps a pattern from seeing them side by side.
+
+- **A character that does not print** is refused: a control, a zero-width, bidi or tag character, a surrogate, a
+  private-use or unassigned code point, a line or paragraph separator, anything Unicode calls default-ignorable (every
+  variation selector, the Hangul and Khmer fillers, the combining grapheme joiner, the soft hyphen) and the Braille
+  blank. The gate lists the ranges of the property in code, since Python has no property for them. An emoji written with
+  its variation selector is refused too.
+- **A secret**: one of the values Dot holds, the value of a key that names a secret, or a key of a known form.
+- **A link**: an address with its scheme or `www.`; `data:`, `javascript:`, `mailto:` and the other addresses that act
+  without slashes; `//host.tld`; a host with a path or a port after it; a numeric address that is not this Mac's or a
+  local network's; and a host named bare on a top-level domain the gate knows (`evil.example`). A domain that is also a
+  file's name or a word (`.md`, `.py`, `.sh`, `.tf`, `.cu`, `.gd`, `.mk`, `.app`, `.info`, `.name`, `.id`, `.to`) is
+  a host only with a port, a path or a third label, so `README.md`, `build.sh`, `main.tf`, `item.id` and
+  `logger.info` stay habits; `.ai` is a host wherever it stands, since the sites on it are many. The host after a colon
+  and any run of slashes and backslashes is asked alone, whatever the letters of the scheme are (`https:/evil.example`,
+  `https:\\evil.example`, the `https:\/\/evil.example` that JSON writes, a scheme in small capitals): a browser skips them
+  all.
+- **An e-mail address**, **a path in somebody's home folder** (`/Users/ada`, `/home/ada`, in any case, with any slashes
+  or `./` between, a backslash for a slash, the dot segments taken out as in `/Users/Shared/../ada` and `~/../ada`, and
+  `~ada/`; your own `~/` is yours) and **an account name** (`@ada`).
+- **A line that imitates the prompt**: a Markdown heading, written with `#` or with its underline (a line over
+  `=====`); a line that starts like a note of the system or a turn of the conversation, in a list or in bold too
+  (`[system note]`, `System:`, `User:`, `- **System:**`); and a token of a model's chat format anywhere in a text
+  (`<|im_start|>`, `[INST]`, `<<SYS>>`).
+- **The owner's mark**: `(you said)`, which the prompt puts before your own lines and says outranks the others, is
+  refused in every text Dot learns, in any case, spacing or look-alike letters: only your own words wear it.
+
+Each text is asked what fits it. A habit or a line of tool guidance is asked everything. A lesson is asked the
+characters, the secret, the address, the path, the mark and the imitation, and, when its run read content others can
+write, whether it holds an address to go to or an account name; a site named bare (`On x.com the counts are not in the
+page`) is know-how and stays. The moments of a run a proposal answers to, the decisions of a composition and the summary
+of a version, which a model writes about a change and which you and the roles after it read, are asked as a lesson of
+such a run is, and the summary and the texts in the notes of a version are asked again whoever made it (the proposer
+and the composer are asked at their answer, and asked again when it is not good). Dot's lines of the owner section are
+asked everything, the mark included; a line that fails is dropped and logged (`owner_line_refused`), the rest of the
+night goes on, and your own lines are never checked. A night in which every line the writer gives is refused leaves the
+lines of the nights before as they were and says so in the log (`owner_lines_all_refused`): it does not empty the
+section. A learned skill that may carry outside content is offered with the lines that fail withheld, as before (a step
+that names a host bare is withheld, and the description of a skill may name a site); it is asked what only a step is,
+too: a command, a path in your home folder or in the Mac's own folders, and a line of more than 2,000 characters,
+which is withheld unread. In every learned skill, one of a clean run, one you trust (`dotx playbooks trust`) and one you
+taught included, the line that holds a character that does not print is withheld and no other (a warning sign with its
+variation selector is one): the rest of the skill, its commands and its description stand as they were written, and the
+run is told that a line was withheld.
+
+The gate is asked again whenever a version of the harness or a line of Dot's in the owner section is used, not only
+when it is written (item 587), and with the values Dot holds, as at the writing (the file `<home>/.env` is read for
+them, off the loop, so a value held only since is found now).
+`dotx harness adopt`, the page's **Use** and `POST /api/harness/{id}/adopt` refuse a version whose texts the gate
+refuses now (one a Dot wrote before the gate was as strict, or whose row a hand edited), say why and how to set it aside
+(`dotx harness retire`, or **Set aside**), and ask nothing: not even `--yes` adopts it; the step with `adopt = "auto"`
+never adopts one. When a prompt is built, a component of the version in use that the gate refuses is left out of it and
+logged once (`harness_component_left_out`), and the page marks the version *Refused* and says that its part is left out
+of every run. Dot's lines of the owner section are asked again when the prompt is built, and the rules that a lesson is
+compared with are taken from the same, checked text. A learned skill is an exception: its lines are masked of the
+values Dot holds when it is written, and are not asked for them again when it is offered (what the gate refuses of them
+is withheld, as above). A lesson is the other: it is asked when it is kept (and when you press Save anyway), and a
+lesson kept before the gate was as strict reaches a run through recall as it was kept.
+
+The gate is a net, not a wall. What must hold for a text Dot learns is held where it stands: a version is yours to
+adopt, a proposal written from a run that read outside content is never adopted on its own, and the rules of trust and
+safety win over every habit. The gate asks by the names it can read, and does not read these: a host on a top-level
+domain it does not know, a bare host on one that is also a file's name or a word, a host spelled out in words (`evil dot
+example`) or split across two lines, a host written as an IPv6 literal (`[2001:db8::1]`) or without a dot, a host or a
+scheme that is encoded (percent-encoded as `evil%2Ecom`, an HTML entity such as `&#46;`, a Unicode escape or base64), a
+letter that looks like another and is not in its small table of Cyrillic and Greek ones, and a numeric address in
+another base. A dotted quad of numbers is read as an address, a version number among them. What stands behind it is the
+wall: your adoption of a version, which reads its text, and the prompt's rule that a habit or a line of tool guidance
+never overrides the rules of trust and safety, so that a line that passes the net is one you chose to follow and one that
+ranks below them.
 
 Not in the harness, by design: the rules of trust and safety and the secrets line of the prompt, the policy engine, the
 approval gate and your rules, the credentials, `config.toml`, Dot's code, and scripts or hooks the model would run. The

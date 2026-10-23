@@ -325,17 +325,17 @@ verify_answer_paths = false
 # "safe" by default since item 248, on the owner's word; "off" leaves every such run to the owner.
 resume = "safe"
 resume_within_s = 1800
-# After a task or research run that ended with success although something went wrong on the way (a failed call, an
-# alert of the progress watchdog, a send-back by the goal check or for paths that do not exist), one call to the
-# review model draws at most three lessons from it: one sentence each, about how to do things. "auto" (the default)
-# asks nobody: a second call of the review model, which sees the goal and the lessons and nothing the run read, keeps
-# only know-how about how tools, commands, sites, applications and formats behave, nothing that sends the agent
-# somewhere, has it trust some content or holds private data; after a run that read content third parties can author
-# (web pages, files from others), a lesson with a link or an account name in it is left out before that. The kept ones
-# are saved as notes tagged lesson, and the run's page shows them with Undo and the others with why and Save anyway.
-# "propose" leaves every lesson on the run's page, where each can be saved to memory or dismissed. Later runs find a
-# saved lesson like any note of the agent; what each lesson did for the runs it was handed to is scored (dotx stats,
-# the Memory page). "off" learns nothing.
+# After a task or research run that ended with success although something went wrong on the way (a failed call, an alert
+# of the progress watchdog, a send-back by the goal check or for paths that do not exist), one call to the review model
+# draws at most three lessons from it: one sentence each, about how to do things. "auto" (the default) asks nobody: a
+# second call of the review model, which sees the goal and the lessons and nothing the run read, keeps only know-how
+# about how tools, commands, sites, applications and formats behave, nothing that sends the agent somewhere, has it
+# trust some content or holds private data; after a run that read content third parties can author (web pages, files
+# from others), a lesson with an address to go to (a scheme, a path, //host; a site named bare is know-how and stays) or
+# an account name in it is left out before that. The kept ones are saved as notes tagged lesson, and the run's page
+# shows them with Undo and the others with why and Save anyway. "propose" leaves every lesson on the run's page, where
+# each can be saved to memory or dismissed. Later runs find a saved lesson like any note of the agent; what each lesson
+# did for the runs it was handed to is scored (dotx stats, the Memory page). "off" learns nothing.
 lessons = "auto"
 # Once a day at reflection_time (a time of day in [scheduler] timezone; "off" never), Dot reflects on the runs that
 # ended since the last reflection: it draws lessons from the runs the loop did not ask at their end, the failed and
@@ -814,10 +814,10 @@ use_half_life_days = 30
 # score.
 score_days = 30
 score_min_uses = 3
-# The nightly reflection keeps one section of what Dot knows about you (your language, hours, tools and sites, the
-# ways you ask, the limits you set), rewritten from its previous version, your own notes and the day's runs, at most
-# owner_chars characters; it opens the memory part of every prompt. The Memory page shows it first: the lines you
-# write there are yours, kept as they are and never rewritten.
+# The nightly reflection keeps one section of what Dot knows about you (your language, hours, the tools and sites you
+# use by their names, the ways you ask, the limits you set), rewritten from its previous version, your own notes and the
+# day's runs, at most owner_chars characters; it opens the memory part of every prompt. The Memory page shows it first:
+# the lines you write there are yours, kept as they are and never rewritten.
 owner_chars = 1500
 # The nightly reflection merges notes that say the same thing in other words (item 584): of the agent's notes that are
 # awake, not pinned and not saved by you, those whose embeddings are at least merge_similarity close (the same agent's,
@@ -841,9 +841,11 @@ trash_days = 30
 # The harness (docs/harness.md): the texts of the adopted version, which every run's system prompt takes after Dot's
 # own. Habits (how to work here) come after how to work, tool guidance (what earlier runs learned of the tools on this
 # Mac) after the tools and the rules of communication; each is at most this many characters and component_lines lines,
-# with no line past 300 characters, and holds no secret, link, e-mail address, home path, account name or character that
-# does not print. A version is written by you (`dotx harness set`, POST /api/harness) or proposed by the improvement
-# loop, and only the adopted one is read; with none adopted a run's prompt is Dot's own text alone.
+# with no line past 300 characters, and holds no secret, link, e-mail address, home path, account name, character that
+# does not print, the owner's mark "(you said)" or line that starts like a heading of the prompt or a note of the
+# system; that is asked again when a version is adopted and when a prompt is built. A version is written by you
+# (`dotx harness set`, POST /api/harness) or proposed by the improvement loop, and only the adopted one is read; with
+# none adopted a run's prompt is Dot's own text alone.
 habits_chars = 1200
 tool_guidance_chars = 1500
 component_lines = 16

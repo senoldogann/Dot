@@ -86,11 +86,12 @@ def harness_router(ctx: ServerContext) -> APIRouter:
         version: HarnessVersion = await create_version(
             store, ctx.runtime.config.harness, text, request.summary, OWNER, "", secrets
         )
-        return await adopt(store, version.id, time.time()) if request.adopt else version
+        return await adopt(store, version.id, time.time(), secrets) if request.adopt else version
 
     @router.post("/harness/{version_id}/adopt")
     async def adopt_version(version_id: str) -> HarnessVersion:
-        return await adopt(store, version_id, time.time())
+        """Adopt a version; one whose text the gate for learned texts refuses now is not adopted (item 587)."""
+        return await adopt(store, version_id, time.time(), await asyncio.to_thread(known_secrets))
 
     @router.post("/harness/{version_id}/retire")
     async def retire_version(version_id: str) -> HarnessVersion:

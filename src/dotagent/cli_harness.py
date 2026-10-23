@@ -6,7 +6,7 @@ import json
 import signal
 import sys
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -47,6 +47,8 @@ from dotagent.harness.service import (
     create_version,
     diff_text,
     notes_with,
+    refusal_words,
+    refusals,
     retire,
     step_facts,
     text_of,
@@ -81,9 +83,13 @@ def version_line(version: HarnessVersion) -> str:
     return f"{version.id}  {version.state:<9} {version.made_by:<6} {_when(version.created_at)}  {version.summary}"
 
 
-def render_version(version: HarnessVersion) -> list[str]:
-    """The version's line, its parent, then each component under its name, ``(nothing)`` for an empty one."""
+def render_version(version: HarnessVersion, secrets: Sequence[str] = ()) -> list[str]:
+    """The version's line, its parent, what the gate for learned texts refuses of it now (``secrets`` are the values Dot
+    holds), then each component under its name, ``(nothing)`` for an empty one."""
     lines: list[str] = [version_line(version), f"made from: {version.parent_id or OWN_TEXT}"]
+    refused: dict[str, str] = refusals(text_of(version), secrets)
+    if refused:
+        lines.append(f"refused: {refusal_words(refused)}; it is not adopted, and no run takes the component")
     for name in COMPONENTS:
         text: str = text_of(version).component(name)
         lines.extend(["", f"## {name}", text if text != "" else "(nothing)"])
@@ -122,7 +128,8 @@ async def cmd_harness_show(command: HarnessShowCommand) -> int:
         return 0
     async with _store() as store:
         lineage: Lineage = await lineage_of(store, version.id)
-    sys.stdout.write("\n".join([*render_version(version), *render_lineage(lineage)]) + "\n")
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    sys.stdout.write("\n".join([*render_version(version, secrets), *render_lineage(lineage)]) + "\n")
     return 0
 
 
@@ -182,7 +189,7 @@ async def cmd_harness_set(command: HarnessSetCommand) -> int:
         )
         version: HarnessVersion = await create_version(store, config.harness, text, command.summary, OWNER, "", secrets)
         if command.adopt:
-            version = await adopt(store, version.id, time.time())
+            version = await adopt(store, version.id, time.time(), secrets)
     sys.stdout.write(f"{'Adopted' if command.adopt else 'Written'}: {version_line(version)}\n")
     if not command.adopt:
         sys.stdout.write(f"Adopt it with 'dotx harness adopt {version.id}'.\n")

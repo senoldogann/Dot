@@ -1808,8 +1808,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
     query: str = await _goal_query(runtime, run)
     recalled: Remembered = await _start_notes(runtime, run, query, notes_budget)
+    # The secrets Dot holds, which the texts a prompt takes from what Dot learned are asked for again, as when they
+    # were written (item 587).
+    held_at_start: tuple[str, ...] = await asyncio.to_thread(known_secrets)
     # The adopted version of the harness (item 389): its texts go into the prompt, and the run records which it took.
-    harness_text, harness_version = await adopted_text(runtime.store)
+    harness_text, harness_version = await adopted_text(runtime.store, held_at_start)
     if harness_version is not None:
         await runtime.store.set_run_harness(run.id, harness_version)
     remembered: tuple[MemoryRecord, ...] = recalled.records
@@ -1888,7 +1891,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     # The accounts are named only to a run that has one of the tools that take them (an agent's may
                     # have none, or only some).
                     *(account_lines(signed_in) if tools_in([spec.name for spec in specs], ACCOUNTS_GROUP) else ()),
-                    *owner_prompt_lines(await owner_section(runtime.store)),
+                    *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
                 ),
                 devtools_address(browser.config),
                 config.prompt,

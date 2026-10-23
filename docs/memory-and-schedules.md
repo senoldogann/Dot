@@ -93,12 +93,22 @@ dotx memory reindex      # embed every note again, for example after changing [m
   then "Ran out …". Saving the same note again wakes it with the new time. Under each note the page says how the runs it was handed to
   ended ("Handed to 5 runs, 4 done"); every use is recorded with the run's end, which `dotx stats` reads.
 - What Dot knows about you opens the memory part of every prompt: a short section the nightly reflection keeps (your
-  language, hours, tools and sites, the ways you ask, the limits you set), rewritten each night from its previous
-  version, your notes and the day's runs. The Memory page shows it first; the lines you write under it are yours, kept
-  as they are, marked "(you said)" in the prompt, never rewritten, and the reflection never contradicts them
-  (`GET`/`PUT /api/memories/owner`). Before them the section names you, as you gave your name in Settings › General
-  ("(you said)") or as your account on this Mac has it, and, in Dot's own runs, the name you call Dot by, once it is
-  not Dot (item 420); those lines come from Settings, not from the Memory page.
+  language, hours, the tools and sites you use by their names, the ways you ask, the limits you set), rewritten each
+  night from its previous version, your notes and the day's runs. The Memory page shows it first; the lines you write
+  under it are yours, kept as they are, marked "(you said)" in the prompt, never rewritten, and the reflection never
+  contradicts them (`GET`/`PUT /api/memories/owner`). The reflection's own lines go through the one gate for learned
+  texts first ([The harness](harness.md#one-gate-for-every-text-dot-learns), item 587): one that holds a secret, a link,
+  an e-mail address, a path in somebody's home folder, an account name or a character that does not print, one that
+  starts like a heading of the prompt, and one that wears the mark "(you said)" (which the prompt says outranks the
+  other lines) are dropped and logged, and the night goes on (a night in which every line is refused keeps the lines of
+  the nights before, and says so in the log); so is one stored before that gate when the prompt is built. The section
+  names your tools and sites by what they are called ("GitHub", "the BBC", "Linear"), and the reflection's writer is
+  asked to: a line of Dot's that names a site by its domain (`bbc.co.uk`) or its address, an account by its @handle, or
+  anyone by an e-mail address is dropped at night and left out of the prompt, as above, since every run reads these
+  lines as instructions and a domain in one is a place to send a run (a name tells it the same). Your own lines are
+  never checked, so a site you write by its domain there stands as you wrote it. Before them the section names you, as
+  you gave your name in Settings › General ("(you said)") or as your account on this Mac has it, and, in Dot's own runs,
+  the name you call Dot by, once it is not Dot (item 420); those lines come from Settings, not from the Memory page.
 - The score decides too: over the last `score_days` (30), a note's balance is the runs handed it that ended done less
   the ones that failed. Once `score_min_uses` (3) runs were handed it, the balance lifts or lowers the note in a search
   as much as a fresh use would, and a negative balance rests it at once, before the nightly reflection retires it.
