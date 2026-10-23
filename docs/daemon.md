@@ -19,7 +19,8 @@ stands over its last line: the answer of its latest run in plain words, or your 
 works. The creatures rest; only those at work move, and the mark of a chat's loop (item 580): a chat that asks again
 by itself, with a loop of `/loop` or a schedule a run of it made that goes on in it, wears at the foot of its creature
 a disc of violet and blue whose arrows turn slowly in a glow that breathes (still when the system reduces motion), its
-row saying how often and when next ("Loops every 30 minutes, next 15:30"); stopped, the loop takes its mark with it.
+row saying how often and when next ("Loops every 30 minutes, next 15:30", "Loops on Mondays, Wednesdays and Fridays at
+18:30, next Fri 18:30": a rhythm of days and times in words too, item 590); stopped, the loop takes its mark with it.
 Each chat stands once (item 202):
 while its latest run works, a chat leaves its day for the **Working** section above the list, and goes back once the run
 ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,

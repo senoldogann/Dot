@@ -313,9 +313,11 @@ async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_
                 # The loop's message went at once as the chat's next run, which is the row's now.
                 looping: Locator = sidebar.locator(".side-run", has=page.locator(".side-loop"))
                 await expect(looping).to_have_count(1)
-                await expect(looping).to_have_attribute("aria-label", re.compile(r"loops every 30 minutes, next \d"))
+                await expect(looping).to_have_attribute(
+                    "aria-label", re.compile(r"loops every 30 minutes, next (\w{3} )?\d")
+                )
                 mark: Locator = looping.locator(".side-loop")
-                await expect(mark).to_have_attribute("title", re.compile(r"^Loops every 30 minutes, next \d"))
+                await expect(mark).to_have_attribute("title", re.compile(r"^Loops every 30 minutes, next (\w{3} )?\d"))
                 face = await looping.locator(".side-face .avatar").bounding_box()
                 badge = await mark.bounding_box()
                 assert face is not None and badge is not None

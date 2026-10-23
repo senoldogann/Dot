@@ -9,14 +9,14 @@
 // (item 507), and goes back among the days once it rests; a pinned one stays under Pinned, with the same faces.
 
 import { ApiError, api, request, SCHEDULES_CHANGED_EVENT } from "./api.js";
-import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, hourMinute, keepChildren, plural, setText, workingFor } from "./dom.js";
+import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
 import { icon } from "./icons.js";
 import { actorFace, lookOf } from "./actors.js";
 import { onAssistant } from "./assistant.js";
 import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
-import { loopRhythm } from "./loops.js";
+import { loopRhythm, nextFiring } from "./rhythm.js";
 import { markContent, markInk } from "./marks.js";
 import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows } from "./nesting.js";
@@ -199,7 +199,8 @@ function chatText(chat, children) {
 }
 
 /** What a chat's loop says of itself (item 580): how often it asks again and when next ("Loops every 30 minutes, next
- * 15:30"), or null for a chat with no loop. A daemon from before item 580 sends none. */
+ * 15:30", "Loops every day at 10:00, next Sat 10:00"; item 590), or null for a chat with no loop. A daemon from before
+ * item 580 sends none. */
 function loopWords(chat) {
   const cron = chat.loop_cron ?? null;
   if (cron === null) {
@@ -207,7 +208,7 @@ function loopWords(chat) {
   }
   const next = chat.loop_next_at ?? null;
   const rhythm = `Loops ${loopRhythm(cron) ?? "on its schedule"}`;
-  return next === null ? rhythm : `${rhythm}, next ${hourMinute(next)}`;
+  return next === null ? rhythm : `${rhythm}, next ${nextFiring(next, Date.now() / 1000)}`;
 }
 
 /** A chat's creature, with the mark of its loop at its foot (item 580): arrows that turn slowly in a glow, so that a
