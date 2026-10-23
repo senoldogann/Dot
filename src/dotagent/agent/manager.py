@@ -5,14 +5,21 @@ import json
 import sqlite3
 import time
 from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterator, Sequence
-from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext
+from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
 from pydantic import JsonValue
 
-from dotagent.agent.attachments import RunInbox, StoredAttachment, UserInput, load_attachments, steer_event
+from dotagent.agent.attachments import (
+    ReactionAct,
+    RunInbox,
+    StoredAttachment,
+    UserInput,
+    load_attachments,
+    steer_event,
+)
 from dotagent.agent.campaign import (
     BRIEF_ENTRIES,
     BRIEF_QUESTIONS,
@@ -45,6 +52,7 @@ from dotagent.agent.picks import picked_groups, picks_problems
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import PLAYBOOK_FAILED, learn_playbook, offered_to_run, playbook_case
 from dotagent.agent.progress import can_ask_user
+from dotagent.agent.reaction_words import RELEASE_NOTE, queued_reaction_note
 from dotagent.agent.reflection import reflect
 from dotagent.agent.reflection_record import Reflection
 from dotagent.agent.resume import (
@@ -72,6 +80,7 @@ from dotagent.core.errors import (
     NotFoundError,
     RunCancelled,
     RunConflict,
+    RunHoldLapsed,
     StoreError,
 )
 from dotagent.core.logs import get_logger
@@ -90,6 +99,7 @@ from dotagent.proactive import NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
+from dotagent.server import UI_SOURCE
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.db import Store
@@ -115,6 +125,7 @@ from dotagent.store.models import (
     CampaignRecord,
     ChatChoices,
     EventRecord,
+    FollowUpOf,
     QueuedMessage,
     RunMode,
     RunPicks,
@@ -199,6 +210,14 @@ class _LeftEnd:
     result: str
     needs: str
     data: JsonObject
+
+
+class FollowedUp(FrozenModel):
+    """Where the follow-up of a reaction went (item 586): the run it started, or the message it waits as in the chat's
+    queue behind the run at work."""
+
+    run: RunRecord | None
+    queued: QueuedMessage | None
 
 
 def thread_title(goal: str) -> str:
@@ -1192,6 +1211,44 @@ class RunManager:
         except asyncio.QueueShutDown as exc:
             raise RunConflict("the run is not active", {"run_id": run_id}) from exc
 
+    def tell(
+        self,
+        run_id: str,
+        text: str,
+        reaction: ReactionAct | None,
+        owner_text: str = "",
+        files: tuple[StoredAttachment, ...] = (),
+    ) -> None:
+        """Hand the running agent a note about a reaction of the owner (item 586), which it reads before its next
+        step as it reads a steer; the note says what the owner did and what that asks. It is Dot's words, not the
+        owner's: it clears no mark of untrusted content (``vouches`` is false) and the reviewer is given no
+        instruction (``said`` is empty). ``reaction`` says what it does to the run (:data:`ReactionAct`): a ✋ holds
+        it. ``None`` is the owner's own press that sends a queued follow-up on to the run (:meth:`steer_queued`), with
+        its ``files``: the run is asked to change what it does and a held run goes on, as for a message, and
+        ``owner_text``, the words they sent, is what the page draws as their message. A run whose end is being
+        recorded reads nothing more, so a note to it is refused like a steer to a run that has ended."""
+        handle: RunHandle = self._handle(run_id)
+        try:
+            handle.inbox.put_nowait(
+                UserInput(
+                    text=text,
+                    files=files,
+                    question_id=None,
+                    vouches=False,
+                    said="",
+                    reaction=reaction,
+                    owner_text=owner_text,
+                )
+            )
+        except asyncio.QueueShutDown as exc:
+            raise RunConflict("the run is not active", {"run_id": run_id}) from exc
+
+    def holding(self, run_id: str) -> bool:
+        """Whether the owner holds the run with a ✋ (item 586): it waits for what they write next; false for a run that
+        is not active."""
+        handle: RunHandle | None = self._handles.get(run_id)
+        return handle is not None and handle.inbox.holding
+
     async def queue(
         self,
         thread_id: str,
@@ -1207,6 +1264,7 @@ class RunManager:
         goal_mode: bool | None,
         agent_id: str | None,
         source: str,
+        follow_up: FollowUpOf | None = None,
     ) -> QueuedMessage:
         """Put a message at the end of a chat's queue (item 148): it starts as the chat's next run, with these choices,
         once the run at work there has ended done (:meth:`_follow_queue`), one message after the other. A chat where no
@@ -1214,7 +1272,10 @@ class RunManager:
         plans what follows its sessions; nor does the thread of a delegated run, which is no chat: the run that
         delegated it decides what follows (:meth:`_follow_queue` leaves it alone). Fast mode is refused at once for a
         model without it (item 223), and so is a choice for one message whose level the model does not offer (item
-        251), and picks the run could not start with (item 318, :meth:`_check_picks`)."""
+        251), and picks the run could not start with (item 318, :meth:`_check_picks`). The follow-up of a reaction
+        (``follow_up``, item 586) carries what it follows up through the queue to its run. A message that comes while
+        the run at work is held by a ✋ lets it go on: the owner has written, and their message waits in the queue as
+        any does."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_speed(ref, speed)
         await self._check_once(ref, once)
@@ -1253,8 +1314,14 @@ class RunManager:
             goal_mode,
             agent_id,
             source,
+            follow_up,
         )
         await self._queue_changed(thread_id, None, None, None)
+        holder: RunHandle | None = self._active_on(thread_id)
+        if holder is not None and holder.inbox.holding and follow_up is None:
+            # A run whose end is being recorded reads nothing more, and needs no letting go.
+            with suppress(RunConflict):
+                self.tell(holder.run_id, RELEASE_NOTE, "release")
         await self._drain(thread_id, newest[0].id)
         return message
 
@@ -1292,7 +1359,8 @@ class RunManager:
         the queue; returns its chat. A chat where no run of this process works has none to steer, and a message starting
         as the chat's next run is refused, as is one queued with picks (item 318), which a run at work cannot take: it
         stays in the queue to start a run of its own. The message leaves the queue as it is before it is sent, so that
-        nothing starts, changes or removes it meanwhile, and goes back when the run ended in that moment."""
+        nothing starts, changes or removes it meanwhile, and goes back when the run ended in that moment. The follow-up
+        of a reaction (item 586) goes with what it follows up, as a note that vouches for nothing (:meth:`tell`)."""
         store: Store = self._runtime.store
         message: QueuedMessage = await store.get_queued(message_id)
         if message.picks != NO_PICKS:
@@ -1309,7 +1377,15 @@ class RunManager:
         try:
             if handle is None:
                 raise RunConflict("no run works on the chat to steer", {"thread_id": taken.thread_id})
-            self.steer(handle.run_id, taken.text, files)
+            if taken.follow_up is None:
+                self.steer(handle.run_id, taken.text, files)
+            else:
+                # The words of a reaction, sent on from the queue, are the owner's to send and the page draws them as
+                # their message (their press, of what they may have edited, leaves its line); but the reaction vouches
+                # for nothing, so the note the run reads around them does not either.
+                self.tell(
+                    handle.run_id, queued_reaction_note(taken.text, taken.follow_up.context), None, taken.text, files
+                )
         except BaseException:
             await _uncancelled(self._put_back(taken))
             raise
@@ -2570,6 +2646,8 @@ class RunManager:
                     ended.outcome.needs,
                     ended.lessons,
                 )
+        except RunHoldLapsed as exc:
+            status, result = "cancelled", exc.message
         except (RunCancelled, asyncio.CancelledError):
             status, result = "cancelled", self._stop_result(run.id)
         except FailSafeTriggered as exc:
@@ -2768,6 +2846,7 @@ class RunManager:
             message.picks,
             message.agent_id,
             message.source,
+            message.follow_up,
         )
 
     async def _start_in_chat(
@@ -2785,8 +2864,15 @@ class RunManager:
         picks: RunPicks,
         agent_id: str | None,
         source: str,
+        follow_up: FollowUpOf | None = None,
     ) -> RunRecord:
-        """Start ``text`` as the next run of a chat, as its agent's run when the chat has one."""
+        """Start ``text`` as the next run of a chat, as its agent's run when the chat has one; the follow-up of a
+        reaction (``follow_up``, item 586) starts with its context and the files it was sent with
+        (:meth:`_start_follow_up`)."""
+        if follow_up is not None:
+            return await self._start_follow_up(
+                thread_id, text, files, mode, model, effort, speed, approvals, goal_mode, agent_id, source, follow_up
+            )
         if agent_id is not None:
             agent: AgentRecord = await self._runtime.store.get_agent(agent_id)
             return await self.start_for_agent(
@@ -2795,6 +2881,141 @@ class RunManager:
         return await self.start_picked(
             text, mode, model, thread_id, source, None, effort, speed, once, approvals, goal_mode, files, picks
         )
+
+    async def follow_up_reaction(self, thread_id: str, goal: str, follow_up: FollowUpOf) -> FollowedUp:
+        """Follow up a reaction of the owner (item 586) in the chat ``thread_id``: ``goal`` is the owner's own message,
+        which starts as the chat's next run with the choices the chat kept, as a message typed in the composer would; or
+        it waits in the chat's queue behind the run at work. The run it starts reads ``follow_up``'s context under the
+        goal, and starts as untrusted as the run of the message, or the chat's last, ended (:meth:`_carried_by`): a
+        reaction is too small a word to vouch for what a run read. A chat that a rewind emptied, a campaign's and the
+        thread of a delegated run take none (``RunConflict``)."""
+        store: Store = self._runtime.store
+        runs: list[RunRecord] = await store.list_runs(1, thread_id)
+        if not runs:
+            raise RunConflict("a chat that a rewind emptied takes no follow-up", {"thread_id": thread_id})
+        newest: RunRecord = runs[0]
+        if newest.campaign_id is not None or newest.parent_run_id is not None:
+            raise RunConflict(
+                "the chat of a campaign, and the thread of a delegated run, take no follow-up of a reaction",
+                {"thread_id": thread_id, "run_id": newest.id},
+            )
+        choices: ChatChoices = await self._choices_of(thread_id, newest)
+        info: ModelInfo = await self._runtime.router.model_info(
+            parse_model_ref(choices.model if choices.model is not None else self._main_model)
+        )
+        # A kept level the model does not offer is not asked for, as the composer does not ask it (item 116).
+        effort: Effort | None = choices.effort if choices.effort is not None and _offers(info, choices.effort) else None
+        mode: RunMode = resolved_mode(choices.mode, goal)
+        # A chat has no goal mode: the choice is kept for a task or research message.
+        goal_mode: bool | None = None if mode == "chat" else choices.goal_mode
+        working: bool = (
+            self._active_on(thread_id) is not None or thread_id in self._claimed or newest.status in WORKING_STATUSES
+        )
+        if not working:
+            try:
+                run: RunRecord = await self._start_in_chat(
+                    thread_id,
+                    goal,
+                    (),
+                    mode,
+                    choices.model,
+                    effort,
+                    choices.speed,
+                    None,
+                    choices.approvals,
+                    goal_mode,
+                    NO_PICKS,
+                    newest.agent_id,
+                    UI_SOURCE,
+                    follow_up,
+                )
+            except RunConflict:
+                # A run started on the chat since its newest was read (a message typed in its page): queued behind it.
+                log.info("reaction_follow_up_queued_after_a_race", thread_id=thread_id, run_id=follow_up.run_id)
+            else:
+                return FollowedUp(run=run, queued=None)
+        queued: QueuedMessage = await self.queue(
+            thread_id,
+            goal,
+            (),
+            mode,
+            choices.model,
+            effort,
+            choices.speed,
+            None,
+            NO_PICKS,
+            choices.approvals,
+            goal_mode,
+            newest.agent_id,
+            UI_SOURCE,
+            follow_up,
+        )
+        return FollowedUp(run=None, queued=queued)
+
+    async def _start_follow_up(
+        self,
+        thread_id: str,
+        goal: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        agent_id: str | None,
+        source: str,
+        follow_up: FollowUpOf,
+    ) -> RunRecord:
+        """Start the run of a reaction's follow-up as the chat's next, as :meth:`start_picked` starts a message of the
+        owner's, or :meth:`start_for_agent` one for a chat of an agent (within the agent's bounds). ``goal`` is all the
+        owner said, and the only part of it a reviewer takes as their instruction; the run's first message to the model
+        holds the context under it, which is Dot's own earlier text, and the ``files`` the owner put on the message
+        while it waited in the queue. The run starts as untrusted as the run of the message, or the chat's last,
+        ended."""
+        store: Store = self._runtime.store
+        agent: AgentRecord | None = None if agent_id is None else await store.get_agent(agent_id)
+        bounds: AgentBounds = (
+            AgentBounds(model=model, effort=effort, approvals=approvals)
+            if agent is None
+            else agent_bounds(agent, model, effort, approvals)
+        )
+        ref: ModelRef = parse_model_ref(bounds.model if bounds.model is not None else self._main_model)
+        _check_speed(ref, speed)
+        if bounds.effort is not None:
+            await self._check_effort(ref, bounds.effort)
+        opening: RunOpening = RunOpening(
+            text=f"{goal}\n\n{follow_up.context}",
+            files=files,
+            resumed=None,
+            once=None,
+            carried=await self._carried_by(thread_id, follow_up),
+            picks=NO_PICKS,
+        )
+        run, _ = await self._launch(
+            goal,
+            mode,
+            bounds.model,
+            thread_id,
+            source,
+            None,
+            bounds.effort,
+            speed,
+            bounds.approvals,
+            goal_mode_asked(goal, mode, goal_mode),
+            opening,
+            None,
+            agent_id,
+        )
+        await store.link_follow_up(follow_up.run_id, follow_up.message, follow_up.reaction, run.id)
+        log.info("reaction_follow_up_started", run_id=run.id, reaction_run_id=follow_up.run_id, thread_id=thread_id)
+        return run
+
+    async def _carried_by(self, thread_id: str, follow_up: FollowUpOf) -> tuple[str, ...]:
+        """The runs a reaction's follow-up takes its mark of untrusted content from: the run of the message and the
+        chat's newest, the one that just ended when the follow-up waited in the queue."""
+        newest: str | None = await self._newest_run_id(thread_id)
+        return tuple(dict.fromkeys(run_id for run_id in (follow_up.run_id, newest) if run_id is not None))
 
     async def _queue_changed(
         self, thread_id: str, started_run_id: str | None, after_run_id: str | None, error: str | None

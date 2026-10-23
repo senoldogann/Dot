@@ -14,6 +14,7 @@ from dotagent.browser.look import PageLook
 from dotagent.browser.profiles import ProfileView
 from dotagent.config import (
     SHOWN_NAME,
+    AfterRun,
     BrowserProfileName,
     DebugPort,
     JudgeProvider,
@@ -22,6 +23,7 @@ from dotagent.config import (
     ResumeMode,
     SnapshotSound,
 )
+from dotagent.config_edit import ReactionsSetting
 from dotagent.connections.catalogue import ConnectionKind
 from dotagent.connections.directory import PluginView, ServiceMark
 from dotagent.connections.states import ConnectionState, ConnectionStep
@@ -52,6 +54,7 @@ from dotagent.store.models import (
     MemoryScore,
     NotifyLevel,
     QueuedMessage,
+    ReactionName,
     RuleRecord,
     RunPicks,
     RunRecord,
@@ -876,8 +879,9 @@ class RunDetail(FrozenModel):
     the questions the run left for the user that are still open, oldest first; ``campaign`` is the campaign the run is a
     session of, ``None`` for any other run; ``held`` is true while the user has taken the run's browser over
     (``POST /runs/{id}/takeover``); ``agent`` is the agent the run belongs to (item 86), ``None`` for Dot;
-    ``keep_going`` is true for a run in goal mode whose goal asks it to keep going until it is done, which its goal
-    check is told (item 132). ``active`` is true while the daemon drives the run; ``elsewhere`` while another
+    ``holding`` is true while the owner holds the run with a hold reaction and it waits for their next message
+    (item 586); ``keep_going`` is true for a run in goal mode whose goal asks it to keep going until it is done, which
+    its goal check is told (item 132). ``active`` is true while the daemon drives the run; ``elsewhere`` while another
     process that lives drives it at work (a ``dotx`` command): its page follows it and its Stop asks that process to
     stop it, but it is not steered or taken over from here. ``choices`` are what the next follow-up of the run's chat
     starts with (item 199), ``None`` for a chat that has none of its own yet. ``title`` is the title of the run's chat,
@@ -896,8 +900,31 @@ class RunDetail(FrozenModel):
     agent: AgentRecord | None
     campaign: CampaignChip | None
     held: bool
+    holding: bool
     keep_going: bool
     choices: ChatChoices | None
+
+
+class ReactionRequest(FrozenModel):
+    """Put a reaction on a message of Dot's (item 586): ``reaction`` is its name (``good``, ``love``, ``wrong``,
+    ``again``, ``remember``, ``explain`` or ``hold``)."""
+
+    reaction: ReactionName
+
+
+class ReactionSettingRequest(FrozenModel):
+    """Change one setting of the reactions (item 586): the switch of the follow-ups (``follow_ups``, true or false), or
+    what a reaction does once its run has ended (``follow_up`` or ``feedback``). The keys are the ones the config file
+    edit takes (:data:`~dotagent.config_edit.ReactionsSetting`), so that the two never differ."""
+
+    key: ReactionsSetting
+    value: StrictBool | AfterRun
+
+    @model_validator(mode="after")
+    def _fits_key(self) -> Self:
+        if (self.key == "follow_ups") != isinstance(self.value, bool):
+            raise ValueError("follow_ups is true or false; a reaction is follow_up or feedback")
+        return self
 
 
 class ActionStep(FrozenModel):

@@ -59,6 +59,11 @@ _IMAGE_MAGIC: tuple[tuple[bytes, str], ...] = (
 _IMAGE_TYPES: frozenset[str] = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
 
 type AttachmentKind = Literal["image", "pdf", "office", "text"]
+# What a note about the owner's reactions does to the run that reads it (item 586): ``quiet`` asks nothing (a 👍, a ❤️),
+# so the step under way is not given up for it, and it is dropped when the run ends before another step; ``note`` asks
+# the run to change what it does, as a message of the owner does; ``hold`` holds the run before its next step until the
+# owner writes to it; ``release`` lets a held run go on.
+type ReactionAct = Literal["quiet", "note", "hold", "release"]
 
 
 class StoredAttachment(FrozenModel):
@@ -79,13 +84,20 @@ class UserInput(FrozenModel):
     own words, which restore trust in what follows (the run's taint is cleared); ``said`` is what of it the owner said
     themselves, the instruction the review model reads: all of it when it vouches. Dot's words that the owner did a
     step kept for them themselves (item 482) vouch for nothing, as an "I did it" during the run does not, and only the
-    note the owner wrote with them, if any, is said."""
+    note the owner wrote with them, if any, is said. Dot's words about a reaction of the owner (item 586) are no
+    one's instruction and vouch for nothing either; ``reaction`` says what they do to the run (:data:`ReactionAct`),
+    ``None`` for what is not about a reaction, a message of the owner among it, which lets a held run go on.
+    ``owner_text`` is the owner's own message that such a note carries on to the run, the queued follow-up of a
+    reaction that they sent on themselves: the page draws it as theirs, in place of the note around it, which vouches
+    for nothing all the same."""
 
     text: str
     files: tuple[StoredAttachment, ...]
     question_id: str | None
     vouches: bool
     said: str
+    reaction: ReactionAct | None = None
+    owner_text: str = ""
 
 
 class RunInbox(asyncio.Queue[UserInput]):
@@ -98,6 +110,8 @@ class RunInbox(asyncio.Queue[UserInput]):
         self._arrived: asyncio.Event = asyncio.Event()
         # The queue's own items, in order, for :meth:`first` (the queue's store is its own).
         self._order: deque[UserInput] = deque()
+        # Whether the run waits on this inbox for the owner, who held it with a ✋ (item 586); the loop says so.
+        self.holding: bool = False
 
     def _put(self, item: UserInput) -> None:
         super()._put(item)
@@ -113,9 +127,15 @@ class RunInbox(asyncio.Queue[UserInput]):
         it is read leaves it for the run's end to keep."""
         return self._order[0]
 
+    def asks(self) -> bool:
+        """Whether the inbox holds a message that asks the step under way to give way: any but a note about a reaction
+        that asks nothing (item 586), which is read at the next step and is not worth a step given up, nor one more
+        step when the run is about to end."""
+        return any(item.reaction != "quiet" for item in self._order)
+
     async def arrival(self) -> None:
-        """Return once the inbox holds a message."""
-        while self.empty():
+        """Return once the inbox holds a message that asks the step to give way (:meth:`asks`)."""
+        while not self.asks():
             self._arrived.clear()
             await self._arrived.wait()
 
@@ -324,8 +344,16 @@ def attachment_summary(files: Sequence[StoredAttachment]) -> list[JsonValue]:
 def steer_event(sent: UserInput, tainted: bool) -> JsonObject:
     """The ``steer`` event of ``sent``, a message that reached a run: its text and the attachments it came with. A
     message of the owner clears the run's taint (:func:`dotagent.agent.gate.tainted_after`); one that vouches for
-    nothing (item 482) says so, with whether the run is ``tainted``, as it was before it."""
+    nothing (item 482) says so, with whether the run is ``tainted``, as it was before it; a note about a reaction of
+    the owner (item 586) says which kind it is, and one that carries the owner's own message on says which, for the
+    page to draw."""
     data: JsonObject = {"text": sent.text, "files": attachment_summary(sent.files)}
     if sent.vouches:
         return data
-    return {**data, "vouches": False, "tainted": tainted}
+    return {
+        **data,
+        "vouches": False,
+        "tainted": tainted,
+        **({} if sent.reaction is None else {"reaction": sent.reaction}),
+        **({} if sent.owner_text == "" else {"owner_text": sent.owner_text}),
+    }

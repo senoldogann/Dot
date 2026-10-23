@@ -40,6 +40,9 @@ NotifyLevel = Literal["always", "problems", "never"]
 # the sessions ``[agent] campaign_max_sessions`` allows.
 CampaignStatus = Literal["active", "achieved", "stopped"]
 CampaignEntryKind = Literal["progress", "setback", "note", "strategy", "question"]
+# The reactions the owner can put on a message of Dot's (item 586), by what each means: 👍 good, ❤️ love it, 👎 not right
+# (``wrong``), 🔁 do it again, 📌 remember this, ❓ explain, ✋ hold on.
+ReactionName = Literal["good", "love", "wrong", "again", "remember", "explain", "hold"]
 
 
 class ThreadRecord(FrozenModel):
@@ -333,12 +336,26 @@ class RuleRecord(FrozenModel):
     created_at: float
 
 
+class FollowUpOf(FrozenModel):
+    """What the follow-up run that a reaction started or queued follows up (item 586): the reaction ``reaction`` of the
+    owner on the message ``message`` of the run ``run_id``, and ``context``, what the run reads under the owner's
+    words: that message, quoted as Dot's own earlier text. The owner's words (the run's goal) never hold the quote,
+    since what a reviewer takes as the owner's instruction must be theirs alone; the run starts as untrusted as the run
+    of the message, or the chat's last, ended (:meth:`RunManager._carried_by`)."""
+
+    run_id: str
+    message: str
+    reaction: ReactionName
+    context: str
+
+
 class QueuedMessage(FrozenModel):
     """A message sent to a chat while a run worked there: it waits in the chat's queue, in ``position`` order, and
     starts as the chat's next run, with the choices it was sent with, once the run before it has ended done (see
     ``RunManager.queue``); ``once`` is one of them, for this message only (item 251), and so are ``picks`` (item
     318). ``attachments`` are the ids of its uploaded files; ``source`` is where it was sent from, and the source of the
-    run it starts."""
+    run it starts. ``follow_up`` is set for the follow-up of a reaction (item 586), which starts with the context it
+    carries."""
 
     id: str
     thread_id: str
@@ -356,6 +373,23 @@ class QueuedMessage(FrozenModel):
     agent_id: str | None
     source: str
     created_at: float
+    follow_up: FollowUpOf | None = None
+
+
+class ReactionRecord(FrozenModel):
+    """A reaction of the owner on a message of Dot's that stands now (item 586). ``message`` is ``answer`` for the
+    answer a run ended with, or ``step-<n>`` for what it said in its step ``n``; ``thread_id`` is the chat of the run;
+    ``follow_up_run_id`` is the run that the reaction started as a follow-up, once it has started (none while it waits
+    in the chat's queue, and for a reaction that started none); ``note_id`` is the note a 📌 made, none for one that
+    found the note there already."""
+
+    run_id: str
+    message: str
+    reaction: ReactionName
+    thread_id: str
+    created_at: float
+    follow_up_run_id: str | None
+    note_id: str | None
 
 
 class MemoryRecord(FrozenModel):

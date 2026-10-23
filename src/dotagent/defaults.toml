@@ -713,6 +713,29 @@ double_tap_ms = 400
 # item 582) goes there too, at most one line in twenty seconds. Approvals are never answered on a channel.
 imessage = false
 
+[reactions]
+# Reactions on Dot's messages (item 586, docs/runs.md): a button under each message of Dot's opens a palette: 👍 good,
+# ❤️ love it, 👎 not right, 🔁 do it again, 📌 remember this, ❓ explain, ✋ hold on. While a run works, a reaction on one
+# of its messages reaches it at its next step as a note from Dot, never as your words: it clears no mark of untrusted
+# content and is no approval of a step. ✋ holds the run before its next step until you write to it (or take the ✋
+# back), and a 📌 keeps the message as a note. Once the run has ended, a reaction does what it says below.
+# follow_ups: false keeps every reaction as feedback only, whatever is said below; a 📌 still makes its note.
+follow_ups = true
+# The most runs reactions start in an hour. A reaction starts at most one run per message, however often it is pressed.
+follow_ups_per_hour = 20
+# How long a run held by a ✋ waits for your next message before it stops, to leave its place to the others.
+hold_minutes = 60.0
+# What each reaction does after the run it is about has ended: "follow_up" starts a run in the same chat, as your own
+# message "My reaction 👎 to your answer above: ..." would (queued behind the run at work, when there is one), or
+# "feedback" only keeps it. The run starts as untrusted as the run of the message, or the chat's last, ended: a
+# reaction never vouches for what a run read. 📌 has no setting: it always keeps the message as a note.
+good = "feedback"
+love = "feedback"
+wrong = "follow_up"
+again = "follow_up"
+explain = "follow_up"
+hold = "feedback"
+
 [recap]
 # The recap of a run (item 536): a few short lines on what it did, what it does now and what waits for you, at the
 # head of its page's Run tab, written by the fast model ([models] fast) from the run's record and never seen by the

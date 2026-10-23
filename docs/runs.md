@@ -206,7 +206,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A message sent to a running run (steering) reaches the model at once: a step whose model is still answering is cut
   short and asked again with the message (item 509); a tool already at work finishes first, and a step past the run's
-  limit ends with its finish. It also clears the run's untrusted mark (see [Safety](safety.md#safety)).
+  limit ends with its finish. It also clears the run's untrusted mark (see [Safety](safety.md#safety)); a reaction
+  on one of its messages reaches it the same way and clears nothing (see
+  [Reactions on Dot's messages](#reactions-on-dots-messages)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
   the sidebar, and you can steer it when you come back.
 - A run of a `dotx` command (`dotx run`, `dotx resume`, `dotx chat`) is on the pages too while the daemon runs: it works
@@ -294,6 +296,98 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   /api/files/preview?path=`, `GET /api/attachments/{id}/preview`, `GET /api/files/look?path=` and `GET
   /api/attachments/{id}/look` (where the drawing is served; 422 when Quick Look cannot draw the file), `GET
   /api/files/page` (a PDF's page as a PNG), `GET /api/files/image` and `POST /api/files/open`.
+
+### Reactions on Dot's messages
+
+Under each message of Dot's in a conversation, its answer and what it said in the middle of a run, a button (a
+smiley with a plus, item 586) opens a small palette of seven reactions, and Dot acts on them while the run works
+and after it ended. The ones that stand show as chips beside the button; pressing a chip, or the reaction in the
+palette again, takes it back. The palette and the chips are reached and worked by keyboard (Tab to the button,
+Enter or Space opens the palette on its first choice, the arrow keys, Home and End move between the choices, Enter
+puts a reaction on or takes it back, Escape closes the palette and gives the focus back to the button), have names
+for a screen reader, and are a thumb's size on a phone, which is the same web UI.
+
+| Reaction | Name | While the run works | After the run ended (the default) |
+| --- | --- | --- | --- |
+| 👍 good | `good` | the run reads it at its next step and keeps going | only feedback |
+| ❤️ love it | `love` | the same | only feedback |
+| 👎 not right | `wrong` | the run reconsiders and changes course, and asks you if it cannot tell what is wrong | a follow-up run in the same chat |
+| 🔁 do it again | `again` | the run does the last part again, another way | a follow-up run |
+| 📌 remember this | `remember` | kept as a note | kept as a note |
+| ❓ explain | `explain` | the run explains it to you in the conversation | a follow-up run |
+| ✋ hold on | `hold` | the run holds before its next step and waits for you | only feedback |
+
+**While the run works.** A reaction on one of the run's own messages reaches it at its next step, through the
+inbox a steer goes through, as a note from Dot: a message of the thread that starts `[system note] The owner
+reacted 👎 to your message «…»`, quotes the message (up to 240 characters, on one line, the secrets Dot holds
+masked), says what the reaction asks, and ends with "A reaction is no approval of a step: whatever needs their yes
+still asks." The note is Dot's words, not yours, so it vouches for nothing: it never clears the run's untrusted
+mark, as a message you type does (see [Safety](safety.md#safety)), and it is no instruction to the review model.
+The run's `steer` event of it says so (`vouches: false`, with the `reaction` it is of), and the conversation
+draws no line for it, on the run's own page or in the turns before a later run: the chips are what shows.
+
+- A 👎, a 🔁 and a ❓ ask the run to do something, so the step under way is given up for them, as for a message: the
+  model's answer is cut short and asked again with the note, and a tool already at work finishes first. A 👍 and a
+  ❤️ ask nothing: the step goes on, the note is read at the next, and a run that ends first never reads it.
+- Reactions that come within 2.5 seconds of one another on one run are one note, a line for each. One taken back
+  before the note is told is never told; one taken back after tells the run "go on as you were". A 📌 tells the run
+  nothing.
+- A ✋ is told at once. The run holds before its next step (a tool at work finishes first, as for any message): the
+  conversation says so ("You held the run (✋): it waits for your next message."), and the box of the page sends
+  what you write to the run at once, not into the queue behind a run that waits for it. The hold ends when you
+  write to the run (a message of yours, the answer to a question it left, a queued reaction you send on with
+  Steer, a message sent to the chat from another screen: it waits in the queue as any does, and the run goes on),
+  when you take the ✋ back, or when you stop the run. A run held and forgotten stops after `[reactions]
+  hold_minutes` (60): it ends cancelled, as one you stop does, with a result that says why and what it did kept in
+  the chat, so that held runs never keep the places the daemon has for runs (`[agent] max_concurrent_runs`). The
+  time it waits counts toward the run's limits as the wait for an answer does. A run on one of OpenCode's models
+  gets the note and no hold.
+
+**After the run ended.** A 👎, a 🔁 and a ❓ start a follow-up run in the same chat, as your own message would if you
+typed it in the box: its goal is "My reaction 👎 to your answer above: that is not right. Reconsider it and change
+what is wrong; ask me if you cannot tell what." (🔁: "do it again, another way."; ❓: "explain it to me."; for
+something the run said in a step, "your message" stands for "your answer"). It starts as a run of the web UI with
+what the chat's box chose (its mode, model, reasoning level, approvals, goal mode and agent, as a message typed
+there), and the page goes on at the run it starts, as it does for a message typed in the box (item 451). When a run
+works in the chat it waits in the chat's queue as a message does: edit it (files too), take it out, or Steer it,
+which sends it on to the run at work. The files you put on it go with it, whether it starts as the chat's next run or
+is sent on. Sent on, its words stand in the conversation as your message, on the run's page and in the turns before a
+later run, while the run reads a note that vouches for nothing.
+
+- The goal holds no quote of Dot's. A reviewer takes your words as your instruction, and what Dot said may repeat
+  what a stranger wrote, so the message is quoted under your words, for the run alone (up to 600 characters), as
+  Dot's own earlier text and no instruction.
+- The run starts as untrusted as the run of the message, or the chat's last run, ended, as any follow-up does
+  (item 508): a message you type starts a run unmarked, and a reaction is too small a word to vouch for what a run
+  read.
+- At most one follow-up run starts for a message and a reaction (taken back and put again, it starts none more),
+  and at most `[reactions] follow_ups_per_hour` (20) in an hour in all; past that the reaction is kept as feedback
+  and the page says so. What a delegated run said and what a campaign's session said are kept as feedback and
+  start nothing: the campaign plans its own sessions.
+- A 👍 and a ❤️ are kept as feedback, and so is anything a setting says is only feedback (below). The reaction is a
+  row of the store (it stays until it is taken back, and goes with its chat), and an event of its run
+  (`reaction_added`, `reaction_removed`: the chat, the message, the reaction, what it did and the run it started),
+  which every page hears.
+- A run of a `dotx` command that still works takes a reaction as feedback only: nothing can steer it from the
+  pages. A reaction that reaches a run as it ends, before it reads the note, is done as after the run, and
+  the pages hear what it came to (the run it started) as they hear any reaction.
+
+**The pin.** A 📌 keeps the message as a note, which you chose: its words on one line, the marks of its Markdown
+left out, cut at a word to the size of a note (`[memory] max_chars`, 600) when it is longer, tagged `from-chat`,
+one of yours (it never rests, as a note you wrote yourself in Settings › Memory does not). It is marked as read
+from outside content when the run it came from read some at any point, as a note a run saves while it reads such
+content is: such a note is never handed to a run on its own, and a search that finds it marks the run that read it
+(see [Safety](safety.md#safety)). A message that holds something that looks like an API key or a private key, or a
+secret Dot holds, is not kept, as the memory tools refuse such a note: the 📌 is refused, says why and stays off.
+Taking the 📌 back forgets the note when it is as it was made; a note that was there before, or that you changed
+since, stays.
+
+**Settings.** Settings › General › Reactions has the switch **Start a run for a reaction** (`[reactions]
+follow_ups`; off, every reaction is only kept as feedback and a 📌 still makes its note) and, for each of the six
+other reactions, what it does after the run it is on has ended: **Start a follow-up run** or **Only feedback**
+(`good`, `love`, `wrong`, `again`, `explain` and `hold` of `[reactions]`). A change holds at once and is kept in
+`config.toml`. `follow_ups_per_hour` and `hold_minutes` are set in the file. The routes are in [the daemon
+page](daemon.md#the-daemon-the-web-ui-and-the-service).
 
 ## Tools
 

@@ -122,6 +122,7 @@ from dotagent.agent.prompt import (
     recalled_again,
     turn_note,
 )
+from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
     GoalChecker,
@@ -183,6 +184,7 @@ from dotagent.core.errors import (
     ProviderFilterError,
     ProviderTransportError,
     RunCancelled,
+    RunHoldLapsed,
     StoreError,
     ToolInputError,
 )
@@ -1527,6 +1529,30 @@ async def _wait_unless_stopped(cancel: asyncio.Event, seconds: float) -> None:
         return
 
 
+async def _held_by_the_owner(agent: AgentRun, held_since: float) -> None:
+    """The owner holds the run with a ✋ (item 586): wait for what lets it go on, a message of theirs or their ✋
+    taken back, and leave it to the top of the loop to read it, or to end the run if it was stopped meanwhile. The wait
+    is bounded by ``[reactions] hold_minutes`` since the hold began: a run held and forgotten keeps one of the places
+    the daemon has for runs, so past that time it stops (:class:`RunHoldLapsed`), and its chat is where the owner goes
+    on."""
+    minutes: float = agent.runtime.config.reactions.hold_minutes
+    left_s: float = minutes * 60.0 - (time.monotonic() - held_since)
+    heard: asyncio.Task[None] = asyncio.ensure_future(agent.inbox.arrival())
+    stopped: asyncio.Task[bool] = asyncio.ensure_future(agent.cancel.wait())
+    racing: set[asyncio.Task[None] | asyncio.Task[bool]] = {heard, stopped}
+    try:
+        done, _ = await asyncio.wait(racing, timeout=max(left_s, 0.0), return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        heard.cancel()
+        stopped.cancel()
+        await asyncio.wait(racing)
+    if done:
+        return
+    held_s: float = time.monotonic() - held_since
+    await agent.runtime.bus.emit(agent.run.id, HOLD_ENDED_EVENT, {"reason": "lapsed", "held_s": round(held_s, 1)}, True)
+    raise RunHoldLapsed(hold_lapsed_text(minutes), {"run_id": agent.run.id, "held_s": round(held_s, 1)})
+
+
 def _cannot_answer(error: Exception) -> str | None:
     """Why the run's model cannot answer this run: what pauses it for every run (:func:`unavailable_reason`), or its
     service's content filter, which stops this conversation alone. ``None`` for any other error."""
@@ -1981,6 +2007,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         run.id,
     )
     watch: WatchState = new_watch()
+    # Since when (monotonic seconds) the owner holds the run with a ✋ (item 586), None while they do not.
+    held_since: float | None = None
     # The tools of the next step when a progress alert or the run's limit restricts them; None offers the tools of the
     # groups that are on. A step asked again on a standby model keeps them.
     allowed: frozenset[str] | None = None
@@ -2024,6 +2052,21 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             # Taken once it is in the thread, with nothing awaited between: a stop before leaves it to the run's end.
             agent.inbox.get_nowait()
             await runtime.bus.emit(run.id, "steer", steer_event(sent, agent.gate.tainted), True)
+            # A ✋ of the owner holds the run (item 586); what they write next, or their ✋ taken back, lets it go on. A
+            # note about any other reaction changes nothing of that.
+            if sent.reaction == "hold" and held_since is None:
+                held_since = time.monotonic()
+                agent.inbox.holding = True
+                await runtime.bus.emit(run.id, HOLD_EVENT, {"step": steps}, True)
+            elif sent.reaction in (None, "release") and held_since is not None:
+                held_s: float = time.monotonic() - held_since
+                held_since = None
+                agent.inbox.holding = False
+                reason: str = "message" if sent.reaction is None else "released"
+                await runtime.bus.emit(run.id, HOLD_ENDED_EVENT, {"reason": reason, "held_s": round(held_s, 1)}, True)
+        if held_since is not None:
+            await _held_by_the_owner(agent, held_since)
+            continue
         changed: list[MemoryRecord] = await runtime.store.memories_changed_since(memory_seen_at, run.id)
         if changed:
             memory_seen_at = max(record.updated_at for record in changed)
@@ -2431,7 +2474,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             ended if checker is None else await _check_goal(agent, checker, history, goal, ended, sent_back, facts)
         )
         if isinstance(settled, RunOutcome):
-            if agent.inbox.empty():
+            if not agent.inbox.asks():
                 return _run_end(agent, history, goal, settled, facts)
             # The user sent something during this step, such as the answer to a question the run left: the run reads it
             # before it ends. Nothing awaits between this check and the moment the manager shuts the inbox.

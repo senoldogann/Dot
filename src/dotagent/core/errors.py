@@ -151,6 +151,11 @@ class RunCancelled(DotError):
     """The run was stopped by the user or by a limit."""
 
 
+class RunHoldLapsed(RunCancelled):
+    """The owner held the run with a ✋ and wrote nothing to it for as long as the hold may last (item 586): it stops,
+    with this error's words as its result."""
+
+
 class BrowserError(DotError):
     """Browser automation failed."""
 

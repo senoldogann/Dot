@@ -52,6 +52,7 @@ from dotagent.store.models import (
     DraftRecord,
     DraftStatus,
     EventRecord,
+    FollowUpOf,
     HarnessExperience,
     HarnessProbe,
     HarnessState,
@@ -63,6 +64,8 @@ from dotagent.store.models import (
     MemoryUseHow,
     PushSubscription,
     QueuedMessage,
+    ReactionName,
+    ReactionRecord,
     RewindCut,
     RuleRecord,
     RunMode,
@@ -138,6 +141,13 @@ CREATE TABLE IF NOT EXISTS shown_pages (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL, title TEXT NOT NULL, html TEXT NOT NULL, created_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS shown_pages_run ON shown_pages(run_id);
+CREATE TABLE IF NOT EXISTS reactions (
+    run_id TEXT NOT NULL, message TEXT NOT NULL, reaction TEXT NOT NULL, thread_id TEXT NOT NULL,
+    created_at REAL NOT NULL, removed_at REAL, follow_up_at REAL, follow_up_run_id TEXT, note_id TEXT,
+    PRIMARY KEY (run_id, message, reaction)
+);
+CREATE INDEX IF NOT EXISTS reactions_thread ON reactions(thread_id, created_at);
+CREATE INDEX IF NOT EXISTS reactions_follow_up ON reactions(follow_up_at);
 CREATE TABLE IF NOT EXISTS rules (
     id TEXT PRIMARY KEY, position INTEGER NOT NULL, enabled INTEGER NOT NULL, behavior TEXT NOT NULL,
     tool_glob TEXT NOT NULL, match_regex TEXT NOT NULL, description TEXT NOT NULL, created_at REAL NOT NULL
@@ -495,6 +505,18 @@ def _run(row: aiosqlite.Row) -> RunRecord:
     )
 
 
+def _reaction(row: aiosqlite.Row) -> ReactionRecord:
+    return ReactionRecord(
+        run_id=row["run_id"],
+        message=row["message"],
+        reaction=row["reaction"],
+        thread_id=row["thread_id"],
+        created_at=row["created_at"],
+        follow_up_run_id=row["follow_up_run_id"],
+        note_id=row["note_id"],
+    )
+
+
 def _harness_version(row: aiosqlite.Row) -> HarnessVersion:
     return HarnessVersion(
         id=row["id"],
@@ -721,6 +743,7 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
     attachments: str = row["attachments"]
     goal_mode: int | None = row["goal_mode"]
     picks: str | None = row["picks"]
+    follow_up: str | None = row["follow_up"]
     return QueuedMessage(
         id=row["id"],
         thread_id=row["thread_id"],
@@ -738,6 +761,7 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
         agent_id=row["agent_id"],
         source=row["source"],
         created_at=row["created_at"],
+        follow_up=None if follow_up is None else FollowUpOf.model_validate_json(follow_up),
     )
 
 
@@ -831,6 +855,12 @@ def _option_values(options: ScheduleOptions) -> _OptionValues:
     )
 
 
+# What claiming the follow-up of a reaction came to (:meth:`Store.claim_follow_up`): the claim is the caller's now, the
+# reaction started one before, the hour's limit of follow-ups is spent, or the reaction is not there (taken back).
+type FollowUpClaim = Literal["claimed", "again", "limit", "gone"]
+# The window of the limit on follow-ups started by reactions.
+_FOLLOW_UP_WINDOW_S: float = 3600.0
+
 # The kv key that names the adopted version of the harness (item 389); absent while none is adopted.
 HARNESS_ADOPTED_KEY: str = "harness.adopted"
 
@@ -901,6 +931,8 @@ _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
     ("once", "TEXT"),
     ("picks", "TEXT"),
+    # What a reaction's follow-up is a follow-up of (item 586; a ``FollowUpOf`` as JSON, NULL for any other message).
+    ("follow_up", "TEXT"),
 )
 # Columns of ``harness_experiences`` added later: whether the run the experience was written from had read content
 # third parties can author (item 392), which keeps it from the proposer.
@@ -1600,6 +1632,7 @@ class Store:
         await self._db.execute(f"{doomed} DELETE FROM shown_pages WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM drafts WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM run_taints WHERE run_id IN (SELECT id FROM doomed)", named)
+        await self._db.execute(f"{doomed} DELETE FROM reactions WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM runs WHERE id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"DELETE FROM messages WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM message_archive WHERE thread_id IN ({marks})", named)
@@ -3203,8 +3236,10 @@ class Store:
         goal_mode: bool | None,
         agent_id: str | None,
         source: str,
+        follow_up: FollowUpOf | None = None,
     ) -> QueuedMessage:
-        """Put a message at the end of a chat's queue."""
+        """Put a message at the end of a chat's queue; ``follow_up`` is what it follows up when a reaction made it (item
+        586)."""
         row = await self._one(
             "SELECT COALESCE(MAX(position), 0) AS top FROM queued_messages WHERE thread_id = ?", (thread_id,)
         )
@@ -3225,6 +3260,7 @@ class Store:
             agent_id=agent_id,
             source=source,
             created_at=time.time(),
+            follow_up=follow_up,
         )
         await self._insert_queued(record)
         await self._db.commit()
@@ -3234,8 +3270,8 @@ class Store:
         """Store ``record`` in its chat's queue; the caller commits."""
         await self._db.execute(
             "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, speed, once,"
-            " picks, approvals, goal_mode, agent_id, source, created_at)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " picks, approvals, goal_mode, agent_id, source, created_at, follow_up)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -3253,6 +3289,7 @@ class Store:
                 record.agent_id,
                 record.source,
                 record.created_at,
+                None if record.follow_up is None else record.follow_up.model_dump_json(),
             ),
         )
 
@@ -3427,6 +3464,151 @@ class Store:
     async def release_queue(self, thread_id: str) -> None:
         await self._db.execute("DELETE FROM queue_holds WHERE thread_id = ?", (thread_id,))
         await self._db.commit()
+
+    # ----- reactions ---------------------------------------------------------------------------
+
+    async def message_reactions(self, run_id: str, message: str) -> list[ReactionRecord]:
+        """The reactions that stand on one message of a run (item 586), the oldest first."""
+        rows = await self._all(
+            "SELECT * FROM reactions WHERE run_id = ? AND message = ? AND removed_at IS NULL"
+            " ORDER BY created_at, rowid",
+            (run_id, message),
+        )
+        return [_reaction(row) for row in rows]
+
+    async def thread_reactions(self, thread_id: str) -> list[ReactionRecord]:
+        """The reactions that stand on the messages of the chat's runs, a run a rewind took out of the chat left out,
+        the oldest first."""
+        rows = await self._all(
+            "SELECT reactions.* FROM reactions JOIN runs ON runs.id = reactions.run_id"
+            " WHERE reactions.thread_id = ? AND reactions.removed_at IS NULL AND runs.rewound_at IS NULL"
+            " ORDER BY reactions.created_at, reactions.rowid",
+            (thread_id,),
+        )
+        return [_reaction(row) for row in rows]
+
+    @_writing
+    async def put_reaction(self, run_id: str, message: str, reaction: ReactionName, thread_id: str, now: float) -> bool:
+        """Put a reaction on a message: whether it was not there. One taken back is put back, and keeps what the
+        reaction did before (the follow-up it started, which it does not start again)."""
+        row = await self._one(
+            "SELECT removed_at FROM reactions WHERE run_id = ? AND message = ? AND reaction = ?",
+            (run_id, message, reaction),
+        )
+        if row is None:
+            await self._db.execute(
+                "INSERT INTO reactions(run_id, message, reaction, thread_id, created_at) VALUES(?, ?, ?, ?, ?)",
+                (run_id, message, reaction, thread_id, now),
+            )
+        elif row["removed_at"] is None:
+            return False
+        else:
+            await self._db.execute(
+                "UPDATE reactions SET removed_at = NULL, created_at = ?"
+                " WHERE run_id = ? AND message = ? AND reaction = ?",
+                (now, run_id, message, reaction),
+            )
+        await self._db.commit()
+        return True
+
+    @_writing
+    async def take_reaction(
+        self, run_id: str, message: str, reaction: ReactionName, now: float
+    ) -> ReactionRecord | None:
+        """Take a reaction back: the reaction as it stood, or ``None`` when it was not there. The note a 📌 made is
+        forgotten here (the caller removes it), and the follow-up the reaction started stays counted."""
+        row = await self._one(
+            "SELECT * FROM reactions WHERE run_id = ? AND message = ? AND reaction = ? AND removed_at IS NULL",
+            (run_id, message, reaction),
+        )
+        if row is None:
+            return None
+        await self._db.execute(
+            "UPDATE reactions SET removed_at = ?, note_id = NULL WHERE run_id = ? AND message = ? AND reaction = ?",
+            (now, run_id, message, reaction),
+        )
+        await self._db.commit()
+        return _reaction(row)
+
+    @_writing
+    async def claim_follow_up(
+        self, run_id: str, message: str, reaction: ReactionName, now: float, per_hour: int
+    ) -> FollowUpClaim:
+        """Claim the one follow-up run a reaction may start (item 586): unless it started one before (a reaction put
+        back starts none again), or ``per_hour`` follow-ups were claimed in the hour before ``now``. One write: two
+        presses at once claim it once."""
+        row = await self._one(
+            "SELECT follow_up_at FROM reactions WHERE run_id = ? AND message = ? AND reaction = ?"
+            " AND removed_at IS NULL",
+            (run_id, message, reaction),
+        )
+        if row is None:
+            return "gone"
+        if row["follow_up_at"] is not None:
+            return "again"
+        count = await self._one(
+            "SELECT COUNT(*) AS claimed FROM reactions WHERE follow_up_at > ?", (now - _FOLLOW_UP_WINDOW_S,)
+        )
+        if count is not None and int(count["claimed"]) >= per_hour:
+            return "limit"
+        await self._db.execute(
+            "UPDATE reactions SET follow_up_at = ? WHERE run_id = ? AND message = ? AND reaction = ?",
+            (now, run_id, message, reaction),
+        )
+        await self._db.commit()
+        return "claimed"
+
+    @_writing
+    async def release_follow_up(self, run_id: str, message: str, reaction: ReactionName) -> None:
+        """Give back the claim of :meth:`claim_follow_up` when the run it was for could not start, so that the owner
+        may press the reaction again."""
+        await self._db.execute(
+            "UPDATE reactions SET follow_up_at = NULL WHERE run_id = ? AND message = ? AND reaction = ?",
+            (run_id, message, reaction),
+        )
+        await self._db.commit()
+
+    @_writing
+    async def link_follow_up(self, run_id: str, message: str, reaction: ReactionName, follow_up_run_id: str) -> None:
+        """Say which run a reaction started: that of a follow-up that waited in the queue is known once it starts."""
+        await self._db.execute(
+            "UPDATE reactions SET follow_up_run_id = ? WHERE run_id = ? AND message = ? AND reaction = ?",
+            (follow_up_run_id, run_id, message, reaction),
+        )
+        await self._db.commit()
+
+    @_writing
+    async def keep_reaction_note(self, run_id: str, message: str, reaction: ReactionName, note_id: str) -> None:
+        """Say which note a 📌 made, so that taking the reaction back can take the note back."""
+        await self._db.execute(
+            "UPDATE reactions SET note_id = ? WHERE run_id = ? AND message = ? AND reaction = ?",
+            (note_id, run_id, message, reaction),
+        )
+        await self._db.commit()
+
+    async def assistant_text(self, run_id: str, step: int) -> str | None:
+        """What the run said in its step ``step``, as its ``assistant`` event kept it (secrets masked); ``None`` when
+        the run has no such event, or the events were pruned."""
+        row = await self._one(
+            "SELECT data FROM events WHERE run_id = ? AND kind = 'assistant' AND json_extract(data, '$.step') = ?"
+            " ORDER BY id DESC LIMIT 1",
+            (run_id, step),
+        )
+        if row is None:
+            return None
+        text: object = parse_json_object(str(row["data"]), "assistant event").get("text")
+        return text if isinstance(text, str) else None
+
+    async def run_read_outside(self, run_id: str) -> bool:
+        """Whether the run read content third parties can author at any point of its work: it started so, or a result
+        of a tool left it so (:func:`dotagent.agent.gate.tainted_after` tells only how it stands at the end), or ``dotx
+        prune`` recorded it so before it deleted the events (:meth:`pruned_run_tainted`)."""
+        row = await self._one(
+            "SELECT 1 FROM events WHERE run_id = ? AND kind IN ('run_queued', 'tool_result')"
+            " AND json_type(data, '$.tainted') = 'true' LIMIT 1",
+            (run_id,),
+        )
+        return row is not None or await self.pruned_run_tainted(run_id)
 
     # ----- push subscriptions ------------------------------------------------------------------
 

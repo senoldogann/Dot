@@ -282,6 +282,100 @@ function buildVoiceCard() {
   );
 }
 
+// What each reaction on one of Dot's messages does while its run works, for the six that have a setting for what they do
+// once it ended (item 586, `[reactions]` in the config file); a pin has none: it always keeps the message as a note.
+const REACTION_SETTINGS = [
+  { key: "good", symbol: "👍", label: "Good", works: "While a run works, it reads it and keeps going." },
+  { key: "love", symbol: "❤️", label: "Love it", works: "While a run works, it reads it and keeps going." },
+  { key: "wrong", symbol: "👎", label: "Not right", works: "While a run works, it reconsiders and changes course." },
+  { key: "again", symbol: "🔁", label: "Do it again", works: "While a run works, it redoes the last part another way." },
+  { key: "explain", symbol: "❓", label: "Explain", works: "While a run works, it explains in the conversation." },
+  { key: "hold", symbol: "✋", label: "Hold on", works: "While a run works, it holds before its next step until you write." },
+];
+const AFTER_RUN = [
+  { id: "follow_up", label: "Start a follow-up run" },
+  { id: "feedback", label: "Only feedback" },
+];
+
+/**
+ * The reactions on Dot's messages (item 586), kept by the daemon in the config file and changed from here at once: the
+ * switch that lets a reaction start a run at all, and for each of six reactions what it does once the run it is on has
+ * ended, a follow-up run in the same chat or only feedback.
+ */
+function buildReactionsCard() {
+  let settings = null;
+  const body = el("div", { class: "card-pad stack" }, inlineLoading());
+
+  async function change(key, value) {
+    settings = await api.post("/reactions/settings", { key, value });
+  }
+
+  const follow = switchSetting({
+    label: "Start a run for a reaction",
+    hint: "On, a reaction on a message of a run that ended does what is chosen below: a follow-up run in the same chat, as a message of yours would start one, queued behind the run at work. Off, every reaction is only kept as feedback. A pin still keeps its message as a note.",
+    read: () => settings !== null && settings.follow_ups === true,
+    write: (on) => change("follow_ups", on),
+    onToggled: () => paint(),
+  });
+  const rows = REACTION_SETTINGS.map((row) => {
+    const select = el(
+      "select",
+      { class: "select reaction-after", "aria-label": `${row.label}, after the run has ended` },
+      AFTER_RUN.map((choice) => el("option", { value: choice.id }, choice.label)),
+    );
+    select.addEventListener("change", () =>
+      attempt(async () => {
+        try {
+          await change(row.key, select.value);
+        } finally {
+          paint();
+        }
+      }),
+    );
+    const element = el(
+      "div",
+      { class: "setting" },
+      el("div", { class: "row" }, el("span", { class: "grow" }, `${row.symbol} ${row.label}`), select),
+      el("div", { class: "hint" }, row.works),
+    );
+    return { key: row.key, select, element };
+  });
+
+  function paint() {
+    if (settings === null) {
+      return;
+    }
+    follow.paint();
+    for (const row of rows) {
+      row.select.value = String(settings[row.key]);
+      row.select.disabled = settings.follow_ups !== true;
+    }
+  }
+
+  async function load() {
+    try {
+      settings = await api.get("/reactions/settings");
+    } catch (error) {
+      body.replaceChildren(
+        inlineError(error, () => {
+          body.replaceChildren(inlineLoading());
+          load();
+        }),
+      );
+      return;
+    }
+    body.replaceChildren(
+      follow.element,
+      ...rows.map((row) => row.element),
+      el("div", { class: "hint" }, "📌 Remember this has no setting: it keeps the message as a note, while a run works and after it, and a second press takes the note back."),
+    );
+    paint();
+  }
+
+  load();
+  return section("Reactions", null, body);
+}
+
 /** What a chat shows of the actions the review model approved (items 346 and 362), kept in this browser. */
 function buildChatCard() {
   const lines = switchSetting({
@@ -2162,7 +2256,7 @@ function buildDotLookCard() {
 
 export function mountGeneral(root, ctx) {
   const look = buildDotLookCard();
-  ctx.head.setLead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, the voice (the microphone and answers read aloud), what a chat shows of what ran without asking, and the token this browser is signed in with.");
+  ctx.head.setLead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, the voice (the microphone and answers read aloud), what a chat shows of what ran without asking, what a reaction on Dot's message does once its run has ended, and the token this browser is signed in with.");
   root.append(
     buildNameCard(),
     look.element,
@@ -2170,6 +2264,7 @@ export function mountGeneral(root, ctx) {
     buildComposerCard(),
     buildVoiceCard(),
     buildChatCard(),
+    buildReactionsCard(),
     buildTokenCard(),
   );
   return look.dispose;

@@ -489,6 +489,30 @@ class ChannelsConfig(FrozenModel):
     imessage: bool
 
 
+# What a reaction does once the run it is about has ended (item 586): ``follow_up`` starts a run in the same chat, as
+# the owner's own message would, ``feedback`` only keeps it.
+type AfterRun = Literal["follow_up", "feedback"]
+
+
+class ReactionsConfig(FrozenModel):
+    """The reactions on Dot's messages (item 586, docs/runs.md): ``follow_ups`` is whether a reaction may start a run
+    after the run it is about has ended (off: every reaction is only kept, and a 📌 still makes its note);
+    ``follow_ups_per_hour`` the most runs reactions start in an hour, whatever the chats; ``hold_minutes`` how long a
+    run held by a ✋ waits for the owner's next message before it stops. The six that follow say what each reaction
+    does after a run: 👍 ``good``, ❤️ ``love``, 👎 ``wrong``, 🔁 ``again``, ❓ ``explain`` and ✋ ``hold``. A 📌 always
+    keeps its message as a note. Settings › General › Reactions changes ``follow_ups`` and these six, live."""
+
+    follow_ups: bool
+    follow_ups_per_hour: int = Field(ge=1, le=1000)
+    hold_minutes: float = Field(gt=0, le=24 * 60, allow_inf_nan=False)
+    good: AfterRun
+    love: AfterRun
+    wrong: AfterRun
+    again: AfterRun
+    explain: AfterRun
+    hold: AfterRun
+
+
 class RecapConfig(FrozenModel):
     """The recap of a run (item 536): whether one is written, after how many steps the first, and after how many more
     each new one; one more is due when the run ended after its last."""
@@ -766,6 +790,7 @@ class AppConfig(FrozenModel):
     desktop: DesktopConfig
     snapshots: SnapshotsConfig
     channels: ChannelsConfig
+    reactions: ReactionsConfig
     recap: RecapConfig
     assistant: AssistantConfig
     memory: MemoryConfig

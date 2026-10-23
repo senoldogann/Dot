@@ -6163,6 +6163,111 @@ a.memory-line:hover .memory-change {
   margin-left: auto;
 }
 
+/* The reactions on Dot's messages (item 586): in the foot of the answer, after the copy and the speaker, a button opens the
+   palette and the chips of what stands on the message follow it; what Dot said in the middle of a conversation has a foot
+   of its own with just these, as quiet as the answer's. A chip is pressed again to take its reaction back. */
+.say-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: -4px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.say-foot .btn {
+  margin-left: -8px;
+}
+
+.reaction-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--accent-weak);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-ui);
+  line-height: var(--leading-xs);
+  cursor: pointer;
+  transition: background var(--motion-quick) var(--ease);
+}
+
+@media (hover: hover) {
+  .reaction-chip:hover {
+    background: var(--surface-3);
+  }
+}
+
+/* The palette opens over the page at the button that opened it: seven reactions in a row, the ones that stand ticked. */
+.reaction-palette {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-half);
+  max-width: calc(100vw - 16px);
+  padding: var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  animation: fade-in var(--motion-quick) var(--ease);
+}
+
+.reaction-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  cursor: pointer;
+}
+
+.reaction-choice[aria-checked="true"] {
+  background: var(--accent-weak);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+@media (hover: hover) {
+  .reaction-choice:hover {
+    background: var(--surface-2);
+  }
+}
+
+/* On a phone the chips and the choices are a thumb's. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .reaction-chip {
+    min-width: 36px;
+    height: 32px;
+  }
+
+  .reaction-choice {
+    width: 44px;
+    height: 44px;
+  }
+}
+
 /* ---------- the conversation around a run ---------- */
 
 .history {

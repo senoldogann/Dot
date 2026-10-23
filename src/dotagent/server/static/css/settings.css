@@ -623,6 +623,12 @@
   min-width: 160px;
 }
 
+/* What a reaction does after a run stands at the right of its name, no wider than its longest choice needs (item 586). */
+.reaction-after {
+  width: auto;
+  min-width: 200px;
+}
+
 /* ---------- the channels (item 572) ---------- */
 
 /* What a paired number or address holds under its title: the handles, the form that sends a code and the one that takes
