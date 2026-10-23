@@ -214,9 +214,10 @@ emergency stop or `campaign_max_sessions` stops it.
 
 **The browser of a campaign.** A campaign works in the Chrome `[browser] mode` names, as every other run does, unless
 you start it with `--browser own` or `--browser attach` (or `browser` in the API, which goes with `standing` only),
-which pins that campaign to that Chrome. A campaign that asks for your Chrome is refused at its
-start while that Chrome is closed or does not allow the connection (`dotx browser attach` sets it up), so its sessions
-do not fail one after the other. The brief of every session says which Chrome it works in, and so do
+which pins that campaign to that Chrome. One that names none reads the mode again at each session, so a switch in
+Settings › Browser reaches its next session, a campaign at work too (item 579). A campaign that asks for your Chrome is
+refused at its start while that Chrome is closed or does not allow the connection (`dotx browser attach` sets it up),
+so its sessions do not fail one after the other. The brief of every session says which Chrome it works in, and so do
 `dotx campaign show` and the campaign's page.
 
 Every session runs with the model, reasoning level and approval mode the campaign started with, and without goal mode:
