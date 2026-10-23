@@ -20,7 +20,20 @@ import { dotName, NAME_CHARS } from "../face.js";
 import { OWNER_CHARS, ownerName, shownOwner } from "../presence.js";
 import { icon } from "../icons.js";
 import { lookPicker } from "../lookpicker.js";
-import { choiceSetting, foldCard, foldGroup, inlineError, inlineLoading, segmented, setCard, setRow, setSection, switchSetting } from "../panels.js";
+import {
+  choiceRowSetting,
+  choiceSetting,
+  foldCard,
+  foldGroup,
+  inlineError,
+  inlineLoading,
+  segmented,
+  setCard,
+  setRow,
+  setSection,
+  switchRowSetting,
+  switchSetting,
+} from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
@@ -229,18 +242,6 @@ function buildAbout() {
 }
 
 function buildDaemon() {
-  const refreshButton = el(
-    "button",
-    {
-      class: "btn ghost sm",
-      type: "button",
-      title: "Read the daemon again",
-      "aria-label": "Read the daemon again",
-      onclick: () => attempt(refresh),
-    },
-    icon("refresh"),
-    el("span", { class: "label" }, "Refresh"),
-  );
   const body = el("div", null, inlineLoading());
   // Item 231: whether the daemon's next start resumes on its own the runs it cut off, kept in the config file.
   let resume = null;
@@ -269,7 +270,7 @@ function buildDaemon() {
   const card = foldCard({
     id: "system-daemon",
     title: "Daemon",
-    actions: refreshButton,
+    actions: null,
     body: el("div", null, body, el("div", { class: "card-pad daemon-resume" }, goOn.element)),
     openByDefault: true,
   });
@@ -293,7 +294,7 @@ const RESTART_ARMED_MS = 6000;
 /** The desktop's permissions (item 409): what macOS granted the program that runs Dot, a button that makes macOS ask
  * (and puts the program in the panes' lists), one that opens the pane of each permission missing, and, when the daemon
  * is the service's, one that starts Dot again, since a running process keeps what it had when it started. */
-function buildPermissions() {
+function buildPermissions(onView) {
   let view = null;
   let armed = false;
   let disarm = null;
@@ -312,7 +313,14 @@ function buildPermissions() {
   }
 
   async function load() {
-    view = await api.get("/desktop/permissions");
+    try {
+      view = await api.get("/desktop/permissions");
+    } catch (error) {
+      // The tile at the head of the page says so too, rather than Reading for ever (item 564).
+      onView(null);
+      body.replaceChildren(inlineError(error, () => attempt(load)));
+      throw error;
+    }
     paint();
   }
 
@@ -377,6 +385,7 @@ function buildPermissions() {
     card.setSummary(
       el("span", { class: `badge ${lacking.length === 0 ? "b-ok" : "b-warn"}` }, lacking.length === 0 ? "all granted" : `missing: ${lacking.join(", ")}`),
     );
+    onView(lacking);
   }
 
   const refreshButton = el("button", { class: "btn ghost sm", type: "button", title: "Read the permissions again", "aria-label": "Read the permissions again", onclick: () => attempt(load) }, icon("refresh"));
@@ -389,103 +398,175 @@ function buildPermissions() {
   return { element: card.element, load: loadQuiet };
 }
 
+/** The emergency stop (item 564): a card with its mark, its state and the button that stops everything, or, engaged,
+ * the one that releases it. */
 function buildFailsafe() {
-  const text = el("div", { class: "grow muted" });
-  const statusBadge = el("span", { class: "badge b-muted" }, "standby");
+  const state = el("span", { class: "badge b-muted" }, "Standby");
+  const text = el("div", { class: "set-row-lead" });
   const engage = el(
     "button",
-    { class: "btn danger solid", type: "button", onclick: () => attempt(engageFailsafe) },
+    { class: "btn danger", type: "button", onclick: () => attempt(engageFailsafe) },
     icon("stop"),
-    "Emergency stop",
+    "Stop everything",
   );
   const release = el("button", { class: "btn", type: "button", onclick: () => attempt(releaseFailsafe) }, "Release");
+  const element = el(
+    "section",
+    { class: "failsafe", "aria-label": "Emergency stop" },
+    el("span", { class: "failsafe-mark", "aria-hidden": "true" }, icon("power")),
+    el("div", { class: "failsafe-text" }, el("div", { class: "set-row-title failsafe-title" }, "Emergency stop", state), text),
+    el("div", { class: "failsafe-actions" }, engage, release),
+  );
   return {
-    element: foldCard({
-      id: "system-failsafe",
-      title: "Emergency stop",
-      actions: statusBadge,
-      body: el("div", { class: "card-pad row" }, text, engage, release),
-      openByDefault: true,
-    }).element,
+    element,
     paint(snapshot) {
       const engaged = snapshot.status?.failsafe_engaged === true;
-      statusBadge.className = engaged ? "badge b-bad" : "badge b-muted";
-      statusBadge.textContent = engaged ? "engaged" : "standby";
+      state.className = engaged ? "badge b-bad" : "badge b-muted";
+      state.textContent = engaged ? "Engaged" : "Standby";
       text.textContent = engaged
         ? "The emergency stop is engaged: every run was cancelled and desktop control is blocked."
-        : "The emergency stop cancels every running task and blocks desktop control until you release it.";
+        : "Cancels every running task and blocks desktop control until you release it.";
+      element.dataset.engaged = String(engaged);
       engage.hidden = engaged;
       release.hidden = !engaged;
     },
   };
 }
 
-function checkRow(check) {
-  let badge = el("span", { class: "badge b-ok" }, "ok");
-  if (!check.ok) {
-    badge = check.required ? el("span", { class: "badge b-bad" }, "failing") : el("span", { class: "badge b-warn" }, "optional");
-  }
-  return el("tr", null, el("td", null, check.name), el("td", null, badge), el("td", { class: "muted" }, check.detail));
+// The groups the health checks are drawn in (item 564), by the names the doctor gives them; a check none of them takes
+// stands in the last group. A group is open at first when the design draws it so.
+const HEALTH_GROUPS = [
+  { key: "setup", title: "Setup", takes: /^(home directory|env file|ripgrep|google chrome|chrome|xcode tools|backups)\b/, open: true },
+  { key: "desktop", title: "Desktop control", takes: /^desktop\b/, open: true },
+  { key: "models", title: "Providers and models", takes: /( api| key$|^ollama|^web search|^judge|^model\b|^review model)/, open: false },
+  { key: "browser", title: "Browser", takes: /^browser\b/, open: false },
+  { key: "tools", title: "Memory, tools and plugins", takes: /^(memory|mcp|skills|plugins|office apps|one-time codes|onedrive)\b/, open: false },
+  { key: "other", title: "Other", takes: /./, open: false },
+];
+
+/** A check that needs a look: it failed. A required one is failing, any other optional. */
+function needsLook(check) {
+  return !check.ok;
 }
 
-/** What the folded Health checks card shows: how many checks failed, which ones are optional, or that all passed. */
+function healthRow(check) {
+  let result = el("span", { class: "health-ok" }, icon("check"), "ok");
+  if (!check.ok) {
+    result = check.required ? el("span", { class: "badge b-bad" }, "failing") : el("span", { class: "badge b-warn" }, "optional");
+  }
+  return el(
+    "div",
+    { class: "set-row health-row", dataset: { check: check.name } },
+    el("span", { class: "health-name" }, check.name),
+    el("span", { class: "health-detail" }, check.detail),
+    result,
+  );
+}
+
+/** What the Health tile says of the checks: how many passed, and what is left to look at. */
 function doctorSummary(checks) {
   const failing = checks.filter((check) => !check.ok && check.required).length;
   const optional = checks.filter((check) => !check.ok && !check.required).length;
-  const verdicts = [];
-  if (failing > 0) {
-    verdicts.push(el("span", { class: "badge b-bad" }, `${failing} failing`));
-  }
-  if (optional > 0) {
-    verdicts.push(el("span", { class: "badge b-warn" }, `${optional} optional`));
-  }
-  if (verdicts.length === 0) {
-    verdicts.push(el("span", { class: "badge b-ok" }, "all ok"));
-  }
-  return [...verdicts, el("span", null, plural(checks.length, "check", "checks"))];
+  const passed = checks.filter((check) => check.ok).length;
+  const line =
+    failing > 0
+      ? `${plural(failing, "check", "checks")} failing`
+      : optional > 0
+        ? `${plural(optional, "optional check", "optional checks")} to look at`
+        : "Every check passed";
+  return { tone: failing > 0 ? "bad" : optional > 0 ? "warn" : "ok", word: `${passed} of ${checks.length} ok`, line };
 }
 
-function buildDoctor(isDisposed) {
-  const body = el("div", null, inlineLoading());
+/** The Health checks (item 564): what needs a look first, then the checks that passed in their groups; the filter keeps the
+ * first alone. `onChecks(checks)` says what the checks found once they ran, or gets null when they could not run. */
+function buildDoctor(isDisposed, onChecks) {
+  const card = el("div", { class: "set-card health" }, inlineLoading());
+  const filterHolder = el("div", { class: "set-filter" });
   const again = el(
     "button",
-    { class: "btn ghost sm", type: "button", title: "Run the health checks again", "aria-label": "Run again", onclick: () => attempt(run) },
+    { class: "btn", type: "button", title: "Run the health checks again", "aria-label": "Run again", onclick: () => attempt(run) },
     icon("refresh"),
     el("span", { class: "label" }, "Run again"),
   );
-  const card = foldCard({ id: "system-doctor", title: "Health checks", actions: again, body, openByDefault: false });
+  const element = setSection({ title: "Health checks", actions: el("div", { class: "set-actions" }, filterHolder, again), body: card });
+  let checks = null;
+  let only = "all";
+
+  function paint() {
+    const looks = checks.filter(needsLook);
+    const rows = [];
+    if (looks.length > 0) {
+      rows.push(el("div", { class: "health-looks", role: "group", "aria-label": "Needs a look" }, el("h3", { class: "health-group-title warn" }, "Needs a look"), looks.map(healthRow)));
+    }
+    if (only === "all") {
+      for (const group of HEALTH_GROUPS) {
+        const passed = checks.filter((check) => check.ok && HEALTH_GROUPS.find((one) => one.takes.test(check.name)) === group);
+        const lacking = checks.filter((check) => !check.ok && HEALTH_GROUPS.find((one) => one.takes.test(check.name)) === group).length;
+        // A group's fold holds the checks that passed; one whose checks all need a look stands only above.
+        if (passed.length === 0) {
+          continue;
+        }
+        rows.push(
+          foldGroup({
+            id: `system-health-${group.key}`,
+            head: el(
+              "span",
+              { class: "row grow" },
+              el("span", { class: "health-group-title" }, group.title),
+              lacking > 0
+                ? el("span", { class: "fold-count warn" }, `${lacking} to look at`)
+                : el("span", { class: "fold-count ok" }, icon("check"), "all ok"),
+            ),
+            body: el("div", { class: "health-passed" }, passed.map(healthRow)),
+            openByDefault: group.open,
+          }),
+        );
+      }
+    }
+    if (rows.length === 0) {
+      rows.push(el("div", { class: "set-row hint" }, "Nothing needs a look."));
+    }
+    card.replaceChildren(...rows);
+  }
+
+  function paintFilter() {
+    const looking = checks.filter(needsLook).length;
+    const filter = segmented(
+      [
+        { id: "all", label: `All ${checks.length}`, hint: "Every check, the ones that need a look first" },
+        { id: "look", label: `Needs a look ${looking}`, hint: "Only the checks that need a look" },
+      ],
+      only,
+      (id) => {
+        only = id;
+        paint();
+      },
+    );
+    filter.element.setAttribute("aria-label", "Show the checks");
+    filterHolder.replaceChildren(filter.element);
+  }
 
   async function run() {
-    body.replaceChildren(inlineLoading());
-    card.setSummary();
+    card.replaceChildren(inlineLoading());
+    filterHolder.replaceChildren();
     try {
-      const checks = await api.get("/doctor");
+      checks = await api.get("/doctor");
       if (isDisposed()) {
         return;
       }
-      card.setSummary(...doctorSummary(checks));
-      body.replaceChildren(
-        el(
-          "div",
-          { class: "table-scroll" },
-          el(
-            "table",
-            { class: "table" },
-            el("thead", null, el("tr", null, el("th", null, "Check"), el("th", null, "Result"), el("th", null, "Detail"))),
-            el("tbody", null, checks.map(checkRow)),
-          ),
-        ),
-      );
+      onChecks(checks);
+      paintFilter();
+      paint();
     } catch (error) {
       if (!isDisposed()) {
         console.error("the health checks failed", error);
-        card.setSummary(el("span", { class: "badge b-bad" }, "could not run"));
-        body.replaceChildren(inlineError(error, () => attempt(run)));
+        onChecks(null);
+        card.replaceChildren(inlineError(error, () => attempt(run)));
       }
     }
   }
 
-  return { element: card.element, run };
+  return { element, run };
 }
 
 function capabilities(model) {
@@ -1320,7 +1401,7 @@ function attachStanding(view) {
   return { word: "not connected", line: "Dot connects on the next step that needs Chrome; Chrome asks you to Allow once.", tone: "" };
 }
 
-function buildBrowser(isDisposed) {
+function buildBrowser(isDisposed, head) {
   let view = null;
   let polling = null;
   // Whether the card last saw the sign-in window open, so that its closing is told once.
@@ -1336,7 +1417,7 @@ function buildBrowser(isDisposed) {
   );
   const steps = el("ol", { class: "browser-steps" });
   const modes = segmented(BROWSER_MODES, BROWSER_MODES[0].id, (id) => attempt(() => choose(id)));
-  const raise = switchSetting({
+  const raise = switchRowSetting({
     label: "Bring Chrome to the front while working",
     hint:
       "Off, Dot's Chrome stays where it is while a run works and the app you were in keeps the focus; the run's page shows the page under Dot's computer either way, and Take over always brings the tab to the front.",
@@ -1352,7 +1433,7 @@ function buildBrowser(isDisposed) {
     },
   });
   // Whether the owner may use the page of a run they hold from the screen that shows it, a phone's too (item 470).
-  const screenInput = switchSetting({
+  const screenInput = switchRowSetting({
     label: "Use the page from the screen while I hold the run",
     hint: "On, a run you took over can be used from the screen that shows its page: your taps, scrolls and keys go to the page while the run waits. Nothing you type is kept.",
     read: () => view?.remote_input === true,
@@ -1368,7 +1449,7 @@ function buildBrowser(isDisposed) {
   });
   // Settings › Browser (item 354): whether runs may use the browser, how its pages look, and whether a run's page shows
   // by itself.
-  const enabled = switchSetting({
+  const enabled = switchRowSetting({
     label: "Runs may use the browser",
     hint: "Off, no run is offered the browser tools, an agent's neither, from the next run on; computer use still sees the screen.",
     read: () => view?.enabled === true,
@@ -1384,13 +1465,12 @@ function buildBrowser(isDisposed) {
   });
   const sizes = el("select", { class: "select sm", "aria-label": "Size of a page" });
   sizes.addEventListener("change", () => attempt(() => chooseSize(sizes.value)));
-  const sizeSetting = el(
-    "div",
-    { class: "setting" },
-    el("div", { class: "row" }, el("span", { class: "grow" }, "Size of a page"), sizes),
-    el("div", { class: "hint" }, "The page a run sees in Dot's own Chrome: as large as its window, or a screen's size. Your Chrome keeps the size of its window."),
-  );
-  const appearance = choiceSetting({
+  const sizeSetting = setRow({
+    title: "Size of a page",
+    lead: "The page a run sees in Dot's own Chrome: as large as its window, or a screen's size. Your Chrome keeps the size of its window.",
+    control: sizes,
+  });
+  const appearance = choiceRowSetting({
     label: "Appearance of pages",
     hint: "The colour scheme pages are told to prefer, in Dot's own Chrome and in the tabs Dot opens in yours.",
     options: APPEARANCES,
@@ -1399,13 +1479,17 @@ function buildBrowser(isDisposed) {
   });
   const zooms = el("select", { class: "select sm", "aria-label": "Zoom of pages" });
   zooms.addEventListener("change", () => attempt(() => chooseLook({ ...view.look, zoom: Number(zooms.value) })));
-  const zoomSetting = el(
-    "div",
-    { class: "setting" },
-    el("div", { class: "row" }, el("span", { class: "grow" }, "Zoom of pages"), zooms),
-    el("div", { class: "hint" }, "How large Dot's own Chrome draws pages; ⌘+ and ⌘− still change one site there. Your Chrome keeps its own."),
-  );
-  const autoComputer = switchSetting({
+  const zoomSetting = setRow({
+    title: "Zoom of pages",
+    lead: "How large Dot's own Chrome draws pages; ⌘+ and ⌘− still change one site there. Your Chrome keeps its own.",
+    control: zooms,
+  });
+  const browseWith = setRow({
+    title: "Browse with",
+    lead: "Own Chrome is a profile of Dot's, apart from yours. My Chrome opens tabs in your Chrome, signed in as you.",
+    control: modes.element,
+  });
+  const autoComputer = switchRowSetting({
     label: "Show Dot's computer when a run opens the browser",
     hint: "On a wide window the details panel opens on the page the run works in, beside the chat; a phone keeps its button. Kept in this browser.",
     read: () => settingValue(AUTO_COMPUTER) === "shown",
@@ -1424,7 +1508,7 @@ function buildBrowser(isDisposed) {
     placeholder: "Work",
     "aria-label": "Name of the new profile",
   });
-  const addForm = el("form", { class: "row profile-add", hidden: true }, profileName, el("button", { class: "btn sm", type: "submit" }, "Add"));
+  const addForm = el("form", { class: "set-row profile-add", hidden: true }, profileName, el("button", { class: "btn sm", type: "submit" }, "Add"));
   addForm.addEventListener("submit", (event) => {
     event.preventDefault();
     attempt(addProfile);
@@ -1432,7 +1516,7 @@ function buildBrowser(isDisposed) {
   const addButton = el(
     "button",
     {
-      class: "btn sm",
+      class: "set-link",
       type: "button",
       title: "Add a profile of Dot's Chrome",
       "aria-label": "Add profile",
@@ -1444,14 +1528,13 @@ function buildBrowser(isDisposed) {
     icon("plus"),
     el("span", { class: "label" }, "Add profile"),
   );
-  const profileSetting = el(
-    "div",
-    { class: "setting", hidden: true },
-    el("div", { class: "row" }, el("span", { class: "grow" }, "Profiles"), addButton),
-    el("div", { class: "hint" }, "Each profile of Dot's own Chrome keeps its own cookies and sign-ins, and runs work on the one in use. Incognito keeps nothing once Dot's Chrome closes."),
-    profileList,
-    addForm,
-  );
+  const profileSetting = setSection({
+    title: "Profiles",
+    lead: "Each profile of Dot's own Chrome keeps its own cookies and sign-ins, and runs work on the one in use.",
+    actions: addButton,
+    body: setCard(profileList, addForm),
+  });
+  profileSetting.hidden = true;
   const port = el("input", {
     class: "input port-input mono",
     type: "text",
@@ -1470,11 +1553,12 @@ function buildBrowser(isDisposed) {
       port.blur();
     }
   });
-  const portHint = el("div", { class: "hint" });
+  const portHint = el("span");
+  const portSetting = setRow({ title: "DevTools port of Dot's Chrome", lead: portHint, control: port });
   const signIn = el(
     "button",
     {
-      class: "btn sm",
+      class: "btn",
       type: "button",
       title: "Sign in to sites in Dot's Chrome",
       "aria-label": "Sign in…",
@@ -1483,16 +1567,12 @@ function buildBrowser(isDisposed) {
     icon("key"),
     el("span", { class: "label" }, "Sign in…"),
   );
-  const signInSetting = el(
-    "div",
-    { class: "setting", hidden: true },
-    el("div", { class: "row" }, el("span", { class: "grow" }, "Sign in to sites in Dot's Chrome"), signIn),
-    el(
-      "div",
-      { class: "hint" },
-      "Opens Dot's own profile in a plain Chrome window: sign in there to the sites Dot should use, then quit that Chrome (⌘Q). Dot keeps the cookies and never sees your passwords.",
-    ),
-  );
+  const signInSetting = setRow({
+    title: "Sign in to sites in Dot's Chrome",
+    lead: "Opens Dot's own profile in a plain Chrome window: sign in there to the sites Dot should use, then quit that Chrome (⌘Q). Dot keeps the cookies and never sees your passwords.",
+    control: signIn,
+  });
+  signInSetting.hidden = true;
   const signingIn = el(
     "div",
     { class: "note signing-in", "aria-live": "polite", hidden: true },
@@ -1501,10 +1581,11 @@ function buildBrowser(isDisposed) {
   );
   const reload = el(
     "button",
-    { class: "btn ghost sm", type: "button", title: "Look at Chrome again", "aria-label": "Look again", onclick: () => attempt(load) },
+    { class: "btn", type: "button", title: "Look at Chrome again", "aria-label": "Look again", onclick: () => attempt(load) },
     icon("refresh"),
     el("span", { class: "label" }, "Look again"),
   );
+  head.setActions(reload);
 
   function complain(message) {
     problem.lastChild.textContent = message;
@@ -1593,8 +1674,8 @@ function buildBrowser(isDisposed) {
     return PROFILE_KINDS[profile.kind] ?? profile.name;
   }
 
-  function profileAction(label, name, onclick) {
-    return el("button", { class: "btn ghost sm", type: "button", "aria-label": name, onclick: () => attempt(onclick) }, label);
+  function profileAction(label, name, onclick, solid = false) {
+    return el("button", { class: solid ? "btn sm" : "btn ghost sm", type: "button", "aria-label": name, onclick: () => attempt(onclick) }, label);
   }
 
   function paintProfiles() {
@@ -1605,9 +1686,16 @@ function buildBrowser(isDisposed) {
         const inUse = profile.name === view.profile;
         return el(
           "div",
-          { class: "profile-row", role: "listitem", "data-profile": profile.name },
-          el("span", { class: "grow" }, el("span", null, label), inUse ? el("span", { class: "badge b-info" }, "In use") : null),
-          inUse ? null : profileAction("Use", `Use ${label} for runs`, () => changeProfiles(api.post("/browser/profile", { name: profile.name }), `Runs use ${label} from Chrome's next start.`)),
+          { class: "set-row profile-row", role: "listitem", "data-profile": profile.name },
+          el("span", { class: inUse ? "profile-dot on" : "profile-dot", "aria-hidden": "true" }),
+          el(
+            "span",
+            { class: "grow profile-name" },
+            el("span", { class: "profile-title" }, label),
+            inUse ? el("span", { class: "badge b-accent" }, "In use") : null,
+            profile.kind === "incognito" ? el("span", { class: "profile-note" }, "Keeps nothing once Dot's Chrome closes") : null,
+          ),
+          inUse ? null : profileAction("Use", `Use ${label} for runs`, () => changeProfiles(api.post("/browser/profile", { name: profile.name }), `Runs use ${label} from Chrome's next start.`), true),
           profile.kind === "incognito" ? null : profileAction("Clear", `Clear the sign-ins and site data of ${label}`, () => clearProfile(profile, label)),
           profile.kind !== "added" || inUse ? null : profileAction("Delete", `Delete ${label}`, () => deleteProfile(profile, label)),
         );
@@ -1854,49 +1942,19 @@ function buildBrowser(isDisposed) {
     toast("ok", `Browsing with ${BROWSER_MODES.find((mode) => mode.id === view.mode).label}.`);
   }
 
-  const element = section(
-    "Browser",
-    reload,
-    el(
-      "div",
-      { class: "card-pad stack" },
-      el("h2", { class: "setting-group-name" }, "Where it browses"),
-      enabled.element,
-      el(
-        "div",
-        { class: "setting" },
-        el("div", { class: "row" }, el("span", { class: "grow" }, "Browse with"), modes.element),
-        el(
-          "div",
-          { class: "hint" },
-          "My Chrome opens tabs in the Chrome you already use, signed in as you are. Own Chrome keeps a profile apart from yours.",
-        ),
-      ),
-      signInSetting,
-      profileSetting,
-      el("h2", { class: "setting-group-name" }, "The page it opens"),
-      sizeSetting,
-      appearance.element,
-      zoomSetting,
-      el("h2", { class: "setting-group-name" }, "While a run works"),
-      raise.element,
-      autoComputer.element,
-      screenInput.element,
-      el("h2", { class: "setting-group-name" }, "Developer"),
-      el(
-        "div",
-        { class: "setting" },
-        el("div", { class: "row" }, el("span", { class: "grow" }, "DevTools port of Dot's Chrome"), port),
-        portHint,
-      ),
-      el("h2", { class: "setting-group-name" }, "How Chrome stands"),
-      facts,
-      standing,
-      signingIn,
-      waiting,
-      problem,
-      el("div", { class: "stack tight" }, el("div", { class: "section-label" }, "To let Dot join your Chrome"), steps),
-    ),
+  // What Dot says of the moment (the connection of your Chrome, the sign-in window, the wait for Allow, a refusal) stands
+  // over the sections while it holds.
+  const element = el(
+    "div",
+    { class: "set-sections" },
+    el("div", { class: "set-notices" }, standing, signingIn, waiting, problem),
+    setSection({ title: "Where it browses", body: setCard(enabled.element, browseWith, signInSetting) }),
+    profileSetting,
+    setSection({ title: "The page it opens", body: setCard(sizeSetting, appearance.element, zoomSetting) }),
+    setSection({ title: "While a run works", body: setCard(raise.element, autoComputer.element, screenInput.element) }),
+    setSection({ title: "Developer", body: setCard(portSetting) }),
+    setSection({ title: "How Chrome stands", body: el("div", { class: "set-card card-pad" }, facts) }),
+    setSection({ title: "Let Dot join your Chrome", body: el("div", { class: "set-card card-pad" }, steps) }),
   );
   return { element, load };
 }
@@ -2032,8 +2090,8 @@ export function mountModels(root, ctx) {
 /** Which Chrome the agent browses with. */
 export function mountBrowser(root, ctx) {
   let disposed = false;
-  const browser = buildBrowser(() => disposed);
-  ctx.head.setLead("Which Chrome the agent browses with, and what Chrome has to allow first.");
+  const browser = buildBrowser(() => disposed, ctx.head);
+  ctx.head.setLead("Which Chrome Dot browses with, the pages it opens, and how it behaves while a run works.");
   root.append(browser.element);
   attempt(browser.load);
   return () => {
@@ -2041,21 +2099,87 @@ export function mountBrowser(root, ctx) {
   };
 }
 
-/** The daemon, its emergency stop and its health checks. */
+/** One of the three tiles at the head of System (item 564): what it is, a dot and a word that say how it stands, and a line
+ * under them. `action` is a button at the right of its name. */
+function systemTile(label, action) {
+  const dot = el("span", { class: "set-dot", "aria-hidden": "true" });
+  const word = el("strong", { class: "set-tile-word" });
+  const line = el("div", { class: "set-tile-line" });
+  const element = el(
+    "div",
+    { class: "set-tile", role: "group", "aria-label": label },
+    el("div", { class: "set-tile-head" }, el("span", null, label), action),
+    el("div", { class: "set-tile-value" }, dot, word),
+    line,
+  );
+  return {
+    element,
+    /** `tone` is ok, warn or bad (anything else is grey); the word and the line say how it stands. */
+    set(tone, text, under) {
+      dot.dataset.tone = tone;
+      word.textContent = text;
+      line.textContent = under;
+    },
+  };
+}
+
+/** The daemon, its permissions, its emergency stop and its health checks. */
 export function mountSystem(root, ctx) {
   let disposed = false;
+  const refreshButton = el(
+    "button",
+    { class: "icon-btn set-tile-action", type: "button", title: "Read the daemon again", "aria-label": "Read the daemon again", onclick: () => attempt(refresh) },
+    icon("refresh"),
+  );
+  const tiles = { daemon: systemTile("Daemon", refreshButton), permissions: systemTile("Permissions", null), health: systemTile("Health", null) };
+  tiles.daemon.set("", "Reading", "");
+  tiles.permissions.set("", "Reading", "");
+  tiles.health.set("", "Checking", "");
   const daemon = buildDaemon();
-  const permissions = buildPermissions();
+  const permissions = buildPermissions((lacking) => {
+    if (lacking === null) {
+      tiles.permissions.set("bad", "Could not read", "Read them again below");
+      return;
+    }
+    tiles.permissions.set(lacking.length === 0 ? "ok" : "warn", lacking.length === 0 ? "All granted" : "Missing", lacking.length === 0 ? "Accessibility, input, screen capture" : lacking.join(", "));
+  });
   const failsafe = buildFailsafe();
-  const doctor = buildDoctor(() => disposed);
+  const doctor = buildDoctor(
+    () => disposed,
+    (checks) => {
+      if (checks === null) {
+        tiles.health.set("bad", "Could not run", "Run them again below");
+        return;
+      }
+      const summary = doctorSummary(checks);
+      tiles.health.set(summary.tone, summary.word, summary.line);
+    },
+  );
 
   function paint(snapshot) {
     daemon.paint(snapshot);
     failsafe.paint(snapshot);
+    const status = snapshot.status;
+    if (status === null || snapshot.stream !== "live") {
+      tiles.daemon.set("warn", snapshot.stream === "live" ? "Reading" : "Not answering", "");
+    } else {
+      tiles.daemon.set("ok", "Running", `Up ${duration(Math.max(0, Date.now() / 1000 - status.started_at))}`);
+    }
   }
 
   ctx.head.setLead("The daemon, its permissions, its emergency stop and its health checks.");
-  root.append(daemon.element, permissions.element, failsafe.element, doctor.element, buildAbout());
+  root.append(
+    el(
+      "div",
+      { class: "set-sections" },
+      el("div", { class: "set-tiles" }, tiles.daemon.element, tiles.permissions.element, tiles.health.element),
+      failsafe.element,
+      doctor.element,
+      daemon.element,
+      permissions.element,
+      buildAbout(),
+    ),
+  );
   const stop = onChange(paint);
   paint(getSnapshot());
   attempt(refresh);

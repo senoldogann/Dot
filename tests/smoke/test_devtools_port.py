@@ -238,7 +238,7 @@ async def test_settings_shows_the_port_and_sets_it(own_home: Path, tmp_path: Pat
                     " return f !== null && !f.disabled; }"
                 )
                 assert await field.input_value() == "0"
-                setting: Locator = page.locator(".setting", has=field)
+                setting: Locator = page.locator(".set-row", has=field)
                 assert "does not start while another program holds the port" in (await setting.text_content() or "")
                 assert await setting.evaluate("(row) => row.getBoundingClientRect().right <= window.innerWidth")
                 await field.fill(str(port))

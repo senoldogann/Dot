@@ -151,8 +151,15 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                         re.compile(r"^(all granted|missing: .+)$")
                     )
                     await expect(_fold(page, "Permissions").locator(".fold-body")).not_to_contain_text("null")
-                    for title in ("Daemon", "Emergency stop", "Health checks", "About this Dot"):
+                    for title in ("Daemon", "Permissions", "About this Dot"):
                         await expect(_fold(page, title)).to_have_count(1)
+                    # The emergency stop and the health checks are no folds: a card, and a section of grouped rows
+                    # (item 564), with three tiles over them that say how the daemon, the permissions and the checks
+                    # stand.
+                    await expect(page.get_by_role("region", name="Emergency stop")).to_contain_text("Stop everything")
+                    await expect(page.get_by_role("heading", name="Health checks")).to_be_visible()
+                    await expect(page.get_by_role("group", name="Daemon")).to_contain_text("Running")
+                    await expect(page.get_by_role("group", name="Health")).to_contain_text(re.compile(r"\d+ of \d+ ok"))
                     await _fold(page, "Daemon").locator(".fold-toggle").click()
                     await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "false")
                     await page.reload()
@@ -162,8 +169,7 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     # On a phone a folded card reads as one row: its title and its facts stay on the same line, beside
                     # the actions, rather than the facts dropping onto a second line under the title (item 549).
                     if width < 960:
-                        await expect(_fold(page, "Health checks").locator(".fold-summary .badge")).to_have_count(1)
-                        for title in ("Daemon", "Permissions", "Health checks"):
+                        for title in ("Daemon", "Permissions"):
                             card = _fold(page, title)
                             title_box = await card.locator(".fold-title").bounding_box()
                             summary_box = await card.locator(".fold-summary").bounding_box()
@@ -218,5 +224,17 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     await expect(page.locator(".tool-row")).to_have_count(5)
                     await page.screenshot(path=tmp_path / f"licences-{width}-{scheme}.png", full_page=True)
                     await page.close()
+                # Checks that cannot be read say so in their tiles too, not "Checking" or "Reading" for ever (item 564).
+                failing: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await failing.goto(ui_url(host, port, TOKEN))
+                for refused_path in ("**/api/doctor", "**/api/desktop/permissions"):
+                    await failing.route(
+                        refused_path, lambda route: route.fulfill(status=500, json={"detail": "refused by the test"})
+                    )
+                await failing.goto(f"{address}/#/settings/system")
+                await expect(failing.get_by_role("group", name="Health")).to_contain_text("Could not run")
+                await expect(failing.get_by_role("group", name="Permissions")).to_contain_text("Could not read")
+                await expect(failing.get_by_role("heading", name="Health checks")).to_be_visible()
+                await failing.close()
             finally:
                 await browser.close()

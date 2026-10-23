@@ -86,9 +86,10 @@
 /* A section: its name over its card, and a line under the name that says what it is for. */
 .set-section-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px 16px;
   margin-bottom: 12px;
 }
 
@@ -1074,32 +1075,314 @@
   max-width: 96px;
 }
 
-/* The profiles of Dot's own Chrome (item 355): a row each, its name with In use, and what can be done with it. */
-.profile-list {
-  display: grid;
-  gap: var(--space-1);
-  margin-top: var(--space-2);
-}
-
+/* The profiles of Dot's own Chrome (items 355 and 564): a row each in one card, a dot (filled in the accent for the one in
+   use), its name with In use, and what can be done with it at the right. */
 .profile-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  gap: var(--space-2) var(--space-3);
+  padding-block: 12px;
 }
 
-.profile-row > .grow {
+.profile-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--control);
+  border-radius: var(--radius-pill);
+}
+
+.profile-dot.on {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.profile-name {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1) var(--space-3);
   min-width: 0;
 }
 
+.profile-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-label);
+}
+
+.profile-note {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 .profile-add {
-  margin-top: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* A link in a section's head, in the accent (Add profile): no box, the plus before its words. */
+.set-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--accent-strong);
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
+.set-link:hover {
+  background: var(--accent-weak);
+}
+
+/* What Dot says of the moment stands over the sections while it holds; with nothing to say it takes no room. */
+.set-notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.set-notices:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+/* A badge in the accent: the profile in use. */
+.badge.b-accent {
+  background: var(--accent-weak);
+  color: var(--accent-strong);
+}
+
+/* ---------- System (item 564) ---------- */
+
+/* Three tiles at the head of the page: what each is, a dot and a word that say how it stands, and a line under them. */
+.set-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.set-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.set-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.set-tile-action {
+  width: 28px;
+  height: 28px;
+  margin: -4px -8px -4px 0;
+}
+
+.set-tile-value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xl);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-title);
+}
+
+.set-tile-line {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.set-tile-line:empty {
+  display: none;
+}
+
+.set-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--faint);
+}
+
+.set-dot[data-tone="ok"] {
+  background: var(--ok);
+}
+
+.set-dot[data-tone="warn"] {
+  background: var(--warn);
+}
+
+.set-dot[data-tone="bad"] {
+  background: var(--bad);
+}
+
+/* The emergency stop: its mark in the red of what it does, its state beside its name, the button at the right. */
+.failsafe {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.failsafe[data-engaged="true"] {
+  border-color: var(--bad-border);
+  background: var(--bad-weak);
+}
+
+.failsafe-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--bad-weak);
+  color: var(--bad);
+}
+
+.failsafe-mark .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.failsafe-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.failsafe-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.failsafe-actions {
+  flex: none;
+}
+
+/* The health checks: what needs a look first, then the checks that passed in their groups, each group a fold with its
+   state at the right. */
+.set-filter:empty {
+  display: none;
+}
+
+.health-group-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-label);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.health-group-title.warn {
+  color: var(--warn);
+}
+
+.health-looks > .health-group-title {
+  padding: var(--space-3) var(--space-5) var(--space-1);
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-block: 8px;
+}
+
+.health-name {
+  flex: 0 0 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.health-detail {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.health-passed .health-detail {
+  font-family: var(--mono);
+}
+
+.health-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--ok);
+  font-size: var(--text-sm);
+}
+
+.health .fold-group > .fold-toggle {
+  padding: 12px 20px;
+}
+
+.health .fold-group > .fold-body {
+  padding: 0;
+}
+
+.health .fold-count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.fold-count.ok {
+  color: var(--ok);
+}
+
+.fold-count.warn {
+  color: var(--warn);
+}
+
+@media (max-width: 720px) {
+  .set-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .failsafe {
+    flex-wrap: wrap;
+  }
+
+  .failsafe-text {
+    flex-basis: 160px;
+  }
+
+  .health-row {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .health-name {
+    flex: 1 1 140px;
+  }
+
+  .health-detail {
+    flex-basis: 100%;
+    order: 3;
+  }
 }
 
 /* The controls page (#/controls): the colour swatches and the rows of controls. A token's swatch and name are a
@@ -1702,8 +1985,15 @@
    329). */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   .provider-docs,
-  .rule-example {
+  .rule-example,
+  .set-link {
     min-height: 44px;
+  }
+
+  .set-tile-action {
+    width: 36px;
+    height: 36px;
+    margin: -8px -12px -8px 0;
   }
 }
 

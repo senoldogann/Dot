@@ -512,10 +512,14 @@ what Dot improves around its model, in plain words: what Dot follows now, a form
 version with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
 harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pairing code for its home-screen app; see
 [Dot on the phone](phone.md#dot-on-the-phone)) and
-**System** (the daemon, its facts in four groups each named over its rows of a label and a value, item 378: this Dot,
-how it acts, what it works with and its models; the emergency stop and the health checks in a fold, closed, with the
-number of failures on its line, and the ways to **Diagnostics** and **Open source licences**, pages of their own). Which
-folds are open is kept in the browser. In a Mac's window the sidebar is the settings' nav while they are open (item 562):
+**System** (item 564: three tiles say how the daemon, the permissions and the health checks stand; the **Emergency
+stop** is a card with **Stop everything**, or **Release** once it is engaged; the **Health checks** are what needs a
+look first, then the checks that passed in their groups (setup, desktop control, providers and models, browser, memory,
+tools and plugins), with a filter and **Run again**; below them the daemon's facts in four groups each named over its
+rows of a label and a value (item 378: this Dot, how it acts, what it works with and its models), the permissions and
+the ways to **Diagnostics** and **Open source licences**, pages of their own). Which folds are open is kept in the
+browser.
+In a Mac's window the sidebar is the settings' nav while they are open (item 562):
 **Back to chats** (to the chat last open), the tabs in four groups (Interface, Models, How Dot works, This Mac), each
 with what it holds at its right (the main model, how many providers have a key, how many notes Dot keeps, a green dot
 when a phone reaches Dot), and at the foot whether the daemon runs and for how long (the emergency stop, when it is

@@ -786,9 +786,7 @@ async def test_the_settings_card_follows_chrome_as_it_quits_and_comes_back(
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, service_workers="block")
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             await page.goto(f"{address}/#/settings/browser")
-            card: Locator = page.locator("section.card").filter(
-                has=page.locator(".card-head .grow", has_text=re.compile(r"^Browser$"))
-            )
+            card: Locator = page.locator(".settings-pane")
             connection: Locator = (
                 card.locator("dl div")
                 .filter(has=page.locator("dt", has_text=re.compile(r"^Agent connection$")))
@@ -872,9 +870,7 @@ async def test_the_settings_card_says_what_a_switch_waits_for_and_how_chrome_sta
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/settings/browser")
-                card: Locator = page.locator("section.card").filter(
-                    has=page.locator(".card-head .grow", has_text=re.compile(r"^Browser$"))
-                )
+                card: Locator = page.locator(".settings-pane")
                 chrome_fact: Locator = (
                     card.locator("dl div")
                     .filter(has=page.locator("dt", has_text=re.compile(r"^Chrome$")))

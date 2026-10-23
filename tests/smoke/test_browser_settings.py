@@ -285,9 +285,17 @@ async def test_settings_browser_sets_the_browser_rows_and_keeps_them(tmp_path: P
             for width, scheme in _SHOTS:
                 page: Page = await _page(browser, address, width, scheme)
                 await page.goto(f"{address}/#/settings/browser")
-                # The rows stand in five groups, each named over its settings (item 378).
-                await expect(page.locator(".setting-group-name")).to_have_text(
-                    ["Where it browses", "The page it opens", "While a run works", "Developer", "How Chrome stands"]
+                # The rows stand in sections, each named over its card (items 378 and 564).
+                await expect(page.locator(".set-section-title")).to_have_text(
+                    [
+                        "Where it browses",
+                        "Profiles",
+                        "The page it opens",
+                        "While a run works",
+                        "Developer",
+                        "How Chrome stands",
+                        "Let Dot join your Chrome",
+                    ]
                 )
                 allowed: Locator = page.get_by_role("switch", name="Runs may use the browser")
                 await expect(allowed).to_have_attribute("aria-checked", "true")
@@ -315,7 +323,7 @@ async def test_settings_browser_sets_the_browser_rows_and_keeps_them(tmp_path: P
                 await expect(shown).to_have_attribute("aria-checked", "true")
                 # Each row stays inside the window, on a phone too.
                 for row in (allowed, size, zoom, shown):
-                    assert await page.locator(".setting", has=row).evaluate(
+                    assert await page.locator(".set-row", has=row).evaluate(
                         "(row) => row.getBoundingClientRect().right <= window.innerWidth"
                     )
                 await page.screenshot(path=tmp_path / f"settings-browser-{width}-{scheme}.png", full_page=True)
