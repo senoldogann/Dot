@@ -212,9 +212,9 @@ emergency stop or `campaign_max_sessions` stops it.
   `[judge] draft_check_threshold` (0.5, provisional until it is set on a labeled sample of your own feed). None of them
   posts; the model keeps the decision.
 
-**The browser of a campaign.** A campaign works in the Chrome you have open, signed in as you are (`attach`), unless you
-start it with `--browser own` (or `browser` in the API, which goes with `standing` only), and `[agent] campaign_browser`
-sets the default; runs you start by hand keep `[browser] mode`. A campaign that asks for your Chrome is refused at its
+**The browser of a campaign.** A campaign works in the Chrome `[browser] mode` names, as every other run does, unless
+you start it with `--browser own` or `--browser attach` (or `browser` in the API, which goes with `standing` only),
+which pins that campaign to that Chrome. A campaign that asks for your Chrome is refused at its
 start while that Chrome is closed or does not allow the connection (`dotx browser attach` sets it up), so its sessions
 do not fail one after the other. The brief of every session says which Chrome it works in, and so do
 `dotx campaign show` and the campaign's page.

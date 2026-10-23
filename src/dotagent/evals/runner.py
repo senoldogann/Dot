@@ -63,10 +63,11 @@ def eval_config(config: AppConfig) -> AppConfig:
     servers, skills and plugins of the user, the Mac desktop, the embeddings of the memory, the lessons and the
     playbooks, which would carry what one attempt learnt into the next, the user's helper and standby models, which
     would answer for the model under measure, and the user's limits of a run: a task's own time and token limits cut
-    its runs); the browser is headless, since nobody watches an attempt."""
+    its runs); the browser is Dot's own Chrome, whatever the owner's mode, so that a measurement never touches the
+    owner's (item 579: a campaign follows the mode), and headless, since nobody watches an attempt."""
     return config.model_copy(
         update={
-            "browser": config.browser.model_copy(update={"headless": True}),
+            "browser": config.browser.model_copy(update={"headless": True, "mode": "own"}),
             "models": config.models.model_copy(update={"helpers": [], "standby": []}),
             "agent": config.agent.model_copy(
                 update={
@@ -74,7 +75,6 @@ def eval_config(config: AppConfig) -> AppConfig:
                     "playbooks": False,
                     "run_max_minutes": 0.0,
                     "run_max_tokens": 0,
-                    "campaign_browser": "own",
                 }
             ),
             "mcp": [],

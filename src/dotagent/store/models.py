@@ -510,8 +510,8 @@ class CampaignRecord(FrozenModel):
     ``once`` and ``approvals`` are the settings of the run that opened it, which every session keeps. ``files`` are the
     paths of the files the owner attached to its goal. ``evidence`` is what the accepted claim of the outcome said,
     empty while the campaign is not achieved. ``browser`` is the Chrome its sessions work in: Dot's own (``own``) or the
-    one the owner has open (``attach``); ``None`` for a campaign from before the choice, whose sessions use the
-    daemon's."""
+    one the owner has open (``attach``); ``None`` for a campaign started without one (item 579) or from before the
+    choice, whose sessions use the daemon's of the moment."""
 
     id: str
     title: str

@@ -43,7 +43,7 @@ can be resumed too.
 - `--standing` keeps going until done: it starts a campaign on the goal with this run as its first session, and the
   daemon runs the sessions after it until the outcome is verified (see
   [Agents and campaigns](agents-and-campaigns.md)); `--browser own|attach` (with `--standing`) picks the Chrome it works
-  in, Dot's own or the one you have open, signed in as you are (default: `[agent] campaign_browser`) (`run` only)
+  in, Dot's own or the one you have open, signed in as you are (default: `[browser] mode`) (`run` only)
 - `--thread ID` continues an earlier conversation; the line printed at the end of a run names its thread
 - `--no-input` never prompts: every approval that would wait for you is denied and questions go unanswered. The same
   holds when standard input is not a terminal

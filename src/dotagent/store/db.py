@@ -4095,10 +4095,10 @@ class Store:
         once: OneMessage | None,
         approvals: ApprovalMode,
         files: Sequence[str],
-        browser: BrowserMode,
+        browser: BrowserMode | None,
     ) -> CampaignRecord:
         """Store a new campaign: active, without targets, with no session planned yet, on the Chrome ``browser``
-        names."""
+        names (``None``: the daemon's browser mode)."""
         now: float = time.time()
         record: CampaignRecord = CampaignRecord(
             id=new_id("cmp"),

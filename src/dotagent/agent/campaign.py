@@ -266,8 +266,8 @@ def _change_of_route(brief: Brief) -> str:
 
 
 def campaign_browser(daemon_mode: BrowserMode, campaign: CampaignRecord) -> BrowserMode:
-    """The Chrome the campaign's sessions work in: its own choice, or the daemon's (``daemon_mode``) for a campaign
-    from before the choice."""
+    """The Chrome the campaign's sessions work in: its own choice, or the daemon's (``daemon_mode``, read at each
+    session) for a campaign started without one (item 579) or from before the choice."""
     return daemon_mode if campaign.browser is None else campaign.browser
 
 

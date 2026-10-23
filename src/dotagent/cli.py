@@ -145,7 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=list(get_args(BrowserMode.__value__)),
         help=(
             "with --standing: the Chrome the campaign works in, attach (the one you have open, signed in as you are) "
-            "or own (Dot's own); the default is [agent] campaign_browser"
+            "or own (Dot's own); the default is [browser] mode"
         ),
     )
     run.add_argument("--thread", default=None, help="continue an existing conversation thread")

@@ -285,7 +285,7 @@ class StartRunRequest(FrozenModel):
     approvals: ApprovalMode | None = None
     goal_mode: bool | None = None
     standing: bool = False
-    # The Chrome a campaign works in; None takes [agent] campaign_browser. Only with standing.
+    # The Chrome a campaign works in; None follows [browser] mode. Only with standing.
     browser: BrowserMode | None = None
     # The agent the run belongs to (item 86); None for Dot. Not with standing.
     agent_id: str | None = None
