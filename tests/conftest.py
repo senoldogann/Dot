@@ -13,7 +13,10 @@ need them are marked, and find them as they run (``tests/smoke/test_hosted_servi
 Only the owner's values go: a test that sets a key of its own under the name of a provider's (a stand-in of the
 provider, a key that is no key) keeps it. A child process that a test starts has the environment of this one, and asks
 the Keychain for a key it needs by its own: a test that starts one gives it a key variable no source has, or a key of
-its own."""
+its own.
+
+The MCP server that comes with Dot is out of every test that did not ask for it (item 583), as
+:func:`_no_builtin_servers` says."""
 
 import os
 from collections.abc import Iterator
@@ -23,9 +26,12 @@ import pytest
 
 from dotagent import secrets
 from dotagent.config import load_default_config, providers_by_key
+from dotagent.mcp import builtin
 
 # The marks of the tests that send requests with the owner's keys or reach the world.
 _NEEDS_KEYS: tuple[str, ...] = ("hosted", "internet", "live")
+# The name the package of the web-research server is found under, read before any fixture changes it (item 583).
+_REAL_WEB_RESEARCH_PACKAGE: str = builtin.WEB_RESEARCH_PACKAGE
 
 
 def _key_variables() -> tuple[str, ...]:
@@ -73,3 +79,22 @@ def _offline_test(request: pytest.FixtureRequest, _offline_run: bool) -> Iterato
         return
     with _without_the_owners_keys():
         yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _no_builtin_servers() -> Iterator[None]:
+    """The web-research server that comes with Dot (item 583) is not started by a test that did not ask for it: the
+    package is installed where the tests run, so every runtime a test builds, and the suite builds hundreds, would
+    start a Python process of its own, and its tools would be among those a test counts. Its package is looked for
+    under a name nothing has, for the whole run; a test of the server asks for the real name back
+    (:func:`web_research_comes`). Only this process is told: a ``dotx`` or a daemon a test starts finds the package, so
+    its config says ``[builtin_mcp] web_research = false`` where it counts servers."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(builtin, "WEB_RESEARCH_PACKAGE", "dot_tests_have_no_web_research_package")
+        yield
+
+
+@pytest.fixture
+def web_research_comes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """For a test of the server that comes with Dot: its package is found where it is installed, as it is for Dot."""
+    monkeypatch.setattr(builtin, "WEB_RESEARCH_PACKAGE", _REAL_WEB_RESEARCH_PACKAGE)

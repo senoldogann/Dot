@@ -22,6 +22,16 @@
 # Customize › Connectors are kept in connected-servers.json in Dot's home, not here.
 mcp = []
 
+[builtin_mcp]
+# The MCP servers that come with Dot (item 583), each started with the servers above unless its switch here is false;
+# Customize › Connectors has the same switches and writes them here. The table is not [mcp], which TOML cannot have
+# beside the [[mcp]] tables. A server of the same name from any other place (a [[mcp]] table, a plugin, another agent,
+# Customize › Connectors) replaces the built-in.
+# web_research: the server web-research (the package dotagent-web-research), whose tools mcp__web-research__web_search,
+# web_scrape, web_map, web_extract and web_crawl_* search the web (DuckDuckGo, Yahoo, and Google when those refuse),
+# read the pages a run asks for and crawl in the background; its crawl jobs are kept in <home>/web-research.
+web_research = true
+
 [server]
 host = "127.0.0.1"
 port = 8765
@@ -644,7 +654,7 @@ screenshot_quality = 60
 max_batch_steps = 5
 read_text_chars = 8000
 # Empty allowed_hosts = every site; a host entry also matches its subdomains. Both lists also apply to web_fetch and
-# web_search.
+# web_search, and to the addresses a call of the web-research server's tools holds (item 583).
 allowed_hosts = []
 blocked_hosts = ["169.254.169.254", "metadata.google.internal"]
 decline_cookie_banners = true

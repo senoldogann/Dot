@@ -25,6 +25,7 @@ it). Two environment variables of the process move things: `DOT_HOME` (the home 
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |
 | `plugins-data/`                                  | each plugin's own files, its `${CLAUDE_PLUGIN_DATA}` (`plugins-data/<name>`) |
 | `runtime/`                                       | what the desktop app installs: Dot's package, the Python it runs on, uv's cache, the links to the tools the app carries and the marker of the install (item 575; a run's commands cannot change it) |
+| `web-research/`                                  | the crawl jobs of the web-research server that comes with Dot (a run's commands cannot change them) |
 | `playbooks/`                                     | the skills Dot learned (`learned-<kind>`) and those you taught it (`taught-<kind>`), the retired ones under `.retired` |
 | `evals/`                                         | the reports of eval runs, one file each                              |
 | `added-servers.json`                             | the MCP servers you added from other agents, by name and fingerprint |
@@ -44,6 +45,13 @@ it). Two environment variables of the process move things: `DOT_HOME` (the home 
 | `run-owners/`                                    | one lock per process that drives runs (the daemon, `dotx run`)       |
 | `backups/`                                       | the copies of the database, unless `[store] backup_dir` names a folder |
 | `backups-partial/`                               | the uncompressed file of a copy under way                            |
+
+**The MCP server that comes with Dot** (item 583). `[builtin_mcp] web_research` (`true`) says whether the server
+`web-research` is started with Dot's other MCP servers. It starts when its package, `dotagent-web-research`, can be
+imported (every install has it) and no `[[mcp]]` table, plugin or added server has the name `web-research`, which
+replaces it. The setting has a table of its own because `[mcp]` cannot hold a key beside the `[[mcp]]` tables, which
+TOML reads as one array of tables. Customize › Connectors has the same switch and writes it here, `dotx mcp list`
+marks the server `built-in`, and an eval run leaves it out. See [MCP servers](extending.md#mcp-servers).
 
 Deleting a chat deletes the screenshot files that only it named, and the daemon thins its copies of the database
 (below). Nothing else is removed by itself: old runs and their

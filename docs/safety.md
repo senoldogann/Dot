@@ -54,16 +54,18 @@ run needs, sent where the configuration points:
   the text may hold a mail's sender and subject, or what a sender wrote) are sent into your conversation with yourself
   through Messages, to Apple's iMessage servers and on to your devices, as any iMessage is. What you send there is read
   from Messages' database on this Mac (see [Channels](channels.md), item 572).
-- **To the browser's makers, if you use the microphone: your voice, from your browser; and, when the Mac has no voice of
-  the language, the text read aloud.** The composer's microphone and the reading of answers aloud (item 574) are the
-  browser's own speech recognition and speech synthesis: Safari and Chrome may send what you say to Apple's or Google's
-  servers to recognize it (the browser's own settings say whether they do). In the desktop app the recognition is
-  WebKit's, macOS's own, which may send what you say to Apple as Safari's does, once macOS lets the app hear (item 593).
-  An answer is read aloud with a voice the browser keeps on this Mac when it has one for the language (`localService`:
-  Dot picks it, and macOS's own voices send nothing). A network voice, such as Chrome's "Google …" voices, sends the
-  text it reads to its servers; the browser speaks with one only when the Mac has no voice of that language, and
-  Settings › General › Voice says so. Dot sends nothing itself: it only gets the words the browser hands back, into the
-  box, and sends nothing until you press send.
+- **To the browser's makers, if you use the microphone: your voice, from your browser or Dot.app (Apple's); and, when
+  the Mac has no voice of the language, the text read aloud.** The composer's microphone and the reading of answers
+  aloud (item 574) are the browser's own speech recognition and speech synthesis: Safari and Chrome may send what you
+  say to Apple's or Google's servers to recognize it (the browser's own settings say whether they do). In the desktop
+  app the recognition is WebKit's, macOS's own, which may send what you say to Apple as Safari's does, once macOS lets
+  the app hear (item 594: the app asks macOS for the microphone and speech recognition). An answer is read aloud with a
+  voice the browser keeps on this Mac when it has one for the language (`localService`: Dot picks it, and macOS's own
+  voices send nothing). A network voice, such as Chrome's "Google …" voices, sends the text it reads to its servers; the
+  browser speaks with one only when the Mac has no voice of that language, and Settings › General › Voice says so. Dot
+  sends nothing itself: it only gets the words the browser hands back, into the box, and sends nothing until you press
+  send. In the desktop app the daemon's page, given the microphone, could record sound with it too (`getUserMedia`), as
+  a site given a browser's microphone can; Dot's page takes only the words (item 594).
 - **To the model, for the morning brief: Dot's record of itself.** The brief's run (item 570, see
   [Dot comes to you](proactive.md)) is given what waits for you, the runs that failed since the last brief, the
   campaigns at work and the schedules of the day, as lines cut to 160 characters with their secrets masked, and what
@@ -76,8 +78,27 @@ run needs, sent where the configuration points:
   watcher without words, ask no model. A mail that cannot be judged is told to you, so it is not dropped.
 - **To GitHub, for a GitHub watcher: the request for your notifications.** `api.github.com/notifications` with your
   personal access token, every few minutes, as a conditional request; it carries nothing else of yours.
-- **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; none is
-  set up by default (see [MCP servers](extending.md#mcp-servers)).
+- **To the search engines and the sites of web-research, the MCP server that comes with Dot: the queries and the pages
+  asked for.** Its `web_search` sends the query to DuckDuckGo (its HTML page, then its lite page) and Yahoo, and to
+  Google only when those refuse, by a plain request and then through a headless Chrome of its own with a temporary
+  profile, never your Chrome profile. Its `web_scrape`, `web_map`, `web_extract` and crawls request the pages they
+  are asked for, with the `robots.txt` and the sitemaps of their sites (a headless Chrome of its own reads a page
+  that needs JavaScript), and with `archive: true` the copy of a page that the Internet Archive
+  (`web.archive.org`) holds. It refuses the addresses of this Mac, of private networks and of cloud metadata
+  services, needs no key and sends nothing to the people who make it; it keeps its crawl jobs in
+  `<home>/web-research`. `[builtin_mcp] web_research = false` leaves it out (see
+  [MCP servers](extending.md#mcp-servers)). Its calls are judged by the rules of Dot's own tools that do the same,
+  in the same functions: the words of a search (the query, and the sites the server makes words of it) as the query
+  of `web_search` is, so that a key in them earns the flag `exfiltration`, which is refused in every mode but yolo,
+  and more than 400 characters are refused; the addresses as the address of `web_fetch` and `web_crawl` is, so that
+  `[browser] allowed_hosts` and `blocked_hosts` bind them and a long one, or one with a key in it, earns the same
+  flag; and a search that reads the pages it found is refused while you have set a list, since those addresses are
+  the server's pick. These rules do not reach what they do not reach in Dot's own tools (a secret that is not in the
+  shape of a key, a key cut in pieces), nor a redirect the server follows to another host, the links a crawl
+  follows on the site it starts on, the search engines a search asks, or the Internet Archive that `archive: true`
+  asks; a crawl goes on after its run has stopped, up to its page limit.
+- **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; the one
+  set up by default is web-research, above (see [MCP servers](extending.md#mcp-servers)).
 - **To your Google and Microsoft accounts, once you sign one in: what the mail and calendar tools ask.** `mail_search`,
   `mail_read` and `calendar_events` ask Gmail and Google Calendar (`googleapis.com`) or Microsoft Graph
   (`graph.microsoft.com`) for your messages and events, with the words of a search (see
@@ -516,7 +537,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   agree: its own code (the folder its package is imported from, the Python environment it runs in and the Python under
   that, the file of the launchd job that starts the daemon, and the program that job starts it with: `Dot.app` in
   Dot's home and the folder it is built in, item 561, and the `runtime` folder of Dot's home that the desktop app
-  installs Dot in, item 575), its plugins and their own files, its skills (with the
+  installs Dot in, item 575), its plugins and their own files, the data folder of the web-research server that comes
+  with Dot (`web-research`, item 583), its skills (with the
   `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's records
   of the MCP servers you added from other agents and on Customize › Connectors, the home of the OpenCode server it starts,
   the playbooks it learned and the file of its emergency stop. The file tools ask you before they write there

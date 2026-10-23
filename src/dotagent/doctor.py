@@ -58,6 +58,7 @@ from dotagent.llm.openrouter import KeyStatus, OpenRouterProvider, listed_id
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import ChatProvider, ModelInfo
 from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
+from dotagent.mcp.builtin import builtin_servers, switch_of
 from dotagent.mcp.launch import referenced_secrets
 from dotagent.memory.embedder import OpenAIEmbedder, build_openai_embedder
 from dotagent.plugins.catalog import load_plugins
@@ -651,12 +652,15 @@ def _find_command(command: str, login_path: str | None) -> str | None:
     return shutil.which(command, path=login_path)
 
 
-def _mcp_row(config: McpServerConfig, found: str | None, missing_secrets: list[str]) -> CheckResult:
+def _mcp_row(
+    config: McpServerConfig, found: str | None, missing_secrets: list[str], built_in: bool = False
+) -> CheckResult:
     """The row of one MCP server from what was found on this Mac. A server that cannot start never stops Dot, which
-    starts without its tools."""
+    starts without its tools. A server that comes with Dot (``built_in``, item 583) is switched by its own setting."""
     name: str = f"mcp {config.name}"
+    off: str = f"[builtin_mcp] {switch_of(config.name)} = false" if built_in else "[[mcp]] enabled = false"
     if not config.enabled:
-        return _result(name, True, False, "switched off ([[mcp]] enabled = false)")
+        return _result(name, True, False, f"switched off ({off})")
     problems: list[str] = []
     if config.command is not None and found is None:
         problems.append(f"{config.command} is not installed or not on the login shell's PATH")
@@ -667,27 +671,32 @@ def _mcp_row(config: McpServerConfig, found: str | None, missing_secrets: list[s
             name,
             False,
             False,
-            f"{'; '.join(problems)}. Dot starts without its tools while it fails; enabled = false stops trying it",
+            f"{'; '.join(problems)}. Dot starts without its tools while it fails; {off} stops trying it",
         )
     where: str = f"{config.url} over {config.transport_kind()}" if found is None else found
-    return _result(name, True, False, f"{where}; connect for real with: dotx mcp list")
+    return _result(
+        name, True, False, f"{'built in, ' if built_in else ''}{where}; connect for real with: dotx mcp list"
+    )
 
 
-async def _mcp_server_row(config: McpServerConfig, login_path: str | None) -> CheckResult:
+async def _mcp_server_row(config: McpServerConfig, login_path: str | None, built_in: bool) -> CheckResult:
     if not config.enabled:
-        return _mcp_row(config, None, [])
+        return _mcp_row(config, None, [], built_in)
     found: str | None = None
     if config.command is not None:
         found = await asyncio.to_thread(_find_command, config.command, login_path)
     names: list[str] = referenced_secrets(config)
     present: list[bool] = list(await asyncio.gather(*(asyncio.to_thread(_has_secret, name) for name in names)))
     missing: list[str] = [name for name, there in zip(names, present, strict=True) if not there]
-    return _mcp_row(config, found, missing)
+    return _mcp_row(config, found, missing, built_in)
 
 
-async def mcp_checks(servers: list[McpServerConfig], login_env_timeout_s: float) -> list[CheckResult]:
-    """One row per configured MCP server: its command is installed (a server reached at a URL has none) and its
-    secrets are set. Nothing is started or contacted."""
+async def mcp_checks(
+    servers: list[McpServerConfig], login_env_timeout_s: float, built_in: frozenset[str] = frozenset()
+) -> list[CheckResult]:
+    """One row per configured MCP server, and per server that comes with Dot (``built_in``, the names of those among
+    ``servers``): its command is installed (a server reached at a URL has none) and its secrets are set. Nothing is
+    started or contacted."""
     if not servers:
         return [_result("mcp", True, False, f"no servers configured (add [[mcp]] tables to {config_path()})")]
     login_path: str | None = None
@@ -701,7 +710,9 @@ async def mcp_checks(servers: list[McpServerConfig], login_env_timeout_s: float)
                 )
             ]
         login_path = login_env.get("PATH")
-    return list(await asyncio.gather(*(_mcp_server_row(server, login_path) for server in servers)))
+    return list(
+        await asyncio.gather(*(_mcp_server_row(server, login_path, server.name in built_in) for server in servers))
+    )
 
 
 def _left_out(problems: Sequence[PluginProblem] | Sequence[SkillProblem]) -> str:
@@ -774,9 +785,12 @@ def _backup_row(config: AppConfig) -> CheckResult:
 
 async def _machine_checks(config: AppConfig) -> list[CheckResult]:
     """What this Mac provides: the home directory, tools, desktop support, the browser profile, the plugins and skills,
-    the Office applications and OneDrive folders, and the MCP servers (the configured ones and those of the plugins)."""
+    the Office applications and OneDrive folders, and the MCP servers (the configured ones, those of the plugins and
+    those that come with Dot)."""
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
     skills: SkillCatalog = await asyncio.to_thread(load_skills, config.skills, plugins.plugins, playbook_root(config))
+    configured: list[McpServerConfig] = [*config.mcp, *plugins.servers()]
+    bundled: tuple[McpServerConfig, ...] = builtin_servers(config, frozenset(server.name for server in configured))
     return [
         *await asyncio.to_thread(_local_checks),
         *_check_desktop(config),
@@ -787,7 +801,9 @@ async def _machine_checks(config: AppConfig) -> list[CheckResult]:
         _plugins_row(plugins),
         _skills_row(skills),
         *await asyncio.to_thread(_office_checks),
-        *await mcp_checks([*config.mcp, *plugins.servers()], config.shell.login_env_timeout_s),
+        *await mcp_checks(
+            [*configured, *bundled], config.shell.login_env_timeout_s, frozenset(server.name for server in bundled)
+        ),
     ]
 
 

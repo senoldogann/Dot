@@ -12,6 +12,7 @@ import pytest
 
 from dotagent.config import load_default_config
 from dotagent.core.errors import ConfigError
+from dotagent.core.paths import web_research_dir
 from dotagent.dot_app import app_path, app_program, build_path, runtime_path
 from dotagent.policy.paths import expand_protected
 from dotagent.policy.sandbox import (
@@ -247,6 +248,53 @@ def test_macos_keeps_a_command_from_changing_the_program_launchd_starts_the_daem
     assert program.read_text(encoding="utf-8") == "#!/bin/sh\nexit 0\n"
     read: subprocess.CompletedProcess[str] = run(f"cat {program}; echo note > {home}/note.txt")
     assert (read.returncode, read.stdout) == (0, "#!/bin/sh\nexit 0\n")
+    assert (home / "note.txt").read_text(encoding="utf-8") == "note\n"
+
+
+def test_macos_keeps_a_command_from_changing_what_the_web_research_server_reads_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 583: the web-research server that comes with Dot starts with the daemon, outside the sandbox, and reads its
+    crawl jobs back from its data folder: a database, a link or a file a command put there would be opened by it with
+    the owner's rights. The profile of a run's commands, built from what Dot loads and runs as the runtime builds it,
+    refuses each, whether the folder is there or not yet, and lets the command read it and write elsewhere in Dot's
+    home."""
+    home: Path = Path(os.path.realpath(tmp_path)) / "home"
+    home.mkdir()
+    monkeypatch.setenv("DOT_HOME", str(home))
+    words: tuple[str, ...] = build_sandbox(
+        (), (), expand_protected([], _dot_paths(load_default_config())), home / "agents"
+    ).commands
+    folder: Path = web_research_dir()
+    assert folder == home / "web-research"
+
+    def run(line: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([*words, "/bin/zsh", "-c", line], capture_output=True, text=True, check=False)
+
+    # Not there yet: a command can make neither the folder nor anything in it.
+    refused: list[subprocess.CompletedProcess[str]] = [
+        run(f"mkdir {folder}"),
+        run(f"mkdir -p {folder} && echo planted > {folder}/crawl-jobs.sqlite3"),
+    ]
+    assert [(done.returncode != 0, "not permitted" in done.stderr) for done in refused] == [(True, True)] * 2
+    assert not folder.exists()
+    # Made as the server makes it, outside the sandbox: it is read, and nothing in it is changed, made or moved.
+    folder.mkdir()
+    jobs: Path = folder / "crawl-jobs.sqlite3"
+    jobs.write_text("jobs", encoding="utf-8")
+    refused = [
+        run(f"echo planted > {jobs}"),
+        run(f"printf planted >> {jobs}"),
+        run(f"echo planted > {folder}/other.sqlite3"),
+        run(f"ln -s /tmp {folder}/link"),
+        run(f"mv {jobs} {jobs}.moved"),
+        run(f"mv {folder} {folder}.moved"),
+    ]
+    assert [(done.returncode != 0, "not permitted" in done.stderr) for done in refused] == [(True, True)] * 6
+    assert jobs.read_text(encoding="utf-8") == "jobs"
+    assert sorted(path.name for path in folder.iterdir()) == ["crawl-jobs.sqlite3"]
+    read: subprocess.CompletedProcess[str] = run(f"cat {jobs}; echo note > {home}/note.txt")
+    assert (read.returncode, read.stdout) == (0, "jobs")
     assert (home / "note.txt").read_text(encoding="utf-8") == "note\n"
 
 

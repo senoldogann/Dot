@@ -24,6 +24,7 @@ classifiers = [
 dependencies = [
     "aiosqlite>=0.22.1",
     "croniter>=6.2.4",
+    "dotagent-web-research==1.2.0",
     "fastapi>=0.143.0",
     "httpx>=0.28.1",
     "mcp>=2.3.0",
@@ -60,6 +61,13 @@ build-backend = "uv_build"
 # The distribution is dotagent-macos on PyPI ("dotagent" was taken, item 348); the package it installs stays dotagent.
 [tool.uv.build-backend]
 module-name = "dotagent"
+
+# dotagent-web-research is the MCP server that comes with Dot (item 583). Until 1.2.0 is on PyPI, uv takes it from its
+# repository at a fixed commit: e8052177, web-research's .env fix, on its pull request #6. A uv source is not carried
+# into the built wheel: the wheel asks PyPI for dotagent-web-research==1.2.0, so that version must be on PyPI before
+# dotagent-macos 0.2.0 is (docs/development.md, Releasing). This table goes then.
+[tool.uv.sources]
+dotagent-web-research = { git = "https://github.com/senoldogann/web-research-stack", rev = "e805217705924733a80a3bc46a6abb91b107289a" }
 
 [dependency-groups]
 dev = [

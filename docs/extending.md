@@ -209,7 +209,11 @@ The ways a service connects:
   (`DELETE /api/installed-plugins/{name}`); a plugin read from a folder of `[plugins] dirs` is refused (409), and is
   yours to take out of `[plugins] dirs` in `config.toml`. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts again, and
   Remove plugin then stops them; a server of the same name added since is the owner's, not the plugin's. A server of
-  Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
+  Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block). The server that comes with Dot
+  (item 583, [below](#mcp-servers)) is listed with a **Built in** chip and a switch on its tile, and **Try again**
+  when it was left out: the switch stops it at once, or starts it and offers its tools to the runs that start
+  after, and writes `[builtin_mcp] web_research` to `config.toml` (`PUT /api/mcp/servers/{name}/switch`); it
+  has no **Remove**, since the switch is how it goes, and it is listed switched off too.
   The sign-in file is named for the server, so a server added again under the name of one that is connected, at
   another address or by another command, forgets the sign-in of the old one first (item 558): its tokens were issued
   for the old address and are not sent to the new, and an address left as it was keeps them. The address the page and
@@ -326,8 +330,65 @@ url = "https://mcp.example.com/mcp"       # a remote server; transport = "http" 
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; headers are never logged
 ```
 
-`dotx mcp list` starts the servers of `[[mcp]]` tables and those of plugins (not the ones added on Connectors),
-and shows the tools each offers, or why one does not start. Only tools are used (no resources, prompts or sampling).
+**A server comes with Dot** (item 583): `web-research`, the MCP server of the package `dotagent-web-research`, which
+Dot's own package depends on, so that every install has it ready and on. Its tools search the web and read what a run
+asks for, and each is named `mcp__web-research__<tool>`: `web_search` (DuckDuckGo, then Yahoo, and Google only when
+those refuse), `web_scrape` (one page, or two to ten in one call, as Markdown; `archive: true` reads the Internet
+Archive's copy), `web_map`, `web_extract`, and a crawl in the background (`web_crawl_start`, `web_crawl_status`,
+`web_crawl_results`, `web_crawl_cancel`). Dot starts it with the servers of `[[mcp]]`, as it starts those: on the Python
+the daemon runs on (`python -P -m web_scraper.mcp_server`: `-P` keeps the workspace, where a run's commands write, off
+its import path), with `WEB_TOOLS_DATA_DIR=<home>/web-research`, where it keeps its crawl jobs, a folder a run's
+commands cannot change, as they cannot change the other files Dot loads and runs, and with `PYTHON_DOTENV_DISABLED=1`,
+so that it reads no `.env` into its environment: neither Dot's own key file nor one that a program left in the
+workspace, its working folder (the browser it starts for a page that needs JavaScript runs with that environment, and a
+`NODE_OPTIONS` in it is a file run outside the sandbox). Its tools are offered and judged like any server's: the six
+that declare themselves read-only run as reads, the other two by their flags (`web_crawl_start` may reach out,
+`web_crawl_cancel` stops something), and what they return is untrusted content in its fence.
+
+**Dot's own rules judge its calls.** A call of the server's tools is judged by the rules of the tool of Dot's own that
+does the same, in the same functions, so that a rule added to `web_search`, `web_fetch` or `web_crawl` binds these too:
+
+- *The words of a search*, which are the `query` of `web_search` and its `sites` and `exclude_sites` (the server makes
+  words of the query it sends of them), as the query of Dot's `web_search` is: one with a key in it (an `sk-…`,
+  `AKIA…`, `ghp_…` or `xox…` key, or a private key) earns the flag `exfiltration`, which the policy refuses in every
+  mode but yolo, and one of more than 400 characters is refused.
+- *The addresses*, which are the `url` or `urls` of `web_scrape` and the `url` of `web_extract`, `web_map` and
+  `web_crawl_start`, as the address of `web_fetch` and `web_crawl` is: checked against `[browser] allowed_hosts` and
+  `blocked_hosts` and the places Dot refuses (this Mac, Dot's own interface), and refused with the same words. The
+  server is handed the address as it was checked, with its scheme, and an address of more than 2,000 characters, or
+  one with a key in it (in its query string, say), earns `exfiltration`.
+- *A `web_search` with `read` above 0*, which has the server read the pages the search chose, is refused while you have
+  set `allowed_hosts` or added a host to `blocked_hosts` (the cloud metadata hosts it ships with are no list of yours):
+  those addresses are the server's pick, and Dot cannot check them, so the model is told to search without `read` and
+  to read the pages with `web_scrape`. Dot's own `web_search` has no such argument.
+
+Every other string a tool takes is worked on inside the server and sent nowhere: a filter of the addresses it found, a
+CSS selector, the name of a crawl job, a date or a language code.
+
+**What those rules do not reach.** What Dot's own tools do not reach either: a secret that is not in the shape of a key
+(a password, a token of another kind) and a key cut in pieces over several arguments or calls; a run marked untrusted
+is also refused a step whose words carry a secret that Dot holds (see *Outside content in yolo* in
+[Safety](safety.md)). And what the server does that those tools do not: a redirect it follows to another host; the
+links a crawl follows on the site it starts on (and on its subdomains, with `include_subdomains`); the search
+engines a search asks, which it chooses; and the Internet Archive (`web.archive.org`), which `archive: true` asks for
+the copy of a page. A crawl outlives its run: `web_crawl_start` keeps crawling in the server
+after the run that started it has stopped, up to its page limit, until it ends or the daemon stops (the server stops
+with it); `web_crawl_cancel` stops it. Where those limits matter, `[builtin_mcp] web_research = false` leaves the
+server out. A server of your own that replaces it is not checked: its tools are not known to Dot.
+
+It starts when its package can be imported (a checkout that did not install it has no such server),
+`[builtin_mcp] web_research` is on (`true` by default) and no other server has its name. To turn it off, use its
+switch on [Customize › Connectors](#customize--connectors), which stops it at once and writes the setting, or write
+`[builtin_mcp] web_research = false`: the table is not `[mcp]`, which TOML cannot have beside the `[[mcp]]` tables.
+To use your own checkout of the server instead, add a `[[mcp]]` table named `web-research`: a server of that name from
+any place (a plugin's, one added from another agent, one added on Connectors before) replaces it, and the built-in
+stays out. Connectors refuses a new server of that name while the built-in is there: name yours otherwise and switch
+the built-in off. `dotx doctor` has a row for it, and [What leaves this Mac](safety.md#what-leaves-this-mac) says
+what it sends.
+
+`dotx mcp list` starts the servers of `[[mcp]]` tables, those of plugins and the one that comes with Dot, which it
+marks `built-in` (not the ones added on Connectors), and shows the tools each offers, or why one does not start.
+Only tools are used (no resources, prompts or sampling).
 A server at a URL may
 sign in as MCP's authorization asks (OAuth): `oauth = true` has
 Dot send the token it keeps for it, which **Sign in again** on [Customize › Connectors](#customize--connectors) gets, and the servers added

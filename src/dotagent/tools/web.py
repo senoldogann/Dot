@@ -94,6 +94,9 @@ _PATH_WORD_CHARS: int = 3
 _PATH_WORDS: re.Pattern[str] = re.compile(r"[a-z0-9]+")
 # The most results web_search returns; a larger number asked is lowered to it, and the result says so.
 _MAX_RESULTS: int = 10
+# The most characters of a query web_search takes (and of each word the server that comes with Dot sends the engines,
+# item 583): a longer one carries text out in a search more than it asks one.
+QUERY_MAX_CHARS: int = 400
 
 
 def _nonce() -> str:
@@ -282,6 +285,20 @@ async def _front_page_links(ctx: ToolContext, url: str, max_bytes: int) -> tuple
     return likely_links(links, url, _LIKELY_LINKS), ""
 
 
+def checked_address(value: str, config: AppConfig) -> tuple[str, tuple[Flag, ...]]:
+    """What the tools that read an address make of it, ``web_fetch`` and ``web_crawl``: refused (ToolInputError) when it
+    is a place Dot does not go or one that the owner's ``[browser] allowed_hosts`` and ``blocked_hosts`` leave out
+    (:func:`dotagent.tools.browser.checked_url`), else the address as checked, a bare host with its scheme, and the
+    flags it earns (:func:`dotagent.browser.safety.url_flags`): ``exfiltration`` for one that is very long or holds a
+    key, which the policy refuses in every mode but yolo.
+
+    The one place that says so: the tools of the MCP server that comes with Dot take the addresses they are given
+    through this function too (item 583, :func:`dotagent.tools.mcp.checked_builtin_call`), so that a rule added here
+    binds them as it binds these."""
+    url: str = checked_url(value, config)
+    return url, url_flags(url)
+
+
 class FetchArgs(ToolArgs):
     url: str = Field(
         description="Address of the page, PDF or text file. A bare host such as example.com gets https://."
@@ -346,8 +363,8 @@ def _browser_problem(error: BrowserError) -> str:
 
 def _fetch_tool() -> RegisteredTool:
     def classify(args: FetchArgs, ctx: ToolContext) -> ActionInfo:
-        url: str = checked_url(args.url, ctx.runtime.config)
-        return _action("web_fetch", f"Read {url}", url, url_flags(url))
+        url, flags = checked_address(args.url, ctx.runtime.config)
+        return _action("web_fetch", f"Read {url}", url, flags)
 
     async def run(args: FetchArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config
@@ -455,10 +472,27 @@ def render_hits(hits: tuple[SearchHit, ...]) -> str:
     return "\n\n".join(blocks)
 
 
+def search_flags(*texts: str) -> tuple[Flag, ...]:
+    """What ``web_search`` makes of the words it sends to the search engines: refused (ToolInputError) when one is
+    longer than :data:`QUERY_MAX_CHARS`, else ``exfiltration`` when one looks like a key, which the policy refuses in
+    every mode but yolo. ``web_search`` passes its query.
+
+    The one place that says so: the search of the MCP server that comes with Dot passes its query and the sites it
+    narrows the search to, which the server makes ``site:`` words of the query it sends (item 583,
+    :func:`dotagent.tools.mcp.checked_builtin_call`), so that a rule added here binds it as it binds this."""
+    for text in texts:
+        if len(text) > QUERY_MAX_CHARS:
+            raise ToolInputError(
+                f"a search query takes at most {QUERY_MAX_CHARS} characters and this one has {len(text)}: shorten it",
+                {"characters": len(text), "most": QUERY_MAX_CHARS},
+            )
+    return ("exfiltration",) if any(looks_like_key(text) for text in texts) else ()
+
+
 class SearchArgs(ToolArgs):
     query: str = Field(
         min_length=2,
-        max_length=400,
+        max_length=QUERY_MAX_CHARS,
         description="What to look for, worded the way you would type it into a search engine.",
     )
     max_results: int = Field(
@@ -521,8 +555,7 @@ def _search_tool() -> RegisteredTool:
         return AnthropicSearch(api_key=key, model=ref.model)
 
     def classify(args: SearchArgs, ctx: ToolContext) -> ActionInfo:
-        flags: tuple[Flag, ...] = ("exfiltration",) if looks_like_key(args.query) else ()
-        return _action("web_search", f"Search the web for {args.query}", "/".join(rungs(ctx)), flags)
+        return _action("web_search", f"Search the web for {args.query}", "/".join(rungs(ctx)), search_flags(args.query))
 
     async def run(args: SearchArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config
@@ -683,10 +716,8 @@ class CrawlArgs(ToolArgs):
 
 def _crawl_tool() -> RegisteredTool:
     def classify(args: CrawlArgs, ctx: ToolContext) -> ActionInfo:
-        url: str = checked_url(args.url, ctx.runtime.config)
-        return _action(
-            "web_crawl", f"Crawl {url} ({args.scope} scope, up to {args.max_pages} pages)", url, url_flags(url)
-        )
+        url, flags = checked_address(args.url, ctx.runtime.config)
+        return _action("web_crawl", f"Crawl {url} ({args.scope} scope, up to {args.max_pages} pages)", url, flags)
 
     async def run(args: CrawlArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config

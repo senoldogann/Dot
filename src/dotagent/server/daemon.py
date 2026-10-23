@@ -70,8 +70,14 @@ class DotServer(uvicorn.Server):
 
 
 def serving_config(app: FastAPI) -> uvicorn.Config:
+    """How the daemon serves. The HTTP parser and the event loop are named, not left to uvicorn's ``auto``: Dot's
+    dependencies bring uvicorn's extras (``uvicorn[standard]``, item 583), so ``auto`` would choose httptools and
+    uvloop, which are installed now, for the daemon that holds the owner's API token. It serves with h11 and asyncio, as
+    it did before they came."""
     return uvicorn.Config(
         app,
+        http="h11",
+        loop="asyncio",
         log_config=None,
         access_log=False,
         lifespan="off",
