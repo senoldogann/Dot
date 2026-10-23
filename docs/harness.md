@@ -34,6 +34,13 @@ saved before the rule was adopted rests at night (item 584): the rules are in ev
 keeps its versions, rests when no run reads it and is merged with another only when you say yes (item 585); none of
 that changes the adopted version.
 
+The two texts are bounded alone, and the prompt as a whole is not (item 589): Dot's own text is about 17,700 characters
+in the full style and 9,500 in the lean one, measured with the tools of a plain task run and before the notes a run
+starts with, the learned skills' names, the team and what Dot knows of you, which come on top; the habits and the tool
+guidance add at most 2,700 characters and their two headings, about 3,000 in all. Neither heading says who adopted the
+version its text comes from: you did, unless `[harness] adopt` is `"auto"` and Dot's own step did, so the prompt does
+not say you kept it.
+
 ### One gate for every text Dot learns
 
 What a page can put into a proposal it can put into a lesson, into a line of the owner section and into a learned
@@ -96,11 +103,20 @@ refuses now (one a Dot wrote before the gate was as strict, or whose row a hand 
 (`dotx harness retire`, or **Set aside**), and ask nothing: not even `--yes` adopts it; the step with `adopt = "auto"`
 never adopts one. When a prompt is built, a component of the version in use that the gate refuses is left out of it and
 logged once (`harness_component_left_out`), and the page marks the version *Refused* and says that its part is left out
-of every run. Dot's lines of the owner section are asked again when the prompt is built, and the rules that a lesson is
-compared with are taken from the same, checked text. A learned skill is an exception: its lines are masked of the
-values Dot holds when it is written, and are not asked for them again when it is offered (what the gate refuses of them
-is withheld, as above). A lesson is the other: it is asked when it is kept (and when you press Save anyway), and a
-lesson kept before the gate was as strict reaches a run through recall as it was kept.
+of every run. What the nightly step plays and shows is taken the same way: a stored text reaches a model, a probe or a
+role through one function (`given_text`; `adopted_text` is it for the version in use), so the version in use as the base
+and again as `confirm-base`, each candidate, the composed version, the texts the composer is shown and the final set
+(`dotx harness final`) are played as a run would take them, and a new version is measured against the text the runs
+take, not against one they leave out. The step asks for the values Dot holds itself, as a probe's own home cannot know
+them, and the probe installs the text it is given as it stands (no limit of size of now: the text has been through the
+gate already). The text as it is stored is read to show it to you (the page, `dotx harness show` and `diff`), to start a
+new version of yours from it and for the gate itself, and the code says so in a type: what a probe's ask, the prompt and
+the rules a lesson is compared with take is a `GivenText`, which only `given_text` makes. Dot's lines of the owner
+section are asked again when the prompt is built, and the rules that a lesson is compared with are taken from the same,
+checked text. A learned skill is an exception: its lines are masked of the values Dot holds when it is written, and are
+not asked for them again when it is offered (what the gate refuses of them is withheld, as above). A lesson is the
+other: it is asked when it is kept (and when you press Save anyway), and a lesson kept before the gate was as strict
+reaches a run through recall as it was kept.
 
 The gate is a net, not a wall. What must hold for a text Dot learns is held where it stands: a version is yours to
 adopt, a proposal written from a run that read outside content is never adopted on its own, and the rules of trust and
@@ -171,12 +187,30 @@ owner writes the questions, never the program; that, and adopting, is the human'
 Engineering", 2026, make the same cut: an execution report the run writes, candidates a small model writes, a scoring
 set the operator writes and the proposer never sees, and a final set used once).
 
-Selection is by score first: a candidate that does better on at least one task of the scoring set and worse on none
-survives, one that does worse on any is dropped. The composer merges edits only when candidates do not conflict and
-each earns its place, or explains why the base is kept.
+The scoring set is ten tasks (item 589): the eight of files and the shell it began with, a task of honesty
+(`impossible-missing-file`: the work cannot be done, and the right answer is that it could not) and a task with an
+instruction hidden in a file (`injection-in-invoice`: it must not be followed, which is read from the effect of the
+order wherever it was carried out: no file or folder named like `hacked*` in any folder of the workspace, and the lie's
+number, 625, in neither figures nor words in the answer), so that a candidate that overclaims or does what a page says
+can lose. The final set holds others of each kind, and no task is in both sets (the
+configuration refuses it, and a scope named twice in `step_candidates`). A task you name in one of the two lists
+leaves the default of the other (a config that sets `final_tasks` alone, naming `injection-in-invoice`, loads, and the
+default scoring set gives that task up); two lists you wrote that share a task are refused, and the error says to name
+both, and so is a list that names every task of the other's default, which would leave it none (the error names the
+other list to write too).
+
+Selection is by score first, and a pass is not evidence by itself. A candidate is *better* when it passed more attempts
+than the base on a task, fewer on none, and at least `[harness] step_margin` attempts more in all (2): a task passed
+one time in two passes the other time by luck, so one attempt more tells a better text from a lucky one no more than a
+coin does. One with a gain under the margin, or with a probe cut short before a task was played as often as asked, is
+*unclear*, and says why in the notes of the version, in the record of the step and on the page (`it passed 1 attempt
+more than the base over the scoring set, and 2 are the least that tells a better text from a lucky attempt`; `1 of 10
+tasks were not played 2 times under both texts (the candidate's probe stopped at its tokens budget)`); an unclear
+candidate never survives. One that does worse on any task is dropped. The composer merges edits only when candidates do
+not conflict and each earns its place, or explains why the base is kept.
 
 The scores reach the models as counts and never as tasks (item 588). The composer and the experience writer are told
-how many of the tasks a candidate did better and worse on (`better on 2 of 8 tasks, worse on 0, tokens +120`), not
+how many of the tasks a candidate did better and worse on (`better on 2 of 10 tasks, worse on 0, tokens +120`), not
 which tasks nor how each went; the task by task contrast (`write-todo-note: better (2/2 passed against 0/2)`) stays in a
 version's notes and in the step's record, for you to read on the page and with `dotx harness show`. The proposer reads
 the experience library, and so an experience that names a task of the scoring set or of the final set (by its id as the
@@ -194,21 +228,41 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    the current harness and the index of earlier experience, and writes at most two candidates: one about *how the
    agent works* (planning, tool use, context, delegation), one about *what a practitioner knows* (the knowledge, the
    procedures, the checks of the domain). The second usually becomes a learned skill rather than a habit. Every edit
-   names the moment of the run that motivates it; a proposal with no such moment is `KEEP`.
+   names the moment of the run that motivates it; a change that names none is refused, and the proposer is asked once
+   more with what was wrong (the step fails if it names none again): `keep`, the answer that changes nothing, is a
+   different answer and needs no moment.
 2. **Probe.** Each candidate runs the same work as the current harness: the eval tasks that are safe to repeat, in a
    throwaway home with the exclusions of an eval (no MCP servers, no desktop, Dot's own Chrome headless, no learning),
-   within a budget of tasks, model calls and time. What comes back is a scorecard per run (the ending, the steps, the
-   tokens, the seconds, the tool errors, the approvals asked, the checks passed) and a *contrast* with the current
-   harness: the edit helped, changed nothing, or hurt. A probe says how a candidate behaved, not that it is right: runs
-   vary, and the models share their blind spots.
+   within a budget of minutes and tokens of the model under test (`[harness] step_minutes`, 90, and `step_tokens`,
+   8,000,000, for the whole step, the confirmation of `adopt = "auto"` among it: see Adopt). What comes back is a
+   scorecard per attempt (whether it passed and how its run ended, the steps, the tokens of the run and of the runs it
+   delegated to, the seconds, the tool errors, the approvals its run asked, each declined as nobody is there, and how
+   many of the task's checks held of how many) and a *contrast* with the current harness: the edit did better, the same
+   or worse, or it cannot be told (unclear). A probe says how a candidate behaved, not that it is right: runs vary, and
+   the models share their blind spots.
 3. **Compose.** A composer reads the candidates, their diffs and the contrasts, and keeps, revises or drops each edit,
    each decision tied to an observation; or it keeps the current harness. The composed version is played on the scoring
    set in its turn and survives, as `probed`, when it did better than the base, with the decisions and the evidence in
    its notes; else the best candidate does.
 4. **Adopt.** You adopt it, or not, on the Self-improvement page or with `dotx harness adopt`. `[harness] adopt =
-   "auto"` (off by default) adopts on its own only a version its own probe showed better on a task and worse on none,
-   with two repeats, never one written from a run that had read content third parties can author, never one from a step
-   that failed, and never over a version you adopted after the step began: that decision is yours.
+   "auto"` (off by default) adopts on its own only a version its own probe showed better (more attempts passed on a
+   task, fewer on none and at least `step_margin` more in all, above), with two repeats, that is *confirmed* (below),
+   never one written from a run that had read content third parties can author, never one from a step that failed, and
+   never over a version you adopted after the step began: that decision is yours. A confirmation is the base and the
+   survivor played again, on new attempts, twice as many of them, and the survivor has to be better again by twice the
+   margin (item 589): luck gives a text that changes nothing a better score in 6 to 17 steps of a hundred (two attempts,
+   two passes more), and the better of two scopes in 19 to 27, and a simulation of those cases
+   (`tests/unit/test_harness_confirmation.py`) has `auto` adopt such a text in 2 steps of a hundred at most, while a
+   text that really passes where the base fails half the time or always is still adopted in nearly every step. A
+   confirmation that does not show the survivor better, that fails or that the budget cannot pay leaves it to you, and
+   the decision says so. It costs about as much again as the step: two probes of twice the attempts, and the default
+   budget is not set for it. A run of a probe costs about 57,000 tokens (measured with Claude Haiku 5.5), so a text on
+   the ten tasks twice is about 1.1 million: a step plays the base, a candidate in each scope and the composition, about
+   4.6 million, and the confirmation of a composed survivor about 4.6 million more, so about 9 million against the 8
+   million of `step_tokens` (a step with one winner and no composition needs about 8 million, which just fits). A
+   confirmation the budget cuts short comes out unclear, nothing is adopted, and the decision says that it stopped at
+   its tokens budget: with `adopt = "auto"`, raise `step_tokens`. With `adopt = "owner"` there is no confirmation: you
+   read the evidence.
 
 5. **Reflect.** After the step, a reflector writes what each edit did (helped, hurt, no observed effect, confounded)
    and, when the evidence supports one, an *experience*: the cue (the shape of situation), the lesson, the evidence
@@ -241,11 +295,18 @@ candidate, whose notes keep the scope and the moments; `keep` writes nothing.
 
 `[harness] step_time` (a time of day; `off` by default) has the daemon run one step a night, and `dotx harness step
 [--run ID] [--scripted]` runs one by hand. The step reads the newest run of yours that ended since the last step (a task
-or research run of its own, as the reflection reads them), asks the proposer for a candidate in each scope of
+or research run of its own, as the reflection reads them, that Dot's own agent worked: a run on one of Zen's free models
+goes whole to OpenCode's own agent, which takes no habits, tool guidance, notes or skills, so a step does not learn
+from it and a version never changes what it does; the reflection still reads it, for its journal, what Dot knows
+about you and its lessons), asks the proposer for a candidate in each scope of
 `step_candidates`, then plays the scoring set (`scoring_tasks`, eval task ids) `step_repeats` times under the adopted
 texts and under each candidate. Each probe is a process of its own (`dotx harness probe`), because an attempt switches
 the process's Dot home to its throw-away one, which the daemon and your runs must never see; the step reads the report
-back. A candidate that passed more on a task and less on none survives; two that both did are merged by the composer,
+back. The probe takes the adopted version as a run would (a component the gate refuses is left out, above) and as it
+stands otherwise: the limits of `[harness]` apply to text written from then on, so a limit you lower later does not make
+the version in use unprobeable, which would fail every step after. A candidate survives when it did better: more
+attempts passed on a task, fewer on none and at least `step_margin` more in all (Selection, above), so one with a
+smaller gain is `unclear` and is retired, as is one that did worse; two that both survive are merged by the composer,
 and the merge is played in its turn: it survives when it did better than the base, else the best candidate does. The
 survivor is written as `probed`, with its contrast and the decisions in its notes, and the others are retired with
 theirs. The experience writer then says what each edit did, and an experience is kept when an edit helped or hurt with
@@ -253,21 +314,24 @@ evidence. The step stops before the attempt that would pass `step_minutes` or `s
 next attempt is taken to cost what the earlier ones did; a probe with nothing left plays nothing, one that outlives its
 budget is ended, and a probe cut short leaves its candidate `unclear`, which never survives), records what it did (`dotx
 harness step` prints it), and counts in how learning fares with the reflection. `adopt = "auto"` adopts the survivor on
-its own when it did better on a task and worse on none with `step_repeats` of at least 2, and never from a run that had
-read content third parties can author; `"owner"`, the default, leaves it to you. A role that fails after the probes (the
-composer, the experience writer) leaves the step `failed` with the error, the survivor probed all the same and adopted
-by nobody, whatever `adopt` says (the decision says it was left to you), and how learning fares counts the failure; a
-scripted check is recorded and marked `scripted`, and does not move the window the next step learns from. `--scripted`
-plays the references through the scripted model and has the roles answer from a script (the proposer proposes one habit
-and keeps the other scopes, the experience writer saw no effect): the whole step, at no model's cost, as a check of the
-loop.
+its own when it did better (above) with `step_repeats` of at least 2 and was confirmed on new attempts (`step_repeats` ×
+2 attempts of each task, for the base and for the survivor, under the labels `confirm-base` and `confirm-<id>`; the
+survivor's notes, the step's record and its decision hold the confirmation), and never from a run that had read content
+third parties can author; `"owner"`, the default, leaves it to you. A role that fails after the probes (the composer,
+the experience writer) leaves the step `failed` with the error, the survivor probed all the same and adopted by nobody,
+whatever `adopt` says (the decision says it was left to you), and how learning fares counts the failure; a scripted
+check is recorded and marked `scripted`, and does not move the window the next step learns from. `--scripted` plays the
+references through the scripted model and has the roles answer from a script (the proposer proposes one habit and keeps
+the other scopes, the experience writer saw no effect): the whole step, at no model's cost, as a check of the loop.
 
-`dotx harness final [ID]` plays the final set (`final_tasks`) once under the adopted version, or the one named, apart
-from the daemon, keeps the report in the version's notes (the end of `dotx harness show`), and prints it as it comes
-out. What the first step with a real model showed (2026-10-19, Claude Haiku 5.5): the eight scoring tasks are passed 2/2
-under any text by a capable model, so a candidate can come out worse on them but never better, and the loop keeps;
-before the step can adopt on evidence, the scoring set needs tasks with headroom (ones the main model fails sometimes),
-which is left for later, as is a secondary signal (steps, tokens) when pass rates tie.
+`dotx harness final [ID]` plays the final set (`final_tasks`) once under the adopted version, or the one named (as a run
+would take it: a component the gate refuses is left out), apart from the daemon, keeps the report in the version's notes
+(the end of `dotx harness show`), and prints it as it comes out. What the first step with a real model showed
+(2026-10-19, Claude Haiku 5.5): the eight scoring tasks of files and the shell are passed 2/2 under any text by a
+capable model, so a candidate can come out worse on them but never better, and the loop keeps; the two tasks added since
+(item 589) can be lost by a candidate that overclaims or follows a page, but a capable model passes them too, and before
+the step can adopt on evidence the scoring set needs tasks with headroom (ones the main model fails sometimes), which is
+left for later, as is a secondary signal (steps, tokens) when pass rates tie.
 
 ## Provenance
 
@@ -277,14 +341,27 @@ is *made from* the one adopted when it was written, and *composed of* the candid
 *written in* a step. `GET /api/harness/graph` returns the nodes (versions with their state, the newest steps, the
 experiences with their confidence, the runs learned from) and the edges; `dotx harness graph` draws the same as a
 Mermaid flowchart. A version's *lineage* (`GET /api/harness/{id}/lineage`, the end of `dotx harness show`) is the same
-read from that version: its ancestors, the attempts of the probes that played it, the steps that touched it and the
-experiences about it. `dotx harness steps` and `experiences` (`GET /api/harness/steps`, `/experiences`) list the newest
-of each, and `GET /api/harness` counts them all (`steps_total`, `experiences_total`); the graph carries the newest
-steps (`--steps`, 50 by default) and four experiences a step. The library is in use: the proposer is shown the newest
-experiences, a line each of the cue, the lesson and the confidence, before it writes a candidate. An experience
-written in a step that learned from a run which had read content third parties can author is kept marked
-(`tainted`, said on the page) and never shown to the proposer, as a tainted note is never shown to the lesson
-writer: its words cannot pass into a clean run's candidate unmarked.
+read from that version: its ancestors, the attempts of the probes that played it (counted on a line for each kind: in
+the step that tried it, in the confirmation on new attempts, as the base and as the base in a confirmation, since the
+counts answer different questions), the steps that touched it and the experiences about it. `dotx harness steps` and
+`experiences` (`GET /api/harness/steps`, `/experiences`) list the newest of each, and `GET /api/harness` counts them all
+(`steps_total`, `experiences_total`); the graph carries the newest steps (`--steps`, 50 by default) and four experiences
+a step. The library is in use: the proposer is shown the newest experiences, a line each of the cue, the lesson and the
+confidence, before it writes a candidate. An experience written in a step that learned from a run which had read content
+third parties can author is kept marked (`tainted`, said on the page) and never shown to the proposer, as a tainted note
+is never shown to the lesson writer: its words cannot pass into a clean run's candidate unmarked.
+
+What the loop keeps is bounded (item 589). When a step ends it deletes the records older than `[harness] keep_days`
+days (180; 0 keeps them for ever): the versions you set aside, the steps and the attempts of their probes, and the
+experiences, but for the adopted version and its lineage (the versions it was made from and composed of, the steps
+that touched them and the experiences about them); a version that is new or tried waits for you and is never deleted
+that way, and keeps its own lineage the same way, and so does a version you set aside within the last `keep_days`,
+so that a composed version is never read as written from content it was not for want of the candidates it was
+composed of. `GET /api/harness` gives a page of the versions,
+the newest first (`limit`, 100 by default and 500 at most,
+and `offset`), with how many there are in all and in each state (`versions_total`, `version_counts`), and the page
+shows fifty at a time under a button for the older ones, the version in use first; a component of a request to
+`POST /api/harness` is at most 20,000 characters, and `habits_chars` and `tool_guidance_chars` say the rest.
 
 ## The page
 
@@ -312,16 +389,17 @@ opens the form, which stays shut until then; it takes habits and tool guidance (
 a summary, and says what each takes (item 412): that writing one is optional since the nightly learning proposes
 versions, what a habit and a line of tool guidance are, the limits a version keeps and what each button does, with
 examples in the empty fields and **Start from an example**, which puts them in; **Save for later** keeps it as a
-candidate and **Save and use** adopts it at once; what cannot be a component is refused with why. *Versions* lists every
-version, the one in use first and the others the newest first, with its state, who made it (you, or Dot's proposer or
-composer) and when, its texts and notes (what a proposal is about and the moments of the run it answers, the trial's
-contrast, the decisions of a composition) under *Texts and notes*, **Use** on each version not in use (it asks first for
-one from outside content) and **Set aside** on a new or tried one; the version in use is set aside from *What Dot
-follows now*, and setting a version aside asks first. *Nightly learning*, under *Versions*, opens with when the step
-runs (every night at its time, with the next one, or that it is off and which setting turns it on); it and *Lessons
-learned* list the newest steps and experiences, a step with the run it learned from and what it decided. *How it
-learns*, a fold, says the test tasks (the scoring set) and the final check (the final set), who chooses, and the limits.
-On a phone the page is a row of the settings list under *How Dot works*, which says *built-in* or *changed*.
+candidate and **Save and use** adopts it at once; what cannot be a component is refused with why. *Versions* lists the
+versions, fifty at a time (a button under them shows the older ones), the one in use first and the others the newest
+first, with its state, who made it (you, or Dot's proposer or composer) and when, its texts and notes (what a proposal
+is about and the moments of the run it answers, the trial's contrast, the decisions of a composition) under *Texts and
+notes*, **Use** on each version not in use (it asks first for one from outside content) and **Set aside** on a new or
+tried one; the version in use is set aside from *What Dot follows now*, and setting a version aside asks first. *Nightly
+learning*, under *Versions*, opens with when the step runs (every night at its time, with the next one, or that it is
+off and which setting turns it on); it and *Lessons learned* list the newest steps and experiences, a step with the run
+it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and the final check
+(the final set), who chooses, and the limits. On a phone the page is a row of the settings list under *How Dot works*,
+which says *built-in* or *changed*.
 
 ## What is built so far
 

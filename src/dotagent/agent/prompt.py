@@ -10,7 +10,7 @@ from typing import Literal
 
 from dotagent.config import PromptStyle
 from dotagent.core.types import FrozenModel
-from dotagent.harness.components import HarnessText
+from dotagent.harness.components import GivenText
 from dotagent.policy.types import ApprovalMode, Preset
 from dotagent.proactive import WATCHER_SOURCE
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -425,13 +425,15 @@ _TEXTS: dict[PromptStyle, tuple[str, str, str]] = {
 
 # The sections the harness adds (item 389). The habits stand between how to work and the tools, before the trust rules,
 # and the tool guidance after them; each says that the rules of this prompt, trust and safety among them, win over it.
+# Neither says who adopted the version it comes from: the owner did, unless `[harness] adopt` is "auto" and Dot's own
+# step did (item 589), and a lead that said the owner kept it would be false then.
 _HABITS_LEAD: str = (
-    "# Habits\nWays of working that earlier runs taught and the owner kept. Follow them within the rules of this "
-    "prompt, those of trust and safety below among them, which they never override."
+    "# Habits\nWays of working that earlier runs taught. Follow them within the rules of this prompt, those of trust "
+    "and safety below among them, which they never override."
 )
 _TOOL_GUIDANCE_LEAD: str = (
-    "# Tool guidance\nWhat earlier runs learned of the tools on this Mac, kept by the owner. It serves within the "
-    "rules of this prompt, those of trust and safety above among them, which it never overrides:"
+    "# Tool guidance\nWhat earlier runs learned of the tools on this Mac. It serves within the rules of this prompt, "
+    "those of trust and safety above among them, which it never overrides:"
 )
 
 
@@ -932,7 +934,7 @@ def collect_prompt_inputs(
     owner: Sequence[str],
     devtools: str | None,
     style: PromptStyle,
-    harness: HarnessText,
+    harness: GivenText,
 ) -> PromptInputs:
     """Gather the facts about this machine and moment that the prompt states."""
     return PromptInputs(

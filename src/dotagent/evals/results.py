@@ -34,7 +34,9 @@ class RunMetrics(FrozenModel):
     their arguments did not fit the tool (a turn lost each); a report saved before item 53 counted none of the three.
     ``help_calls`` are the calls of find_help, the search of the help the Mac offers (none in a report saved before
     item 167 counted them). ``plan_changes`` are the run's plan events, the plan it made and each change of it, the
-    marks of its steps too (none in a report saved before item 252 counted them)."""
+    marks of its steps too (none in a report saved before item 252 counted them). ``approvals_asked`` are the
+    approvals the policy asked of the run, each declined as nobody is there (none in a report saved before item 589
+    counted them). ``input_tokens`` and ``output_tokens`` are the run's and those of the runs it delegated to."""
 
     steps: int
     input_tokens: int
@@ -57,6 +59,7 @@ class RunMetrics(FrozenModel):
     rejected_arguments: int | None = None
     help_calls: int | None = None
     plan_changes: int | None = None
+    approvals_asked: int | None = None
 
 
 class TaskOutcome(FrozenModel):

@@ -4,8 +4,9 @@ by the owner, adopted and retired."""
 import asyncio
 import time
 from collections.abc import Sequence
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from dotagent.harness.components import NO_HARNESS, HarnessText
 from dotagent.harness.graph import HarnessGraph, Lineage, graph_of, lineage_of
@@ -14,15 +15,15 @@ from dotagent.harness.service import (
     adopt,
     adopted,
     create_version,
+    raw_text_of,
     refusal_words,
     refusals,
     retire,
     taint_of,
-    text_of,
 )
 from dotagent.secrets import known_secrets
 from dotagent.server.context import ServerContext
-from dotagent.server.views import HarnessRequest, HarnessView
+from dotagent.server.views import HarnessQuery, HarnessRequest, HarnessView
 from dotagent.store.db import Store
 from dotagent.store.models import HarnessExperience, HarnessStep, HarnessVersion
 
@@ -35,20 +36,21 @@ def _refused_of(versions: Sequence[HarnessVersion], held: Sequence[str]) -> dict
     """The versions of ``versions`` whose texts the gate for learned texts refuses now, by id, with why in words
     (:func:`refusal_words`). Seven questions over up to six readings of each text of each version: work for a thread,
     not for the daemon's loop."""
-    return {version.id: refusal_words(found) for version in versions if (found := refusals(text_of(version), held))}
+    return {version.id: refusal_words(found) for version in versions if (found := refusals(raw_text_of(version), held))}
 
 
 def harness_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     store: Store = ctx.runtime.store
 
-    async def view() -> HarnessView:
+    async def view(query: HarnessQuery) -> HarnessView:
         limits = ctx.runtime.config.harness
         # The values Dot holds are asked for in a stored text as when it was written (item 587).
         held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        counts: dict[str, int] = await store.count_harness_versions()
         current: HarnessVersion | None = await adopted(store)
-        versions: list[HarnessVersion] = await store.list_harness_versions()
-        shown: list[HarnessVersion] = [*([] if current is None else [current]), *versions]
+        page: list[HarnessVersion] = await store.list_harness_versions(query.limit, query.offset)
+        shown: list[HarnessVersion] = [*([] if current is None else [current]), *page]
         from_outside: dict[str, tuple[str, ...]] = {}
         for version in shown:
             reasons: tuple[str, ...] = await taint_of(store, version)
@@ -59,9 +61,11 @@ def harness_router(ctx: ServerContext) -> APIRouter:
         refused: dict[str, str] = await asyncio.to_thread(_refused_of, shown, held)
         return HarnessView(
             adopted=current,
-            versions=tuple(versions),
+            versions=tuple(page),
             from_outside=from_outside,
             refused=refused,
+            versions_total=sum(counts.values()),
+            version_counts=counts,
             habits_chars=limits.habits_chars,
             tool_guidance_chars=limits.tool_guidance_chars,
             component_lines=limits.component_lines,
@@ -69,14 +73,18 @@ def harness_router(ctx: ServerContext) -> APIRouter:
             scoring_tasks=tuple(limits.scoring_tasks),
             final_tasks=tuple(limits.final_tasks),
             step_repeats=limits.step_repeats,
+            step_margin=limits.step_margin,
             adopt=limits.adopt,
+            keep_days=limits.keep_days,
             steps_total=await store.count_harness_steps(),
             experiences_total=await store.count_harness_experiences(),
         )
 
     @router.get("/harness")
-    async def get_harness() -> HarnessView:
-        return await view()
+    async def get_harness(query: Annotated[HarnessQuery, Query()]) -> HarnessView:
+        """The adopted version, a page of the versions (the newest first: ``limit``, ``offset``) with how many there
+        are in all and in each state, and how the nightly step is set."""
+        return await view(query)
 
     # The fixed places first: a version id never reads "graph", "steps" or "experiences".
     @router.get("/harness/graph")
@@ -109,7 +117,7 @@ def harness_router(ctx: ServerContext) -> APIRouter:
         """A version of the owner's: each component given replaces the adopted version's, one left out is kept; with
         ``adopt`` it is adopted at once."""
         current: HarnessVersion | None = await adopted(store)
-        kept: HarnessText = NO_HARNESS if current is None else text_of(current)
+        kept: HarnessText = NO_HARNESS if current is None else raw_text_of(current)
         text: HarnessText = HarnessText(
             habits=kept.habits if request.habits is None else request.habits,
             tool_guidance=kept.tool_guidance if request.tool_guidance is None else request.tool_guidance,

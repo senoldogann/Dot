@@ -21,11 +21,16 @@ const STRIP_STEPS = 14;
 const STRIP_KIND = { done: "done", keep: "quiet", skipped: "quiet", failed: "failed" };
 const MADE_BY = { owner: "written by you", proposer: "proposed by Dot", composer: "combined by Dot" };
 const SUMMARY_CHARS = 200;
+// How many versions the list shows at first and each time **Show older versions** is pressed (the daemon pages them).
+const VERSIONS_PAGE = 50;
+// The most versions the daemon gives in one answer.
+const MOST_VERSIONS = 500;
 // The keys of a version's notes the page reads out, in this order, each with its words.
 const NOTE_WORDS = {
   scope: "about",
   moments: "what in the run it answers",
   contrast: "in the trial, against the version before",
+  confirmation: "in the trial played again, before Dot used it itself",
   decisions: "decisions",
   retired: "set aside",
   from_run: "learned from run",
@@ -274,10 +279,7 @@ function nightLegend() {
 /** The overview above the sections: the version in use, the versions, the nights of learning and the lessons, counted in
  * all by the daemon, as the lists of nights and lessons stop at the newest. */
 function overview(view, steps) {
-  const counts = {};
-  for (const version of view.versions) {
-    counts[version.state] = (counts[version.state] ?? 0) + 1;
-  }
+  const counts = view.version_counts;
   const breakdown = ["adopted", "candidate", "probed", "retired"]
     .filter((state) => counts[state] > 0)
     .map((state) => `${counts[state]} ${STATE_WORDS[state]}`)
@@ -296,7 +298,7 @@ function overview(view, steps) {
       sub: view.adopted === null ? "Dot's own instructions alone" : "Not the built-in texts",
       hover: view.adopted === null ? "Dot's own instructions alone" : view.adopted.summary,
     }),
-    statTile({ label: "Versions", value: String(view.versions.length), sub: breakdown === "" ? "None yet" : breakdown }),
+    statTile({ label: "Versions", value: String(view.versions_total), sub: breakdown === "" ? "None yet" : breakdown }),
     statTile({ label: "Learning nights", value: String(view.steps_total), extra: steps.length === 0 ? null : nightStrip(steps), sub: nights }),
     statTile({
       label: "Lessons kept",
@@ -393,8 +395,12 @@ function howItLearns(view) {
   const once = view.step_repeats >= 2 ? "" : " (they are played once now, so it puts nothing in use until they are played twice)";
   const adopts =
     view.adopt === "auto"
-      ? `Dot itself, when the trial showed a version better on a task and worse on none with the test tasks played twice${once}`
+      ? `Dot itself, when the trial showed a version better and worse on no task with the test tasks played twice${once}, and the trial played again on new attempts showed it better again; never over a version you chose since the night began`
       : "you, from the versions above";
+  const kept =
+    view.keep_days === 0
+      ? "The nights, their trials and the versions you set aside are kept for ever"
+      : `The nights, their trials and the versions you set aside are deleted after ${plural(view.keep_days, "day", "days")}, but for the version in use and the ones it came from`;
   return foldCard({
     id: "harness-how",
     title: "How it learns",
@@ -403,8 +409,13 @@ function howItLearns(view) {
     body: [
       fact("Test tasks", `${view.scoring_tasks.join(", ")} (${plural(view.step_repeats, "time", "times")} each), on which each new version is tried`),
       fact("Final check", `${view.final_tasks.join(", ")}, played once by dotx harness final after a version is in use, never to choose one`),
+      fact(
+        "Better",
+        `at least ${plural(view.step_margin, "attempt", "attempts")} passed more than the version in use, over all the tasks together, and fewer on none; with less the trial says it is unclear, and why`,
+      ),
       fact("Who chooses", adopts),
       fact("Limits", `habits ${view.habits_chars} characters, tool guidance ${view.tool_guidance_chars}, ${view.component_lines} lines each`),
+      fact("Kept", kept),
     ],
   }).element;
 }
@@ -522,14 +533,45 @@ export function mount(root, ctx) {
     return reload();
   });
 
-  /** The versions, the one in use first and the others as the daemon lists them, the newest first. */
+  /** The versions, the one in use first (also when it is older than the page the daemon gave) and the others as the
+   * daemon lists them, the newest first; under them, how many older ones there are to show. */
   function versionsBody(handlers) {
-    const listed = [...view.versions].sort((one, other) => Number(other.state === "adopted") - Number(one.state === "adopted"));
-    return listed.length === 0
-      ? setCard(
-          emptyPanel("squarePen", "No version yet", "Every run follows Dot's built-in instructions. A version appears here when the nightly learning proposes one, or when you write one."),
-        )
-      : setCard(...listed.map((version) => versionRow(version, handlers)));
+    const inPage = view.adopted !== null && view.versions.some((version) => version.id === view.adopted.id);
+    const listed = [...(view.adopted === null || inPage ? [] : [view.adopted]), ...view.versions].sort(
+      (one, other) => Number(other.state === "adopted") - Number(one.state === "adopted"),
+    );
+    if (listed.length === 0) {
+      return setCard(
+        emptyPanel("squarePen", "No version yet", "Every run follows Dot's built-in instructions. A version appears here when the nightly learning proposes one, or when you write one."),
+      );
+    }
+    // The version in use, when it is older than the page, is listed already and is not one of the older ones left.
+    const older = view.versions_total - listed.length;
+    const more =
+      older > 0
+        ? el(
+            "div",
+            { class: "panel-foot" },
+            el("button", { class: "btn ghost sm", type: "button", onclick: () => attempt(showOlder) }, `Show ${plural(Math.min(older, VERSIONS_PAGE), "older version", "older versions")}`),
+          )
+        : null;
+    return setCard(...listed.map((version) => versionRow(version, handlers)), more);
+  }
+
+  /** The next page of versions, under the ones shown. */
+  async function showOlder() {
+    const page = await api.get(`/harness?limit=${VERSIONS_PAGE}&offset=${view.versions.length}`);
+    if (disposed) {
+      return;
+    }
+    const shown = new Set(view.versions.map((version) => version.id));
+    view = {
+      ...view,
+      versions: [...view.versions, ...page.versions.filter((version) => !shown.has(version.id))],
+      from_outside: { ...view.from_outside, ...page.from_outside },
+      refused: { ...view.refused, ...page.refused },
+    };
+    paint();
   }
 
   function paint() {
@@ -553,7 +595,7 @@ export function mount(root, ctx) {
         overview(view, steps),
         setSection({ title: "What Dot follows now", body: followBody(view, handlers) }),
         setSection({
-          title: ["Versions", el("span", { class: "harness-count" }, String(view.versions.length))],
+          title: ["Versions", el("span", { class: "harness-count" }, String(view.versions_total))],
           actions: form.opener,
           body: el("div", { class: "harness-stack" }, form.element, versionsBody(handlers)),
         }),
@@ -573,8 +615,11 @@ export function mount(root, ctx) {
 
   async function reload() {
     try {
+      // The versions already shown stay shown (up to what the daemon gives at once), so that Use or Set aside on one of
+      // the older ones does not send the list back to its first page.
+      const asked = Math.min(Math.max(VERSIONS_PAGE, view === null ? 0 : view.versions.length), MOST_VERSIONS);
       const [fresh, freshSteps, freshExperiences] = await Promise.all([
-        api.get("/harness"),
+        api.get(`/harness?limit=${asked}`),
         api.get("/harness/steps"),
         api.get("/harness/experiences"),
       ]);

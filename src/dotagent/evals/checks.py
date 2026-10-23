@@ -1,7 +1,9 @@
 """Judging the end of an eval run: each check is looked at once the run is over, in the workspace it left behind."""
 
 import asyncio
+import fnmatch
 import json
+import os
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -14,6 +16,7 @@ from dotagent.evals.results import CheckOutcome
 from dotagent.evals.types import (
     AnswerContains,
     AnswerLacks,
+    AnswerLacksPattern,
     AnswerMatches,
     Check,
     CommandSucceeds,
@@ -22,6 +25,7 @@ from dotagent.evals.types import (
     FileEquals,
     FileExists,
     JsonEquals,
+    NoFileNamed,
 )
 
 # How much of what was found is kept in the outcome of a check that did not hold.
@@ -58,6 +62,10 @@ def describe_check(check: Check) -> str:
             return f"the answer matches /{check.pattern}/"
         case AnswerLacks():
             return f"the answer does not contain {check.text!r}"
+        case AnswerLacksPattern():
+            return f"the answer does not match /{check.pattern}/"
+        case NoFileNamed():
+            return f"no file or folder is named like {check.pattern!r}"
 
 
 def _dump(value: JsonValue) -> str:
@@ -106,7 +114,20 @@ def _judge_file(
             return _outcome(check, parsed == check.expected, f"the file holds: {_shown(_dump(parsed))}")
 
 
-def _judge_answer(check: AnswerContains | AnswerMatches | AnswerLacks, answer: str) -> CheckOutcome:
+def _judge_names(check: NoFileNamed, workspace: Path) -> CheckOutcome:
+    """Whether nothing in the workspace, in any folder, is named like ``check.pattern`` (a glob, whatever the case).
+    Blocking."""
+    wanted: str = check.pattern.casefold()
+    for folder, folders, files in os.walk(workspace):
+        for name in (*folders, *files):
+            if fnmatch.fnmatchcase(name.casefold(), wanted):
+                return _outcome(check, False, f"there is {Path(folder, name).relative_to(workspace)}")
+    return _outcome(check, True, "")
+
+
+def _judge_answer(
+    check: AnswerContains | AnswerMatches | AnswerLacks | AnswerLacksPattern, answer: str
+) -> CheckOutcome:
     match check:
         case AnswerContains():
             return _outcome(check, fold_search(check.text) in fold_search(answer), f"the answer is: {_shown(answer)!r}")
@@ -114,7 +135,7 @@ def _judge_answer(check: AnswerContains | AnswerMatches | AnswerLacks, answer: s
             return _outcome(
                 check, fold_search(check.text) not in fold_search(answer), f"the answer is: {_shown(answer)!r}"
             )
-        case AnswerMatches():
+        case AnswerMatches() | AnswerLacksPattern():
             try:
                 found: bool = re.search(check.pattern, answer, re.IGNORECASE) is not None
             except re.error as error:
@@ -122,7 +143,7 @@ def _judge_answer(check: AnswerContains | AnswerMatches | AnswerLacks, answer: s
                     "the pattern of an eval check is not a regular expression",
                     {"pattern": check.pattern, "error": str(error)},
                 ) from error
-            return _outcome(check, found, f"the answer is: {_shown(answer)!r}")
+            return _outcome(check, found != isinstance(check, AnswerLacksPattern), f"the answer is: {_shown(answer)!r}")
 
 
 async def _judge_command(check: CommandSucceeds, workspace: Path, env: Mapping[str, str]) -> CheckOutcome:
@@ -154,8 +175,10 @@ async def evaluate_check(check: Check, workspace: Path, answer: str, env: Mappin
     match check:
         case CommandSucceeds():
             return await _judge_command(check, workspace, env)
-        case AnswerContains() | AnswerMatches() | AnswerLacks():
+        case AnswerContains() | AnswerMatches() | AnswerLacks() | AnswerLacksPattern():
             return _judge_answer(check, answer)
+        case NoFileNamed():
+            return await asyncio.to_thread(_judge_names, check, workspace)
         case FileExists() | FileAbsent() | FileContains() | FileEquals() | JsonEquals():
             return await asyncio.to_thread(_judge_file, check, workspace)
 

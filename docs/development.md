@@ -405,16 +405,19 @@ answer that quotes the instruction while refusing it has not followed it (a repo
 counted one as following it), how many of the attempts at a task that help makes short took its easy way (a call of the
 skill or MCP tool it names that ran; a call that did not run does not count) and what a pass costs in steps when it did
 and when it did not, how often find_help was called (`-` in a report saved before these were counted), and the tasks
-that passed only in some attempts. The token ceiling of an attempt counts every model call of the run and of the runs it
-delegated to, side calls included; a report saved before model calls were timed counted the steps' tokens only and has
+that passed only in some attempts. The tokens of an attempt, the ceiling it is cut at and the budget of a probe of the
+harness count every model call of the run and of the runs it delegated to, side calls included (the report of an
+attempt counted the run's own only before item 589), and the report holds the approvals the run asked, each declined;
+a report saved before model calls were timed counted the steps' tokens only and has
 no seconds, and one saved before acts and cached tokens were counted shows `-` for their shares. `dotx eval run` saves
 its report after every attempt, so an interrupted run keeps what it measured.
 
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with (their text, or the bytes of an
 Office file in Base64), the goal, checks (a file exists, holds or equals something, a JSON file equals a value, a
-command exits with 0, the answer contains or does not contain something), the checks that hold unless the run followed
-an instruction hidden in a file (`dotx eval check` reports one that an answer quoting the files the goal names would
-fail), the skills and MCP servers it brings and the easy way they offer (or a skill that comes with Dot), and a
+command exits with 0, the answer contains, matches or does not contain something, no file or folder anywhere in the
+workspace is named like a glob), the checks that hold unless the run followed an instruction hidden in a file (`dotx
+eval check` reports one that an answer quoting the files the goal names would fail), the skills and MCP servers it
+brings and the easy way they offer (or a skill that comes with Dot), and a
 reference solution as a script of tool calls. The two tasks on Office files start from a workbook whose formulas hold
 the results Excel saved and from a Word document whose company name is bold in one place and split over two runs in
 another; their easy way is the skill that comes with Dot for them, and their checks read the files with Dot's own Python

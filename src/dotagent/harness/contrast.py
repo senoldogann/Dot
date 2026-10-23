@@ -1,7 +1,8 @@
 """What a probe of a candidate shows against the probe of the base (item 391, docs/harness.md): per task, whether the
-candidate passed more, as often or less often; in all, whether it did better (more on a task, less on none), the same,
-worse (less on a task), or whether that cannot be told (a probe cut short before a task was played). A contrast says
-how a candidate behaved, not that it is right: runs vary, and the models share their blind spots."""
+candidate passed more, as often or less often; in all, whether it did better (more on a task, less on none, and at least
+a margin of passes more in all, item 589), the same, worse (less on a task), or whether that cannot be told (a probe cut
+short before a task was played, or a gain under the margin, which one lucky attempt can make); the contrast says why.
+A contrast says how a candidate behaved, not that it is right: runs vary, and the models share their blind spots."""
 
 from collections.abc import Sequence
 from typing import Literal
@@ -10,6 +11,18 @@ from dotagent.core.types import FrozenModel
 from dotagent.harness.probe import ProbeReport, Scorecard
 
 type Verdict = Literal["better", "same", "worse", "unclear"]
+# How many passes more than the base a candidate needs over the whole scoring set to be better (``[harness]
+# step_margin``, whose default this is): a task passed one time in two passes the other time by luck, so one pass more
+# is no evidence, two are the least that is.
+DEFAULT_MARGIN: int = 2
+
+
+# The confirmation that comes before a step adopts a survivor on its own (item 589, review round 1): the base and the
+# survivor are played again on new attempts, this many times as many, and the survivor has to be better again by this
+# many times the margin, the same gain for each attempt on a sample this much larger. Luck gives a text that changes
+# nothing a better score in 6 to 17 steps of a hundred (two attempts, two passes more), and the better of two scopes in
+# 19 to 27; it gives it twice in a row in under 2 (simulated in tests/unit/test_harness_confirmation.py).
+CONFIRM_FACTOR: int = 2
 
 
 class TaskScore(FrozenModel):
@@ -31,8 +44,9 @@ class TaskContrast(FrozenModel):
 
 
 class Contrast(FrozenModel):
-    """A candidate against the base: a verdict per task and in all, how many tasks it did better and worse on, and how
-    its tokens compare (the candidate's less the base's, over the tasks both played)."""
+    """A candidate against the base: a verdict per task and in all, how many tasks it did better and worse on, how many
+    passes more it had in all (``gain``), and how its tokens compare (the candidate's less the base's, over the tasks
+    both played). ``why`` says, in counts and never by task, why the verdict is ``unclear`` (empty for any other)."""
 
     label: str
     tasks: tuple[TaskContrast, ...]
@@ -40,6 +54,8 @@ class Contrast(FrozenModel):
     better: int
     worse: int
     tokens_delta: int
+    gain: int = 0
+    why: str = ""
 
 
 def scores_of(report: ProbeReport) -> dict[str, TaskScore]:
@@ -72,8 +88,22 @@ def _task_verdict(base: TaskScore | None, candidate: TaskScore | None, repeats: 
     return "same"
 
 
-def contrast(base: ProbeReport, candidate: ProbeReport) -> Contrast:
-    """The candidate's report against the base's, task by task over the base's tasks."""
+def _cut_short(base: ProbeReport, candidate: ProbeReport, unplayed: int, tasks: int) -> str:
+    """Why a verdict cannot be told: ``unplayed`` of ``tasks`` were not played as many times as asked under both texts,
+    and the probe that stopped short, with the budget it stopped at."""
+    stopped: list[str] = [
+        f"the {name}'s probe stopped at its {report.cut_short} budget"
+        for name, report in (("base", base), ("candidate", candidate))
+        if report.cut_short is not None
+    ]
+    said: str = f"{unplayed} of {tasks} tasks were not played {base.repeats} times under both texts"
+    return f"{said} ({'; '.join(stopped)})" if stopped else said
+
+
+def contrast(base: ProbeReport, candidate: ProbeReport, margin: int = DEFAULT_MARGIN) -> Contrast:
+    """The candidate's report against the base's, task by task over the base's tasks. It is better when it passed more
+    on a task and less on none and ``margin`` passes more in all: a gain under the margin is ``unclear`` (and says so),
+    as is a verdict a probe cut short cannot give."""
     base_scores: dict[str, TaskScore] = scores_of(base)
     candidate_scores: dict[str, TaskScore] = scores_of(candidate)
     tasks: list[TaskContrast] = [
@@ -88,13 +118,27 @@ def contrast(base: ProbeReport, candidate: ProbeReport) -> Contrast:
     verdicts: list[Verdict] = [task.verdict for task in tasks]
     better: int = verdicts.count("better")
     worse: int = verdicts.count("worse")
+    # The passes the candidate had more than the base, on the tasks it did better on.
+    gain: int = sum(
+        task.candidate.passes - task.base.passes
+        for task in tasks
+        if task.verdict == "better" and task.base is not None and task.candidate is not None
+    )
     overall: Verdict
+    why: str = ""
     if worse > 0:
         overall = "worse"
     elif "unclear" in verdicts:
         overall = "unclear"
-    elif better > 0:
+        why = _cut_short(base, candidate, verdicts.count("unclear"), len(tasks))
+    elif better > 0 and gain >= margin:
         overall = "better"
+    elif better > 0:
+        overall = "unclear"
+        why = (
+            f"it passed {gain} {'attempt' if gain == 1 else 'attempts'} more than the base over the scoring set, and "
+            f"{margin} are the least that tells a better text from a lucky attempt"
+        )
     else:
         overall = "same"
     tokens_delta: int = round(
@@ -111,19 +155,30 @@ def contrast(base: ProbeReport, candidate: ProbeReport) -> Contrast:
         better=better,
         worse=worse,
         tokens_delta=tokens_delta,
+        gain=gain,
+        why=why,
     )
+
+
+def confirm_contrast(base: ProbeReport, survivor: ProbeReport, margin: int) -> Contrast:
+    """The survivor's confirmation against the base's, both played again on new attempts, :data:`CONFIRM_FACTOR` times
+    as many as the step's own (the reports say how many): better when it did better on a task, worse on none and
+    :data:`CONFIRM_FACTOR` times ``margin`` passes more in all."""
+    return contrast(base, survivor, margin * CONFIRM_FACTOR)
 
 
 def contrast_text(found: Contrast) -> str:
     """A contrast as the models read it (item 588): the verdict in all, on how many of the tasks the candidate did
-    better, worse and could not be judged, and how its tokens compare. Never a task's id nor its verdict: what a
-    candidate is judged on is never shown to the model that writes it (the composer, the experience writer)."""
+    better, worse and could not be judged, how its tokens compare and, for an unclear one, why. Never a task's id nor
+    its verdict: what a candidate is judged on is never shown to the model that writes it (the composer, the experience
+    writer)."""
     unclear: int = sum(1 for task in found.tasks if task.verdict == "unclear")
     sign: str = "+" if found.tokens_delta >= 0 else ""
     return (
         f"In all {found.verdict}: better on {found.better} of {len(found.tasks)} tasks, worse on {found.worse}"
         + (f", not played enough to judge on {unclear}" if unclear else "")
         + f", tokens {sign}{found.tokens_delta}."
+        + (f" Why unclear: {found.why}." if found.why else "")
     )
 
 

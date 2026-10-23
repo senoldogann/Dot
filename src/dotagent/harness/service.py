@@ -16,6 +16,7 @@ from dotagent.harness.components import (
     COMPONENTS,
     NO_HARNESS,
     Component,
+    GivenText,
     HarnessText,
     component_problem,
     description_problem,
@@ -53,7 +54,12 @@ def _notes_texts(notes: str) -> tuple[str, ...]:
         return (notes,)
 
 
-def text_of(version: HarnessVersion) -> HarnessText:
+def raw_text_of(version: HarnessVersion) -> HarnessText:
+    """The text of the stored ``version`` as it is stored, whatever the gate for learned texts says of it. It is read to
+    show what is stored (the page, the command, the diff), to start a new version from it (which the gate asks again
+    when it is written) and by the gate itself; it is never handed to a model, which gets :func:`given_text`: a prompt,
+    a probe, a role's request and an installed text are made of that and of nothing else (item 587, pre-push review;
+    a test reads the source for any other reader)."""
     return HarnessText(habits=version.habits, tool_guidance=version.tool_guidance)
 
 
@@ -78,7 +84,7 @@ def check_adoptable(version: HarnessVersion, secrets: Sequence[str] = ()) -> Non
     """Raise :class:`InvalidValueError` unless the gate for learned texts accepts both texts of ``version`` as they
     stand: what a run follows is never a text that the gate would refuse to write, however the version came to be
     (item 587, review round 1). The message says how to set the version aside."""
-    refused: dict[str, str] = refusals(text_of(version), secrets)
+    refused: dict[str, str] = refusals(raw_text_of(version), secrets)
     if refused:
         raise InvalidValueError(
             f"{version.id} cannot be adopted: {refusal_words(refused)}. Set it aside "
@@ -130,6 +136,18 @@ async def create_version(
     )
     log.info("harness_version_written", version=version.id, made_by=made_by, parent=parent)
     return version
+
+
+async def install(store: Store, text: GivenText, summary: str, made_by: str, now: float) -> HarnessVersion:
+    """Write ``text`` as it stands and adopt it: what a probe does in its own throw-away store, so that the text it
+    plays is the text of the version under test, never a text of its own (item 589). No limit of size of now is applied:
+    a limit the owner lowered since is for the text written from then on, and a version adopted before is probed as it
+    is, or every step would fail from then on. ``text`` is what :func:`given_text` made of a stored version, which has
+    left out what the gate refuses: this function does not ask, and a stored text as it is never comes here."""
+    version: HarnessVersion = await store.create_harness_version(
+        None, made_by, summary, text.habits, text.tool_guidance, ""
+    )
+    return await store.adopt_harness(version.id, now)
 
 
 async def adopt(store: Store, version_id: str, now: float, secrets: Sequence[str] = ()) -> HarnessVersion:
@@ -187,31 +205,37 @@ async def adopted(store: Store) -> HarnessVersion | None:
     return version
 
 
-# The components of the adopted version that were left out of a prompt, which are logged once each, not at every run.
+# The components of a stored version that were left out of what a model is given, which are logged once each, not at
+# every run.
 _LEFT_OUT: set[tuple[str, str]] = set()
 
 
-async def adopted_text(store: Store, secrets: Sequence[str] = ()) -> tuple[HarnessText, str | None]:
-    """What a run starting now takes from the harness, and the id of the version it is, ``None`` with none adopted. A
-    component that the gate for learned texts refuses now (:func:`refusals`: a version written before the gate was as
-    strict, or by a hand that never asked it; ``secrets`` are the values Dot holds, which a caller reads as the
-    write-time check does) is left out of the text, and logged once; the Harness page shows the version as refused
-    (item 587)."""
-    version: HarnessVersion | None = await adopted(store)
-    if version is None:
-        return NO_HARNESS, None
-    text: HarnessText = text_of(version)
+def given_text(version: HarnessVersion, secrets: Sequence[str]) -> GivenText:
+    """The text of the stored ``version`` as a model may be given it, the one way a stored text reaches a prompt, a
+    probe or a role (item 587, pre-push review): each component that the gate for learned texts refuses now
+    (:func:`refusals`: a version written before the gate was as strict, or by a hand that never asked it; ``secrets``
+    are the values Dot holds, which a caller reads as the write-time check does, and which a probe's own home cannot
+    know) is left out, and logged once for each version and component. The step plays its base, its candidates and the
+    composed version through it, and shows its roles their texts through it, so that what is scored is what a run
+    would take; :func:`adopted_text` is it for the version in use. The text as it is stored is :func:`raw_text_of`."""
+    text: HarnessText = raw_text_of(version)
     refused: dict[str, str] = refusals(text, secrets)
     for name, problem in refused.items():
         if (version.id, name) not in _LEFT_OUT:
             _LEFT_OUT.add((version.id, name))
             log.warning("harness_component_left_out", version=version.id, component=name, problem=problem)
-    if refused:
-        text = HarnessText(
-            habits="" if "habits" in refused else text.habits,
-            tool_guidance="" if "tool_guidance" in refused else text.tool_guidance,
-        )
-    return text, version.id
+    return GivenText(
+        habits="" if "habits" in refused else text.habits,
+        tool_guidance="" if "tool_guidance" in refused else text.tool_guidance,
+    )
+
+
+async def adopted_text(store: Store, secrets: Sequence[str] = ()) -> tuple[GivenText, str | None]:
+    """What a run starting now takes from the harness, and the id of the version it is, ``None`` with none adopted:
+    :func:`given_text` of the version in use, a component that the gate refuses left out and logged once; the Harness
+    page shows the version as refused (item 587). ``secrets`` are the values Dot holds."""
+    version: HarnessVersion | None = await adopted(store)
+    return (NO_HARNESS, None) if version is None else (given_text(version, secrets), version.id)
 
 
 def diff_text(before: HarnessText, after: HarnessText, before_name: str, after_name: str) -> str:

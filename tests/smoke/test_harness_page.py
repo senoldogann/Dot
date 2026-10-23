@@ -337,6 +337,8 @@ async def test_a_version_written_from_outside_content_wears_a_pill_and_asks_befo
                 _section(page, "What Dot follows now").locator(".badge", has_text="From outside content")
             ).to_be_visible()
             assert (await client.get("/api/harness")).json()["adopted"]["id"] == outside.id
+            assert await page.evaluate(FITS), width
+            await page.screenshot(path=tmp_path / f"harness-outside-in-use-{width}.png", full_page=True)
         finally:
             await page.close()
         await runtime.store.retire_harness(outside.id, time.time())
@@ -398,3 +400,40 @@ async def test_a_version_composed_before_the_taint_was_noted_and_one_the_gate_re
         await store.retire_harness(stored.id, time.time())
     for version_id in (part.id, composed.id, odd.id):
         await store.retire_harness(version_id, time.time())
+
+
+async def test_the_versions_come_fifty_at_a_time_and_the_ones_in_use_and_older_stay_listed(
+    browser: Browser, client: httpx.AsyncClient, runtime: Runtime, tmp_path: Path
+) -> None:
+    """Item 589 (L8): the daemon gives a page of the versions; the page shows fifty and a button for the older ones, the
+    count says how many there are in all, and the version in use is listed first even when it is older than the page."""
+    store = runtime.store
+    # Older than every version the other tests of this home left, and the one in use.
+    oldest = await store.create_harness_version(None, "owner", "The oldest", "- Read it first.", "", "")
+    for number in range(52):
+        await store.create_harness_version(None, "proposer", f"Habit {number}", "- Read it first.", "", "")
+    await store.adopt_harness(oldest.id, time.time())
+    total: int = (await client.get("/api/harness")).json()["versions_total"]
+    assert total > 52
+    for width in (1280, 390):
+        page: Page = await _open(browser, client, width)
+        try:
+            rows: Locator = page.locator("[data-version]")
+            await expect(rows).to_have_count(51)
+            await expect(rows.first.locator(".badge")).to_have_text("In use")
+            await expect(rows.first).to_have_attribute("data-version", oldest.id)
+            await expect(_section(page, "Versions").locator(".harness-count")).to_have_text(str(total))
+            # The fifty newest and the one in use, which is older: the others are those left.
+            more: Locator = page.get_by_role("button", name=f"Show {total - 51} older versions")
+            await expect(more).to_be_visible()
+            assert await page.evaluate(FITS), width
+            await page.screenshot(path=tmp_path / f"harness-versions-{width}.png", full_page=True)
+            await more.click()
+            await expect(rows).to_have_count(total)
+            await expect(more).to_have_count(0)
+            # The version in use is not listed twice, and the list stays whole when one of its rows is acted on.
+            await expect(page.locator(f"[data-version='{oldest.id}']")).to_have_count(1)
+            await page.locator("[data-version]").nth(1).get_by_role("button", name="Texts and notes").click()
+            await expect(rows).to_have_count(total)
+        finally:
+            await page.close()

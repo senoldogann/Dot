@@ -59,10 +59,14 @@ async def test_the_graph_links_versions_steps_experiences_and_runs_and_a_version
         )
         step: HarnessStep = await store.create_harness_step(2.0, run.id, base.id)
         await store.add_harness_probes(
-            step.id, None, "base", [("write-todo-note", 1, True, "done", "none", 2, 100, 10, 0, 1.0)], 2.5
+            step.id, None, "base", [("write-todo-note", 1, True, "done", "none", 2, 100, 10, 0, 1.0, 0, 3, 3)], 2.5
         )
         await store.add_harness_probes(
-            step.id, candidate.id, candidate.id, [("write-todo-note", 1, True, "done", "none", 2, 100, 10, 0, 1.0)], 2.6
+            step.id,
+            candidate.id,
+            candidate.id,
+            [("write-todo-note", 1, True, "done", "none", 2, 100, 10, 0, 1.0, 0, 3, 3)],
+            2.6,
         )
         probed = await store.set_harness_state(candidate.id, "probed")
         await store.finish_harness_step(

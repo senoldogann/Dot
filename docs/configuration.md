@@ -54,20 +54,22 @@ TOML reads as one array of tables. Customize › Connectors has the same switch 
 marks the server `built-in`, and an eval run leaves it out. See [MCP servers](extending.md#mcp-servers).
 
 Deleting a chat deletes the screenshot files that only it named, and the daemon thins its copies of the database
-(below). Nothing else is removed by itself: old runs and their
-events stay until their chats are deleted or `dotx prune --apply` finds them old, and the journals of file changes
-until it finds them old. `dotx prune` lists the events of the runs that ended more than `[store] retention_days`
-(90) days ago (the steps, tool calls and results of their timelines; the runs keep their answers, numbers and
-conversations), the screenshot files that no chat names any more (what chats deleted earlier left behind), the free
-space inside the database file and the journals of file changes (`dotx undo`) whose last change is older than
-`[agent] undo_keep_days`; `dotx prune --apply` deletes those events, and with them the screenshots only they named,
-those files and journals, and gives the space back to the disk, after which a delete returns its space by itself. Two
-things those events said are kept (item 556): that a run ended after reading outside content, which decides how a run
-that resumes it, or a schedule's firing that builds on it, starts; and that you saved a lesson from a run's page, which
-keeps the nightly reflection from folding or resting it. The earlier versions of a chat's history that compacting keeps
-aside, so that the chat can be rewound, stay until the chat is deleted or rewound; `dotx prune` lists how many messages
-they are and their size, and the screenshots they name stay with them. The database is locked for a moment while it
-compacts, so run it when no run is active.
+(below). Nothing else is removed by itself, but the notes you forgot (the nightly reflection deletes them from the trash
+after `[memory] trash_days`, 30) and the loop's own records (a step deletes the versions you set aside, its nights,
+their trials and its experiences after `[harness] keep_days`, 180, but for the version in use and the ones it came from;
+[The harness](harness.md)): old runs and their events stay until their chats are deleted or `dotx prune --apply` finds
+them old, and the journals of file changes until it finds them old. `dotx prune` lists the events of the runs that ended
+more than `[store] retention_days` (90) days ago (the steps, tool calls and results of their timelines; the runs keep
+their answers, numbers and conversations), the screenshot files that no chat names any more (what chats deleted earlier
+left behind), the free space inside the database file and the journals of file changes (`dotx undo`) whose last change
+is older than `[agent] undo_keep_days`; `dotx prune --apply` deletes those events, and with them the screenshots only
+they named, those files and journals, and gives the space back to the disk, after which a delete returns its space by
+itself. Two things those events said are kept (item 556): that a run ended after reading outside content, which decides
+how a run that resumes it, or a schedule's firing that builds on it, starts; and that you saved a lesson from a run's
+page, which keeps the nightly reflection from folding or resting it. The earlier versions of a chat's history that
+compacting keeps aside, so that the chat can be rewound, stay until the chat is deleted or rewound; `dotx prune` lists
+how many messages they are and their size, and the screenshots they name stay with them. The database is locked for a
+moment while it compacts, so run it when no run is active.
 
 **Copies of the database** (item 526). While the daemon runs, it copies the database every `[store] backup_every_hours`
 hours (1), and as it starts when no copy is younger, whenever the database changed since the last copy; a database found

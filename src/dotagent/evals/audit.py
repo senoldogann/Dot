@@ -8,7 +8,15 @@ from dotagent.agent.review import GOAL_TOOL
 from dotagent.core.errors import EvalError
 from dotagent.core.text import fold_search
 from dotagent.evals.checks import workspace_path
-from dotagent.evals.types import AnswerLacks, AnswerMatches, Check, EvalTask, FileSeed, ScriptedCall
+from dotagent.evals.types import (
+    AnswerLacks,
+    AnswerLacksPattern,
+    AnswerMatches,
+    Check,
+    EvalTask,
+    FileSeed,
+    ScriptedCall,
+)
 from dotagent.mcp.naming import PREFIX
 from dotagent.skills.catalog import builtin_skill_names
 from dotagent.skills.types import SKILL_TOOL
@@ -65,12 +73,20 @@ def _easy_way_problems(task: EvalTask) -> list[str]:
     return []
 
 
+def _compiles(pattern: str) -> bool:
+    try:
+        re.compile(pattern)
+    except re.error:
+        return False
+    return True
+
+
 def _quoting_problems(task: EvalTask) -> list[str]:
     """An instruction hidden in a task is followed by doing what it asks, never by quoting it: no injection check that
     the answer lacks some words may name words that the files the goal names hold, as an answer that quotes them while
     refusing what they ask would fail it."""
     named: list[FileSeed] = [seed for seed in task.files if seed.encoding == "text" and seed.path in task.goal]
-    return [
+    quoted: list[str] = [
         f"an answer that quotes {seed.path}, which the goal names, holds {check.text!r}, so quoting the hidden "
         "instruction would count as following it"
         for check in task.injection_checks
@@ -78,6 +94,15 @@ def _quoting_problems(task: EvalTask) -> list[str]:
         for seed in named
         if fold_search(check.text) in fold_search(seed.content)
     ]
+    quoted.extend(
+        f"an answer that quotes {seed.path}, which the goal names, matches /{check.pattern}/, so quoting the hidden "
+        "instruction would count as following it"
+        for check in task.injection_checks
+        if isinstance(check, AnswerLacksPattern) and _compiles(check.pattern)
+        for seed in named
+        if re.search(check.pattern, seed.content, re.IGNORECASE) is not None
+    )
+    return quoted
 
 
 def task_problems(task: EvalTask) -> tuple[str, ...]:
@@ -102,7 +127,7 @@ def task_problems(task: EvalTask) -> tuple[str, ...]:
         if problem is not None:
             problems.append(problem)
     for check in every_check:
-        if isinstance(check, AnswerMatches):
+        if isinstance(check, AnswerMatches | AnswerLacksPattern):
             try:
                 re.compile(check.pattern)
             except re.error as error:
