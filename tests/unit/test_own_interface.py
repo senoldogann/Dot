@@ -148,32 +148,47 @@ def test_nothing_else_of_dots_interface_opens_with_the_way_back(url: str) -> Non
     assert not request_verdict(url, True, (), (), SERVER).allowed
 
 
+def _refusal(url: str, config: AppConfig) -> str:
+    with pytest.raises(ToolInputError) as refused:
+        checked_url(url, config)
+    return str(refused.value)
+
+
 def test_a_file_of_this_mac_is_refused_with_what_to_do_instead(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Item 596: the owner's Dot tried to open the page it built in its workspace as a file address and was told only
     that the scheme is not allowed. The refusal stays (a page opened from disk could lead the browser to any other
-    file) and says what to do: read the file with read_file, and a page of the workspace reaches the owner by its path
-    in the answer. Nothing names a server of this Mac: a folder a page names would bring the files around it, the
-    home's keys among them, within the browser's reach (the review of its first round)."""
+    file) and says what to do: read the file with read_file; a page of the workspace is shown by its path with
+    show_page, which draws it in the conversation and opens it full size in the owner's browser (item 598), and any
+    other file of the workspace reaches the owner by its path in the answer. Nothing names a server of this Mac: a
+    folder a page names would bring the files around it, the home's keys among them, within the browser's reach (item
+    596's review)."""
     monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
     config: AppConfig = load_default_config()
-    page: Path = tmp_path / "home" / "workspace" / "ai herald" / "index.html"
-    with pytest.raises(ToolInputError) as refused:
-        checked_url(page.as_uri(), config)
-    made: str = str(refused.value)
+    workspace: Path = tmp_path / "home" / "workspace"
+    page: Path = workspace / "ai herald" / "index.html"
+    made: str = _refusal(page.as_uri(), config)
     assert "scheme 'file' is not allowed" in made
     assert "A file of this Mac is read with read_file." in made
-    # In code, which makes it the answer's button to the file; the panel shows its text, not the page (the review).
-    assert f"write its path in code in the answer (`{page}`): the panel beside the conversation shows its text" in made
-    assert "the owner opens the page in their own browser" in made
+    # The page itself, drawn, rather than its text in the panel (item 598).
+    assert "give its path to show_page (use_tools with the group pages turns it on)" in made
+    assert "its Open shows it full size in the owner's browser" in made
+    assert "from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, esm.sh alone" in made
+    assert "write its path" not in made
+    for other in ("site/About.HTM", "site/feed.xhtml", "chart.svg"):
+        assert "give its path to show_page" in _refusal((workspace / other).as_uri(), config)
+    # Another file of the workspace: its path in code, which makes it the answer's button to the file in the panel.
+    report: Path = workspace / "report.pdf"
+    kept: str = _refusal(report.as_uri(), config)
+    assert f"write its path in code in the answer (`{report}`): the panel beside the conversation shows it." in kept
+    assert "show_page" not in kept
     # A file elsewhere, a key among them, gets the refusal and read_file, which the rules on files judge, and no way to
-    # a server.
-    with pytest.raises(ToolInputError) as elsewhere:
-        checked_url("file:///Users/dogan/.ssh/id_rsa", config)
-    told: str = str(elsewhere.value)
-    assert "A file of this Mac is read with read_file." in told
-    assert "write its path" not in told
-    for word in ("http.server", "127.0.0.1"):
-        assert word not in told and word not in made
+    # a server; so does a path that climbs out of the workspace (item 596's review).
+    for elsewhere in ("file:///Users/dogan/.ssh/id_rsa", f"{workspace.as_uri()}/../../.ssh/id_rsa.html"):
+        told: str = _refusal(elsewhere, config)
+        assert "A file of this Mac is read with read_file." in told
+        assert "write its path" not in told and "show_page" not in told
+        for word in ("http.server", "127.0.0.1"):
+            assert word not in told and word not in made and word not in kept
     # An address of another scheme gets no such words.
     with pytest.raises(ToolInputError) as other:
         checked_url("ftp://example.com/x", config)

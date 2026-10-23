@@ -242,13 +242,14 @@ Both modes share what follows.
   run whose tab lands there still has the tab reset (item 448). A server of this Mac on another port opens as any site.
   A file of this Mac (`file:`) opens in neither browser: a page opened from disk could lead the browser to any other
   file, past the rules on reading files. The refusal tells the model what to do instead (item 596): read the file with
-  `read_file`, which those rules judge, and, for a page it made in its workspace, write its path in code in the answer:
-  the panel beside the conversation shows its text (not the page drawn, see [Runs](runs.md)), and you open the page in
-  your own browser. In Dot's own Chrome every request is checked as Chrome sends it, not only the address a tool opens:
-  a page (in a tab, and each hop of a redirect) must pass both lists, and anything a page loads (a script, a picture, a
-  fetch, a worker) must be neither a blocked host nor Dot's interface, so a page of an allowed site still loads its
-  parts from wherever it keeps them; what a page makes itself (`blob:` and `data:` addresses) reaches no server and
-  passes. In your Chrome (`mode = "attach"`) Dot holds none of its requests, so as not to slow or stall your own tabs.
+  `read_file`, which those rules judge; show a page it made in its workspace with `show_page`, which draws it in the
+  conversation and whose Open shows it full size in your browser (item 598, [Runs](runs.md)); and write the path of any
+  other file of its workspace in code in the answer, which the panel beside the conversation shows. In Dot's own Chrome
+  every request is checked as Chrome sends it, not only the address a tool opens: a page (in a tab, and each hop of a
+  redirect) must pass both lists, and anything a page loads (a script, a picture, a fetch, a worker) must be neither a
+  blocked host nor Dot's interface, so a page of an allowed site still loads its parts from wherever it keeps them; what
+  a page makes itself (`blob:` and `data:` addresses) reaches no server and passes. In your Chrome (`mode = "attach"`)
+  Dot holds none of its requests, so as not to slow or stall your own tabs.
   What is not held is judged where it lands (item 554): a tab of Dot's on a refused address, and a frame of its page on
   one, is reset before anything is read from it or done in it. Every view, text, picture and search of a tab, every
   step, script, scroll, wait and upload asks first; a tab a page opens (a popup) is asked as the chat takes it in, and a

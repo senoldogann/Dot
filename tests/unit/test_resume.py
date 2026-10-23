@@ -117,6 +117,8 @@ def test_a_meta_call_is_repeated_only_when_a_second_call_sets_what_the_first_set
         assert resumes_on_start(RESTARTED, "run_1", [_call(tool, "meta", "cut_off", "")]), tool
     for tool in ("create_agent", "notify", "show_page", "consult", "campaign_targets"):
         assert not resumes_on_start(RESTARTED, "run_1", [_call(tool, "meta", "cut_off", "")]), tool
+    # A page shown by its path is a read of its file (item 598), and a second call shows it twice all the same.
+    assert not resumes_on_start(RESTARTED, "run_1", [_call("show_page", "read", "cut_off", "")])
     resumption: Resumption = Resumption(
         from_run_id="run_1",
         cut_off="daemon_restarted",
