@@ -1,12 +1,12 @@
-// The context sections of a run's Run tab (item 539), under its recap: the skills and MCP servers it can use, the files
-// its chat wrote, the pages and searches it read and the notes it saved. The readings and notes are gathered from the
-// run's events as they come, and again from its history, each once and newest first (contextpanel.js); nothing is shown
-// of what the run did not do. Each row wears the theme's own colours (run.css), so the panel reads in every theme.
+// The context sections of a run's Run tab (items 539 and 546), under its recap: the skills and MCP servers it used, the
+// files its chat wrote, the pages and searches it read and the notes it saved. The usage is gathered from the run's
+// tool calls, and the readings and notes from its events as they come, and again from its history, each once
+// (contextpanel.js); nothing is shown of what the run did not do. Each row wears the theme's own colours (run.css), so
+// the panel reads in every theme.
 
-import { addMemory, addReadings, readingsOf } from "./contextpanel.js";
+import { addMemory, addReadings, addUsage, readingsOf, usageOf } from "./contextpanel.js";
 import { clip, el, plural } from "./dom.js";
 import { icon } from "./icons.js";
-import { loadPalette } from "./palette.js";
 import { panelSection } from "./panels.js";
 
 // How many rows a section shows before it counts the rest; the readings and the notes keep their own longer lists.
@@ -34,50 +34,55 @@ function fileMark(path) {
   return kind.length >= 1 && kind.length <= 3 ? el("span", { class: "context-kind" }, kind) : "file";
 }
 
-/** The skills and the MCP servers a run can use (`GET /palette`), read once; the section keeps out of sight until the
- * palette names one and stays there when it fails. */
+/** The skills and the MCP servers a run used (item 546), from its tool calls; the section keeps out of sight until it
+ * uses one. A skill is the `skill` tool's name, a server the one in `mcp__server__tool`. */
 function skillsSection() {
   const body = el("div", { class: "context-list" });
   const section = panelSection({ id: "run-skills", title: "Skills & MCP", actions: null, body });
   section.element.hidden = true;
-  loadPalette().then(
-    (palette) => {
-      const { skills, servers } = palette;
-      if (skills.length === 0 && servers.length === 0) {
-        return;
-      }
-      const rows = [
-        ...skills.map((skill) =>
-          el("a", { class: "context-row", href: "#/customize/skills", title: skill.description }, row("hammer", skill.name, "")),
-        ),
-        ...servers.map((server) =>
-          el(
-            "a",
-            { class: "context-row", href: "#/customize/connectors", title: server.tools.map((tool) => tool.name).join(", ") },
-            row("plug", server.name, plural(server.tools.length, "tool", "tools")),
+  let usages = [];
+
+  function paint() {
+    body.replaceChildren(
+      ...usages.map((usage) =>
+        el(
+          "a",
+          {
+            class: "context-row",
+            href: usage.kind === "skill" ? "#/customize/skills" : "#/customize/connectors",
+            title: `${usage.name} — open ${usage.kind === "skill" ? "Skills" : "Connectors"} in Customize`,
+          },
+          row(
+            usage.kind === "skill" ? "hammer" : "plug",
+            usage.name,
+            usage.count === 1 ? "used once" : `used ${usage.count} times`,
           ),
         ),
-      ];
-      const shown = rows.slice(0, SECTION_ROWS);
-      body.replaceChildren(...shown);
-      if (rows.length > shown.length) {
-        // The skills stand before the servers, so the link goes where the first row it hides lives.
-        const href = skills.length > SECTION_ROWS ? "#/customize/skills" : "#/customize/connectors";
-        body.append(el("a", { class: "context-more", href }, `${rows.length - shown.length} more in Customize`));
+      ),
+    );
+    const skills = usages.filter((usage) => usage.kind === "skill").length;
+    const servers = usages.length - skills;
+    const counts = [];
+    if (skills > 0) {
+      counts.push(plural(skills, "skill", "skills"));
+    }
+    if (servers > 0) {
+      counts.push(plural(servers, "MCP server", "MCP servers"));
+    }
+    section.setSummary(el("span", null, counts.join(" · ")));
+    section.element.hidden = usages.length === 0;
+  }
+
+  return {
+    element: section.element,
+    add(call) {
+      const usage = usageOf(call.tool, call.args ?? {});
+      if (usage !== null) {
+        usages = addUsage(usages, usage);
+        paint();
       }
-      const counts = [];
-      if (skills.length > 0) {
-        counts.push(plural(skills.length, "skill", "skills"));
-      }
-      if (servers.length > 0) {
-        counts.push(plural(servers.length, "MCP server", "MCP servers"));
-      }
-      section.setSummary(el("span", null, counts.join(" · ")));
-      section.element.hidden = false;
     },
-    (error) => console.warn("the skills and MCP servers could not be read", error),
-  );
-  return section.element;
+  };
 }
 
 /** The files the chat wrote, each with its counts, opening the Changes tab where its diff is; `set(files)` takes the
@@ -204,8 +209,9 @@ export function createContextPanel({ onOpenChanges }) {
   const reading = readingSection();
   const memory = memorySection();
   return {
-    elements: [skills, artifacts.element, reading.element, memory.element],
+    elements: [skills.element, artifacts.element, reading.element, memory.element],
     onTool: (call) => {
+      skills.add(call);
       const readings = readingsOf(call.tool, call.args ?? {});
       if (readings.length > 0) {
         reading.add(readings);

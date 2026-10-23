@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { addMemory, addReadings, readingsOf } from "../../src/dotagent/server/static/js/contextpanel.js";
+import { addMemory, addReadings, addUsage, readingsOf, usageOf } from "../../src/dotagent/server/static/js/contextpanel.js";
 
 test("a page a tool opened or read, as a line and the address it points at", () => {
   assert.deepEqual(readingsOf("web_fetch", { url: "https://docs.python.org/3/library/asyncio.html?x=1#top" }), [
@@ -65,6 +65,37 @@ test("the readings keep the newest first, each once, and never grow past their l
   const many = Array.from({ length: 12 }, (_, index) => ({ kind: "search", text: `query ${index}` }));
   assert.equal(addReadings([], many, 8).length, 8);
   assert.equal(addReadings([], many, 8)[0].text, "query 0");
+});
+
+test("a tool call says which skill or MCP server the run used, and nothing of the run's own tools", () => {
+  assert.deepEqual(usageOf("skill", { name: "accessibility-review" }), { kind: "skill", name: "accessibility-review" });
+  assert.deepEqual(usageOf("skill", { name: "  " }), null);
+  assert.deepEqual(usageOf("skill", {}), null);
+  // A skill read in parts counts when it begins, not once per part.
+  assert.deepEqual(usageOf("skill", { name: "long-read", start: 12000 }), null);
+  assert.deepEqual(usageOf("skill", { name: "long-read", start: 0 }), { kind: "skill", name: "long-read" });
+  assert.deepEqual(usageOf("mcp__github__list_repos", {}), { kind: "server", name: "github" });
+  assert.deepEqual(usageOf("mcp__web-research__web_fetch", {}), { kind: "server", name: "web-research" });
+  // A tool of no server, and the run's own tools, use nothing.
+  assert.deepEqual(usageOf("mcp__", {}), null);
+  assert.deepEqual(usageOf("web_fetch", {}), null);
+  assert.deepEqual(usageOf("shell", { command: "mcp__github__list_repos" }), null);
+});
+
+test("the used skills and servers are listed once, in the order they were first used, with their calls counted", () => {
+  const skill = usageOf("skill", { name: "review" });
+  const server = usageOf("mcp__github__list_repos", {});
+  const list = addUsage(addUsage([], skill), server);
+  assert.deepEqual(list, [
+    { kind: "skill", name: "review", count: 1 },
+    { kind: "server", name: "github", count: 1 },
+  ]);
+  assert.deepEqual(addUsage(list, usageOf("mcp__github__get_file", {})), [
+    { kind: "skill", name: "review", count: 1 },
+    { kind: "server", name: "github", count: 2 },
+  ]);
+  // A skill and a server of the same name are two rows.
+  assert.equal(addUsage(list, { kind: "server", name: "review" }).length, 3);
 });
 
 test("a note changed again is told once, as it stands now, newest first", () => {
