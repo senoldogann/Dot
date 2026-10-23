@@ -6,7 +6,7 @@ between."""
 import re
 from pathlib import Path
 
-from dotagent.policy.paths import expand_path
+from dotagent.policy.paths import expand_path, within
 
 CRAWL_FOLDER: str = "crawl"
 MCP_FOLDER: str = "mcp-results"
@@ -19,8 +19,10 @@ def third_party_roots(workspace: Path) -> tuple[Path, ...]:
 
 
 def holds_third_party(path: Path, workspace: Path) -> bool:
-    """Whether the resolved ``path`` is one of the folders of third-party files of ``workspace`` or lies in one."""
-    return any(path.is_relative_to(root) for root in third_party_roots(workspace))
+    """Whether the resolved ``path`` is one of the folders of third-party files of ``workspace`` or lies in one, letter
+    case aside (item 599): a Mac's volume ignores it, so ``CRAWL/page.md`` is the crawl's file, which resolving does
+    not spell as the folder is spelled."""
+    return any(within(path, root) for root in third_party_roots(workspace))
 
 
 def matches_third_party(lines: list[str], target: Path, workspace: Path) -> bool:
@@ -30,7 +32,12 @@ def matches_third_party(lines: list[str], target: Path, workspace: Path) -> bool
     if holds_third_party(target, workspace):
         return True
     roots: tuple[Path, ...] = (*third_party_roots(workspace), *(workspace / folder for folder in THIRD_PARTY_FOLDERS))
-    return any(Path(line.split(":", 1)[0]).is_relative_to(root) for line in lines for root in roots)
+    return any(within(Path(line.split(":", 1)[0]), root) for line in lines for root in roots)
+
+
+def _from(path: Path, base: Path) -> Path | None:
+    """``path`` written from ``base``, letter case aside (item 599); ``None`` when it does not lie there."""
+    return Path(*path.parts[len(base.parts) :]) if within(path, base) else None
 
 
 def _spellings(paths: tuple[Path, ...], here: Path) -> frozenset[str]:
@@ -38,15 +45,16 @@ def _spellings(paths: tuple[Path, ...], here: Path) -> frozenset[str]:
     home: Path = Path.home()
     found: set[str] = {str(path) for path in paths}
     for path in paths:
-        if path.is_relative_to(home):
-            found.add(f"~/{path.relative_to(home)}")
-        if path.is_relative_to(here):
-            found.add(str(path.relative_to(here)))
+        if (from_home := _from(path, home)) is not None:
+            found.add(f"~/{from_home}")
+        if (from_here := _from(path, here)) is not None:
+            found.add(str(from_here))
     return frozenset(found)
 
 
 def _names(command: str, spelling: str) -> bool:
-    return re.search(rf"(?<![\w.~/-])(?:\./)?{re.escape(spelling)}(?![\w.-])", command) is not None
+    """Whether ``command`` names ``spelling``, in any letter case, as the Mac's volume reads a path (item 599)."""
+    return re.search(rf"(?<![\w.~/-])(?:\./)?{re.escape(spelling)}(?![\w.-])", command, re.IGNORECASE) is not None
 
 
 def mentions_third_party(command: str, cwd: Path, workspace: Path) -> bool:
@@ -56,7 +64,7 @@ def mentions_third_party(command: str, cwd: Path, workspace: Path) -> bool:
     here: Path = expand_path(str(cwd), workspace)
     for folder in THIRD_PARTY_FOLDERS:
         root: Path = expand_path(folder, workspace)
-        if here.is_relative_to(root):
+        if within(here, root):
             return True
         if any(_names(command, spelling) for spelling in _spellings((root, workspace / folder), here)):
             return True
