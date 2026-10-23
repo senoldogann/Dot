@@ -97,7 +97,9 @@ what is missing, and the flags of `run` and `chat`.
 
 The web UI works on a phone too, as an app on its home screen that notifies you. The phone reaches the Mac through your
 own network: with [Tailscale](https://tailscale.com) on both, `tailscale serve --bg 8765` on the Mac and the Mac's name
-on the tailnet in Dot's config file. [Dot on the phone](docs/phone.md) has the steps.
+on the tailnet in Dot's config file. [Dot on the phone](docs/phone.md) has the steps. Without Tailscale, a message you
+send to yourself in Messages on your iPhone starts a run too, and its answer comes back in that conversation
+([Channels](docs/channels.md)).
 
 ## Safety in short
 
@@ -131,6 +133,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Safety and privacy](docs/safety.md): what leaves this Mac, the policy, the sandbox
 - [The daemon, the web UI and the desktop shell](docs/daemon.md)
 - [Dot on the phone](docs/phone.md)
+- [Channels](docs/channels.md): reach Dot from the phone's own Messages
 - [Browser and computer use](docs/browser-and-computer-use.md)
 - [Memory and schedules](docs/memory-and-schedules.md)
 - [Dot comes to you](docs/proactive.md): the morning brief and the watchers

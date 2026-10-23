@@ -278,3 +278,8 @@ class AccountApiError(DotError):
 class PhoneSetupError(DotError):
     """What a phone needs to reach Dot away from home could not be set up (item 271): Tailscale is missing, not running
     or refused to serve, or the Mac cannot be kept awake."""
+
+
+class ChannelError(DotError):
+    """A channel of the owner's messaging apps (iMessage; item 572) could not be set up or used: a handle that is not
+    one, a code that is wrong, Messages refusing or not answering."""

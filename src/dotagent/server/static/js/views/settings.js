@@ -13,6 +13,7 @@ import { getSnapshot, onChange } from "../state.js";
 import { findTheme, onSchemeChange, onThemeChange, shownScheme, themePicks } from "../theme.js";
 import { attempt } from "../ui.js";
 import * as appearance from "./appearance.js";
+import * as channels from "./channels.js";
 import * as harness from "./harness.js";
 import * as keys from "./keys.js";
 import * as memory from "./memory.js";
@@ -31,6 +32,7 @@ const MOUNTS = {
   memory: memory.mount,
   harness: harness.mount,
   phone: phone.mount,
+  channels: channels.mount,
   snapshots: snapshots.mount,
   system: mountSystem,
 };

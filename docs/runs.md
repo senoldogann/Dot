@@ -475,7 +475,10 @@ another way. While two or more drafts wait, each card has a tick, and a bar afte
 ones together, one after the other, each with its own words. A draft can be answered long after its run ended, and on
 another screen: an open page shows the answer as it comes (the lifecycle stream carries `draft_decided`), and the
 phone hears of every new draft ("Dot drafted an email", with the recipients and the subject), as the web UI's
-notification says it.
+notification says it. A message draft to a number or address you paired with the iMessage channel is refused, when the
+run writes it and when you press Send on a card whose recipient you changed to one: that conversation is yours to
+write in, and Dot reads what is written there as your command
+([Channels](channels.md#who-may-command-dot-through-this-channel)).
 
 Send gives the draft to `osascript` with a fixed script for Mail or Messages; the recipients and the words reach the
 script as its arguments, never as words of the script (`drafts/scripts.py`), and after `--`, so that a subject or a

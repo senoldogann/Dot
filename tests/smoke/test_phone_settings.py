@@ -55,6 +55,7 @@ _TABS: dict[str, str] = {
     "harness": "Self-improvement",
     "browser": "Browser",
     "phone": "Phone",
+    "channels": "Channels",
     "snapshots": "SnapShots",
     "system": "System",
 }

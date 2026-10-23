@@ -615,6 +615,46 @@
   letter-spacing: var(--tracking-caps);
 }
 
+/* ---------- the channels (item 572) ---------- */
+
+/* What a paired number or address holds under its title: the handles, the form that sends a code and the one that takes
+   it back. A field and its button wrap under each other on a phone. */
+.channel-body {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.channel-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 520px;
+}
+
+.channel-form > .input {
+  flex: 1 1 220px;
+  width: auto;
+  min-width: 0;
+}
+
+.channel-verify {
+  display: grid;
+  gap: 8px;
+}
+
+.channel-handle {
+  gap: var(--space-half);
+  padding: var(--space-half) var(--space-half) var(--space-half) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.channel-handle > .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+
 /* ---------- a provider's key (Providers tab, item 373) ---------- */
 
 .key-secret {

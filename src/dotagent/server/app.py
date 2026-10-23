@@ -14,6 +14,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from dotagent import __version__
 from dotagent.core.errors import (
     BrowserError,
+    ChannelError,
     ConfigError,
     DotError,
     ElsewhereError,
@@ -44,6 +45,7 @@ from dotagent.server.routes_agents import agents_router
 from dotagent.server.routes_assistant import assistant_router
 from dotagent.server.routes_browser import browser_router
 from dotagent.server.routes_campaigns import campaigns_router
+from dotagent.server.routes_channels import channels_router
 from dotagent.server.routes_connections import connections_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
 from dotagent.server.routes_drafts import drafts_router
@@ -90,6 +92,7 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (BrowserError, 422),
     (PreviewError, 422),
     (PhoneSetupError, 422),
+    (ChannelError, 422),
     (SignInError, 422),
     (ProviderError, 502),
 )
@@ -179,6 +182,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(files_router(ctx, looks))
     app.include_router(looks_router(looks))
     app.include_router(phone_router(ctx))
+    app.include_router(channels_router(ctx))
     app.include_router(snapshots_router(ctx))
     app.include_router(assistant_router(ctx))
     app.include_router(accounts_router(ctx))

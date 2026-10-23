@@ -6,6 +6,7 @@ from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
+from dotagent.core.errors import InvalidValueError, ToolInputError
 from dotagent.drafts.service import (
     MAX_BODY_CHARS,
     MAX_RECIPIENTS,
@@ -69,9 +70,13 @@ def build_draft_tool() -> RegisteredTool:
         )
 
     async def run(args: DraftArgs, ctx: ToolContext) -> ToolResult:
-        draft: DraftRecord = await create_draft(
-            ctx.runtime.store, ctx.runtime.bus, ctx.run_id, args.channel, args.to, args.cc, args.subject, args.body
-        )
+        try:
+            draft: DraftRecord = await create_draft(
+                ctx.runtime.store, ctx.runtime.bus, ctx.run_id, args.channel, args.to, args.cc, args.subject, args.body
+            )
+        except InvalidValueError as refused:
+            # The owner's own conversation with themselves (item 572): the words tell the run what to do instead.
+            raise ToolInputError(refused.message, refused.context) from refused
         what: str = _WHAT[draft.channel]
         return ok(
             f"Draft {draft.id} is in the conversation for the owner, who sends it from there, after changing it if "

@@ -4,7 +4,8 @@ raised), the default model, ``[models] main`` (item 199), a model of Dot's own w
 context size of a model, a key of ``[models.context]`` (item 250), whether the typed judge answers, ``[judge] provider``
 (item 255), whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), or the names the
 daemon answers to and whether it keeps the Mac awake, ``[server] reach`` and ``keep_awake`` (item 271), or whether the
-notes are found by meaning, ``[memory] embed_enabled`` (item 558), so the comments and the other settings stay as
+notes are found by meaning, ``[memory] embed_enabled`` (item 558), or whether a messaging app of the owner reaches Dot,
+``[channels] imessage`` (item 572), so the comments and the other settings stay as
 written."""
 
 import os
@@ -33,9 +34,12 @@ _FILE_MODE: int = 0o600
 _EDITING: threading.Lock = threading.Lock()
 
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
-type ConfigTable = Literal["agent", "assistant", "browser", "judge", "memory", "models", "server", "shell", "snapshots"]
+type ConfigTable = Literal[
+    "agent", "assistant", "browser", "channels", "judge", "memory", "models", "server", "shell", "snapshots"
+]
 type AgentSetting = Literal["resume"]
 type AssistantSetting = Literal["name", "owner", "introduced"]
+type ChannelsSetting = Literal["imessage"]
 type BrowserSetting = Literal[
     "mode",
     "raise_window",
@@ -59,6 +63,7 @@ type SettingKey = (
     AgentSetting
     | AssistantSetting
     | BrowserSetting
+    | ChannelsSetting
     | JudgeSetting
     | MemorySetting
     | ModelsSetting

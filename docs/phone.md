@@ -1,5 +1,8 @@
 # Dot on the phone
 
+Without Tailscale, Dot can also be reached from the phone's own Messages, in the conversation you have with yourself:
+see [Channels](channels.md).
+
 The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on the chat you
 were in last (New chat the first time; item 286), with the sidebar's sections, the chats and the run pages at a phone
 width. Back from the background, it follows the daemon again at once, and says it is reconnecting only when that takes
