@@ -438,7 +438,7 @@ def _learned(number: int) -> Playbook:
         run_id=f"run-{number}",
         agent_id=None,
         goal=f"When is library {number:02d} open?",
-        written_at=1_700_000_000.0 + number,
+        written_at=time.time() + number,
         acting_steps=2,
         tainted=False,
     )

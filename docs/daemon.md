@@ -232,8 +232,9 @@ with their lines and skills, stays in the chat, and with grouped tools `use_tool
 **Save from a chat**, on the Skills page (`POST /api/runs/{id}/skill`), has the review model write the skill of a chat's
 last run as a learned skill, as one is written when a run ends, also after fewer acting steps than `[agent]
 skill_min_steps`; it is refused while learned skills are off, and for a run that did not end done or took no acting
-step, a delegated run, an eval's and one of OpenCode's agent. The box of a run held it as **Save skill**, under a
-**More** button, until item 406.
+step, a delegated run, an eval's, one of OpenCode's agent, a chat-mode run and a run that changed Dot itself (item
+585; the review model is not asked whether the steps will recur: you chose). The box of a run held it as **Save
+skill**, under a **More** button, until item 406.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
@@ -888,6 +889,10 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PUT /memories/{id}/pin` (`{"pinned": true}`), `POST /memories/{id}/unmerge` | pin a note, so that it never rests (a resting one wakes), or take the pin off; take back the merge that made a note: its sources wake apart, tagged `keep-separate`, and it goes to the trash (422 for a note no merge made) (item 584) |
 | `GET /memories/proposals`, `POST /memories/proposals/forget` and `/keep` (`{"ids": […]}`) | the notes that rested for `[memory] forget_after_days`, the longest first; forget or keep the notes of the ids the page showed, the ones not proposed any more left as they are and named in `skipped` (item 584) |
 | `GET /memories/trash`, `POST /memories/trash/{id}/restore`, `DELETE /memories/trash/{id}` | the notes you forgot, the newest 200 first (`total` says how many there are), each with when it is deleted for good; bring one back awake; delete one for good (404 for one that is not in the trash) (item 584) |
+| `GET /skills/learned`, `DELETE /skills/learned/{name}`, `PUT /skills/learned/{name}` (`{"shared": true}`) | the skills Dot learned, active first, each saying whether it rests and why, is pinned, taught or marked, its version and when a run last read it, with `rest_days`; drop one (the owner's alone); offer an agent's to every run (item 94) |
+| `GET /skills/learned/{name}/versions`, `POST /skills/learned/{name}/restore` (`{"version": 2}`) | the versions of a skill, the oldest first, each with how it was made and what its file says; put one back as a new version of its own (404 for one with no file, 422 for the one the skill has now) (item 585) |
+| `PUT /skills/learned/{name}/pin` (`{"pinned": true}`), `POST /skills/learned/{name}/rest`, `POST /skills/learned/{name}/wake` | pin a skill so that it never rests (one that rests wakes) or take the pin off; put one to rest by hand; wake one (item 585) |
+| `GET /skills/proposals`, `POST /skills/proposals/{id}/accept`, `DELETE /skills/proposals/{id}` | the merges of learned skills that wait for the owner's yes, each with why it cannot be applied now (`stale`), what its skills say now and every field the yes would write to the first (`fields`: name, description, kind, when, steps and parameters, each line marked kept, dropped or written against the skill it replaces); the yes writes exactly those fields as a new version (409 when a skill changed since); the no drops it (item 585) |
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule; `POST` with `"enabled": false` adds one switched off, its time checked but not the room for one more switched on, which switching it on checks, item 464) |
 | `POST /schedules/{id}/run`, `GET /schedules/{id}/firings?limit=` | a run of the schedule started by hand, 201 (409 while the emergency stop is engaged, while one of its runs is at work, or in a daemon that runs no scheduler); its last runs, at its time and by hand, newest first (item 455) |

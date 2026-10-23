@@ -261,7 +261,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             record=await store.get_agent(agent_id),
             runs=await store.agent_runs(agent_id, _PAGE_RUNS),
             messages=await team_messages(store, await store.agent_messages(agent_id, _PAGE_MESSAGES)),
-            learned=await agent_learning(store, agent_id),
+            learned=await agent_learning(store, agent_id, ctx.runtime.config.agent.skill_rest_days),
         )
 
     @router.put("/agents/{agent_id}")
@@ -317,12 +317,15 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     return router
 
 
-async def agent_learning(store: Store, agent_id: str) -> AgentLearning:
-    """What the agent learned (item 94): its lessons with the scores of its own runs, and its learned skills."""
+async def agent_learning(store: Store, agent_id: str, rest_days: int) -> AgentLearning:
+    """What the agent learned (item 94): its lessons with the scores of its own runs, and its learned skills, which rest
+    when no run read them for ``rest_days`` days (item 585)."""
     lessons: list[MemoryRecord] = await store.agent_memories(agent_id, _PAGE_LESSONS)
     entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
     return AgentLearning(
         lessons=lessons,
         scores=await store.agent_memory_scores([lesson.id for lesson in lessons], 0.0, agent_id),
-        skills=tuple(learned_skill_view(entry) for entry in entries if entry.meta.agent_id == agent_id),
+        skills=tuple(
+            learned_skill_view(entry, time.time(), rest_days) for entry in entries if entry.meta.agent_id == agent_id
+        ),
     )

@@ -356,6 +356,21 @@ lesson_rest_days = 60
 # that read one on a host with the runs on that host that did not. false distils nothing.
 playbooks = true
 skill_min_steps = 4
+# A skill is written only from a task run whose steps the review model judges a procedure the owner will likely ask for
+# again (a question answered, a lookup or a job done once gives none), and never from a chat-mode run or from a run that
+# changed Dot itself (a step that acts which the policy flagged as a change of its own files or as reaching a secret or
+# the clipboard, or that named its configuration, its keys, its code, its skills, its program or the daemon's address,
+# in the run or in a run it delegated). A rewrite by a later run keeps the file it replaces as a version, and Customize
+# › Skills shows the versions and puts one back. A learned or taught skill that no run read for skill_rest_days days
+# rests: no run is offered it, the page shows it as resting, and you wake it or pin it (a pinned skill never rests);
+# nothing is deleted. A read is dated when it happens, when a run reads the skill with the skill tool or starts with it
+# picked, whatever the run is (a chat, a helper's run, one that is stopped later). Each night the review model is asked
+# about pairs of skills whose kinds are at least skill_merge_similarity close (cosine of their embeddings): when it says
+# they are one procedure it writes the merged skill, which waits on Customize › Skills as a proposal for your yes (at
+# most skill_proposals_per_night a night; 0 proposes none); your yes makes it a new version of one, and the other rests.
+skill_rest_days = 60
+skill_merge_similarity = 0.75
+skill_proposals_per_night = 3
 # Before write_file or edit_file changes a file, the run notes the change in its journal, and its first change to a file
 # keeps a copy of the file as it was, so that `dotx undo RUN_ID` can take the changes of the run back. A file larger
 # than undo_max_file_bytes, or one whose copy would bring the copies of the run past undo_max_run_bytes, is changed

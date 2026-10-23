@@ -10,7 +10,11 @@
 // agents set up (item 164): their skills, folded by agent, and their MCP servers by name and what they reach, never
 // their arguments or keys. Dot uses one only once the owner adds it here, after a confirmation (item 165): a skill is
 // copied into Dot's skills folder and offered to runs at once, a server is started from Dot's next start; Remove takes
-// it back. Import from other apps adds several at once from a checklist (item 219).
+// it back. Import from other apps adds several at once from a checklist (item 219). A learned skill no run read for
+// [agent] skill_rest_days rests (item 585): it is shown as resting, last in its section, and is not offered to runs
+// until Wake; Pin keeps one from resting; Versions lists the ones a rewrite, a merge or a restore kept, with the steps
+// each changed, and Restore puts one back. What the nightly reflection proposes (a merge of two skills that say the
+// same) waits above them as cards, with the steps it would write, for the owner's yes or no.
 
 import { api, query } from "../api.js";
 import { customizeHead } from "../customizehead.js";
@@ -18,6 +22,8 @@ import { ago, clip, el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { IMPORTED_SKILL_MARK, LEARNED_SKILL_MARK, skillMark, tintMark } from "../marks.js";
 import { emptyPanel, errorPanel, foldGroup, loadingPanel, segmented } from "../panels.js";
+import { proposalCard } from "../skillproposals.js";
+import { showVersions } from "../skillversions.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 /** Drop a learned skill after a confirmation; resolves to the list after it, or null when the owner kept it. */
@@ -44,6 +50,28 @@ async function shareSkill(skill, shared) {
   return page.items;
 }
 
+/** Pin a learned skill so that it never rests (a resting one wakes), or take the pin off; resolves to the list after it. */
+async function pinSkill(skill, pinned) {
+  const page = await api.put(`/skills/learned/${encodeURIComponent(skill.name)}/pin`, { pinned });
+  toast("ok", pinned ? `${skill.name} is pinned: it never rests.` : `${skill.name} is not pinned.`);
+  return page.items;
+}
+
+/** Wake a learned skill that rests, for disuse, by hand or for a merge; resolves to the list after it. */
+async function wakeSkill(skill) {
+  const page = await api.post(`/skills/learned/${encodeURIComponent(skill.name)}/wake`, {});
+  toast("ok", `${skill.name} is awake: runs are offered it again.`);
+  return page.items;
+}
+
+/** Why a skill rests, in words: no run read it for `restDays` days, the owner put it to rest, or a merge put it aside. */
+function restWords(skill, restDays) {
+  if (skill.rest_reason === "merged") {
+    return `Merged into ${skill.merged_into}`;
+  }
+  return skill.rest_reason === "owner" ? "Put to rest by you" : `No run read it for ${plural(restDays, "day", "days")}`;
+}
+
 /**
  * One learned skill as a row: the name and the description, then the kind, the place, the agent whose it is, the runs
  * and the record. `skill.agentName` names the agent when the skill is one's; `onChanged` gets the list after an action.
@@ -66,6 +94,11 @@ export function skillRow(skill, onChanged) {
     skill.agent_id === null
       ? null
       : el("span", { class: "chip" }, skill.shared ? `${skill.agentName ?? "An agent"}, shared` : (skill.agentName ?? "An agent"));
+  // A skill that rests is not offered to runs (item 585): the row says so and Wake offers it again.
+  const wake = skill.resting ? el("button", { class: "btn ghost sm", type: "button" }, "Wake") : null;
+  if (wake !== null) {
+    wake.addEventListener("click", () => attempt(async () => onChanged(await wakeSkill(skill))));
+  }
   return el(
     "div",
     { class: "list-row" },
@@ -79,12 +112,14 @@ export function skillRow(skill, onChanged) {
         { class: "row-meta" },
         el("span", { class: "chip" }, skill.kind),
         whose,
+        skill.resting ? el("span", { class: "chip" }, "Resting") : null,
+        skill.pinned ? el("span", { class: "chip" }, "Pinned") : null,
         el("span", null, skill.host),
         el("span", null, `Learned from ${plural(skill.runs.length, "run", "runs")}, last ${ago(skill.updated_at)}`),
         el("span", null, record),
       ),
     ),
-    el("div", { class: "row-actions" }, share, drop),
+    el("div", { class: "row-actions" }, wake, share, drop),
   );
 }
 
@@ -422,8 +457,9 @@ const BUILTIN_SOURCE = "built-in";
 const PLUGIN_SOURCE = "plugin ";
 const OWN_SOURCES = new Set(["home", "config"]);
 
-/** A card: the skill's mark, its name with that Dot has it, what it is for, its facts and its actions. */
-function skillCard({ name, description, mark, facts, actions, have }) {
+/** A card: the skill's mark, its name with that Dot has it, what it is for, its facts and its actions. `haveMark` is the
+ * icon beside the state and `haveClass` a class that sets its tone (a skill that rests is quiet, item 585). */
+function skillCard({ name, description, mark, facts, actions, have, haveMark = "check", haveClass = "" }) {
   return el(
     "div",
     { class: "skill-card", dataset: { skill: name } },
@@ -435,7 +471,7 @@ function skillCard({ name, description, mark, facts, actions, have }) {
         "div",
         { class: "skill-head" },
         el("div", { class: "skill-name" }, name),
-        el("span", { class: `skill-have${have === "Retired" ? " retired" : ""}` }, have === "Retired" ? null : icon("check"), have),
+        el("span", { class: `skill-have${have === "Retired" ? " retired" : ""}${haveClass}` }, have === "Retired" ? null : icon(haveMark), have),
       ),
       el("div", { class: "skill-does" }, description),
       facts,
@@ -460,22 +496,78 @@ function factsOf(chips, words) {
   ];
 }
 
-/** A learned skill as a card: the kind of work, the place, the agent whose it is, the runs and the record, with Share
- * for an agent's and Drop. `onChanged` gets the list after an action. */
-function learnedCard(skill, onChanged) {
+/** The state a learned skill's card says: retired, resting (quiet), pinned or learned, with the icon beside it. */
+function learnedState(skill) {
+  if (skill.retired) {
+    return { have: "Retired", haveMark: "check", haveClass: "" };
+  }
+  if (skill.resting) {
+    return { have: "Resting", haveMark: "clock", haveClass: " resting" };
+  }
+  return skill.pinned ? { have: "Pinned", haveMark: "pin", haveClass: "" } : { have: "Learned", haveMark: "check", haveClass: "" };
+}
+
+/** A learned skill as a card: the kind of work, the place, the agent whose it is, the runs, the record and when a run last
+ * read it, with Versions once it was rewritten, Wake while it rests, Pin, Share for an agent's and Drop. `onChanged` gets
+ * the list after an action; `restDays` is the days after which a skill no run read rests. */
+function learnedCard(skill, onChanged, restDays) {
   const drop = el("button", { class: "btn ghost sm", type: "button" }, "Drop");
   drop.addEventListener("click", () => attempt(async () => onChanged(await dropSkill(skill))));
   const share = skill.agent_id === null ? null : el("button", { class: "btn ghost sm", type: "button" }, skill.shared ? "Keep to the agent" : "Share");
   if (share !== null) {
     share.addEventListener("click", () => attempt(async () => onChanged(await shareSkill(skill, !skill.shared))));
   }
+  const versions =
+    skill.version > 1
+      ? el("button", { class: "btn ghost sm", type: "button", title: "The versions this skill had, and what each changed" }, icon("clock"), `Versions (${skill.version})`)
+      : null;
+  if (versions !== null) {
+    versions.addEventListener("click", () => attempt(() => showVersions(skill, onChanged)));
+  }
+  const wake =
+    skill.resting && !skill.retired
+      ? el("button", { class: "btn ghost sm", type: "button", title: "Offer this skill to runs again" }, "Wake")
+      : null;
+  if (wake !== null) {
+    wake.addEventListener("click", () => attempt(async () => onChanged(await wakeSkill(skill))));
+  }
+  const pin = skill.retired
+    ? null
+    : el(
+        "button",
+        {
+          class: "btn ghost sm",
+          type: "button",
+          "aria-pressed": String(skill.pinned),
+          title: skill.pinned ? "Take the pin off: this skill may rest again" : "Pin this skill: it never rests",
+        },
+        icon("pin"),
+        skill.pinned ? "Unpin" : "Pin",
+      );
+  if (pin !== null) {
+    pin.addEventListener("click", () => attempt(async () => onChanged(await pinSkill(skill, !skill.pinned))));
+  }
   const record = skill.uses + skill.failures === 0 ? "Not read by a run yet" : `${plural(skill.uses, "run", "runs")} done after reading it, ${skill.failures} failed`;
   const chips = [
     el("span", { class: "chip" }, skill.kind),
     skill.agent_id === null ? null : el("span", { class: "chip" }, skill.shared ? `${skill.agentName ?? "An agent"}, shared` : (skill.agentName ?? "An agent")),
   ].filter((chip) => chip !== null);
-  const facts = factsOf(chips, [skill.host, `Learned from ${plural(skill.runs.length, "run", "runs")}, last ${ago(skill.updated_at)}`, record]);
-  return skillCard({ name: skill.name, description: skill.description, mark: LEARNED_SKILL_MARK, facts, actions: [share, drop].filter((one) => one !== null), have: skill.retired ? "Retired" : "Learned" });
+  const facts = factsOf(chips, [
+    skill.host,
+    `Learned from ${plural(skill.runs.length, "run", "runs")}, last ${ago(skill.updated_at)}`,
+    record,
+    skill.last_read_at === null ? null : `Last read ${ago(skill.last_read_at)}`,
+    skill.version > 1 ? `Version ${skill.version}` : null,
+    skill.resting && !skill.retired ? restWords(skill, restDays) : null,
+  ].filter((fact) => fact !== null));
+  return skillCard({
+    name: skill.name,
+    description: skill.description,
+    mark: LEARNED_SKILL_MARK,
+    facts,
+    actions: [versions, wake, pin, share, drop].filter((one) => one !== null),
+    ...learnedState(skill),
+  });
 }
 
 // A chat's run that can give a skill at the owner's word, by what the page knows of it: it ended done, it is no
@@ -556,6 +648,10 @@ export function mount(root) {
   let disposed = false;
   let palette = null;
   let items = null;
+  // The days after which a learned skill no run read rests ([agent] skill_rest_days), as the list says.
+  let restDays = 60;
+  // The changes to learned skills that wait for a yes, read apart from the skills so that a failure leaves them on the page.
+  let proposals = [];
   let agents = [];
   let found = null;
   let foundError = null;
@@ -692,9 +788,32 @@ export function mount(root) {
         const from = skill.gone ? `Imported from ${skill.agent}, which no longer has it` : `Imported from ${skill.agent}`;
         return skillCard({ name: skill.name, description: skill.description, mark: IMPORTED_SKILL_MARK, facts: factsOf([], [from]), actions: [remove], have: "Installed" });
       });
-    const named = withAgentNames(items, agents).filter((skill) => matches(skill.name, skill.description));
-    const learnedCards = named.map((skill) => learnedCard(skill, changed));
-    const parts = [section("own", "Yours", ownCards), section("imported", "Imported", importedCards), section("learned", "Learned", learnedCards)];
+    // Awake first, then those that rest, then the retired ones; each in the order the list gave.
+    const rank = (skill) => (skill.retired ? 2 : skill.resting ? 1 : 0);
+    const named = withAgentNames(items, agents)
+      .filter((skill) => matches(skill.name, skill.description))
+      .sort((one, other) => rank(one) - rank(other));
+    const learnedCards = named.map((skill) => learnedCard(skill, changed, restDays));
+    const waiting = proposals
+      .filter((view) => matches(view.proposal.names.join(" "), view.proposal.reason))
+      .map((view) =>
+        proposalCard(view, {
+          onAccepted: (list) => {
+            changed(list);
+            attempt(loadProposals);
+          },
+          onDismissed: (after) => {
+            proposals = after.items;
+            paint();
+          },
+        }),
+      );
+    const parts = [
+      section("proposals", "Waiting for your yes", waiting),
+      section("own", "Yours", ownCards),
+      section("imported", "Imported", importedCards),
+      section("learned", "Learned", learnedCards),
+    ];
     if (parts.every((part) => part === null)) {
       parts.push(
         words === ""
@@ -799,6 +918,7 @@ export function mount(root) {
         return;
       }
       items = page.items;
+      restDays = page.rest_days;
       agents = rows;
       palette = offered;
       paint();
@@ -811,6 +931,19 @@ export function mount(root) {
           }),
         );
       }
+    }
+  }
+
+  // Read apart from the skills, so that a failure here leaves them on the page: what the page shows without them is the
+  // skills as they were.
+  async function loadProposals() {
+    try {
+      proposals = (await api.get("/skills/proposals")).items;
+    } catch (error) {
+      console.error("the proposals to change skills could not be read", error);
+    }
+    if (!disposed) {
+      paint();
     }
   }
 
@@ -828,6 +961,7 @@ export function mount(root) {
 
   root.append(head.element, holder);
   load();
+  loadProposals();
   loadFound();
   return () => {
     disposed = true;

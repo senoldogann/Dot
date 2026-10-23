@@ -84,7 +84,7 @@ from dotagent.agent.plan import (
     render_plan,
     with_step_status,
 )
-from dotagent.agent.playbooks import offered_to_run
+from dotagent.agent.playbooks import date_reads, offered_to_run
 from dotagent.agent.progress import (
     SINGLE_ACTION_STEPS,
     ActCall,
@@ -911,10 +911,11 @@ def _turned_on(outcomes: Sequence[ToolOutcome], hidden: Mapping[str, str], on: f
     return tuple(dict.fromkeys(group for group in named if group not in on))
 
 
-async def _opening_text(opening: RunOpening, offered: Sequence[Skill], room: int) -> str:
+async def _opening_text(opening: RunOpening, offered: Sequence[Skill], room: int, root: Path | None) -> str:
     """The run's first message to the model: its opening's text, then what the owner picked for it (item 318), each
-    picked skill's instructions within ``room`` characters as the ``skill`` tool gives them. A picked skill no longer
-    ``offered`` to the run (taken away since the message was sent) fails the run, which says why."""
+    picked skill's instructions within ``room`` characters as the ``skill`` tool gives them, the read of each learned
+    skill dated first (item 585: ``root`` is the playbooks' folder, ``None`` with learned skills off). A picked skill no
+    longer ``offered`` to the run (taken away since the message was sent) fails the run, which says why."""
     if opening.picks == NO_PICKS:
         return opening.text
     by_name: dict[str, Skill] = {skill.name: skill for skill in offered}
@@ -923,6 +924,8 @@ async def _opening_text(opening: RunOpening, offered: Sequence[Skill], room: int
         raise InvalidValueError(
             f"the skills {', '.join(gone)} picked for this message are no longer offered to it", {"skills": list(gone)}
         )
+    if root is not None:
+        await date_reads(root, [by_name[name] for name in opening.picks.skills], time.time())
     skills: list[str] = [await skill_instructions(by_name[name], room) for name in opening.picks.skills]
     return with_picks(opening.text, opening.picks, skills)
 
@@ -1913,7 +1916,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         runtime,
         run.thread_id,
         run.id,
-        await _opening_text(opening, skills.skills, scaffold.tool_output_chars),
+        await _opening_text(opening, skills.skills, scaffold.tool_output_chars, playbook_root(runtime.config)),
         opening.files,
         info.vision,
     )

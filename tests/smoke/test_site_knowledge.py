@@ -7,6 +7,7 @@ every role is the scripted model and Ollama's address is a closed port.
 
 import asyncio
 import threading
+import time
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -122,7 +123,7 @@ def _learned(kind: str, host: str, description: str) -> Playbook:
         run_id="run_old",
         agent_id=None,
         goal=description,
-        written_at=1_700_000_000.0,
+        written_at=time.time(),
         acting_steps=2,
         tainted=False,
     )

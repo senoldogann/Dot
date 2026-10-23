@@ -4,18 +4,28 @@ import asyncio
 import secrets
 import shlex
 import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
 from pydantic import Field
 
-from dotagent.agent.playbooks import offered_to_run
+from dotagent.agent.playbooks import OfferedSkills, date_reads, offered_with_marks
 from dotagent.config import AppConfig
 from dotagent.core.text import text_window, unclosing
 from dotagent.policy.types import ActionInfo
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import PYTHON_MARK, SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
-from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
+from dotagent.tools.base import (
+    ALL_MODES,
+    RegisteredTool,
+    ToolArgs,
+    ToolResult,
+    fail,
+    make_tool,
+    mark_untrusted,
+    ok,
+)
 from dotagent.tools.context import ToolContext
 
 _NONCE_BYTES: int = 8
@@ -127,11 +137,17 @@ def build_skill_tool() -> RegisteredTool:
         catalog: SkillCatalog = await asyncio.to_thread(
             load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
         )
-        offered: tuple[Skill, ...] = await offered_to_run(config, catalog, ctx.agent_id)
-        found: Skill | None = next((entry for entry in offered if entry.name == args.name), None)
+        offered: OfferedSkills = await offered_with_marks(config, catalog, ctx.agent_id)
+        found: Skill | None = next((entry for entry in offered.skills if entry.name == args.name), None)
         if found is None:
-            names: str = ", ".join(entry.name for entry in offered) or "none"
+            names: str = ", ".join(entry.name for entry in offered.skills) or "none"
             return fail(f"No skill offered to this run is called {args.name}. The skills it is offered: {names}.")
+        # The read is dated here, where it happens, whatever the run is (a chat, a helper's, one that will be stopped):
+        # a skill that no run read for the days rests (item 585). Before the run is handed the instructions; a date
+        # that cannot be written is logged and the skill is read all the same.
+        root: Path | None = playbook_root(config)
+        if root is not None:
+            await date_reads(root, [found], time.time())
         skill: Skill = with_python(found, shlex.quote(sys.executable))
         start: int = args.start or 0
         if start > 0 and start >= len(skill.body):
@@ -140,7 +156,10 @@ def build_skill_tool() -> RegisteredTool:
             )
         # The files come with the first part of the instructions.
         files: list[str] = await asyncio.to_thread(files_of_skill, skill.root) if start == 0 else []
-        return ok(render_skill(skill, files, secrets.token_hex(_NONCE_BYTES), start, ctx.output_chars))
+        read: ToolResult = ok(render_skill(skill, files, secrets.token_hex(_NONCE_BYTES), start, ctx.output_chars))
+        # A learned skill whose steps may come from content third parties can author is such content for the run that
+        # reads it (item 585): the run is tainted from here on, as one that read a page, and what it learns is marked.
+        return mark_untrusted(read) if found.name in offered.third_party else read
 
     return make_tool(
         name=SKILL_TOOL,

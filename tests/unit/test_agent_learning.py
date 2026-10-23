@@ -13,6 +13,7 @@ from dotagent.agent.playbooks import (
     offered_to,
     playbook_name,
     read_meta,
+    record_use,
     release_playbooks,
     share_playbook,
     write_playbook,
@@ -89,16 +90,16 @@ def test_an_agents_skill_is_offered_to_its_runs_alone_until_shared_and_is_dots_o
     skills: tuple[Skill, ...] = load_catalog((SkillRoot(path=tmp_path, source="learned"),)).skills
     stranger: Skill = skills[0].model_copy(update={"name": "learned-unrecorded", "source": "learned"})
     home: Skill = skills[0].model_copy(update={"name": "home-skill", "source": "home"})
-    assert [skill.name for skill in offered_skills([*skills, stranger, home], entries, SCOUT)] == [
+    assert [skill.name for skill in offered_skills([*skills, stranger, home], entries, SCOUT, ())] == [
         "learned-book-a-table",
         "learned-sort-the-inbox",
         "home-skill",
     ]
-    assert [skill.name for skill in offered_skills([*skills, stranger, home], entries, None)] == [
+    assert [skill.name for skill in offered_skills([*skills, stranger, home], entries, None, ())] == [
         "learned-book-a-table",
         "home-skill",
     ]
-    assert [skill.name for skill in offered_skills(skills, (), SCOUT)] == []
+    assert [skill.name for skill in offered_skills(skills, (), SCOUT, ())] == []
     # Shared, it goes to every run; kept to the agent again, to its runs alone.
     assert share_playbook(tmp_path, scouts.name, True).shared is True
     assert offered_to(read_meta(tmp_path / scouts.name), CLERK)
@@ -109,6 +110,26 @@ def test_an_agents_skill_is_offered_to_its_runs_alone_until_shared_and_is_dots_o
     released: PlaybookMeta = read_meta(tmp_path / scouts.name)
     assert (released.agent_id, released.kind, released.runs) == (None, "Sort the inbox", ("run-1",))
     assert release_playbooks(tmp_path, SCOUT) == 0
+
+
+def test_releasing_an_agents_skills_writes_each_record_in_its_own_folder_a_retired_one_beside_an_active_one(
+    tmp_path: Path,
+) -> None:
+    """The review of item 585, round 2, looking for the slip beside the one it found: a retired skill that carries the
+    name of an active one was released into the folder its name finds, the active skill's, whose record it replaced."""
+    write_playbook(tmp_path, _playbook("Sort the inbox", SCOUT).model_copy(update={"run_id": "run-old"}))
+    record_use(tmp_path, "learned-sort-the-inbox", False, 1_700_000_000.0)
+    record_use(tmp_path, "learned-sort-the-inbox", False, 1_700_000_000.0)
+    write_playbook(tmp_path, _playbook("Sort the inbox", SCOUT).model_copy(update={"run_id": "run-new"}))
+    assert [(entry.meta.name, entry.retired) for entry in list_playbooks(tmp_path)] == [
+        ("learned-sort-the-inbox", False),
+        ("learned-sort-the-inbox", True),
+    ]
+    assert release_playbooks(tmp_path, SCOUT) == 2
+    active: PlaybookMeta = read_meta(tmp_path / "learned-sort-the-inbox")
+    retired: PlaybookMeta = read_meta(tmp_path / ".retired" / "learned-sort-the-inbox")
+    assert (active.agent_id, active.runs, active.failures) == (None, ("run-new",), 0)
+    assert (retired.agent_id, retired.runs, retired.failures) == (None, ("run-old",), 2)
 
 
 async def _run(store: Store, thread: ThreadRecord, agent_id: str | None, status: str) -> RunRecord:

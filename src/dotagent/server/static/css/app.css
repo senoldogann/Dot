@@ -2696,6 +2696,142 @@ a.pill:hover {
   margin-top: 8px;
 }
 
+/* The life of a learned skill (item 585): one that rests says so quietly, beside a clock; a proposal to change skills is a
+   card of the grid's full width, for it shows the steps it would write; the steps of a version, or of a proposal, mark
+   the one added and strike the one dropped; the versions are listed in a dialog that scrolls inside. */
+.skill-have.resting {
+  color: var(--muted);
+}
+
+.proposal-card {
+  grid-column: 1 / -1;
+}
+
+.proposal-card .skill-actions {
+  margin-top: var(--space-3);
+}
+
+.proposal-effects {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.proposal-stale {
+  margin: 0;
+}
+
+/* Everything a yes writes, a field at a time: its name, then its lines marked against the skill it replaces. */
+.proposal-fields {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.proposal-field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.proposal-field-label {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  line-height: var(--leading-sm);
+}
+
+.proposal-none {
+  margin: 0;
+}
+
+.version-steps {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.version-step {
+  display: grid;
+  grid-template-columns: 1.25em minmax(0, 1fr);
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  overflow-wrap: anywhere;
+}
+
+.version-step.kept {
+  color: var(--text-2);
+}
+
+.version-step.added {
+  color: var(--ok);
+}
+
+.version-step.dropped {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.version-sign {
+  font-family: var(--mono);
+  font-weight: var(--weight-label);
+}
+
+.version-counts {
+  margin: 0;
+}
+
+dialog.modal.versions-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-width: min(640px, calc(100vw - 32px));
+}
+
+.versions-list {
+  display: grid;
+  gap: var(--space-3);
+  max-height: min(520px, 60vh);
+  max-height: min(520px, 60dvh);
+  margin-top: var(--space-3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.version-block {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.version-block[data-current="true"] {
+  border-color: var(--border-strong);
+}
+
+.version-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.version-number {
+  font-weight: var(--weight-title);
+}
+
+.version-how {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  overflow-wrap: anywhere;
+}
+
 .chat-skill-list {
   display: grid;
   gap: 4px;

@@ -413,6 +413,41 @@ class SkillsListCommand(FrozenModel):
     name: Literal["skills-list"]
 
 
+class SkillsVersionsCommand(FrozenModel):
+    """The versions of a learned skill (item 585)."""
+
+    name: Literal["skills-versions"]
+    skill: str
+
+
+class SkillsRestoreCommand(FrozenModel):
+    """Put a version of a learned skill back as its steps (item 585)."""
+
+    name: Literal["skills-restore"]
+    skill: str
+    version: int = Field(ge=1)
+
+
+class SkillsKeepCommand(FrozenModel):
+    """Pin, unpin, put to rest or wake a learned skill (item 585)."""
+
+    name: Literal["skills-pin", "skills-unpin", "skills-rest", "skills-wake"]
+    skill: str
+
+
+class SkillsProposalsCommand(FrozenModel):
+    """The changes to learned skills that wait for the owner's yes (item 585)."""
+
+    name: Literal["skills-proposals"]
+
+
+class SkillsDecideCommand(FrozenModel):
+    """The owner's yes or no to a proposal of a change to a learned skill (item 585)."""
+
+    name: Literal["skills-accept", "skills-dismiss"]
+    proposal_id: str
+
+
 class StatsCommand(FrozenModel):
     name: Literal["stats"]
     days: int = Field(ge=1)
@@ -497,6 +532,11 @@ type Command = Annotated[
     | CampaignAchievedCommand
     | McpListCommand
     | SkillsListCommand
+    | SkillsVersionsCommand
+    | SkillsRestoreCommand
+    | SkillsKeepCommand
+    | SkillsProposalsCommand
+    | SkillsDecideCommand
     | PlaybooksListCommand
     | PlaybooksShowCommand
     | PlaybooksDropCommand

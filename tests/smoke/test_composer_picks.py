@@ -121,6 +121,7 @@ SKILL_WRITTEN: ScriptedTurn = _turn(
     ScriptedCall(
         tool=PLAYBOOK_TOOL,
         arguments={
+            "recurs": True,
             "kind": KIND,
             "description": "Add two numbers and keep the sum in a file.",
             "when": "A goal that asks for a sum to keep.",

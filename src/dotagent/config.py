@@ -312,6 +312,12 @@ class AgentConfig(FrozenModel):
     playbooks: bool
     # The acting steps a done task run must have taken before it is distilled into a learned skill.
     skill_min_steps: int = Field(ge=1)
+    # After how many days that no run read a learned skill it rests (item 585): not offered to a run, shown as resting.
+    skill_rest_days: int = Field(ge=1)
+    # How close (cosine of the embeddings of their kinds) two learned skills must be for the review model to be asked
+    # whether they are one procedure, and the most merges it proposes to the owner in a night (0 for none).
+    skill_merge_similarity: float = Field(gt=0, le=1)
+    skill_proposals_per_night: int = Field(ge=0)
     undo_max_file_bytes: int
     undo_max_run_bytes: int
     undo_keep_days: int

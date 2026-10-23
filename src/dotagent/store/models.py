@@ -436,6 +436,21 @@ class MemoryRecord(FrozenModel):
     rested_at: float | None = None
 
 
+class ResultStep(FrozenModel):
+    """What a step of a run said of itself when it ended (item 585): the tool, the kind of its action, what it acted on
+    (a path, a command, an address, as the run's record shows it), the flags its action raised and, when the call's
+    arguments named something Dot guards or loads (an MCP call's target is its server, so the executor reads its
+    arguments where it classifies it), what they named: ``""`` for a step that named nothing, or that an older Dot
+    recorded. ``helper`` says the step is one of a run the run delegated (the steps of a family are read together)."""
+
+    tool: str
+    kind: str
+    target: str
+    flags: tuple[str, ...]
+    names_dot: str = ""
+    helper: bool = False
+
+
 class TrashedMemory(FrozenModel):
     """A note the owner forgot, kept whole for a while so that it can come back (item 584): the note as it was and
     when it went to the trash."""

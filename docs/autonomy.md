@@ -369,6 +369,12 @@ notes you forgot more than `trash_days` (30) ago, the only thing it deletes. A n
 pinned note, a `core` note and a journal are never merged, rested or proposed by it, and none of it writes What Dot
 knows about you. `dotx reflect` says what it did, among it how many notes wait for you to forget or keep them.
 
+**The reflection and the learned skills (item 585).** In the same night a skill whose record counts uses and has no
+date of its last read is given one, and the review model is asked which pairs of skills whose kinds are close in
+meaning (`[agent] skill_merge_similarity`, 0.75) are one procedure: each yes is a merge that waits as a card on
+Customize › Skills, at most `skill_proposals_per_night` (3) a night, for your yes. No skill is written, rested or
+deleted by it: see Learned skills in [Extending Dot](extending.md).
+
 **Taking back the file changes of a run.** Under the answer of a chat's run, its line of what it changed has an
 **Undo**, which does what follows for the files it lists (item 597).
 Before `write_file` or `edit_file` changes a file, the run notes the change
