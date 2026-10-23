@@ -1,10 +1,12 @@
 // Settings › Channels (item 572): the owner's own messaging apps as ways to reach Dot. A message of theirs starts a run in
 // a chat of its own ("iMessage"), the answer comes back on the app, and an approval is answered in Dot, never in a message.
-// iMessage reads the owner's conversation with themselves in Messages: its card has the switch, the numbers and addresses
-// paired (each with a code sent to it that the owner types back from their iPhone), and what macOS has granted: Full Disk
-// Access to read Messages' database and Automation to send in it.
+// iMessage reads the owner's conversation with themselves in Messages, or with their iPhone's Apple ID when it is not the
+// Mac's own (item 595): its card has the switch, the numbers and addresses paired (each with a code sent to it that the
+// owner types back from their iPhone), what macOS has granted (Full Disk Access to read Messages' database and Automation
+// to send in it) and what the channel sees of that database, with Check now, which looks at once.
 
 import { api } from "../api.js";
+import { lookWords, seenFacts } from "../channelfacts.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { errorPanel, loadingPanel, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
@@ -18,6 +20,8 @@ const DATABASE = {
   missing: ["b-warn", "missing"],
   no_database: ["b-warn", "no Messages database yet"],
 };
+// What a paired number or address means (item 595): what it writes to this Mac runs as the owner's command.
+const RUNS_AS_YOU = "Messages from this address run as you";
 const AUTOMATION = {
   allowed: ["b-ok", "allowed"],
   not_asked: ["b-warn", "not asked yet"],
@@ -94,6 +98,16 @@ export function mount(root, ctx) {
     }
   }
 
+  // Check now looks at Messages' database at once, as the next poll would, and says what it saw. It is made once, so that
+  // it keeps its place and its pressed state through every drawing of the page.
+  const checkNow = async () => {
+    const before = current?.imessage.seen.command?.rowid ?? null;
+    await post("/channels/imessage/poll", {});
+    if (!disposed) {
+      toast(...lookWords(current.imessage, before));
+    }
+  };
+  const checkButton = offer("Check now", "refresh", checkNow);
   const sendCode = () => post("/channels/imessage/code", { handle: handleField.value }, "A code is on its way to that number or address.");
   const confirmCode = async () => {
     await post("/channels/imessage/confirm", { code: codeField.value }, "Paired. Messages you send to yourself now reach Dot.");
@@ -129,19 +143,24 @@ export function mount(root, ctx) {
     confirmButton,
   );
 
-  /** The numbers and addresses paired, each with the button that forgets it; the form that sends a code to another, and
-   * the one that takes the code back. */
+  /** The numbers and addresses paired, each with the button that forgets it and what pairing it means; the form that
+   * sends a code to another, and the one that takes the code back. */
   function handlesRow(view) {
     const paired = view.handles.map((handle) =>
       el(
-        "span",
-        { class: "chip channel-handle" },
-        el("span", { class: "mono" }, handle),
+        "div",
+        { class: "channel-paired" },
         el(
-          "button",
-          { class: "icon-btn", type: "button", title: `Stop reading ${handle}`, "aria-label": `Stop reading ${handle}`, onclick: () => attempt(() => remove(handle)) },
-          icon("x"),
+          "span",
+          { class: "chip channel-handle" },
+          el("span", { class: "mono" }, handle),
+          el(
+            "button",
+            { class: "icon-btn", type: "button", title: `Stop reading ${handle}`, "aria-label": `Stop reading ${handle}`, onclick: () => attempt(() => remove(handle)) },
+            icon("x"),
+          ),
         ),
+        el("span", { class: "hint" }, RUNS_AS_YOU),
       ),
     );
     const waiting =
@@ -159,11 +178,11 @@ export function mount(root, ctx) {
           );
     return setRow({
       title: "Your number or Apple ID email",
-      lead: "Pair only your own number or Apple ID email: the conversation with yourself. Dot runs what you write there as your command, and the code it sends shows only that it reached whoever holds that number.",
+      lead: "Pair only your own number or Apple ID email: the conversation with yourself. If your iPhone uses another Apple ID than this Mac, pair the number or address it writes from, which names the conversation on this Mac. Dot runs what you write there as your command, and so what that number or address writes to this Mac: pairing someone else's gives them Dot. The code it sends shows only that it reached whoever holds it.",
       body: el(
         "div",
         { class: "channel-body" },
-        paired.length === 0 ? el("p", { class: "hint" }, "None paired yet.") : el("div", { class: "cluster" }, paired),
+        paired.length === 0 ? el("p", { class: "hint" }, "None paired yet.") : el("div", { class: "channel-pairings" }, paired),
         handleForm,
         waiting,
       ),
@@ -204,10 +223,28 @@ export function mount(root, ctx) {
     ];
   }
 
+  /** What the channel sees of Messages' database (item 595): the newest message, how far Dot has read, when it looked, the
+   * two files, the last command and the last error, and Check now. */
+  function seenRow(view) {
+    const facts = el(
+      "dl",
+      { class: "kv kv-rows channel-seen" },
+      seenFacts(view.seen).map(([label, value]) => el("div", null, el("dt", null, label), el("dd", null, value))),
+    );
+    const row = setRow({
+      title: "What Dot sees in Messages",
+      lead: "Dot looks at Messages' database every few seconds while iMessage is on. Check now looks at once, and reads what is new when iMessage is on.",
+      control: checkButton,
+      body: el("div", { class: "channel-body" }, facts),
+    });
+    row.classList.add("channel-seen-row");
+    return row;
+  }
+
   function imessageSection(view) {
     const toggle = switchRowSetting({
       label: "iMessage",
-      hint: "Dot reads your conversation with yourself on this Mac and answers in it, and tells you there what it has to say on its own: the morning brief and your watchers. Only what you send from now on is read.",
+      hint: "Dot reads your conversation with yourself on this Mac, or the one your iPhone's Apple ID has with this Mac's, and answers in it, and tells you there what it has to say on its own: the morning brief and your watchers. Only what you send from now on is read.",
       read: () => view.on,
       write: async (on) => {
         await post("/channels/imessage/switch", { on }, on ? "Dot reads your conversation with yourself." : "Dot no longer reads iMessage.");
@@ -215,6 +252,10 @@ export function mount(root, ctx) {
       onToggled: () => toggle.paint(),
     });
     toggle.paint();
+    const warning =
+      view.seen.warning === null
+        ? null
+        : el("div", { class: "set-row" }, el("div", { class: "note" }, icon("alert"), el("span", null, view.seen.warning)));
     const problem =
       view.problem === null
         ? null
@@ -223,12 +264,12 @@ export function mount(root, ctx) {
       view.chat_run_id === null
         ? null
         : el("a", { class: "btn sm", href: `#/runs/${view.chat_run_id}` }, icon("message"), el("span", null, "Open the chat"));
-    const card = setCard(toggle.element, handlesRow(view), ...permissionRows(view), problem);
+    const card = setCard(toggle.element, handlesRow(view), ...permissionRows(view), seenRow(view), warning, problem);
     card.setAttribute("role", "group");
     card.setAttribute("aria-label", "iMessage");
     return setSection({
       title: "iMessage",
-      lead: "Message yourself from your iPhone. Each answer of Dot comes back in the same conversation, marked ◆.",
+      lead: "Message yourself from your iPhone, or write to this Mac's Apple ID from your own. Each answer of Dot comes back in the same conversation, marked ◆.",
       actions: chat,
       body: card,
     });

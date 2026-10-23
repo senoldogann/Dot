@@ -658,6 +658,26 @@
   gap: 8px;
 }
 
+/* What Dot sees in Messages (item 595): its lead is long, so on a phone Check now goes under it, as a control too wide
+   for the room beside the text does, instead of squeezing the text into a narrow column. */
+.channel-seen-row .set-row-text {
+  flex-basis: 260px;
+}
+
+/* A paired number or address and what pairing it means (item 595): the line stands beside it on a wide page and under it
+   on a phone. */
+.channel-pairings {
+  display: grid;
+  gap: 8px;
+}
+
+.channel-paired {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
 .channel-handle {
   gap: var(--space-half);
   padding: var(--space-half) var(--space-half) var(--space-half) var(--space-3);

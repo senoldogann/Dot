@@ -28,7 +28,9 @@ CREATE TABLE chat (
 CREATE TABLE message (
     ROWID INTEGER PRIMARY KEY AUTOINCREMENT, guid TEXT, text TEXT, attributedBody BLOB, handle_id INTEGER DEFAULT 0,
     date INTEGER, is_from_me INTEGER, service TEXT, cache_has_attachments INTEGER DEFAULT 0,
-    associated_message_type INTEGER DEFAULT 0, item_type INTEGER DEFAULT 0{more}
+    associated_message_type INTEGER DEFAULT 0, item_type INTEGER DEFAULT 0, is_delivered INTEGER DEFAULT 0,
+    is_read INTEGER DEFAULT 0, is_sent INTEGER DEFAULT 0, is_finished INTEGER DEFAULT 0,
+    date_delivered INTEGER DEFAULT 0, date_read INTEGER DEFAULT 0, error INTEGER DEFAULT 0{more}
 );
 CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
 """
@@ -74,6 +76,12 @@ class MessagesDb:
         self._db.executescript(_schema(extra_columns, balloons))
         self._guids: int = 0
 
+    def handle(self, identifier: str, service: str = "iMessage") -> int:
+        """A person's number or address as Messages keeps it, which a message received names as its sender."""
+        cursor: sqlite3.Cursor = self._db.execute("INSERT INTO handle(id, service) VALUES(?, ?)", (identifier, service))
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
+
     def chat(self, identifier: str, style: int = 45) -> int:
         """A chat named ``identifier``: with one person (45) or a group (43)."""
         cursor: sqlite3.Cursor = self._db.execute(
@@ -96,15 +104,18 @@ class MessagesDb:
         item_type: int = 0,
         later: dict[str, int] | None = None,
         balloon: str | None = None,
+        sender: int = 0,
     ) -> int:
         """A message in ``chat``: its words in the plain column (``text``) or as an attributed body (``body``).
+        ``sender`` is the handle (see :meth:`handle`) a message received names as the one it came from; none for a
+        message this Mac sent.
         ``later`` sets columns of Send Later (``{"schedule_type": 2}``): a message sent after it was written.
         ``balloon`` is the bundle of the rich content the row holds (a link preview's: the row of a link Messages split
         off a message); the database must have the column."""
         self._guids += 1
         cursor: sqlite3.Cursor = self._db.execute(
             "INSERT INTO message(guid, text, attributedBody, date, is_from_me, service, cache_has_attachments, "
-            "associated_message_type, item_type) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "associated_message_type, item_type, handle_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 f"guid-{self._guids}",
                 text,
@@ -115,6 +126,7 @@ class MessagesDb:
                 int(attachment),
                 reaction,
                 item_type,
+                sender,
             ),
         )
         rowid: int | None = cursor.lastrowid
@@ -125,6 +137,12 @@ class MessagesDb:
             self._db.execute("UPDATE message SET balloon_bundle_id = ? WHERE ROWID = ?", (balloon, rowid))
         self._db.execute("INSERT INTO chat_message_join(chat_id, message_id) VALUES(?, ?)", (chat, rowid))
         return rowid
+
+    def receipt(self, rowid: int, **columns: int) -> None:
+        """What Messages writes to a message after it is there: it was delivered (``is_delivered=1``,
+        ``date_delivered``), it was read (``is_read=1``, ``date_read``). No new row, but a change in the log."""
+        for column, value in columns.items():
+            self._db.execute(f"UPDATE message SET {column} = ? WHERE ROWID = ?", (value, rowid))
 
     def close(self) -> None:
         self._db.close()

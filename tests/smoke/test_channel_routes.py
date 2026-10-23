@@ -21,11 +21,12 @@ from dotagent.agent.manager import RunManager
 from dotagent.channels.imessage import MARKER
 from dotagent.channels.service import Channels
 from dotagent.config import ChannelsConfig, load_config
-from dotagent.core.errors import DesktopError
-from dotagent.core.paths import config_path
+from dotagent.core.errors import ChannelError, DesktopError
+from dotagent.core.paths import config_path, env_file_path
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.secrets import write_env_value
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.store.models import RunRecord
@@ -119,6 +120,20 @@ def _view(body: JsonObject) -> JsonObject:
     return imessage
 
 
+def _seen(body: JsonObject) -> JsonObject:
+    """What the channel says it sees of Messages' database (item 595), of a view."""
+    seen: object = _view(body)["seen"]
+    assert isinstance(seen, dict)
+    return seen
+
+
+def _part(seen: JsonObject, name: str) -> JsonObject:
+    """A part of what the channel sees that is there: the newest row, a file, the last command or error."""
+    found: object = seen[name]
+    assert isinstance(found, dict), f"{name} is {found!r}"
+    return found
+
+
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def world(runtime: Runtime, manager: RunManager, messages: MessagesDb) -> AsyncIterator[World]:
     osascript: Osascript = Osascript()
@@ -180,6 +195,16 @@ async def test_the_page_shows_a_channel_that_is_off_with_no_one_paired(world: Wo
         "needs": None,
         "chat_run_id": None,
         "program": "Dot",
+        "seen": {
+            "looked_at": None,
+            "cursor": None,
+            "newest": None,
+            "chat_db": None,
+            "chat_db_wal": None,
+            "command": None,
+            "error": None,
+            "warning": None,
+        },
     }
 
 
@@ -188,8 +213,27 @@ async def test_the_routes_need_the_token(world: World) -> None:
         await world.http.get("/api/channels"),
         await world.http.post("/api/channels/imessage/switch", json={"on": True}),
         await world.http.post("/api/channels/imessage/code", json={"handle": PHONE}),
+        await world.http.post("/api/channels/imessage/poll", json={}),
     ):
         assert answered.status_code == 401
+
+
+async def test_check_now_with_the_channel_off_looks_at_the_database_and_reads_no_message(world: World) -> None:
+    before: float = time.time()
+    newest: int = world.messages.message(world.messages.chat("+358409999999"), "to a friend", at=time.time())
+    seen: JsonObject = _seen(await world.post("/api/channels/imessage/poll", {}))
+    looked_at: object = seen["looked_at"]
+    assert isinstance(looked_at, float) and looked_at >= before
+    row: JsonObject = _part(seen, "newest")
+    assert row["rowid"] == newest and isinstance(row["dated"], float) and row["seen_at"] == looked_at
+    assert seen["cursor"] is None and seen["command"] is None and seen["error"] is None
+    # The files of the database, as the disk has them: the log has the rows the test just wrote.
+    database: JsonObject = _part(seen, "chat_db")
+    log_file: JsonObject = _part(seen, "chat_db_wal")
+    assert isinstance(database["size"], int) and isinstance(log_file["size"], int) and log_file["size"] > 0
+    assert isinstance(log_file["changed_at"], float)
+    # It only looked: the switch is off, nothing is paired, and no run was started.
+    assert _view(await world.get("/api/channels"))["on"] is False and await world.runs() == []
 
 
 async def test_a_number_is_paired_by_the_code_sent_to_it_typed_back(world: World) -> None:
@@ -230,6 +274,10 @@ async def test_a_message_the_owner_sends_to_themselves_starts_a_run_and_its_answ
     assert (run.goal, run.source, run.status) == ("what is two and two?", "imessage", "done")
     chat: JsonObject = _view(await world.get("/api/channels"))
     assert chat["chat_run_id"] == run.id and chat["on"] is True
+    # What the channel saw: the row it took as a command, which is the newest, and where it has read up to.
+    seen: JsonObject = _seen(await world.get("/api/channels"))
+    command: JsonObject = _part(seen, "command")
+    assert command["rowid"] == _part(seen, "newest")["rowid"] == seen["cursor"] and seen["warning"] is None
     # Dot's own answer, which landed in the same conversation as the owner's, is not read as one.
     world.messages.message(own, f"{MARKER}Four, said plainly.", at=time.time())
     await asyncio.sleep(0.4)
@@ -291,6 +339,9 @@ async def test_an_answer_that_could_not_go_leaves_the_channel_saying_what_it_nee
         return shown["needs"] == "automation" and "control Messages" in str(shown["problem"])
 
     await _until(says_automation, "the channel says what it needs")
+    # The last error is the one Messages gave, with its time; it stays when the problem is gone.
+    error: JsonObject = _part(_seen(await world.get("/api/channels")), "error")
+    assert "Not authorized to send Apple events" in str(error["message"]) and isinstance(error["at"], float)
     world.osascript.error = None
     replies.push(finish("This one goes."))
     sent_before: int = len(world.osascript.sent)
@@ -298,6 +349,64 @@ async def test_an_answer_that_could_not_go_leaves_the_channel_saying_what_it_nee
     await _until(lambda: len(world.osascript.sent) == sent_before + 1, "the answer goes")
     shown: JsonObject = _view(await world.get("/api/channels"))
     assert shown["needs"] is None and shown["problem"] is None
+
+
+async def test_check_now_with_the_channel_on_reads_what_is_new_once_with_the_loops_own_poll(
+    world: World, replies: Replies
+) -> None:
+    replies.clear()
+    before: int = len(await world.runs())
+    sent_before: int = len(world.osascript.sent)
+    replies.push(finish("It is late."))
+    row: int = world.messages.message(world.messages.chat(PHONE), "what time is it?", at=time.time())
+    # The loop polls every 0.05 s here, and the owner's press may come before or after it: one run either way.
+    seen: JsonObject = _seen(await world.post("/api/channels/imessage/poll", {}))
+    assert _part(seen, "command")["rowid"] == row == seen["cursor"]
+    await _until(lambda: len(world.osascript.sent) == sent_before + 1, "the answer was sent")
+    await asyncio.sleep(0.4)
+    assert [run.goal for run in (await world.runs())[before:]] == ["what time is it?"]
+
+
+async def test_check_now_with_the_switch_off_and_a_number_paired_looks_and_runs_nothing(
+    world: World, replies: Replies
+) -> None:
+    """The switch means Dot reads no message: Check now must not read one either."""
+    replies.clear()
+    own: int = world.messages.chat(PHONE)
+    await world.post("/api/channels/imessage/switch", {"on": False})
+    try:
+        before: int = len(await world.runs())
+        kept: JsonObject = _seen(await world.get("/api/channels"))
+        row: int = world.messages.message(own, "written while the switch is off", at=time.time())
+        seen: JsonObject = _seen(await world.post("/api/channels/imessage/poll", {}))
+        assert _part(seen, "newest")["rowid"] == row
+        assert seen["cursor"] == kept["cursor"] and seen["command"] == kept["command"]
+        await asyncio.sleep(0.4)
+        assert len(await world.runs()) == before
+    finally:
+        await world.post("/api/channels/imessage/switch", {"on": True})
+
+
+async def test_check_now_waits_for_a_switch_or_a_pairing_step_under_way(world: World) -> None:
+    """A press that could run a message must not run one after the switch said off: it takes its turn."""
+    async with world.channels.changing:
+        pressed: asyncio.Task[JsonObject] = asyncio.create_task(world.post("/api/channels/imessage/poll", {}))
+        await asyncio.sleep(0.3)
+        assert not pressed.done()
+    assert _seen(await pressed)["looked_at"] is not None
+
+
+async def test_the_last_error_is_masked_of_the_secrets_dot_holds(world: World) -> None:
+    secret: str = "hunter2-horse-battery-staple"
+    write_env_value(env_file_path(), "SOME_SERVICE_PASSWORD_FILE", secret)
+    world.osascript.error = DesktopError("osascript failed", {"stderr": f"Messages got an error: {secret} (-1728)"})
+    try:
+        with pytest.raises(ChannelError):
+            await world.channels.imessage.send("an answer")
+        message: str = str(_part(_seen(await world.get("/api/channels")), "error")["message"])
+    finally:
+        world.osascript.error = None
+    assert secret not in message and "Messages got an error: *** (-1728)" in message
 
 
 async def test_a_removed_number_is_no_longer_read(world: World) -> None:
@@ -367,6 +476,64 @@ async def test_a_daemon_that_starts_with_the_channel_on_reads_it_from_the_start(
         await _until(lambda: len(osascript.sent) == 1, "the answer")
         assert osascript.sent == [(PHONE, f"{MARKER}Read from the start.")]
         assert len(await runtime.store.list_runs(100, None)) == before + 1
+    finally:
+        await channels.stop()
+
+
+async def test_a_message_from_the_iphones_other_apple_id_starts_a_run_and_its_answer_goes_back_in_that_chat(
+    runtime: Runtime, manager: RunManager, messages: MessagesDb, replies: Replies
+) -> None:
+    """Two Apple IDs (item 595): the owner's message arrives on this Mac as a row received from their handle, not
+    flagged as sent by this Mac, in the chat named for it. It starts a run as the owner's; another handle's row in the
+    same chat, or one from a group, does not; and a message that Messages keeps as a sent row and a received row is one
+    command."""
+    replies.clear()
+    configured: Runtime = dataclasses.replace(
+        runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True)})
+    )
+    osascript: Osascript = Osascript()
+    channels: Channels = Channels(
+        configured,
+        manager,
+        "127.0.0.1",
+        8765,
+        script=osascript,
+        messages_db=messages.path,
+        macos=FakeMacos(),
+        poll_s=0.05,
+    )
+    await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
+    await channels.start()
+    try:
+        own: int = messages.chat(PHONE)
+        owner: int = messages.handle(PHONE)
+        await asyncio.sleep(0.4)
+        before: int = len(await runtime.store.list_runs(100, None))
+        replies.push(finish("Four, from your other Apple ID."))
+        messages.message(own, "what is two and two?", from_me=False, sender=owner, at=time.time())
+        await _until(lambda: len(osascript.sent) == 1, "the answer")
+        assert osascript.sent == [(PHONE, f"{MARKER}Four, from your other Apple ID.")]
+        assert len(await runtime.store.list_runs(100, None)) == before + 1
+        newest: list[RunRecord] = await runtime.store.list_runs(1, None)
+        assert (newest[0].goal, newest[0].source) == ("what is two and two?", "imessage")
+        # Another handle's row in that chat, and a row that came in from a group, start nothing.
+        messages.message(
+            own, "from another handle", from_me=False, sender=messages.handle("+358409999999"), at=time.time()
+        )
+        messages.message(messages.chat("chat777", style=43), "from the handle, in a group", from_me=False, sender=owner)
+        await asyncio.sleep(0.4)
+        assert len(await runtime.store.list_runs(100, None)) == before + 1
+        # One message kept as two rows, one sent and one received a second after it, starts one run and gets one answer.
+        replies.push(finish("Once."))
+        at: float = time.time()
+        messages.message(own, "say it once", at=at)
+        messages.message(own, "say it once", from_me=False, sender=owner, at=at + 1)
+        await _until(lambda: len(osascript.sent) == 2, "the answer to the pair")
+        await asyncio.sleep(0.4)
+        assert len(osascript.sent) == 2 and len(await runtime.store.list_runs(100, None)) == before + 2
+        seen: JsonObject = channels.imessage.seen().model_dump()
+        command: object = seen["command"]
+        assert isinstance(command, dict) and command["at"] > 0
     finally:
         await channels.stop()
 
