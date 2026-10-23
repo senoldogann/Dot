@@ -532,6 +532,19 @@
     grid-area: plus;
   }
 
+  /* With a microphone (item 574) the box keeps the line it had, so that the words of an empty box still fit the narrowest
+     phone, and the microphone stands on the line of the choices, by the context meter's place. */
+  .composer-bar.has-mic {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "plus field field send"
+      "options options mic meter";
+  }
+
+  .composer-bar > .mic-button {
+    grid-area: mic;
+  }
+
   .composer-bar > .composer-field {
     grid-area: field;
     flex: none;

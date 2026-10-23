@@ -3487,11 +3487,30 @@ a.pill:hover {
   margin-inline-end: auto;
 }
 
-.composer .plus-button {
+.composer .plus-button,
+.composer .mic-button {
   width: 32px;
   padding: 0;
   border-radius: var(--radius-pill);
   color: var(--text-2);
+}
+
+/* The microphone (item 574) while it listens: the accent's tint, and a ring that breathes out from it (none when the page
+   asks for reduced motion). The words a dictation may still change are drawn quieter (mirror.js). */
+.composer .mic-button.listening {
+  background: var(--accent-weak);
+  color: var(--accent-strong);
+  animation: pulse var(--motion-pulse) ease-out infinite;
+}
+
+::highlight(md-interim) {
+  color: var(--faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer .mic-button.listening {
+    animation: none;
+  }
 }
 
 /* A pill reads an icon and its value (the mark of a provider and "Muse Spark 1.3"), soft at rest: the secondary ink
@@ -3763,6 +3782,7 @@ a.pill:hover {
   }
 
   .composer .plus-button,
+  .composer .mic-button,
   .composer .btn.send {
     width: 36px;
     height: 36px;
@@ -7881,7 +7901,8 @@ button.attach-chip:hover {
   border-radius: var(--radius-xs);
 }
 
-.plus-button {
+.plus-button,
+.mic-button {
   flex: none;
 }
 
@@ -8642,6 +8663,7 @@ button.attach-chip:hover {
 
   /* The composer's round buttons are the send's size, at the dock's right, and so is the stop's square in them. */
   .composer .plus-button,
+  .composer .mic-button,
   .composer .btn.send {
     width: 36px;
     height: 36px;

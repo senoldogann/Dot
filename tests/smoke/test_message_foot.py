@@ -39,7 +39,7 @@ _MOST_GAP_PX: dict[str, dict[str, float]] = {
     "phone": {"user": 8.0, "answer": 8.0},
 }
 # What the page measures once the test has put on it a file sent with the message, a code block that ends the answer
-# and an answer's foot with no copy button: how far each foot stands under what is above it (review B7: the feet rose
+# and an answer's foot with no buttons: how far each foot stands under what is above it (review B7: the feet rose
 # over the file and the block, and a foot with no button touched the line above).
 _UNDER: str = """() => {
   const user = document.querySelector(".user-message");
@@ -56,7 +56,10 @@ _UNDER: str = """() => {
   const underFile = foot.getBoundingClientRect().top - chip.getBoundingClientRect().bottom;
   const underBlock = answerFoot.getBoundingClientRect().top - block.getBoundingClientRect().bottom;
   block.remove();
-  answerFoot.querySelector(".btn").remove();
+  // The foot of an answer with no words has no buttons: the copy and the speaker (item 574) both go.
+  for (const button of answerFoot.querySelectorAll(".btn")) {
+    button.remove();
+  }
   const facts = answerFoot.querySelector(".answer-facts").getBoundingClientRect();
   const underText = facts.top - prose.getBoundingClientRect().bottom;
   return { file: underFile, block: underBlock, text: underText };

@@ -147,6 +147,36 @@ export const AUTO_LINES = {
   paint: () => undefined,
 };
 
+/** The languages the microphone listens in and an answer is read aloud in (item 574): the page's own, or one of these tags. */
+export const VOICE_LANGUAGES = [
+  { id: "page", label: "The page's language" },
+  { id: "en-US", label: "English" },
+  { id: "tr-TR", label: "Türkçe" },
+  { id: "fi-FI", label: "Suomi" },
+  { id: "sv-SE", label: "Svenska" },
+  { id: "de-DE", label: "Deutsch" },
+  { id: "fr-FR", label: "Français" },
+  { id: "es-ES", label: "Español" },
+];
+
+/** The language of the voice (item 574): the page's own, or one of `VOICE_LANGUAGES`. Settings › General chooses it; it puts
+ * nothing on the page. */
+export const VOICE_LANGUAGE = {
+  key: "dot.voiceLanguage",
+  initial: "page",
+  parse: oneOf(VOICE_LANGUAGES.map((language) => language.id)),
+  paint: () => undefined,
+};
+
+/** Whether an answer that comes in is read aloud (item 574). Off until asked to. Settings › General chooses it; it puts nothing
+ * on the page. */
+export const READ_ALOUD = {
+  key: "dot.readAloud",
+  initial: "off",
+  parse: oneOf(["on", "off"]),
+  paint: () => undefined,
+};
+
 /** Whether the details panel opens on Dot's computer when a run that is going on first works in its browser (item 354),
  * beside the chat on a wide window; a phone keeps the button of its bar. Settings › Browser chooses it; it puts
  * nothing on the page. */

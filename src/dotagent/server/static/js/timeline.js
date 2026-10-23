@@ -896,6 +896,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         endedAt: record.ts,
         startedAt: scope.began,
         href: isRoot ? null : `#/runs/${scope.runId}`,
+        // The answer of a run that ends under the reader's eyes is read aloud when Settings › General says so (item 574).
+        readNow: isRoot && revealing(),
       });
       place(scope, answer, record.ts);
       if (isRoot && needs !== "") {

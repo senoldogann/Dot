@@ -373,6 +373,7 @@ _BAR: str = """(() => {
   const name = (node) => node.dataset.pill
     ?? (node.classList.contains('send') ? 'send'
       : node.classList.contains('plus-button') ? 'plus'
+      : node.classList.contains('mic-button') ? 'mic'
       : node.classList.contains('composer-field') ? 'field'
       : node.className);
   const parts = [...document.querySelectorAll(
@@ -396,7 +397,8 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
 ) -> None:
     """Item 115: with every pill out (an agent, a model with reasoning levels, YOLO), the bar is one line at 1280, 800,
     560 and 390 px, as tall as its pills (32 px, and 36 px on a phone, item 273), nothing past its right edge; the
-    mode's name folds to its icon on a short bar, and YOLO wears no fill."""
+    mode's name folds to its icon on a short bar, and YOLO wears no fill. The microphone (item 574, which Chrome's
+    speech recognition gives the bar) stands on the send's line, as tall as the "+" button."""
     made: httpx.Response = await client.post(
         "/api/agents",
         json={
@@ -435,10 +437,10 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                 bar: dict[str, float | list[list[str | float]]] = await page.evaluate(_BAR)
                 right, parts = bar["right"], bar["parts"]
                 assert isinstance(right, float | int)
-                # On Auto (item 495) the bar has no mode pill.
-                assert isinstance(parts, list) and len(parts) == 7, (width, bar)
+                # On Auto (item 495) the bar has no mode pill; Chrome has speech recognition, so it has a microphone.
+                assert isinstance(parts, list) and len(parts) == 8, (width, bar)
                 by_name: dict[str, list[float]] = {str(part[0]): [float(value) for value in part[1:]] for part in parts}
-                assert set(by_name) == {"plus", "send", "field", "agent", "model", "reasoning", "options"}, bar
+                assert set(by_name) == {"plus", "mic", "send", "field", "agent", "model", "reasoning", "options"}, bar
                 # The pills keep one line at every width, and their height is the bar's (item 273).
                 pills = [by_name[name] for name in ("agent", "model", "reasoning", "options")]
                 assert max(float(pill[0]) for pill in pills) - min(float(pill[0]) for pill in pills) <= 1, (width, bar)
@@ -446,16 +448,24 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                 assert all(round(float(pill[4])) == height_px for pill in pills), (width, bar)
                 assert all(float(part[2]) <= right + 0.5 for part in parts), (width, bar)
                 plus, send, field = by_name["plus"], by_name["send"], by_name["field"]
+                # The microphone is as tall as the "+" (item 574).
+                mic = by_name["mic"]
+                assert round(float(mic[4])) == height_px, (width, bar)
                 if width > _PHONE_PX:
-                    # The desk keeps the box above its controls: one line of pills, the field over it.
+                    # The desk keeps the box above its controls: one line of pills, the field over it, and the
+                    # microphone on the send's line, left of it.
                     assert max(abs(float(plus[0]) - float(pill[0])) for pill in pills) <= 1, (width, bar)
                     assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
                     assert float(field[3]) < float(pills[0][2]) - 1, (width, bar)
+                    assert abs(float(mic[0]) - float(send[0])) <= 1 and float(mic[1]) < float(send[1]), (width, bar)
                 else:
-                    # The phone puts the "+" and the send beside the box, and the pills on the line under it (item 374).
+                    # The phone puts the "+" and the send beside the box, and the pills on the line under it (item 374);
+                    # the microphone is on the line of the pills, so that the words of an empty box keep their room.
                     assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
                     assert float(pills[0][2]) > float(plus[3]) - 1, (width, bar)
                     assert abs(float(field[3]) - float(plus[3])) <= 2, (width, bar)
+                    assert abs(float(mic[0]) - float(pills[0][0])) <= 1, (width, bar)
+                    assert float(mic[1]) <= float(send[1]), (width, bar)
                 # On Auto (item 495) the mode has no pill at any width, and the Options pill shows YOLO with no tint
                 # (item 500).
                 await expect(page.locator(".composer-pill[data-pill='mode']")).to_be_hidden()

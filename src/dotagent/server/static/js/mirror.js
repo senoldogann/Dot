@@ -36,7 +36,8 @@ function lineNode(line) {
 /**
  * The box `textarea` with its markdown shown under it. Returns `field` (the box and the copy under it, to place where
  * the box goes), `paint()`, which shows the text the box holds now and lines the copy up with the box, to call after
- * every change of the text (the composer's `autosize` does), and `dispose()`.
+ * every change of the text (the composer's `autosize` does), `setInterim([from, to])`, which draws those characters of
+ * the text quieter (the words a dictation may still change, item 574; null for none), and `dispose()`.
  */
 export function markdownMirror(textarea) {
   const copy = el("div", { class: "composer-mirror", "aria-hidden": "true" });
@@ -44,6 +45,9 @@ export function markdownMirror(textarea) {
   // The ranges this copy painted, `[kind, range]`.
   let painted = [];
   let shown = null;
+  // The characters of the text drawn quieter, `[from, to]`, and the ones drawn so.
+  let interim = null;
+  let shownInterim = "";
   // A paint asked for before the copy was disposed of (in a frame to come) paints nothing.
   let live = true;
 
@@ -71,6 +75,28 @@ export function markdownMirror(textarea) {
     }
   }
 
+  // The words a dictation may still change are a highlight of their own over the lines they fall in.
+  function highlightInterim(lines, nodes) {
+    if (!CAN_HIGHLIGHT || interim === null) {
+      return;
+    }
+    let offset = 0;
+    lines.forEach((line, index) => {
+      const length = line.pieces.reduce((sum, part) => sum + part.text.length, 0);
+      const from = Math.max(interim[0], offset);
+      const to = Math.min(interim[1], offset + length);
+      const text = nodes[index].firstChild;
+      if (from < to && text !== null && text.nodeType === Node.TEXT_NODE) {
+        const range = document.createRange();
+        range.setStart(text, from - offset);
+        range.setEnd(text, to - offset);
+        highlightOf("interim").add(range);
+        painted.push(["interim", range]);
+      }
+      offset += length + 1;
+    });
+  }
+
   function follow() {
     copy.scrollTop = textarea.scrollTop;
   }
@@ -79,8 +105,10 @@ export function markdownMirror(textarea) {
     if (!live) {
       return;
     }
-    if (textarea.value !== shown) {
+    const marked = interim === null ? "" : `${interim[0]}:${interim[1]}`;
+    if (textarea.value !== shown || marked !== shownInterim) {
       shown = textarea.value;
+      shownInterim = marked;
       unpaint();
       const lines = sourceLines(shown);
       const nodes = lines.map(lineNode);
@@ -88,6 +116,7 @@ export function markdownMirror(textarea) {
       lines.forEach((line, index) => {
         highlight(nodes[index], line);
       });
+      highlightInterim(lines, nodes);
     }
     // A box that scrolls may give room to its scroll bar: the copy leaves the same room, and scrolls with the box.
     copy.style.setProperty("--mirror-bar", `${textarea.offsetWidth - textarea.clientWidth}px`);
@@ -104,6 +133,10 @@ export function markdownMirror(textarea) {
   return {
     field,
     paint,
+    setInterim: (range) => {
+      interim = range;
+      paint();
+    },
     dispose: () => {
       live = false;
       textarea.removeEventListener("scroll", follow);
