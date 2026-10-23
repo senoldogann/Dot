@@ -311,50 +311,284 @@
   overflow-x: auto;
 }
 
-/* ---------- Phone tab (item 267) ---------- */
+/* ---------- Phone tab (items 267, 271, 421 and 565) ---------- */
 
-/* The steps to Dot on a phone, each with what it needs: the address, then the pairing code; each numbered in a round
-   mark, as the steps on this Mac are. */
-.phone-steps {
+/* The card at the head: whether the phone reaches Dot (a tile, the words and, while a step is left, a track of three),
+   the three steps on this Mac side by side and the switch that keeps the Mac awake, the three parted by hairlines. */
+.phone-reach-head {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: phone-step;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
 }
 
-.phone-steps > li {
-  position: relative;
-  padding-left: calc(var(--leading-md) + var(--space-3));
-  counter-increment: phone-step;
-}
-
-.phone-steps > li::before {
-  content: counter(phone-step);
-  position: absolute;
-  top: 0;
-  left: 0;
+.phone-reach-tile {
   display: grid;
+  flex: none;
   place-items: center;
-  width: var(--leading-md);
-  height: var(--leading-md);
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: var(--text-sm);
+  background: var(--accent-weak);
+  color: var(--accent-strong);
+}
+
+.phone-reach-tile.ready {
+  background: var(--ok-weak);
+  color: var(--ok);
+}
+
+.phone-reach-tile .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.phone-reach-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.phone-reach-title {
+  color: var(--text);
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
   font-weight: var(--weight-title);
 }
 
-/* A step's first line is as tall as its mark, so the two sit level. */
-.phone-steps > li > p:first-child {
-  margin: 0;
-  line-height: var(--leading-md);
+.phone-reach-name {
+  display: block;
+  margin-top: var(--space-half);
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
-.phone-steps > li > * + * {
-  margin-top: var(--space-2);
+/* How many of the steps on this Mac are done: a track of three parts. */
+.phone-progress-track {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
+  width: 72px;
+}
+
+.phone-progress-part {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.phone-progress-part.done {
+  background: var(--ok);
+}
+
+.phone-progress-part.now {
+  background: var(--accent);
+  opacity: 0.55;
+}
+
+/* The steps on this Mac, side by side: a mark (its number, or a tick once done), a title, where it stands and what does
+   it. Each is a cell, a hairline apart. */
+.phone-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.phone-guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 20px;
+}
+
+.phone-guide-step + .phone-guide-step {
+  border-left: 1px solid var(--border);
+}
+
+.phone-guide-body,
+.phone-step-body {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  min-width: 0;
+}
+
+.phone-guide-body > .hint,
+.phone-step-body > .hint {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.phone-guide-body > .btn {
+  max-width: 100%;
+  margin-top: var(--space-1);
+  white-space: normal;
+}
+
+.phone-guide-title,
+.phone-step-title {
+  color: var(--text);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-label);
+}
+
+.phone-guide-step.left:not(.current) .phone-guide-title {
+  color: var(--text-2);
+}
+
+/* A step's mark, as the steps on this Mac and on the phone share it: its number in a ring, in the accent for the step to
+   do now, a tick on the soft green for one that is done. It sits level with the step's first line. */
+.phone-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-top: calc((var(--leading-ui) - 24px) / 2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-label);
+}
+
+:is(.phone-guide-step, .phone-step).done .phone-mark {
+  border-color: transparent;
+  background: var(--ok-weak);
+  color: var(--ok);
+}
+
+:is(.phone-guide-step, .phone-step).current .phone-mark {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* The phone's own steps at the left, the one QR code and the address at the right, a hairline between; the step the guide
+   is at is set on the surface a step up. A narrow screen has them one under the other. */
+.phone-setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+}
+
+.phone-steps {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 12px;
+  list-style: none;
+}
+
+.phone-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+}
+
+.phone-step.current {
+  background: var(--surface-2);
+}
+
+.phone-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px;
+  border-left: 1px solid var(--border);
+}
+
+.phone-qr-box {
+  display: grid;
+  justify-items: center;
+  max-width: 100%;
+}
+
+/* A QR code on the light tile of a service's mark, which a phone's camera reads in a dark theme too; the padding is the
+   quiet zone round the code. */
+.phone-qr {
+  box-sizing: content-box;
+  max-width: 100%;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--mark-ground);
+  image-rendering: pixelated;
+}
+
+.phone-addresses {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+/* An address in mono, in a box of its own, with the button that copies it; a long one breaks rather than reach past the
+   screen's edge. */
+.phone-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+}
+
+.phone-address-text {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+/* The code that signs in a phone: eight dots in two groups of four stand for it until it is shown. */
+.phone-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: var(--space-2);
+}
+
+.phone-dot-group {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.phone-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--faint);
+}
+
+@container (max-width: 640px) {
+  .phone-guide,
+  .phone-setup-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .phone-guide-step + .phone-guide-step {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+
+  .phone-side {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
 }
 
 /* The pairing code, large enough to read off the screen and type on a phone, in a box of its own. */
@@ -988,24 +1222,21 @@
 }
 
 .rule-example {
-  min-height: 28px;
-  padding: 4px 12px;
-  border: 1px solid var(--border);
+  min-height: 32px;
+  padding: 4px 16px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text-2);
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
   text-align: left;
   cursor: pointer;
-  transition:
-    color var(--motion-quick) var(--ease),
-    border-color var(--motion-quick) var(--ease);
+  transition: background var(--motion-quick) var(--ease);
 }
 
 .rule-example:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
+  background: var(--surface-2);
 }
 
 /* The Draft button keeps the end of its line; what the draft said takes the rest, or the line above it on a phone. */
@@ -1041,13 +1272,6 @@
 
 .rule-outcome.bad {
   color: var(--bad);
-}
-
-/* The order of the rules: its name, and under it the one line on how they are read. */
-.rule-order {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 .rule-readback {
@@ -2057,151 +2281,6 @@
   }
 }
 
-/* Settings › Phone (items 271 and 421): the steps on this Mac, each with its mark (its number, or a tick once done),
-   its title, where it stands and what does it. */
-.phone-guide {
-  display: grid;
-  gap: var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.phone-guide-step {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-
-/* A line joins each step's mark to the next one's. */
-.phone-guide-step:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 28px;
-  bottom: calc(-1 * var(--space-4) + 4px);
-  left: 11px;
-  width: 2px;
-  border-radius: var(--radius-pill);
-  background: var(--border-strong);
-}
-
-.phone-guide-step.done:not(:last-child)::after {
-  background: var(--ok);
-  opacity: 0.45;
-}
-
-/* The step to do now: its mark in the accent, and its title in full ink. */
-.phone-guide-step.current .phone-guide-mark {
-  background: var(--accent);
-  color: var(--surface);
-}
-
-.phone-guide-step.left:not(.current) .phone-guide-title {
-  color: var(--text-2);
-}
-
-/* How many steps on this Mac are done: a track of three parts, and the same in words. */
-.phone-progress {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.phone-progress-track {
-  display: flex;
-  flex: 1 1 10rem;
-  gap: var(--space-1);
-  max-width: 18rem;
-}
-
-.phone-progress-part {
-  flex: 1;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-3);
-}
-
-.phone-progress-part.done {
-  background: var(--ok);
-}
-
-.phone-progress-part.now {
-  background: var(--accent);
-  opacity: 0.55;
-}
-
-.phone-progress-words {
-  color: var(--text-2);
-  font-size: var(--text-sm);
-}
-
-/* Keeping the Mac awake is a setting, not a step: a hairline sets it apart from the steps above. */
-.phone-awake {
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-}
-
-.phone-guide-mark {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-title);
-}
-
-.phone-guide-step.done .phone-guide-mark {
-  background: var(--ok-weak);
-  color: var(--ok);
-}
-
-.phone-guide-body {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: start;
-  min-width: 0;
-}
-
-.phone-guide-body > .hint {
-  margin: 0;
-}
-
-.phone-guide-title {
-  font-weight: var(--weight-title);
-}
-
-/* A QR code a phone's camera opens, with what it opens beside it; on a phone's own width they stack. */
-.phone-qr-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-/* A QR code on the light tile of a service's mark, which a phone's camera reads in a dark theme too. */
-.phone-qr {
-  flex: none;
-  box-sizing: content-box;
-  padding: var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--mark-ground);
-  image-rendering: pixelated;
-}
-
-/* The words beside a QR code go under it when the row is narrow (an iPhone SE's), and an address in them breaks
-   rather than reach past the screen's edge. */
-.phone-qr-row > .hint {
-  flex: 1 1 12rem;
-  overflow-wrap: anywhere;
-}
-
 /* ---------- Memory (item 373): the lines Dot knows and the notes in two columns, as Providers keeps its list and its
    pane: what is yours and what to add at the left, the notes themselves at the right, each a hairline row. ---------- */
 
@@ -2351,44 +2430,182 @@
   overflow-wrap: anywhere;
 }
 
-/* ---------- Rules (item 373): the rules that are checked, in order, and the ways to write one when Add rule asks. ---------- */
+/* ---------- Rules (items 373 and 565): what is always on, the sandbox, the rules checked in order and what a rule can
+   answer, in cards of the settings' look; the ways to write one wait for New rule. ---------- */
 
-.rule-forms {
+/* What no rule lifts: the lock and its name, four checked lines in two columns, and what a yolo run does. */
+.rule-always {
+  padding: 20px;
+}
+
+.rule-always-head {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  align-items: center;
+  gap: 12px;
 }
 
-.rule-forms > .card {
+.rule-tile {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.rule-always-title {
   margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  font-weight: var(--weight-title);
 }
 
-.rule-list > .list-row {
-  padding-block: var(--space-2);
+.rule-always-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 32px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.rule-list > .list-row:first-child {
-  border-top: 0;
+.rule-always-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--text);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
 }
 
-.rule-list {
-  padding-bottom: var(--space-2);
+.rule-always-list .icon {
+  margin-top: var(--space-half);
+  color: var(--ok);
 }
 
-.rule-panel .panel-note {
-  margin: 0;
-  padding: 0 var(--space-3) var(--space-2);
-  border-bottom: 1px solid var(--border);
+.rule-always-note {
+  margin: 16px 0 0;
   color: var(--muted);
   font-size: var(--text-sm);
+  line-height: var(--leading-sm);
 }
 
-.rule-panel .rule-sentence {
-  flex-wrap: wrap;
+/* The sandbox's explanation reads as a line and, under it, the finer print: what off does, when it applies, its key. */
+.rule-fine {
+  display: block;
+  margin-top: var(--space-1);
 }
 
-.rule-panel .rule-list .row-text {
+/* The answer that hands the step to you is blue, as the design draws it: no colour of the themes is, so it is the
+   blue of the character's palette, laid thin on the ground and, for its words, mixed with the ink so that it reads on
+   the light and the dark ground alike. */
+.badge.b-hand {
+  background: color-mix(in srgb, var(--character-blue) 18%, transparent);
+  color: color-mix(in srgb, var(--character-blue) 62%, var(--text));
+}
+
+/* The card of the rules: its rows are hairline-parted, as a settings card's are. */
+.page[data-layout="page"] .rule-list > .list-row {
+  padding: 16px 20px;
+}
+
+.rule-list .row-text {
   font-size: var(--text-sm);
+}
+
+.rule-problem {
+  margin: 0;
+  padding: 12px 20px 0;
+}
+
+/* With no rule: the shield, what the preset does meanwhile and the sentences to start from, in the middle of the card. */
+.rule-empty {
+  padding: 32px 20px 24px;
+}
+
+.rule-empty .empty-state {
+  max-width: none;
+  padding: 0;
+}
+
+.rule-empty .empty-line {
+  max-width: none;
+}
+
+.rule-empty .rule-examples {
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.rule-empty .rule-example {
+  text-align: center;
+}
+
+/* What a rule can answer, under the rules (or the empty card), set apart by the card's hairline: the four answers in two
+   columns, each its badge over what Dot does then. */
+.rule-legend {
+  padding: 20px;
+}
+
+.rule-legend-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-label);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.rule-legend-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 32px;
+  margin: 12px 0 0;
+}
+
+.rule-legend-item dt {
+  margin: 0;
+}
+
+.rule-legend-item dd {
+  margin: var(--space-2) 0 0;
+  color: var(--text-2);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+}
+
+/* The ways to write a rule, a section of one card of two rows: what lies under a row's title keeps off it; the buttons
+   of the form are Close at the left and the test and Add rule at the right, going under it on a narrow screen. */
+.rule-body {
+  margin-top: var(--space-3);
+}
+
+.rule-form-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rule-form-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@container (max-width: 640px) {
+  .rule-always-list,
+  .rule-legend-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* A schedule's goal reads as its first two lines in the list: the whole of it is in its form (item 373). */
@@ -2403,10 +2620,6 @@
 .rule-forms,
 .schedule-form-slot {
   scroll-margin-top: 80px;
-}
-
-.rule-forms-foot {
-  padding-top: var(--space-1);
 }
 
 /* A schedule's when and how it went read as one line of words, its parts kept by a dot (item 373). */

@@ -177,15 +177,16 @@ async def test_a_rule_said_in_plain_words_is_drafted_read_back_and_added(
             await page.goto(f"http://{host}:{port}/#/settings/rules")
             await page.get_by_role("button", name="New rule").click()
             # The button that opened the forms shuts them: a cross and Close, not the plus of New rule (item 437).
-            opener: Locator = page.locator(".rule-panel > .panel-head").get_by_role("button", name="Close")
+            opener: Locator = page.locator(".set-actions").get_by_role("button", name="Close")
             await expect(opener.locator(".icon")).to_have_attribute("data-icon", "x")
             await expect(opener).to_have_attribute("aria-expanded", "true")
             words = page.get_by_role("textbox", name="The rule in your words", exact=True)
             draft = page.get_by_role("button", name="Draft the rule", exact=True)
+            # With no rule yet, the sentences to start from are the empty card's (item 565); one puts itself in the box.
             await page.get_by_role("button", name="Ask me before Dot deletes anything with rm").click()
             await expect(words).to_have_value("Ask me before Dot deletes anything with rm")
             # Closed and opened again, the forms keep what was written (item 373).
-            await page.locator(".rule-panel > .panel-head").get_by_role("button", name="Close").click()
+            await page.locator(".set-actions").get_by_role("button", name="Close").click()
             await expect(words).to_be_hidden()
             await expect(page.get_by_role("button", name="New rule").locator(".icon")).to_have_attribute(
                 "data-icon", "plus"
@@ -431,6 +432,67 @@ async def test_a_rule_moves_with_its_arrows_and_one_that_never_decides_says_so(
                 await expect(handed).to_have_count(3)
                 await expect(handed.first).to_have_attribute("title", re.compile(r"^Rule #4 hands you every action"))
                 await expect(rows.nth(3).locator(".badge", has_text="Never decides")).to_have_count(0)
+                await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_the_card_of_the_rules_offers_sentences_while_it_is_empty_and_says_what_a_rule_can_answer(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 565, on a wide window and a phone: the protections that are always on stand in a card of their own; with no
+    rule the card of the rules names three sentences to start from, and one opens the ways to write a rule with it in
+    the box; the four answers a rule can give are told under the rules, with any or none, and the head counts them."""
+    for rule in (await client.get("/api/rules")).json():
+        assert (await client.delete(f"/api/rules/{rule['id']}")).status_code == 200
+    host, port = _address(client)
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, height, scheme in ((1280, 900, "dark"), (390, 844, "light")):
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height}, color_scheme=scheme, reduced_motion="reduce"
+                )
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"http://{host}:{port}/#/settings/rules")
+                await expect(page.get_by_text("No rules yet")).to_be_visible()
+                await expect(page.get_by_role("heading", name="Always on, whatever your rules say")).to_be_visible()
+                await expect(page.locator(".rule-always li")).to_have_count(4)
+                legend: Locator = page.locator(".rule-legend")
+                await expect(legend.locator("dt .badge")).to_have_text(
+                    ["Do it", "Do it, whatever it has read", "Ask me first", "Hand it to me"]
+                )
+                await expect(page.locator(".set-meta")).to_be_hidden()
+                # The ways to write a rule wait for New rule or for a sentence of the empty card, which they open with.
+                words: Locator = page.get_by_role("textbox", name="The rule in your words", exact=True)
+                await expect(words).to_be_hidden()
+                sentence: Locator = page.get_by_role("button", name="Hand me every step on mybank.com")
+                await sentence.click()
+                await expect(words).to_have_value("Hand me every step on mybank.com")
+                await expect(words).to_be_focused()
+                await expect(page.get_by_role("button", name="Close").first).to_have_attribute("aria-expanded", "true")
+                assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                await page.screenshot(path=str(tmp_path / f"rules-empty-{width}-{scheme}.png"), full_page=True)
+                # A rule comes from another page: the empty card gives way to the list, the sentences to start from are
+                # the form's now, the head counts, and what a rule can answer stays.
+                added: httpx.Response = await client.post(
+                    "/api/rules",
+                    json={"behavior": "handoff", "tool_glob": "browser_*", "match_regex": "mybank", "description": ""},
+                )
+                assert added.status_code == 201, added.text
+                await expect(page.locator(".rule-list > .list-row")).to_have_count(1)
+                await expect(page.get_by_text("No rules yet")).to_have_count(0)
+                await expect(sentence).to_have_count(1)
+                await expect(page.locator(".set-meta")).to_have_text("1 rule")
+                await expect(legend).to_be_visible()
+                assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                assert (await client.delete(f"/api/rules/{added.json()['id']}")).status_code == 200
+                await expect(page.get_by_text("No rules yet")).to_be_visible()
+                await expect(page.locator(".set-meta")).to_be_hidden()
+                # The form's own Close shuts the ways to write a rule and gives the focus back to New rule.
+                await page.locator(".rule-form-buttons").get_by_role("button", name="Close").click()
+                await expect(words).to_be_hidden()
+                await expect(page.get_by_role("button", name="New rule")).to_be_focused()
                 await page.close()
         finally:
             await browser.close()

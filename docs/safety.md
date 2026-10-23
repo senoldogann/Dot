@@ -121,7 +121,9 @@ currency, so list sites that bill in one currency. Empty by default.
    that a pattern that backtracks for long cannot hold the daemon (item 387). A rule
    reads as a sentence in Settings › Rules, "When Dot would use `shell`, matching `\bgit push\b`: ask me first", and
    is managed there or through `/api/rules`; the page lists the rules in the order they are checked, a rule's arrows
-   move it one place up or down that order, and **New rule** opens the two ways to write one. A rule that an earlier
+   move it one place up or down that order, and **New rule** opens the two ways to write one (with no rule yet, the
+   page offers three sentences to start from, one of which opens them with it in the box; under the rules it tells
+   what each of the four answers does, and above them it lists what is always on, item 565). A rule that an earlier
    enabled rule fits wherever it fits (no expression, or the same one, on a tool pattern that takes in its own: `*`,
    the same pattern, or one that matches its plain tool name) never decides, nor does a rule that one handing the step
    to you fits wherever it fits, wherever that one stands, while a hand-off is kept from deciding only by an earlier

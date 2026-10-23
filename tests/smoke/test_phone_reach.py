@@ -260,9 +260,9 @@ async def test_a_serve_that_waits_is_ended_in_time_and_says_what_it_waits_for(
 
 
 async def _card_gap(page: Page) -> float:
-    """The room between the card of Tailscale and the card of the phone below it."""
-    reach: FloatRect | None = await page.locator("section.card", has_text="Reach Dot from anywhere").bounding_box()
-    phone: FloatRect | None = await page.locator("section.card", has_text="Dot on your phone").bounding_box()
+    """The room between the card that says whether the phone reaches Dot and the card of the phone's steps below it."""
+    reach: FloatRect | None = await page.locator("section.phone-reach").bounding_box()
+    phone: FloatRect | None = await page.locator(".set-card", has=page.locator(".phone-setup-grid")).bounding_box()
     assert reach is not None and phone is not None
     return phone["y"] - (reach["y"] + reach["height"])
 
@@ -314,6 +314,15 @@ async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins:
                     await expect(download).to_have_attribute("src", re.compile(r"^blob:"))
                     assert await download.evaluate("picture => picture.decode().then(() => picture.naturalWidth)") > 0
                     assert await _card_gap(page) >= 8
+                    # The one QR code opens Tailscale's page or Dot's address (item 565); Dot answers to no name yet and
+                    # says so, and the step the guide is at is the one whose code is shown.
+                    await expect(page.locator(".phone-step.current")).to_contain_text("Install Tailscale on the phone")
+                    await page.get_by_role("button", name="Open Dot").click()
+                    await expect(page.get_by_text("No address yet")).to_be_visible()
+                    await expect(download).to_have_count(0)
+                    await expect(page.locator(".phone-step.current")).to_contain_text("Open Dot on the phone")
+                    await page.get_by_role("button", name="Tailscale app").click()
+                    await expect(page.get_by_role("img", name="A QR code of Tailscale's download page")).to_be_visible()
                     awake: Locator = page.get_by_role("switch", name="Keep this Mac awake while it charges")
                     await awake.click()
                     await expect(awake).to_have_attribute("aria-checked", "true")

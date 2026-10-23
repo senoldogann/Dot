@@ -7,10 +7,12 @@ more than two seconds. Its colours follow the light or dark appearance
 through CSS `light-dark()`, so it needs iOS 17.5 or later (Safari 17.5; Chrome 123 and Firefox 120 on a computer). It
 needs to reach the Mac, and a push needs a secure address, so the way there is your own network:
 
-Settings › Phone › **Reach Dot from anywhere** (items 271 and 421) guides you there a step at a time, each step saying
-where it stands and offering what does it, and it reads Tailscale again every few seconds while a step is left, so that
-it follows an install or a sign-in. A bar above the steps counts those done on this Mac (*2 of 3 steps done*); a step
-done has a tick and a green line down to the next, and the one to do now has its number marked (item 527).
+Settings › Phone (items 271, 421 and 565) guides you there a step at a time. Its first card says whether the phone
+reaches Dot, **Ready: your phone reaches Dot** with the name it reaches Dot by, or, while a step is left, how many
+of the three steps on this Mac are done (*2 of 3 steps done on this Mac*, in words and in a track of three), and holds
+those steps side by side, each saying where it stands and offering what does it; it reads Tailscale again every few
+seconds while a step is left, so that it follows an install or a sign-in. A step done has a tick, and the one to do now
+has its number marked (item 527).
 **Tailscale on this Mac**: while it is not installed, **Get Tailscale** opens its
 page in the Mac App Store, where a click installs it; while it is installed but not running signed in, **Open
 Tailscale** opens its app, which shows its sign-in (`POST /api/phone/tailscale`); when Tailscale cannot be asked, its
@@ -19,12 +21,16 @@ app closed or a call that failed, the step says what it said. **Dot on your tail
 why when Tailscale is missing or not signed in); when the tailnet has HTTPS off, Tailscale names the page that turns it
 on, and the step offers it as **Turn on HTTPS for your tailnet**, then Set up again. **Dot answers to the name**: the
 daemon answers to it from its next start, and **Restart Dot** starts it again once you say yes, and says when runs
-going on would stop with it (`GET /api/phone` reads the state). Under them, **Dot on your phone** has, as numbered
-steps, a QR code of Tailscale's download page for the phone, then, once Dot answers to its name, a QR code of its
-address, both made by macOS's own generator (`GET /api/phone/qr/tailscale` and `/dot`), Add to Home Screen, and the
-pairing code. Its switch **Keep this Mac awake while it charges** (`[server] keep_awake`, `POST
-/api/phone/awake`) has the daemon hold macOS's `/usr/bin/caffeinate -s`, which keeps the Mac from sleeping on power
-while the daemon runs; a closed lid still puts a MacBook to sleep. The same by hand:
+going on would stop with it (`GET /api/phone` reads the state). The card's switch **Keep this Mac awake while it
+charges** (`[server] keep_awake`, `POST /api/phone/awake`) has the daemon hold macOS's `/usr/bin/caffeinate -s`, which
+keeps the Mac from sleeping on power while the daemon runs; a closed lid still puts a MacBook to sleep. Under it, **Set
+up a phone** has the phone's four steps (install Tailscale on it, open Dot in Safari, add it to the home screen, sign in
+with a code) beside one QR code that a choice, **Tailscale app** or **Open Dot**, sets to Tailscale's download page for
+the phone or, once Dot answers to its name, to its address (also there to type, or to **Copy**), both made by macOS's
+own generator (`GET /api/phone/qr/tailscale` and `/dot`); the step marked is the one whose code is shown, and the last
+once a pairing code is. **Sign-in code** keeps a row of dots in the code's place until **Show code** makes one (`POST
+/api/phone/pairing`): good for ten minutes and for one use, it signs in the app on one phone's home screen, and **New
+code** takes its place. The same by hand:
 
 1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
    presents it as `https://<mac>.<tailnet>.ts.net`, with a certificate of its own, to your tailnet only.
@@ -133,7 +139,7 @@ and the browser's Back skips the run it went on from (item 345). The pages' own 
 
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
 that the signed-in address gave Safari, and its sign-in screen asks for a pairing code instead (item 267): Settings ›
-Phone, on the Mac or in Safari where Dot is open, shows one with **Pair a phone**, eight characters in two groups
+Phone, on the Mac or in Safari where Dot is open, shows one with **Show code**, eight characters in two groups
 (Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a new code
 takes the place of the one before, and five wrong tries use a code up. The app trades it for the token (`POST
 /api/phone/pair`, the one route besides the health check and the proof that takes no token; the Host and Origin checks
