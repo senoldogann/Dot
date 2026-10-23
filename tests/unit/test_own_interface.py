@@ -2,6 +2,8 @@
 reads, a dot at the end of the host included (item 140), or a name of ``[server] reach``. A server of this Mac on
 another port and the web stay open."""
 
+from pathlib import Path
+
 import pytest
 
 from dotagent.browser.safety import UrlVerdict, check_browser_url, forbidden_target, request_verdict
@@ -144,3 +146,35 @@ def test_the_way_back_of_a_sign_in_opens_as_a_page_and_as_nothing_else(url: str)
 )
 def test_nothing_else_of_dots_interface_opens_with_the_way_back(url: str) -> None:
     assert not request_verdict(url, True, (), (), SERVER).allowed
+
+
+def test_a_file_of_this_mac_is_refused_with_what_to_do_instead(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Item 596: the owner's Dot tried to open the page it built in its workspace as a file address and was told only
+    that the scheme is not allowed. The refusal stays (a page opened from disk could lead the browser to any other
+    file) and says what to do: read the file with read_file, and a page of the workspace reaches the owner by its path
+    in the answer. Nothing names a server of this Mac: a folder a page names would bring the files around it, the
+    home's keys among them, within the browser's reach (the review of its first round)."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
+    config: AppConfig = load_default_config()
+    page: Path = tmp_path / "home" / "workspace" / "ai herald" / "index.html"
+    with pytest.raises(ToolInputError) as refused:
+        checked_url(page.as_uri(), config)
+    made: str = str(refused.value)
+    assert "scheme 'file' is not allowed" in made
+    assert "A file of this Mac is read with read_file." in made
+    # In code, which makes it the answer's button to the file; the panel shows its text, not the page (the review).
+    assert f"write its path in code in the answer (`{page}`): the panel beside the conversation shows its text" in made
+    assert "the owner opens the page in their own browser" in made
+    # A file elsewhere, a key among them, gets the refusal and read_file, which the rules on files judge, and no way to
+    # a server.
+    with pytest.raises(ToolInputError) as elsewhere:
+        checked_url("file:///Users/dogan/.ssh/id_rsa", config)
+    told: str = str(elsewhere.value)
+    assert "A file of this Mac is read with read_file." in told
+    assert "write its path" not in told
+    for word in ("http.server", "127.0.0.1"):
+        assert word not in told and word not in made
+    # An address of another scheme gets no such words.
+    with pytest.raises(ToolInputError) as other:
+        checked_url("ftp://example.com/x", config)
+    assert "read_file" not in str(other.value)
