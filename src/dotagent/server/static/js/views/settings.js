@@ -1,13 +1,13 @@
-// The settings. In a Mac's window, one page with the tabs down its left side where the page has the room for them beside
-// the pane, and in one row above the pane where it has not (settings.css: from 1100 px of page, a window of 1412 px with
-// the sidebar open); on a phone, a list of the tabs in groups whose rows open each tab as a page of its own (item 330).
-// Each tab is drawn by the module that owns it.
+// The settings. In a Mac's window the sidebar is their nav (settingsnav.js, item 562) and the page is the open tab alone: its
+// name, a line that says what it is for and what it holds, in a column of its own; on a phone, a list of the tabs in groups
+// whose rows open each tab as a page of its own (item 330). Each tab is drawn by the module that owns it.
 
 import { api, query } from "../api.js";
 import { el, modelName } from "../dom.js";
 import { icon } from "../icons.js";
 import { PHONE } from "../layout.js";
-import { scrollCue } from "../scrollcue.js";
+import { settingsHead } from "../panels.js";
+import { GROUPS, TABS, DEFAULT_TAB } from "../settingstabs.js";
 import { setStageTitle } from "../stage.js";
 import { getSnapshot, onChange } from "../state.js";
 import { findTheme, onSchemeChange, onThemeChange, shownScheme, themePicks } from "../theme.js";
@@ -21,37 +21,20 @@ import * as rules from "./rules.js";
 import * as snapshots from "./snapshots.js";
 import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.js";
 
-const DEFAULT_TAB = "general";
-const TABS = [
-  { id: "general", label: "General", icon: "sliders", mount: mountGeneral },
-  { id: "appearance", label: "Appearance", icon: "palette", mount: appearance.mount },
-  { id: "models", label: "Models", icon: "layers", mount: mountModels },
-  { id: "keys", label: "Providers", icon: "key", mount: keys.mount },
-  { id: "browser", label: "Browser", icon: "globe", mount: mountBrowser },
-  { id: "rules", label: "Rules", icon: "shield", mount: rules.mount },
-  { id: "memory", label: "Memory", icon: "database", mount: memory.mount },
-  { id: "harness", label: "Self-improvement", icon: "sparkle", mount: harness.mount },
-  { id: "phone", label: "Phone", icon: "smartphone", mount: phone.mount },
-  { id: "snapshots", label: "SnapShots", icon: "image", mount: snapshots.mount },
-  { id: "system", label: "System", icon: "monitor", mount: mountSystem },
-];
-// The phone's list: the tabs in groups, each group's name over its rows.
-const GROUPS = [
-  { title: "Interface", tabs: ["general", "appearance"] },
-  { title: "Models", tabs: ["models", "keys"] },
-  { title: "How Dot works", tabs: ["rules", "memory", "harness"] },
-  { title: "This Mac", tabs: ["browser", "phone", "snapshots", "system"] },
-];
+const MOUNTS = {
+  general: mountGeneral,
+  appearance: appearance.mount,
+  models: mountModels,
+  keys: keys.mount,
+  browser: mountBrowser,
+  rules: rules.mount,
+  memory: memory.mount,
+  harness: harness.mount,
+  phone: phone.mount,
+  snapshots: snapshots.mount,
+  system: mountSystem,
+};
 const SYSTEM_DARK = window.matchMedia("(prefers-color-scheme: dark)");
-
-function tabLink(tab, current) {
-  return el(
-    "a",
-    { class: "settings-tab", href: `#/settings/${tab.id}`, "aria-current": current ? "page" : null },
-    icon(tab.icon),
-    el("span", null, tab.label),
-  );
-}
 
 /** A row of the phone's list: the tab's mark and name, `value` (what the tab holds, or nothing) and an arrow. */
 function listRow(tab, value) {
@@ -109,7 +92,9 @@ function mountList(root, ctx) {
 }
 
 /** Draw the settings of the route. On a phone `#/settings` is the list of the tabs; in a wider window it leads to
- * General, and so does an unknown tab. `#/settings/<tab>` draws that tab. */
+ * General, and so does an unknown tab. `#/settings/<tab>` draws that tab, under its head: the tab is given `ctx.head`,
+ * to say what it is for (`setLead`), what it holds (`setMeta`) and the buttons that belong to the whole page
+ * (`setActions`). */
 export function mount(root, ctx) {
   if (ctx.params[0] === undefined && PHONE.matches) {
     return mountList(root, ctx);
@@ -120,36 +105,16 @@ export function mount(root, ctx) {
     return () => undefined;
   }
   ctx.setTitle(`${tab.label} · Settings`);
-  const pane = el("div", { class: "settings-pane" });
-  const links = TABS.map((candidate) => tabLink(candidate, candidate.id === tab.id));
-  const nav = el("nav", { class: "settings-nav", "aria-label": "Settings" }, links);
-  // On a phone the rail is hidden (settings.css): the bar's Back at the top left leads to the list (item 338).
-  root.append(el("div", { class: "settings-frame" }, el("div", { class: "settings" }, el("div", { class: "settings-side" }, nav), pane)));
-  // In the row that scrolls sideways (a narrow window, item 272) the open tab is brought to its middle, and the row's
-  // edge fades while more tabs lie to the right. A row drawn before the webfont came in was measured in the fallback
-  // face, which is narrower, so it is centred again once the fonts are in, unless it was moved meanwhile (item 328).
-  const centre = () => {
-    const open = links[TABS.indexOf(tab)].getBoundingClientRect();
-    const row = nav.getBoundingClientRect();
-    nav.scrollLeft += open.left - row.left - (row.width - open.width) / 2;
-  };
-  centre();
-  const centred = nav.scrollLeft;
-  document.fonts.ready.then(() => {
-    if (nav.isConnected && nav.scrollLeft === centred) {
-      centre();
-    }
-  });
-  const stopCue = scrollCue(nav);
-  const dispose = tab.mount(pane, ctx);
-  // The bar names the page and the open tab names the pane; on a phone, whose page is the tab alone, the bar names the
-  // tab.
-  const paintTitle = () => setStageTitle(el("h1", { class: "stage-h1" }, PHONE.matches ? tab.label : "Settings"));
+  const head = settingsHead(tab.label);
+  const pane = el("div", { class: "settings-pane" }, head.element);
+  root.append(el("div", { class: "settings-frame" }, pane));
+  const dispose = MOUNTS[tab.id](pane, { ...ctx, head });
+  // The page names itself in its head; on a phone, whose page is the tab alone, the bar names the tab.
+  const paintTitle = () => setStageTitle(PHONE.matches ? el("h1", { class: "stage-h1" }, tab.label) : null);
   paintTitle();
   PHONE.addEventListener("change", paintTitle);
   return () => {
     PHONE.removeEventListener("change", paintTitle);
-    stopCue();
     dispose();
   };
 }

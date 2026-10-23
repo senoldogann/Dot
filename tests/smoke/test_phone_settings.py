@@ -10,9 +10,10 @@ On a phone:
 - a card's name stands over the card, out of its surface;
 - neither the list nor any tab runs wider than the screen.
 
-In a Mac's window `#/settings` leads to General, in the place of the address it was opened at: the rail is there and the
-way back and the list are not, the bar says Settings and a card's name is inside the card. Before, a phone had the row
-of tabs over the pane, and `#/settings` was General. The model is a scripted one.
+In a Mac's window `#/settings` leads to General, in the place of the address it was opened at: the nav is the sidebar's
+(item 562, test_settings_nav.py) and the way back and the list are not, the page names itself in its head and the bar
+says nothing, and a card's name stands over the card as on a phone. Before, a phone had the row of tabs over the pane,
+and `#/settings` was General. The model is a scripted one.
 """
 
 import asyncio
@@ -210,7 +211,7 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
             await browser.close()
 
 
-async def test_a_macs_window_opens_the_settings_on_general_with_the_rail(own_home: Path) -> None:
+async def test_a_macs_window_opens_the_settings_on_general_with_the_nav_in_the_sidebar(own_home: Path) -> None:
     async with _served(own_home) as address, async_playwright() as playwright:
         browser: Browser = await playwright.webkit.launch(headless=True)
         try:
@@ -219,14 +220,15 @@ async def test_a_macs_window_opens_the_settings_on_general_with_the_rail(own_hom
             await page.goto(f"{address}/#/runs")
             await page.get_by_role("complementary", name="Sidebar").get_by_role("link", name="Settings").click()
             await expect(page).to_have_url(f"{address}/#/settings/general")
-            rail: Locator = page.get_by_role("navigation", name="Settings")
-            await expect(rail.get_by_role("link")).to_have_count(len(_TABS))
-            await expect(rail.locator("[aria-current='page']")).to_have_text("General")
-            await expect(page.locator("h1.stage-h1")).to_have_text("Settings")
+            nav: Locator = page.get_by_role("navigation", name="Settings")
+            await expect(nav.locator(".settings-nav-label")).to_have_text(list(_TABS.values()))
+            await expect(nav.locator("[aria-current='page']")).to_contain_text("General")
+            await expect(page.get_by_role("heading", level=1)).to_have_text("General")
+            await expect(page.locator("h1.stage-h1")).to_have_count(0)
             await expect(page.get_by_role("button", name="Back")).to_have_count(0)
             await expect(page.locator(".settings-list")).to_have_count(0)
             card: dict[str, object] = await page.locator(".settings-pane .card:has(> .card-head)").first.evaluate(_CARD)
-            assert card["card"] != _CLEAR, card
+            assert card["card"] == _CLEAR and card["body"] != _CLEAR, card
             # The address it was opened at gave its place to General's: one step back is the page before.
             await page.go_back()
             await expect(page).to_have_url(f"{address}/#/runs")

@@ -1,9 +1,8 @@
 """Dot's pages on a phone (items 272 and up), on a served daemon in Chrome.
 
-Settings (item 272): in a window wider than a phone where the tabs and the pane do not fit side by side, the tabs are
-one row that scrolls sideways, with the open tab in sight, and the row stays under the bar while the page scrolls; a tab
-chosen from it opens at the top of its pane. Side by side, the tabs are a column. Before, the row wrapped into four rows
-and scrolled away with the page. On a phone the settings are a list of their tabs (item 330, test_phone_settings.py).
+Settings (item 272): the tabs stood in a column beside the pane, or in a row above it where they did not fit side by
+side; since item 562 they are the sidebar's (test_settings_nav.py). On a phone the settings are a list of their tabs
+(item 330, test_phone_settings.py).
 
 The bar and the composer (item 273): the bar beside a closed sidebar holds its opener alone, and neither holds the
 emergency stop, which is in Settings › System (item 289); the sidebar's buttons and the side panel's switch and close
@@ -51,20 +50,11 @@ _CONTEXT_LENGTH: int = 32768
 _RUN_WAIT_S: float = 30.0
 # The size of the sidebar's buttons, which the side panel's switch and close share (item 273): the button and its icon.
 _SWITCH_PX: tuple[int, int, int] = (36, 36, 19)
-# The settings' tabs; Skills is a tab of Customize since item 317, Schedules a page of its own since item 401.
-TABS: int = 11
-# Where the window scrolls the page to in the checks of a row that stays.
-_SCROLLED_PX: int = 700
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (390, "light"),
     (390, "dark"),
     (1280, "light"),
 )
-# A laptop's window with the sidebar open: the tabs and the pane do not fit side by side, and a phone's list is not
-# used.
-_ROW_SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"))
-# Wide enough for the tabs and the pane side by side, the sidebar open.
-_WIDE: int = 1680
 
 
 @pytest.fixture
@@ -158,10 +148,6 @@ async def _box(locator: Locator) -> FloatRect:
     return found
 
 
-async def _boxes(locator: Locator) -> list[FloatRect]:
-    return [await _box(item) for item in await locator.all()]
-
-
 def _inside(inner: FloatRect, outer: FloatRect) -> bool:
     return (
         outer["x"] - 1 <= inner["x"]
@@ -177,69 +163,6 @@ async def _signed_in(browser: Browser, address: str, width: int, scheme: Literal
     )
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     return page
-
-
-async def _settings_row(
-    browser: Browser, address: str, size: tuple[int, Literal["light", "dark"]], shots: Path
-) -> None:
-    width, scheme = size
-    page: Page = await _signed_in(browser, address, width, scheme)
-    nav: Locator = page.get_by_role("navigation", name="Settings")
-    tabs: Locator = nav.get_by_role("link")
-
-    # The last tab open: one row, scrolled so that the open tab is in sight.
-    await page.goto(f"{address}/#/settings/system")
-    await expect(tabs).to_have_count(TABS)
-    await expect(nav.locator("[aria-current='page']")).to_have_text("System")
-    assert len({round(box["y"]) for box in await _boxes(tabs)}) == 1
-    assert _inside(await _box(nav.locator("[aria-current='page']")), await _box(nav))
-    await page.screenshot(path=str(shots / f"settings-system-{width}-{scheme}.png"))
-
-    # Down the page the row stays under the bar, over the pane.
-    await page.goto(f"{address}/#/settings/general")
-    await expect(nav.locator("[aria-current='page']")).to_have_text("General")
-    await page.evaluate("(y) => window.scrollTo(0, y)", _SCROLLED_PX)
-    await page.wait_for_function("(least) => window.scrollY > least", arg=_SCROLLED_PX // 2)
-    bar: FloatRect = await _box(page.locator("header.stagebar"))
-    row: FloatRect = await _box(page.locator(".settings-side"))
-    assert abs(row["y"] - (bar["y"] + bar["height"])) <= 1, (row, bar)
-    assert await page.evaluate(
-        "() => { const r = document.querySelector('.settings-nav').getBoundingClientRect();"
-        " const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);"
-        " return hit !== null && hit.closest('.settings-nav') !== null; }"
-    )
-    await page.screenshot(path=str(shots / f"settings-scrolled-{width}-{scheme}.png"))
-
-    # A tab chosen from the row opens at the top of its pane.
-    await nav.get_by_role("link", name="Phone").click()
-    await expect(nav.locator("[aria-current='page']")).to_have_text("Phone")
-    await page.wait_for_function("() => window.scrollY === 0")
-    assert _inside(await _box(nav.locator("[aria-current='page']")), await _box(nav))
-    await page.close()
-
-
-async def _settings_column(browser: Browser, address: str) -> None:
-    page: Page = await _signed_in(browser, address, _WIDE, "light")
-    await page.goto(f"{address}/#/settings/general")
-    tabs: Locator = page.get_by_role("navigation", name="Settings").get_by_role("link")
-    await expect(tabs).to_have_count(TABS)
-    boxes: list[FloatRect] = await _boxes(tabs)
-    assert len({round(box["x"]) for box in boxes}) == 1
-    assert [box["y"] for box in boxes] == sorted(box["y"] for box in boxes)
-    await page.close()
-
-
-async def test_the_settings_tabs_are_one_row_that_stays_where_they_do_not_fit_beside_the_pane(
-    own_home: Path, tmp_path: Path
-) -> None:
-    async with _served(own_home) as (_, address), async_playwright() as playwright:
-        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
-        try:
-            for size in _ROW_SHOTS:
-                await _settings_row(browser, address, size, tmp_path)
-            await _settings_column(browser, address)
-        finally:
-            await browser.close()
 
 
 async def _size(locator: Locator) -> tuple[int, int, int]:

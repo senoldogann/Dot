@@ -5,7 +5,7 @@
 import { api } from "../api.js";
 import { clip, dateTime, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, paneHead } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel } from "../panels.js";
 import { readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -361,7 +361,7 @@ function buildForm(onWritten) {
   };
 }
 
-export function mount(root, _ctx) {
+export function mount(root, ctx) {
   let disposed = false;
   let view = null;
   let steps = [];
@@ -498,11 +498,8 @@ export function mount(root, _ctx) {
     );
   }
 
+  ctx.head.setLead("Dot learns from its own runs how to work better on this Mac. Besides its built-in instructions, every run follows two short texts: habits (how to work) and tool guidance (what the commands, apps and sites of this Mac want). Each night Dot can propose a new version of them and try it on test tasks first; you choose the version it follows. You never have to write one yourself.");
   root.append(
-    paneHead(
-      "Dot learns from its own runs how to work better on this Mac. Besides its built-in instructions, every run follows two short texts: habits (how to work) and tool guidance (what the commands, apps and sites of this Mac want). Each night Dot can propose a new version of them and try it on test tasks first; you choose the version it follows. You never have to write one yourself.",
-      null,
-    ),
     overviewHolder,
     section("What Dot follows now", [], inUse),
     section("Write your own (optional)", [], form.element),

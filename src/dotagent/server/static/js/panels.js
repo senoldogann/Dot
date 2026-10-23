@@ -16,13 +16,80 @@ export function pageHead(title, subtitle, actions) {
   return paneHead(subtitle, actions);
 }
 
-/** The line under the bar on a page whose name the bar already shows (a settings pane): the description and the
- * actions; nothing when both are empty. */
-export function paneHead(subtitle, actions) {
+/** The line under the bar on a page whose name the bar already shows: the description and the actions; nothing when
+ * both are empty. */
+function paneHead(subtitle, actions) {
   if (subtitle === "" && actions === null) {
     return null;
   }
   return el("div", { class: "page-head" }, el("div", { class: "grow page-sub" }, subtitle), actions);
+}
+
+/**
+ * The head of a settings tab (item 562): the tab's name, the line that says what it is for and, at the right, what the
+ * tab holds and the buttons that belong to the whole page. Returns the element and `setLead(text)`, `setMeta(...nodes)` and
+ * `setActions(...nodes)`, which a tab calls once it knows them.
+ */
+export function settingsHead(title) {
+  const lead = el("p", { class: "set-lead" });
+  const meta = el("span", { class: "set-meta" });
+  const actions = el("div", { class: "set-actions" });
+  const element = el(
+    "header",
+    { class: "set-head" },
+    el("div", { class: "set-head-text" }, el("h1", { class: "set-title" }, title), lead),
+    el("div", { class: "set-head-side" }, meta, actions),
+  );
+  const fill = (node, nodes) => node.replaceChildren(...nodes.filter((child) => child !== null && child !== undefined));
+  return {
+    element,
+    setLead: (text) => {
+      lead.textContent = text;
+    },
+    setMeta: (...nodes) => fill(meta, nodes),
+    setActions: (...nodes) => fill(actions, nodes),
+  };
+}
+
+/**
+ * A section of a settings tab (item 562): `title` over a card (or whatever `body` is), a `lead` line under the title that
+ * says what the section is for, and `actions` at the right of the title. `body` is a node or a list of nodes.
+ */
+export function setSection({ title, lead = "", actions = null, body }) {
+  return el(
+    "section",
+    { class: "set-section" },
+    el(
+      "div",
+      { class: "set-section-head" },
+      el("div", { class: "set-section-text" }, el("h2", { class: "set-section-title" }, title), lead === "" ? null : el("p", { class: "set-section-lead" }, lead)),
+      actions,
+    ),
+    body,
+  );
+}
+
+/** A card of rows (item 562): each row a line the hairline parts from the one before. */
+export function setCard(...rows) {
+  return el("div", { class: "set-card" }, rows);
+}
+
+/**
+ * A row of a settings card (item 562): `title` and, under it, the muted `lead` on the left; `control` (a switch, a select, a
+ * button, a group of them) on the right. `body` goes under both, over the row's whole width.
+ */
+export function setRow({ title, lead = "", control = null, body = null }) {
+  return el(
+    "div",
+    { class: "set-row" },
+    el(
+      "div",
+      { class: "set-row-main" },
+      el("div", { class: "set-row-text" }, el("div", { class: "set-row-title" }, title), lead === "" ? null : el("div", { class: "set-row-lead" }, lead)),
+      control === null ? null : el("div", { class: "set-row-control" }, control),
+    ),
+    body,
+  );
 }
 
 /**
@@ -276,12 +343,9 @@ export function field(label, control, hint) {
   );
 }
 
-/**
- * A labelled on/off switch; `write` may be asynchronous. `paint()` shows the current `read()` again after something else
- * changed it; `toggle` and `note` are the button and the hint line, for settings that depend on more than their value.
- */
-export function switchSetting({ label, hint, read, write, onToggled }) {
-  const toggle = el("button", {
+/** The switch of a setting: a button that writes the opposite of what `read()` says, and calls `onToggled` once it is done. */
+function switchToggle({ label, read, write, onToggled }) {
+  return el("button", {
     class: "switch",
     type: "button",
     role: "switch",
@@ -297,6 +361,14 @@ export function switchSetting({ label, hint, read, write, onToggled }) {
         }
       }),
   });
+}
+
+/**
+ * A labelled on/off switch; `write` may be asynchronous. `paint()` shows the current `read()` again after something else
+ * changed it; `toggle` and `note` are the button and the hint line, for settings that depend on more than their value.
+ */
+export function switchSetting({ label, hint, read, write, onToggled }) {
+  const toggle = switchToggle({ label, read, write, onToggled });
   const note = el("div", { class: "hint" }, hint);
   const element = el("div", { class: "setting" }, switchRow(el("div", { class: "row" }, el("span", { class: "grow" }, label), toggle), toggle), note);
   return {
@@ -305,6 +377,27 @@ export function switchSetting({ label, hint, read, write, onToggled }) {
     note,
     paint: () => toggle.setAttribute("aria-checked", String(read())),
   };
+}
+
+/**
+ * A switch as a row of a settings card (item 562), the title and the muted line on the left and the switch on the right;
+ * the row turns it wherever it is tapped. `write` may be asynchronous. Returns the element, the `toggle` and `paint()`, as
+ * `switchSetting` does.
+ */
+export function switchRowSetting({ label, hint, read, write, onToggled }) {
+  const toggle = switchToggle({ label, read, write, onToggled });
+  return {
+    element: switchRow(setRow({ title: label, lead: hint, control: toggle }), toggle),
+    toggle,
+    paint: () => toggle.setAttribute("aria-checked", String(read())),
+  };
+}
+
+/** A choice of a few as a row of a settings card (item 562), the buttons on the right: as `choiceSetting` returns it. */
+export function choiceRowSetting({ label, hint, options, selected, onSelect }) {
+  const choice = segmented(options, selected, onSelect);
+  choice.element.setAttribute("aria-label", label);
+  return { element: setRow({ title: label, lead: hint, control: choice.element }), choice };
 }
 
 /** A choice of a few, as Density is drawn: the label and the buttons on a line, the hint under them. */

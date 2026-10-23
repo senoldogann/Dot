@@ -19,6 +19,7 @@ import { markContent, markInk } from "./marks.js";
 import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
+import { buildSettingsNav } from "./settingsnav.js";
 import { requestCompose } from "./shortcuts.js";
 import { onLifecycle, onStreamBack, readFailed } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
@@ -1218,13 +1219,27 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
   placeForWidth();
   PHONE.addEventListener("change", placeForWidth);
+  // While the settings are open the sidebar is their nav in place of the chats and the pages (item 562); a phone keeps the
+  // sidebar as it is, its settings being a list of tabs on a page of their own.
+  const settingsNav = buildSettingsNav({ homeHref, onCollapse, onNavigate });
   const element = el(
     "aside",
     { class: "sidebar", id: "sidebar", "aria-label": "Sidebar" },
     el("div", { class: "side-head", "data-tauri-drag-region": "" }, close, el("span", { class: "side-title" }, dotName())),
     body,
     foot,
+    settingsNav.element,
   );
+  let routeTab = null;
+  function paintMode() {
+    if (routeTab === "settings" && !PHONE.matches) {
+      element.dataset.mode = "settings";
+      settingsNav.setRoute();
+    } else {
+      delete element.dataset.mode;
+    }
+  }
+  PHONE.addEventListener("change", paintMode);
   // The name the owner calls Dot by, as it changes (item 420).
   onAssistant((names) => setText(element.querySelector(".side-title"), names.name));
   const workTicker = setInterval(() => {
@@ -1240,9 +1255,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       search.select();
     },
     focusClose() {
-      close.focus();
+      if (element.dataset.mode === "settings") {
+        settingsNav.focusClose();
+      } else {
+        close.focus();
+      }
     },
     setRoute({ tab, runId }) {
+      routeTab = tab;
+      paintMode();
       mark(agentsLink, tab === "agents");
       mark(campaignsLink, tab === "campaigns");
       mark(schedulesLink, tab === "schedules");
@@ -1262,6 +1283,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     },
     dispose() {
       disposed = true;
+      settingsNav.dispose();
       closeMenu();
       clearInterval(ageTicker);
       clearInterval(workTicker);
@@ -1272,6 +1294,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       window.removeEventListener("focus", onBackInView);
       window.removeEventListener("keydown", onEscape);
       PHONE.removeEventListener("change", placeForWidth);
+      PHONE.removeEventListener("change", paintMode);
     },
   };
 }

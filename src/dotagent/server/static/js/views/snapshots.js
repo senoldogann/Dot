@@ -4,7 +4,7 @@
 import { api } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
-import { choiceSetting, errorPanel, loadingPanel, paneHead, switchSetting } from "../panels.js";
+import { choiceRowSetting, errorPanel, loadingPanel, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
 import { attempt, toast } from "../ui.js";
 
 const SOUNDS = [
@@ -14,7 +14,7 @@ const SOUNDS = [
   { id: "off", label: "Off", hint: "No sound" },
 ];
 
-export function mount(root, _ctx) {
+export function mount(root, ctx) {
   let disposed = false;
   let view = null;
   const holder = el("div", { class: "stack" }, loadingPanel());
@@ -23,33 +23,29 @@ export function mount(root, _ctx) {
     view = await api.post("/snapshots/settings", { key, value });
   }
 
+  /** The row that says whether the Command key is watched; when macOS has not allowed it, the pane is a press away (item 409) and the
+   * watch starts by itself once the permission is granted. */
   function listening() {
     if (!view.enabled) {
-      return el("p", { class: "hint" }, "Off: the Command key is not watched.");
+      return setRow({ title: "The Command key", lead: "Off: the Command key is not watched." });
     }
     if (view.problem !== null) {
-      // The pane a press away (item 409); the watch starts by itself once the permission is granted.
-      return el(
-        "div",
-        { class: "stack tight" },
-        el("p", { class: "hint snapshots-problem" }, icon("alert"), el("span", null, ` ${view.problem}`)),
-        el(
-          "div",
-          { class: "cluster" },
-          el(
-            "button",
-            { class: "btn sm", type: "button", onclick: () => attempt(() => api.post("/desktop/permissions/open", { pane: "accessibility" })) },
-            icon("external"),
-            "Open System Settings",
-          ),
+      return setRow({
+        title: "The Command key",
+        lead: el("span", { class: "snapshots-problem" }, icon("alert"), el("span", null, ` ${view.problem}`)),
+        control: el(
+          "button",
+          { class: "btn sm", type: "button", onclick: () => attempt(() => api.post("/desktop/permissions/open", { pane: "accessibility" })) },
+          icon("external"),
+          "Open System Settings",
         ),
-      );
+      });
     }
-    return el("p", { class: "hint" }, view.listening ? `Listening for ${view.shortcut}.` : "Starting the watch of the key…");
+    return setRow({ title: "The Command key", lead: view.listening ? `Listening for ${view.shortcut}.` : "Starting the watch of the key…" });
   }
 
   function paint() {
-    const enabled = switchSetting({
+    const enabled = switchRowSetting({
       label: "SnapShots",
       hint: "Capture a window and attach it to your current draft.",
       read: () => view.enabled,
@@ -62,7 +58,7 @@ export function mount(root, _ctx) {
       },
     });
     enabled.paint();
-    const appText = switchSetting({
+    const appText = switchRowSetting({
       label: "Include app text",
       hint: "Include text and controls when the app makes them available: a Markdown file beside the picture.",
       read: () => view.app_text,
@@ -74,24 +70,19 @@ export function mount(root, _ctx) {
       },
     });
     appText.paint();
-    const shortcut = el(
-      "div",
-      { class: "setting" },
-      el("div", { class: "row" }, el("span", { class: "grow" }, "Capture shortcut"), el("kbd", { class: "snapshots-keys" }, view.shortcut)),
-      el(
-        "div",
-        { class: "hint" },
-        "Capture the window you're using without switching apps: press both Command keys together, or tap the Command key twice. Another key in between, as in ⌘C ⌘V, is not a capture. Dot's own window and a password manager's are never captured.",
-      ),
-    );
-    const sound = choiceSetting({
+    const shortcut = setRow({
+      title: "Capture shortcut",
+      lead: "Capture the window you're using without switching apps: press both Command keys together, or tap the Command key twice. Another key in between, as in ⌘C ⌘V, is not a capture. Dot's own window and a password manager's are never captured.",
+      control: el("kbd", { class: "snapshots-keys" }, view.shortcut),
+    });
+    const sound = choiceRowSetting({
       label: "Capture sound",
       hint: "Choose the sound played when capture starts.",
       options: SOUNDS,
       selected: view.sound,
       onSelect: (id) => attempt(() => change("sound", id)),
     });
-    const animations = switchSetting({
+    const animations = switchRowSetting({
       label: "Capture animations",
       hint: "Animate captured windows into your draft.",
       read: () => view.animations,
@@ -103,7 +94,7 @@ export function mount(root, _ctx) {
       },
     });
     animations.paint();
-    const flash = switchSetting({
+    const flash = switchRowSetting({
       label: "Capture flash",
       hint: "A soft flash over the window as it is captured.",
       read: () => view.flash,
@@ -115,7 +106,7 @@ export function mount(root, _ctx) {
       },
     });
     flash.paint();
-    const openDot = switchSetting({
+    const openDot = switchRowSetting({
       label: "Open Dot after a capture",
       hint: "Bring Dot's window, or its tab in your browser, to the front with the capture in the box. macOS asks once whether Dot may choose the browser's tab.",
       read: () => view.open_dot,
@@ -129,10 +120,10 @@ export function mount(root, _ctx) {
     openDot.paint();
     holder.replaceChildren(
       el(
-        "section",
-        { class: "card", "aria-label": "SnapShots" },
-        el("div", { class: "card-head" }, el("span", { class: "grow" }, "SnapShots")),
-        el("div", { class: "card-pad stack" }, enabled.element, listening(), appText.element, shortcut, sound.element, animations.element, flash.element, openDot.element),
+        "div",
+        { class: "set-sections", role: "region", "aria-label": "SnapShots" },
+        setSection({ title: "Capture", body: setCard(enabled.element, listening(), appText.element, shortcut) }),
+        setSection({ title: "When it captures", body: setCard(sound.element, animations.element, flash.element, openDot.element) }),
       ),
     );
   }
@@ -151,7 +142,8 @@ export function mount(root, _ctx) {
     }
   }
 
-  root.append(paneHead("A double tap of ⌘ in any application captures the window in front into the open chat's box.", null), holder);
+  ctx.head.setLead("A double tap of ⌘ in any application captures the window in front into the open chat's box.");
+  root.append(holder);
   attempt(load);
   return () => {
     disposed = true;

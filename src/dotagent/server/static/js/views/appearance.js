@@ -47,7 +47,7 @@ import {
   setShowInspector,
   showInspector,
 } from "../layout.js";
-import { choiceSetting, paneHead, rangeSetting, switchSetting } from "../panels.js";
+import { choiceSetting, rangeSetting, switchSetting } from "../panels.js";
 import {
   SCHEMES,
   allThemes,
@@ -818,7 +818,7 @@ function typeCard() {
 }
 
 /** Draw the Appearance tab into `root`. Returns the function that stops its listeners. */
-export function mount(root) {
+export function mount(root, ctx) {
   const schemes = schemeCards();
   const look = interfaceCard();
   const motion = motionCard();
@@ -834,8 +834,8 @@ export function mount(root) {
       card.hidden = editing;
     }
   });
+  ctx.head.setLead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the size of the text, the interface, the motion and the type. Themes of your own are kept by Dot, for every browser.");
   root.append(
-    paneHead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the size of the text, the interface, the motion and the type. Themes of your own are kept by Dot, for every browser.", null),
     others[0],
     themes.element,
     ...others.slice(1),

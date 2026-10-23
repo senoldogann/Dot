@@ -7,7 +7,7 @@ import { api } from "../api.js";
 import { el, modelName } from "../dom.js";
 import { icon } from "../icons.js";
 import { PHONE } from "../layout.js";
-import { errorPanel, loadingPanel, paneHead, switchSetting } from "../panels.js";
+import { errorPanel, loadingPanel, switchSetting } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -530,7 +530,7 @@ function buildProvider(initial, isDisposed, host) {
 }
 
 /** The key of each provider, the form that saves one, and where the keys are kept. */
-export function mount(root, _ctx) {
+export function mount(root, ctx) {
   let disposed = false;
   let entries = [];
   let chosen = null;
@@ -604,11 +604,8 @@ export function mount(root, _ctx) {
     await load();
   }
 
+  ctx.head.setLead("The providers Dot signs in to its models with: the key each one takes, the models it brings and where the key is kept. The page never shows a whole key.");
   root.append(
-    paneHead(
-      "The providers Dot signs in to its models with: the key each one takes, the models it brings and where the key is kept. The page never shows a whole key.",
-      null,
-    ),
     holder,
     el(
       "div",
