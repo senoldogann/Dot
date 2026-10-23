@@ -267,6 +267,23 @@ export function hourMinute(ts) {
   return HOUR_MINUTE.format(new Date(ts * 1000));
 }
 
+/**
+ * When a time of day set in the config file comes next, "Next: tonight, 04:00", by this window's clock (item 566): an
+ * hour before six is the coming night's, and an evening hour is tonight while it is still to come today and tomorrow
+ * once it passed. The daemon reads the time in its [scheduler] timezone, this Mac's unless the config file says another.
+ */
+export function nextNight(stepTime, now = new Date()) {
+  const [hour, minute] = stepTime.split(":").map(Number);
+  const at = new Date(now);
+  at.setHours(hour, minute, 0, 0);
+  if (at <= now) {
+    at.setDate(at.getDate() + 1);
+  }
+  const today = at.getDate() === now.getDate();
+  const day = hour < 6 || (hour >= 21 && today) ? "tonight" : today ? "today" : "tomorrow";
+  return `Next: ${day}, ${stepTime}`;
+}
+
 /** The start of the local day of `date`, in milliseconds. */
 function dayStart(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();

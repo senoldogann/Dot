@@ -1,9 +1,9 @@
 """Adding or deleting keeps the page where it is (item 204). The side menu brings the open chat into view when the
 page comes to another chat, and a list painted again after a delete, a pin, a run that starts or a follow-up in the
 open chat stays where the reader scrolled it; the Memory page keeps the notes it has read, and its place, when one of
-them is forgotten. The notes keep a size and scroll inside it (item 218); the learned skills show their first six and
-the rest a click away (item 317). Chats, notes and skills in a home of their own, scripted runs, served by a real
-server, wide and on a phone, light and dark."""
+them is forgotten. The notes come a page at a time, Show more notes under them adding the next (item 218); the learned
+skills show their first six and the rest a click away (item 317). Chats, notes and skills in a home of their own,
+scripted runs, served by a real server, wide and on a phone, light and dark."""
 
 import asyncio
 import re
@@ -47,13 +47,9 @@ _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
 # A list one row shorter may move by about a row; a jump back to the open chat moves it by the whole list.
 _ROW_SLACK_PX: int = 80
-# Enough learned skills for more than a section shows at first, and the most the box of notes may be tall (.list-box,
-# app.css).
+# Enough learned skills for more than a section shows at first.
 _SKILLS: int = 20
 _SHOWN_SKILLS: int = 6
-_BOX_MOST_PX: int = 560
-# The most room between the count of the notes and their search, in the head of the card: its gap and a little more.
-_HEAD_GAP_MAX_PX: int = 24
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
 
 
@@ -165,22 +161,6 @@ async def _window_kept(page: Page, before: int) -> bool:
     """Whether the window is where it was scrolled to, or as near as the end of a shorter page lets it be."""
     now, end = await page.evaluate("[window.scrollY, document.documentElement.scrollHeight - window.innerHeight]")
     return int(now) >= min(before, int(end)) - _ROW_SLACK_PX
-
-
-async def _box_scroll(box: Locator) -> int:
-    return int(await box.evaluate("node => node.scrollTop"))
-
-
-async def _box_kept(box: Locator, before: int) -> bool:
-    """Whether a list's box is where it was scrolled to, or as near as the end of a shorter list lets it be."""
-    now, end = await box.evaluate("node => [node.scrollTop, node.scrollHeight - node.clientHeight]")
-    return int(now) >= min(before, int(end)) - _ROW_SLACK_PX
-
-
-async def _scrolls_inside(box: Locator) -> bool:
-    """Whether a list's box keeps its size and scrolls inside: no taller than its most, with more rows than it shows."""
-    shown, whole = await box.evaluate("node => [node.clientHeight, node.scrollHeight]")
-    return int(shown) <= _BOX_MOST_PX and int(whole) > int(shown)
 
 
 async def _list_rested(page: Page) -> None:
@@ -372,28 +352,36 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
             page: Page = await _page(browser, address, 1280, "light", "/settings/memory")
             learning: Locator = page.locator("[data-learning]")
             await expect(learning).to_contain_text("How learning fares")
-            await expect(learning).to_contain_text(
-                "Lessons from runs: has not gone well yet; failed 1 time in a row since: the embedder is down"
+            await expect(learning.locator(".set-row", has_text="Lessons from runs")).to_contain_text(
+                "has not gone well yet; failed 1 time in a row since: the embedder is down"
             )
             # A work with neither a success nor a failure recorded has not failed: it says there is nothing yet.
-            await expect(learning).to_contain_text("The nightly reflection: nothing recorded yet")
-            await expect(learning).not_to_contain_text("The nightly reflection: has not gone well yet")
-            # The count of the notes stands beside the search at the head's right, not in the middle of the row
-            # (item 437).
-            head: Locator = page.locator(".notes-panel > .card-head")
-            count: FloatRect | None = await head.locator(".hint").bounding_box()
+            reflection: Locator = learning.locator(".set-row", has_text="The nightly reflection")
+            await expect(reflection).to_contain_text("nothing recorded yet")
+            await expect(reflection).not_to_contain_text("has not gone well yet")
+            # The count of the notes stands beside their name at the head's left, the choice of what to see and the
+            # search at its right, level with the card's edge, not in the middle of the row (item 437).
+            head: Locator = page.locator(".notes-section .set-section-head")
+            title: FloatRect | None = await head.locator(".set-section-title").bounding_box()
+            count: FloatRect | None = await head.locator(".note-count").bounding_box()
             search: FloatRect | None = await head.get_by_role("searchbox", name="Search notes").bounding_box()
-            assert count is not None and search is not None
-            assert 0 <= search["x"] - (count["x"] + count["width"]) < _HEAD_GAP_MAX_PX, (count, search)
-            # Learning that has stopped says why in the head of its card, beside the name and not over it.
+            card: FloatRect | None = await page.locator(".note-card").bounding_box()
+            assert title is not None and count is not None and search is not None and card is not None
+            assert title["x"] <= count["x"] and count["x"] + count["width"] <= title["x"] + title["width"] + 1, (
+                title,
+                count,
+            )
+            assert count["x"] + count["width"] < search["x"], (count, search)
+            assert abs(search["x"] + search["width"] - (card["x"] + card["width"])) <= 1, (search, card)
+            # Learning that has stopped says why in the head of its section, beside the name and not over it.
             for _ in range(2):
                 await record_learning(
                     runtime.store, runtime.bus, "lessons", time.time(), failed_with("the embedder is down " * 20), None
                 )
             await page.reload()
-            why: Locator = page.locator("[data-learning] .card-head .hint")
+            why: Locator = page.locator("[data-learning] .set-section-head .hint")
             await expect(why).to_contain_text("Learning has stopped")
-            name: Locator = page.locator("[data-learning] .card-head .grow")
+            name: Locator = page.locator("[data-learning] .set-section-title")
             name_box: FloatRect | None = await name.bounding_box()
             why_box: FloatRect | None = await why.bounding_box()
             assert name_box is not None and why_box is not None
@@ -401,36 +389,33 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
             assert await name.evaluate("(node) => node.scrollWidth <= node.clientWidth")
             notes: Locator = page.locator("[data-memory]")
             await expect(notes).to_have_count(30)
-            # The notes keep a size (item 218): their box scrolls inside, and Load more under it adds the next page.
-            box: Locator = page.locator(".list-box").first
-            assert await _scrolls_inside(box)
-            await page.get_by_role("button", name="Load more").click()
+            # The notes come a page at a time (item 218): Show more notes under them adds the next page.
+            await page.get_by_role("button", name="Show more notes").click()
             await expect(notes).to_have_count(_NOTES)
-            await box.evaluate("node => { node.scrollTop = node.scrollHeight; }")
-            before: int = await _box_scroll(box)
-            assert before > 400, f"the list does not scroll: {before}"
+            await expect(page.get_by_role("button", name="Show more notes")).to_be_hidden()
             # A note near the end is being corrected while another is forgotten.
             note_id: str = await notes.nth(_NOTES - 3).get_attribute("data-memory") or ""
             corrected: Locator = page.locator(f"[data-memory='{note_id}']")
             await corrected.get_by_role("button", name="Edit this note").click()
             await expect(corrected.get_by_role("textbox", name="Note")).to_be_visible()
-            before = await _box_scroll(box)
+            before: int = int(await page.evaluate("window.scrollY"))
+            assert before > 400, f"the page does not scroll: {before}"
             await notes.last.get_by_role("button", name="Forget this note").click()
             await page.get_by_role("dialog").get_by_role("button", name="Forget").click()
             await expect(page.locator(".toast", has_text="Forgotten.")).to_be_visible()
-            # The notes read stay read, one fewer, the list stays where it was and the form stays open.
+            # The notes read stay read, one fewer, the page stays where it was and the form stays open.
             await expect(notes).to_have_count(_NOTES - 1)
-            assert await _box_kept(box, before)
+            assert await _window_kept(page, before)
             await expect(corrected.get_by_role("textbox", name="Note")).to_be_visible()
             # The correction is saved: the note goes to the head of the list, where the notes changed last stand, and
             # the list stays.
-            before = await _box_scroll(box)
+            before = int(await page.evaluate("window.scrollY"))
             await corrected.get_by_role("textbox", name="Note").fill("A corrected note about the garden.")
             await corrected.get_by_role("button", name="Save").click()
             await expect(page.locator(".toast", has_text="Note updated.")).to_be_visible()
             await expect(notes.first).to_contain_text("A corrected note about the garden.")
             await expect(notes).to_have_count(_NOTES - 1)
-            assert await _box_kept(box, before)
+            assert await _window_kept(page, before)
             await page.screenshot(path=str(tmp_path / "memory-forgotten-1280-light.png"), animations="disabled")
             await page.close()
         finally:

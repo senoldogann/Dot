@@ -4,26 +4,29 @@
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
 `memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
-UI, where Settings › Memory is one column of cards: the box that adds a note, then the notes changed last first, 30 at a
-time with **Load more** for the next and their search in the head of the list (item 373), then what Dot knows about you
-with your own lines, then how learning fares; a note's actions show when the pointer is on its row (always on a touch
-screen); forgetting, correcting or adding a note keeps the notes read and the list where it was, and a correction open
-on another note stays open (item 204). In a run's conversation, a note the run saves, corrects (`memory_update`) or
-forgets leaves a quiet line where it happened, what changed and the first words of the note: "Saved to memory", "Updated
-memory" or "Removed from memory" (item 313, after Grok's "Updated memory"). The line of a saved or corrected note opens
-Settings › Memory with that note first, to read, correct or forget (`#/settings/memory?note=ID`, `GET
-/api/memories/{id}`); a note forgotten since is said to be gone. A note saved again, or a call that failed, changed
-nothing and leaves no line. The line names no agent: a note a run saves is Dot's, for every run (item 94). The notes a
-run is handed at its start leave a line too, "Recalled 3 memories", not in the conversation but under Set up in the side
-panel's Run tab (item 365), and only when its chat had not been handed one of them before: a follow-up handed the same
-notes says nothing, and one handed a new note says how many are new, "(1 new)" (item 335). The notes themselves go under
-the message that recalled them, in the note that gives the time ("[system note] It is now…", item 404), not into the
-instructions: the instructions stay the same bytes from one message of a chat to the next, so the provider serves them
-and the history from its prompt cache (the first word of an answer came after 30 to 50 seconds of a 200,000-token chat
-before; `first_token_seconds` on each `model_call` event measures it from now on); a note an earlier message of the chat
-was handed is not repeated while its text stands, comes again when it changed (a correction on the Memory page, a run's
-update), and is named as forgotten when it was, since the old text stays in the chat; a note folded into a summary, in
-the run or since, is handed again after the summary, as it stands then.
+UI, where Settings › Memory (items 373 and 566) is the box that adds a note at its head (its tags beside it, one fact
+per note, **Remember** or ⌘Enter), then **Notes** with how many there are, a choice of All, Lessons, Preferences and
+From outside content (each reads the 2,000 newest notes, not only the ones shown; with a search, the search's 50 best
+hits) and their search, the notes changed last first, 30 at a time with **Show more notes**, each a row with its tags,
+the mark of a note saved while a run read outside content, who saved it and when, how often it was used, and its edit
+and delete; then what Dot knows about you with your own lines, then how learning fares; a note's actions show when the
+pointer is on its row (always on a touch screen); forgetting, correcting or adding a note keeps the notes read and the
+list where it was, and a correction open on another note stays open (item 204). In a run's conversation, a note the run
+saves, corrects (`memory_update`) or forgets leaves a quiet line where it happened, what changed and the first words of
+the note: "Saved to memory", "Updated memory" or "Removed from memory" (item 313, after Grok's "Updated memory"). The
+line of a saved or corrected note opens Settings › Memory with that note first, to read, correct or forget
+(`#/settings/memory?note=ID`, `GET /api/memories/{id}`); a note forgotten since is said to be gone. A note saved again,
+or a call that failed, changed nothing and leaves no line. The line names no agent: a note a run saves is Dot's, for
+every run (item 94). The notes a run is handed at its start leave a line too, "Recalled 3 memories", not in the
+conversation but under Set up in the side panel's Run tab (item 365), and only when its chat had not been handed one of
+them before: a follow-up handed the same notes says nothing, and one handed a new note says how many are new, "(1 new)"
+(item 335). The notes themselves go under the message that recalled them, in the note that gives the time ("[system
+note] It is now…", item 404), not into the instructions: the instructions stay the same bytes from one message of a chat
+to the next, so the provider serves them and the history from its prompt cache (the first word of an answer came after
+30 to 50 seconds of a 200,000-token chat before; `first_token_seconds` on each `model_call` event measures it from now
+on); a note an earlier message of the chat was handed is not repeated while its text stands, comes again when it changed
+(a correction on the Memory page, a run's update), and is named as forgotten when it was, since the old text stays in
+the chat; a note folded into a summary, in the run or since, is handed again after the summary, as it stands then.
 
 How learning fares, the last card, says for the reflection, the lessons and the skills when each last went well and,
 for one that failed, how many times in a row and why. A work with neither a success nor a failure recorded (one that

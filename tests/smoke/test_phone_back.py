@@ -157,7 +157,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await _home_with_links(page, address)
     await page.locator("#old-address").click()
     await expect(page).to_have_url(f"{address}/#/settings/memory")
-    await expect(page.locator(".memory-layout")).to_be_visible()
+    await expect(page.locator(".note-composer")).to_be_visible()
     await expect(button).to_have_attribute("aria-label", "Back")
     # As Back it opens no panel and says it controls none (review B8).
     assert await button.get_attribute("aria-expanded") is None and await button.get_attribute("aria-controls") is None
