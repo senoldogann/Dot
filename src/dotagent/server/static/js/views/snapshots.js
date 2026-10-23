@@ -49,11 +49,14 @@ export function mount(root, ctx) {
       label: "SnapShots",
       hint: "Capture a window and attach it to your current draft.",
       read: () => view.enabled,
-      write: (on) => change("enabled", on),
+      // The words follow the change once it is made (item 559): a switch that failed says so alone.
+      write: async (on) => {
+        await change("enabled", on);
+        toast("ok", view.enabled ? "SnapShots are on." : "SnapShots are off.");
+      },
       onToggled: () => {
         if (!disposed) {
           paint();
-          toast("ok", view.enabled ? "SnapShots are on." : "SnapShots are off.");
         }
       },
     });

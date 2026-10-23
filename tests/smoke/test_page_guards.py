@@ -19,6 +19,7 @@ from pydantic import JsonValue
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.memory.service import OwnerSection, owner_section, set_owner_section
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -240,6 +241,11 @@ async def _answer_with_an_error(route: Route) -> None:
     await route.fulfill(status=500, content_type="application/json", body=body)
 
 
+async def _answer_refused(route: Route) -> None:
+    """The answer of a daemon that does not take the token the page sends."""
+    await route.fulfill(status=401, content_type="application/json", body='{"message": "refused", "context": {}}')
+
+
 async def test_a_daemon_that_answers_with_an_error_is_not_said_to_be_down(page: Page) -> None:
     """Item 178: when a read of the sign-in fails with an answer of the daemon, the page says that the daemon runs and
     shows the error; before, it asked to start the daemon that had answered."""
@@ -263,3 +269,187 @@ async def test_a_page_that_cannot_read_again_keeps_what_it_showed_and_says_so(ru
         "could not be read again: Dot failed on an error it did not expect"
     )
     await expect(now).to_have_text(shown)
+
+
+async def test_a_status_that_cannot_be_read_again_is_told_and_does_not_keep_the_approvals_from_showing(
+    runtime: Runtime, page: Page
+) -> None:
+    """Item 559: the status and the approvals that wait are read again at each event; a read that failed was only
+    written to the console, so the waiting count and the emergency stop's banner stood as they were, with the page
+    saying it was live, and the one read that failed kept the other's answer out as well. It is told as the pages tell
+    theirs, and the tab counts the question that came while the status could not be read."""
+    await expect(page.locator(".home-now")).not_to_have_text("Looking around…")
+    await page.route("**/api/status", _answer_with_an_error)
+    asked = await runtime.store.create_approval("run-559", "shell", "touch x", "write", {"command": "touch x"})
+    try:
+        await runtime.bus.emit("run-559", "run_started", {}, False)
+        await expect(page.locator(".toast.error", has_text="Dot's status could not be read again")).to_be_visible()
+        await page.wait_for_function("() => document.title.startsWith('(1) ')")
+    finally:
+        await runtime.store.decide_approval(asked.id, "denied", "test", "")
+
+
+async def test_an_address_with_a_token_the_daemon_does_not_hold_signs_nobody_out(
+    runtime: Runtime, address: str
+) -> None:
+    """Item 559: any link to the daemon's address with ``#token=`` in it put that token in the browser's storage, and
+    the proof that failed took it out again, with the token that was there: every tab of the browser signed out, and a
+    phone's home-screen app to pair anew. The token of an address is kept once the daemon has proven that it holds it,
+    and one it does not hold gives way to the token the browser has; with none to go on, it is the sign-in screen."""
+    port: int = int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            context = await browser.new_context(service_workers="block")
+            signed: Page = await context.new_page()
+            await signed.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await signed.goto(ui_url("127.0.0.1", port, TOKEN))
+            await expect(signed.locator("main.page")).to_be_visible()
+            assert await signed.evaluate("localStorage.getItem('dot.token')") == TOKEN
+            # A link another page made, with a token of its own, in the same browser.
+            linked: Page = await context.new_page()
+            await linked.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await linked.goto(ui_url("127.0.0.1", port, "a-token-the-daemon-never-made"))
+            await expect(linked.locator(".toast.error", has_text="is not the daemon's")).to_be_visible()
+            await expect(linked.locator("main.page")).to_be_visible()
+            await expect(linked.get_by_label("Access token", exact=True)).to_have_count(0)
+            assert "token" not in linked.url, linked.url
+            assert await linked.evaluate("localStorage.getItem('dot.token')") == TOKEN
+            await context.close()
+            # A browser with no token of its own has nothing to go on: it is asked for one, and keeps nothing.
+            bare = await (await browser.new_context(service_workers="block")).new_page()
+            await bare.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await bare.goto(ui_url("127.0.0.1", port, "a-token-the-daemon-never-made"))
+            await expect(bare.get_by_label("Access token", exact=True)).to_be_visible()
+            assert await bare.evaluate("localStorage.getItem('dot.token')") is None
+        finally:
+            await browser.close()
+
+
+async def test_a_page_loaded_again_while_its_token_is_being_proven_tries_it_again(
+    runtime: Runtime, address: str
+) -> None:
+    """Item 559: the token of an address is kept once the daemon has proven that it holds it, and the page takes it out
+    of the address as it opens, so a page loaded again before the proof came had it nowhere and asked for it. The tab
+    keeps the token it is trying until it is proven or refused."""
+    port: int = int(address.rpartition(":")[2])
+    asked: asyncio.Event = asyncio.Event()
+    given: asyncio.Event = asyncio.Event()
+
+    async def hold_the_proof(route: Route) -> None:
+        asked.set()
+        await given.wait()
+        await route.continue_()
+
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            opened: Page = await (await browser.new_context(service_workers="block")).new_page()
+            await opened.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await opened.route(_PROOF, hold_the_proof)
+            await opened.goto(ui_url("127.0.0.1", port, TOKEN))
+            await asyncio.wait_for(asked.wait(), 30)
+            # Loaded again before the daemon was heard: the address no longer has the token.
+            assert "token" not in opened.url, opened.url
+            await opened.reload()
+            given.set()
+            await expect(opened.locator("main.page")).to_be_visible()
+            assert await opened.evaluate("localStorage.getItem('dot.token')") == TOKEN
+            assert await opened.evaluate("sessionStorage.getItem('dot.tokenTrying')") is None
+        finally:
+            await browser.close()
+
+
+async def test_your_lines_are_not_saved_before_they_are_read_nor_after_they_could_not_be(
+    runtime: Runtime, page: Page
+) -> None:
+    """Item 559: a save of Your lines replaces them all with what is in the box, so one made before they were read, or
+    after the read failed and left the box empty, wiped what the owner wrote before. Settings › Memory draws what Dot
+    knows about you only once the lines are read (item 566): while they come, and after a read that fails, there is no
+    box and no Save."""
+    kept: str = "I read Turkish; answer me in Turkish."
+    await set_owner_section(runtime.store, OwnerSection(dot_lines=(), owner_lines=(kept,), updated_at=time.time()))
+    section = page.locator("section.set-section").filter(has_text="What Dot knows about you")
+    lines = section.get_by_label("Your lines", exact=True)
+    save = section.get_by_role("button", name="Save your lines")
+    # Slow: nothing of it is shown while the lines are on their way, and the box holds them once they come.
+    arrive: asyncio.Event = asyncio.Event()
+
+    async def late(route: Route) -> None:
+        await arrive.wait()
+        await route.continue_()
+
+    await page.route("**/api/memories/owner", late)
+    await page.evaluate("location.hash = '#/settings/memory'")
+    await expect(page.locator("section.set-section").first).to_be_visible()
+    await expect(save).to_be_hidden()
+    arrive.set()
+    await expect(lines).to_have_value(kept)
+    await expect(save).to_be_enabled()
+    await page.unroute("**/api/memories/owner", late)
+    # A read that fails: no box and no Save, so an empty one cannot be saved over the lines.
+    await page.route("**/api/memories/owner", _answer_with_an_error)
+    await page.reload()
+    await expect(page.locator("section.set-section").first).to_be_visible()
+    await expect(lines).to_be_hidden()
+    await expect(save).to_be_hidden()
+    await page.unroute("**/api/memories/owner", _answer_with_an_error)
+    await page.reload()
+    await expect(lines).to_have_value(kept)
+    await lines.fill(f"{kept}\nI like short answers.")
+    await save.click()
+    await expect(page.locator(".toast.ok", has_text="Your lines are kept")).to_be_visible()
+    assert (await owner_section(runtime.store)).owner_lines == (kept, "I like short answers.")
+
+
+# What main.js adds to the document and to the phone's media query while a session is on, with the signal each was
+# given: every one is read from the call, by the file it was made in.
+_WATCH_LISTENERS: str = """() => {
+  window.__listeners = [];
+  const add = EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function (type, listener, options) {
+    const target = this === document ? "document" : this instanceof MediaQueryList ? "media" : "other";
+    const made = (new Error().stack ?? "").split("\\n").find((line) => line.includes("/js/")) ?? "";
+    if (made.includes("/js/main.js") && target !== "other" && (type === "click" || type === "change")) {
+      const signal = options !== null && typeof options === "object" ? (options.signal ?? null) : null;
+      window.__listeners.push({ type, target, signal });
+    }
+    return add.call(this, type, listener, options);
+  };
+}"""
+
+
+async def test_the_listeners_a_session_adds_end_with_it(runtime: Runtime, address: str) -> None:
+    """Item 559: a token the daemon refuses ends the session without loading the page again, and signing in again
+    begins another; the click and the phone's media query listeners of the first stayed for the life of the tab, a
+    pair more for each sign-in. Each is given the session's signal now, which ends when it does."""
+    port: int = int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            opened: Page = await (await browser.new_context(service_workers="block")).new_page()
+            await opened.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await opened.add_init_script(f"({_WATCH_LISTENERS})()")
+            await opened.goto(ui_url("127.0.0.1", port, TOKEN))
+            await expect(opened.locator("main.page")).to_be_visible()
+            # The daemon refuses the token once: the session ends, and the page asks for a token.
+            await opened.route("**/api/status", _answer_refused)
+            await runtime.bus.emit("run-559", "run_started", {}, False)
+            sign_in = opened.get_by_label("Access token", exact=True)
+            await expect(sign_in).to_be_visible()
+            await opened.unroute("**/api/status", _answer_refused)
+            await sign_in.fill(TOKEN)
+            await opened.get_by_role("button", name="Connect", exact=True).click()
+            await expect(opened.locator("main.page")).to_be_visible()
+            listeners: list[dict[str, JsonValue]] = await opened.evaluate(
+                """() => window.__listeners.map((one) => ({
+                    type: one.type, target: one.target, scoped: one.signal !== null,
+                    ended: one.signal !== null && one.signal.aborted,
+                }))"""
+            )
+            # One of each for each session, each scoped to its session; the first session's have ended.
+            assert len(listeners) == 4, listeners
+            assert all(one["scoped"] for one in listeners), listeners
+            assert [one["ended"] for one in listeners] == [True, True, False, False], listeners
+        finally:
+            await browser.close()

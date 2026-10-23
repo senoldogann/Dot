@@ -92,18 +92,40 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     paint();
   }
 
+  // The reads of the queue in the order they were sent, and the newest whose answer is shown (item 559): two changes
+  // close together (a message queued, then started) put two reads on their way, and an answer older than the one shown
+  // is dropped, not painted over it. A request of the queue's own counts as a read, its answer being the queue as it
+  // then is.
+  let reads = 0;
+  let shownRead = 0;
+
+  /** Show `view`, the answer to the read or request `mine`, unless the answer of a newer one is shown already: the rows
+   * are then drawn as they stand. */
+  function showNewest(mine, view) {
+    if (mine > shownRead) {
+      shownRead = mine;
+      show(view);
+    } else {
+      paint();
+    }
+  }
+
   /** Read the chat's queue; one that cannot be read keeps what was shown and says why, with Read again. */
   async function load() {
+    const mine = ++reads;
     let view;
     try {
       view = await api.get(`/threads/${threadId}/queue`);
     } catch (error) {
       console.warn("the queue could not be read", error);
-      problem = error instanceof Error ? error.message : String(error);
-      paint();
+      if (mine > shownRead) {
+        shownRead = mine;
+        problem = error instanceof Error ? error.message : String(error);
+        paint();
+      }
       return;
     }
-    show(view);
+    showNewest(mine, view);
   }
 
   /** Run one request of the queue at a time, the others being ignored; its answer is the queue as it then is. */
@@ -114,7 +136,10 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     busy = true;
     paint();
     try {
-      await attempt(async () => show(await request()));
+      await attempt(async () => {
+        const mine = ++reads;
+        showNewest(mine, await request());
+      });
     } finally {
       busy = false;
       paint();
@@ -356,7 +381,8 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
   return {
     element,
     add: async (body) => {
-      show(await api.post(`/threads/${threadId}/queue`, body));
+      const mine = ++reads;
+      showNewest(mine, await api.post(`/threads/${threadId}/queue`, body));
     },
     steerFirst: () => (messages.length > 0 && active ? steer(messages[0]) : Promise.resolve()),
     setActive: (on) => {
@@ -365,9 +391,10 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     },
     editing: () => editingId,
     saveEdit: async (text) => {
+      const mine = ++reads;
       const view = await api.patch(`/queue/${editingId}`, { text, attachments: frame.attachments.ids() });
       endEdit();
-      show(view);
+      showNewest(mine, view);
     },
     cancelEdit: () => {
       endEdit();

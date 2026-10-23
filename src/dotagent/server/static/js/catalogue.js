@@ -157,7 +157,8 @@ function toolsDialog(offered) {
  * The services and where each stands, read with `load()`: `onChange()` runs whenever what is shown should be drawn
  * again (a step started or ended, the servers changed, a key's form opened or closed). While Dot tries a server or waits
  * for a sign-in, it asks again how the servers stand by itself. Returns the state (`plugins`, `listing`, `servers`) and
- * what reads and acts on it; `dispose()` stops the asking and lets go of the icons read.
+ * what reads and acts on it; `dispose()` stops the asking, empties a key's form that is open and lets go of the icons
+ * read.
  */
 export function createCatalogue(onChange) {
   let disposed = false;
@@ -320,8 +321,7 @@ export function createCatalogue(onChange) {
 
   /** Open the form that takes a service account token for 1Password, on its page (item 493). */
   function askVault() {
-    asking = "vault";
-    changed();
+    ask("vault");
   }
 
   /** The form under 1Password's way that takes a service account token the owner made (item 493): a password field,
@@ -398,9 +398,25 @@ export function createCatalogue(onChange) {
     return el("span", { class: "chip" }, WAY_NAMES[first.kind]);
   }
 
-  function askSecrets(service) {
-    asking = service.id;
+  /** Empty what was typed into the form of `id` (a service's, or "vault"). */
+  function forgetTyped(id) {
+    for (const input of secretFields.get(id)?.values() ?? []) {
+      input.value = "";
+    }
+  }
+
+  /** Open the form of `id` (a service's, or "vault"): one open before closes with what was typed in it, as its Cancel
+   * would (item 559). */
+  function ask(id) {
+    if (asking !== null && asking !== id) {
+      forgetTyped(asking);
+    }
+    asking = id;
     changed();
+  }
+
+  function askSecrets(service) {
+    ask(service.id);
     const fields = secretFields.get(service.id);
     if (fields !== undefined) {
       const [first] = fields.values();
@@ -408,15 +424,13 @@ export function createCatalogue(onChange) {
     }
   }
 
-  /** Close the form of the key being asked for, and empty what was typed in it: the way back from a service's page
-   * leaves no key behind. */
+  /** Close the form of the key being asked for, and empty what was typed in it: Cancel and the way away from the page
+   * leave no key behind for the next form to show (item 559). */
   function stopAsking() {
     if (asking === null) {
       return;
     }
-    for (const input of secretFields.get(asking)?.values() ?? []) {
-      input.value = "";
-    }
+    forgetTyped(asking);
     asking = null;
     changed();
   }
@@ -446,11 +460,7 @@ export function createCatalogue(onChange) {
         changed();
       }),
     );
-    const cancel = el("button", { class: "btn sm", type: "button" }, "Cancel");
-    cancel.addEventListener("click", () => {
-      asking = null;
-      changed();
-    });
+    const cancel = el("button", { class: "btn sm", type: "button", onclick: () => stopAsking() }, "Cancel");
     return el(
       "div",
       { class: "connect-add plugin-secrets" },
@@ -613,7 +623,6 @@ export function createCatalogue(onChange) {
     standing,
     howChip,
     askSecrets,
-    stopAsking,
     secretsForm,
     askVault,
     vaultBadge,
@@ -629,6 +638,7 @@ export function createCatalogue(onChange) {
     load,
     dispose() {
       disposed = true;
+      stopAsking();
       clearTimeout(polling);
       for (const pending of appIcons.values()) {
         // An icon that could not be read was reported where it was asked for; there is no URL to let go of.

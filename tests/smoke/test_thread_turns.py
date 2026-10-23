@@ -23,7 +23,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import RunRecord
+from dotagent.store.models import RunRecord, ThreadRecord
 from dotagent.tools.meta import FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -401,6 +401,64 @@ async def test_a_run_opened_again_is_drawn_at_once_from_what_the_page_read_witho
             await expect(calls).to_have_count(count, timeout=500)
             assert len([url for url in streams if f"/runs/{runs[0].id}/stream" in url]) == opened, streams
             await page.screenshot(path=str(tmp_path / "chat-opened-again.png"))
+            await page.context.close()
+        finally:
+            await browser.close()
+
+
+# The most runs of a chat one read gives (`GET /runs` takes 200 at most), and one more.
+_READ_AT_MOST: int = 200
+
+
+async def test_a_chat_of_more_runs_than_the_page_reads_says_so_instead_of_counting_the_ones_it_read(
+    runtime: Runtime, thread: tuple[str, list[RunRecord]], tmp_path: Path
+) -> None:
+    """The page reads the newest 200 runs of a chat (item 559), and of a chat of more it said how many of those it did
+    not show and led to the oldest of them as the first run; a run older than all of them showed no earlier turn and
+    no word on why. Now both say that the earlier runs are not shown, without a count or a first run to name."""
+    address, short = thread
+    long: ThreadRecord = await runtime.store.create_thread("A long chat", "test")
+    chat: list[RunRecord] = []
+    for index in range(_READ_AT_MOST + 1):
+        made: RunRecord = await runtime.store.create_run(
+            long.id,
+            f"Question {index}",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            "high",
+            "standard",
+            None,
+            "yolo",
+            False,
+            None,
+            None,
+            None,
+        )
+        await runtime.store.finish_run(made.id, "done", f"Answer {index}.")
+        chat.append(made)
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url(host, port, TOKEN))
+            note: Locator = page.locator(".history .note")
+            # The newest run of the chat and its first, which is older than the 200 read.
+            for opened in (chat[-1], chat[0]):
+                await page.goto(f"{address}/#/runs/{opened.id}")
+                await expect(page.locator(".bubble.user", has_text=opened.goal)).to_be_visible(timeout=15000)
+                await expect(note).to_have_text(
+                    "Earlier runs of this chat are not shown: the page reads its latest 200."
+                )
+                await expect(page.locator(".history a", has_text="Open the first run")).to_have_count(0)
+            await page.screenshot(path=str(tmp_path / "chat-cut.png"))
+            # A chat of fewer runs says nothing of the kind.
+            await page.goto(f"{address}/#/runs/{short[-1].id}")
+            await expect(page.locator(".history .turn")).to_have_count(_TURNS - 1, timeout=15000)
+            await expect(note).to_have_count(0)
             await page.context.close()
         finally:
             await browser.close()

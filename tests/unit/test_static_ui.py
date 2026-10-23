@@ -172,9 +172,11 @@ def test_every_import_on_demand_names_a_script_that_exists() -> None:
 
 def test_every_export_of_the_interface_is_used_somewhere() -> None:
     """An export nothing imports is code nobody reads any more, or a seam kept for a test: a script imported whole
-    (`import * as`, or on demand) is used whole, the tests of the interface (`tests/js`), the browser tests that import
-    a script in the page (`tests/smoke`) and the unit tests that read one (`tests/unit`) use what they name, and the
-    rest must be imported by name."""
+    (`import * as`) is used for the names its importer reaches through the name it gave it, a page loaded on demand for
+    its `mount`, which the router calls, the tests of the interface (`tests/js`), the browser tests that import a script
+    in the page (`tests/smoke`) and the unit tests that read one (`tests/unit`) use what they name, and the rest must be
+    imported by name. (Before item 559 a script imported whole was used whole, and the helpers of a page that only the
+    page itself used stood among its exports unseen.)"""
     scripts: dict[Path, str] = read_scripts()
     exports: dict[Path, set[str]] = {path: exports_of(source) for path, source in scripts.items()}
     named: dict[Path, set[str]] = {path: set() for path in scripts}
@@ -184,12 +186,16 @@ def test_every_export_of_the_interface_is_used_somewhere() -> None:
             target: Path = (path.parent / statement["specifier"]).resolve()
             clause: str = statement["clause"].strip()
             listed: re.Match[str] | None = NAMED.match(clause)
+            namespace: re.Match[str] | None = NAMESPACE.match(clause)
             if listed is not None:
                 named.setdefault(target, set()).update(exported for exported, _ in names_in(listed["names"]))
+            elif namespace is not None:
+                reached: list[str] = re.findall(rf"\b{re.escape(namespace['alias'])}\.(\w+)", source)
+                named.setdefault(target, set()).update(reached)
             else:
                 whole.add(target)
         for statement in IMPORT_ON_DEMAND.finditer(source):
-            whole.add((path.parent / statement["specifier"]).resolve())
+            named.setdefault((path.parent / statement["specifier"]).resolve(), set()).add("mount")
     elsewhere: str = "\n".join(
         file.read_text(encoding="utf-8")
         for folder, pattern in (("js", "*.js"), ("smoke", "*.py"), ("unit", "*.py"))

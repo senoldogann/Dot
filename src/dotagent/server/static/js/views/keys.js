@@ -249,13 +249,13 @@ function buildProvider(initial, isDisposed, host) {
   // ---- the row down the left side
   const dot = el("span", { class: "provider-dot" });
   const line = el("span", { class: "provider-line" });
+  // A button among buttons, the open one marked as current (item 559): the list is no listbox, which the arrow keys
+  // would be expected to move through.
   const element = el(
     "button",
     {
       class: "provider-item",
       type: "button",
-      role: "option",
-      "aria-selected": "false",
       onclick: () => host.choose(view.provider),
     },
     providerMark(view.provider),
@@ -593,7 +593,7 @@ export function mount(root, ctx) {
   let chosen = null;
   const holder = el("div", null, loadingPanel());
   const kept = el("span");
-  const list = el("div", { class: "providers-list", role: "listbox", "aria-label": "Providers" });
+  const list = el("div", { class: "providers-list", role: "group", "aria-label": "Providers" });
   const detail = el("div", { class: "providers-detail" });
   const layout = el("div", { class: "providers-layout" }, list, detail);
   layout.dataset.open = "false";
@@ -606,7 +606,11 @@ export function mount(root, ctx) {
     chosen = id;
     layout.dataset.open = "true";
     for (const entry of entries) {
-      entry.element.setAttribute("aria-selected", String(entry.id === id));
+      if (entry.id === id) {
+        entry.element.setAttribute("aria-current", "true");
+      } else {
+        entry.element.removeAttribute("aria-current");
+      }
     }
     const entry = entries.find((each) => each.id === id);
     if (entry !== undefined) {
@@ -615,16 +619,15 @@ export function mount(root, ctx) {
     }
   }
 
+  // Back on a phone gives the focus to the provider that was open (item 559), where the reader left the list.
   function back() {
+    const was = entries.find((entry) => entry.id === chosen) ?? entries[0];
     chosen = null;
     layout.dataset.open = "false";
     for (const entry of entries) {
-      entry.element.setAttribute("aria-selected", "false");
+      entry.element.removeAttribute("aria-current");
     }
-    const first = entries[0];
-    if (first !== undefined) {
-      first.element.focus();
-    }
+    was?.element.focus();
   }
 
   async function load() {

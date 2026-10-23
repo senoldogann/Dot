@@ -283,12 +283,6 @@ textarea {
   min-width: 0;
 }
 
-.truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .stack {
   display: flex;
   flex-direction: column;
@@ -1773,8 +1767,11 @@ a.pill:hover {
   margin-left: auto;
 }
 
+/* Over the link of the tile's name, whose ::after covers the tile: its step, its actions and the form that takes a
+   service's key (item 559), which a click would otherwise pass through to the service's page. */
 .plugin-tile .plugin-add,
-.plugin-tile .plugin-actions {
+.plugin-tile .plugin-actions,
+.plugin-tile .plugin-secrets {
   position: relative;
   z-index: 1;
 }
@@ -3951,13 +3948,6 @@ a.pill:hover {
   color: var(--muted);
   font-size: var(--text-sm);
   font-weight: var(--weight-label);
-}
-
-/* What a group of a composer menu says in place of its rows: that it has none, or could not be loaded. */
-.pop-note {
-  padding: 4px 8px;
-  color: var(--muted);
-  font-size: var(--text-xs);
 }
 
 /* The slash menu (item 64): a listbox over the composer's frame, grouped Commands, Skills and MCP; the active option
@@ -7880,11 +7870,6 @@ button.attach-chip:hover {
 
 /* ---------- the rows of the home's Today strip: one per thing in motion ---------- */
 
-.activity-list {
-  display: flex;
-  flex-direction: column;
-}
-
 .activity-row {
   display: flex;
   align-items: center;
@@ -7948,12 +7933,6 @@ button.attach-chip:hover {
 }
 
 /* ---------- delegated runs (item 68) ---------- */
-
-.activity-children {
-  margin-left: 28px;
-  padding-left: 8px;
-  border-left: 1px solid var(--border);
-}
 
 .child > summary .child-open {
   flex: none;

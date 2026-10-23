@@ -15,7 +15,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from PIL import Image
-from playwright.async_api import Browser, Page, async_playwright, expect
+from playwright.async_api import Browser, Page, Route, async_playwright, expect
 
 from dotagent.agent.attachments import attachment_summary, store_attachment
 from dotagent.agent.manager import RunManager
@@ -231,6 +231,35 @@ async def test_the_settings_page_shows_and_changes_what_the_daemon_holds(
         assert _written().get("sound") == "glass"
         assert _written()["app_text"] is False and runtime.snapshots.app_text is False
         await page.screenshot(path=str(config_path().parent / "snapshots-settings.png"))
+    finally:
+        await page.close()
+
+
+async def test_a_switch_the_daemon_refused_says_so_and_not_that_it_was_done(
+    browser: Browser, client: httpx.AsyncClient
+) -> None:
+    """Item 559: the switch said what the change was, in green, before the daemon's answer was known, so one it refused
+    showed the words of the change that never happened and its error under them. The words come once the daemon has
+    made the change, and a refused switch tells the error alone and stays as it was."""
+
+    async def refuse(route: Route) -> None:
+        body: str = '{"message": "config.toml could not be written", "context": {}}'
+        await route.fulfill(status=500, content_type="application/json", body=body)
+
+    page: Page = await browser.new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+        host, port = _address(client)
+        await page.goto(ui_url(host, port, TOKEN))
+        await page.goto(f"http://{host}:{port}/#/settings/snapshots")
+        switch = page.get_by_role("region", name="SnapShots").get_by_role("switch", name="SnapShots")
+        await expect(switch).to_have_attribute("aria-checked", "false")
+        await page.route("**/api/snapshots/settings", refuse)
+        await switch.click()
+        await expect(page.locator(".toast.error")).to_have_text("config.toml could not be written")
+        await expect(switch).to_have_attribute("aria-checked", "false")
+        # Counted at once, not waited for: a toast of "done" would be gone in a few seconds, and so pass a wait.
+        assert await page.locator(".toast.ok").count() == 0
     finally:
         await page.close()
 

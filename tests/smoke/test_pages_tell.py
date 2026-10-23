@@ -18,7 +18,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import APIResponse, Browser, Locator, Page, Route, async_playwright, expect
+from playwright.async_api import APIResponse, Browser, Locator, Page, Response, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_default_config
@@ -216,6 +216,80 @@ async def test_a_queue_that_could_not_be_read_says_so_and_is_read_again(
                     await expect(page.locator(".queue-list > li")).to_have_count(1)
                     await expect(page.locator(".queue-list")).to_contain_text(SUMMARY)
                     await page.close()
+            await asyncio.to_thread(_let_the_command_end)
+            async with asyncio.timeout(WAIT_S):
+                assert (await manager.wait(run_id)).status == "done"
+
+
+async def test_an_older_answer_of_the_queue_does_not_paint_over_a_newer_one(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    """Item 559: two changes of the queue close together (a message queued, then taken out) put two reads on their
+    way, and the answer of the first, that came last, drew the queue as it was and left the message in it. The answer
+    of the read sent last is the one that stays."""
+    with scratch_home() as home, eval_environment(home, {}):
+        turns: list[ScriptedTurn] = [_WAITING, _FINISH, _FINISH]
+        async with _daemon(login_env, turns) as (runtime, manager, address), _api(address) as api:
+            started: httpx.Response = await api.post(
+                "/api/runs",
+                json={"goal": GOAL, "model": SCRIPTED_MODEL, "approvals": "yolo", "key": str(uuid.uuid4())},
+            )
+            run_id: str = started.json()["id"]
+            thread_id: str = started.json()["thread_id"]
+            await _until_called(runtime, run_id)
+            queued: httpx.Response = await api.post(
+                f"/api/threads/{thread_id}/queue", json={"text": SUMMARY, "model": SCRIPTED_MODEL, "approvals": "yolo"}
+            )
+            assert queued.status_code == 201, queued.text
+            async with _chrome(runtime) as browser:
+                page: Page = await _signed_in(browser, address, 1280, "light")
+                await page.goto(f"{address}/#/runs/{run_id}")
+                rows: Locator = page.locator(".queue-list > li")
+                await expect(rows).to_have_count(1)
+                # The answer of the first read after this is held until the test lets it go, whatever it says.
+                holding: asyncio.Event = asyncio.Event()
+                release: asyncio.Event = asyncio.Event()
+                reads: list[Route] = []
+                # The answers the page gets to the reads of the queue, the first that arrives and the second.
+                first: asyncio.Event = asyncio.Event()
+                second: asyncio.Event = asyncio.Event()
+
+                async def hold_the_first(route: Route) -> None:
+                    if route.request.method != "GET" or reads:
+                        await route.continue_()
+                        return
+                    reads.append(route)
+                    answer: APIResponse = await route.fetch()
+                    holding.set()
+                    await release.wait()
+                    await route.fulfill(response=answer)
+
+                await page.route(f"**/api/threads/{thread_id}/queue", hold_the_first)
+
+                def count_answer(response: Response) -> None:
+                    if response.request.method == "GET" and response.url.endswith(f"/{thread_id}/queue"):
+                        (second if first.is_set() else first).set()
+
+                page.on("response", count_answer)
+                later: httpx.Response = await api.post(
+                    f"/api/threads/{thread_id}/queue",
+                    json={"text": "Then tidy up.", "model": SCRIPTED_MODEL, "approvals": "yolo"},
+                )
+                assert later.status_code == 201, later.text
+                async with asyncio.timeout(WAIT_S):
+                    await holding.wait()
+                # The message is taken out: the read that follows answers at once with the queue as it is.
+                gone: httpx.Response = await api.delete(f"/api/queue/{later.json()['messages'][-1]['id']}")
+                assert gone.status_code == 200, gone.text
+                await asyncio.wait_for(first.wait(), WAIT_S)
+                await expect(rows).to_have_count(1)
+                # The older answer comes now, last, with the message still in it.
+                release.set()
+                await asyncio.wait_for(second.wait(), WAIT_S)
+                await page.wait_for_timeout(_SETTLE_MS)
+                await expect(rows).to_have_count(1)
+                await expect(page.locator(".queue-list")).not_to_contain_text("Then tidy up.")
+                await page.close()
             await asyncio.to_thread(_let_the_command_end)
             async with asyncio.timeout(WAIT_S):
                 assert (await manager.wait(run_id)).status == "done"

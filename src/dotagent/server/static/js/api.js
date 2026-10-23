@@ -54,8 +54,13 @@ export function loadToken() {
   return token;
 }
 
-export function setToken(value) {
+/** Use `value` as the page's token; `keep` writes it in this browser's storage too, for its next pages. A token that
+ * came in the address is kept only once the daemon has proven that it holds it (main.js, item 559). */
+export function setToken(value, keep = true) {
   token = value;
+  if (!keep) {
+    return;
+  }
   try {
     localStorage.setItem(TOKEN_KEY, value);
   } catch {

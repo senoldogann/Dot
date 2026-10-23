@@ -105,6 +105,9 @@ const ROUTES = [
 // answered from its copy while the network woke): once per build, so that a copy answered again does not load the page
 // again and again; the page then says that Dot was updated (item 328).
 const RELOADED_KEY = "dot.reloadedFor";
+// The token an address brought, kept for this tab alone until the daemon has proven that it holds it (item 559): a page
+// loaded again meanwhile tries it again, where the address no longer has it.
+const TRYING_KEY = "dot.tokenTrying";
 // The longest the curtain stays over a chat's page that has not said it shows its chat (item 328).
 const CURTAIN_MAX_MS = 3000;
 
@@ -140,16 +143,44 @@ function standalone() {
   return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 }
 
-/** The token from `#token=...`, which `dotx open` and `dotx url` put in the address; it is moved out of the address bar. */
+/** The token from `#token=...`, which `dotx open` and `dotx url` put in the address, or null; it is moved out of the
+ * address bar. */
 function takeFragmentToken() {
   const fragment = location.hash.startsWith("#") ? location.hash.slice(1) : "";
   const value = new URLSearchParams(fragment).get("token");
   if (value === null || value === "") {
-    return false;
+    return null;
   }
-  setToken(value);
   history.replaceState(null, "", `${location.pathname}${location.search}#${startPath()}`);
-  return true;
+  return value;
+}
+
+// The token the address brought, until the daemon has proven that it holds it, and the one this browser kept before
+// it (item 559). The page tries the new one and keeps it only once it is proven; one the daemon does not hold gives way
+// to the one kept before, so that a link to Dot's address with any token in it signs nobody out.
+let untried = null;
+let keptBefore = null;
+
+/** The token this tab was trying when it was loaded again, or null. */
+function tokenTrying() {
+  try {
+    return sessionStorage.getItem(TRYING_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Keep `value` for this tab as the token it is trying; null lets it go. */
+function keepTrying(value) {
+  try {
+    if (value === null) {
+      sessionStorage.removeItem(TRYING_KEY);
+    } else {
+      sessionStorage.setItem(TRYING_KEY, value);
+    }
+  } catch {
+    // A tab whose storage is blocked tries the token in memory alone.
+  }
 }
 
 // ------------------------------------------------------------------------------------------------ screens
@@ -381,7 +412,8 @@ function beginSession() {
   // (`history.state.dotLinked`, item 338), so the browser's own Back and Forward and a reload keep a phone's Back as
   // it was: such a page goes back to the page before it; another goes to the page above it, or opens the chats. The
   // link is told by the click that leads to it, wherever on the page it is (a dialog, a helper's row that stops its
-  // clicks), but in the sidebar, whose pages start anew, and but a click that opens another tab.
+  // clicks), but in the sidebar, whose pages start anew, and but a click that opens another tab. The listener ends with
+  // the session (item 559), as the phone's below does: a sign-in again in the same tab adds no second one.
   let linkedTo = null;
   document.addEventListener(
     "click",
@@ -394,7 +426,7 @@ function beginSession() {
         linkedTo = MOVED.get(path) ?? path;
       }
     },
-    true,
+    { capture: true, signal: controller.signal },
   );
   // The page on screen and whether it was opened by a link: Back is reckoned again when a phone turns (a settings tab
   // has a page above it on a phone alone).
@@ -423,11 +455,15 @@ function beginSession() {
     return parent === null ? null : { to: `#${parent}` };
   }
 
-  PHONE.addEventListener("change", () => {
-    if (current !== null) {
-      shell.setBack(backFrom(current.found, current.linked));
-    }
-  });
+  PHONE.addEventListener(
+    "change",
+    () => {
+      if (current !== null) {
+        shell.setBack(backFrom(current.found, current.linked));
+      }
+    },
+    { signal: controller.signal },
+  );
 
   // Which page was asked for last: a page whose script came after another was asked for is not opened.
   let asked = 0;
@@ -592,6 +628,16 @@ async function connect() {
     await Promise.all([refresh(), loadLooks(), loadOwnThemes(), loadAssistant()]);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
+      const before = untried === null ? null : keptBefore;
+      untried = null;
+      keptBefore = null;
+      keepTrying(null);
+      if (before !== null) {
+        setToken(before, false);
+        toast("error", "The access token in the address is not the daemon's: this browser goes on with its own.");
+        await connect();
+        return;
+      }
       clearToken();
       renderSignIn("The daemon did not accept that access token.");
       return;
@@ -603,6 +649,13 @@ async function connect() {
     }
     renderUnreachable(error.message);
     return;
+  }
+  if (untried !== null) {
+    // Proven: the token of the address is this browser's from now on.
+    setToken(untried);
+    untried = null;
+    keptBefore = null;
+    keepTrying(null);
   }
   retryPause = RETRY_FIRST_MS;
   // Pages of another build than the daemon's (a copy the service worker kept, answered while the network woke) load
@@ -617,8 +670,15 @@ async function connect() {
 async function boot() {
   // The desktop shell's New chat (menu bar item, ⇧⌘Space) calls this after it moves to the home.
   window.focusComposer = requestCompose;
-  if (!takeFragmentToken()) {
-    loadToken();
+  const saved = loadToken();
+  const offered = takeFragmentToken() ?? tokenTrying();
+  if (offered !== null && offered !== saved) {
+    untried = offered;
+    keptBefore = saved;
+    keepTrying(offered);
+    setToken(offered, false);
+  } else {
+    keepTrying(null);
   }
   if (!hasToken()) {
     renderSignIn("");

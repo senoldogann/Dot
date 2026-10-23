@@ -346,3 +346,54 @@ async def test_the_form_offers_the_agents_and_the_row_names_its_agent(
                 await page.close()
         finally:
             await browser.close()
+
+
+@pytest.mark.browser
+async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defaults(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 559: the form that adds a schedule was made once and only hidden, and a schedule added left its agent, its
+    approvals and its other choices in it, so the next one, which runs unattended, started from them unless the owner
+    saw the selects. The page makes the form anew after each schedule it adds."""
+    chosen: AgentRecord = await _agent(client, "Chosen", "ask")
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 1000}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            form: Locator = page.locator(".schedule-form-slot")
+            agent: Locator = form.get_by_role("combobox", name="Agent")
+            approvals: Locator = form.get_by_role("combobox", name="Approvals")
+            await page.get_by_role("button", name="New schedule").click()
+            await expect(agent.locator(f"option[value='{chosen.id}']")).to_have_count(1)
+            await form.get_by_label("Name", exact=True).fill("Morning look")
+            await form.get_by_label("Goal", exact=True).fill("Look at the tide.")
+            await form.get_by_label("Cron expression", exact=True).fill("0 9 * * 1-5")
+            await agent.select_option(chosen.id)
+            await approvals.select_option("supervised")
+            await form.get_by_role("button", name="Add schedule").click()
+            await expect(page.locator(".toast.ok", has_text="Schedule added.")).to_be_visible()
+            added: list[ScheduleRecord] = [
+                record for record in await runtime.store.list_schedules() if record.name == "Morning look"
+            ]
+            try:
+                assert [(record.options.agent_id, record.options.approvals) for record in added] == [
+                    (chosen.id, "supervised")
+                ]
+                # The next one opens on the defaults: Dot, the configured approvals, nothing typed.
+                await page.get_by_role("button", name="New schedule").click()
+                await expect(agent.locator(f"option[value='{chosen.id}']")).to_have_count(1)
+                await expect(agent).to_have_value("")
+                await expect(approvals).to_have_value("")
+                await expect(form.get_by_label("Name", exact=True)).to_have_value("")
+                await expect(form.get_by_label("Goal", exact=True)).to_have_value("")
+                await expect(form.get_by_label("Cron expression", exact=True)).to_have_value("")
+            finally:
+                for record in added:
+                    await runtime.store.delete_schedule(record.id)
+            await page.close()
+        finally:
+            await browser.close()

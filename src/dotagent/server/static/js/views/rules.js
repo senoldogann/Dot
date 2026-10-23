@@ -176,7 +176,12 @@ function alwaysOn() {
         { class: "rule-always-list" },
         lines.map((line) => el("li", null, icon("check"), el("span", null, line))),
       ),
-      el("p", { class: "rule-always-note" }, "A yolo run asks about none of the others: it does the step and records why it would have asked."),
+      el(
+        "p",
+        { class: "rule-always-note" },
+        // What a yolo run keeps besides (item 559): what an untrusted read leaves it is said, not only what it waives.
+        "A yolo run asks about none of the others: it does the step and records why it would have asked. One that has read untrusted content still has a secret refused on the way out, and a step that content may be after judged by the review model.",
+      ),
     ),
   );
 }

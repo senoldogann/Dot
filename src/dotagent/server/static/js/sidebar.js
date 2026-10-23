@@ -1,8 +1,9 @@
-// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity, the campaigns, the schedules and Customize,
-// what waits and what works (folded or not, as the owner left them), the chats themselves (several of them can be
-// deleted at once) and, in the foot, the way to the settings; a run stops from its composer (item 289). A row whose
-// run works says Working and for how long (item 122). A chat's menu (item 130) pins it,
-// names it, copies its link, starts choosing chats with it and deletes it; the pinned chats come first, under Pinned.
+// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity, the campaigns and the
+// schedules, what waits and what works (folded or not, as the owner left them), the chats themselves (several of them
+// can be deleted at once) and, in the foot, Connect apps (the way to Customize, item 545) and the way to the settings;
+// a run stops from its composer (item 289). A row whose run works says Working and for how long (item 122). A chat's
+// menu (item 130) pins it, names it, copies its link, starts choosing chats with it and deletes it; the pinned chats
+// come first, under Pinned.
 // A chat whose latest run ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark
 // read. Each chat stands once (item 202): a chat at work stands under Working, wearing the faces of the runs it delegated
 // (item 507), and goes back among the days once it rests; a pinned one stays under Pinned, with the same faces.
@@ -1272,6 +1273,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       // it, where a server may have been connected or removed, the marks of the servers that are ready are read again.
       const leavingCustomize = connectButton.hasAttribute("data-current") && tab !== "customize";
       connectButton.toggleAttribute("data-current", tab === "customize");
+      // The styles read data-current; a screen reader reads aria-current, as the links of the pages give it (item 559).
+      mark(connectButton, tab === "customize");
       if (leavingCustomize) {
         paintConnected();
       }

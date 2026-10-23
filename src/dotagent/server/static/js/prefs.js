@@ -46,13 +46,3 @@ export function readFolds(key) {
     return {};
   }
 }
-
-/** Forget a preference. */
-export function clearPref(key) {
-  setHere.delete(key);
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    // Same as above.
-  }
-}

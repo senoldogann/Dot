@@ -34,7 +34,7 @@ const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", y
 /** The mark of a plugin of the gallery: its logo on the light tile a connector's logo sits on, else the puzzle piece a
  * skill wears (item 537) on a tile of its kind's colour; a plugin of no kind of the gallery's takes the development
  * one. */
-export function galleryMark(plugin) {
+function galleryMark(plugin) {
   if (plugin.logo !== null && plugin.logo !== undefined) {
     return el("span", { class: "plugin-mark", "aria-hidden": "true" }, el("img", { class: "plugin-logo", src: `/icons/plugins/${plugin.logo}`, alt: "" }));
   }

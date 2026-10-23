@@ -1,6 +1,7 @@
 // Every control of the interface on one page, drawn on the tokens of the visual system, for checking a look in light
-// and in dark, wide and on a phone. Reached at #/controls; nothing links to it. The cards here act on nothing: the
-// approval cards post nowhere, the buttons do nothing.
+// and in dark, wide and on a phone. Reached at #/controls; nothing links to it. The buttons here do nothing, but those
+// of the approval cards, which are the real ones: they post to ids no approval has (`demo-...`), and the daemon's
+// refusal shows as their error (item 559).
 
 import { dotFace } from "../actors.js";
 import { approvalCard } from "../approvals.js";

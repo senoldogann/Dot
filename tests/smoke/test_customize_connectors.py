@@ -14,6 +14,9 @@ colour (item 542); the Accounts card heads the list and no service's own page, a
 
 macOS is never asked here and System Settings never opens: the test answers for them (``_Mac``). The sign-ins are read
 for real, from a cookie file in the profile of Dot's browser.
+
+A service that takes a key (item 408) asks for it in its tile, where the form can be clicked, typed in and added from,
+and the key typed is gone once the form is cancelled (item 559).
 """
 
 import asyncio
@@ -27,6 +30,7 @@ from typing import Literal
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, FloatRect, Locator, Page, Route, async_playwright, expect
+from pydantic import JsonValue
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -430,5 +434,67 @@ async def test_the_list_of_connectors_stands_still_when_the_accounts_card_has_re
             first: FloatRect = await _box(linear)
             await expect(page.locator(".account-provider")).not_to_have_count(0)
             assert await _box(linear) == first
+        finally:
+            await browser.close()
+
+
+async def test_a_keyed_services_tile_takes_its_key_where_it_is_clicked_and_keeps_none_after_cancel(
+    address: str, mac_at_rest: None
+) -> None:
+    """Item 559: the form that asks for a service's key sits under the tile's link, which covers the tile to open the
+    service's page, so a click on its field, Add or Cancel went to that page, where the form was gone. It now stands
+    over the link: the key is typed and added from the tile, and a key typed and cancelled is not there when the form
+    opens again. Wide and on a phone. The daemon's answer to the add is the test's own (Tavily is a service on the
+    internet)."""
+    port: int = int(address.rpartition(":")[2])
+    added: list[JsonValue] = []
+
+    async def adding(route: Route) -> None:
+        if route.request.method != "POST":
+            await route.continue_()
+            return
+        added.append(route.request.post_data_json)
+        await route.fulfill(status=200, json={})
+
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(headless=True)
+        try:
+            for width, height, phone in ((1280, 860, False), (390, 844, True)):
+                added.clear()
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height},
+                    is_mobile=phone,
+                    has_touch=phone,
+                    reduced_motion="reduce",
+                )
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.route("**/api/mcp/servers", adding)
+                await page.goto(ui_url("127.0.0.1", port, TOKEN))
+                await page.goto(f"{address}/#/customize/connectors")
+                tavily: Locator = _tile(page, "tavily")
+                form: Locator = tavily.locator(".plugin-secrets")
+                key: Locator = tavily.get_by_label("Tavily: API key")
+                await expect(tavily).to_be_visible()
+                await tavily.get_by_role("button", name="Add Tavily").click()
+                await expect(form).to_be_visible()
+                await expect(key).to_be_focused()
+                # Typed into with a click on the field, and cancelled with a click: neither goes to the service's page.
+                await key.click(timeout=5000)
+                await page.keyboard.type("tvly-typed-and-cancelled")
+                await form.get_by_role("button", name="Cancel").click(timeout=5000)
+                await expect(form).to_have_count(0)
+                await expect(page).to_have_url(f"{address}/#/customize/connectors")
+                # The form opens empty again, and Add sends what is typed in it now.
+                await tavily.get_by_role("button", name="Add Tavily").click()
+                await expect(key).to_have_value("")
+                await key.click(timeout=5000)
+                await page.keyboard.type("tvly-the-one-added")
+                await form.get_by_role("button", name="Add", exact=True).click(timeout=5000)
+                await expect(form).to_have_count(0)
+                await expect(page).to_have_url(f"{address}/#/customize/connectors")
+                assert len(added) == 1 and isinstance(added[0], dict), added
+                assert added[0]["service"] == "tavily", added
+                assert added[0]["secrets"] == {"TAVILY_API_KEY": "tvly-the-one-added"}, added
+                await page.close()
         finally:
             await browser.close()
