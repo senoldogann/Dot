@@ -2535,16 +2535,19 @@
   font-weight: var(--weight-text);
 }
 
+/* The choices keep one line (item 578): where they and the search do not fit side by side, the search goes under
+   them and fills its line; the last choice had wrapped alone under the other three. */
 .note-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
 }
 
 .note-tools .segmented {
+  flex: none;
   max-width: 100%;
-  flex-wrap: wrap;
   border: 1px solid var(--border);
   background: var(--bg);
 }
@@ -2552,6 +2555,7 @@
 .note-tools .segmented button {
   padding: var(--space-1) var(--space-4);
   font-size: var(--text-ui);
+  white-space: nowrap;
 }
 
 .note-tools .segmented button[aria-pressed="true"] {
@@ -2561,7 +2565,7 @@
 .note-search {
   position: relative;
   display: block;
-  flex: 0 0 16rem;
+  flex: 1 0 16rem;
   min-width: 0;
 }
 
@@ -2761,18 +2765,15 @@
 
   .note-tools {
     flex: 1 1 100%;
-    flex-wrap: wrap;
   }
 
   .note-search {
     flex: 1 1 100%;
   }
 
-  /* The four choices fill the width on one line, which scrolls sideways when they do not fit (item 576): in two lines
-     the last choice stood alone under the other three. */
+  /* The four choices fill the width on one line, which scrolls sideways when they do not fit (item 576). */
   .note-tools .segmented {
     width: 100%;
-    flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
   }
@@ -2783,7 +2784,6 @@
 
   .note-tools .segmented button {
     flex: 1 0 auto;
-    white-space: nowrap;
   }
 
   .note-row {
