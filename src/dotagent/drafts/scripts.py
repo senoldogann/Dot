@@ -21,7 +21,9 @@ _MAIL: str = "\n".join(
         "        make new cc recipient at end of cc recipients with properties {address:(item i of argv)}",
         "      end repeat",
         "    end tell",
-        "    send theMessage",
+        # Mail's send says whether it sent: false (no account to send from, a message it refuses) raises no error of
+        # its own, and osascript would end well for a mail that went nowhere (item 558).
+        '    if not (send theMessage) then error "Mail did not send the message"',
         "  end tell",
         "end run",
     )
@@ -48,3 +50,11 @@ def send_arguments(draft: DraftRecord) -> tuple[str, ...]:
     if draft.channel == "mail":
         return (draft.subject, draft.body, str(len(draft.to)), *draft.to, *draft.cc)
     return (draft.body, *draft.to)
+
+
+def send_calls(draft: DraftRecord) -> tuple[tuple[str, ...], ...]:
+    """The arguments of each run of the draft's script: one for an email, whose recipients are one message, and one for
+    each recipient of a message, so that a send that fails partway knows who was reached (item 558)."""
+    if draft.channel == "mail":
+        return (send_arguments(draft),)
+    return tuple((draft.body, recipient) for recipient in draft.to)

@@ -41,8 +41,17 @@ your keys. A few smoke tests that use the local Ollama server's embedding model 
 of the same name), and a mark that is not in the table fails, so a mistyped one cannot pick a test that needs a service
 (item 213).
 
+A test never finds your keys unless it is marked `hosted`, `internet` or `live` (item 558, `tests/conftest.py`): in a
+run where none of those is selected the variables of the providers' keys are out of the environment and the login
+Keychain is never asked, from the first fixture on; in a run that holds some, each of the others goes without them
+while it runs. A test that needs a key of its own sets one under a name it makes up, and a test that starts a child
+process gives it a key variable no source has. The tests that do use your keys look for them as they run (a module
+that asked as it was read made every run, the offline ones too, wait for the Keychain, and stop at its prompt).
+
 The smoke tests of the eval runner (`tests/smoke/test_evals_runner.py`) need no service at all: a scripted model
-plays the real loop, tools, policy and store.
+plays the real loop, tools, policy and store. The two that play the form task in a headless Chrome (it and the whole
+catalog's check) are marked `browser`, so that `-m "not browser"` starts none; the gate plays the catalog with
+`dotx eval check` as a step of its own.
 
 A browser test that waits for something only an async function of the page can tell (the service worker's caches)
 polls it with `page.evaluate`: Playwright's `wait_for_function` takes the promise such a function returns for true at

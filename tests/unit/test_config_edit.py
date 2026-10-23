@@ -14,11 +14,13 @@ from dotagent.config_edit import (
     set_browser_mode,
     set_browser_setting,
     set_default_model,
+    set_embeddings,
     set_judge_provider,
     set_resume,
     set_role_model,
     set_setting,
     set_shell_sandbox,
+    set_standby_models,
     with_browser_mode,
     with_browser_setting,
 )
@@ -271,3 +273,47 @@ def test_a_name_typed_with_a_quote_or_a_backslash_reads_back_as_it_was_written(t
     set_setting(path, "assistant", "name", "Miro")
     written: str = path.read_text(encoding="utf-8")
     assert tomllib.loads(written)["assistant"]["name"] == "Miro" and "# the name" in written, written
+
+
+def test_a_list_written_over_several_lines_is_replaced_whole(tmp_path: Path) -> None:
+    """Item 558: ``standby`` and ``reach`` formatted the usual multi-line way were refused, as only the first line of
+    the list was replaced."""
+    path: Path = tmp_path / "config.toml"
+    path.write_text(
+        '[models]\nmain = "ollama:x"\nstandby = [\n  "ollama:a:cloud",  # the first\n  "ollama:b:cloud",\n]  # mine\n'
+        '\n[server]\nreach = [\n  "a.example.ts.net",\n]\nport = 8765\n',
+        encoding="utf-8",
+    )
+    set_standby_models(path, ["ollama:c:cloud"])
+    set_setting(path, "server", "reach", [])
+    assert path.read_text(encoding="utf-8") == (
+        '[models]\nmain = "ollama:x"\nstandby = ["ollama:c:cloud"]  # mine\n\n[server]\nreach = []\nport = 8765\n'
+    )
+
+
+def test_a_bracket_in_a_name_or_a_comment_does_not_end_the_list(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text(
+        "[server]\nreach = [\n  \"a]b.example\", # one ] too many\n  'c]',\n]\nport = 8765\n", encoding="utf-8"
+    )
+    set_setting(path, "server", "reach", ["d.example"])
+    assert path.read_text(encoding="utf-8") == '[server]\nreach = ["d.example"]\nport = 8765\n'
+
+
+def test_a_list_that_never_closes_is_refused_and_left_as_it_was(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    text: str = '[server]\nreach = [\n  "a.example",\n'
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ConfigError):
+        set_setting(path, "server", "reach", ["b.example"])
+    assert path.read_text(encoding="utf-8") == text
+
+
+def test_whether_the_notes_are_found_by_meaning_is_written_under_memory(tmp_path: Path) -> None:
+    """Item 558: ``dotx setup`` switches embeddings off on a Mac that has no Ollama to run them."""
+    path: Path = tmp_path / "config.toml"
+    path.write_text('[models]\nmain = "openai:gpt-5.5"\n', encoding="utf-8")
+    set_embeddings(path, False)
+    assert path.read_text(encoding="utf-8") == '[models]\nmain = "openai:gpt-5.5"\n\n[memory]\nembed_enabled = false\n'
+    set_embeddings(path, True)
+    assert tomllib.loads(path.read_text(encoding="utf-8"))["memory"] == {"embed_enabled": True}

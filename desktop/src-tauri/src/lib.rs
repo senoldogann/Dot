@@ -105,9 +105,9 @@ enum Seen {
     Counted(Count),
     /// Nothing answers in time.
     Silent,
-    /// Something answers without the proof the token gives (another program on the port, a daemon of an older version
-    /// or of another home): it is sent nothing.
-    Unproven,
+    /// Something answers at this address without the proof the token gives (another program on the port, a daemon of
+    /// an older version or of another home): it is sent nothing.
+    Unproven(String),
     /// The shell could not read where the daemon listens or its token, so it asked nothing.
     Unread(Unread),
 }
@@ -301,19 +301,42 @@ fn ui_url(daemon: &Daemon) -> String {
     format!("{}/#token={}", daemon.base, daemon.token)
 }
 
+/// What the down page says of something that answers at `address` without the proof (`Seen::Unproven`): the shell
+/// sent it nothing, so it is not this home's daemon, and the way to see what it is, as `dotx service` gives it.
+fn unproven_detail(address: &str) -> String {
+    let listening = match url::Url::parse(address)
+        .ok()
+        .and_then(|parsed| parsed.port())
+    {
+        Some(port) => format!("lsof -nP -iTCP:{port} -sTCP:LISTEN"),
+        None => "lsof -nP -iTCP -sTCP:LISTEN".to_string(),
+    };
+    format!(
+        "It does not prove that it holds this Dot's token, so the shell sent it nothing: another program holds the \
+         port, or a daemon of another Dot home or of an older version answers. See what listens with '{listening}', \
+         stop it, and this window opens the web UI by itself."
+    )
+}
+
 /// The down page, told in its fragment what kept the shell from the daemon (`down.js`): `title` stands for "Dot is
-/// not running" and the advice to start it, `detail` says which file and what is wrong with it. A daemon that does not
-/// answer, or not with the proof, gets the page as it is.
+/// not running" and the advice to start it, `detail` says which file and what is wrong with it, or what answers at
+/// the daemon's address instead of it. A daemon that does not answer gets the page as it is.
 fn down_url(seen: &Seen) -> String {
     let page = format!("tauri://localhost/{DOWN_PAGE}");
-    let Seen::Unread(unread) = seen else {
-        return page;
-    };
     let mut told = url::form_urlencoded::Serializer::new(String::new());
-    if let Some(title) = unread.title() {
-        told.append_pair("title", title);
+    match seen {
+        Seen::Unread(unread) => {
+            if let Some(title) = unread.title() {
+                told.append_pair("title", title);
+            }
+            told.append_pair("detail", &unread.detail());
+        }
+        Seen::Unproven(address) => {
+            told.append_pair("title", &format!("Something else answers at {address}"));
+            told.append_pair("detail", &unproven_detail(address));
+        }
+        Seen::Counted(_) | Seen::Silent => return page,
     }
-    told.append_pair("detail", &unread.detail());
     format!("{page}#{}", told.finish())
 }
 
@@ -372,7 +395,7 @@ fn count(daemon: &Daemon, token: &str) -> Option<Count> {
 fn look(daemon: &Daemon) -> Seen {
     match proven(daemon, &daemon.token) {
         None => Seen::Silent,
-        Some(false) => Seen::Unproven,
+        Some(false) => Seen::Unproven(daemon.base.clone()),
         Some(true) => count(daemon, &daemon.token).map_or(Seen::Silent, Seen::Counted),
     }
 }
@@ -509,7 +532,7 @@ fn watch(app: AppHandle, shown: Shown) {
             if let Some(tray) = app.tray_by_id(TRAY) {
                 let (state, waiting, working) = match &seen {
                     Seen::Counted(count) => (count.state.as_str(), count.waiting, count.working),
-                    Seen::Silent | Seen::Unproven | Seen::Unread(_) => ("idle", 0, 0),
+                    Seen::Silent | Seen::Unproven(_) | Seen::Unread(_) => ("idle", 0, 0),
                 };
                 let _ = tray.set_icon_with_as_template(Some(tray_icon(state)), false);
                 let _ = tray.set_title(if waiting > 0 {
@@ -522,7 +545,7 @@ fn watch(app: AppHandle, shown: Shown) {
                         format!("Dot · {waiting} waiting for you · {working} working")
                     }
                     Seen::Silent => "Dot · the daemon is not running".to_string(),
-                    Seen::Unproven => {
+                    Seen::Unproven(_) => {
                         "Dot · something else answers at the daemon's address".to_string()
                     }
                     Seen::Unread(unread) => format!("Dot · {}", unread.tip()),
@@ -964,7 +987,7 @@ mod tests {
     fn a_program_without_the_proof_is_sent_no_token() {
         for answer in [stranger as Answer, refuser] {
             let (daemon, requests) = listener(answer);
-            assert!(matches!(look(&daemon), Seen::Unproven));
+            assert!(matches!(look(&daemon), Seen::Unproven(address) if address == daemon.base));
             let seen: Vec<String> = requests.try_iter().collect();
             assert_eq!(seen.len(), 1);
             assert!(!carries_the_token(&seen[0]));
@@ -1076,7 +1099,6 @@ mod tests {
     #[test]
     fn the_down_page_is_told_what_kept_the_shell_from_the_daemon() {
         assert_eq!(down_url(&Seen::Silent), "tauri://localhost/down.html");
-        assert_eq!(down_url(&Seen::Unproven), "tauri://localhost/down.html");
         let told = |unread: Unread| -> Vec<(String, String)> {
             let page = url::Url::parse(&down_url(&Seen::Unread(unread))).expect("an address");
             assert_eq!(
@@ -1114,6 +1136,35 @@ mod tests {
                 )
             )]
         );
+    }
+
+    #[test]
+    fn the_down_page_says_that_something_else_answers_at_the_daemons_address() {
+        let told = {
+            let page = url::Url::parse(&down_url(&Seen::Unproven(
+                "http://127.0.0.1:8765".to_string(),
+            )))
+            .expect("an address");
+            assert_eq!(
+                page.as_str().split('#').next(),
+                Some("tauri://localhost/down.html")
+            );
+            url::form_urlencoded::parse(page.fragment().expect("what the page is told").as_bytes())
+                .into_owned()
+                .collect::<Vec<(String, String)>>()
+        };
+        assert_eq!(told.len(), 2);
+        assert_eq!(
+            told[0],
+            (
+                "title".to_string(),
+                "Something else answers at http://127.0.0.1:8765".to_string()
+            )
+        );
+        assert_eq!(told[1].0, "detail");
+        assert!(told[1].1.contains("lsof -nP -iTCP:8765 -sTCP:LISTEN"));
+        assert!(!told[1].1.contains("  "), "{}", told[1].1);
+        assert!(unproven_detail("not an address").contains("lsof -nP -iTCP -sTCP:LISTEN"));
     }
 
     #[test]

@@ -31,6 +31,10 @@ _APPROVALS_HELP: str = (
 _GOAL_MODE_HELP: str = (
     "a checker sends the run back to work until the goal is really reached (default: [agent] goal_mode)"
 )
+_PRUNE_HELP: str = (
+    "report what can go: the events of runs that ended over [store] retention_days ago, the screenshot files that no "
+    "chat names any more, the undo journals older than [agent] undo_keep_days, and the free space in the database file"
+)
 # The module that carries out each command, by the command's name; loaded only once that command runs.
 _FAMILIES: dict[str, str] = {
     "run": "dotagent.cli_run",
@@ -138,7 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--browser",
         default=None,
-        choices=list(get_args(BrowserMode)),
+        choices=list(get_args(BrowserMode.__value__)),
         help=(
             "with --standing: the Chrome the campaign works in, attach (the one you have open, signed in as you are) "
             "or own (Dot's own); the default is [agent] campaign_browser"
@@ -396,13 +400,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     playbooks_trust.add_argument("playbook", help="the name shown by 'dotx playbooks list'")
 
-    prune = commands.add_parser(
-        "prune", help="find the screenshot files that no chat names any more and the free space in the database file"
-    )
+    prune = commands.add_parser("prune", help=_PRUNE_HELP, description=_PRUNE_HELP)
     prune.add_argument(
         "--apply",
         action="store_true",
-        help="delete those screenshots and give the free space back to the disk (without it, only report)",
+        help=(
+            "delete those events (the runs keep their answers, not their timelines), screenshots and undo journals "
+            "(the file changes of their runs can no longer be taken back), and give the free space back to the disk "
+            "(without it, only report)"
+        ),
     )
 
     backup = commands.add_parser("backup", help="the copies of Dot's database: make one now, or list them")

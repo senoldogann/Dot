@@ -45,10 +45,14 @@ _LAST_MONTH_ROW: int = len(SALES_MONTHS) + 1
 _GREETING: str = "Dear Ms. Larsen,"
 _THANKS: str = "Thank you for your order with "
 _QUESTIONS: str = "Questions about the delivery go to the customer care of "
-# A range of cells (B2:B9, $B$2:$B$9), a range of whole columns (B:C) and a cell outside any range (B9, $C$9).
-_RANGE: re.Pattern[str] = re.compile(r"\$?[A-Z]{1,3}\$?(\d+):\$?[A-Z]{1,3}\$?(\d+)")
-_COLUMNS: re.Pattern[str] = re.compile(r"(?<![A-Za-z\d$])\$?[A-Z]{1,3}:\$?[A-Z]{1,3}(?![\d(])")
-_CELL: re.Pattern[str] = re.compile(r"(?<![A-Za-z\d$:])\$?[A-Z]{1,3}\$?(\d+)(?![\d:(])")
+# What a formula reads of a sheet: a cell (B9, $C$9), a range of cells (B2:B9, $B$2:$B$9) or a range of whole columns
+# (B:C), with the sheet it is on before it (Data!B9, 'Data'!B2:B9). The name of a function (LOG10(, SUM() is none, and
+# neither is a word that goes on after the letters and digits.
+_REFERENCE: re.Pattern[str] = re.compile(
+    r"(?<![\w$.'!])(?:(?P<sheet>'[^']+'|[A-Za-z_][\w.]*)!)?"
+    r"(?:\$?[A-Z]{1,3}\$?(?P<first>\d+)(?::\$?[A-Z]{1,3}\$?(?P<last>\d+))?(?![\w(])|\$?[A-Z]{1,3}:\$?[A-Z]{1,3}(?![\w(]))"
+)
+_DATA_SHEET: str = "data"
 
 
 def _plain(text: str) -> Run:
@@ -95,11 +99,21 @@ def letter_document() -> bytes:
 
 
 def reaches(formula: str, row: int) -> bool:
-    """Whether ``formula`` reads a cell of ``row``: through a range of cells that holds it, a range of whole columns,
-    or the cell itself."""
-    if any(int(first) <= row <= int(last) for first, last in _RANGE.findall(formula)):
-        return True
-    return _COLUMNS.search(formula) is not None or any(int(found) == row for found in _CELL.findall(formula))
+    """Whether ``formula`` reads a cell of ``row`` of the Data sheet: through a range of cells that holds it
+    (``Data!B2:B9``), a range of whole columns (``Data!B:C``) or the cell itself (``Data!B9``). A reference with no
+    sheet is of the sheet the formula is on, the Summary sheet, and one of another sheet is that sheet's: neither reads
+    a month (item 558: ``=SUM(Data!B2:B8)+B9`` leaves August out)."""
+    for reference in _REFERENCE.finditer(formula):
+        sheet: str | None = reference.group("sheet")
+        if sheet is None or sheet.strip("'").casefold() != _DATA_SHEET:
+            continue
+        first: str | None = reference.group("first")
+        if first is None:
+            return True
+        last: str = reference.group("last") or first
+        if min(int(first), int(last)) <= row <= max(int(first), int(last)):
+            return True
+    return False
 
 
 def sales_problems(book: Workbook) -> list[str]:

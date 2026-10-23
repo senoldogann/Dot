@@ -261,6 +261,37 @@ def test_the_workbook_check_refuses_totals_saved_as_figures_and_totals_that_leav
     assert not reaches("=LOG10(B2)+SUM(B2:B8)", 10)
 
 
+@pytest.mark.parametrize(
+    "formula",
+    [
+        "=SUMPRODUCT(Data!B2:B8,Data!C2:C8)+B9",
+        "=SUM(Data!B2:B8)+C9",
+        "=SUM(Data!B2:B8)+0*COUNT(Z:Z)",
+        "=SUM(Data!B2:B8)+SUM(Summary!A1:A20)",
+        "=SUM(B2:B9)",
+        "=SUM(Other!B2:B9)",
+        "=SUM('My Data'!B:B)",
+    ],
+)
+def test_a_total_that_reads_august_from_no_cell_of_the_data_sheet_is_refused(formula: str) -> None:
+    """Item 558: a reference with no sheet reads the Summary sheet, and one of another sheet that sheet: none of them
+    reads August's row of the Data sheet, though its number is among theirs or a whole column is."""
+    assert not reaches(formula, 9)
+    book: Workbook = load_workbook(io.BytesIO(sales_workbook()))
+    book["Data"].append(list(AUGUST))
+    book["Summary"]["B1"] = formula
+    book["Summary"]["B2"] = "=SUM(Data!B2:B9)"
+    assert sales_problems(_reloaded(book)) == [f"Summary!B1 ({formula}) does not read row 9 of the Data sheet"]
+
+
+@pytest.mark.parametrize(
+    "formula",
+    ["=SUM(Data!B2:B9)", "=SUM('Data'!$B$2:$B$9)", "=SUM(data!B9:B2)", "=SUM(Data!B:C)", "=Data!B9+SUM(Data!B2:B8)"],
+)
+def test_a_total_that_reads_august_from_the_data_sheet_is_taken(formula: str) -> None:
+    assert reaches(formula, 9)
+
+
 def test_the_letter_check_refuses_a_paragraph_set_anew_and_a_name_split_over_runs_left_behind() -> None:
     # Setting a paragraph's text makes one plain run of it: the bold and the italic name lose their formatting.
     flat: DocumentObject = Document(io.BytesIO(letter_document()))

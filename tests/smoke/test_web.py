@@ -170,12 +170,15 @@ def settings(tmp_path_factory: pytest.TempPathFactory) -> Path:
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def runtime(settings: Path, tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
-    patch.setenv("DOT_HOME", str(tmp_path_factory.mktemp("home")))
-    built: Runtime = await build_runtime(load_config(settings))
+    # The try opens first: a runtime that cannot be built leaves nothing set for the modules that follow (item 558).
     try:
-        yield built
+        patch.setenv("DOT_HOME", str(tmp_path_factory.mktemp("home")))
+        built: Runtime = await build_runtime(load_config(settings))
+        try:
+            yield built
+        finally:
+            await close_runtime(built)
     finally:
-        await close_runtime(built)
         patch.undo()
 
 

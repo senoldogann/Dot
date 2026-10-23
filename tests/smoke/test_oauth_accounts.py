@@ -51,11 +51,18 @@ class _Google:
     def __init__(self) -> None:
         self.challenge: str = ""
         self.forms: list[dict[str, list[str]]] = []
+        # The tokens given back to end their grant (item 558), and a refresh that is held for as long as the test wants.
+        self.revoked: list[str] = []
+        self.refreshing: asyncio.Event = asyncio.Event()
+        self.hold: asyncio.Event | None = None
 
-    def __call__(self, request: httpx.Request) -> httpx.Response:
+    async def __call__(self, request: httpx.Request) -> httpx.Response:
         if str(request.url) == GOOGLE.profile_url:
             assert request.headers["authorization"] in ("Bearer at-1", "Bearer at-2")
             return httpx.Response(200, json={"email": "ada@example.com"})
+        if str(request.url) == GOOGLE.revoke_url:
+            self.revoked.extend(parse_qs(request.content.decode())["token"])
+            return httpx.Response(200)
         assert str(request.url) == GOOGLE.token_url, request.url
         form: dict[str, list[str]] = parse_qs(request.content.decode())
         self.forms.append(form)
@@ -67,6 +74,9 @@ class _Google:
                 200, json={"access_token": "at-1", "refresh_token": "rt-1", "expires_in": 3600, "scope": "s"}
             )
         assert form["grant_type"] == ["refresh_token"] and form["refresh_token"] == ["rt-1"]
+        self.refreshing.set()
+        if self.hold is not None:
+            await self.hold.wait()
         return httpx.Response(200, json={"access_token": "at-2", "expires_in": 3600})
 
 
@@ -112,6 +122,36 @@ async def test_a_sign_in_keeps_the_account_its_tokens_refresh_and_signing_out_ta
     await accounts.forget("google", "ada@example.com")
     assert await keychain.read("google", "ada@example.com") is None
     assert [view.accounts for view in await accounts.providers()] == [(), ()]
+    # Signing out gives the refresh token back to Google, which ends the grant: a copy taken before mints no more.
+    assert google.revoked == ["rt-1"]
+
+
+async def test_signing_out_during_a_refresh_leaves_no_token_behind(
+    keychain_file: str, clients: None, store: Store
+) -> None:
+    """The refresh ended after the sign-out and wrote fresh tokens, the refresh token among them, into the Keychain
+    again, with no account left in the list to sign out of."""
+    google: _Google = _Google()
+    keychain: Keychain = Keychain(keychain_file)
+    accounts: Accounts = Accounts(store, keychain, httpx.MockTransport(google))
+    assert (await _signed_in(accounts, google)) is not None
+    kept: Tokens | None = await keychain.read("google", "ada@example.com")
+    assert kept is not None
+    await keychain.save("google", "ada@example.com", kept.model_copy(update={"expires_at": time.time() - 1}))
+    google.hold = asyncio.Event()
+    refreshing: asyncio.Task[str] = asyncio.create_task(accounts.access_token("google", "ada@example.com"))
+    await asyncio.wait_for(google.refreshing.wait(), 30)
+    signing_out: asyncio.Task[None] = asyncio.create_task(accounts.forget("google", "ada@example.com"))
+    await asyncio.sleep(0.2)
+    assert not signing_out.done(), "the sign-out did not wait for the refresh under way"
+    google.hold.set()
+    assert await asyncio.wait_for(refreshing, 30) == "at-2"
+    await asyncio.wait_for(signing_out, 30)
+    assert await keychain.read("google", "ada@example.com") is None
+    assert [view.accounts for view in await accounts.providers()] == [(), ()]
+    # The account that is signed in is not asked for a token any more.
+    with pytest.raises(SignInError, match="not signed in"):
+        await accounts.access_token("google", "ada@example.com")
 
 
 async def test_a_code_the_provider_refuses_a_no_and_a_state_nobody_waits_for(

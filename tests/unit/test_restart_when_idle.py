@@ -16,7 +16,7 @@ from structlog.testing import capture_logs
 
 from dotagent import cli_daemon, launchd, restart_when_idle
 from dotagent.cli import build_parser, parse_command
-from dotagent.cli_commands import Command, ServiceInstallCommand, ServiceRestartCommand
+from dotagent.cli_commands import Command, ServiceInstallCommand, ServiceRestartCommand, ServiceUninstallCommand
 from dotagent.cli_daemon import _duration, _restart_line, dispatch
 from dotagent.core.errors import ServiceError
 from dotagent.core.paths import db_path, dot_home, ensure_layout, screenshots_dir
@@ -390,13 +390,17 @@ def test_a_command_a_run_starts_carries_the_mark_of_a_run() -> None:
 
 @pytest.mark.parametrize(
     "command",
-    [ServiceRestartCommand(name="service-restart", when_idle=False), ServiceInstallCommand(name="service-install")],
+    [
+        ServiceRestartCommand(name="service-restart", when_idle=False),
+        ServiceInstallCommand(name="service-install"),
+        ServiceUninstallCommand(name="service-uninstall"),
+    ],
 )
-async def test_a_run_cannot_restart_the_daemon_at_once(
+async def test_a_run_cannot_stop_the_daemon_at_once(
     command: Command, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, launchctl: Path
 ) -> None:
-    """The restart would stop the daemon under the run, and the run's end would kill the command before it loads the
-    daemon again: a run asks for the restart that waits."""
+    """The restart (or the uninstall, item 558) would stop the daemon under the run, and the run's end would kill the
+    command before it loads the daemon again (or removes the job's file): a run asks for the restart that waits."""
     monkeypatch.setenv(RUN_SHELL_MARKER, "1")
     monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
     _load_the_daemons_job(launchctl)

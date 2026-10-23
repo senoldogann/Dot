@@ -51,6 +51,10 @@ checks their files against the hash the gallery keeps, and only then gives the f
 that cannot be downloaded and a name Dot has a plugin of already are refused (409) and leave nothing behind. Dot then
 reads its plugins again: the runs that start after are offered the new skills, with no restart. **Remove** moves the
 plugin's folder to the Trash (item 497) and Dot reads its plugins again, so its skills leave the runs that start after.
+When a newer Dot moves the pin of a plugin you installed, the runs keep reading the skills of the commit installed, and
+the card's badge reads **Older version** in place of Installed (the state `outdated`, with `installed_commit`; the
+plugin's page says which commit its files are from): Install is refused while the folder is there, so Remove it and
+Install it again to take the new pin (item 558).
 Two plugins may bring a skill of the same name (UI/UX Pro Max and Product Design a `design-system`, Product Management
 and Marketing a `competitive-brief`): the first read is offered, and `dotx skills list` names the other as left out. A
 skill is text the run's model reads as instructions: the gallery takes repositories of known publishers and pins them,
@@ -204,6 +208,14 @@ The ways a service connects:
   instead. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts again, and
   Remove plugin then stops them; a server of the same name added since is the owner's, not the plugin's. A server of
   Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
+  The sign-in file is named for the server, so a server added again under the name of one that is connected, at
+  another address or by another command, forgets the sign-in of the old one first (item 558): its tokens were issued
+  for the old address and are not sent to the new, and an address left as it was keeps them. The address the page and
+  the API show for a server, and what `GET /api/status`, the log and the terminal say of why it was left out, leave a
+  key out: the user and password of a URL, its query, a segment of its path that reads as a key, and an argument
+  that follows an option naming a secret (`--api-key`, `--token`) or has a known form of a key are masked, as is what
+  the server printed as it failed (`mcp/masking.py`). A server's tools are not chosen (`PUT .../allow`, 409) while Dot
+  tries it, as a sign-in again does: the try would write its own list over the choice when it ends.
   Dot's Playwright server starts with `--no-webmcp` (item 514): the tools a page registers through WebMCP, which the
   server offers by default, are that page's words and code, and stay out of a run's tools; a server added before keeps
   the arguments it was added with.
@@ -234,8 +246,11 @@ Google Calendar) and Microsoft (Outlook, Microsoft 365), each with its own mark,
 the client you register with each, as each asks of an app that runs on a computer. **Sign in** opens the provider's page
 in a new tab; you say yes there, the provider sends the browser back to the daemon's `/oauth/callback` on this Mac's own
 address with a code, which Dot trades for tokens with PKCE, and the card follows until the account is there, named by
-its address; **Sign out** takes it away. The list below the card is drawn once the card has read the accounts (item
-511), so the tiles do not move down under a finger as its rows come. A sign-in starts only from a page on this Mac (the
+its address; **Sign out** takes it away, and gives Google the refresh token back, which ends the grant there (item
+558; Microsoft has no such call for a client like Dot's: take Dot's access away at your Microsoft account, under the
+apps that may use it). A refresh under way ends first, so that no token it fetched is written back after the sign-out.
+The list below the card is drawn once the card has read the accounts (item 511), so the tiles do not move down under a
+finger as its rows come. A sign-in starts only from a page on this Mac (the
 provider comes back to the Mac's loopback address, which a phone does not reach). An account's access token is refreshed
 with its refresh token once it is about to run out.
 
@@ -269,8 +284,11 @@ security add-generic-password -U -s dot-agent -a DOT_GOOGLE_CLIENT_SECRET -w
 security add-generic-password -U -s dot-agent -a DOT_MS_CLIENT_ID -w
 ```
 
-Google is asked for `gmail.modify` and `calendar` (and who you are), Microsoft for `Mail.ReadWrite`, `Mail.Send`,
-`Calendars.ReadWrite`, `User.Read` and `offline_access`. The tokens of each account are in the login Keychain under the
+Google is asked for `gmail.readonly` and `calendar.readonly` (and who you are), Microsoft for `Mail.Read`,
+`Calendars.Read`, `User.Read` and `offline_access`: the account tools only read (item 558; before, Google was asked for
+`gmail.modify` and `calendar` and Microsoft for `Mail.ReadWrite`, `Mail.Send` and `Calendars.ReadWrite`, and an account
+signed in then keeps that grant until you sign in again). A tool that writes will ask for what it needs, and be one that
+asks before it sends. The tokens of each account are in the login Keychain under the
 service `dot-oauth`, in pieces short enough for a line of `security`'s own prompt (Microsoft's run to some kilobytes):
 the item `google:<address>` says which of two slots holds them and how many there are (`a2`), the items
 `google:<address>#a0`, `#a1`… hold the pieces, and new tokens go to the other slot before that item names it, so that

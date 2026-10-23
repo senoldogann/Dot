@@ -110,6 +110,16 @@ def test_a_page_names_the_account_with_its_address_and_the_service_with_its_host
     assert "Back from Notion</h1>" in back and "mcp.notion.com" in back and "Signed in" not in back
 
 
+def test_every_outcome_sends_the_owner_to_connectors_where_sign_ins_live() -> None:
+    """Item 558: a sign-in that failed said to start it again from Customize › Plugins, the plugin gallery, which has no
+    sign-in on it."""
+    for outcome in ("signed_in", "declined", "expired", "failed", "unknown"):
+        subject: Subject | None = None if outcome == "unknown" else _GOOGLE
+        page: str = _body(render(Callback(outcome=outcome, subject=subject, reason=None)))
+        assert "Customize › Plugins" not in page, outcome
+    assert "Customize › Connectors" in _body(render(Callback(outcome="failed", subject=_MICROSOFT, reason=None)))
+
+
 def test_what_a_provider_said_is_escaped() -> None:
     page: str = render(Callback(outcome="failed", subject=_MICROSOFT, reason='<img src=x onerror="alert(1)">'))
     assert "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;" in page and "<img src=x" not in page

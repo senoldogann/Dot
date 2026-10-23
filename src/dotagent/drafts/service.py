@@ -11,7 +11,7 @@ from dotagent.core.errors import DesktopError, InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.script import run_osascript
-from dotagent.drafts.scripts import SCRIPTS, send_arguments
+from dotagent.drafts.scripts import SCRIPTS, send_calls
 from dotagent.events import EventBus
 from dotagent.store.db import Store
 from dotagent.store.models import DraftChannel, DraftRecord
@@ -100,12 +100,20 @@ async def send_draft(store: Store, bus: EventBus, timeout_s: float, draft_id: st
         raise InvalidValueError(f"the draft cannot be sent: {'; '.join(problems)}", {"draft_id": draft_id})
     claimed: DraftRecord = await store.claim_draft(draft_id, to, cc, words.subject.strip(), words.body)
     error: str | None = None
+    # The recipients of a message the application took before one failed: a retry would send them the message again.
+    reached: list[str] = []
     try:
-        await run_osascript("AppleScript", SCRIPTS[claimed.channel], send_arguments(claimed), (), timeout_s)
+        for arguments in send_calls(claimed):
+            await run_osascript("AppleScript", SCRIPTS[claimed.channel], arguments, (), timeout_s)
+            if claimed.channel == "message":
+                reached.append(arguments[1])
     except DesktopError as failure:
         said: object = failure.context.get("stderr")
         error = f"{failure.message}: {said}" if isinstance(said, str) and said else failure.message
-        log.warning("draft_not_sent", draft_id=draft_id, channel=claimed.channel, error=error)
+        if reached:
+            sent: str = ", ".join(reached)
+            error += f"; it was already sent to {sent}, so take them off the recipients before you send it again"
+        log.warning("draft_not_sent", draft_id=draft_id, channel=claimed.channel, error=error, reached=len(reached))
     settled: DraftRecord = await store.settle_draft(draft_id, error)
     if error is None:
         log.info("draft_sent", draft_id=draft_id, channel=settled.channel, recipients=len(to) + len(cc))

@@ -436,13 +436,40 @@ class Accounts:
         return tokens_from(_json(provider, response), time.time(), refresh_token)
 
     async def forget(self, provider_id: ProviderId, address: str) -> None:
-        """Sign the account out: its tokens leave the Keychain and it leaves the list."""
-        await self._keychain.forget(provider_id, address)
-        await self._keep(
-            [
-                account
-                for account in await self.accounts()
-                if not (account.provider == provider_id and account.address == address)
-            ]
-        )
-        log.info("signed_out", provider=provider_id)
+        """Sign the account out: its tokens leave the Keychain and it leaves the list, and the provider is asked to end
+        the grant the refresh token stands for (:meth:`_revoke`). It waits for a refresh of the account's tokens that
+        is under way, which would write fresh ones into the Keychain after they were removed, with no account left in
+        the list to sign out of (item 558)."""
+        provider: Provider = PROVIDERS[provider_id]
+        lock: asyncio.Lock = self._refreshing.setdefault(f"{provider_id}:{address}", asyncio.Lock())
+        async with lock:
+            tokens: Tokens | None = await self._keychain.read(provider_id, address)
+            await self._keychain.forget(provider_id, address)
+            await self._keep(
+                [
+                    account
+                    for account in await self.accounts()
+                    if not (account.provider == provider_id and account.address == address)
+                ]
+            )
+        revoked: bool = tokens is not None and await self._revoke(provider, tokens)
+        log.info("signed_out", provider=provider_id, revoked=revoked)
+
+    async def _revoke(self, provider: Provider, tokens: Tokens) -> bool:
+        """Give the refresh token (else the access token) back to the provider, which ends the grant: a copy of the
+        token taken before the owner signed out mints no more. Best effort: a provider that cannot be reached or that
+        refuses is logged, without the token, and the sign-out stands. Microsoft has no such call for a client like
+        Dot's: the app's consent is taken away at the owner's account."""
+        if provider.revoke_url is None:
+            return False
+        token: str = tokens.refresh_token or tokens.access_token
+        try:
+            async with self.client() as client:
+                response: httpx.Response = await client.post(provider.revoke_url, data={"token": token})
+        except httpx.HTTPError as error:
+            log.warning("sign_out_not_revoked", provider=provider.id, error=type(error).__name__)
+            return False
+        if response.status_code != 200:
+            log.warning("sign_out_not_revoked", provider=provider.id, status=response.status_code)
+            return False
+        return True

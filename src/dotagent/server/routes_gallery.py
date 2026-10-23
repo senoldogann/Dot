@@ -30,41 +30,52 @@ from dotagent.server.views import GalleryPluginView, GalleryState, GalleryView, 
 log = get_logger(__name__)
 
 
-def _state(entry: GalleryEntry, plugins: Sequence[Plugin]) -> GalleryState:
-    """Whether Dot installed ``entry``, has another plugin of its name, or can install it."""
+def _installed(entry: GalleryEntry) -> GalleryMarker | None:
+    """What Dot kept of installing ``entry``: the marker in the folder of its name, none for another plugin's folder."""
+    marker: GalleryMarker | None = installed_marker(plugins_dir() / entry.id)
+    return marker if marker is not None and marker.id == entry.id else None
+
+
+def _state(entry: GalleryEntry, marker: GalleryMarker | None, plugins: Sequence[Plugin]) -> GalleryState:
+    """Whether Dot installed ``entry`` (``marker``), and from the commit the gallery pins now or an older one (the pin
+    moved with a newer Dot: the runs read the old skills, and Install is refused until Remove), has another plugin of
+    its name, or can install it."""
+    if marker is not None:
+        return "installed" if (marker.commit, marker.files) == (entry.commit, entry.files) else "outdated"
     folder: Path = plugins_dir() / entry.id
-    marker: GalleryMarker | None = installed_marker(folder)
-    if marker is not None and marker.id == entry.id:
-        return "installed"
     if folder.exists() or folder.is_symlink() or any(plugin.name == entry.id for plugin in plugins):
         return "taken"
     return "available"
 
 
+def _plugin_view(entry: GalleryEntry, plugins: Sequence[Plugin]) -> GalleryPluginView:
+    """``entry`` as the page shows it, with where it stands."""
+    marker: GalleryMarker | None = _installed(entry)
+    return GalleryPluginView(
+        id=entry.id,
+        name=entry.name,
+        publisher=entry.publisher,
+        official=entry.official,
+        category=entry.category,
+        does=entry.does,
+        skills=tuple(skill.rsplit("/", 1)[-1] for skill in entry.skills),
+        licence=entry.licence,
+        featured=entry.featured,
+        stars=entry.stars,
+        added=entry.added.isoformat(),
+        logo=entry.logo,
+        repository=entry.repository,
+        commit=entry.commit,
+        homepage=homepage(entry),
+        state=_state(entry, marker, plugins),
+        installed_commit=None if marker is None else marker.commit,
+    )
+
+
 def gallery_view(entries: Sequence[GalleryEntry], plugins: Sequence[Plugin]) -> GalleryView:
     """The gallery's plugins with where each stands, and the plugins Dot reads that are not the gallery's."""
     own: Path = plugins_dir()
-    views: tuple[GalleryPluginView, ...] = tuple(
-        GalleryPluginView(
-            id=entry.id,
-            name=entry.name,
-            publisher=entry.publisher,
-            official=entry.official,
-            category=entry.category,
-            does=entry.does,
-            skills=tuple(skill.rsplit("/", 1)[-1] for skill in entry.skills),
-            licence=entry.licence,
-            featured=entry.featured,
-            stars=entry.stars,
-            added=entry.added.isoformat(),
-            logo=entry.logo,
-            repository=entry.repository,
-            commit=entry.commit,
-            homepage=homepage(entry),
-            state=_state(entry, plugins),
-        )
-        for entry in entries
-    )
+    views: tuple[GalleryPluginView, ...] = tuple(_plugin_view(entry, plugins) for entry in entries)
     others: tuple[InstalledPluginView, ...] = tuple(
         InstalledPluginView(
             name=plugin.name,

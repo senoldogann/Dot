@@ -1,7 +1,8 @@
 """The desktop shell's page for a daemon it cannot reach (``desktop/ui/down.html``, item 191) says what the shell tells
 it in its fragment (``down_url`` in ``desktop/src-tauri/src/lib.rs``): a file the shell could not read stands for "Dot
-is not running" and the advice to start it, a home without a token keeps them and says why, and a page told nothing is
-the page it was."""
+is not running" and the advice to start it, a home without a token keeps them and says why, something else at the
+daemon's address is named and gets no advice to start the daemon (item 558), and a page told nothing is the page it
+was."""
 
 from pathlib import Path
 from typing import Literal
@@ -18,8 +19,13 @@ _NOT_RUNNING: str = "Dot is not running"
 _TITLE: str = "Dot could not read its config.toml"
 _CONFIG: str = f"{_HOME}/config.toml: line 3, column 8: invalid string; expected `\"`, `'`"
 _NO_TOKEN: str = f"{_HOME}/api-token: there is none yet; the daemon makes it the first time it starts"
-# The paragraph and the command that tell how to start Dot, as the page shows them.
+# The paragraph, the command and the line for a clone that tell how to start Dot, as the page shows them.
 _ADVICE: str = ".start:visible"
+_ADDRESS: str = "http://127.0.0.1:8765"
+_SOMETHING_ELSE: str = f"Something else answers at {_ADDRESS}"
+_LSOF: str = (
+    "It does not prove that it holds this Dot's token. See what listens with 'lsof -nP -iTCP:8765 -sTCP:LISTEN'"
+)
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (1280, "light"),
     (1280, "dark"),
@@ -51,12 +57,23 @@ async def test_the_down_page_says_what_kept_the_shell_from_the_daemon(tmp_path: 
                 await page.evaluate("fragment => { location.hash = fragment; }", urlencode({"detail": _NO_TOKEN}))
                 await expect(page.locator("h1")).to_have_text(_NOT_RUNNING)
                 await expect(page.locator(".why")).to_have_text(_NO_TOKEN)
-                await expect(page.locator(_ADVICE)).to_have_count(2)
+                await expect(page.locator(_ADVICE)).to_have_count(3)
                 await page.screenshot(path=str(tmp_path / f"down-token-{width}-{scheme}.png"))
+                # Something else at the daemon's address is no daemon that is off: no advice to start it (item 558).
+                await page.evaluate(
+                    "fragment => { location.hash = fragment; }",
+                    urlencode({"title": _SOMETHING_ELSE, "detail": _LSOF}),
+                )
+                await expect(page.locator("h1")).to_have_text(_SOMETHING_ELSE)
+                await expect(page.locator(".why")).to_have_text(_LSOF)
+                await expect(page.locator(_ADVICE)).to_have_count(0)
                 await page.goto(_DOWN.as_uri())
                 await expect(page.locator("h1")).to_have_text(_NOT_RUNNING)
                 await expect(page.locator(".why")).to_be_hidden()
-                await expect(page.locator(_ADVICE)).to_have_count(2)
+                await expect(page.locator(_ADVICE)).to_have_count(3)
+                # The command works wherever Dot is installed; a clone writes it with uv run, which the page says.
+                await expect(page.locator("pre.start")).to_have_text("dotx service install")
+                await expect(page.locator("p.start code")).to_have_text("uv run dotx service install")
                 await page.close()
         finally:
             await browser.close()

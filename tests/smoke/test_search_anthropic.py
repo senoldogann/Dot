@@ -1,5 +1,5 @@
 """The Anthropic rung against the live API (item 69): one search through the Messages API's web_search tool, with the
-key of this machine; skipped without it."""
+key of this machine; skipped without it, which is looked for as the test runs (item 558)."""
 
 import pytest
 
@@ -12,14 +12,14 @@ from dotagent.web.types import SearchHit
 pytestmark = [pytest.mark.internet, pytest.mark.asyncio]
 
 _KEY_ENV: str = load_default_config().providers.anthropic.api_key_env
-requires_key = pytest.mark.skipif(resolve_secret(_KEY_ENV) is None, reason=f"needs {_KEY_ENV}")
 
 
-@requires_key
 async def test_one_search_comes_back_with_addresses_and_titles() -> None:
     config = load_default_config()
+    # Looked for when the test runs, not when the module is read, which every run does and so asks the Keychain.
     key: str | None = resolve_secret(_KEY_ENV)
-    assert key is not None
+    if key is None:
+        pytest.skip(f"needs {_KEY_ENV}")
     client: WebClient = WebClient(config.web, (), ())
     try:
         relay: AnthropicSearch = AnthropicSearch(api_key=key, model=config.models.search.split(":", 1)[1])

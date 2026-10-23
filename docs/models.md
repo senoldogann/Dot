@@ -274,6 +274,8 @@ at OpenRouter (what it has spent and may spend) cost nothing, the Ollama key is 
 search. **Add key** or **Replace key** saves a key in `<home>/.env` and then runs **Check**; **Remove** takes away the
 key saved there (a key from the environment or the Keychain is left alone). The page warns when the daemon was started
 with the variable in its environment, which comes before a key saved in Dot. A saved or removed key is used from the
-next request of a run on, even in a run under way. The memory search (an OpenAI or ollama.com key) and the MCP servers
+next request of a run on, even in a run under way; so are the Ollama and Anthropic rungs of web search, which join the
+ladder with the key saved here and leave it with the key removed (item 558; a key set with `dotx auth set` or in the
+environment joins them at the daemon's next start). The memory search (an OpenAI or ollama.com key) and the MCP servers
 read their keys when the daemon starts: after changing a key they use, restart the daemon (`dotx service restart`; a
 run in `yolo` asks for `dotx service restart --when-idle`, see [Daemon](daemon.md)).

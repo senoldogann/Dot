@@ -181,3 +181,28 @@ async def test_a_plugin_the_gallery_does_not_have_is_not_found(
     missing: httpx.Response = await client.post("/api/plugin-gallery/nothing-like-it")
 
     assert missing.status_code == 404, missing.text
+
+
+async def test_a_plugin_installed_from_a_pin_the_gallery_has_moved_since_is_outdated(
+    setup: tuple[httpx.AsyncClient, Runtime, Path, Path, list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 558: after a newer Dot re-pins an entry the card said Installed at the new commit while the runs read the
+    skills of the old one, and nothing said so. The state says it now, and tells the commit that is installed."""
+    client, _runtime, _plugins, _trash, _fetched = setup
+    pinned: GalleryEntry = routes_gallery.GALLERY[0]
+    assert (await client.post("/api/plugin-gallery/acme")).status_code == 200
+
+    for moved in (pinned.model_copy(update={"commit": "d" * 40}), pinned.model_copy(update={"files": "a" * 64})):
+        monkeypatch.setattr(routes_gallery, "GALLERY", (moved, *routes_gallery.GALLERY[1:]))
+        view: JsonObject = (await client.get("/api/plugin-gallery")).json()["plugins"][0]
+        assert (view["id"], view["state"]) == ("acme", "outdated")
+        assert (view["commit"], view["installed_commit"]) == (moved.commit, _COMMIT)
+        refused: httpx.Response = await client.post("/api/plugin-gallery/acme")
+        assert refused.status_code == 409, refused.text
+
+    monkeypatch.setattr(routes_gallery, "GALLERY", (pinned, *routes_gallery.GALLERY[1:]))
+    current: JsonObject = (await client.get("/api/plugin-gallery")).json()["plugins"][0]
+    assert (current["state"], current["installed_commit"]) == ("installed", _COMMIT)
+    assert (await client.delete("/api/installed-plugins/acme")).status_code == 200
+    gone: JsonObject = (await client.get("/api/plugin-gallery")).json()["plugins"][0]
+    assert (gone["state"], gone["installed_commit"]) == ("available", None)

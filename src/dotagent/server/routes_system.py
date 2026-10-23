@@ -22,7 +22,7 @@ from dotagent.agent.scaffold import (
     window_choices,
 )
 from dotagent.agent.sizes import ContextSizes
-from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, ModelsConfig
+from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, JudgeProvider, ModelsConfig
 from dotagent.config_edit import (
     set_context_size,
     set_default_model,
@@ -351,8 +351,14 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         """Have the typed judge answer through TypeSafe, or answer nothing, from the next judgment on (item 255): the
         config file keeps it as ``[judge] provider``. Switching it on without the TypeSafe service (its key was not set
         when the daemon started) is refused, as is a config file that cannot be changed; nothing changes then."""
+        before: JudgeProvider = ctx.runtime.judge.provider
         ctx.runtime.judge.set_provider(request.provider)
-        await asyncio.to_thread(set_judge_provider, config_path(), request.provider)
+        try:
+            await asyncio.to_thread(set_judge_provider, config_path(), request.provider)
+        except (ConfigError, OSError):
+            # A config file that cannot be changed leaves the judge as it was, as the docstring says (item 558).
+            ctx.runtime.judge.set_provider(before)
+            raise
         return judge_now()
 
     @router.get("/shell/sandbox")

@@ -20,6 +20,7 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
+import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
@@ -346,3 +347,56 @@ async def test_the_gallery_installs_lists_and_removes_a_plugin(
             await phone.screenshot(path=str(tmp_path / "gallery-plugin-390-dark.png"), full_page=True)
         finally:
             await browser.close()
+
+
+async def test_a_plugin_whose_pin_the_gallery_moved_since_says_older_version(
+    world: tuple[str, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mac_at_rest: None
+) -> None:
+    """Item 558: after a newer Dot re-pins a plugin the card said Installed while the runs read the skills of the old
+    commit. Its badge says Older version, with the two commits in its title and on the plugin's page, and Remove is
+    there, as Install is refused until it is used; wide and on a phone."""
+    address, _plugins, _trash = world
+    port: int = int(address.rpartition(":")[2])
+    async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}, timeout=60.0) as api:
+        assert (await api.post("/api/plugin-gallery/acme")).status_code == 200
+        try:
+            moved: tuple[GalleryEntry, ...] = tuple(
+                entry.model_copy(update={"commit": "e" * 40}) if entry.id == "acme" else entry
+                for entry in routes_gallery.GALLERY
+            )
+            monkeypatch.setattr(routes_gallery, "GALLERY", moved)
+            async with async_playwright() as playwright:
+                browser: Browser = await playwright.chromium.launch(headless=True)
+                try:
+                    for width in (1280, 390):
+                        page: Page = await browser.new_page(
+                            viewport={"width": width, "height": 860}, reduced_motion="reduce"
+                        )
+                        await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                        await page.goto(ui_url("127.0.0.1", port, TOKEN))
+                        await page.goto(f"{address}/#/customize/plugins")
+                        acme: Locator = _card(page, "acme")
+                        older: Locator = acme.locator(".gallery-outdated")
+                        await expect(older).to_have_text("Older version")
+                        await expect(older).to_have_attribute(
+                            "title", re.compile(r"Installed from d{7}; the gallery pins e{7} now")
+                        )
+                        await expect(acme.get_by_role("button", name="Remove Acme Skills")).to_be_visible()
+                        await expect(acme.get_by_role("button", name="Install Acme Skills")).to_have_count(0)
+                        # Installed lists it, with the plugin put in the folder by hand.
+                        await page.get_by_role("button", name=re.compile(r"^Installed 2$")).click()
+                        await expect(acme).to_be_visible()
+                        await _fits(page)
+                        # The plugin's own page says which commit its files are from, beside the one pinned now.
+                        await acme.locator(".gallery-card-name").click()
+                        facts: Locator = page.locator(".gallery-facts")
+                        await expect(facts).to_contain_text("Installed from")
+                        await expect(facts).to_contain_text("ddddddd")
+                        await expect(facts).to_contain_text("eeeeeee")
+                        await _fits(page)
+                        await page.screenshot(path=str(tmp_path / f"gallery-older-version-{width}.png"), full_page=True)
+                        await page.close()
+                finally:
+                    await browser.close()
+        finally:
+            assert (await api.delete("/api/installed-plugins/acme")).status_code == 200

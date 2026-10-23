@@ -57,17 +57,16 @@ from dotagent.web.types import SearchHit
 # No such file: the defaults of the application are used.
 DEFAULTS: AppConfig = load_config(Path(__file__).with_name("no-such-config.toml"))
 
-OPENAI_KEY: str | None = resolve_secret("OPENAI_API_KEY")
-OPENCODE_KEY: str | None = resolve_secret("OPENCODE_API_KEY")
-OLLAMA_KEY: str | None = resolve_secret("OLLAMA_API_KEY")
-ANTHROPIC_KEY: str | None = resolve_secret("ANTHROPIC_API_KEY")
-TYPESAFE_KEY: str | None = resolve_secret(DEFAULTS.judge.api_key_env)
 
-requires_openai = pytest.mark.skipif(OPENAI_KEY is None, reason="needs OPENAI_API_KEY")
-requires_opencode_go = pytest.mark.skipif(OPENCODE_KEY is None, reason="needs OPENCODE_API_KEY")
-requires_ollama_search = pytest.mark.skipif(OLLAMA_KEY is None, reason="needs OLLAMA_API_KEY")
-requires_anthropic = pytest.mark.skipif(ANTHROPIC_KEY is None, reason="needs ANTHROPIC_API_KEY")
-requires_typesafe = pytest.mark.skipif(TYPESAFE_KEY is None, reason="needs TYPESAFE_API_KEY")
+def _key(name: str) -> str:
+    """The key ``name`` as the owner has it, looked for when the test runs and not when the module is read, which every
+    run does (the offline ones too, which then never ask the owner's Keychain, item 558): the test is skipped without
+    it."""
+    key: str | None = resolve_secret(name)
+    if key is None:
+        pytest.skip(f"needs {name}")
+    return key
+
 
 OPENAI_MODEL: str = "gpt-4.1-mini"
 # The smallest current Claude model; it thinks, so the round trip also replays a signed thinking block.
@@ -95,18 +94,17 @@ CACHED_PROMPT: str = " ".join(f"Rule {number}: answer in one short sentence." fo
 
 
 def openai_provider(wire: str) -> ChatProvider:
-    assert OPENAI_KEY is not None
-    return OpenAIProvider(DEFAULTS.providers.openai.model_copy(update={"wire": wire}), OPENAI_KEY, None, None)
+    return OpenAIProvider(
+        DEFAULTS.providers.openai.model_copy(update={"wire": wire}), _key("OPENAI_API_KEY"), None, None
+    )
 
 
 def go_provider() -> ChatProvider:
-    assert OPENCODE_KEY is not None
-    return OpenCodeGoProvider(DEFAULTS.providers.opencode_go, OPENCODE_KEY)
+    return OpenCodeGoProvider(DEFAULTS.providers.opencode_go, _key("OPENCODE_API_KEY"))
 
 
 def anthropic_provider() -> ChatProvider:
-    assert ANTHROPIC_KEY is not None
-    return AnthropicProvider(DEFAULTS.providers.anthropic, ANTHROPIC_KEY)
+    return AnthropicProvider(DEFAULTS.providers.anthropic, _key("ANTHROPIC_API_KEY"))
 
 
 async def blue_screenshot_description(provider: ChatProvider, model: str) -> str:
@@ -126,7 +124,6 @@ async def blue_screenshot_description(provider: ChatProvider, model: str) -> str
 
 
 @pytest.mark.hosted
-@requires_openai
 @pytest.mark.parametrize("wire", ["responses", "chat"])
 async def test_openai_round_trips_tools_and_reads_screenshots_on_each_wire(wire: str) -> None:
     provider: ChatProvider = openai_provider(wire)
@@ -140,7 +137,6 @@ async def test_openai_round_trips_tools_and_reads_screenshots_on_each_wire(wire:
 
 
 @pytest.mark.hosted
-@requires_opencode_go
 @pytest.mark.parametrize(("route", "model"), GO_MODELS)
 async def test_opencode_go_round_trips_tools_and_reads_screenshots_on_each_route(route: GoRoute, model: str) -> None:
     assert route_of(model, DEFAULTS.providers.opencode_go.route_overrides) == route
@@ -155,7 +151,6 @@ async def test_opencode_go_round_trips_tools_and_reads_screenshots_on_each_route
 
 
 @pytest.mark.hosted
-@requires_opencode_go
 async def test_opencode_go_reads_a_repeated_claude_prompt_from_the_cache() -> None:
     request: ChatRequest = request_for(
         GO_CACHED_MODEL, (system_message(CACHED_PROMPT), user_message("Say ok.", ())), ()
@@ -170,7 +165,6 @@ async def test_opencode_go_reads_a_repeated_claude_prompt_from_the_cache() -> No
 
 
 @pytest.mark.hosted
-@requires_anthropic
 async def test_anthropic_lists_its_models_round_trips_tools_and_reads_screenshots() -> None:
     provider: ChatProvider = anthropic_provider()
     try:
@@ -185,7 +179,6 @@ async def test_anthropic_lists_its_models_round_trips_tools_and_reads_screenshot
 
 
 @pytest.mark.hosted
-@requires_anthropic
 async def test_claude_drafts_a_rule_for_everything_and_refuses_what_no_rule_can_do_in_english() -> None:
     """Item 110's drafter with Dot's own tools: words that cover every action make a rule for every tool, and a
     sentence that asks for what no rule can do is refused in one English sentence."""
@@ -216,12 +209,11 @@ async def test_claude_drafts_a_rule_for_everything_and_refuses_what_no_rule_can_
 
 
 @pytest.mark.hosted
-@requires_ollama_search
 async def test_the_hosted_search_of_ollama_answers_with_titles_and_addresses() -> None:
-    assert OLLAMA_KEY is not None
+    key: str = _key("OLLAMA_API_KEY")
     client: WebClient = WebClient(DEFAULTS.web, (), ())
     try:
-        hits: tuple[SearchHit, ...] = await search_ollama(client, OLLAMA_KEY, "Python programming language", 5)
+        hits: tuple[SearchHit, ...] = await search_ollama(client, key, "Python programming language", 5)
     finally:
         await client.aclose()
     assert 1 <= len(hits) <= 5
@@ -230,12 +222,11 @@ async def test_the_hosted_search_of_ollama_answers_with_titles_and_addresses() -
 
 
 @pytest.mark.hosted
-@requires_typesafe
 async def test_typesafe_flags_click_labels_the_patterns_do_not_know() -> None:
     """Labels no pattern of the policy knows, on the pages they belong to, as the judge gets them (a repost, a share, a
     payment and a deletion in other languages): each one gets its flag at ``public_action_threshold``, since a missed
     flag lets the click through without its question outside yolo. The probabilities are printed."""
-    assert TYPESAFE_KEY is not None
+    typesafe_key: str = _key(DEFAULTS.judge.api_key_env)
     clicks: tuple[tuple[str, str, str], ...] = (
         ("Boost", "https://mastodon.social/home", "public_post"),
         ("Teilen", "https://www.facebook.com/", "public_post"),
@@ -244,7 +235,7 @@ async def test_typesafe_flags_click_labels_the_patterns_do_not_know() -> None:
         ("Konto löschen", "https://x.com/settings/deactivate", "destructive"),
     )
     questions: tuple[NoulQuestion, ...] = tuple(question for question, _ in CLICK_QUESTIONS)
-    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, TYPESAFE_KEY)
+    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, typesafe_key)
     try:
         answers: list[dict[str, float]] = [
             await client.nouls({"control": {"label": label, "role": "button"}, "page": page}, questions)
@@ -280,13 +271,12 @@ def _claim(claim: str) -> JsonObject:
 
 
 @pytest.mark.hosted
-@requires_typesafe
 async def test_typesafe_lets_a_true_campaign_claim_through_and_stops_one_resting_on_a_hope() -> None:
     """Two claims of the same campaign: one that the session's own read of the profile shows, at or above
     ``target_threshold``, and one that rests on posts still to come, below it. A true claim the judge refused would keep
     a campaign from ending; the probabilities are printed."""
-    assert TYPESAFE_KEY is not None
-    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, TYPESAFE_KEY)
+    typesafe_key: str = _key(DEFAULTS.judge.api_key_env)
+    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, typesafe_key)
     try:
         read: dict[str, float] = await client.nouls(
             _claim(
@@ -327,17 +317,16 @@ _OFF_TOPIC: tuple[str, ...] = (
 
 
 @pytest.mark.hosted
-@requires_typesafe
 async def test_typesafe_ranks_the_posts_on_a_topic_above_every_other_in_one_request() -> None:
     """Twelve posts, five on Python packaging, as judge_items sends them: one request, one question per post. Every
     on-topic post has to come out above every off-topic one; the probabilities and the time of the request are
     printed, since they set ``[judge] items_per_request``."""
-    assert TYPESAFE_KEY is not None
+    typesafe_key: str = _key(DEFAULTS.judge.api_key_env)
     items: tuple[Item, ...] = tuple(
         Item(id=f"p{number}", text=text) for number, text in enumerate([*_ON_TOPIC, *_OFF_TOPIC], 1)
     )
     question: str = "Is this post about Python packaging (installing, building or publishing Python packages)?"
-    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, TYPESAFE_KEY)
+    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, typesafe_key)
     started: float = time.monotonic()
     try:
         answers: dict[str, float] = await client.nouls(state_of(items), noul_questions(question, items))
@@ -385,17 +374,16 @@ _NOT_ANSWERABLE: tuple[tuple[str, str], ...] = (
 
 
 @pytest.mark.hosted
-@requires_typesafe
 async def test_typesafe_ranks_the_answerable_posts_of_a_feed_at_the_top() -> None:
     """The labeled sample above, ranked as rank_posts does it with equal weights: the precision of the top ten is
     printed and has to be at least 0.8 (eight of the ten are posts worth answering)."""
-    assert TYPESAFE_KEY is not None
+    typesafe_key: str = _key(DEFAULTS.judge.api_key_env)
     posts: tuple[Post, ...] = tuple(
         Post(id=f"p{number}", author=author, text=text)
         for number, (author, text) in enumerate([*_ANSWERABLE, *_NOT_ANSWERABLE], 1)
     )
     answerable: frozenset[str] = frozenset(f"p{number}" for number in range(1, len(_ANSWERABLE) + 1))
-    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, TYPESAFE_KEY)
+    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, typesafe_key)
     started: float = time.monotonic()
     try:
         answers: dict[str, float] = await client.nouls(posts_state("Python packaging", posts), post_questions(posts))

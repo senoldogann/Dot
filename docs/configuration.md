@@ -2,15 +2,17 @@
 
 `config.toml` in the home directory is merged over the packaged `src/dotagent/defaults.toml`, which lists every key with
 a comment and is the reference. A key that does not exist is an error, and so is a number that would stop Dot from
-working: a count of runs, tools, tabs, tries or calls at once below 1, a timeout or the scheduler's tick of 0 or less, a
-port outside 1 to 65535, a browser page smaller than 320 by 240 or larger than 3840 by 2160, a screenshot quality
-outside 1 to 100, a context budget of 0 or less, a tool output under 2,000 characters, a default shell timeout above
-`max_timeout_s`. So is a value no run could use: an address of a provider or of the judge that is not `http://` or
-`https://` with a host, a model that is not `<provider>:<model>` with a provider Dot knows (`[models] search` an
-Anthropic one), a site under `[policy.spend]` that is not a bare host in lower case without `www.`, such as
-`example.com`. The error names each setting; for a key this version of Dot does not have it says that a newer Dot may
-add it (a daemon that runs an older checkout than the one that wrote the file refuses it). Two environment variables of
-the process move things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
+working: a count of runs, tools, tabs, tries (a page's `navigation_attempts` too) or calls at once below 1, the steps of
+a browser or desktop batch below 1, a limit of the progress watchdog that would fire at every step (`stall_limit` or
+`revisit_window` below 2, `failure_streak` below 1), a count of nudges or send-backs below 0, a timeout or the
+scheduler's tick of 0 or less, a port outside 1 to 65535, a browser page smaller than 320 by 240 or larger than 3840 by
+2160, a screenshot quality outside 1 to 100 (the desktop's too), a context budget of 0 or less, a tool output under
+2,000 characters, a default shell timeout above `max_timeout_s`. So is a value no run could use: an address of a
+provider or of the judge that is not `http://` or `https://` with a host, a model that is not `<provider>:<model>` with
+a provider Dot knows (`[models] search` an Anthropic one), a site under `[policy.spend]` that is not a bare host in
+lower case without `www.`, such as `example.com`. The error names each setting; for a key this version of Dot does not
+have it says that a newer Dot may add it (a daemon that runs an older checkout than the one that wrote the file refuses
+it). Two environment variables of the process move things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
 
 | Path (under `~/Library/Application Support/Dot`) | Content                                                              |
 | ------------------------------------------------ | -------------------------------------------------------------------- |

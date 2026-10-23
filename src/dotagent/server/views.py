@@ -1259,14 +1259,16 @@ class PluginsView(FrozenModel):
     plugins: tuple[PluginView, ...]
 
 
-type GalleryState = Literal["available", "installed", "taken"]
+type GalleryState = Literal["available", "installed", "outdated", "taken"]
 
 
 class GalleryPluginView(FrozenModel):
     """A plugin of the gallery as Customize › Plugins shows it (item 542): ``skills`` are the names of its skill
     folders, ``logo`` a file of ``static/icons/plugins`` (else the page draws its plugin mark), ``repository`` and
     ``commit`` the GitHub repository and the commit Install downloads, ``homepage`` that commit's page, and ``state``
-    whether Dot installed it, has another plugin of its name (``taken``), or can install it."""
+    whether Dot installed it, has another plugin of its name (``taken``), or can install it. A plugin Dot installed
+    from another commit than the one the gallery pins now (a Dot that came since moved the pin) is ``outdated``, and
+    ``installed_commit`` is the commit its files are from (item 558)."""
 
     id: str
     name: str
@@ -1284,6 +1286,7 @@ class GalleryPluginView(FrozenModel):
     commit: str
     homepage: str
     state: GalleryState
+    installed_commit: str | None
 
 
 class InstalledPluginView(FrozenModel):

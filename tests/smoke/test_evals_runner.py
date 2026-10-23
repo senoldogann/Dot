@@ -48,7 +48,10 @@ def _with_reference(task_id: str, reference: Sequence[ScriptedTurn]) -> EvalTask
     return select_tasks([task_id])[0].model_copy(update={"reference": tuple(reference)})
 
 
+@pytest.mark.browser
 async def test_every_task_of_the_catalog_is_sound(capsys: pytest.CaptureFixture[str]) -> None:
+    """The whole check of ``dotx eval check``, which plays the form task in a headless Chrome too (item 558: marked, so
+    that ``-m "not browser"`` starts no Chrome; the gate runs the same check as a step of its own)."""
     assert await cmd_eval_check(EvalCheckCommand(name="eval-check")) == 0
     printed: str = capsys.readouterr().out
     assert "FAIL" not in printed
@@ -174,6 +177,7 @@ async def test_a_run_that_uses_more_tokens_than_its_task_allows_is_cut(
     assert not outcome.passed
 
 
+@pytest.mark.browser
 async def test_the_site_tasks_are_served_for_the_attempt_and_count_the_numbers_of_a_long_run(
     config: AppConfig, login_env: dict[str, str]
 ) -> None:

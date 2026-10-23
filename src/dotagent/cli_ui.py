@@ -4,6 +4,7 @@ import asyncio
 import os
 import select
 import sys
+import termios
 import threading
 import time
 from collections.abc import Sequence
@@ -36,6 +37,10 @@ _ARG_PREVIEW_CHARS: int = 140
 _RESULT_PREVIEW_CHARS: int = 170
 _PREFERRED_ARGS: tuple[str, ...] = ("command", "url", "path", "query", "goal", "text", "title", "name")
 _CHILD_INDENT: str = "    │ "
+# The answers that allow a step at ``allow? [y/N]``, and those that say a hand-off was done (item 558): Enter, as its
+# prompt asks, or a yes; any other answer skips the hand-off rather than tell the run it happened.
+_YES_WORDS: frozenset[str] = frozenset({"y", "yes", "e", "evet"})
+_DONE_WORDS: frozenset[str] = frozenset({"", "done", *_YES_WORDS})
 
 
 def _lesson_mark(lesson: LessonView) -> str:
@@ -258,11 +263,26 @@ class UiOptions(FrozenModel):
     verbose: bool
 
 
-def _read_line_blocking(prompt: str, stop: threading.Event) -> str | None:
-    """Read one line from the terminal without ever blocking past ``stop`` (polls the raw descriptor)."""
+def _set_aside_typed(fd: int) -> bool:
+    """Discard what was typed at the terminal ``fd`` and not read yet: a line typed while a run worked (the next
+    message of a chat) was meant for something else, and must not answer the prompt for a decision that comes after it
+    (item 558). Whether a whole line was waiting. Standard input that is not a terminal (a pipe, a file) is kept: what
+    it holds was given for the prompts ahead."""
+    if not os.isatty(fd):
+        return False
+    waiting, _, _ = select.select([fd], [], [], 0)
+    termios.tcflush(fd, termios.TCIFLUSH)
+    return bool(waiting)
+
+
+def _read_line_blocking(prompt: str, stop: threading.Event, fresh: bool) -> str | None:
+    """Read one line from the terminal without ever blocking past ``stop`` (polls the raw descriptor). ``fresh``: only
+    a line typed at the prompt answers it, what was typed before is set aside (:func:`_set_aside_typed`)."""
+    fd: int = sys.stdin.fileno()
+    if fresh and _set_aside_typed(fd):
+        sys.stderr.write("    (what you typed before this question was set aside: answer it now)\n")
     sys.stderr.write(prompt)
     sys.stderr.flush()
-    fd: int = sys.stdin.fileno()
     collected: bytearray = bytearray()
     while not stop.is_set():
         ready, _, _ = select.select([fd], [], [], _STDIN_POLL_S)
@@ -279,11 +299,12 @@ def _read_line_blocking(prompt: str, stop: threading.Event) -> str | None:
     return None
 
 
-async def read_line(prompt: str) -> str | None:
-    """Prompt on stderr and read a line from stdin. ``None`` on end of input or when the task is cancelled."""
+async def read_line(prompt: str, fresh: bool = False) -> str | None:
+    """Prompt on stderr and read a line from stdin. ``None`` on end of input or when the task is cancelled. ``fresh``
+    (the prompts for a decision): a line typed before the prompt appeared is set aside, not taken as the answer."""
     stop: threading.Event = threading.Event()
     try:
-        return await asyncio.to_thread(_read_line_blocking, prompt, stop)
+        return await asyncio.to_thread(_read_line_blocking, prompt, stop, fresh)
     finally:
         stop.set()
 
@@ -663,23 +684,29 @@ class TerminalUi:
             await self._resolve(request, approve=False, note="no interactive terminal was available")
             return
         prompt: str = (
-            "    do this step yourself, then press Enter (or type 'skip')> " if handoff else "    allow? [y/N]> "
+            "    do this step yourself, then press Enter (any other answer skips it)> "
+            if handoff
+            else "    allow? [y/N]> "
         )
         reply: PromptReply = await self._read_unless_decided(request.approval_id, prompt)
         if reply.decided is not None:
             self._say_decided(reply.decided)
             return
+        answer: str | None = None if reply.line is None else reply.line.strip().lower()
         if handoff:
-            skipped: bool = reply.line is None or reply.line.strip().lower() == "skip"
-            await self._resolve(request, approve=not skipped, note="the user completed the step themselves")
+            done: bool = answer is not None and answer in _DONE_WORDS
+            note: str = (
+                "the user completed the step themselves" if done else "the user skipped the step in the terminal"
+            )
+            await self._resolve(request, approve=done, note=note)
             return
-        approved: bool = reply.line is not None and reply.line.strip().lower() in ("y", "yes", "e", "evet")
+        approved: bool = answer is not None and answer in _YES_WORDS
         await self._resolve(request, approve=approved, note="" if approved else "denied in the terminal")
 
     async def _read_unless_decided(self, approval_id: str, prompt: str) -> PromptReply:
         """The line typed at ``prompt`` for the approval ``approval_id``, unless the approval is decided first without
         it: on the pages of the daemon, whose decisions reach the runs of this command, or by the deadline."""
-        reading: asyncio.Task[str | None] = asyncio.create_task(read_line(prompt))
+        reading: asyncio.Task[str | None] = asyncio.create_task(read_line(prompt, fresh=True))
         settling: asyncio.Task[None] = asyncio.create_task(self._runtime.approvals.settled(approval_id))
         try:
             done, _ = await asyncio.wait({reading, settling}, return_when=asyncio.FIRST_COMPLETED)
