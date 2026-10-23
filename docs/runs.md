@@ -238,7 +238,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   deletes its schedule (`schedule_delete`) once the work is done for good. Right above the composer, in the bar that
   also says how long the run has worked and how its helpers stand (one pane of glass on a phone, item 401), a line shows
   each loop of the chat, how often it asks again ("every 30 minutes", and "every day at 10:00" for a schedule a run of
-  it made, where it read `cron 0 10 * * *` before item 590), when next, and a Stop that deletes it. A rhythm a cron
+  it made, where it read `cron 0 10 * * *` before item 590), when next, and a Stop that deletes it; the Stops stand in
+  one column, on a phone the message stands over how often it asks again, and the rows fold under a head that says how
+  many loops there are and, folded, when the next one asks, the fold kept in the browser (item 591). A rhythm a cron
   expression cannot keep exactly, or one shorter than `[scheduler] min_interval_s`, is refused (422); a new chat then
   starts nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going,
   whose campaign goes on by itself.
