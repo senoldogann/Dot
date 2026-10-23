@@ -1,6 +1,8 @@
 """Which network addresses the web tools may connect to: the public internet, unless the user allowed more."""
 
+import asyncio
 import ipaddress
+import socket
 from collections.abc import Sequence
 
 # IPv6 addresses whose last 32 bits are an IPv4 address: the well-known prefix of NAT64, which a gateway translates to
@@ -30,6 +32,33 @@ def is_public_address(address: str) -> bool:
     if carried is not None:
         parsed = carried
     return parsed.is_global and not parsed.is_multicast
+
+
+def is_private_text(address: str) -> bool:
+    """Whether ``address``, as Chrome or a resolver writes it (an IPv6 address may come in brackets), is not a public
+    one; text that is no address is not taken for one (item 554)."""
+    try:
+        return not is_public_address(address.strip("[]"))
+    except ValueError:
+        return True
+
+
+async def non_public_address(host: str) -> str | None:
+    """The first address of ``host`` that is not a public one, or ``None`` when every address it has is public or none
+    can be found (item 554). A host that is an address is judged as it is, a name by what it resolves to now: the rule
+    of the plain client (``web.allow_private_hosts``) for a page the browser read for the web tools."""
+    literal: str = host.strip("[]")
+    try:
+        ipaddress.ip_address(literal)
+    except ValueError:
+        pass
+    else:
+        return literal if is_private_text(literal) else None
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except (socket.gaierror, UnicodeError):
+        return None
+    return next((str(info[4][0]) for info in infos if is_private_text(str(info[4][0]))), None)
 
 
 def order_addresses(addresses: Sequence[str]) -> tuple[str, ...]:

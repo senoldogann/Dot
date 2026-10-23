@@ -19,6 +19,7 @@ from dotagent.browser.chrome_import import (
     import_chrome_profile,
 )
 from dotagent.browser.keychain import read_keychain_mode, write_keychain_mode
+from dotagent.browser.profile_lock import IMPORT_LOCK, held_for_import, held_for_start
 from dotagent.core.errors import BrowserError
 from dotagent.core.paths import browser_incognito_dir
 
@@ -86,6 +87,49 @@ def test_an_open_chrome_or_an_unknown_profile_is_refused_and_nothing_is_changed(
     assert read_keychain_mode(dot_profile) == "mock"
 
 
+def test_an_import_waits_for_no_start_and_a_start_waits_for_no_import(tmp_path: Path) -> None:
+    """Item 554: Dot's own Chrome starts on a profile no Chrome has open, so the profile is held while it starts and
+    while an import swaps files in: neither runs under the other, and the one refused says so at once."""
+    data_dir: Path = make_chrome(tmp_path / "Chrome")
+    dot_profile: Path = _dot_profile_with_sign_ins(tmp_path / "dot")
+    before: dict[str, bytes] = _files(dot_profile)
+    with held_for_start(dot_profile), held_for_start(dot_profile):
+        with pytest.raises(BrowserError, match="starting on this profile"):
+            import_chrome_profile(data_dir, "Default", dot_profile)
+        assert _files(dot_profile) == before
+    with held_for_import(dot_profile):
+        with pytest.raises(BrowserError, match="being imported"), held_for_start(dot_profile):
+            raise AssertionError("a start began under an import")
+        with pytest.raises(BrowserError, match="another import"):
+            import_chrome_profile(data_dir, "Default", dot_profile)
+    assert import_chrome_profile(data_dir, "Default", dot_profile).cookies == 1
+    with held_for_start(dot_profile):
+        pass
+
+
+def test_a_start_that_begins_while_an_import_runs_is_refused_and_the_lock_goes_with_the_import(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_dir: Path = make_chrome(tmp_path / "Chrome")
+    dot_profile: Path = tmp_path / "dot"
+    refused: list[str] = []
+    real_stage: Callable[[Path, Path], tuple[int, int]] = chrome_import._stage_cookies
+
+    def stage_while_a_start_tries(source: Path, staged: Path) -> tuple[int, int]:
+        try:
+            with held_for_start(dot_profile):
+                raise AssertionError("a start began under an import")
+        except BrowserError as error:
+            refused.append(error.message)
+        return real_stage(source, staged)
+
+    monkeypatch.setattr(chrome_import, "_stage_cookies", stage_while_a_start_tries)
+    assert import_chrome_profile(data_dir, "Default", dot_profile).cookies == 1
+    assert len(refused) == 1 and "being imported" in refused[0], refused
+    with held_for_start(dot_profile):
+        pass
+
+
 def _dot_profile_with_sign_ins(folder: Path) -> Path:
     """A Dot profile that already holds a cookie, a local storage and the marker of the mock keychain."""
     cookies: Path = folder / "Default" / "Cookies"
@@ -105,8 +149,13 @@ def _dot_profile_with_sign_ins(folder: Path) -> Path:
 
 def _files(profile: Path) -> dict[str, bytes]:
     """What the profile holds, file by file; its preferences too, as the word that keeps the session cookies is the last
-    thing an import writes, so a failed one leaves them as they were."""
-    return {str(path.relative_to(profile)): path.read_bytes() for path in sorted(profile.rglob("*")) if path.is_file()}
+    thing an import writes, so a failed one leaves them as they were. The empty file an import locks stays (item 554)
+    and is no part of the profile."""
+    return {
+        str(path.relative_to(profile)): path.read_bytes()
+        for path in sorted(profile.rglob("*"))
+        if path.is_file() and path.name != IMPORT_LOCK
+    }
 
 
 @pytest.mark.parametrize("fails_at", range(1, 7))

@@ -58,22 +58,30 @@ class EngineBench:
 
 
 class AnswerMemory:
-    """The outcomes of recent queries, so the same query asked again within ``MEMORY_S`` costs no engine anything."""
+    """The outcomes of recent queries, so the same query asked again within ``MEMORY_S`` costs no engine anything. An
+    answer is the one of its rungs and of the count it was asked for (item 554): a larger ask, or the same query on
+    another ladder (``search_backend`` changed), is a new search, not the earlier, shorter or other answer."""
 
     def __init__(self) -> None:
-        self._kept: dict[str, tuple[float, SearchOutcome]] = {}
+        self._kept: dict[tuple[str, tuple[SearchEngine, ...]], tuple[float, int, SearchOutcome]] = {}
 
-    def recall(self, query: str, now: float) -> SearchOutcome | None:
-        found: tuple[float, SearchOutcome] | None = self._kept.get(memory_key(query))
-        if found is None or now - found[0] > MEMORY_S:
+    def recall(self, query: str, rungs: tuple[SearchEngine, ...], max_results: int, now: float) -> SearchOutcome | None:
+        """The outcome kept for ``query`` on ``rungs`` that was asked for at least ``max_results`` results, with its
+        age; ``None`` when there is none, or it is older than ``MEMORY_S``."""
+        found: tuple[float, int, SearchOutcome] | None = self._kept.get((memory_key(query), rungs))
+        if found is None or now - found[0] > MEMORY_S or found[1] < max_results:
             return None
-        return found[1].model_copy(update={"age_s": now - found[0]})
+        return found[2].model_copy(update={"age_s": now - found[0]})
 
-    def keep(self, query: str, outcome: SearchOutcome, now: float) -> None:
-        stale: list[str] = [key for key, (at, _) in self._kept.items() if now - at > MEMORY_S]
+    def keep(
+        self, query: str, rungs: tuple[SearchEngine, ...], max_results: int, outcome: SearchOutcome, now: float
+    ) -> None:
+        stale: list[tuple[str, tuple[SearchEngine, ...]]] = [
+            key for key, (at, _asked, _outcome) in self._kept.items() if now - at > MEMORY_S
+        ]
         for key in stale:
             del self._kept[key]
-        self._kept[memory_key(query)] = (now, outcome)
+        self._kept[(memory_key(query), rungs)] = (now, max_results, outcome)
 
 
 def memory_key(query: str) -> str:

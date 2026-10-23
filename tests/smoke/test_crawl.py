@@ -8,6 +8,7 @@ import dataclasses
 import json
 import re
 import threading
+import time
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -29,9 +30,10 @@ from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
 from dotagent.policy.engine import auto_review
 from dotagent.policy.types import ActionInfo, Decision
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.tools import web as web_tools
 from dotagent.tools.base import ToolResult
 from dotagent.tools.context import ToolContext
-from dotagent.web.extract import EXTRACT_TOOL
+from dotagent.web.extract import EXTRACT_TOOL, ExtractedField, Extraction
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -234,8 +236,10 @@ async def test_the_crawl_stays_in_scope_within_its_limits_renders_the_app_page_a
     assert "robots.txt disallows 1 of these addresses" in head and "/catalogue/private/secret.html" in head
     assert "more addresses were found within the scope but not read (limits)" in head
     fences: list[str] = [match.group(2) for match in _FENCE.finditer(result.text)]
-    assert len(fences) == 11
-    assert fences[0].startswith("# Catalogue\nSource:")
+    # The first fence holds what the pages and their links wrote of the index (item 554), the others the pages.
+    assert len(fences) == 12
+    assert head.count("<web_content") == 1 and "] http://" in fences[0] and "/blog/news.html" not in fences[0]
+    assert fences[1].startswith("# Catalogue\nSource:")
 
 
 @pytest.mark.browser
@@ -321,7 +325,9 @@ async def test_the_extraction_returns_typed_fields_with_quotes_checked_against_t
     )
     assert not result.is_error, result.text
     assert result.text.startswith("Extracted 3 of 3 sources; 1 values whose quote is not in the source")
-    data: list[JsonObject] = json.loads(result.text.split("\n", 1)[1])
+    fenced: re.Match[str] | None = _FENCE.search(result.text)
+    assert fenced is not None, result.text
+    data: list[JsonObject] = json.loads(fenced.group(2))
     assert [entry["fields"]["price"]["value"] for entry in data] == ["11,50 EUR", "12,50 EUR", "13,50 EUR"]  # type: ignore[index]
     assert [entry["fields"]["price"]["verified"] for entry in data] == [True, True, False]  # type: ignore[index]
     assert all(entry["fields"]["weight"]["verified"] for entry in data)  # type: ignore[index]
@@ -408,6 +414,50 @@ async def test_a_fast_model_paused_after_a_rate_limit_is_not_asked_again_and_the
     paused: str = rf"- {re.escape(name)}: {re.escape(SCRIPTED_MODEL)} \(rate limited until [^)]+\) cannot answer now; "
     assert re.search(rf"- {re.escape(name)}: the fast model is rate limited\n{paused}", first.text), first.text
     assert len(re.findall(paused, again.text)) == 2, again.text
+
+
+async def test_a_call_that_runs_out_of_time_returns_what_it_extracted_and_lists_the_rest(
+    runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 554: the executor cancels a call at its timeout and everything extracted so far went with it; the call
+    ends at its own time instead, with the extractions it has, the source it was in the middle of and the ones it did
+    not reach listed as not extracted."""
+    asked: list[str] = []
+
+    async def source_text(source: str, ctx: ToolContext) -> str:
+        return f"The text of {source}."
+
+    async def extraction(
+        router: object, model: str, timeout_s: float, thread: str, run: str, source: str, text: str, fields: object
+    ) -> Extraction:
+        asked.append(source)
+        if source.endswith("slow"):
+            await asyncio.sleep(60)
+        return Extraction(
+            source=source, fields={"price": ExtractedField(value="4,20 EUR", quote="4,20", verified=False)}
+        )
+
+    monkeypatch.setattr(web_tools, "_source_text", source_text)
+    monkeypatch.setattr(web_tools, "extract", extraction)
+    # Five seconds of working time: the margin takes the rest of the call's twenty.
+    monkeypatch.setattr(web_tools, "_EXTRACT_TIMEOUT_S", 20.0)
+    monkeypatch.setattr(web_tools, "_EXTRACT_MARGIN_S", 15.0)
+    monkeypatch.setattr(web_tools, "_EXTRACT_MIN_SOURCE_S", 1.0)
+    started: float = time.monotonic()
+    result, _ = await _call(
+        runtime,
+        "web_extract",
+        {
+            "sources": ["a.example/one", "a.example/slow", "a.example/three", "a.example/four"],
+            "fields": [{"name": "price", "description": "The price with its currency."}],
+        },
+        200_000,
+    )
+    assert time.monotonic() - started < 10.0
+    assert not result.is_error, result.text
+    assert result.text.startswith("Extracted 1 of 4 sources;"), result.text
+    assert "a.example/one" in result.text and asked == ["a.example/one", "a.example/slow"]
+    assert result.text.count("not extracted: the call's time ran out") == 3, result.text
 
 
 async def test_a_protected_file_is_refused_to_the_extraction_as_it_is_to_read_file(runtime: Runtime) -> None:

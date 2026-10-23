@@ -112,6 +112,9 @@ def page_png(path: Path, number: int, width: int) -> bytes:
         raise InvalidValueError("the PDF has no such page", {"path": str(path), "page": number, "pages": pages})
     page: object = CGPDFDocumentGetPage(document, number)
     shown: PageSize = _size(page)
+    if not (shown.width > 0 and shown.height > 0):
+        # A crop box with no width or no height (a malformed PDF): nothing to draw, nothing to divide by (item 554).
+        raise InvalidValueError("the page has no size", {"path": str(path), "page": number})
     height: int = max(1, round(width * shown.height / shown.width))
     if height > MOST_PAGE_HEIGHT:
         # A page far taller than wide would take gigabytes as a bitmap (item 386): it is refused, not drawn.

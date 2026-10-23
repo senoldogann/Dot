@@ -328,18 +328,26 @@ set (relayed by `[models] search`, Haiku 5.5 by default; the API bills $10 per 1
 failed search is not billed; `[web] anthropic_search = "first"` puts it before Ollama, `"off"` leaves it out), then the
 HTML pages of DuckDuckGo and Brave Search (no key), then DuckDuckGo opened in Dot's own Chrome when the run's browser is
 Dot's own with a visible window (its bot check runs there and passes; a headless Chrome is shown a CAPTCHA, measured
-2026-10-11). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave 90 seconds, SearXNG and the
-Anthropic rung 2 minutes) and the searches of that time skip it at once; the same query within 10 minutes is answered
-from memory. The first line of a result names the engine that answered, every rung skipped with its reason (for an
+2026-10-11). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave 90 seconds, Ollama 1 minute,
+SearXNG and the Anthropic rung 2 minutes) and the searches of that time skip it at once. An Anthropic answer in which
+the relay did not search is no result: the next rung is asked (a search that found nothing has its result block). The
+same query within 10 minutes is answered from memory, when it was asked of the same rungs for at least as many
+results; a larger `max_results` or another `search_backend` climbs again (item 554). The first line of a result names
+the engine that answered, every rung skipped with its reason (for an
 engine that answered with an error: the HTTP status and the start of what it said, secrets masked, so an engine that is
 down reads differently from one out of credit; the log's `search_engine_failed` and `search_engine_benched` carry the
 whole context), and the age of a remembered answer. Bing is not a rung: without a session its page answers some queries
 with the results of another query. `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web]
-allow_private_hosts` is set. A page that turns the plain request away (HTTP 401, 403, 429, 503 or 999, LinkedIn's
+allow_private_hosts` is set. A body is read as it comes and inflated a piece at a time (gzip or deflate, once): a body
+in more codings, or in one Dot does not read, is refused, so that a few hundred bytes of nested gzip are not gigabytes
+in memory (item 554). A page that turns the plain request away (HTTP 401, 403, 429, 503 or 999, LinkedIn's
 refusal) or shows little text without JavaScript is read in the run's Chrome, in a tab the owner does not work in that
 closes after the read: a scratch tab of Dot's own Chrome, or a tab opened behind the owner's in the owner's attached
-Chrome (item 98); the first line of the result says so. A host that refused a plain request once is remembered for the
-run, and the next fetch of that host goes to the browser first. The plain request itself sends the headers a browser's
+Chrome (item 98); the first line of the result says so. That Chrome is held to the same rule (item 554): a page it was
+served from a private or local address, in any hop of its redirects or where it landed, is not given back (the request
+for it may have been sent: a redirect of the page can have made Chrome send one, which a plain request would not),
+and the crawl's reading in the run's own tab holds the page it landed on to it likewise. A host that refused a plain
+request once is remembered for the run, and the next fetch of that host goes to the browser first. The plain request itself sends the headers a browser's
 address bar sends (`Sec-Fetch-*`, `Upgrade-Insecure-Requests`) with the same user agent. A page that refuses the browser
 too says that, with both answers, and names the next rung in one line: another source, `web_search` with the address as
 the query for the hosted search's snippet, or `browser_open` and Take over for a login wall. A page that is not there
@@ -355,10 +363,16 @@ within the limits of `[web.crawl]` (`max_pages` 50, `max_depth` 3, `concurrency`
 ask for less, never for more). Every page comes back as one clean text document (title, address, description, then the
 text as `web_fetch` renders it, at most `page_max_chars`), each in its own `<web_content>` fence, under an index that
 lists the pages with their depth, size and how they were read, the addresses left out and why, and how many more
-addresses were found within the scope but not read. A page that shows little text without JavaScript (fewer than 400
+addresses were found within the scope but not read. What the pages and their links wrote of the index (their
+addresses, their titles clipped to 200 characters, the addresses left out, the ones `robots.txt` disallows) stands in a
+fence of its own, and the lines outside it are Dot's; the links listed for a page that is not there, and the JSON of
+`web_extract`, are fenced the same way (item 554). A page that shows little text without JavaScript (fewer than 400
 characters and three or more script tags) is rendered once in Dot's own browser tab and read from the screen
 (`render = "auto"`; `"never"` fetches only, `"always"` renders every page); PDFs are read as `web_fetch` reads them. A
-page that turns the plain request away is read the way `web_fetch` reads one, in a tab the owner does not work in, and
+page that cannot be read (a character set nobody knows, a PDF that is locked or will not open) is left out with its
+reason, and the pages read stay (item 554); a level the page limit cuts goes on at its own depth, so no page is read
+past `max_depth` or listed one level too shallow. A page that turns the plain request away is read the way `web_fetch`
+reads one, in a tab the owner does not work in, and
 the index says so (`rendered; the plain request got HTTP 403, read in the browser`); its links are not followed. A page
 that refuses the browser too is left out with both answers. `robots.txt` is read once per host: with `robots = "report"`
 the addresses it disallows are named in the index but fetched, with `"obey"` they are left out. The crawl goes through
@@ -401,7 +415,9 @@ source does not hold is kept and marked `verified: false`, a claim to treat as o
 gave without a quote. A file's text goes to the fast model, so a file in a protected location is refused, as `read_file`
 refuses it. A source that cannot be read or extracted is listed under "Not extracted" with the reason; while the fast
 model is paused after a quota, rate-limit or key error, no source is read or sent to it, and each is listed with the
-pause (item 240). At most 20 sources and 20 fields per call.
+pause (item 240). At most 20 sources and 20 fields per call. A call has 10 minutes, and ends at its own time rather
+than at the tool timeout, which would lose every extraction already paid for (item 554): the source it is in when the
+time runs out and the ones it did not reach are listed under "Not extracted", and what was extracted comes back.
 
 A terminal session is for a program that does not run to its end by itself: one that asks questions (an installer,
 `npm create`, `ssh`), a REPL (`python3 -i`, `psql`), or a server that must stay up while the run goes on.

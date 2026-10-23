@@ -11,7 +11,7 @@ import asyncio
 import socket
 import threading
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -34,8 +34,9 @@ from playwright.async_api import (
 from starlette.types import Message, Receive, Scope, Send
 from test_browser import act, ref_of
 
+from dotagent.browser.pages import Tab
 from dotagent.browser.session import BrowserSession, no_runs_at_work
-from dotagent.browser.types import PageView, ScriptRun, Step
+from dotagent.browser.types import ActOutcome, PageView, ScriptRun, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import ForbiddenUrlError
 from dotagent.mcp.signin import CALLBACK_PATH
@@ -108,6 +109,7 @@ def _site_pages(inside: str, guarded: str) -> dict[str, str]:
 <a href="{inside}/popup" target="_blank">Open inside</a>
 <a href="{inside}/link">Inside link</a>
 <a href="/hop">Hop to inside</a>
+<a href="/hop" target="_blank">Hop in a new tab</a>
 <a href="{guarded}/">Guarded link</a>
 <a href="/hop-guarded">Hop to guarded</a>
 <a href="/allow">Allow sign-in</a>
@@ -141,6 +143,18 @@ def _site_handler(inside: str, guarded: str) -> type[BaseHTTPRequestHandler]:
             if path == "/allow":
                 # An authorization server that the owner allowed a sign-in on sends the browser back to the daemon.
                 self._redirect(f"{guarded}{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state")
+                return
+            if path == "/framed":
+                # A frame of another site (this Mac by its other name), which Chrome runs as a target of its own.
+                port: int | None = urlsplit(f"//{self.headers.get('Host', '')}").port
+                frame: str = f"<iframe src='http://localhost:{port}/frame-inner'></iframe>"
+                self._answer(f"<!doctype html><title>Framed</title><h1>Framed</h1>{frame}".encode(), "text/html")
+                return
+            if path == "/frame-inner":
+                # The page of that frame sends itself on to a page that redirects to the interface (item 554): a
+                # navigation the frame's own process starts, whose hop the tab's guard does not see.
+                script: str = "<script>setTimeout(() => { location.href = '/hop'; }, 300)</script>"
+                self._answer(f"<!doctype html><title>Inner</title><p>Inner</p>{script}".encode(), "text/html")
                 return
             if path == "/sw.js":
                 body: bytes = (
@@ -311,6 +325,14 @@ async def _settled(seconds: float = 0.5) -> None:
     await asyncio.sleep(seconds)
 
 
+async def _until(done: Callable[[], bool], within: float = _STARTUP_S) -> None:
+    """Wait until ``done`` is true, ``within`` seconds at most."""
+    deadline: float = time.monotonic() + within
+    while not done():
+        assert time.monotonic() < deadline, "what the test waits for did not happen"
+        await asyncio.sleep(0.05)
+
+
 async def test_a_popup_a_page_opens_to_the_interface_never_reaches_it(
     browser: BrowserSession, site: str, inside: str
 ) -> None:
@@ -436,6 +458,92 @@ async def test_a_link_that_redirects_to_the_interface_is_stopped(
     assert _InsideHandler.arrivals.items == []
 
 
+async def _popup_by_a_redirect(browser: BrowserSession, thread: str, site: str) -> ActOutcome:
+    """Click the link that opens a new tab whose page redirects to the interface."""
+    view: PageView = await browser.open_url(thread, f"{site}/", True)
+    return await act(browser, thread, [Step(action="click", ref=ref_of(view.body, 'link "Hop in a new tab"'))], False)
+
+
+async def test_a_popup_a_redirect_sends_to_the_interface_is_reset_as_it_is_taken_in(
+    browser: BrowserSession, site: str
+) -> None:
+    """Chrome tells of a popup only once its page answered, so a hop of its first redirect is sent before the tab's own
+    guard is up (item 554: the interface answered, 5 of 5 times); nothing of what it answers is read: the tab is reset
+    as the thread takes it in, the page it came from is told, and reading the tab shows a blank page."""
+    outcome: ActOutcome = await _popup_by_a_redirect(browser, "popup-hop", site)
+    assert outcome.stopped is not None and "new tab" in outcome.stopped, outcome
+    assert any("reset to a blank page" in note for note in outcome.view.notes), outcome.view.notes
+    assert [tab.index for tab in outcome.view.tabs] == [1, 2]
+    switched: PageView = await browser.switch_tab("popup-hop", 2, True)
+    assert switched.url == "about:blank" and switched.title == "" and "Inside" not in switched.body, switched
+    assert all("Inside" not in tab.title for tab in switched.tabs), switched.tabs
+
+
+async def test_a_tab_on_a_url_the_rules_forbid_is_left_before_anything_is_read_or_done_in_it(
+    browser: BrowserSession, site: str, inside: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Whatever put a tab on a URL the rules forbid (here the popup's redirect, with the check made as it is taken in
+    left out), every operation that reads the tab or acts in it resets it first and fails (item 554): its views, its
+    text and pictures, its steps (a click at a point needs no ref the page was read for), a wait for text, a script and
+    a scroll."""
+
+    async def never(self: BrowserSession, opener: object, tab: object) -> None:
+        return
+
+    monkeypatch.setattr(BrowserSession, "_leave_refused_popup", never)
+    operations: dict[str, Callable[[], Awaitable[object]]] = {
+        "snapshot": lambda: browser.snapshot("ops", True),
+        "find": lambda: browser.find("ops", "link", 5, True),
+        "links": lambda: browser.links("ops", "", 5, True),
+        "read_text": lambda: browser.read_text("ops", None, 0, 1000),
+        "screenshot": lambda: browser.screenshot("ops", True),
+        "scroll": lambda: browser.scroll("ops", "down", None, None, True),
+        "wait_text": lambda: browser.wait_text("ops", "Inside", 1.0, True),
+        "run_script": lambda: browser.run_script("ops", "document.title", 5.0, False),
+        "act": lambda: act(browser, "ops", [Step(action="click_at", x=20.0, y=20.0)], False),
+        "switch_tab": lambda: browser.switch_tab("ops", 2, True),
+    }
+    for name, operation in operations.items():
+        await _popup_by_a_redirect(browser, "ops", site)
+        thread = browser._threads["ops"]
+        thread.active = len(thread.tabs) - 1
+        assert browser.current_url("ops") == f"{inside}/chain", name
+        before: int = len(_InsideHandler.arrivals.of("/chain"))
+        with pytest.raises(ForbiddenUrlError) as refused:
+            await operation()
+        assert refused.value.url == f"{inside}/chain" and "Dot's own interface" in refused.value.reason, name
+        assert browser.current_url("ops") == "about:blank", name
+        assert len(_InsideHandler.arrivals.of("/chain")) == before, name
+        await browser.release_thread("ops")
+
+
+async def test_a_frame_that_a_redirect_sends_to_the_interface_is_left_for_a_blank_page(
+    browser: BrowserSession, site: str, inside: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A frame of another site is a target of Chrome's own, which the tab's guard does not reach: the hops of its
+    redirects are not held, and the frame shows the interface (item 554). The tab's views leave it for a blank page and
+    say so, as they leave a page of the tab itself."""
+    leave = BrowserSession._leave_refused_frames
+
+    async def never(self: BrowserSession, tab: Tab, after_read: bool) -> None:
+        return
+
+    # Without the check the frame's page is in the view: the page and the redirect are as they were measured.
+    monkeypatch.setattr(BrowserSession, "_leave_refused_frames", never)
+    await browser.open_url("frame-open", f"{site}/framed", True)
+    await _until(lambda: any(arrival.path == "/chain" for arrival in _InsideHandler.arrivals.items))
+    await _settled()
+    unchecked: PageView = await browser.snapshot("frame-open", True)
+    if "Inside Dot" not in unchecked.body:
+        pytest.skip("this Chrome holds the hop of a frame's redirect")
+    monkeypatch.setattr(BrowserSession, "_leave_refused_frames", leave)
+    left: PageView = await browser.snapshot("frame-open", True)
+    assert "Inside Dot" not in left.body and "Framed" in left.body, left
+    assert any("a frame of the page was on a URL that may not be opened" in note for note in left.notes), left.notes
+    frames: list[str] = [frame.url for frame in browser._tab_of("frame-open").page.frames]  # type: ignore[union-attr]
+    assert not any(url.startswith(inside) for url in frames), frames
+
+
 async def test_a_page_read_in_a_scratch_tab_is_stopped_on_the_way_too(
     browser: BrowserSession, site: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -453,8 +561,23 @@ async def test_a_page_read_in_a_scratch_tab_is_stopped_on_the_way_too(
     port: int | None = urlsplit(site).port
     for read in range(_READS):
         with pytest.raises(ForbiddenUrlError):
-            await browser.read_page(f"http://localhost:{port}/hop?read={read}")
+            await browser.read_page(f"http://localhost:{port}/hop?read={read}", public_only=False)
     assert _InsideHandler.arrivals.items == []
+
+
+async def test_a_page_read_for_the_web_tools_must_have_come_from_a_public_address(
+    browser: BrowserSession, site: str
+) -> None:
+    """The plain client reaches public addresses only; the browser that reads a page for the web tools when it turned
+    the plain request away is held to the same rule (item 554). This Mac is not public, a redirect to it included; with
+    ``[web] allow_private_hosts`` on the page is read as before."""
+    for url in (f"{site}/", f"{site}/hop-guarded"):
+        with pytest.raises(ForbiddenUrlError) as refused:
+            await browser.read_page(url, public_only=True)
+        assert "the web tools only reach the public internet" in refused.value.message, refused.value
+        assert refused.value.reason.startswith("it was served from "), refused.value
+    read = await browser.read_page(f"{site}/", public_only=False)
+    assert "Outside" in read.html and read.status == 200
 
 
 async def test_the_pages_and_resources_of_other_servers_load_as_before(browser: BrowserSession, site: str) -> None:

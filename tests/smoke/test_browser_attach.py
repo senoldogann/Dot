@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Literal
+from typing import ClassVar, Literal
 
 import httpx
 import pytest
@@ -38,7 +38,7 @@ from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession, RenderedDocument, no_runs_at_work
 from dotagent.browser.types import ActOutcome, Attachment, PageView, Screenshot, ScriptRun, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
-from dotagent.core.errors import BrowserError, ToolExecutionError
+from dotagent.core.errors import BrowserError, ForbiddenUrlError, ToolExecutionError
 from dotagent.core.paths import ensure_layout
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -409,7 +409,7 @@ async def test_a_page_is_read_quietly_in_a_tab_behind_the_users_and_the_tab_clos
     )
     try:
         assert session.quiet_reads and not session.human_like
-        rendered: RenderedDocument = await session.read_page(f"{site}/other")
+        rendered: RenderedDocument = await session.read_page(f"{site}/other", public_only=False)
         assert (rendered.url, rendered.status) == (f"{site}/other", 200)
         assert "Another page of the user" in rendered.html
         await wait_for_tabs(chrome.port, [f"{site}/mine"])
@@ -901,3 +901,155 @@ async def test_the_settings_card_says_what_a_switch_waits_for_and_how_chrome_sta
             await browser.close()
             for process in opened:
                 await stop_process(process)
+
+
+class _Interface(BaseHTTPRequestHandler):
+    """A server that stands for Dot's interface, on the port the session is told is the daemon's: its page is one big
+    control, and every request that reaches it is kept (item 554)."""
+
+    reached: ClassVar[list[str]] = []
+
+    def do_GET(self) -> None:
+        self.reached.append(self.path)
+        body: bytes = (
+            b"<!doctype html><title>Inside</title><h1>Inside Dot</h1>"
+            b'<div style="position:fixed;inset:0" onclick="fetch(\'/clicked\')"></div>'
+        )
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+
+def _bait_pages(interface: str) -> dict[str, str]:
+    return {
+        # A link that opens the interface in a new tab, a page that sends itself there when it has settled, and a page
+        # that holds it in a frame.
+        "/to-interface": f'<!doctype html><title>Bait</title><a href="{interface}/" target="_blank">Open it</a>',
+        # Links enough that the first view is not taken for a page still drawing, which would wait for the timer.
+        "/later": (
+            "<!doctype html><title>Later</title><h1>Later</h1><a href='#a'>A</a><a href='#b'>B</a><a href='#c'>C</a>"
+            f"<script>setTimeout(() => {{ location.href = '{interface}/'; }}, 800)</script>"
+        ),
+        "/framed": f'<!doctype html><title>Framed</title><h1>Framed</h1><iframe src="{interface}/"></iframe>',
+    }
+
+
+@pytest.fixture
+def interface() -> Iterator[str]:
+    _Interface.reached.clear()
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _Interface)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    server.server_close()
+
+
+@pytest.fixture
+def bait(interface: str) -> Iterator[str]:
+    pages: dict[str, str] = _bait_pages(interface)
+
+    class Bait(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            body: bytes = pages.get(self.path.split("?", 1)[0], "not found").encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), Bait)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    server.server_close()
+
+
+def _daemon_at(interface: str) -> ServerConfig:
+    """The daemon's address as the session knows it: the stand-in's own."""
+    port: int = int(interface.rsplit(":", 1)[1])
+    return SERVER.model_copy(update={"port": port})
+
+
+async def _until_reached(interface: str) -> None:
+    """Wait until the stand-in for the interface has been asked for its page."""
+    deadline: float = time.monotonic() + _TABS_TIMEOUT_S
+    while "/" not in _Interface.reached:
+        assert time.monotonic() < deadline, f"nothing reached {interface}"
+        await asyncio.sleep(_POLL_S)
+    await asyncio.sleep(_EVENT_GRACE_S)
+
+
+async def test_a_tab_a_page_opens_on_the_interface_is_reset_in_the_chrome_of_the_user(
+    chrome: ScratchChrome, attach_config: BrowserConfig, bait: str, interface: str, tmp_path: Path
+) -> None:
+    """Item 554: the Chrome of the user holds none of Dot's requests, so a link to a new tab that opens the interface
+    (the same site as a server of the run's own, whatever its port) is stopped by the check when the thread takes the
+    tab in and again when it is read: the opener is told, and the view is a blank page."""
+    session: BrowserSession = BrowserSession(
+        attach_config, _daemon_at(interface), chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        view: PageView = await session.open_url("agent", f"{bait}/to-interface", True)
+        opened: ActOutcome = await session.act(
+            "agent", [Step(action="click", ref=ref_of(view.body, 'link "Open it"'))], False, refuse_secret_field, True
+        )
+        assert any("reset to a blank page" in note for note in opened.view.notes), opened.view.notes
+        switched: PageView = await session.switch_tab("agent", 2, True)
+        assert switched.url == "about:blank" and "Inside" not in switched.body, switched
+        assert "/clicked" not in _Interface.reached
+    finally:
+        await session.aclose()
+
+
+async def test_a_page_that_sends_itself_to_the_interface_after_it_settled_takes_no_step_and_shows_nothing(
+    chrome: ScratchChrome, attach_config: BrowserConfig, bait: str, interface: str, tmp_path: Path
+) -> None:
+    """Item 554: a page that goes to the interface on a timer, after the view of it was taken, is reset before the
+    next step runs in it (a click at a point needs no ref the page was read for) and before the next view shows it."""
+    session: BrowserSession = BrowserSession(
+        attach_config, _daemon_at(interface), chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        for read in ("act", "snapshot"):
+            await session.open_url(read, f"{bait}/later", True)
+            await _until_reached(interface)
+            with pytest.raises(ForbiddenUrlError) as refused:
+                if read == "act":
+                    await session.act(read, [Step(action="click_at", x=20.0, y=20.0)], False, refuse_secret_field, True)
+                else:
+                    await session.snapshot(read, True)
+            assert refused.value.url == f"{interface}/", read
+            assert session.current_url(read) == "about:blank", read
+            _Interface.reached.clear()
+        assert "/clicked" not in _Interface.reached
+    finally:
+        await session.aclose()
+
+
+async def test_a_frame_that_holds_the_interface_is_left_for_a_blank_page_in_the_chrome_of_the_user(
+    chrome: ScratchChrome, attach_config: BrowserConfig, bait: str, interface: str, tmp_path: Path
+) -> None:
+    """Item 554: a page that frames the interface is shown without the frame, and with a note that it was left."""
+    session: BrowserSession = BrowserSession(
+        attach_config, _daemon_at(interface), chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        opened: PageView = await session.open_url("agent", f"{bait}/framed", True)
+        await _until_reached(interface)
+        view: PageView = await session.snapshot("agent", True)
+        # The frame was left by the first view or by the second, whichever found it on the interface.
+        assert "Inside Dot" not in opened.body + view.body and "Framed" in view.body, (opened, view)
+        notes: tuple[str, ...] = opened.notes + view.notes
+        assert any("a frame of the page was on a URL that may not be opened" in note for note in notes), notes
+        await session.act("agent", [Step(action="click_at", x=20.0, y=300.0)], False, refuse_secret_field, True)
+        assert "/clicked" not in _Interface.reached
+    finally:
+        await session.aclose()

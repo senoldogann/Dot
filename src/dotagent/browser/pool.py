@@ -52,6 +52,17 @@ class BrowserPool:
             self._others[mode] = found
         return found
 
+    async def retire_other(self, mode: BrowserMode) -> None:
+        """Close and forget the session kept for ``mode`` besides the main one (item 554), before the main session
+        switches into that mode: from then on :meth:`session_for` hands out the main session for it, and the other would
+        keep its own Chrome, if it started one, on the profile the main session must start on (``the Dot browser profile
+        is open in another process``), with nothing in Settings to close it. The caller has refused the switch while
+        runs are active, so no chat works in it."""
+        other: BrowserSession | None = self._others.pop(mode, None)
+        if other is not None:
+            await other.aclose()
+            _log.info("browser_session_retired", mode=mode, profile=str(other.profile_dir))
+
     def chrome_pids(self) -> frozenset[int]:
         """The Chromes the sessions work in, by the pid that holds each one's profile: Dot's own Chrome while it runs,
         and the Chrome of the user. A name that fits several Chromes means one of these on the desktop (item 343)."""

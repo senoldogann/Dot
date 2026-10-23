@@ -17,7 +17,10 @@ the sites Dot should use with your accounts:
 - `dotx browser import-chrome [--profile "Profile 1"] [--replace]` copies the cookies and the local storage of a profile
   of your Chrome into Dot's profile, so the accounts that are open in your Chrome are open for Dot too. Quit Chrome
   first. If the Dot service has its browser open, stop it for the import (`dotx service uninstall`, import,
-  `dotx service install`). Your Chrome profile is only read and nothing is decrypted; the cookie values stay encrypted
+  `dotx service install`). The import holds Dot's profile while it copies and swaps the files in (item 554): a browser
+  call of the service that would start Dot's Chrome on it meanwhile fails at once, saying an import is under way, and
+  an import is refused while Dot's Chrome is starting on the profile. Your Chrome profile is only read and nothing is
+  decrypted; the cookie values stay encrypted
   with the key that Chrome keeps in the Keychain, which Chrome itself reads when Dot's browser starts (macOS may ask
   once; choose Always Allow). The command ends by counting the cookies Chrome can read, and says when it reads fewer
   than it was given. The copy is a snapshot: a sign-in that expires or rotates needs a new import, and a site that keeps
@@ -75,7 +78,9 @@ The mode can also switch without a restart: Settings › Browser in the web UI, 
 `{"mode": "own"}` or `{"mode": "attach"}`. The live switch runs the same one-blank-tab proof; it is refused with 409
 while runs are active, and a failed proof leaves the session in the Chrome it had (422). When your Chrome is closed,
 the live switch opens it first, as a click on its icon does, and waits up to 30 seconds for it to start and 10 more for
-it to listen; with remote debugging off, the switch then says how to turn it on (item 261). While the switch is under
+it to listen; with remote debugging off, the switch then says how to turn it on (item 261). A session a campaign had
+made for the mode that is switched to (`browser = "own"` or `"attach"` on the campaign) is closed first, so that its
+Chrome does not keep the profile the switched session starts on (item 554). While the switch is under
 way, Settings says what it waits for, and after a failed one it shows how Chrome stands. Runs, campaigns and
 `dotx browser attach` never open Chrome; `dotx browser attach` and `dotx browser detach` only write the mode, which the
 service takes up on its next start. The same tab's switch "Bring
@@ -195,14 +200,21 @@ Both modes share what follows.
   element and what to do about it (close or answer the box, or press Escape). A page whose script holds it, so that it
   answers nothing, fails a step within two seconds, saying so, and a view of it hides a filled field it could not ask
   about (item 471).
-- Password, one-time-code and card fields are never filled by Dot outside `yolo`: there the step is refused, and the
-  browser is yours to take over; in `yolo` the run fills the field itself and the record of the step says why it would
-  have asked (items 429 and 443, see [Safety](safety.md#safety)), once the review model let it through when the run
-  read outside content (item 525). Outside `yolo` the run never reads such a field's
-  value either: the page's lines show `[hidden]` and a screenshot covers the field (item 467). Cookie banners
-  are declined (`decline_cookie_banners`; a click on a banner that goes away under it is no error, and one that fails
-  with the banner still there is logged as `consent_decline_failed` with the page's address, and why the banner could
-  not be counted when it could not).
+- Password, one-time-code and card fields are never filled by a step of `browser_act` outside `yolo`: there the step
+  is refused, and the browser is yours to take over; in `yolo` the run fills the field itself and the record of the
+  step says why it would have asked (items 429 and 443, see [Safety](safety.md#safety)), once the review model let it
+  through when the run read outside content (item 525). A login of your 1Password is the one other way in, in every
+  mode (item 493): `browser_logins` lists the logins Dot may fill (titles and websites), and `browser_fill_login` fills
+  one into the current page, each fill asking you first outside `yolo`. Dot fills it, not the model, and the values
+  show in no result of the chat's tools. It fills only on the login's own site, never a password or a code in your own
+  Chrome (`attach`: that Chrome's requests are not held, so nothing would keep a value out of an address), and not in a
+  chat in which a script (`browser_eval`) ran in a tab that is still open; once it filled one, no script runs in the
+  chat's tabs while that tab is open. [Safety](safety.md#safety) has the whole of it. Outside `yolo` the run never reads
+  such a field's value either: the page's lines show `[hidden]` and a screenshot covers the field (item 467). A
+  `<select>` that takes a card's expiry (`autocomplete="cc-exp-month"` or `cc-exp-year`) is one of those fields (item
+  554). Cookie banners are declined (`decline_cookie_banners`; a click on a banner that goes away under it is no
+  error, and one that fails with the banner still there is logged as `consent_decline_failed` with the page's address,
+  and why the banner could not be counted when it could not).
 - A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
 - With `idle_close_s` set (seconds; 0, the default, keeps it open until the daemon stops; item 454), Dot's own Chrome
   (`own`) closes, the Playwright driver with it, once nothing used it for that long: no chat's step is under way in it,
@@ -213,24 +225,33 @@ Both modes share what follows.
   Chrome in the Dock brings Dot's forward instead of opening yours. Once Dot's has closed, the Dock opens yours again;
   while a run works in its browser, the mode `attach` lets Dot work in your own Chrome instead.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
-  matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the cloud-metadata
-  hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any spelling
+  matches its subdomains, and an empty `allowed_hosts` means every site. An entry is read as a host is, so that one
+  spelling names a host in all of them: an international name written in Unicode or in punycode, with the dot of an
+  absolute name, or as a numeric address (item 554). The blocked list starts with the cloud-metadata hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any spelling
   (`localhost`, `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be signed in
   there. One page of it passes: the one a sign-in comes back to (`/oauth/callback` on this Mac at `[server] port`),
   which macOS may open in Dot's own Chrome when you sign in from Customize; Chrome opens it as a page and nothing else
   of the interface, and a run whose tab lands there still has the tab reset (item 448). A server of this Mac on another
   port opens as any site. In Dot's own Chrome every request is checked as Chrome sends it, not only the address a tool
-  opens: a page (in a tab or a popup, and each hop of a redirect) must pass both lists, and anything a page loads (a
-  script, a picture, a fetch, a worker) must be neither a blocked host nor Dot's interface, so a page of an allowed site
-  still loads its parts from wherever it keeps them; what a page makes itself (`blob:` and `data:` addresses) reaches no
+  opens: a page (in a tab, and each hop of a redirect) must pass both lists, and anything a page loads (a script, a
+  picture, a fetch, a worker) must be neither a blocked host nor Dot's interface, so a page of an allowed site still
+  loads its parts from wherever it keeps them; what a page makes itself (`blob:` and `data:` addresses) reaches no
   server and passes. In your Chrome (`mode = "attach"`) Dot holds none of its requests, so as not to slow or stall your
-  own tabs; a tab of Dot's that lands on a refused address is reset. Whatever the browser, the daemon itself refuses a
-  navigation to its interface that a page of another site started (`Sec-Fetch-Site: cross-site`), save to the page a
-  sign-in comes back to and to the pages runs showed. A host is read the way Chrome reads it (international names, the
-  numeric spellings of an IPv4 address, a trailing dot), and an address with a backslash before its query is refused. A
-  new tab's first page waits until Dot checks each hop of its redirects. A page that cancels a request while Dot is
-  judging it makes Chrome refuse the verdict ("Invalid InterceptionId"); that is logged only at debug level, and any
-  other refusal as `browser_hop_unanswered`.
+  own tabs. What is not held is judged where it lands (item 554): a tab of Dot's on a refused address, and a frame of
+  its page on one, is reset before anything is read from it or done in it. Every view, text, picture and search of a
+  tab, every step, script, scroll, wait and upload asks first; a tab a page opens (a popup) is asked as the chat takes
+  it in, and a page of the tab that goes there on a timer, after it was read, is found by the next call, which fails
+  and says so. A frame is left for a blank page, with a note, and a frame that goes there while the page is read fails
+  that read. Whatever the browser, the daemon itself refuses a navigation to its interface that a page of another site
+  started (`Sec-Fetch-Site: cross-site`), save to the page a sign-in comes back to and to the pages runs showed. A host
+  is read the way Chrome reads it (international names, the numeric spellings of an IPv4 address, a trailing dot), and
+  an address with a backslash before its query is refused. A tab Dot opens waits until Dot checks each hop of its
+  redirects. Chrome tells of a popup only once its page has answered, so the hops of the popup's first redirect, and of
+  a redirect that a frame of another site starts by itself, are sent before Dot can ask about them (Dot's own Chrome
+  as well): a hop to a refused address reaches its server, and nothing of the answer is read, since the popup or frame
+  is reset when it is taken in or read. A page that cancels a request while Dot is judging it makes Chrome refuse the
+  verdict ("Invalid InterceptionId"); that is logged only at debug level, and any other refusal as
+  `browser_hop_unanswered`.
 - `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
   the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and
@@ -241,7 +262,10 @@ Both modes share what follows.
 - `remote_input = true` (the default) lets you use the page of a run you hold from the screen that shows it, a phone's
   too (item 470): the run is held as for Take over, nothing comes to the front of the Mac, and your taps, scrolls and
   keys go to the page while the run waits. Nothing of what you type is kept. A tab a tap opens is not the one the
-  picture shows. Settings › Browser switches it.
+  picture shows. Settings › Browser switches it. Taking a run over, on the Mac or from the screen, first gives you a
+  page no script of the run is in, when one (`browser_eval`) ran in the chat's tabs: it could have left a listener that
+  copies what you type, so the chat's other tabs close and the current page is opened again from its address (a form
+  it was the answer of is not sent again), and the run's next view says so (item 554).
 - `headless = true` hides the window. Starting Chrome and loading the first page took about 2 seconds with it on an
   Apple-silicon Mac; later calls take well under a second. When Chrome crashes or the connection to it is lost, the
   next call starts it again.
@@ -279,7 +303,10 @@ A browser without a window refuses to record (there is nothing for the owner to 
 a second recording is refused while the first goes on, as is one started while a run works in that chat (a run's own
 clicks are real ones, and a step of them would read as the owner's; while a run is at work in the chat mid-recording, its
 steps are not taken). A recording is only ever of the tab it was started on and only while it goes on: closing the panel,
-or the tab, throws it away.
+or the tab, throws it away. The recorder reports through a binding in the page's own world, so a script of the page
+can call it too and add steps the owner never took, as the labels of the page's own buttons already are the page's words
+(item 554): a recording keeps at most 400 steps, and when it is full the skill writer is told the rest was not kept. The
+owner reads the steps, and the skill drafted from them, before saving it, as above.
 
 ## Computer use
 

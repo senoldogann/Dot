@@ -19,6 +19,7 @@ from dotagent.agent.helpers import Unavailable, paused_model, unavailable_text
 from dotagent.browser.safety import hides_secrets, url_flags
 from dotagent.browser.session import RenderedDocument
 from dotagent.browser.snapshot import fence_untrusted
+from dotagent.browser.types import PageView
 from dotagent.config import AppConfig
 from dotagent.core.errors import BrowserError, ProviderError, ToolExecutionError, ToolInputError, WebError
 from dotagent.core.text import text_window
@@ -42,6 +43,7 @@ from dotagent.tools.browser import checked_url, masked_tool
 from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_flags, resolve_path
 from dotagent.tools.third_party import CRAWL_FOLDER
+from dotagent.web.addresses import non_public_address
 from dotagent.web.crawl import (
     CrawledPage,
     CrawlResult,
@@ -69,8 +71,14 @@ _FETCH_TIMEOUT_S: float = 90.0
 _SEARCH_TIMEOUT_S: float = 90.0
 _CRAWL_TIMEOUT_S: float = 900.0
 _EXTRACT_TIMEOUT_S: float = 600.0
+# What web_extract keeps of its own time for the result, and the least a source is begun with (item 554).
+_EXTRACT_MARGIN_S: float = 15.0
+_EXTRACT_MIN_SOURCE_S: float = 5.0
+_TIME_RAN_OUT: str = "not extracted: the call's time ran out; ask for these sources in another call"
 _MAX_SOURCES: int = 20
 _MAX_FIELDS: int = 20
+# The longest title of a page the index of a crawl carries (item 554): a page's <title> has no limit of its own.
+_INDEX_TITLE_CHARS: int = 200
 # A plain request turned away: the page is read in the browser instead when the run may read quietly (items 59, 98).
 _UNREADABLE_STATUS: frozenset[int] = REFUSED_STATUS
 # What the result says when the browser was refused too (item 98): the next rung, in one line.
@@ -242,8 +250,9 @@ def render_http_failure(
             "words) or web_crawl of the host, or pick one of the links below."
         )
         if likely:
+            # The front page wrote them, spaces and words of its own among them: they stand in a fence (item 554).
             lines.append("Links on the host's front page that share a word with the address asked for:")
-            lines.extend(f"- {link}" for link in likely)
+            lines.append(fence_untrusted(front_page(document.url), "\n".join(f"- {link}" for link in likely), nonce))
         elif front_problem:
             lines.append(f"The host's front page could not be read either: {front_problem}")
         else:
@@ -303,13 +312,19 @@ def render_browser_failure(shown_url: str, why: str, status: int, excerpt: str, 
     return "\n".join(lines)
 
 
+def _public_only(ctx: ToolContext) -> bool:
+    """Whether a page the browser reads for the web tools must have been served from public addresses, as the plain
+    client holds every request to them (``[web] allow_private_hosts`` off, item 554)."""
+    return not ctx.runtime.config.web.allow_private_hosts
+
+
 async def _fetch_in_browser(ctx: ToolContext, args: FetchArgs, url: str, shown_url: str, why: str) -> ToolResult:
     """Read ``url`` in the run's browser because the plain request did not do (``why`` says what it got), and render
     the page the way a plain fetch is rendered, with a first line that says how it was read. A browser that cannot
     open the page raises :class:`BrowserError`; the caller falls back to the plain answer and says so."""
     config: AppConfig = ctx.runtime.config
     nonce: str = _nonce()
-    rendered: RenderedDocument = await ctx.browser.read_page(url)
+    rendered: RenderedDocument = await ctx.browser.read_page(url, public_only=_public_only(ctx))
     document: FetchedDocument = browser_document(rendered)
     readable: _Readable = await _readable(document, "html", config.web.fetch_max_bytes)
     if not 200 <= document.status < 300:
@@ -474,7 +489,7 @@ def _page_reader(ctx: ToolContext) -> ReadPage | None:
 
     async def read(url: str) -> str:
         try:
-            return (await ctx.browser.read_page(url)).html
+            return (await ctx.browser.read_page(url, public_only=_public_only(ctx))).html
         except BrowserError as error:
             raise WebError(f"Dot's browser could not open the search: {error.message}", dict(error.context)) from error
 
@@ -572,29 +587,34 @@ def page_markdown(page: CrawledPage) -> str:
     return "\n".join(lines)
 
 
-def render_index(result: CrawlResult, files: tuple[Path, ...]) -> str:
+def render_index(result: CrawlResult, files: tuple[Path, ...], nonce: str) -> str:
     """The index of a crawl: one line per page (its number, depth, size, how it was read and, when the pages were
-    written to files, its file), the addresses left out, what robots.txt said and whether a limit cut the crawl."""
+    written to files, its file), the addresses left out, what robots.txt said and whether a limit cut the crawl. What
+    the pages and their links wrote (an address a redirect ended on, a title, the addresses robots.txt disallows) is
+    third parties' text, so those lines stand in one ``<web_content>`` fence, the title clipped, and the lines Dot
+    writes (the counts, what was read how, the limits) outside it (item 554)."""
     lines: list[str] = [
         f"Crawled {len(result.pages)} pages from {result.start} ({result.scope.kind} scope, {result.scope.url}) in "
         f"{result.seconds:.1f} s."
     ]
+    listed: list[str] = []
     for number, page in enumerate(result.pages, start=1):
         how: str = "rendered" if page.rendered else page.kind
         note: str = f"; {page.problem}" if page.problem else ""
         file: str = f"  -> {files[number - 1]}" if files else ""
-        lines.append(
-            f"{number}. [{page.depth}] {page.url}  {page.title or '(no title)'}  {len(page.text)} chars, "
-            f"{how}{note}{file}"
-        )
+        title: str = _clip(page.title, _INDEX_TITLE_CHARS) or "(no title)"
+        listed.append(f"{number}. [{page.depth}] {page.url}  {title}  {len(page.text)} chars, {how}{note}{file}")
     if result.skipped:
-        lines.append(f"Left out ({len(result.skipped)}):")
-        lines.extend(f"- {entry.url}: {entry.reason}" for entry in result.skipped)
+        listed.append(f"Left out ({len(result.skipped)}):")
+        listed.extend(f"- {entry.url}: {entry.reason}" for entry in result.skipped)
+    if result.robots.disallowed:
+        listed.append("Disallowed by robots.txt" + (" (the first 10):" if len(result.robots.disallowed) > 10 else ":"))
+        listed.extend(f"- {address}" for address in result.robots.disallowed[:10])
+    if listed:
+        lines.append(fence_untrusted(result.start, "\n".join(listed), nonce))
     if result.robots.disallowed:
         lines.append(
-            f"robots.txt disallows {len(result.robots.disallowed)} of these addresses: "
-            + ", ".join(result.robots.disallowed[:10])
-            + (" …" if len(result.robots.disallowed) > 10 else "")
+            f"robots.txt disallows {len(result.robots.disallowed)} of these addresses (named in the block above)."
         )
     elif result.robots.hosts:
         lines.append("robots.txt was read and disallows none of these addresses.")
@@ -605,7 +625,7 @@ def render_index(result: CrawlResult, files: tuple[Path, ...]) -> str:
     return "\n".join(lines)
 
 
-def _crawl_files(root: Path, result: CrawlResult) -> tuple[Path, ...]:
+def _crawl_files(root: Path, result: CrawlResult, nonce: str) -> tuple[Path, ...]:
     """Write every page of the crawl as a Markdown file under ``root`` and the index next to them."""
     root.mkdir(parents=True, exist_ok=False)
     files: list[Path] = []
@@ -614,7 +634,7 @@ def _crawl_files(root: Path, result: CrawlResult) -> tuple[Path, ...]:
         file.write_text(page_markdown(page), encoding="utf-8")
         files.append(file)
     written: tuple[Path, ...] = tuple(files)
-    (root / "index.md").write_text(render_index(result, written) + "\n", encoding="utf-8")
+    (root / "index.md").write_text(render_index(result, written, nonce) + "\n", encoding="utf-8")
     return written
 
 
@@ -622,7 +642,16 @@ def _renderer_for(ctx: ToolContext) -> Renderer:
     """A page shown in the run's browser tab: its visible text after JavaScript ran."""
 
     async def render(url: str, max_chars: int) -> str:
-        await ctx.browser.open_url(ctx.thread_id, url, hides_secrets(ctx.approvals))
+        view: PageView = await ctx.browser.open_url(ctx.thread_id, url, hides_secrets(ctx.approvals))
+        # The rule of the plain client holds for the page the crawl asked to see: where a redirect or a name pointed at
+        # the local network led is not read for it (item 554). The tab stays where it is, as the run's own.
+        private: str | None = await non_public_address(urlsplit(view.url).hostname or "") if _public_only(ctx) else None
+        if private is not None:
+            raise BrowserError(
+                "the page is on a private or local network address; the web tools only reach the public internet "
+                "(web.allow_private_hosts)",
+                {"url": _clip(view.url, _SHOWN_URL_CHARS), "address": private},
+            )
         return (await ctx.browser.read_text(ctx.thread_id, None, 0, max_chars)).text
 
     return render
@@ -634,7 +663,7 @@ def _quiet_renderer_for(ctx: ToolContext) -> Renderer | None:
         return None
 
     async def render(url: str, max_chars: int) -> str:
-        rendered: RenderedDocument = await ctx.browser.read_page(url)
+        rendered: RenderedDocument = await ctx.browser.read_page(url, public_only=_public_only(ctx))
         if not 200 <= rendered.status < 300:
             raise BrowserError(f"the browser got HTTP {rendered.status} too", {"url": url})
         page: ReadablePage = await asyncio.to_thread(html_to_text, rendered.html, rendered.url)
@@ -669,21 +698,22 @@ def _crawl_tool() -> RegisteredTool:
         result: CrawlResult = await crawl(
             ctx.runtime.web, config.web, url, scope, max_pages, max_depth, renderer, _quiet_renderer_for(ctx)
         )
-        if not result.pages:
-            return fail(render_index(result, ()))
         nonce: str = _nonce()
+        if not result.pages:
+            # The addresses left out are the pages' own words too.
+            return mark_untrusted(fail(render_index(result, (), nonce)))
         inline: str = "\n\n".join(fence_untrusted(page.url, page_markdown(page), nonce) for page in result.pages)
         budget: int = _text_budget(ctx.output_chars)
         if len(inline) <= budget:
-            return mark_untrusted(ok(f"{render_index(result, ())}\n\n{inline}"))
+            return mark_untrusted(ok(f"{render_index(result, (), nonce)}\n\n{inline}"))
         host: str = scope.url.split("//", 1)[-1].split("/", 1)[0].replace(":", "-")
         root: Path = ctx.workspace / CRAWL_FOLDER / f"{host}-{time.strftime('%Y%m%d-%H%M%S')}-{nonce[:6]}"
-        files: tuple[Path, ...] = await asyncio.to_thread(_crawl_files, root, result)
+        files: tuple[Path, ...] = await asyncio.to_thread(_crawl_files, root, result, nonce)
         return mark_untrusted(
             ok(
-                f"{render_index(result, files)}\n\nThe pages are {len(inline)} characters in all, more than one result "
-                f"holds, so each is a Markdown file under {root} (index.md lists them). Read the ones you need with "
-                "read_file, or pass their paths to web_extract."
+                f"{render_index(result, files, nonce)}\n\nThe pages are {len(inline)} characters in all, more than one "
+                f"result holds, so each is a Markdown file under {root} (index.md lists them). Read the ones you need "
+                "with read_file, or pass their paths to web_extract."
             )
         )
 
@@ -755,9 +785,10 @@ async def _source_text(source: str, ctx: ToolContext) -> str:
         raise ToolInputError(f"{source} cannot be read as a text file: {exc}", {"source": source}) from exc
 
 
-def render_extractions(extractions: tuple[Extraction, ...], problems: tuple[tuple[str, str], ...]) -> str:
+def render_extractions(extractions: tuple[Extraction, ...], problems: tuple[tuple[str, str], ...], nonce: str) -> str:
     """The extractions as JSON, one object per source with every field's value, quote and whether the quote is in
-    the source, then the sources that could not be read or extracted."""
+    the source, then the sources that could not be read or extracted. The JSON is the fast model's words about pages
+    third parties wrote, values and verbatim quotes, so it stands in a ``<web_content>`` fence (item 554)."""
     data: list[JsonObject] = [
         {
             "source": extraction.source,
@@ -774,7 +805,11 @@ def render_extractions(extractions: tuple[Extraction, ...], problems: tuple[tupl
     lines: list[str] = [
         f"Extracted {len(extractions)} of {len(extractions) + len(problems)} sources; "
         f"{unverified} values whose quote is not in the source (verified: false): treat those as claims.",
-        json.dumps(data, ensure_ascii=False, indent=1),
+        fence_untrusted(
+            _clip(", ".join(extraction.source for extraction in extractions), _SHOWN_URL_CHARS),
+            json.dumps(data, ensure_ascii=False, indent=1),
+            nonce,
+        ),
     ]
     if problems:
         lines.append("Not extracted:")
@@ -800,7 +835,15 @@ def _extract_tool() -> RegisteredTool:
         fast: str = ctx.runtime.roles.fast()
         extractions: list[Extraction] = []
         problems: list[tuple[str, str]] = []
-        for source in args.sources:
+        # The call ends at its own time, with what was extracted (item 554): the executor would cancel it at
+        # ``_EXTRACT_TIMEOUT_S`` and lose every extraction already paid for, so the time left bounds each source, and
+        # the sources it does not reach are listed as not extracted.
+        started: float = time.monotonic()
+        for position, source in enumerate(args.sources):
+            left: float = _EXTRACT_TIMEOUT_S - _EXTRACT_MARGIN_S - (time.monotonic() - started)
+            if left < _EXTRACT_MIN_SOURCE_S:
+                problems.extend((unread, _TIME_RAN_OUT) for unread in args.sources[position:])
+                break
             # A fast model the router has paused is not asked, nor the source read, until the pause ends (item 240).
             now: float = time.time()
             paused: Unavailable | None = paused_model(ctx.runtime.router, parse_model_ref(fast).label, now)
@@ -810,22 +853,27 @@ def _extract_tool() -> RegisteredTool:
                 )
                 continue
             try:
-                text: str = await _source_text(source, ctx)
-                extractions.append(
-                    await extract(
-                        ctx.runtime.router,
-                        fast,
-                        config.agent.model_call_timeout_s,
-                        f"{ctx.thread_id}:extract",
-                        ctx.run_id,
-                        source,
-                        text,
-                        fields,
+                async with asyncio.timeout(left) as budget:
+                    text: str = await _source_text(source, ctx)
+                    extractions.append(
+                        await extract(
+                            ctx.runtime.router,
+                            fast,
+                            min(config.agent.model_call_timeout_s, left),
+                            f"{ctx.thread_id}:extract",
+                            ctx.run_id,
+                            source,
+                            text,
+                            fields,
+                        )
                     )
-                )
             except (WebError, ToolInputError, ProviderError) as error:
                 problems.append((source, error.message))
-        text_out: str = render_extractions(tuple(extractions), tuple(problems))
+            except TimeoutError:
+                if not budget.expired():
+                    raise
+                problems.append((source, _TIME_RAN_OUT))
+        text_out: str = render_extractions(tuple(extractions), tuple(problems), _nonce())
         result: ToolResult = ok(text_out) if extractions else fail(text_out)
         return mark_untrusted(result)
 

@@ -28,6 +28,7 @@ from structlog.testing import capture_logs
 
 from dotagent.agent.attachments import load_attachments, message_with_attachments
 from dotagent.agent.manager import RunManager
+from dotagent.browser.session import BrowserSession
 from dotagent.cli_daemon import prove_daemon
 from dotagent.config import AppConfig, load_config
 from dotagent.core.errors import NotFoundError, ServiceError
@@ -681,7 +682,7 @@ async def test_the_status_the_models_and_the_checks_describe_this_installation(c
 
 
 async def test_the_browser_mode_is_reported_and_only_switched_when_chrome_is_there(
-    client: httpx.AsyncClient, home: Path
+    client: httpx.AsyncClient, home: Path, runtime: Runtime
 ) -> None:
     state: httpx.Response = await client.get("/api/browser")
     assert state.status_code == 200
@@ -689,9 +690,13 @@ async def test_the_browser_mode_is_reported_and_only_switched_when_chrome_is_the
     assert (body["mode"], body["connected"]) == ("own", False)
     assert (body["chrome_running"], body["remote_debugging"], body["port"]) == (False, False, None)
     assert body["inspect_page"] == "chrome://inspect/#remote-debugging"
+    # The session a campaign made for the mode the switch asks for is closed before the main session tries it (item
+    # 554): its Chrome, if it started one, must not hold the profile the main session starts on.
+    campaigns: BrowserSession = runtime.browsers.session_for("attach")
     refused: httpx.Response = await client.post("/api/browser/mode", json={"mode": "attach"})
     assert refused.status_code == 422, refused.text
     assert "Chrome is not running" in refused.json()["message"]
+    assert runtime.browsers.session_for("attach") is not campaigns
     assert (await client.get("/api/browser")).json()["mode"] == "own"
     assert (await client.get("/api/status")).json()["browser_mode"] == "own"
     assert (await client.post("/api/browser/mode", json={"mode": "chrome"})).status_code == 422

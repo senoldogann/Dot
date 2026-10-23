@@ -147,9 +147,10 @@ _EDITOR_MAX_MS: int = 500
 _DRAG_MOVES: int = 10  # mouse moves on the way: some drag libraries start a drag only after the pointer moved
 
 # What the field a step writes into says about the secret it takes: "password" for a password input, then its
-# autocomplete tokens; null for an element that takes no typed text. Given a label, or an element inside one, the
-# field is the label's control, which is where Playwright's fill writes (its retarget(node, "follow-label")). The
-# model never sees this check and cannot disable it.
+# autocomplete tokens; null for an element that takes no typed text and no choice (a dropdown takes one: a card's
+# expiry month and year are often dropdowns, item 554). Given a label, or an element inside one, the field is the
+# label's control, which is where Playwright's fill writes (its retarget(node, "follow-label")). The model never sees
+# this check and cannot disable it.
 _FIELD_MARKING_SCRIPT: str = """(element) => {
   let field = element;
   if (!field.matches('input, textarea, select') && !field.isContentEditable)
@@ -159,7 +160,9 @@ _FIELD_MARKING_SCRIPT: str = """(element) => {
     const label = field.closest('label');
     if (label && label.control) field = label.control;
   }
-  if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) return null;
+  const takesValue = field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement
+    || field instanceof HTMLSelectElement;
+  if (!takesValue) return null;
   const marking = field.getAttribute('autocomplete') || '';
   return field instanceof HTMLInputElement && field.type === 'password' ? `password ${marking}` : marking;
 }"""
@@ -766,6 +769,7 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     await page.mouse.up()  # a drag that fails or is cancelled after the press leaves the button down
                     raise
             case "select":
+                await _check_secret_field(page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field)
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
             case "press":
                 if key_enters_text(_key_of(step)):

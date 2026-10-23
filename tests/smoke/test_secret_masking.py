@@ -13,9 +13,20 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 from PIL import Image
+from test_browser import ref_of
 
+from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession, no_runs_at_work
-from dotagent.browser.types import FindResult, PageView, Screenshot, ScriptRun, TextView
+from dotagent.browser.types import (
+    ActOutcome,
+    FindResult,
+    PageView,
+    Screenshot,
+    ScriptRun,
+    SecretField,
+    Step,
+    TextView,
+)
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
 
@@ -52,6 +63,15 @@ def _frame_only(frame_origin: str) -> str:
     return f'<!doctype html><title>Frame only</title><iframe title="Card frame" src="{frame_origin}/card"></iframe>'
 
 
+# A card's expiry in dropdowns, as a checkout page has it, and a dropdown that is no secret (item 554).
+_EXPIRY: str = (
+    "<!doctype html><title>Expiry</title><style>select{display:block;width:200px;height:40px;margin:8px}</style>"
+    '<label>Expiry month <select id="month" autocomplete="cc-exp-month">'
+    "<option>01</option><option selected>07</option></select></label>"
+    '<label>Expiry year <select id="year" autocomplete="section-pay cc-exp-year">'
+    "<option>2029</option><option selected>2031</option></select></label>"
+    '<label>Country <select id="country"><option selected>Norway</option><option>Sweden</option></select></label>'
+)
 _MANY: str = "<!doctype html><title>Many</title>" + "".join(
     f'<label>Field {number} <input value="Item {number}"></label>' for number in range(1, 61)
 )
@@ -85,7 +105,9 @@ def frame_site() -> Iterator[str]:
 
 @pytest.fixture(scope="module")
 def site(frame_site: str) -> Iterator[str]:
-    yield from _serve({"/form": _form(frame_site), "/many": _MANY, "/frame-only": _frame_only(frame_site)})
+    yield from _serve(
+        {"/form": _form(frame_site), "/many": _MANY, "/frame-only": _frame_only(frame_site), "/expiry": _EXPIRY}
+    )
 
 
 @pytest.fixture(scope="module")
@@ -171,6 +193,59 @@ async def test_a_screenshot_covers_the_secret_fields_in_every_frame_but_not_the_
     for secret in ("pass", "code", "card", "frame"):
         assert _masked(_pixel(image, boxes[secret])), (secret, _pixel(image, boxes[secret]))
     assert not _masked(_pixel(image, boxes["name"]))
+
+
+async def test_a_card_expiry_dropdown_hides_its_choice_refuses_the_step_and_is_covered_in_a_screenshot(
+    browser: BrowserSession, site: str
+) -> None:
+    """The month and the year of a card are dropdowns more often than fields (item 554): they take a card secret, as the
+    card's number does. Outside yolo the view does not say which option is chosen, the step is refused and a screenshot
+    covers them; a dropdown that is no secret keeps all three; yolo hides nothing and refuses nothing."""
+    view: PageView = await browser.open_url("expiry", f"{site}/expiry", True)
+    assert '"07"' in view.body and '"2031"' in view.body, view.body
+    assert '"07" [selected]' not in view.body and '"2031" [selected]' not in view.body, view.body
+    assert '"Norway" [selected]' in view.body, view.body
+    month, country = ref_of(view.body, 'combobox "Expiry month"'), ref_of(view.body, 'combobox "Country"')
+    refused: ActOutcome = await browser.act(
+        "expiry", [Step(action="select", ref=month, text="01")], False, refuse_secret_field, True
+    )
+    assert [step.outcome for step in refused.steps] == ["failed"], refused
+    assert "cc-exp-month" in refused.steps[0].detail and "ask the user" in refused.steps[0].detail, refused
+    allowed: ActOutcome = await browser.act(
+        "expiry", [Step(action="select", ref=country, text="Sweden")], False, refuse_secret_field, True
+    )
+    assert [step.outcome for step in allowed.steps] == ["done"], allowed
+    chosen: ScriptRun = await browser.run_script(
+        "expiry",
+        "[document.getElementById('month').value, document.getElementById('country').value]",
+        5.0,
+        False,
+    )
+    assert json.loads(chosen.text) == ["07", "Sweden"], chosen
+    boxes: ScriptRun = await browser.run_script(
+        "expiry",
+        "Object.fromEntries(['month', 'year', 'country'].map((id) => {"
+        " const r = document.getElementById(id).getBoundingClientRect();"
+        " return [id, {x: r.x, y: r.y, w: r.width, h: r.height}]; }))",
+        5.0,
+        False,
+    )
+    where: dict[str, dict[str, float]] = json.loads(boxes.text)
+    shot: Screenshot = await browser.screenshot("expiry", True)
+    image: Image.Image = Image.open(io.BytesIO(shot.data))
+    assert _masked(_pixel(image, where["month"])) and _masked(_pixel(image, where["year"]))
+    assert not _masked(_pixel(image, where["country"]))
+
+    async def allow(field: SecretField) -> None:
+        return None
+
+    open_view: PageView = await browser.open_url("expiry-yolo", f"{site}/expiry", False)
+    assert '"07" [selected]' in open_view.body, open_view.body
+    month_ref: str = ref_of(open_view.body, 'combobox "Expiry month"')
+    chosen_in_yolo: ActOutcome = await browser.act(
+        "expiry-yolo", [Step(action="select", ref=month_ref, text="01")], False, allow, False
+    )
+    assert [step.outcome for step in chosen_in_yolo.steps] == ["done"], chosen_in_yolo
 
 
 async def test_yolo_sees_every_value(browser: BrowserSession, site: str) -> None:

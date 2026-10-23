@@ -15,6 +15,7 @@ import pytest_asyncio
 
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
+from dotagent.core.errors import WebError
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.evals.site import serve_site
@@ -199,3 +200,32 @@ async def test_a_host_that_refused_once_is_read_in_the_browser_first_from_then_o
     # Another run has no such memory: the plain request is made and the page read as fetched.
     fresh: ToolResult = await _fetch(runtime, f"{wall}/open")
     assert fresh.text.startswith("Fetched ") and "Asked by a plain request." in fresh.text
+
+
+@pytest_asyncio.fixture(loop_scope="module")
+async def strict_runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
+    """A runtime as the owner has it by default: the web tools reach public addresses only."""
+    home: Path = tmp_path_factory.mktemp("strict-home")
+    (home / "config.toml").write_text("[browser]\nheadless = true\n", encoding="utf-8")
+    patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
+    patch.setenv("DOT_HOME", str(home))
+    patch.setenv("DOT_CHROME_DIR", str(home / "chrome"))
+    built: Runtime = await build_runtime(load_config(home / "config.toml"))
+    try:
+        yield built
+    finally:
+        await close_runtime(built)
+        patch.undo()
+
+
+@pytest.mark.browser
+async def test_the_browser_that_reads_a_page_for_web_fetch_reaches_no_address_the_plain_client_may_not(
+    strict_runtime: Runtime, wall: str
+) -> None:
+    """Item 554: a host remembered as refusing goes to the browser first, whose answer a hostile page may have sent to
+    the local network (a redirect, a name pointed there): with ``allow_private_hosts`` off nothing it served from a
+    private address comes back as the page, the plain request is made as it would be, and it is refused as it is."""
+    refused: RefusedHosts = RefusedHosts()
+    refused.note(f"{wall}/open")
+    with pytest.raises(WebError, match="private or local network address"):
+        await _fetch_as(strict_runtime, f"{wall}/open", refused)

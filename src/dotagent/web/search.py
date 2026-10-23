@@ -27,7 +27,7 @@ from dotagent.core.errors import WebError, WebThrottledError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel
-from dotagent.web.client import WebClient
+from dotagent.web.client import ACCEPT_ENCODING, WebClient, read_capped
 from dotagent.web.ladder import BENCH_S, EngineBench, SearchEngine, SearchOutcome, Skipped
 from dotagent.web.text import decode_body
 from dotagent.web.types import SearchHit
@@ -278,11 +278,20 @@ async def search_searxng(client: WebClient, base_url: str, query: str, max_resul
     answer, so the quality is theirs and no key is spent. The instance is configuration, not a page a run picked, so a
     loopback instance is reached without the address gate; that is the usual case."""
     url: str = searxng_search_url(base_url, query)
-    headers: dict[str, str] = {"User-Agent": client.user_agent, "Accept": "application/json"}
+    headers: dict[str, str] = {
+        "User-Agent": client.user_agent,
+        "Accept": "application/json",
+        "Accept-Encoding": ACCEPT_ENCODING,
+    }
     timeout: httpx.Timeout = httpx.Timeout(10.0, connect=5.0, read=_SEARXNG_TIMEOUT_S)
     try:
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False) as http:
-            response: httpx.Response = await http.get(url, headers=headers)
+        # Read as it comes, up to what an answer may be (item 554): the instance is the owner's, and the body of an
+        # answer is not ours to hold whole in memory, whatever it is compressed to.
+        async with (
+            httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False) as http,
+            http.stream("GET", url, headers=headers) as response,
+        ):
+            body, _more = await read_capped(response, _SEARXNG_ANSWER_BYTES)
     except httpx.TimeoutException as exc:
         raise WebError("the SearXNG instance did not answer in time", {"query": query, "url": base_url}) from exc
     except httpx.HTTPError as exc:
@@ -309,9 +318,9 @@ async def search_searxng(client: WebClient, base_url: str, query: str, max_resul
     if response.status_code != 200:
         raise WebError(
             "the SearXNG instance did not answer the search",
-            {"status": response.status_code, "body": response.text[:_ERROR_BODY_CHARS]},
+            {"status": response.status_code, "body": body.decode("utf-8", errors="replace")[:_ERROR_BODY_CHARS]},
         )
-    page: ResultsPage = parse_searxng(response.content[:_SEARXNG_ANSWER_BYTES])
+    page: ResultsPage = parse_searxng(body)
     if not page.hits and not page.announced_no_results:
         # Results came, and none of them names a page: the next rung answers instead of an empty one.
         raise WebError("the SearXNG instance's results name no page", {"query": query, "url": base_url})
@@ -407,14 +416,14 @@ async def search(
     query: str,
     max_results: int,
 ) -> SearchOutcome:
-    """A query's outcome: the one remembered from the last ``MEMORY_S`` when there is one (cut to ``max_results``),
-    else the ladder climbed and the outcome kept."""
+    """A query's outcome: the one remembered from the last ``MEMORY_S`` when there is one that asked the same rungs for
+    as many results (cut to ``max_results``), else the ladder climbed and the outcome kept (item 554)."""
     now: float = time.monotonic()
-    remembered: SearchOutcome | None = client.search_memory.recall(query, now)
+    remembered: SearchOutcome | None = client.search_memory.recall(query, rungs, max_results, now)
     if remembered is not None:
         return remembered.model_copy(update={"hits": remembered.hits[:max_results]})
     outcome: SearchOutcome = await climb(rungs, attempts, client.search_bench, query, max_results, time.monotonic)
-    client.search_memory.keep(query, outcome, now)
+    client.search_memory.keep(query, rungs, max_results, outcome, now)
     return outcome
 
 
@@ -577,6 +586,11 @@ async def search_ollama(client: WebClient, api_key: str, query: str, max_results
     """Search through the hosted web search API of Ollama (``POST /api/web_search``, bearer key, at most 10 results)."""
     body: bytes = json.dumps({"query": query, "max_results": min(max_results, _OLLAMA_MAX_RESULTS)}).encode()
     document = await client.post_json(_OLLAMA_SEARCH_URL, {"Authorization": f"Bearer {api_key}"}, body, _API_BYTES)
+    if document.status == 429:
+        # The key's allowance is used up: the rung sits out, as the engines that limit do (item 554).
+        raise WebThrottledError(
+            "the Ollama search API is limiting this key (HTTP 429)", {"query": query, "status": document.status}
+        )
     if document.status != 200:
         raise WebError(
             "the Ollama search API did not answer the search",
@@ -667,8 +681,10 @@ def parse_anthropic(body: bytes, query: str, max_results: int) -> tuple[SearchHi
         ) from exc
     cited: dict[str, str] = {}
     results: list[_AnthropicResult] = []
+    searched: bool = False
     for block in message.content:
         if block.type == "web_search_tool_result":
+            searched = True
             if isinstance(block.content, _AnthropicToolError):
                 code: str = block.content.error_code
                 if code in _ANTHROPIC_BENCHED_CODES:
@@ -681,6 +697,10 @@ def parse_anthropic(body: bytes, query: str, max_results: int) -> tuple[SearchHi
         elif block.type == "text":
             for citation in block.citations or []:
                 cited.setdefault(citation.url, citation.cited_text)
+    if not searched:
+        # The relay answered or declined without using the tool: that is no answer to the query, and the next rung is
+        # asked (a search that found nothing has its result block, with an empty list).
+        raise WebError("the Anthropic relay did not search: its answer holds no search result", {"query": query})
     hits: list[SearchHit] = []
     seen: set[str] = set()
     for result in results:

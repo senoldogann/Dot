@@ -97,9 +97,24 @@ def normalize_url(raw: str) -> str:
 
 
 def host_matches(host: str, entries: Sequence[str]) -> bool:
-    """Whether ``host`` is one of ``entries`` or a subdomain of one."""
-    lowered: str = host.lower().rstrip(".")
-    return any(lowered == entry or lowered.endswith(f".{entry}") for entry in (e.lower().lstrip(".") for e in entries))
+    """Whether ``host`` is one of ``entries`` or a subdomain of one. Both are read the way a browser reads a host
+    (:func:`browser_host`), so that an entry the owner wrote in Unicode, in punycode, with the dot of an absolute name
+    or as a numeric address names the host a browser goes to by any of its spellings (item 554). An entry that cannot be
+    read as a host names none."""
+    name: str | None = _plain_host(host)
+    if name is None:
+        return False
+    return any(
+        name == entry or name.endswith(f".{entry}")
+        for entry in (_plain_host(written.lstrip(".")) for written in entries)
+        if entry
+    )
+
+
+def _plain_host(host: str) -> str | None:
+    """``host`` as :func:`browser_host` reads it, without the dot that ends the name of an absolute host."""
+    name: str | None = browser_host(host)
+    return None if name is None else name.removesuffix(".")
 
 
 def browser_host(host: str) -> str | None:
@@ -317,12 +332,13 @@ def hides_secrets(approvals: ApprovalMode) -> bool:
 
 def secret_selector() -> str:
     """The CSS selector of the fields :func:`secret_kind` takes for secret (item 467), as the driver's field marking
-    reads them: password inputs, and the inputs and text areas whose autocomplete names a secret among its tokens
-    (``section-pay shipping cc-number`` too), whatever their case."""
+    reads them: password inputs, and the inputs, text areas and dropdowns whose autocomplete names a secret among its
+    tokens (``section-pay shipping cc-number`` too), whatever their case. A dropdown is one since a card's expiry month
+    and year are often dropdowns (item 554)."""
     return ", ".join(
         [
             'input[type="password" i]',
-            *(f'{tag}[autocomplete~="{kind}" i]' for kind in _SECRET_KINDS for tag in ("input", "textarea")),
+            *(f'{tag}[autocomplete~="{kind}" i]' for kind in _SECRET_KINDS for tag in ("input", "textarea", "select")),
         ]
     )
 
