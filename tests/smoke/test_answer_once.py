@@ -17,7 +17,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment,
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
-from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
+from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply, StreamDelta
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server import UI_SOURCE
 from dotagent.server.app import create_app
@@ -199,3 +199,73 @@ async def test_a_reply_that_says_more_than_the_answer_stays() -> None:
                 )
             finally:
                 await browser.close()
+
+
+# A chat left and come back to while its run works (item 568). The page keeps what it read of the stream and goes on
+# from its last event; that was a piece of a thought, which has no id, so the page read the whole stream again and drew
+# every message a second time, a third after a second return.
+_FIRST: str = "I looked at both accounts first: the mail of each answered, and now I check their calendars too."
+_THOUGHT: str = "Now the calendars, one after the other. "
+
+
+class _HoldsAThought(ScriptedProvider):
+    """The script, its second step thinking aloud once the page follows the run, then held until the test lets it go."""
+
+    def __init__(self, script: tuple[ScriptedTurn, ...]) -> None:
+        super().__init__(_PROVIDER, script)
+        self.calls: int = 0
+        self.followed: asyncio.Event = asyncio.Event()
+        self.thinking: asyncio.Event = asyncio.Event()
+        self.go: asyncio.Event = asyncio.Event()
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        self.calls += 1
+        reply: ModelReply = await super().complete(request, sink)
+        if self.calls == 2:
+            # A live piece goes to the pages that follow the run then: none is told it again.
+            await self.followed.wait()
+            await sink(StreamDelta(kind="thinking", text=_THOUGHT))
+            self.thinking.set()
+            await self.go.wait()
+        return reply
+
+
+async def test_a_chat_left_and_come_back_to_while_its_run_works_shows_each_message_once() -> None:
+    """A message, then a thought streams and the reader goes to another page and back, twice: once the run ends, the
+    message and the answer are each in the chat once."""
+    model = _HoldsAThought(
+        (
+            ScriptedTurn(text=_FIRST, calls=(ScriptedCall(tool="shell", arguments={"command": "echo checked"}),)),
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="finish", arguments={"answer": _ANSWER, "success": True}),)),
+        )
+    )
+    async with _served(model) as (runtime, manager, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            run: RunRecord = await manager.start(
+                _GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+            )
+            await page.goto(f"{address}/#/runs/{run.id}")
+            chat: Locator = page.locator(".timeline")
+            await expect(chat.get_by_text(_FIRST)).to_have_count(1, timeout=15000)
+            model.followed.set()
+            async with asyncio.timeout(WAIT_S):
+                await model.thinking.wait()
+            # The thought's piece is the last event the page read of the stream.
+            await expect(page.locator("details.thought .thought-text").last).to_contain_text(_THOUGHT.strip())
+            for _ in range(2):
+                await page.goto(f"{address}/#/settings/system")
+                await expect(page.get_by_role("heading", name="System", level=1)).to_be_visible()
+                await page.goto(f"{address}/#/runs/{run.id}")
+                await expect(chat.get_by_text(_FIRST)).to_have_count(1)
+            model.go.set()
+            async with asyncio.timeout(WAIT_S):
+                assert (await manager.wait(run.id)).status == "done"
+            await expect(page.locator(".timeline .answer")).to_contain_text(_ANSWER, timeout=15000)
+            await expect(chat.get_by_text(_FIRST)).to_have_count(1)
+            await expect(chat.get_by_text(_ANSWER)).to_have_count(1)
+        finally:
+            await browser.close()
