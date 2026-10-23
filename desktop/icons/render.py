@@ -1,7 +1,8 @@
 """Render Dot's mark (item 114) into the files that carry it: the favicon of the web UI (``static/favicon.svg``), the
 web app's icons (``static/icons/icon-192.png``, ``icon-512.png``, the home screen's
-``apple-touch-icon.png`` at the root, item 410), the app icon of the desktop shell (``app.png``, 1024
-px, for ``npm run icons``) and its menu bar icons, one per state (``tray-{state}.png``, 44 px, the 22 pt item at 2x).
+``static/icons/touch-icon-{180,167,152,120}.png`` and the 180 px files at the root, items 410 and 550), the app icon of
+the desktop shell (``app.png``, 1024 px, for ``npm run icons``) and its menu bar icons, one per state
+(``tray-{state}.png``, 44 px, the 22 pt item at 2x).
 
 The mark is a yellow dot that looks: a disc with the two capsule eyes of the character's attentive rest pose
 (``static/js/character``), a little larger than the engine draws them so they hold at 16 px. ``static/index.html`` sets
@@ -37,8 +38,15 @@ GLANCE: tuple[str, str] = (
 TRAY_PX: int = 44
 APP_PX: int = 1024
 WEB_PX: tuple[int, ...] = (192, 512)
-# The icon iOS asks for when the app is added to the home screen (item 410): 180 px, at the root of the pages.
-TOUCH_PX: int = 180
+# The sizes iOS asks for when the app is added to the home screen (items 410 and 550): the width of the touch icon
+# under the icons folder, and the 180 px files at the root that it also tries by name.
+TOUCH_PX: tuple[int, ...] = (120, 152, 167, 180)
+ROOT_TOUCH: tuple[str, ...] = (
+    "apple-touch-icon.png",
+    "apple-touch-icon-precomposed.png",
+    "apple-touch-icon-180x180.png",
+    "apple-touch-icon-180x180-precomposed.png",
+)
 
 
 def dot(eyes: tuple[str, str], fill: str) -> str:
@@ -108,8 +116,12 @@ async def main() -> None:
     await render(HERE / "app.png", tile_svg(True), APP_PX)
     for size in WEB_PX:
         await render(STATIC / "icons" / f"icon-{size}.png", tile_svg(False), size)
-    await render(STATIC / "apple-touch-icon.png", tile_svg(False), TOUCH_PX)
-    await render(STATIC / "apple-touch-icon-precomposed.png", tile_svg(False), TOUCH_PX)
+    for size in TOUCH_PX:
+        await render(STATIC / "icons" / f"touch-icon-{size}.png", tile_svg(False), size)
+    # The 180 px files at the root, which iOS tries by name when a page names no icon: the same artwork.
+    tile: bytes = (STATIC / "icons" / "touch-icon-180.png").read_bytes()
+    for name in ROOT_TOUCH:
+        (STATIC / name).write_bytes(tile)
     states: dict[str, str] = {
         "idle": mark_svg(ATTENTIVE, False),
         "working": mark_svg(GLANCE, False),
