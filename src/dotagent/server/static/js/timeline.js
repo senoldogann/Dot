@@ -174,15 +174,13 @@ function revealAnswer(answer, text) {
   if (body === null) {
     return;
   }
-  const foot = answer.querySelector(":scope > .answer-foot");
   const live = { body, text: "", drawn: [], caret: el("span", { class: "stream-caret", "aria-hidden": "true" }), queued: false, ended: false };
   const room = body.offsetHeight;
   body.replaceChildren();
   body.classList.add("stream");
   body.style.minHeight = `${room}px`;
-  if (foot !== null) {
-    foot.style.visibility = "hidden";
-  }
+  // What stands under the words, the foot and the line of what the run changed (item 597), waits until they are all in.
+  answer.dataset.revealing = "";
   const step = Math.max(REVEAL_MIN_CHARS, Math.ceil(text.length / REVEAL_MOST_FRAMES));
   let at = 0;
   function frame() {
@@ -197,9 +195,7 @@ function revealAnswer(answer, text) {
       return;
     }
     body.replaceWith(prose(text));
-    if (foot !== null) {
-      foot.style.visibility = "";
-    }
+    delete answer.dataset.revealing;
   }
   requestAnimationFrame(frame);
 }

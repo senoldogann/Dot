@@ -1,6 +1,6 @@
 """An answer that ends a run under the reader's eyes is written in (item 366): its words come a few at a time, formatted
-as they stay, and its foot shows once they are all in. Under reduced motion, and on a run opened after it ended, the
-answer shows at once. A real server on a scripted model, in Chrome."""
+as they stay, and its foot and the line of what the run changed (item 597) show once they are all in. Under reduced
+motion, and on a run opened after it ended, the answer shows at once. A real server on a scripted model, in Chrome."""
 
 import asyncio
 import time
@@ -45,18 +45,20 @@ _ANSWER: str = "\n\n".join(
 _RUN_WAIT_S: float = 60.0
 # A window shorter than the run's page, so that landing on its answer is a scroll.
 _SHORT_WINDOW: int = 420
-# Every frame's length of the answer's words, whether its foot shows and where the answer's top stands in the window,
-# from before the answer comes.
+# Every frame's length of the answer's words, whether its foot shows, where the answer's top stands in the window and
+# whether the line of what the run changed shows once it is drawn, from before the answer comes.
 _SAMPLER: str = """() => {
   window.__seen = [];
   const sample = () => {
     const words = document.querySelector('.answer > .prose');
     const foot = document.querySelector('.answer > .answer-foot');
     const answer = document.querySelector('.answer');
+    const changed = document.querySelector('.answer > .run-changes:not([hidden])');
     window.__seen.push([
       words === null ? -1 : words.textContent.length,
       foot === null ? null : getComputedStyle(foot).visibility,
       answer === null ? null : Math.round(answer.getBoundingClientRect().top),
+      changed === null ? null : getComputedStyle(changed).visibility,
     ]);
     requestAnimationFrame(sample);
   };
@@ -65,11 +67,15 @@ _SAMPLER: str = """() => {
 
 
 def _script() -> list[ScriptedTurn]:
+    # Each run writes a file, so that the line of what it changed comes under its answer.
+    write = ScriptedTurn(
+        text="", calls=(ScriptedCall(tool="write_file", arguments={"path": "shelves.md", "content": "Dry.\n"}),)
+    )
     look = ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 2"}),))
     finish = ScriptedTurn(
         text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": _ANSWER, "success": True}),)
     )
-    return [turn for _ in range(_RUNS) for turn in (look, finish)]
+    return [turn for _ in range(_RUNS) for turn in (write, look, finish)]
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -169,16 +175,18 @@ async def test_an_answer_that_ends_a_run_under_the_readers_eyes_is_written_in(se
             run: RunRecord = await _start(manager)
             # A window shorter than the conversation: the page must scroll to land on the answer.
             seen, whole = await _watch(browser, address, run, reduced=False, height=_SHORT_WINDOW)
-            lengths: list[int] = [int(length) for length, _, _ in seen if isinstance(length, int) and length >= 0]
+            lengths: list[int] = [int(length) for length, _, _, _ in seen if isinstance(length, int) and length >= 0]
             partial = [frame for frame in seen if isinstance(frame[0], int) and 0 < frame[0] < whole]
             assert len(partial) >= 5, f"the words came at once: {sorted(set(lengths))[:12]} of {whole}"
             assert lengths == sorted(lengths), "the words only ever grew"
             assert lengths[-1] == whole
-            # The foot waits until the words are all in.
-            assert all(shown == "hidden" for _, shown, _ in partial)
+            # The foot and the line of what the run changed wait until the words are all in.
+            assert all(shown == "hidden" for _, shown, _, _ in partial)
+            assert all(changed in (None, "hidden") for _, _, _, changed in partial)
+            assert seen[-1][3] == "visible"
             # The words are written in sight, where the answer stands: its top in the upper half of the window, still
             # once the page has landed on it.
-            tops = [int(top) for _, _, top in partial[2:] if isinstance(top, int)]
+            tops = [int(top) for _, _, top, _ in partial[2:] if isinstance(top, int)]
             assert tops and max(tops) < _SHORT_WINDOW / 2, tops
             assert max(tops) - min(tops) <= 2, tops
         finally:
@@ -194,11 +202,11 @@ async def test_under_reduced_motion_and_on_a_run_read_again_the_answer_shows_at_
         try:
             live: RunRecord = await _start(manager)
             seen, whole = await _watch(browser, address, live, reduced=True, height=900)
-            assert next(length for length, _, _ in seen if isinstance(length, int) and length >= 0) == whole
+            assert next(length for length, _, _, _ in seen if isinstance(length, int) and length >= 0) == whole
             ended: RunRecord = await _start(manager)
             async with asyncio.timeout(_RUN_WAIT_S):
                 assert (await manager.wait(ended.id)).status == "done"
             seen, whole = await _watch(browser, address, ended, reduced=False, height=900)
-            assert next(length for length, _, _ in seen if isinstance(length, int) and length >= 0) == whole
+            assert next(length for length, _, _, _ in seen if isinstance(length, int) and length >= 0) == whole
         finally:
             await browser.close()

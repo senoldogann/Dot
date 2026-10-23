@@ -315,7 +315,14 @@ without a jump: the chat stands where it was, at its foot, inert, until the next
 never lifted to its top and dropped back. The answer of the run is the last message, with a copy button
 (its icon turns to a check once the answer is on the clipboard) and, where the browser can speak, a speaker (item 574),
 when it came and how the run ended under it; how long the run took shows where the pointer rests on it (on a touch
-screen it always shows). The speaker reads the answer aloud with the browser's own voice, in the language of Settings ›
+screen it always shows). Over that line, once the run of the page has ended, one line says what its file tools created
+and changed on this Mac (item 597: "Created a file and changed 1", from the undo journal, the run's own notes left
+out), the files by name, each a button to the file beside the conversation, with **Review**, which opens the side
+panel's Changes tab and their diffs, and **Undo**, which asks first, then deletes the files the run created and puts
+back the ones it changed that are as it left them; the line then says its changes were taken back. A run that changed
+no file shows nothing there: not an editor's list, which the Changes tab is, and a command's own writes, which no
+journal holds, are not in it.
+The speaker reads the answer aloud with the browser's own voice, in the language of Settings ›
 General › Voice (with a voice kept on this Mac when the browser has one for the language, a network voice only when it
 has not: [what leaves this Mac](safety.md#what-leaves-this-mac)), leaving out its code, its addresses and the marks of
 its Markdown, and stops the reading at a second press. With **Read answers aloud** on in Settings › General › Voice

@@ -24,6 +24,8 @@ const LEFT_OUT = [
   ".turn-face",
   ".message-foot",
   ".answer-foot",
+  // The line of what a run changed, under its answer (item 597): Dot's account of the run, not what it said.
+  ".run-changes",
   // The head of a block of code or of a table (its label and its buttons; item 537).
   ".code-head",
 ].join(", ");

@@ -32,6 +32,7 @@ import { createReactions, REACTION_EVENTS } from "../reactions.js";
 import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { changesSection } from "../changes.js";
+import { runChangesCard } from "../runchanges.js";
 import { setupSection } from "../setup.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
@@ -1108,6 +1109,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
 
   function onAnswer(node) {
     answerNode = node;
+    // What the run changed on this Mac, under its answer, with the way back (item 597).
+    const changed = runChangesCard({ runId, onReview: () => showChanges(), onUndone: () => refreshChanges() });
+    node.querySelector(".answer-foot")?.before(changed.element);
+    changed.load();
     if (openedFinished) {
       // A chat that is over when it opens starts at its foot, on the newest message (item 440), and keeps there while
       // what is above it settles (pictures, a table's width) until the reader scrolls up.

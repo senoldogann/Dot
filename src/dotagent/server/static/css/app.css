@@ -6122,6 +6122,82 @@ a.memory-line:hover .memory-change {
   color: var(--bad);
 }
 
+/* What the run changed on this Mac (item 597): a quiet line under the answer, the files by name, Review and Undo at its
+   end, as the actions under a message stand; not an editor's list, which the Changes tab is. */
+.run-changes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+.run-changes > .icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.run-changes-body {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+
+.run-changes-words {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.run-changes-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+
+.run-changes-file {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.run-changes-file:hover {
+  color: var(--text);
+}
+
+.run-changes-more {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.run-changes-actions {
+  display: flex;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+/* While an answer is written in (item 366), what stands under its words waits until they are all in: its foot, and the
+   line of what the run changed. */
+.answer[data-revealing] > :is(.answer-foot, .run-changes) {
+  visibility: hidden;
+}
+
 /* The answer's foot follows its last line closely (item 336): its row is the copy button's height, whose band above the
    button's mark stands for the space under the line, and it rises into the line's own spacing below its letters. */
 .answer-foot {
