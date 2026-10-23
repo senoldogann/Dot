@@ -231,6 +231,34 @@ async def test_the_memory_page_fits_a_phone(browser: Browser, address: str, runt
             await page.close()
 
 
+async def test_in_any_window_the_choices_keep_one_line_and_the_search_goes_under_them(
+    browser: Browser, address: str, runtime: Runtime, tmp_path: Path
+) -> None:
+    """The owner's screenshot (item 578): in a column too narrow for the four choices and the search side by side, the
+    last choice wrapped alone under the other three. The choices keep one line in every window, and the search stands
+    beside them while both fit, under them when they do not."""
+    await _seed(runtime)
+    for width in (1000, 1060, 1280):
+        page: Page = await _open(browser, address, width)
+        try:
+            await expect(_choice(page, "From outside content")).to_be_visible()
+            choices: list[Locator] = await page.get_by_role("group", name="Show notes").get_by_role("button").all()
+            boxes = [await choice.bounding_box() for choice in choices]
+            assert all(box is not None for box in boxes), boxes
+            assert len({round(box["y"]) for box in boxes if box is not None}) == 1, (width, boxes)
+            group = await page.get_by_role("group", name="Show notes").bounding_box()
+            search = await page.get_by_placeholder("Search notes").bounding_box()
+            card = await page.locator(".note-card").bounding_box()
+            assert group is not None and search is not None and card is not None
+            beside: bool = abs(search["y"] + search["height"] / 2 - (group["y"] + group["height"] / 2)) <= 2
+            assert beside or search["y"] >= group["y"] + group["height"], (width, group, search)
+            assert max(group["x"] + group["width"], search["x"] + search["width"]) <= card["x"] + card["width"] + 1
+            assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+            await page.screenshot(path=tmp_path / f"memory-choices-{width}.png")
+        finally:
+            await page.close()
+
+
 async def test_on_a_touch_phone_the_tags_are_labels_and_remember_stands_at_the_right(
     browser: Browser, address: str, runtime: Runtime, tmp_path: Path
 ) -> None:
