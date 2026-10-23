@@ -680,11 +680,12 @@ when it asks for an approval, a question or your help, and when it leaves you a 
 first line of its answer; the sub-runs of a run stay quiet, and a schedule's run is told as its notification level
 says, item 461, see [Memory and schedules](memory-and-schedules.md)); when a campaign ends by itself (achieved, or
 stopped by the emergency stop or by `campaign_max_sessions`); when a schedule misses a firing that nobody saw (overdue,
-or its run could not start; told once while the reason stays the same, and not at its level "never"); and when a
-repeating schedule is switched off because its runs failed so many times in a row (item 458, once). It says nothing
-while you are looking at that run: its page open, the tab visible and the window active. On another
-page, in a background tab or in an inactive window you are told; "Tell me even when I am looking" under the same
-setting turns the rule off. Clicking a notification opens what it tells of. The tab's
+or its run could not start; told once while the reason stays the same, and not at its level "never"); when a
+repeating schedule is switched off because its runs failed so many times in a row (item 458, once); and when Dot has
+something to tell you on its own: the first line of the morning brief (item 570, see
+[Dot comes to you](proactive.md)). It says nothing while you are looking at that run: its page open, the tab visible
+and the window active. On another page, in a background tab or in an inactive window you are told; "Tell me even when
+I am looking" under the same setting turns the rule off. Clicking a notification opens what it tells of. The tab's
 icon is the same face in the state of the whole of Dot (amber ring while something waits for you, working while a run
 is active, still otherwise), and a notification carries the face in the state it tells of.
 
@@ -834,6 +835,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule; `POST` with `"enabled": false` adds one switched off, its time checked but not the room for one more switched on, which switching it on checks, item 464) |
 | `POST /schedules/{id}/run`, `GET /schedules/{id}/firings?limit=` | a run of the schedule started by hand, 201 (409 while the emergency stop is engaged, while one of its runs is at work, or in a daemon that runs no scheduler); its last runs, at its time and by hand, newest first (item 455) |
+| `GET\|PUT /brief` (`{"enabled": true, "time": "08:00", "days": "every"\|"weekdays", "lines": […]}`) | the morning brief (item 570, [Dot comes to you](proactive.md)): its settings and when it fires next and last fired; set it, which makes or changes its schedule (`research`, read-only), shown in `GET /schedules` with `brief: true` (422 for a time that is not `HH:MM`, a line over 300 characters, more than 20 lines, or what the scheduler refuses) |
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `POST /runs/{id}/takeover/screen`, `POST /runs/{id}/input` (`{"events": [...]}`) | hold the run for its page to be used from the screen, which needs no window; your taps, scrolls and keys as fractions of the picture (409 when the run is not held, has no page, a step of it is still going, or `remote_input` is off); nothing typed is kept (item 470) |
 | `POST /browser/remote-input` (`{"remote_input": true\|false}`)                | whether a held run's page can be used from the screen (item 470), kept in the config file |

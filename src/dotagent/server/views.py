@@ -1024,7 +1024,7 @@ class ScheduleAgent(FrozenModel):
 class ScheduleView(FrozenModel):
     """A schedule as the UI shows it; the times are in the schedule's own ``zone``. ``run_at_input`` is the one-time
     moment as a ``datetime-local`` field takes it (``2026-10-06T09:30``). ``agent`` is the agent its runs run as,
-    ``None`` for Dot."""
+    ``None`` for Dot. ``brief`` says that it is the morning brief (item 570), whose card sets it."""
 
     record: ScheduleRecord
     when: str
@@ -1033,6 +1033,7 @@ class ScheduleView(FrozenModel):
     run_at_input: str | None
     zone: str
     agent: ScheduleAgent | None
+    brief: bool
 
 
 class ContextChoice(FrozenModel):

@@ -26,6 +26,7 @@ from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.probe import probe_apart
 from dotagent.harness.step import run_step
 from dotagent.llm.types import Speed
+from dotagent.proactive.brief import BriefFiring, is_brief, prepare, tell_brief
 from dotagent.runtime import Runtime
 from dotagent.scheduler import (
     SCHEDULE_MISSED_EVENT,
@@ -482,7 +483,9 @@ class Scheduler:
         store: Store = self._runtime.store
         one_time: bool = record.cron is None
         same_chat, digest = await self._history(record, zone)
-        title: str = thread_title(f"{record.name} · {format_local(now, zone)}")
+        record, digest, title = await self._briefed(
+            record, digest, now, zone, thread_title(f"{record.name} · {format_local(now, zone)}")
+        )
         thread_id, made = await self._firing_chat(record, same_chat, title)
         await store.record_schedule_fire(record.id, now, following, thread_id, "starting")
         if late:
@@ -559,7 +562,8 @@ class Scheduler:
         try:
             zone: ZoneInfo = await schedule_zone(record.options, self._zone)
             same_chat, digest = await self._history(record, zone)
-            title: str = thread_title(f"{record.name} · {format_local(now, zone)} · by hand")
+            by_hand: str = thread_title(f"{record.name} · {format_local(now, zone)} · by hand")
+            record, digest, title = await self._briefed(record, digest, now, zone, by_hand)
             thread_id, made = await self._firing_chat(record, same_chat, title)
             carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
             started: RunRecord | None = None
@@ -610,12 +614,25 @@ class Scheduler:
         )
         return same_chat, digest
 
+    async def _briefed(
+        self, record: ScheduleRecord, digest: Digest, now: float, zone: ZoneInfo, title: str
+    ) -> tuple[ScheduleRecord, Digest, str]:
+        """The firing of ``record`` as its run takes it: the morning brief (item 570) fires with the goal built for it,
+        what Dot knows of itself in the digest's place and the chat's own name; any other schedule as it is, with the
+        ``digest`` and the ``title`` it was given."""
+        briefing: BriefFiring | None = await prepare(self._runtime, record, now, zone)
+        if briefing is None:
+            return record, digest, title
+        return briefing.record, briefing.context, briefing.title
+
     async def _carried(self, digest: Digest, made: bool, thread_id: str) -> tuple[str, ...]:
         """The earlier runs whose words a firing's run reads: the digest's in a chat made for it, else that chat's last
-        run."""
+        run and the digest's. A schedule that goes on in its chat has no digest of earlier runs, so for it the digest's
+        runs are none, except for the morning brief, whose digest names the runs its record of Dot quotes (item 570)."""
         if made:
             return digest.run_ids
-        return tuple(run.id for run in await self._runtime.store.list_runs(1, thread_id))
+        last: tuple[str, ...] = tuple(run.id for run in await self._runtime.store.list_runs(1, thread_id))
+        return tuple(dict.fromkeys((*last, *digest.run_ids)))
 
     async def _start(self, record: ScheduleRecord, opening: str, thread_id: str, carried: tuple[str, ...]) -> RunRecord:
         """Start the run of a firing of ``record`` in the chat ``thread_id`` with the schedule's own choices, as the
@@ -742,6 +759,10 @@ class Scheduler:
         ended: EventRecord | None = await self._runtime.store.last_event(finished.id, "run_finished")
         needs: object = None if ended is None else ended.data.get("needs")
         if not tells(level, finished.status, needs if isinstance(needs, str) else "", failed_in_row):
+            return
+        if finished.status == "done" and await is_brief(self._runtime.store, schedule_id):
+            # The brief is told in its own words, its first line, and opens in its chat (item 570).
+            await tell_brief(self._runtime.bus, finished)
             return
         told: ScheduleRunEnded = ScheduleRunEnded(
             schedule_id=schedule_id, run_id=finished.id, status=finished.status, result=finished.result

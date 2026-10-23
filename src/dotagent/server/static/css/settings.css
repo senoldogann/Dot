@@ -2843,6 +2843,49 @@
   overflow-wrap: anywhere;
 }
 
+/* ---------- The Morning brief card (item 570) at the head of Schedules: its name and switch, the time, the days and the
+   owner's own lines, then when it fires next and when it last did. ---------- */
+
+.brief-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.brief-head .switch {
+  margin-top: var(--space-half);
+}
+
+.brief-mark {
+  display: inline-flex;
+  flex: none;
+  margin-top: var(--space-half);
+  color: var(--muted);
+}
+
+.brief-form .input[type="time"] {
+  width: 9rem;
+  max-width: 100%;
+}
+
+.brief-form .textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.brief-status {
+  overflow-wrap: anywhere;
+}
+
+.brief-status .empty {
+  padding: var(--space-2) 0;
+}
+
+.brief-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 /* ---------- Rules (items 373 and 565): what is always on, the sandbox, the rules checked in order and what a rule can
    answer, in cards of the settings' look; the ways to write one wait for New rule. ---------- */
 

@@ -1,8 +1,8 @@
 // How Dot gets your attention when you are not looking: the tab title counts the approvals that wait, and desktop
 // notifications (off until you switch them on) say when Dot needs an answer or left you a question, a run has ended, a
-// campaign ended by itself or a schedule missed a firing, unless you are looking at that run (its page open, the tab
-// visible, the window active; item 75), or you asked to be told even then. They say what the daemon's pushes say
-// (notify/push.py), word for word.
+// campaign ended by itself, a schedule missed a firing or Dot has something to tell you on its own (the morning brief,
+// the watchers), unless you are looking at that run (its page open, the tab visible, the window active; item 75), or
+// you asked to be told even then. They say what the daemon's pushes say (notify/push.py), word for word.
 
 import { api } from "./api.js";
 import { faceDataUrl, overallState } from "./face.js";
@@ -244,6 +244,12 @@ function tellAboutStoppedSchedule(event) {
   });
 }
 
+/** What Dot tells you on its own, the morning brief and the watchers (items 570 and 571): the title, the text and the page it opens, as pushed. */
+function tellAboutOwner(event) {
+  const { title, text, url } = event.data;
+  tell({ title, body: shorten(text), tag: `owner-${event.ts}`, route: url, state: "idle" });
+}
+
 function tellAboutLearningStalled(event) {
   tell({ title: "Dot's learning has stopped", body: shorten(event.data.reason), tag: "learning-stalled", route: "#/settings/memory", state: "failed" });
 }
@@ -270,6 +276,8 @@ function onLifecycleEvent(event) {
       tellAboutScheduledEnd(event);
     } else if (event.kind === "learning_stalled") {
       tellAboutLearningStalled(event);
+    } else if (event.kind === "owner_told") {
+      tellAboutOwner(event);
     }
   } catch (error) {
     console.warn("could not notify", error);

@@ -1,10 +1,12 @@
 // Schedules: goals that Dot carries out by itself, once or on a cron schedule, while the daemon runs. A page of the
 // sidebar above Customize. Each schedule keeps how its runs start (mode, approvals, goal mode, model, reasoning level,
 // time zone) and can be changed later. Run now starts one of its runs by hand, switched on or off, and its Firings
-// list its last runs, at its time and by hand (item 455).
+// list its last runs, at its time and by hand (item 455). The Morning brief card is at its head (item 570): the brief is
+// a schedule of its own, labelled in the list, which its card sets.
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
+import { mountBrief } from "../briefcard.js";
 import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
@@ -247,7 +249,13 @@ function scheduleRow(view, handlers) {
   });
   const edit = el(
     "button",
-    { class: "btn ghost sm icon-only", type: "button", title: "Edit this schedule", "aria-label": `Edit ${record.name}`, onclick: () => handlers.onEdit(view) },
+    {
+      class: "btn ghost sm icon-only",
+      type: "button",
+      title: view.brief ? "Edit the morning brief on its card, at the top of this page" : "Edit this schedule",
+      "aria-label": `Edit ${record.name}`,
+      onclick: () => handlers.onEdit(view),
+    },
     icon("pencil"),
   );
   const remove = el(
@@ -282,7 +290,12 @@ function scheduleRow(view, handlers) {
     el(
       "div",
       { class: "row-main" },
-      el("div", { class: "row" }, el("span", { class: "row-title" }, record.name)),
+      el(
+        "div",
+        { class: "row" },
+        el("span", { class: "row-title" }, record.name),
+        view.brief ? el("span", { class: "badge b-info", title: "Dot writes it each morning; its card at the top of this page sets it" }, "Brief") : null,
+      ),
       el("div", { class: "row-meta" }, optionChips(record, agent)),
       goalText(record.goal),
       // One line of when and how it went, its parts kept by a dot: a phone wraps it in two lines, not one a part.
@@ -665,6 +678,8 @@ export function mount(root, ctx) {
     }
   });
   const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "The scheduler is not running, so nothing fires until the daemon restarts."));
+  // The brief's card reads again whenever the list does: a switch in the list, a run's end, a failure that switched it off.
+  const brief = mountBrief(ctx, () => reload());
 
   function paint() {
     if (views === null || editing !== null) {
@@ -677,7 +692,7 @@ export function mount(root, ctx) {
     const handlers = {
       onToggle: (record) => attempt(() => toggle(record)),
       onDelete: (record) => attempt(() => remove(record)),
-      onEdit: (view) => startEditing(view),
+      onEdit: (view) => (view.brief ? brief.focus() : startEditing(view)),
       onRunNow: (record) => attempt(() => runNow(record)),
       onFirings: (record, button, list) => attempt(() => toggleFirings(record, button, list)),
       firingsOpen: (id) => openFirings.has(id),
@@ -729,6 +744,7 @@ export function mount(root, ctx) {
       }
       views = fresh;
       paint();
+      attempt(brief.reload);
     } catch (error) {
       if (disposed || mine !== ticket) {
         return;
@@ -827,6 +843,7 @@ export function mount(root, ctx) {
       el("span", null, "Schedules fire only while the daemon runs and this Mac is awake. A firing that was missed while the daemon was down is skipped, not replayed."),
     ),
     schedulerNote,
+    brief.element,
     formSlot,
     el(
       "section",
@@ -845,6 +862,7 @@ export function mount(root, ctx) {
   attempt(reload);
   return () => {
     disposed = true;
+    brief.dispose();
     stopLifecycle();
     stopBack();
   };
