@@ -483,7 +483,8 @@ class SnapshotsConfig(FrozenModel):
 
 class ChannelsConfig(FrozenModel):
     """Which of the owner's messaging apps reach Dot (item 572): whether Dot reads the owner's conversation with
-    themselves in Messages and answers in it (``imessage``). Settings › Channels switches it, live."""
+    themselves in Messages and answers in it, and tells them there what it says on its own (item 582) (``imessage``).
+    Settings › Channels switches it, live."""
 
     imessage: bool
 

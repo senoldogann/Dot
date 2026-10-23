@@ -10,11 +10,17 @@ nothing more. ``/stop`` stops the run at work in the chat.
 Outbound, the answer of each run of the chat is sent when the run ends, masked of the secrets Dot holds, as plain text
 and cut to the channel's size with a link to the chat for the rest. A run that waits for the owner (an approval, a
 question) sends one line with what it asks and the link. Approvals and questions are never answered on a channel: the
-account of a channel, if taken, must not be able to approve."""
+account of a channel, if taken, must not be able to approve.
+
+What Dot tells the owner on its own (the morning brief and the watchers, ``owner_told`` of ``notify/owner.py``, item
+582) goes out on each channel that is on and paired as one line: the title, the text and the link to the page it opens.
+A channel gets one such line in a window of :data:`ASKS_APART_S`; the tells that come inside it are held and told after
+it as one line, "and N more"."""
 
 import asyncio
 import time
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.manager import RunManager
@@ -25,6 +31,7 @@ from dotagent.core.errors import DotError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_known
 from dotagent.events import Subscription
+from dotagent.notify.owner import OWNER_TOLD_EVENT, OwnerTold
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
@@ -41,12 +48,16 @@ from dotagent.store.models import (
 
 log = get_logger(__name__)
 
-# The events the router tells the owner of: the end of a run, and an approval or a question that waits for them.
-WATCHED_KINDS: frozenset[str] = frozenset({"run_finished", "approval_requested", QUESTION_LEFT_EVENT})
+# The events the router tells the owner of: the end of a run, an approval or a question that waits for them, and what
+# Dot tells them on its own (item 582).
+WATCHED_KINDS: frozenset[str] = frozenset({"run_finished", "approval_requested", QUESTION_LEFT_EVENT, OWNER_TOLD_EVENT})
 # The kv key of the chat of each channel (``channels.thread.imessage``).
 _THREAD_KEY: str = "channels.thread."
-# A run waits for the owner a few times in a row now and then: the owner is told of the first, not of each.
+# A run waits for the owner a few times in a row now and then: the owner is told of the first, not of each. A watcher
+# tells a few things in a row too: a channel gets one line of them in this time, and the rest as one line after it.
 ASKS_APART_S: float = 20.0
+# The title of a line that holds tells of different titles.
+_FOLDED_TITLE: str = "Dot"
 # How far up from a helper's run the run of the channel's chat is looked for.
 _ROOT_DEPTH: int = 8
 _ASKING_LEAD: dict[str, str] = {"question": "Dot has a question", "handoff": "Dot needs your help"}
@@ -56,6 +67,16 @@ _FIRST_LINE_CHARS: int = 300
 DEFAULT_CHOICES: ChatChoices = ChatChoices(
     mode="auto", model=None, effort=None, speed="standard", approvals=None, goal_mode=None
 )
+
+
+@dataclass
+class _Held:
+    """What Dot told the owner on its own while a channel's window was not over: how many tells, the title they share
+    (``None`` once two differ) and the newest, whose page the line opens."""
+
+    count: int
+    title: str | None
+    newest: OwnerTold
 
 
 class ChannelRouter:
@@ -83,6 +104,10 @@ class ChannelRouter:
         self._making: asyncio.Lock = asyncio.Lock()
         self._asks_apart_s: float = asks_apart_s
         self._asked_at: dict[ChannelId, float] = {}
+        # What Dot told the owner on its own (item 582): when each channel was last sent such a line, and what waits
+        # for its window to end.
+        self._told_at: dict[ChannelId, float] = {}
+        self._held: dict[ChannelId, _Held] = {}
 
     async def load(self) -> None:
         """Read which thread is the chat of each channel."""
@@ -208,17 +233,26 @@ class ChannelRouter:
     # ----- outbound --------------------------------------------------------------------------
 
     async def watch(self, feed: Subscription) -> None:
-        """Tell the owner what the events of ``feed`` (:data:`WATCHED_KINDS`) say of the runs of the channels' chats,
-        until cancelled. An event that cannot be told of (its run was deleted, the store failed) is logged and the next
-        one still goes."""
+        """Tell the owner what the events of ``feed`` (:data:`WATCHED_KINDS`) say of the runs of the channels' chats and
+        what Dot tells on its own, until cancelled. The tells held for a channel's window go out when it ends, between
+        two events. An event that cannot be told of (its run was deleted, the store failed) is logged and the next one
+        still goes."""
         while True:
-            event: EventRecord = await feed.queue.get()
+            try:
+                event: EventRecord = await asyncio.wait_for(feed.queue.get(), self._held_for())
+            except TimeoutError:
+                await self._tell_held()
+                continue
             try:
                 await self._tell_of(event)
             except DotError as error:
                 log.warning("channel_event_not_told", run_id=event.run_id, kind=event.kind, error=error.message)
 
     async def _tell_of(self, event: EventRecord) -> None:
+        if event.kind == OWNER_TOLD_EVENT:
+            # An event of Dot itself: it has no run, and no chat of a channel is its own.
+            await self._told_on_its_own(OwnerTold.model_validate(event.data))
+            return
         run: RunRecord = await self._store.get_run(event.run_id)
         root: RunRecord = await self._root(run)
         channel_id: ChannelId | None = self._chats.get(root.thread_id)
@@ -267,9 +301,63 @@ class ChannelRouter:
         lead: str = _ASKING_LEAD.get(str(severity), "Dot waits for your approval")
         return f"{lead}: {one_line(what, _ASK_CHARS)}\nAnswer it in Dot, not here: {link}"
 
-    async def _say(self, channel_id: ChannelId, text: str, run_id: str | None) -> bool:
+    async def _told_on_its_own(self, owner: OwnerTold) -> None:
+        """What Dot tells the owner on its own (the morning brief, a watcher) goes on each channel that is on and
+        paired, once the channel's window is over. The window is each channel's own, and the tells that come inside it
+        are held for the line after it."""
+        for channel_id in self._channels:
+            if self._reachable(channel_id):
+                self._hold(channel_id, owner)
+        await self._tell_held()
+
+    def _hold(self, channel_id: ChannelId, owner: OwnerTold) -> None:
+        held: _Held | None = self._held.get(channel_id)
+        if held is None:
+            self._held[channel_id] = _Held(1, owner.title, owner)
+            return
+        held.count += 1
+        held.title = held.title if held.title == owner.title else None
+        held.newest = owner
+
+    async def _tell_held(self) -> None:
+        """Send the line of each channel whose window is over: the tell held for it, or how many are held. A channel
+        that was switched off, or lost its pairing, while its tells were held is not told, and no window starts."""
+        for channel_id in tuple(self._held):
+            if time.monotonic() < self._may_tell_at(channel_id):
+                continue
+            held: _Held = self._held.pop(channel_id)
+            if self._reachable(channel_id):
+                await self._say(channel_id, self._told_line(held), None)
+                self._told_at[channel_id] = time.monotonic()
+                log.info("channel_owner_told", channel=channel_id, tells=held.count)
+
+    def _held_for(self) -> float | None:
+        """The seconds until the first window ends that has tells held for it; ``None`` when none is held."""
+        if not self._held:
+            return None
+        return max(0.0, min(self._may_tell_at(channel_id) for channel_id in self._held) - time.monotonic())
+
+    def _may_tell_at(self, channel_id: ChannelId) -> float:
+        """When (``time.monotonic``) the window of ``channel_id`` since its last line of tells ends."""
+        return self._told_at.get(channel_id, -self._asks_apart_s) + self._asks_apart_s
+
+    def _told_line(self, held: _Held) -> str:
+        """The one line of the tells held for a channel: the tell itself when it is the only one, else how many there
+        are under the title they share ("Dot" when they differ). The link opens the page of the newest: the route of a
+        tell is one of Dot's own pages (:func:`~dotagent.notify.owner.told`), at the address the router's links open
+        at."""
+        link: str = f"{self._base}{held.newest.url}"
+        if held.count == 1:
+            return f"{held.newest.title}: {held.newest.text}\n{link}"
+        return f"{held.title or _FOLDED_TITLE}: and {held.count} more\n{link}"
+
+    def _reachable(self, channel_id: ChannelId) -> bool:
+        """Whether the owner can be told on ``channel_id``: it is switched on and knows who to answer."""
+        return self._is_on(channel_id) and self._channels[channel_id].paired()
+
+    async def _say(self, channel_id: ChannelId, text: str, run_id: str | None) -> None:
         """Send ``text`` to the owner on ``channel_id``: masked of the secrets Dot holds, as plain text and cut to the
-        channel's size, with the link to the run's page for the rest. Returns whether it went; a failure is logged."""
+        channel's size, with the link to the run's page for the rest. A failure is logged."""
         channel: Channel = self._channels[channel_id]
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
         words: str = as_plain_text(redact_known(text, known))
@@ -278,14 +366,3 @@ class ChannelRouter:
             await channel.send(cut_with_link(words, channel.limit, link))
         except DotError as error:
             log.warning("channel_send_failed", channel=channel_id, error=redact_known(error.message, known))
-            return False
-        return True
-
-    async def tell(self, text: str, run_id: str | None = None) -> tuple[ChannelId, ...]:
-        """Send ``text`` to the owner on every channel that is on and knows who to answer (a morning brief, a watcher's
-        line); returns the channels it went on."""
-        reached: list[ChannelId] = []
-        for channel_id, channel in self._channels.items():
-            if self._is_on(channel_id) and channel.paired() and await self._say(channel_id, text, run_id):
-                reached.append(channel_id)
-        return tuple(reached)

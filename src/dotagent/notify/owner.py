@@ -3,8 +3,9 @@ it through :func:`tell_owner`, and nothing else in Dot tells the owner a thing t
 
 A tell is an event of Dot itself (``owner_told``, live only, like the other notices of ``notify/push.py``), so every
 way to reach the owner listens to the one bus: the web push sends it to the phone (``notice_message`` of
-``notify/push.py``), and the web UI shows it as a desktop notification. A channel added later listens for the same
-event and needs no change to the callers."""
+``notify/push.py``), the web UI shows it as a desktop notification, and the router of the channels sends it into the
+owner's messaging apps (``channels/router.py``, item 582). A way added later listens for the same event and needs no
+change to the callers."""
 
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import FrozenModel

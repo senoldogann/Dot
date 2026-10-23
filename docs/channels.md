@@ -1,9 +1,10 @@
 # Channels: reach Dot from your phone's own messaging app
 
 Dot can be reached without Tailscale and without the web UI: from the messaging app of your phone. A *channel* receives
-your messages and sends Dot's. There is one, **iMessage**, through the conversation you have with yourself (item 572).
-Settings › Channels shows where it stands (what macOS has granted, which numbers and addresses are paired) and has its
-switch. [Dot on the phone](phone.md) is the other way, the web UI itself on your phone through your own tailnet.
+your messages and sends Dot's, and what Dot tells you on its own. There is one, **iMessage**, through the conversation
+you have with yourself (item 572). Settings › Channels shows where it stands (what macOS has granted, which numbers and
+addresses are paired) and has its switch. [Dot on the phone](phone.md) is the other way, the web UI itself on your phone
+through your own tailnet.
 
 ## How it works
 
@@ -24,6 +25,17 @@ as if you had typed it in the box of the web UI (the same code that sends the bo
   most one line is sent every twenty seconds: *Dot waits for your approval: Run `rm -r build`. Answer it in Dot, not
   here: https://…/#/runs/…*. The link goes to the name a phone reaches the Mac by (`[server] reach`, see
   [Dot on the phone](phone.md)), else to this Mac's own address, and never carries the access token.
+- What Dot tells you on its own comes the same way (item 582): the first line of the morning brief and each tell of a
+  watcher ([Dot comes to you](proactive.md)), as one message, **marked with `◆ `**, that holds the title, a colon, the
+  text and the link to the page the tell opens (the brief's run, the chat Watchers or Schedules): *Your morning brief:
+  Nothing needs you today. https://…/#/runs/…*. It goes to the conversation you wrote in last, masked of the secrets Dot
+  holds and as plain text, while iMessage is on and a number is paired; with the channel off, or no number paired,
+  nothing is sent. Your phone's push and the page's notification carry the same tell, as before. A channel gets at most
+  one such message every twenty seconds: the first tell of a burst goes at once, and what comes after it inside the
+  twenty seconds is told as one message when they are over, *Bank mail: and 3 more* with the link to the newest (a
+  single one that waited goes as itself, and tells under different titles are counted under the name *Dot*). Dot's own
+  message starts with `◆`, so it is never read back as a command, whoever wrote the words in it, and neither is the
+  link that Messages may split off its end (see Links, below).
 
 **Approvals are not answered on a channel.** You answer them in Dot's web UI or the phone app. A channel's account, if
 someone took it, must not be able to approve anything: it can only send Dot a message, and a message is judged by the
@@ -122,8 +134,10 @@ switched off.
 
 ## What leaves this Mac
 
-Dot's answers go to Apple's iMessage servers and on to your own devices, as any iMessage does. Nothing else leaves:
-what you send is read from this Mac's own database. See [What leaves this Mac](safety.md#what-leaves-this-mac).
+Dot's answers, and what it tells you on its own (the brief's first line, a watcher's tell: a mail's sender and subject
+may be in it, as they are in the push to your phone), go to Apple's iMessage servers and on to your own devices, as any
+iMessage does. Nothing else leaves: what you send is read from this Mac's own database. See [What leaves this
+Mac](safety.md#what-leaves-this-mac).
 
 ## If it does not work
 

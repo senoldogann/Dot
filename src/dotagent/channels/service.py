@@ -18,7 +18,7 @@ from dotagent.channels.imessage import (
     Script,
     database_access,
 )
-from dotagent.channels.router import WATCHED_KINDS, ChannelRouter
+from dotagent.channels.router import ASKS_APART_S, WATCHED_KINDS, ChannelRouter
 from dotagent.channels.types import Channel, ChannelId
 from dotagent.channels.views import AutomationAnswer, ChannelsView, ImessageView
 from dotagent.connections import mac
@@ -99,6 +99,7 @@ class Channels:
         macos: Macos | None = None,
         poll_s: float = POLL_S,
         ask_wait_s: float = ASK_WAIT_S,
+        asks_apart_s: float = ASKS_APART_S,
     ) -> None:
         self._runtime: Runtime = runtime
         self._macos: Macos = RealMacos() if macos is None else macos
@@ -116,7 +117,7 @@ class Channels:
             runtime.store, script, self._messages_db, runtime.config.desktop.osascript_timeout_s, base, poll_s
         )
         self._channels: dict[ChannelId, Channel] = {"imessage": self._imessage}
-        self._router: ChannelRouter = ChannelRouter(runtime, manager, self._channels, base, self.is_on)
+        self._router: ChannelRouter = ChannelRouter(runtime, manager, self._channels, base, self.is_on, asks_apart_s)
         self._tasks: dict[ChannelId, asyncio.Task[None]] = {}
         self._watcher: asyncio.Task[None] | None = None
         self._stack: contextlib.AsyncExitStack = contextlib.AsyncExitStack()
