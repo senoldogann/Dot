@@ -374,6 +374,17 @@ const SHAPES = {
     ["path", { d: "M19.967 17.484A4 4 0 0 1 18 18" }],
   ],
   message: [["path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" }]],
+  // The microphone of the composer and the speaker that reads an answer aloud (item 574).
+  mic: [
+    ["path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }],
+    ["path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }],
+    ["line", { x1: 12, x2: 12, y1: 19, y2: 22 }],
+  ],
+  volume: [
+    ["polygon", { points: "11 5 6 9 2 9 2 15 6 15 11 19 11 5" }],
+    ["path", { d: "M15.54 8.46a5 5 0 0 1 0 7.07" }],
+    ["path", { d: "M19.07 4.93a10 10 0 0 1 0 14.14" }],
+  ],
   // A draft of an email and the press that sends it (item 314).
   mail: [["rect", { width: 20, height: 16, x: 2, y: 4, rx: 2 }], ["path", { d: "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" }]],
   send: [

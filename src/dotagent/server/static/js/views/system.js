@@ -2,7 +2,17 @@
 
 import { DOT_ID, lookOf, rememberLook } from "../actors.js";
 import { api, clearToken } from "../api.js";
-import { AUTO_COMPUTER, AUTO_LINES, BUSY_SEND, SEND_KEY, setValue, settingValue } from "../appearance/settings.js";
+import {
+  AUTO_COMPUTER,
+  AUTO_LINES,
+  BUSY_SEND,
+  READ_ALOUD,
+  SEND_KEY,
+  VOICE_LANGUAGE,
+  VOICE_LANGUAGES,
+  setValue,
+  settingValue,
+} from "../appearance/settings.js";
 import {
   notificationsAvailable,
   notificationsBlocked,
@@ -35,11 +45,13 @@ import {
   switchSetting,
 } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
+import { voiceLanguage } from "../readaloud.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
 import { scrollCue } from "../scrollcue.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
+import { canListen, canSpeak, sayOnce, stopReading } from "../voice.js";
 
 const NOT_SET = "—";
 // The roles a model is configured for, and the tab where a missing or refused key is put right.
@@ -208,6 +220,66 @@ function buildComposerCard() {
     onSelect: (id) => setValue(BUSY_SEND, id),
   });
   return section("Composer", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
+}
+
+/** The voice (item 574), kept in this browser: the language the microphone listens in and an answer is read aloud in, and whether
+ * an answer that comes in is read aloud. Where the browser has no speech recognition or no voice, the card says so. */
+function buildVoiceCard() {
+  const language = el(
+    "select",
+    { class: "select voice-language", "aria-label": "Language of the voice" },
+    VOICE_LANGUAGES.map((choice) => el("option", { value: choice.id }, choice.label)),
+  );
+  language.value = settingValue(VOICE_LANGUAGE);
+  language.addEventListener("change", () => setValue(VOICE_LANGUAGE, language.value));
+  const aloud = switchSetting({
+    label: "Read answers aloud",
+    hint: "Off until you turn it on. An answer that comes in while you watch is read with the browser's own voice; the speaker under each answer reads it again, or stops it.",
+    read: () => settingValue(READ_ALOUD) === "on",
+    write: async (on) => {
+      setValue(READ_ALOUD, on ? "on" : "off");
+      if (on) {
+        // Said at the press, so that a browser that speaks only after a touch speaks later, and the owner hears the voice.
+        sayOnce("Dot reads answers aloud now.", voiceLanguage());
+      } else {
+        stopReading();
+      }
+    },
+    onToggled: () => aloud.paint(),
+  });
+  aloud.paint();
+  const facts = [];
+  if (canSpeak()) {
+    facts.push(
+      "An answer is read with a voice kept on this Mac when there is one for the language. A network voice (Chrome's “Google …” voices) sends the text it reads to a server, and the browser speaks with one only when it has no other.",
+    );
+  } else {
+    aloud.toggle.disabled = true;
+    facts.push("This browser cannot speak, so no answer is read aloud.");
+  }
+  if (canListen()) {
+    facts.push(
+      "The browser does the listening: Safari and Chrome may send your voice to Apple's or Google's servers to recognize it. Dot sends nothing itself, and nothing is sent by voice alone: the words fill the box, and you send them.",
+    );
+  } else {
+    facts.push("This browser has no speech recognition, so the composer shows no microphone.");
+  }
+  return section(
+    "Voice",
+    null,
+    el(
+      "div",
+      { class: "card-pad stack" },
+      el(
+        "div",
+        { class: "setting" },
+        el("div", { class: "row" }, el("span", { class: "grow" }, "Language"), language),
+        el("div", { class: "hint" }, "What the microphone listens for and the voice speaks in: the page's own language, or one you choose (an answer in Turkish is read in Türkçe)."),
+      ),
+      aloud.element,
+      facts.map((fact) => el("div", { class: "hint" }, fact)),
+    ),
+  );
 }
 
 /** What a chat shows of the actions the review model approved (items 346 and 362), kept in this browser. */
@@ -2090,12 +2162,13 @@ function buildDotLookCard() {
 
 export function mountGeneral(root, ctx) {
   const look = buildDotLookCard();
-  ctx.head.setLead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, what a chat shows of what ran without asking, and the token this browser is signed in with.");
+  ctx.head.setLead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, the voice (the microphone and answers read aloud), what a chat shows of what ran without asking, and the token this browser is signed in with.");
   root.append(
     buildNameCard(),
     look.element,
     buildNotifications(),
     buildComposerCard(),
+    buildVoiceCard(),
     buildChatCard(),
     buildTokenCard(),
   );

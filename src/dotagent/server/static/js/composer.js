@@ -15,6 +15,7 @@ import { icon } from "./icons.js";
 import { markContent, markInk } from "./marks.js";
 import { touchFirst, trackHeight } from "./layout.js";
 import { openMenu } from "./menu.js";
+import { createMicrophone } from "./microphone.js";
 import { markdownMirror } from "./mirror.js";
 import { loadPalette } from "./palette.js";
 import { arePicks, createPicks } from "./picks.js";
@@ -70,8 +71,9 @@ export function moveDraft(fromKey, toKey) {
  * of the MCP servers and the plugins, each with its service's mark (items 367, 447 and 477), and the markdown it holds shown under
  * it; `edited()` runs after a pick of the menu changed the text, as the input event does after typing, and `picked(pick)` after a skill or
  * a tool was picked for the message (`{ kind, name }`, item 318). Returns the menu element and the box's field (the box
- * with its markdown under it) to place in the composer's frame, `autosize()`, to call after any change of the text, and
- * `dispose()`. */
+ * with its markdown under it) to place in the composer's frame, `autosize()`, to call after any change of the text,
+ * `setInterim([from, to])`, which draws those characters of the text quieter (the words a dictation may still change,
+ * item 574), and `dispose()`. */
 function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
   const menu = el("div", { class: "slash-menu", role: "listbox", id: `slash-${Math.random().toString(36).slice(2, 8)}`, hidden: true });
   textarea.setAttribute("aria-controls", menu.id);
@@ -267,6 +269,7 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
     menu,
     field: mirror.field,
     autosize,
+    setInterim: mirror.setInterim,
     dispose: () => {
       textarea.removeEventListener("keydown", onKeydown);
       textarea.removeEventListener("click", follow);
@@ -357,6 +360,9 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   }
 
   const wired = wireComposer(textarea, { maxPx, send, commands, edited, picked: (pick) => picks.add(pick.kind, pick.name) });
+  // The microphone, where the browser has speech recognition (item 574): it fills the box as the owner speaks; a message is
+  // still sent by the owner's own press.
+  const microphone = createMicrophone({ textarea, setInterim: wired.setInterim });
   // The "+" opens a menu: the files, and the task the owner shows Dot once (item 423, teach.js). A composer with no chat
   // behind it (the curtain while Dot opens) adds files alone.
   function plusMenu() {
@@ -377,7 +383,13 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     { class: "btn ghost sm plus-button", type: "button", title: "Add files or teach a task", "aria-label": "Add files or teach a task", onclick: plusMenu },
     icon("plus"),
   );
-  element.append(wired.menu, attachments.list, picks.list, attachments.picker, el("div", { class: "composer-bar" }, plusButton, wired.field, options, sendButton));
+  element.append(
+    wired.menu,
+    attachments.list,
+    picks.list,
+    attachments.picker,
+    el("div", { class: microphone === null ? "composer-bar" : "composer-bar has-mic" }, plusButton, wired.field, options, microphone?.button, sendButton),
+  );
   sendButton.addEventListener("click", () => (stopping() ? stop() : send()));
 
   function onInput() {
@@ -436,6 +448,8 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       return () => watchers.delete(watcher);
     },
     clear: () => {
+      // A message was sent: what is still being heard is not for the next one.
+      microphone?.abort();
       textarea.value = "";
       edited();
       wired.autosize();
@@ -452,6 +466,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     dispose: () => {
       stopSnapshots();
       stopHeight();
+      microphone?.dispose();
       wired.dispose();
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);

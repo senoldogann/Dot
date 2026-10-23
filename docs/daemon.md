@@ -154,7 +154,13 @@ in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
 links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
-sent is the text as typed. A message whose answer was lost on its way back (the page says the sending failed and keeps
+sent is the text as typed. A **microphone** by the send (item 574; where the browser has speech recognition,
+`SpeechRecognition` or Safari's `webkitSpeechRecognition`: Safari and Chrome, not Firefox or the desktop app, which show
+none) fills the box as you speak, after what it holds, the words the engine may still change drawn quieter until it
+settles them. It listens in the page's language or the one chosen in Settings › General › Voice (English, Türkçe, Suomi,
+Svenska, Deutsch, Français or Español), and stops at a second press, after six seconds of silence, when you type, when you
+send and when the page goes out of sight; a browser that refuses the microphone is said so. Nothing is sent by voice
+alone: you read the box and send as usual. A message whose answer was lost on its way back (the page says the sending failed and keeps
 the message) is done once when it is sent again, here and in the box of a run: the page sends each new message with a
 key of its own, and the daemon answers the same message sent again with what its first sending made. `/` at the start of
 a word opens the slash menu over the box: the commands of the composer (`/auto`, `/task`, `/chat`, `/research` and
@@ -290,10 +296,17 @@ events, those of the runs it delegated to, and the work of the turn before it ar
 nothing fills in as the stream comes. A message sent from a chat that is over starts the next run in the same chat
 without a jump: the chat stands where it was, at its foot, inert, until the next run's page is drawn in its place,
 never lifted to its top and dropped back. The answer of the run is the last message, with a copy button
-(its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how long
-the run took shows where the pointer rests on it (on a touch screen it always shows). A message that only says the
-answer again is not shown beside it, wherever it stands in the turn (item 460): a task run that answers in a plain
-reply is told to call finish, thinks once more and finishes with the same words, or nearly: its first line reworded
+(its icon turns to a check once the answer is on the clipboard) and, where the browser can speak, a speaker (item 574),
+when it came and how the run ended under it; how long the run took shows where the pointer rests on it (on a touch
+screen it always shows). The speaker reads the answer aloud with the browser's own voice, in the language of Settings ›
+General › Voice (with a voice kept on this Mac when the browser has one for the language, a network voice only when it
+has not: [what leaves this Mac](safety.md#what-leaves-this-mac)), leaving out its code, its addresses and the marks of
+its Markdown, and stops the reading at a second press. With **Read answers aloud** on in Settings › General › Voice
+(off until you turn it on, in this browser alone), the answer of a run that ends while its page is open is read as it
+appears, and one shown again by a chat opened later is not; one answer is read at a time. A message that only says the
+answer again is not shown beside it, wherever it
+stands in the turn (item 460): a task run that answers in a plain reply is told to call finish, thinks once more
+and finishes with the same words, or nearly: its first line reworded
 (item 567), a path cut short written out whole, a comma made a semicolon, a line added before or after (item 569). Such
 a message goes when every line of it is held in a line of the answer, in order: its words are words of that line in
 their order, the marks of a sentence at a word's ends aside (a sign, a unit or a currency is part of the word), and a

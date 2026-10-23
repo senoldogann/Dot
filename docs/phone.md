@@ -1,7 +1,10 @@
 # Dot on the phone
 
 Without Tailscale, Dot can also be reached from the phone's own Messages, in the conversation you have with yourself:
-see [Channels](channels.md).
+see [Channels](channels.md). By voice, where the phone's browser offers it (Safari does; an app added to the home
+screen may not, and the page says when the browser refuses): the composer's microphone dictates a message, and the
+speaker under an answer reads it aloud, with the browser's own speech recognition and voice, in the language chosen in
+Settings › General › Voice (item 574; see [the daemon page](daemon.md#the-daemon-the-web-ui-and-the-service)).
 
 The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on the chat you
 were in last (New chat the first time; item 286), with the sidebar's sections, the chats and the run pages at a phone

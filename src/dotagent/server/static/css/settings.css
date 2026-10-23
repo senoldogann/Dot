@@ -615,6 +615,14 @@
   letter-spacing: var(--tracking-caps);
 }
 
+/* ---------- the voice (item 574) ---------- */
+
+/* The language of the voice stands at the right of its name, no wider than its longest choice needs. */
+.voice-language {
+  width: auto;
+  min-width: 160px;
+}
+
 /* ---------- the channels (item 572) ---------- */
 
 /* What a paired number or address holds under its title: the handles, the form that sends a code and the one that takes
