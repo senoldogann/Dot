@@ -655,7 +655,14 @@ export function mount(root, ctx) {
 
   const composer = setCard(
     content,
-    el("div", { class: "note-compose" }, el("label", { class: "note-tags" }, el("span", { class: "note-tags-label" }, "Tags"), tags), el("span", { class: "note-compose-hint", title: "⌘ or Ctrl + Enter keeps the note" }, "One fact per note · ⌘↵"), add),
+    el(
+      "div",
+      { class: "note-compose" },
+      el("label", { class: "note-tags" }, el("span", { class: "note-tags-label" }, "Tags"), tags),
+      // The key is a keyboard's: a touch screen has none, and the line says only what a note holds (item 576).
+      el("span", { class: "note-compose-hint", title: "⌘ or Ctrl + Enter keeps the note" }, "One fact per note", el("span", { class: "note-compose-keys" }, " · ⌘↵")),
+      add,
+    ),
     outcome,
   );
   composer.classList.add("note-composer");

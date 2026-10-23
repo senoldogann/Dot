@@ -229,13 +229,14 @@ function modelsOf(provider) {
   return models.find((each) => each.provider === provider) ?? null;
 }
 
-// The word under a provider's name in the list: where its key stands, in the few words a row has room for.
+// The word under a provider's name in the list: where its key stands, in the few words a row has room for. The last
+// characters of a key are set in the mono face, and words in the face of the page (item 576).
 function keyLine(view) {
   // A key in use may be the daemon's own (its environment or the Keychain): `source` says so while `saved` is false.
   if (view.source === null) {
     return aboutProvider(view.provider).needed ? "No key yet" : "Optional · no key";
   }
-  return view.tail === "" ? (SOURCES[view.source] ?? view.source) : `••••${view.tail}`;
+  return view.tail === "" ? (SOURCES[view.source] ?? view.source) : el("span", { class: "mono" }, `••••${view.tail}`);
 }
 
 /**
@@ -475,7 +476,7 @@ function buildProvider(initial, isDisposed, host) {
     const set = view.source !== null;
     const using = about.needed ? rolesOn(view.provider) : [];
     element.dataset.state = set ? "set" : "unset";
-    line.textContent = keyLine(view);
+    line.replaceChildren(keyLine(view));
     stateLine.dataset.tone = set ? "ok" : "off";
     stateLine.replaceChildren(
       ...(set ? [icon("check"), `Connected · ${about.needed ? shortUse(about.use) : "optional"}`] : [about.needed ? "No key yet" : "Optional"]),

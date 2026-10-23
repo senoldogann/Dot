@@ -173,14 +173,15 @@
 }
 
 /* A tab's cards that are not drawn as rows yet name themselves over their body, as a phone's do (app.css): a card's head
-   is the section's name and its body the card. */
+   is the section's name, as a section's title is, and its body the card. A card that folds keeps its head on its ground
+   (item 576), as a group of the health checks does: folded, the head is all there is of it. */
 @media (min-width: 721px) {
-  .settings-pane .card:has(> .card-head) {
+  .settings-pane .card:not(.fold):has(> .card-head) {
     border: 0;
     background: none;
   }
 
-  .settings-pane .card > .card-head {
+  .settings-pane .card:not(.fold) > .card-head {
     padding: 0 0 12px;
     border-bottom: 0;
     color: var(--text);
@@ -188,10 +189,21 @@
     font-weight: var(--weight-title);
   }
 
-  .settings-pane .card > .card-head + * {
+  .settings-pane .card:not(.fold) > .card-head + * {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
+  }
+}
+
+/* On a phone too the name over such a card reads as a section's title, flush with the cards (item 576): it was a muted
+   line set in, unlike the titles of the redrawn tabs. */
+@media (max-width: 720px) {
+  .settings-pane .card:not(.fold) > .card-head {
+    padding: 0 0 8px;
+    color: var(--text);
+    font-size: var(--text-ui);
+    font-weight: var(--weight-title);
   }
 }
 
@@ -726,15 +738,20 @@
   font-weight: var(--weight-label);
 }
 
+/* Where a provider's key stands, in words; the last characters of a key alone are set in the mono face. */
 .provider-line {
   margin: 0;
   color: var(--muted);
-  font-family: var(--mono);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The last characters of a key take the mono face at the size of their line. */
+.provider-line > .mono {
+  font-size: inherit;
 }
 
 .provider-dot {
@@ -1526,9 +1543,14 @@
   padding: var(--space-3) var(--space-5) var(--space-1);
 }
 
+/* The checks are a fold (item 576): its body holds what needs a look and the groups, a hairline between them. */
+.health > :not([hidden]) ~ :not([hidden]) {
+  border-top: 1px solid var(--border);
+}
+
 .health-row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-4);
   padding-block: 8px;
 }
@@ -1549,6 +1571,32 @@
 
 .health-passed .health-detail {
   font-family: var(--mono);
+}
+
+/* A finding that says much shows its first two lines over the button that shows the rest (item 576). */
+.health-detail-box {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.health-detail-box > .health-detail {
+  flex: none;
+  max-width: 100%;
+}
+
+.health-detail.clipped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.health-more {
+  margin-inline-start: calc(var(--space-2) * -1);
 }
 
 .health-ok {
@@ -1603,7 +1651,8 @@
     flex: 1 1 140px;
   }
 
-  .health-detail {
+  .health-row > .health-detail,
+  .health-row > .health-detail-box {
     flex-basis: 100%;
     order: 3;
   }
@@ -2432,6 +2481,30 @@
   white-space: nowrap;
 }
 
+/* On a phone the tags take a line of their own and the button stands at the right of the line under them, beside what
+   a note holds (item 576): it no longer wraps alone to the left. A touch screen has no key to keep a note with. */
+@media (max-width: 720px) {
+  .note-compose {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .note-compose > .note-tags {
+    grid-column: 1 / -1;
+  }
+
+  .note-compose-hint {
+    margin-left: 0;
+    white-space: normal;
+  }
+}
+
+@media (pointer: coarse) {
+  .note-compose-keys {
+    display: none;
+  }
+}
+
 .set-card.note-composer > .note-outcome {
   display: flex;
   flex-direction: column;
@@ -2584,6 +2657,15 @@
   font-size: var(--text-sm);
 }
 
+/* A note's tags are labels, not buttons: on a phone they keep the height of their words, the height of the badge beside
+   them (item 576), where the thumb's 36 px of a chip made each tag a large round button. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .note-meta .chip {
+    min-height: 0;
+    padding-block: 0;
+  }
+}
+
 .note-when {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -2686,13 +2768,22 @@
     flex: 1 1 100%;
   }
 
-  /* The four choices fill the width, in two lines when they do not fit in one. */
+  /* The four choices fill the width on one line, which scrolls sideways when they do not fit (item 576): in two lines
+     the last choice stood alone under the other three. */
   .note-tools .segmented {
     width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .note-tools .segmented::-webkit-scrollbar {
+    display: none;
   }
 
   .note-tools .segmented button {
-    flex: 1 1 auto;
+    flex: 1 0 auto;
+    white-space: nowrap;
   }
 
   .note-row {
@@ -3546,4 +3637,16 @@
   .theme-gallery > .theme-card {
     flex-basis: 132px;
   }
+}
+
+/* A card that folds lines its head up with the rows of the tab's cards (item 576). Its actions go under its name when
+   both do not fit on one line, as the health checks' filter and Run again do on a phone. */
+.settings-pane .card.fold > .card-head {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+  padding: 12px 20px;
+}
+
+.settings-pane .card.fold > .card-head > .fold-toggle {
+  flex: 1 1 12rem;
 }

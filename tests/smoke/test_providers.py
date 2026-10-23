@@ -8,9 +8,10 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Literal
 
+import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright
+from playwright.async_api import Browser, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -107,6 +108,12 @@ async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
                 await rows.nth(index).locator(".provider-name").text_content() for index in range(await rows.count())
             ]
             assert names[:3] == ["OpenAI", "Anthropic", "OpenCode Go"]
+            # Where a key stands is said in the page's face; only a key's last characters are set in mono (item 576).
+            fonts = await wide.evaluate(
+                """() => [...document.querySelectorAll('.provider-item .provider-line')]
+                     .map((line) => getComputedStyle(line).fontFamily === getComputedStyle(document.body).fontFamily)"""
+            )
+            assert fonts and all(fonts), fonts
             marks = await wide.evaluate(
                 """() => [...document.querySelectorAll('.provider-item .provider-mark')]
                      .map((mark) => getComputedStyle(mark).maskImage)
@@ -131,6 +138,20 @@ async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
             assert await rows.filter(has_text="Anthropic").get_attribute("aria-current") == "true"
             assert await wide.locator(".provider-item[aria-current]").count() == 1
             await wide.screenshot(path=str(tmp_path / "wide-dark-anthropic.png"))
+            # A key's last characters are set in mono at the size of their line (item 576). The key goes to the
+            # throw-away home's .env.
+            async with httpx.AsyncClient(base_url=served, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+                listed = (await client.get("/api/keys")).json()["keys"]
+                name = next(key["name"] for key in listed if key["provider"] == "openrouter")
+                saved = await client.post(f"/api/keys/{name}", json={"value": "sk-or-test-0123456789abcdef7c38"})
+                assert saved.status_code < 300, saved.text
+            await wide.reload()
+            tail = wide.locator(".provider-item .provider-line > .mono").first
+            await expect(tail).to_have_text("••••7c38")
+            sizes = await tail.evaluate(
+                "(tail) => [getComputedStyle(tail).fontSize, getComputedStyle(tail.parentNode).fontSize]"
+            )
+            assert sizes[0] == sizes[1], sizes
             assert wide_errors == []
             await wide.context.close()
 
