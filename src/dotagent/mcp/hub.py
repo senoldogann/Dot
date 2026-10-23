@@ -15,12 +15,15 @@ from dotagent.config import McpServerConfig
 from dotagent.core.errors import DotError, McpError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import log_dir, workspace_dir
+from dotagent.core.text import redact_known
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.mcp.connection import McpConnection
 from dotagent.mcp.launch import resolve_server_secrets, server_environment, server_headers
+from dotagent.mcp.masking import masked_context
 from dotagent.mcp.naming import require_distinct_names
 from dotagent.mcp.signin import kept_sign_in
 from dotagent.mcp.types import McpFailure, McpTool
+from dotagent.secrets import known_secrets
 from dotagent.tools.schema import flatten_json_schema
 
 log = get_logger(__name__)
@@ -209,10 +212,14 @@ def _failure(config: McpServerConfig, error: Exception) -> McpFailure:
     MCP library, logged with its traceback."""
     log_file: str = str(server_log_path(config))
     if isinstance(error, DotError):
-        log.warning("mcp_server_left_out", server=config.name, error=error.message, context=error.context)
-        return McpFailure(server=config.name, error=error.message, detail=error.context, log=log_file)
+        # The context holds the server's URL and arguments and the tail of what it printed, where a key may be (item
+        # 558): the log, the status and the page say where it is and why it failed without it.
+        detail: JsonObject = masked_context(error.context)
+        log.warning("mcp_server_left_out", server=config.name, error=error.message, context=detail)
+        return McpFailure(server=config.name, error=error.message, detail=detail, log=log_file)
     log.error("mcp_server_crashed", server=config.name, exc_info=error)
-    return McpFailure(server=config.name, error=f"{type(error).__name__}: {error}", detail={}, log=log_file)
+    words: str = redact_known(f"{type(error).__name__}: {error}", known_secrets())
+    return McpFailure(server=config.name, error=words, detail={}, log=log_file)
 
 
 async def open_hub(configs: Sequence[McpServerConfig], login_env: Mapping[str, str]) -> McpHub:

@@ -36,6 +36,18 @@ def _with(path: tuple[str, ...], value: JsonValue) -> JsonObject:
         ("providers", "anthropic", "attempts"),
         ("providers", "opencode_go", "read_timeout_s"),
         ("browser", "max_tabs"),
+        ("browser", "navigation_attempts"),
+        ("browser", "max_batch_steps"),
+        ("desktop", "max_batch_steps"),
+        ("desktop", "ax_max_nodes"),
+        ("desktop", "ax_max_depth"),
+        ("desktop", "screenshot_max_edge"),
+        ("providers", "ollama", "num_ctx"),
+        ("providers", "ollama", "num_ctx_cloud"),
+        ("agent", "stall_limit"),
+        ("agent", "failure_streak"),
+        ("agent", "revisit_window"),
+        ("agent", "reminder_every"),
         ("browser", "action_timeout_s"),
         ("agent", "tool_output_chars"),
         ("agent", "context_tokens"),
@@ -72,6 +84,50 @@ def test_a_page_size_or_a_screenshot_quality_chrome_cannot_take_is_refused(path:
     with pytest.raises(ValidationError) as refused:
         AppConfig.model_validate(_with(path, value))
     assert [error["loc"] for error in refused.value.errors()] == [path]
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("agent", "stall_limit"), 1),
+        (("agent", "revisit_window"), 1),
+        (("agent", "goal_patience"), -1),
+        (("agent", "finish_nudges"), -3),
+        (("agent", "keep_recent_tool_results"), -1),
+        (("browser", "navigation_attempts"), -1),
+        (("browser", "max_batch_steps"), -1),
+        (("desktop", "max_batch_steps"), -1),
+        (("browser", "settle_quiet_ms"), -1),
+        (("desktop", "settle_ms"), -1),
+        (("desktop", "jpeg_quality"), 0),
+        (("desktop", "jpeg_quality"), 101),
+    ],
+)
+def test_a_count_or_a_wait_below_what_the_loop_can_run_on_is_refused(path: tuple[str, ...], value: int) -> None:
+    """Item 558: a try, a batch of steps or a watchdog limit below its floor loaded without a word and then stopped the
+    browser, dropped the last step of a batch, or stopped every task run at its third tool step."""
+    with pytest.raises(ValidationError) as refused:
+        AppConfig.model_validate(_with(path, value))
+    assert [error["loc"] for error in refused.value.errors()] == [path]
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("agent", "goal_patience"), 0),
+        (("agent", "finish_nudges"), 0),
+        (("agent", "failure_streak"), 1),
+        (("agent", "stall_limit"), 2),
+        (("agent", "revisit_window"), 2),
+        (("agent", "keep_recent_screenshots"), 0),
+        (("browser", "navigation_attempts"), 1),
+        (("browser", "settle_quiet_ms"), 0),
+        (("desktop", "jpeg_quality"), 100),
+    ],
+)
+def test_the_floor_of_a_count_is_a_value_that_means_something(path: tuple[str, ...], value: int) -> None:
+    """No patience, no nudge, one try: each is a choice the owner may make, and loads."""
+    AppConfig.model_validate(_with(path, value))
 
 
 def test_the_defaults_are_within_the_bounds() -> None:

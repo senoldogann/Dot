@@ -534,7 +534,10 @@ go on without waits on the chat while the run works, and one in a run nobody can
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
 what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
 ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by
-commas) or your own words. The run reads which option you chose, and whether it was the one it recommended.
+commas) or your own words. The run reads which option you chose, and whether it was the one it recommended. A line
+typed in the terminal before a prompt for a decision appears (the next message of a chat, typed while the run worked)
+is set aside and answers nothing, and the prompt says so; at a hand-off only Enter or a yes says that you did the step,
+and any other answer skips it (item 558).
 
 **The record of each step.** Every step that the policy let through keeps, with its result, what decided it (item 468):
 the verdict, where it came from (one of your rules, named, the preset, the guard, the taint, supervised...), the reason,

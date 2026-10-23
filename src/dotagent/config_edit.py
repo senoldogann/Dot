@@ -3,8 +3,9 @@ raised), the default model, ``[models] main`` (item 199), a model of Dot's own w
 ``vision`` (item 232), whether the daemon resumes on its own the runs it cut off, ``[agent] resume`` (item 231), or the
 context size of a model, a key of ``[models.context]`` (item 250), whether the typed judge answers, ``[judge] provider``
 (item 255), whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), or the names the
-daemon answers to and whether it keeps the Mac awake, ``[server] reach`` and ``keep_awake`` (item 271), so the comments
-and the other settings stay as written."""
+daemon answers to and whether it keeps the Mac awake, ``[server] reach`` and ``keep_awake`` (item 271), or whether the
+notes are found by meaning, ``[memory] embed_enabled`` (item 558), so the comments and the other settings stay as
+written."""
 
 import os
 import re
@@ -32,7 +33,7 @@ _FILE_MODE: int = 0o600
 _EDITING: threading.Lock = threading.Lock()
 
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
-type ConfigTable = Literal["agent", "assistant", "browser", "judge", "models", "server", "shell", "snapshots"]
+type ConfigTable = Literal["agent", "assistant", "browser", "judge", "memory", "models", "server", "shell", "snapshots"]
 type AgentSetting = Literal["resume"]
 type AssistantSetting = Literal["name", "owner", "introduced"]
 type BrowserSetting = Literal[
@@ -49,6 +50,7 @@ type BrowserSetting = Literal[
     "zoom",
 ]
 type JudgeSetting = Literal["provider"]
+type MemorySetting = Literal["embed_enabled"]
 type ModelsSetting = Literal["main", "fast", "review", "vision", "standby"]
 type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
@@ -58,6 +60,7 @@ type SettingKey = (
     | AssistantSetting
     | BrowserSetting
     | JudgeSetting
+    | MemorySetting
     | ModelsSetting
     | ServerSetting
     | ShellSetting
@@ -111,17 +114,61 @@ def _key_line(key: str) -> re.Pattern[str]:
 
 
 def _key_value(key: str) -> re.Pattern[str]:
+    """A ``key = value`` line whose value is a string, a boolean or an integer (an array: :func:`_array_end`)."""
     return re.compile(
-        rf"""^(\s*{_key_pattern(key)}\s*=\s*)("(?:[^"\\]|\\.)*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*|\[[^\]]*\])(.*)$"""
+        rf"""^(\s*{_key_pattern(key)}\s*=\s*)("(?:[^"\\]|\\.)*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*)(.*)$"""
     )
 
 
-def _replaced_line(line: str, key: str, setting: str) -> str:
-    """``line`` (a ``key = ...`` line) with its value replaced by ``setting``, a trailing comment kept."""
-    match: re.Match[str] | None = _key_value(key).match(line)
+def _key_opening(key: str) -> re.Pattern[str]:
+    """The start of a ``key = ...`` line up to its value (group 1), and the rest of the line (group 2)."""
+    return re.compile(rf"^(\s*{_key_pattern(key)}\s*=\s*)(.*)$")
+
+
+def _array_end(lines: list[str], index: int, column: int) -> tuple[int, int] | None:
+    """Where the array opening at ``column`` of ``lines[index]`` closes, on that line or on a later one (an owner
+    writes a list over several lines): the index of the line with its ``]`` and the column after it, or ``None`` when it
+    never closes. A bracket in a string or after a ``#`` is not counted (item 558)."""
+    depth: int = 0
+    for number in range(index, len(lines)):
+        line: str = lines[number]
+        quote: str = ""
+        position: int = column if number == index else 0
+        while position < len(line):
+            char: str = line[position]
+            if quote:
+                if char == "\\" and quote == '"':
+                    position += 1
+                elif char == quote:
+                    quote = ""
+            elif char in "\"'":
+                quote = char
+            elif char == "#":
+                break
+            elif char == "[":
+                depth += 1
+            elif char == "]":
+                depth -= 1
+                if depth == 0:
+                    return number, position + 1
+            position += 1
+    return None
+
+
+def _replaced_lines(lines: list[str], index: int, key: str, setting: str) -> tuple[str, int]:
+    """The line that replaces the ``key = ...`` assignment starting at ``lines[index]`` with ``setting``, a trailing
+    comment kept, and the index of the line after the assignment: an array that runs over several lines is replaced as
+    a whole."""
+    opening: re.Match[str] | None = _key_opening(key).match(lines[index])
+    if opening is not None and opening.group(2).startswith("["):
+        closed: tuple[int, int] | None = _array_end(lines, index, opening.end(1))
+        if closed is not None:
+            last, column = closed
+            return f"{opening.group(1)}{setting}{lines[last][column:]}", last + 1
+    match: re.Match[str] | None = _key_value(key).match(lines[index])
     if match is None:
-        return f"{_written_key(key)} = {setting}"
-    return f"{match.group(1)}{setting}{match.group(3)}"
+        return f"{_written_key(key)} = {setting}", index + 1
+    return f"{match.group(1)}{setting}{match.group(3)}", index + 1
 
 
 def _table_lines(lines: list[str], table: str) -> tuple[int, int] | None:
@@ -150,7 +197,8 @@ def _with_value(text: str, table: str, key: str, setting: str) -> str:
     existing: int | None = _key_index(lines, bounds, key)
     if existing is None:
         return "\n".join([*lines[: bounds[0] + 1], line, *lines[bounds[0] + 1 :]]) + "\n"
-    return "\n".join([*lines[:existing], _replaced_line(lines[existing], key, setting), *lines[existing + 1 :]]) + "\n"
+    replaced, following = _replaced_lines(lines, existing, key, setting)
+    return "\n".join([*lines[:existing], replaced, *lines[following:]]) + "\n"
 
 
 def _without_value(text: str, table: str, key: str) -> str:
@@ -250,6 +298,12 @@ def set_standby_models(path: Path, models: list[str]) -> None:
     """Write ``[models] standby``, the models a run moves to in their order when its own model cannot answer (item
     478), into the config file at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "models", "standby", models)
+
+
+def set_embeddings(path: Path, on: bool) -> None:
+    """Write ``[memory] embed_enabled``, whether the notes are found by meaning as well as by their words (item 558),
+    into the config file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "memory", "embed_enabled", on)
 
 
 def set_resume(path: Path, mode: ResumeMode) -> None:

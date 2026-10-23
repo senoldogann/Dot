@@ -61,9 +61,9 @@ owner writes the questions, never the program; that, and adopting, is the human'
 Engineering", 2026, make the same cut: an execution report the run writes, candidates a small model writes, a scoring
 set the operator writes and the proposer never sees, and a final set used once).
 
-Selection is by score first: a candidate that does better on every task of the scoring set survives, one that does
-worse on any is dropped. The composer merges edits only when candidates do not conflict and each earns its place, or
-explains why the base is kept.
+Selection is by score first: a candidate that does better on at least one task of the scoring set and worse on none
+survives, one that does worse on any is dropped. The composer merges edits only when candidates do not conflict and
+each earns its place, or explains why the base is kept.
 
 ## How a change comes about
 

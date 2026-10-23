@@ -144,8 +144,8 @@ class StoreConfig(FrozenModel):
 class OllamaConfig(FrozenModel):
     base_url: ServiceAddress
     api_key_env: str
-    num_ctx: int
-    num_ctx_cloud: int
+    num_ctx: int = Field(ge=1)
+    num_ctx_cloud: int = Field(ge=1)
     keep_alive: str
     connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
@@ -257,7 +257,8 @@ _TIME_OF_DAY: re.Pattern[str] = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 
 class AgentConfig(FrozenModel):
     goal_mode: bool
-    goal_patience: int
+    # How often the checker may send a run back to work; 0 ends the run at its first refusal.
+    goal_patience: int = Field(ge=0)
     run_max_minutes: float = Field(ge=0, allow_inf_nan=False)
     run_max_tokens: int = Field(ge=0)
     campaign_gap_minutes: float = Field(gt=0, allow_inf_nan=False)
@@ -277,13 +278,14 @@ class AgentConfig(FrozenModel):
     context_elide_share: float = Field(gt=0, le=1, allow_inf_nan=False)
     context_summarise_share: float = Field(gt=0, le=1, allow_inf_nan=False)
     plan_each_turn: bool
-    keep_recent_tool_results: int
-    keep_recent_screenshots: int
-    stall_limit: int
+    keep_recent_tool_results: int = Field(ge=0)
+    keep_recent_screenshots: int = Field(ge=0)
+    # The progress watchdog's limits (dotagent.agent.progress): one repeat or one revisit is every step, so 2 at least.
+    stall_limit: int = Field(ge=2)
     stall_escalation: bool
-    failure_streak: int
-    revisit_window: int
-    finish_nudges: int
+    failure_streak: int = Field(ge=1)
+    revisit_window: int = Field(ge=2)
+    finish_nudges: int = Field(ge=0)
     questions: QuestionMode
     parallel_tools: int = Field(ge=1)
     model_call_timeout_s: float = Field(gt=0, allow_inf_nan=False)
@@ -293,7 +295,7 @@ class AgentConfig(FrozenModel):
     tiers: dict[str, Tier]
     profile_min_calls: int
     weak_refusal_share: float
-    reminder_every: int
+    reminder_every: int = Field(ge=1)
     steer_single_actions: bool
     tool_surface: ToolSurface
     # How much the system prompt says (item 280): "lean" keeps its rules and gives the tools' habits in a line each.
@@ -407,17 +409,17 @@ class BrowserConfig(FrozenModel):
     action_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     snapshot_max_chars: int
     viewport_margin_px: int = Field(ge=0)
-    settle_quiet_ms: int
-    settle_max_ms: int
-    navigation_attempts: int
-    navigation_backoff_ms: int
+    settle_quiet_ms: int = Field(ge=0)
+    settle_max_ms: int = Field(ge=0)
+    navigation_attempts: int = Field(ge=1)
+    navigation_backoff_ms: int = Field(ge=0)
     max_tabs: int = Field(ge=1)
     tab_idle_s: float = Field(gt=0, allow_inf_nan=False)
     # Dot's own Chrome closes once unused this long (item 454); 0 keeps it open until the daemon stops.
     idle_close_s: float = Field(ge=0, allow_inf_nan=False)
     # The JPEG quality Chrome takes a screenshot with.
     screenshot_quality: int = Field(ge=1, le=100)
-    max_batch_steps: int
+    max_batch_steps: int = Field(ge=1)
     read_text_chars: int
     allowed_hosts: list[str]
     blocked_hosts: list[str]
@@ -426,22 +428,22 @@ class BrowserConfig(FrozenModel):
 
 class DesktopConfig(FrozenModel):
     enabled: bool
-    screenshot_max_edge: int
-    jpeg_quality: int
-    settle_quiet_ms: int
-    settle_ms: int
+    screenshot_max_edge: int = Field(ge=1)
+    jpeg_quality: int = Field(ge=1, le=100)
+    settle_quiet_ms: int = Field(ge=0)
+    settle_ms: int = Field(ge=0)
     failsafe_corner: bool
     ax_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     ax_budget_s: float = Field(gt=0, allow_inf_nan=False)
-    ax_max_nodes: int
-    ax_max_depth: int
+    ax_max_nodes: int = Field(ge=1)
+    ax_max_depth: int = Field(ge=1)
     snapshot_max_chars: int
     capture_timeout_s: float = Field(gt=0, allow_inf_nan=False)
-    paste_settle_ms: int
+    paste_settle_ms: int = Field(ge=0)
     paste_threshold_chars: int
     keep_awake: bool
     keep_awake_s: int
-    max_batch_steps: int
+    max_batch_steps: int = Field(ge=1)
     launch_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     activate_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     osascript_timeout_s: float = Field(gt=0, allow_inf_nan=False)

@@ -477,15 +477,19 @@ notification says it.
 
 Send gives the draft to `osascript` with a fixed script for Mail or Messages; the recipients and the words reach the
 script as its arguments, never as words of the script (`drafts/scripts.py`), and after `--`, so that a subject or a
-message that starts with a dash is not read as an option of `osascript` (`-e` would add a line of script). A send the application refuses leaves the
-draft "Not sent" with what the application said, and **Send again** retries it; a second press, here or on another
-screen, finds it taken (409). A draft the daemon was handing over when it stopped is marked "Not sent" at its next
+message that starts with a dash is not read as an option of `osascript` (`-e` would add a line of script). A send the
+application refuses leaves the draft "Not sent" with what the application said, and **Send again** retries it. Mail's
+`send` answers whether it sent, and an answer of false (no account to send from) is a refusal too: the script ends in
+the error "Mail did not send the message" (item 558). A message to several people is handed over one recipient at a
+time, and one that fails partway leaves the draft "Not sent" with the names of those it had reached, which you take off
+the recipients before you send it again, or they get it twice. A second press, here or on another screen, finds the
+draft taken (409). A draft the daemon was handing over when it stopped is marked "Not sent" at its next
 start, as whether it went out is not known: look in Mail's Sent mailbox or the conversation in Messages before you send
 it again. Drafts are kept in the `drafts` table and go with their chat, or with the events of their run when those age
 out. The API: `GET /api/drafts/{id}`, `POST /api/drafts/{id}/send` (`{"to", "cc", "subject", "body"}`: the words that
 go; a message has no cc and no subject) and `POST /api/drafts/{id}/discard`. The scripts were not run against Mail or
-Messages themselves, which would send for real: the tests give them to a stand-in of `osascript` that writes down what
-it was handed.
+Messages themselves, which would send for real: the tests compile them, and give them to a stand-in of `osascript` that
+writes down what it was handed.
 
 ### Mail and calendars
 

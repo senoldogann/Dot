@@ -64,7 +64,12 @@ The pictures show a run of Dot's scripted test model, under the name of a real o
 - It asks which provider's models Dot runs on, and stores the provider's API key in Dot's `.env` file (mode 0600) when
   it needs one.
 - It offers the provider's models that can call tools. The one you pick becomes the model new chats start on, and the
-  model of Dot's own work: the fast and review models, and the vision model when it sees images.
+  model of Dot's own work: the fast and review models, and the vision model when it sees images. One of Zen's free
+  models is only the model new chats start on: they answer only as OpenCode's own agent, so the fast, review and vision
+  models stay as they are.
+- With the models of a provider other than Ollama, it checks that Ollama serves `bge-m3`, which finds the notes by
+  meaning. Where it does not (no Ollama, or no `bge-m3`), it sets `[memory] embed_enabled = false`, so that the notes
+  are found by their words alone, and says how to turn it back on.
 
 Without a terminal, flags give each answer: `--model provider:model`, `--key-stdin` (the key on standard input) and
 `--no-service` (the service is left as it is).

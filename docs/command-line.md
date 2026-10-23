@@ -1,7 +1,11 @@
 # The command line
 
 `dotx setup` checks this Mac, asks for the model Dot runs on and stores its key, and installs the service (see
-[Install](../README.md#install)); `dotx --help` lists every command, and `dotx COMMAND --help` its flags.
+[Install](../README.md#install)); `dotx --help` lists every command, and `dotx COMMAND --help` its flags. The model it
+asks for is also the fast and review model (and the vision model when it sees images), except one of Zen's free models,
+which answers only as OpenCode's own agent and so is the main model alone. With the models of a provider other than
+Ollama it asks the Ollama of this Mac for `bge-m3`, and where there is none it writes `[memory] embed_enabled = false`
+(the notes are found by their words alone, as `dotx doctor` then expects) and says how to switch it back on.
 
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
 permissions the desktop tools need, the Office applications and the OneDrive folders of the skills that come with Dot
@@ -36,6 +40,10 @@ can be resumed too.
   `--auto-approve` and `--yolo` are short for the last two. `chat` takes the same flags (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run))
 - `--goal-mode` / `--no-goal-mode` turns the check of the answer against the goal on or off for this run (`run` only)
+- `--standing` keeps going until done: it starts a campaign on the goal with this run as its first session, and the
+  daemon runs the sessions after it until the outcome is verified (see
+  [Agents and campaigns](agents-and-campaigns.md)); `--browser own|attach` (with `--standing`) picks the Chrome it works
+  in, Dot's own or the one you have open, signed in as you are (default: `[agent] campaign_browser`) (`run` only)
 - `--thread ID` continues an earlier conversation; the line printed at the end of a run names its thread
 - `--no-input` never prompts: every approval that would wait for you is denied and questions go unanswered. The same
   holds when standard input is not a terminal

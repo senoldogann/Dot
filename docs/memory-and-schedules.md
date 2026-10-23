@@ -100,6 +100,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   by their words that once, without a warning, while they are made behind it. Before, the first run after each start
   waited for all of them in one call, half a minute and more, and one call with hundreds of texts broke Ollama's model
   runner.
+- `dotx setup` writes `[memory] embed_enabled = false` when it sets up the models of a provider other than Ollama and
+  the Ollama of this Mac does not serve the embedding model (item 558): `dotx doctor` then passes, and no run waits
+  out an embedder that is not there. It says how to switch the embeddings on again.
 - Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
   outdated.
 - A note a run saves while it has read content third parties can author is marked "saved while reading outside content"

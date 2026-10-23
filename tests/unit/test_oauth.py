@@ -33,10 +33,30 @@ def test_the_providers_page_asks_for_the_access_with_pkce_and_comes_back_to_this
     assert query["client_id"] == ["client-1"] and query["state"] == ["state-1"]
     assert query["code_challenge"] == ["challenge-1"] and query["code_challenge_method"] == ["S256"]
     assert query["redirect_uri"] == ["http://127.0.0.1:8765/oauth/callback"]
-    assert query["access_type"] == ["offline"] and "https://www.googleapis.com/auth/gmail.modify" in query["scope"][0]
+    assert query["access_type"] == ["offline"] and "https://www.googleapis.com/auth/gmail.readonly" in query["scope"][0]
     assert client_names(GOOGLE) == ("DOT_GOOGLE_CLIENT_ID", "DOT_GOOGLE_CLIENT_SECRET")
     assert client_names(MICROSOFT) == ("DOT_MS_CLIENT_ID",)
     assert "offline_access" in MICROSOFT.scopes
+
+
+def test_the_access_asked_for_is_what_the_account_tools_do_which_is_to_read() -> None:
+    """Item 558: Google was asked for ``gmail.modify`` and ``calendar``, Microsoft for ``Mail.ReadWrite``,
+    ``Mail.Send`` and ``Calendars.ReadWrite``, though every account tool only reads. A token read out of the Keychain
+    by a script could then send mail as the owner, and delete or change their events."""
+    assert GOOGLE.scopes == (
+        "openid",
+        "email",
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/calendar.readonly",
+    )
+    assert MICROSOFT.scopes == ("openid", "email", "offline_access", "User.Read", "Mail.Read", "Calendars.Read")
+    for scope in (*GOOGLE.scopes, *MICROSOFT.scopes):
+        assert not any(word in scope for word in ("modify", "send", "Send", "ReadWrite", "compose", "full_access"))
+        assert scope != "https://www.googleapis.com/auth/calendar"
+
+
+def test_only_google_has_a_call_that_ends_a_grant() -> None:
+    assert GOOGLE.revoke_url == "https://oauth2.googleapis.com/revoke" and MICROSOFT.revoke_url is None
 
 
 def test_tokens_run_out_when_the_provider_says_and_a_refresh_keeps_the_refresh_token_it_had() -> None:

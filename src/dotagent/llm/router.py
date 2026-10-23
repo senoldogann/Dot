@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 
 from dotagent.agent.sizes import ContextSizes
 from dotagent.config import AppConfig
@@ -180,7 +180,21 @@ class ModelRouter:
         self._registered: set[str] = set()
         # The connectors `retire` took out of service, closed with the others at `aclose`.
         self._retired: list[ChatProvider] = []
-        self._lock: asyncio.Lock = asyncio.Lock()
+        # One connector is made, retired or registered at a time for each provider, and not for all of them (item 558):
+        # finding a key can take seconds (a Keychain that does not answer), and holds back only the calls that wait for
+        # that provider's connector, not those of a provider whose connector exists.
+        self._making: dict[str, asyncio.Lock] = {}
+        # How often :meth:`aclose` ran, so that a connector made while it ran is closed rather than left behind.
+        self._closings: int = 0
+        # What reads whether a provider's key is set, told each time the provider is retired (:meth:`on_retire`).
+        self._retire_listeners: list[Callable[[str], Awaitable[None]]] = []
+
+    def _maker(self, name: str) -> asyncio.Lock:
+        """The lock of the provider ``name`` (a known one: :data:`KNOWN_PROVIDERS` bounds the locks)."""
+        lock: asyncio.Lock | None = self._making.get(name)
+        if lock is None:
+            lock = self._making[name] = asyncio.Lock()
+        return lock
 
     async def _create(self, name: str) -> ChatProvider:
         match name:
@@ -211,11 +225,23 @@ class ModelRouter:
                 raise ConfigError("unknown provider", {"provider": name})
 
     async def provider(self, name: str) -> ChatProvider:
-        async with self._lock:
-            existing: ChatProvider | None = self._providers.get(name)
+        """The connector of the provider ``name``: the one in service, which every call takes without waiting for
+        another provider's, or a new one, made once even when several calls ask for it at the same time."""
+        existing: ChatProvider | None = self._providers.get(name)
+        if existing is not None:
+            return existing
+        if name not in KNOWN_PROVIDERS:
+            raise ConfigError("unknown provider", {"provider": name, "providers": list(KNOWN_PROVIDERS)})
+        async with self._maker(name):
+            existing = self._providers.get(name)
             if existing is not None:
                 return existing
+            closings: int = self._closings
             created: ChatProvider = await self._create(name)
+            if closings != self._closings:
+                # The router closed while the key was being found: nobody would close this connector.
+                await created.aclose()
+                raise ConfigError("the model router was closed", {"provider": name})
             self._providers[name] = created
             return created
 
@@ -224,7 +250,7 @@ class ModelRouter:
         scripted model of the evals and of the tests). It has to come before the name is used for the first time."""
         if name not in KNOWN_PROVIDERS:
             raise ConfigError("unknown provider", {"provider": name, "providers": list(KNOWN_PROVIDERS)})
-        async with self._lock:
+        async with self._maker(name):
             if name in self._providers:
                 raise ConfigError("a connector for this provider exists already", {"provider": name})
             self._providers[name] = provider
@@ -237,12 +263,18 @@ class ModelRouter:
         self._pauses = {
             label: pause for label, pause in self._pauses.items() if parse_model_ref(label).provider != name
         }
-        async with self._lock:
-            if name in self._registered:
-                return
-            retired: ChatProvider | None = self._providers.pop(name, None)
-            if retired is not None:
-                self._retired.append(retired)
+        async with self._maker(name):
+            if name not in self._registered:
+                retired: ChatProvider | None = self._providers.pop(name, None)
+                if retired is not None:
+                    self._retired.append(retired)
+        for listener in self._retire_listeners:
+            await listener(name)
+
+    def on_retire(self, listener: Callable[[str], Awaitable[None]]) -> None:
+        """Have ``listener`` called with a provider's name each time :meth:`retire` retires it, as a key of the
+        provider is saved or removed: what reads whether the key is set reads it again (item 558)."""
+        self._retire_listeners.append(listener)
 
     async def complete(self, ref: ModelRef, request: ChatRequest, sink: DeltaSink, origin: CallOrigin) -> ModelReply:
         """Send ``request`` to the provider of ``ref`` and hand the recorder what the call cost: its seconds and tokens,
@@ -323,9 +355,9 @@ class ModelRouter:
         return grown_window(info.context_length, info.own_context_length, self.context_sizes.of(ref.label))
 
     async def aclose(self) -> None:
-        async with self._lock:
-            providers: list[ChatProvider] = [*self._providers.values(), *self._retired]
-            self._providers.clear()
-            self._retired.clear()
+        self._closings += 1
+        providers: list[ChatProvider] = [*self._providers.values(), *self._retired]
+        self._providers.clear()
+        self._retired.clear()
         for provider in providers:
             await provider.aclose()

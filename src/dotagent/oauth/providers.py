@@ -14,7 +14,8 @@ type ProviderId = Literal["google", "microsoft"]
 
 class Provider(FrozenModel):
     """One sign-in: ``extra`` are the parameters of its authorization request besides the common ones;
-    ``profile_url`` says who signed in, read with the new access token."""
+    ``profile_url`` says who signed in, read with the new access token; ``revoke_url`` is where a token is given back
+    to end its grant at the provider (``None``: it has none for a client like Dot's, item 558)."""
 
     id: ProviderId
     name: str
@@ -26,6 +27,7 @@ class Provider(FrozenModel):
     loopback: str
     extra: tuple[tuple[str, str], ...]
     profile_url: str
+    revoke_url: str | None
 
 
 GOOGLE: Provider = Provider(
@@ -33,11 +35,13 @@ GOOGLE: Provider = Provider(
     name="Google",
     authorize_url="https://accounts.google.com/o/oauth2/v2/auth",
     token_url="https://oauth2.googleapis.com/token",
+    # What the account tools do is read: no more is asked than that (item 558), so that a token that is read out of
+    # the Keychain cannot send, delete or change either. A tool that writes asks for what it needs with it.
     scopes=(
         "openid",
         "email",
-        "https://www.googleapis.com/auth/gmail.modify",
-        "https://www.googleapis.com/auth/calendar",
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/calendar.readonly",
     ),
     client_id_name="DOT_GOOGLE_CLIENT_ID",
     client_secret_name="DOT_GOOGLE_CLIENT_SECRET",
@@ -45,17 +49,19 @@ GOOGLE: Provider = Provider(
     # A refresh token every time the owner says yes, so that a second sign-in after a lost one still gets one.
     extra=(("access_type", "offline"), ("prompt", "consent")),
     profile_url="https://openidconnect.googleapis.com/v1/userinfo",
+    revoke_url="https://oauth2.googleapis.com/revoke",
 )
 MICROSOFT: Provider = Provider(
     id="microsoft",
     name="Microsoft",
     authorize_url="https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
     token_url="https://login.microsoftonline.com/common/oauth2/v2.0/token",
-    scopes=("openid", "email", "offline_access", "User.Read", "Mail.ReadWrite", "Mail.Send", "Calendars.ReadWrite"),
+    scopes=("openid", "email", "offline_access", "User.Read", "Mail.Read", "Calendars.Read"),
     client_id_name="DOT_MS_CLIENT_ID",
     client_secret_name=None,
     loopback="localhost",
     extra=(("prompt", "select_account"),),
     profile_url="https://graph.microsoft.com/v1.0/me",
+    revoke_url=None,
 )
 PROVIDERS: dict[ProviderId, Provider] = {GOOGLE.id: GOOGLE, MICROSOFT.id: MICROSOFT}

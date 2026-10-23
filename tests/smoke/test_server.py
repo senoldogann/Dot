@@ -149,13 +149,16 @@ def home(tmp_path_factory: pytest.TempPathFactory) -> Path:
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def runtime(home: Path) -> AsyncIterator[Runtime]:
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
-    patch.setenv("DOT_HOME", str(home))
-    patch.setenv("DOT_CHROME_DIR", str(home / "chrome"))
-    built: Runtime = await build_runtime(load_config(home / "config.toml"))
+    # The try opens first: a runtime that cannot be built leaves nothing set for the modules that follow (item 558).
     try:
-        yield built
+        patch.setenv("DOT_HOME", str(home))
+        patch.setenv("DOT_CHROME_DIR", str(home / "chrome"))
+        built: Runtime = await build_runtime(load_config(home / "config.toml"))
+        try:
+            yield built
+        finally:
+            await close_runtime(built)
     finally:
-        await close_runtime(built)
         patch.undo()
 
 
@@ -811,8 +814,12 @@ async def test_a_key_is_saved_shown_by_its_end_only_used_at_once_and_removed(
         "saved": False,
         "tail": "",
     }
+    # The Anthropic rung of web_search's ladder follows the key from the next search on (item 558): the runtime was
+    # built without it, and Settings saving or removing it is all it takes.
+    assert not runtime.anthropic_key_present
     saved: httpx.Response = await client.post(f"/api/keys/{KEY_VARIABLE}", json={"value": FAKE_KEY})
     assert saved.status_code == 200
+    assert runtime.anthropic_key_present
     assert saved.json() == {
         "provider": "anthropic",
         "name": KEY_VARIABLE,
@@ -844,6 +851,7 @@ async def test_a_key_is_saved_shown_by_its_end_only_used_at_once_and_removed(
     assert removed.status_code == 200
     assert (removed.json()["source"], removed.json()["saved"]) == (None, False)
     assert KEY_VARIABLE not in (home / ".env").read_text(encoding="utf-8")
+    assert not runtime.anthropic_key_present
     assert (await client.delete(f"/api/keys/{KEY_VARIABLE}")).status_code == 404
 
 
@@ -1587,6 +1595,12 @@ async def test_a_fault_and_a_path_that_does_not_exist_are_answered_as_json(live:
         with capture_logs() as logs:
             failed: httpx.Response = await live.get("/api/themes")
         assert failed.status_code == 500, failed.text
+        # Item 558: the answer carries the headers of every other answer of the API; it left the handler outside the
+        # guard without them, and the error was raised again for uvicorn to log a second time.
+        assert failed.headers["cache-control"] == "no-store", failed.headers
+        assert failed.headers["x-content-type-options"] == "nosniff", failed.headers
+        assert "default-src 'none'" in failed.headers["content-security-policy"], failed.headers
+        assert failed.headers["x-frame-options"] == "DENY", failed.headers
         body: JsonObject = failed.json()
         assert set(body) == {"message", "context"}, body
         error = body["context"]

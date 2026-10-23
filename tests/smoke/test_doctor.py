@@ -146,6 +146,7 @@ def _models_config(root: str) -> str:
         f'organization_env = "{UNSET_SECRET}"\nproject_env = "{UNSET_SECRET}"\n\n'
         f'[providers.opencode_go]\nbase_url = "{root}/go"\napi_key_env = "{GO_KEY_ENV}"\n\n'
         f'[providers.anthropic]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.openrouter]\napi_key_env = "{UNSET_SECRET}"\n\n'
         f'[judge]\napi_key_env = "{UNSET_SECRET}"\n\n'
         "[memory]\nembed_enabled = false\n"
     )
@@ -313,6 +314,7 @@ async def test_an_ollama_server_that_is_not_running_is_reported_at_once(
         f'[providers.openai]\napi_key_env = "{UNSET_SECRET}"\n\n'
         f'[providers.opencode_go]\napi_key_env = "{UNSET_SECRET}"\n\n'
         f'[providers.anthropic]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.openrouter]\napi_key_env = "{UNSET_SECRET}"\n\n'
         f'[judge]\napi_key_env = "{UNSET_SECRET}"\n',
         encoding="utf-8",
     )

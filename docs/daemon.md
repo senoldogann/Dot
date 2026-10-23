@@ -721,8 +721,9 @@ dotx service uninstall   # stop the daemon and remove the job
   `service install` is for a change of the job itself (another Python, another `DOT_HOME`). The runs at work are cut
   off, and the daemon's next start resumes them as `[agent] resume` says. When launchd has no job of the service, the
   command says so and names `service install`. In a command a run's tool started (the shell and terminal tools mark
-  them, `DOT_RUN_SHELL`), `service restart` and `service install` refuse: the daemon would stop under the run, and the
-  run's end would kill the command before it loads the daemon again.
+  them, `DOT_RUN_SHELL`), `service restart`, `service install` and `service uninstall` refuse: the daemon would stop
+  under the run, and the run's end would kill the command before it loads the daemon again (or, for the uninstall,
+  before it removes the job's file, which would bring the daemon back at the next login).
 - **A run restarts the daemon with `dotx service restart --when-idle`, never with a launchd job of its own** (item 441;
   the shell tool's description tells the model so). A run that merged a change of Dot's own code wants the daemon
   restarted once it has ended, and restarting at once would cut the run itself off. A run reaches launchctl only in
@@ -846,7 +847,9 @@ sending is under way, for two minutes at most. A key is kept for a day.
 
 Errors come as `{"message": …, "context": {…}}`, those of the web framework itself (a path that does not exist, a method
 a path does not take) included; an error Dot did not expect is a 500 whose context names its kind and its words, and the
-log keeps its traceback. Invalid input is a 422 with the validation errors in the context.
+log keeps its traceback once (item 558: the answer is made inside the guard, so it carries the security headers and
+`Cache-Control: no-store` of every other answer, and is not raised again for uvicorn to log a second time). Invalid
+input is a 422 with the validation errors in the context.
 
 **SnapShots** (item 405, after another coding agent's). In any application, both Command keys pressed together (⌘ ⌘,
 item 414, as another coding agent's shortcut is), or the Command key tapped twice, captures the window in front and puts
@@ -888,12 +891,16 @@ the agent itself.
   that file) and the token from the token file under the home directory, and opens the UI with the token in the
   fragment, never typed, once the daemon has proven that it holds that token (see the server above; each poll checks it
   again before it sends the token). While the daemon is down, the window shows Dot's wordmark and the one command that
-  starts it, and opens the UI by itself when the daemon answers. When the shell could not read one of those files, that
-  page and the menu bar item's tip say which and why instead, and the shell guesses no address: a `config.toml` that is
-  not valid TOML, with the line and column of the fault; a file it may not read, in the system's words; no token file
-  yet, which the daemon makes the first time it starts. The window leaves the UI for that page only after ten polls in
-  a row go unanswered (item 200): a restart of the daemon, a few seconds, and one slow answer of a busy daemon leave the
-  open page, which says that it reconnects and reads again what changed once the daemon is back.
+  starts it (`dotx service install`, written `uv run dotx service install` in a clone), and opens the UI by itself when
+  the daemon answers. When the shell could not read one of those files, that page and the menu bar item's tip say which
+  and why instead, and the shell guesses no address: a `config.toml` that is not valid TOML, with the line and column
+  of the fault; a file it may not read, in the system's words; no token file yet, which the daemon makes the first time
+  it starts. When something answers at the address without the proof (another program holds the port, or a daemon of
+  another Dot home or of an older version), the page says "Something else answers at" that address and gives the `lsof`
+  line that shows what (item 558), not the command that starts the daemon, which would be refused. The window leaves
+  the UI for that page only after ten polls in a row go unanswered (item 200): a restart of the daemon, a few seconds,
+  and one slow answer of a busy daemon leave the open page, which says that it reconnects and reads again what changed
+  once the daemon is back.
 - **The menu bar item** is Dot's mark in the state of the whole of Dot (looking at you at rest, glancing up while a
 run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from
 `GET /api/activity/count` every second. A click opens the window; the menu has Open Dot, New chat, Check for Updates…

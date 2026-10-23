@@ -163,16 +163,20 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(f"[browser]\nheadless = true\n\n{_MODELS_TABLE}", encoding="utf-8")
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
-    patch.setenv("DOT_HOME", str(home))
-    patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
-    built: Runtime = await build_runtime(load_config(home / "config.toml"))
-    for provider, models in _LISTS.items():
-        await built.router.register(provider, Listed(provider, models))
-    await _seed_history(built)
+    # The try opens first: a runtime that cannot be built or seeded leaves nothing set for the modules that follow (item
+    # 558), and one that was built is closed.
     try:
-        yield built
+        patch.setenv("DOT_HOME", str(home))
+        patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
+        built: Runtime = await build_runtime(load_config(home / "config.toml"))
+        try:
+            for provider, models in _LISTS.items():
+                await built.router.register(provider, Listed(provider, models))
+            await _seed_history(built)
+            yield built
+        finally:
+            await close_runtime(built)
     finally:
-        await close_runtime(built)
         patch.undo()
 
 

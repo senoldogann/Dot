@@ -31,6 +31,7 @@ from dotagent.mcp.catalogue import MCP_SERVICES, McpService
 from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_connected, read_connected
 from dotagent.mcp.hub import McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
+from dotagent.mcp.masking import masked_context, shown_command, shown_url
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
 from dotagent.mcp.types import McpFailure
 from dotagent.oauth.accounts import CameBack, denial_reason
@@ -95,9 +96,11 @@ def _answer(callback: Callback) -> HTMLResponse:
 
 
 def _address(config: McpServerConfig) -> str:
+    """Where the server is, as the page and the API show it: a key put in its URL or in an argument of its command is
+    the owner's, and is not given back (item 558)."""
     if config.url is not None:
-        return config.url
-    return shlex.join([config.command or "", *config.args])
+        return shown_url(config.url)
+    return shown_command(config.command or "", config.args)
 
 
 def service_of(config: McpServerConfig) -> str | None:
@@ -216,6 +219,11 @@ def requested_server(body: McpServerAdd) -> McpServerConfig:
     except ValueError as error:
         # shlex: an unclosed quote.
         raise ConfigError("the command line cannot be read", {"address": address, "error": str(error)}) from error
+
+
+def _same_server(kept: McpServerConfig, asked: McpServerConfig) -> bool:
+    """Whether ``asked`` is the server ``kept``: at the same address, or started by the same command line."""
+    return (kept.url, kept.command, kept.args) == (asked.url, asked.command, asked.args)
 
 
 def chosen_tools(wanted: tuple[str, ...], offered: tuple[str, ...]) -> list[str]:
@@ -385,7 +393,13 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             # and Try again connect with it (item 499).
             if not config.oauth and await asyncio.to_thread(signed_in, sign_in_path(config.name)):
                 attempt.config = config.model_copy(update={"oauth": True})
-            log.warning("mcp_server_not_added", server=config.name, error=error.message, context=error.context)
+            # The context holds the server's URL and arguments and the tail of what it printed, where a key may be.
+            log.warning(
+                "mcp_server_not_added",
+                server=config.name,
+                error=error.message,
+                context=masked_context(error.context),
+            )
         except Exception as error:
             # Not one of Dot's own errors: a fault in Dot or in the MCP library, as the hub reports it.
             attempt.error = f"{type(error).__name__}: {error}"
@@ -426,6 +440,10 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         current: _Try | None = tries.get(config.name)
         if current is not None and current.running():
             raise RunConflict("Dot is trying this server already", {"server": config.name})
+        if found is None or not _same_server(found[0], config):
+            # What signing in to a server of this name gave is that server's: tokens issued for another address are
+            # never sent to this one (item 558). A name no server has any more has left its sign-in behind.
+            await asyncio.to_thread(forget_sign_in, sign_in_path(config.name))
         service: McpService | None = requested_service(body)
         if service is not None and service.secrets:
             # The secrets go into Dot's .env under the names the server's config refers to (item 408), once nothing
@@ -479,6 +497,11 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         """Keep the tools chosen as the server's allow list and connect it again with them: they are offered to the
         runs that start after."""
         config: McpServerConfig = await chosen_server(name)
+        current: _Try | None = tries.get(name)
+        if current is not None and current.running():
+            # A try under way (a sign-in again) keeps the config it began with, and would write it over this choice
+            # when it ends; the page hides Choose tools meanwhile, a stale page or a second tab does not (item 558).
+            raise RunConflict("Dot is trying this server already", {"server": name})
         offered: tuple[str, ...] = tuple(tool.remote_name for tool in await hub.offered(config))
         kept: McpServerConfig = config.model_copy(update={"allow": chosen_tools(body.tools, offered)})
         # Connected first, kept after: a server that does not answer now leaves the choice unwritten, so the owner may

@@ -243,7 +243,12 @@ async def _models_row(
 
 
 def _has_secret(variable: str) -> bool:
-    return resolve_secret(variable) is not None
+    """Whether the key ``variable`` is set; a Keychain that does not answer or refuses is taken as no key, so that the
+    checks still run (item 558): a run that needs the key is told the Keychain's own error."""
+    try:
+        return resolve_secret(variable) is not None
+    except ConfigError:
+        return False
 
 
 def _check_key(provider: str, variable: str, present: bool, needed: bool) -> CheckResult:
@@ -403,7 +408,7 @@ async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
         await router.aclose()
 
 
-def _model_is_installed(installed: tuple[str, ...], wanted: str) -> bool:
+def model_is_installed(installed: tuple[str, ...], wanted: str) -> bool:
     """Whether ``wanted`` is among the ``installed`` names; Ollama reads a name without a tag as ``:latest``."""
     full: str = wanted if ":" in wanted else f"{wanted}:latest"
     return full in installed
@@ -450,7 +455,7 @@ async def _check_memory(router: ModelRouter, app: AppConfig, down: Mapping[str, 
         installed: tuple[str, ...] = await provider.installed_names()
     except (ConfigError, ProviderError) as exc:
         return _result("memory", False, True, f"the embedding models cannot be listed: {exc.message}")
-    if not _model_is_installed(installed, config.embed_model):
+    if not model_is_installed(installed, config.embed_model):
         return _result(
             "memory",
             False,

@@ -169,7 +169,7 @@ def words_of(callback: Callback) -> Words:
             return Words(
                 title=f"Not signed in to {name}",
                 lead=f"The sign-in with {name} did not finish, so nothing was saved. Start it again from Customize › "
-                f"Plugins; if it fails the same way, check the client you registered with {name}.",
+                f"Connectors; if it fails the same way, check the client you registered with {name}.",
                 tone="bad",
             )
         case "unknown":

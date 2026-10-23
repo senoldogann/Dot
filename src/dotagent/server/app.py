@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import JsonValue, TypeAdapter
 from starlette.exceptions import HTTPException
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from dotagent import __version__
 from dotagent.core.errors import (
@@ -104,6 +105,47 @@ def _error_response(status: int, message: str, context: dict[str, JsonValue]) ->
     return JSONResponse(ErrorView(message=message, context=context).model_dump(mode="json"), status_code=status)
 
 
+def _fault_response(exc: Exception) -> JSONResponse:
+    """The answer to an error that is not one of Dot's own: in the shape of every other error, with its kind and its
+    words, so a page can say what failed."""
+    words: str = truncate_middle(redact_secrets(str(exc)), _FAULT_CHARS)
+    return _error_response(
+        _SERVER_FAULT, "Dot failed on an error it did not expect", {"error": f"{type(exc).__name__}: {words}"}
+    )
+
+
+class _AnswerFaults:
+    """Answers an error that is not one of Dot's own from inside the guard (item 558). Starlette moves the handler of
+    ``Exception`` out to the layer outside every middleware, the guard's included, so that its answer went out without
+    the security headers and ``Cache-Control: no-store`` of every other answer of the API, and was raised again for
+    uvicorn to log a second time, whole and unmasked. Here the guard's own ``send`` carries the answer, nothing is
+    raised again, and the log has the one ``request_crashed`` entry. An answer already begun (a stream) cannot be
+    taken back: that error goes on."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app: ASGIApp = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+        started: bool = False
+
+        async def watching(message: Message) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self._app(scope, receive, watching)
+        except Exception as exc:
+            if started:
+                raise
+            log.error("request_crashed", method=scope["method"], path=scope["path"], exc_info=exc)
+            await _fault_response(exc)(scope, receive, send)
+
+
 def create_app(ctx: ServerContext) -> FastAPI:
     """Build the application for one running Dot; the guard wraps everything, the UI files answer last, as they were
     when it was built (item 309, :mod:`dotagent.server.kept_pages`)."""
@@ -161,16 +203,6 @@ def create_app(ctx: ServerContext) -> FastAPI:
             headers=exc.headers,
         )
 
-    @app.exception_handler(Exception)
-    async def fault(request: Request, exc: Exception) -> JSONResponse:
-        """An error that is not one of Dot's own is a fault of Dot: logged with its traceback, and answered in the shape
-        of every other error, with its kind and its words, so a page can say what failed."""
-        log.error("request_crashed", method=request.method, path=request.url.path, exc_info=exc)
-        words: str = truncate_middle(redact_secrets(str(exc)), _FAULT_CHARS)
-        return _error_response(
-            _SERVER_FAULT, "Dot failed on an error it did not expect", {"error": f"{type(exc).__name__}: {words}"}
-        )
-
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
         """What is wrong with each field, without the value that was refused: it may be a secret, an API key for one."""
@@ -179,6 +211,8 @@ def create_app(ctx: ServerContext) -> FastAPI:
         )
         return _error_response(422, "the request is not valid", {"errors": problems})
 
+    # Added before the guard, so that the guard wraps it and its answer carries the guard's headers (item 558).
+    app.add_middleware(_AnswerFaults)
     app.add_middleware(LocalGuard, token=ctx.token, port=ctx.port, reach=frozenset(ctx.runtime.config.server.reach))
     # Added last to be the outermost layer, so that the pages' answers go through gzip as much as the API's (item 381).
     app.add_middleware(GzipExceptEventStreams)

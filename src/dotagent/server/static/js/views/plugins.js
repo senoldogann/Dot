@@ -43,6 +43,11 @@ export function galleryMark(plugin) {
   return mark;
 }
 
+/** Whether Dot installed the plugin: from the commit the gallery pins, or from an older one (`outdated`, item 558). */
+function isInstalled(plugin) {
+  return plugin.state === "installed" || plugin.state === "outdated";
+}
+
 /** The check beside the name of a plugin whose publisher makes what its skills are about. */
 function verified(plugin) {
   return el(
@@ -165,14 +170,24 @@ export function mount(root, ctx) {
   /** What a card or a plugin's page offers: Install, or Installed with Remove, or that a plugin of Dot holds its name.
    * `wide` writes Remove out, as the plugin's page has room for. */
   function action(plugin, wide) {
-    if (plugin.state === "installed") {
+    if (isInstalled(plugin)) {
       const label = `Remove ${plugin.name}`;
       const removing = busy.has(plugin.id);
       const button = wide
         ? el("button", { class: "btn sm", type: "button", disabled: removing }, icon("trash"), "Remove")
         : el("button", { class: "btn sm ghost icon-only gallery-remove", type: "button", title: label, "aria-label": label, disabled: removing }, icon("trash"));
       button.addEventListener("click", () => attempt(() => remove(plugin.id, plugin.name, 0)));
-      return el("div", { class: "gallery-action" }, el("span", { class: "badge b-ok gallery-installed" }, icon("check"), "Installed"), button);
+      // The pin moved since: the runs read the skills of the commit installed, and Install is refused while they are.
+      // One badge, so that the card is no wider than with Installed.
+      const badge =
+        plugin.state === "outdated"
+          ? el(
+              "span",
+              { class: "badge b-warn gallery-installed gallery-outdated", title: `Installed from ${plugin.installed_commit.slice(0, 7)}; the gallery pins ${plugin.commit.slice(0, 7)} now. Remove it and Install it again to take the new one.` },
+              "Older version",
+            )
+          : el("span", { class: "badge b-ok gallery-installed" }, icon("check"), "Installed");
+      return el("div", { class: "gallery-action" }, badge, button);
     }
     if (plugin.state === "taken") {
       return el(
@@ -263,7 +278,7 @@ export function mount(root, ctx) {
 
   function paintCounts() {
     const [allButton, featuredButton, installedButton] = filters.element.children;
-    const installed = gallery.plugins.filter((plugin) => plugin.state === "installed").length + gallery.others.length;
+    const installed = gallery.plugins.filter(isInstalled).length + gallery.others.length;
     allButton.textContent = `All ${gallery.plugins.length}`;
     featuredButton.textContent = `Featured ${gallery.plugins.filter((plugin) => plugin.featured).length}`;
     installedButton.textContent = `Installed ${installed}`;
@@ -275,7 +290,7 @@ export function mount(root, ctx) {
     featured.hidden = words !== "" || shown !== "all";
     featuredGrid.replaceChildren(...gallery.plugins.filter((plugin) => plugin.featured).map(card));
     const showing = ordered(
-      gallery.plugins.filter((plugin) => (shown === "all" || (shown === "featured" && plugin.featured) || (shown === "installed" && plugin.state === "installed")) && matches(plugin)),
+      gallery.plugins.filter((plugin) => (shown === "all" || (shown === "featured" && plugin.featured) || (shown === "installed" && isInstalled(plugin))) && matches(plugin)),
     );
     const others =
       shown === "installed" ? gallery.others.filter((other) => words === "" || foldSearch(`${other.name} ${other.description ?? ""}`).includes(words)) : [];
@@ -301,6 +316,7 @@ export function mount(root, ctx) {
     const facts = [
       ["Repository", el("a", { href: plugin.homepage, target: "_blank", rel: "noopener noreferrer" }, `github.com/${plugin.repository}`, icon("external"))],
       ["Pinned to", el("span", { class: "mono" }, plugin.commit.slice(0, 7))],
+      ...(plugin.state === "outdated" ? [["Installed from", el("span", { class: "mono" }, plugin.installed_commit.slice(0, 7))]] : []),
       ["Licence", plugin.licence],
       ["Stars", `${compact(plugin.stars)} on GitHub`],
       ["In the gallery since", DAY.format(new Date(`${plugin.added}T00:00:00`))],

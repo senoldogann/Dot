@@ -19,7 +19,7 @@ from dotagent.awake import KeepAwake
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import RECONNECT_NOTICE, BrowserSession
 from dotagent.config import AppConfig, McpServerConfig
-from dotagent.core.errors import ElsewhereError, McpError, StoreError
+from dotagent.core.errors import ConfigError, ElsewhereError, McpError, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.notify import Notifier, show_notification
 from dotagent.core.paths import (
@@ -103,6 +103,37 @@ from dotagent.web.client import WebClient
 log = get_logger(__name__)
 
 
+class SearchKeys:
+    """Whether the keys of the hosted rungs of web_search's ladder are set: Ollama's hosted search, the first rung when
+    [web] search_backend is auto, and the Anthropic relay. Found when the runtime is built, and again when Settings ›
+    Providers saves or removes one of them, which retires the provider's connector (:meth:`ModelRouter.on_retire`), so
+    that a key works from the next search and a removed one is no longer climbed to (item 558)."""
+
+    def __init__(self, ollama: bool, anthropic: bool) -> None:
+        self.ollama: bool = ollama
+        self.anthropic: bool = anthropic
+
+
+def _optional_secret(name: str) -> str | None:
+    """The key ``name`` when it is set, for a service the daemon can start without: a Keychain that does not answer or
+    refuses (locked, a prompt denied) is logged and taken as no key, so the daemon still starts, and a run that needs
+    the key meets the Keychain's error itself (:func:`dotagent.secrets.resolve_secret`). Blocking."""
+    try:
+        return resolve_secret(name)
+    except ConfigError as error:
+        log.warning("keychain_unreadable", name=name, error=error.message)
+        return None
+
+
+async def _refresh_search_key(config: AppConfig, keys: SearchKeys, provider: str) -> None:
+    """Read again whether the key of ``provider`` is set when its connector is retired (a key saved or removed in
+    Settings › Providers), if it is one of web_search's hosted rungs (:class:`SearchKeys`)."""
+    if provider == "ollama":
+        keys.ollama = await asyncio.to_thread(_optional_secret, config.providers.ollama.api_key_env) is not None
+    elif provider == "anthropic":
+        keys.anthropic = await asyncio.to_thread(_optional_secret, config.providers.anthropic.api_key_env) is not None
+
+
 @dataclass(frozen=True)
 class Runtime:
     config: AppConfig
@@ -133,11 +164,9 @@ class Runtime:
     vault: OnePassword
     terminals: Terminals
     web: WebClient
-    # Whether the key of Ollama's hosted search was found when the runtime was built: the first rung of web_search's
-    # ladder when [web] search_backend is auto.
-    search_key_present: bool
-    # Whether ANTHROPIC_API_KEY (or the configured variable) is set: the Anthropic rung joins the ladder when it is.
-    anthropic_key_present: bool
+    # Whether the key of Ollama's hosted search (the first rung of web_search's ladder when [web] search_backend is
+    # auto) and ANTHROPIC_API_KEY (or the configured variable: the Anthropic rung joins the ladder with it) are set.
+    search_keys: SearchKeys
     mcp: McpHub
     memory: MemoryIndex
     # SnapShots (item 405): the watch of the Command key and the captures waiting for a composer.
@@ -161,6 +190,16 @@ class Runtime:
     notify: Notifier
     # The runs at work in this process and what each holds (item 301), so that they leave each other's alone.
     peers: Peers
+
+    @property
+    def search_key_present(self) -> bool:
+        """Whether Ollama's hosted search has its key now: web_search's ladder starts with that rung."""
+        return self.search_keys.ollama
+
+    @property
+    def anthropic_key_present(self) -> bool:
+        """Whether the key of the Anthropic search relay is set now: its rung joins the ladder."""
+        return self.search_keys.anthropic
 
 
 def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[RegisteredTool, ...], ...]:
@@ -380,9 +419,10 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
     protected, dot_paths, sandbox = confinement.protected, confinement.dot_paths, confinement.sandbox
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
-    ollama_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.ollama.api_key_env)
-    anthropic_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.anthropic.api_key_env)
-    typesafe_key: str | None = await asyncio.to_thread(resolve_secret, config.judge.api_key_env)
+    # Keys of services the daemon starts without: a Keychain that does not answer does not stop it (item 558).
+    ollama_key: str | None = await asyncio.to_thread(_optional_secret, config.providers.ollama.api_key_env)
+    anthropic_key: str | None = await asyncio.to_thread(_optional_secret, config.providers.anthropic.api_key_env)
+    typesafe_key: str | None = await asyncio.to_thread(_optional_secret, config.judge.api_key_env)
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
     push_keys: PushKeys = await asyncio.to_thread(read_or_create_keys, vapid_path())
     for problem in plugins.problems:
@@ -409,6 +449,8 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
         peers: Peers = Peers()
         browsers: BrowserPool = BrowserPool(config.browser, config.server, downloads_dir(), peers.threads)
         router: ModelRouter = ModelRouter(config, _call_recorder(store, bus), login_env)
+        search_keys: SearchKeys = SearchKeys(ollama=ollama_key is not None, anthropic=anthropic_key is not None)
+        router.on_retire(partial(_refresh_search_key, config, search_keys))
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -429,8 +471,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             desktop=DesktopSession(config.desktop, failsafe_path(), browsers.chrome_pids),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
-            search_key_present=ollama_key is not None,
-            anthropic_key_present=anthropic_key is not None,
+            search_keys=search_keys,
             mcp=mcp,
             memory=memory,
             snapshots=SnapshotService(config.snapshots, bus),

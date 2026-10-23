@@ -304,15 +304,15 @@ async def _unanswered(url: str, uid: int, began: datetime) -> ServiceError:
     )
 
 
-def _refused_in_a_run(what: str) -> None:
-    """Refuse ``what``, which restarts the daemon at once, in a command a run's tool started
-    (:mod:`dotagent.core.runenv`): the restart would cut that run off, and the end of the run would kill the command
-    before it loads the daemon again. Such a run asks for ``dotx service restart --when-idle``."""
+def _refused_in_a_run(
+    what: str, fix: str = "'dotx service restart --when-idle' restarts the daemon once the run has ended"
+) -> None:
+    """Refuse ``what``, which stops the daemon at once, in a command a run's tool started
+    (:mod:`dotagent.core.runenv`): the stop would cut that run off, and the end of the run would kill the command
+    before it loads the daemon again (or, for an uninstall, before it removes the job's file, which would bring the
+    daemon back at the next login). Such a run asks for ``dotx service restart --when-idle``."""
     if started_by_a_run(os.environ):
-        raise ServiceError(
-            f"a run cannot {what}: the daemon would stop under it, cutting the run off",
-            {"fix": "'dotx service restart --when-idle' restarts the daemon once the run has ended"},
-        )
+        raise ServiceError(f"a run cannot {what}: the daemon would stop under it, cutting the run off", {"fix": fix})
 
 
 async def cmd_service_install(command: ServiceInstallCommand) -> int:
@@ -503,6 +503,10 @@ async def cmd_service_permissions(command: ServicePermissionsCommand) -> int:
 
 
 async def cmd_service_uninstall(command: ServiceUninstallCommand) -> int:
+    _refused_in_a_run(
+        "uninstall the service, which stops the daemon at once",
+        "uninstall it from a terminal of your own, once the run has ended",
+    )
     # A restart that waits would find no job to restart: it goes with the service.
     if await cancel_restart_job(restart_job_path(dot_home()), os.getuid()):
         sys.stdout.write(f"Cancelled the restart that waited for the runs to end ({RESTART_LABEL}).\n")
