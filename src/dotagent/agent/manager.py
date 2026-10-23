@@ -59,7 +59,14 @@ from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
 from dotagent.agent.parking import allowed_text, handed_back_text, parking_for
 from dotagent.agent.picks import picked_groups, picks_problems
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
-from dotagent.agent.playbooks import PLAYBOOK_FAILED, learn_playbook, offered_to_run, playbook_case
+from dotagent.agent.playbooks import (
+    PLAYBOOK_FAILED,
+    PlaybookEntry,
+    learn_playbook,
+    list_playbooks,
+    offered_to_run,
+    playbook_case,
+)
 from dotagent.agent.progress import can_ask_user
 from dotagent.agent.reaction_words import RELEASE_NOTE, queued_reaction_note
 from dotagent.agent.reflection import reflect
@@ -2377,7 +2384,19 @@ class RunManager:
         for run_id in opening.carried:
             if await self._ended_tainted(run_id):
                 return True
-        return False
+        return await self._picked_third_party_skill(opening.picks.skills)
+
+    async def _picked_third_party_skill(self, names: Sequence[str]) -> bool:
+        """Whether one of the skills the owner picked for a message is a learned one whose record says it may carry
+        content third parties can author (item 585): the run starts with its instructions in its first message, so it
+        starts tainted, as a run that reads such a skill with the ``skill`` tool is."""
+        root: Path | None = playbook_root(self._runtime.config)
+        if root is None or not names:
+            return False
+        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
+        return any(
+            entry.meta.name in names and entry.meta.tainted is not False for entry in entries if not entry.retired
+        )
 
     async def _ended_tainted(self, run_id: str) -> bool:
         """Whether the run ``run_id`` was tainted when it ended, from its events (:func:`tainted_after`), or, when

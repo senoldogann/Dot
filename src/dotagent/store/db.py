@@ -69,6 +69,7 @@ from dotagent.store.models import (
     QueuedMessage,
     ReactionName,
     ReactionRecord,
+    ResultStep,
     RewindCut,
     RuleRecord,
     RunMode,
@@ -2712,6 +2713,33 @@ class Store:
             (run_id, tool),
         )
         return [_event(row) for row in rows]
+
+    async def result_steps(self, run_id: str) -> list[ResultStep]:
+        """Every step a run took and every step of the runs it delegated (the family, walked by ``parent_run_id`` as
+        far as it goes: a delegated run delegates no further today, and a family that did would be read whole), oldest
+        first, as their ``tool_result`` events say it: its tool, the kind of its action, what it acted on, its flags and
+        what its arguments named of Dot's own, and whether a helper took it (item 585: what a run and its helpers
+        touched, whatever its length)."""
+        rows = await self._all(
+            "WITH RECURSIVE family(id) AS (SELECT ?"
+            " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
+            " SELECT e.run_id != ? AS helper, json_extract(e.data, '$.tool') AS tool,"
+            " json_extract(e.data, '$.kind') AS kind, json_extract(e.data, '$.target') AS target,"
+            " json_extract(e.data, '$.flags') AS flags, json_extract(e.data, '$.names_dot') AS names_dot"
+            " FROM events AS e WHERE e.run_id IN (SELECT id FROM family) AND e.kind = 'tool_result' ORDER BY e.id",
+            (run_id, run_id),
+        )
+        return [
+            ResultStep(
+                tool=str(row["tool"] or ""),
+                kind=str(row["kind"] or ""),
+                target=str(row["target"] or ""),
+                flags=_step_flags(parse_json_value(row["flags"], "step flags")) if row["flags"] else (),
+                names_dot=str(row["names_dot"] or ""),
+                helper=bool(row["helper"]),
+            )
+            for row in rows
+        ]
 
     async def run_sites(self, run_id: str) -> list[str]:
         """The sites a run's calls reached (the ``site`` of its ``tool_result`` events: page hosts and applications),

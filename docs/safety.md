@@ -12,8 +12,8 @@ shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, s
   `yolo`, see Secrets below) and the screenshots the run takes or is given. By default
   every role (`main`, `vision`, `fast`, `review`) is a cloud model of Ollama: the Ollama server on this Mac passes each
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
-  playbooks and the nightly reflection (which shows `review` the notes it considers merging or putting aside) to
-  `review`, the shortening of a long run's conversation to `fast`. OpenAI,
+  playbooks and the nightly reflection (which shows `review` the notes it considers merging or putting aside, and the
+  learned skills it considers merging) to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
   OpenCode Go, Anthropic and OpenRouter get it only when a role, a helper or a standby model names one of their models;
   OpenRouter passes each call on to the lab whose model it is. OpenCode Zen's free models (`opencode:`) get the whole
   conversation of a run that runs on one, through OpenCode's own agent, and the providers of some of them may use what
@@ -341,7 +341,10 @@ set it off: its goal is your own words and the item stands in its first message,
 a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`): it is never among the notes a run
 starts with, is handed while it works or as a site's lessons (item 384), a `memory_search` that returns one marks the
 run that read it, so its next save asks again, and Settings › Memory and `dotx memory list` say of such a note that it
-was saved while reading outside content.
+was saved while reading outside content. A
+learned skill whose steps may come from outside content (its record says so, or is older than the mark) marks the
+run that reads it with the `skill` tool, and a run that starts with one picked in the composer starts marked (item
+585).
 
 **Outside content in yolo** (item 525). A `yolo` run asks nothing, and a run marked untrusted may be steered by what a
 stranger wrote. Two checks hold for such a run, and neither asks you:
@@ -527,6 +530,24 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   is refused, never followed (item 556). A plugin's MCP servers, and those you added, start with the
   daemon and are given keys from the key store: put a plugin or a skill in place yourself, or install one from
   Customize › Plugins, which takes a gallery plugin's skills alone, as its commit pins them (item 542).
+- What a run did to Dot is not taught to the next (item 585). A run that changed what is listed above, or whose helper
+  did, is never distilled into a learned skill, whatever the review model says of it, and the model is not asked; the
+  skip is logged with its reason. A helper is a run the run delegated: its steps are read with the run's own, by the
+  same rules, and the reason says that the step was a helper's. Of each step that is not a read it reads three things.
+  What the policy stored on it when it ran: `self_change` (a file tool wrote there), and `secret_access` or
+  `protected_read`, the shell guard's own verdict on the line, which a `yolo` run is let carry out and which sees what
+  the words of a line do not show (its working folder, a link, capital letters, a copy over the whole of Dot's home); so
+  a command, or another step that acts, which the guard flagged for reaching a secret or the clipboard (`pbpaste`, a
+  line that names `~/.ssh`) gives no skill, while a read, which only looks (`read_file` of a protected file,
+  `desktop_clipboard_read`), does not. What an MCP call's arguments name: the policy knows nothing of what a server does
+  with them and the step's target is the server's name, so the executor reads every string of the arguments where it
+  classifies the call and stores what they named with the step. And its own words: a path of those places or with `~` or
+  `$HOME` for the home folder, in any letter case, the daemon's address, or in a command Dot's own program, `dotx` or
+  `dotagent`. What none of the three reads is not seen: a command that builds a path as it runs, in a way the guard does
+  not flag, and an MCP server that takes a path relative to a folder of its own or builds one. A step counts when the
+  policy refused it too: the run tried. Outside `yolo` the sandbox below holds the commands; a server of files is a
+  process of its own that no sandbox of Dot's holds. A skill whose steps may come from outside content is offered with
+  the lines that name an address, run a command or reach a path withheld, as before.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
   files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals)

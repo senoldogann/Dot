@@ -282,6 +282,24 @@ def test_a_lesson_rests_after_sixty_days_without_a_run_being_handed_it() -> None
     assert to_retire([again], now, 60, set()) == []
 
 
+def test_the_summary_counts_the_skill_merges_it_proposed_in_the_singular_and_the_plural() -> None:
+    """The review of item 585, round 3: the line said "3 skill merge proposed". Each count of it that names something
+    says one or several: the runs, the lessons and the skill merges; the others (merged, retired, outdated, to forget)
+    are words that stay as they are."""
+    base: Reflection = Reflection(
+        at=2.0, since=1.0, runs_read=1, lessons_written=1, merged=0, retired=0, journal=None, owner_updated=False
+    )
+    one: Reflection = base.model_copy(update={"skills_proposed": 1})
+    assert summary_line(one) == "Reflected on 1 run: 1 lesson, 0 merged, 0 retired, 1 skill merge proposed."
+    several: Reflection = base.model_copy(
+        update={"runs_read": 3, "lessons_written": 2, "skills_proposed": 3, "outdated": 1, "to_forget": 4}
+    )
+    assert summary_line(several) == (
+        "Reflected on 3 runs: 2 lessons, 0 merged, 0 retired, 1 outdated, 4 to forget, 3 skill merges proposed."
+    )
+    assert "skill merge" not in summary_line(base)
+
+
 def test_the_summary_and_the_journal_say_what_happened() -> None:
     reflection: Reflection = Reflection(
         at=2.0, since=1.0, runs_read=3, lessons_written=1, merged=1, retired=2, journal=None, owner_updated=False

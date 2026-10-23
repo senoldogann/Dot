@@ -94,6 +94,15 @@ _FAMILIES: dict[str, str] = {
     "campaign-achieved": "dotagent.cli_campaign",
     "mcp-list": "dotagent.cli_mcp",
     "skills-list": "dotagent.cli_skills",
+    "skills-versions": "dotagent.cli_playbooks",
+    "skills-restore": "dotagent.cli_playbooks",
+    "skills-pin": "dotagent.cli_playbooks",
+    "skills-unpin": "dotagent.cli_playbooks",
+    "skills-rest": "dotagent.cli_playbooks",
+    "skills-wake": "dotagent.cli_playbooks",
+    "skills-proposals": "dotagent.cli_playbooks",
+    "skills-accept": "dotagent.cli_playbooks",
+    "skills-dismiss": "dotagent.cli_playbooks",
     "playbooks-list": "dotagent.cli_playbooks",
     "playbooks-show": "dotagent.cli_playbooks",
     "playbooks-drop": "dotagent.cli_playbooks",
@@ -431,6 +440,40 @@ def build_parser() -> argparse.ArgumentParser:
     skills = commands.add_parser("skills", help="the skills and plugins the agent can use")
     skills_commands = skills.add_subparsers(dest="skills_action", required=True)
     skills_commands.add_parser("list", help="show every skill and plugin found, and the folders left out and why")
+    skills_versions = skills_commands.add_parser(
+        "versions", help="the versions of a learned skill: when and from which run each was made, and what it changed"
+    )
+    skills_versions.add_argument("skill", help="the name shown by 'dotx playbooks list'")
+    skills_restore = skills_commands.add_parser(
+        "restore", help="put a version of a learned skill back as its steps, as a new version of its own"
+    )
+    skills_restore.add_argument("skill", help="the name shown by 'dotx playbooks list'")
+    skills_restore.add_argument("version", type=int, help="the number 'dotx skills versions' shows")
+    skills_pin = skills_commands.add_parser(
+        "pin", help="pin a learned skill, so that it never rests (a resting one wakes)"
+    )
+    skills_pin.add_argument("skill", help="the name shown by 'dotx playbooks list'")
+    skills_unpin = skills_commands.add_parser("unpin", help="take the pin off a learned skill")
+    skills_unpin.add_argument("skill", help="the name shown by 'dotx playbooks list'")
+    skills_rest = skills_commands.add_parser(
+        "rest", help="put a learned skill to rest: runs are not offered it until you wake it"
+    )
+    skills_rest.add_argument("skill", help="the name shown by 'dotx playbooks list'")
+    skills_wake = skills_commands.add_parser(
+        "wake", help="wake a learned skill that rests, for disuse, by hand or for a merge"
+    )
+    skills_wake.add_argument("skill", help="the name shown by 'dotx playbooks list'")
+    skills_commands.add_parser(
+        "proposals", help="the merges of learned skills that wait for your yes, with the steps each would write"
+    )
+    skills_accept = skills_commands.add_parser(
+        "accept", help="say yes to a proposal: its steps become a new version of the first skill, the other one rests"
+    )
+    skills_accept.add_argument("proposal_id", help="the id 'dotx skills proposals' shows")
+    skills_dismiss = skills_commands.add_parser(
+        "dismiss", help="say no to a proposal: it is dropped and not proposed again until one of its skills changes"
+    )
+    skills_dismiss.add_argument("proposal_id", help="the id 'dotx skills proposals' shows")
 
     playbooks = commands.add_parser("playbooks", help="the playbooks Dot distilled from runs that reached their goal")
     playbooks_commands = playbooks.add_subparsers(dest="playbooks_action", required=True)

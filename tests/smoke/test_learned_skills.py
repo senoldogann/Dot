@@ -164,6 +164,7 @@ NAMELESS_SKILL: ScriptedTurn = _turn(
     ScriptedCall(
         tool=PLAYBOOK_TOOL,
         arguments={
+            "recurs": True,
             "kind": "!!!",
             "description": "Write a line to a notes file and read it back to check it.",
             "when": "A goal that asks to keep a line in a file.",
@@ -177,6 +178,7 @@ TAINTED_SKILL: ScriptedTurn = _turn(
     ScriptedCall(
         tool=PLAYBOOK_TOOL,
         arguments={
+            "recurs": True,
             "kind": KIND,
             "description": "Write a line to a notes file and read it back to check it.",
             "when": "A goal that asks to keep a line in a file.",
@@ -193,6 +195,7 @@ SKILL: ScriptedTurn = _turn(
     ScriptedCall(
         tool=PLAYBOOK_TOOL,
         arguments={
+            "recurs": True,
             "kind": KIND,
             "description": "Write a line to a notes file and read it back to check it.",
             "when": "A goal that asks to keep a line in a file.",

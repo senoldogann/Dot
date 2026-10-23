@@ -6,13 +6,20 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse
 
 from dotagent import __version__
-from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
+from dotagent.agent.playbooks import (
+    PlaybookEntry,
+    PlaybookMeta,
+    drop_playbook,
+    list_playbooks,
+    share_playbook,
+    skill_resting,
+)
 from dotagent.agent.scaffold import (
     context_budget,
     context_ceiling,
@@ -22,6 +29,14 @@ from dotagent.agent.scaffold import (
     window_choices,
 )
 from dotagent.agent.sizes import ContextSizes
+from dotagent.agent.skill_history import (
+    pin_playbook,
+    rest_playbook,
+    restore_playbook,
+    versions_of,
+    wake_playbook,
+)
+from dotagent.agent.skill_proposals import accept_proposal, dismiss_proposal, waiting_proposals
 from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, JudgeProvider, ModelsConfig
 from dotagent.config_edit import (
     set_context_size,
@@ -113,6 +128,7 @@ from dotagent.server.views import (
     PaletteView,
     PaneRequest,
     PermissionsView,
+    PinRequest,
     ProofQuery,
     ProofView,
     ProviderModels,
@@ -125,7 +141,10 @@ from dotagent.server.views import (
     RoleModelRequest,
     SandboxRequest,
     SandboxView,
+    SkillProposalsView,
+    SkillRestoreRequest,
     SkillShareRequest,
+    SkillVersionsView,
     StandbyModelsRequest,
     StatusView,
 )
@@ -462,25 +481,83 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         input. Read from the run history, which it does not change."""
         return await ctx.runtime.store.context_evidence(parse_model_ref(query.model).label, _EVIDENCE_DAYS)
 
+    async def learned_list() -> LearnedSkillsView:
+        """The learned skills as the page shows them now (item 585: which rest, and after how many days)."""
+        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
+        days: int = config.agent.skill_rest_days
+        now: float = time.time()
+        return LearnedSkillsView(items=tuple(learned_skill_view(entry, now, days) for entry in entries), rest_days=days)
+
     @router.get("/skills/learned")
     async def learned_skills() -> LearnedSkillsView:
         """The skills Dot learned from its own work, active first, then the retired ones."""
-        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
-        return LearnedSkillsView(items=tuple(learned_skill_view(entry) for entry in entries))
+        return await learned_list()
 
     @router.delete("/skills/learned/{name}")
     async def drop_learned_skill(name: str) -> LearnedSkillsView:
-        """Remove a learned skill, active or retired; the list after it."""
+        """Remove a learned skill, active or retired; the list after it. Only the owner deletes a skill: nothing Dot
+        does on its own does (item 585)."""
         await asyncio.to_thread(drop_playbook, playbooks_dir(), name)
-        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
-        return LearnedSkillsView(items=tuple(learned_skill_view(entry) for entry in entries))
+        return await learned_list()
 
     @router.put("/skills/learned/{name}")
     async def share_learned_skill(name: str, request: SkillShareRequest) -> LearnedSkillsView:
         """Offer an agent's learned skill to every run, or to its agent's alone again; the list after it."""
         await asyncio.to_thread(share_playbook, playbooks_dir(), name, request.shared)
-        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
-        return LearnedSkillsView(items=tuple(learned_skill_view(entry) for entry in entries))
+        return await learned_list()
+
+    @router.get("/skills/learned/{name}/versions")
+    async def learned_skill_versions(name: str) -> SkillVersionsView:
+        """The versions of a learned skill, the oldest first and its own now last, with the run that made each and what
+        its file says (item 585)."""
+        return SkillVersionsView(name=name, items=await asyncio.to_thread(versions_of, playbooks_dir(), name))
+
+    @router.post("/skills/learned/{name}/restore")
+    async def restore_learned_skill(name: str, request: SkillRestoreRequest) -> LearnedSkillsView:
+        """Put a version of a learned skill back as its steps, as a new version of its own, so that it too can be taken
+        back; the list after it (item 585)."""
+        await asyncio.to_thread(restore_playbook, playbooks_dir(), name, request.version, time.time())
+        return await learned_list()
+
+    @router.put("/skills/learned/{name}/pin")
+    async def pin_learned_skill(name: str, request: PinRequest) -> LearnedSkillsView:
+        """Pin a learned skill so that it never rests (a skill that rests wakes), or take the pin off; the list after it
+        (item 585)."""
+        await asyncio.to_thread(pin_playbook, playbooks_dir(), name, request.pinned, time.time())
+        return await learned_list()
+
+    @router.post("/skills/learned/{name}/rest")
+    async def rest_learned_skill(name: str) -> LearnedSkillsView:
+        """Put a learned skill to rest by hand: no run is offered it until the owner wakes it; the list after it (item
+        585)."""
+        await asyncio.to_thread(rest_playbook, playbooks_dir(), name, time.time())
+        return await learned_list()
+
+    @router.post("/skills/learned/{name}/wake")
+    async def wake_learned_skill(name: str) -> LearnedSkillsView:
+        """Wake a learned skill that rests, whether for disuse, by hand or for a merge; the list after it (item 585)."""
+        await asyncio.to_thread(wake_playbook, playbooks_dir(), name, time.time())
+        return await learned_list()
+
+    @router.get("/skills/proposals")
+    async def skill_proposals() -> SkillProposalsView:
+        """The merges and rewrites of learned skills that wait for the owner's yes (item 585)."""
+        return SkillProposalsView(items=await asyncio.to_thread(waiting_proposals, playbooks_dir()))
+
+    @router.post("/skills/proposals/{proposal_id}/accept")
+    async def accept_skill_proposal(proposal_id: str) -> LearnedSkillsView:
+        """The owner's yes: the draft they were shown is written as a new version of the skill it names first (the file
+        it replaces kept), and a merge puts the other skill to rest; 409 for a proposal whose skills changed since;
+        the skills after it (item 585)."""
+        await asyncio.to_thread(accept_proposal, playbooks_dir(), proposal_id, time.time())
+        return await learned_list()
+
+    @router.delete("/skills/proposals/{proposal_id}")
+    async def dismiss_skill_proposal(proposal_id: str) -> SkillProposalsView:
+        """The owner's no: the proposal is dropped, and a merge of the same skills is proposed again only after one of
+        them changes; the proposals after it (item 585)."""
+        await asyncio.to_thread(dismiss_proposal, playbooks_dir(), proposal_id)
+        return SkillProposalsView(items=await asyncio.to_thread(waiting_proposals, playbooks_dir()))
 
     async def found_now() -> FoundElsewhere:
         catalog: SkillCatalog = await asyncio.to_thread(
@@ -661,7 +738,13 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
     return router
 
 
-def learned_skill_view(entry: PlaybookEntry) -> LearnedSkillView:
+def learned_skill_view(entry: PlaybookEntry, now: float, rest_days: int) -> LearnedSkillView:
+    """A learned skill as the page shows it at ``now``, with the days after which a skill no run read rests."""
+    meta: PlaybookMeta = entry.meta
+    resting: bool = not entry.retired and skill_resting(meta, now, rest_days)
+    reason: Literal["disuse", "owner", "merged"] | None = None
+    if resting:
+        reason = "merged" if meta.merged_into is not None else ("owner" if meta.rested_at is not None else "disuse")
     return LearnedSkillView(
         name=entry.meta.name,
         description=entry.skill.description,
@@ -675,4 +758,12 @@ def learned_skill_view(entry: PlaybookEntry) -> LearnedSkillView:
         updated_at=entry.meta.updated_at,
         agent_id=entry.meta.agent_id,
         shared=entry.meta.shared,
+        taught=meta.taught,
+        tainted=meta.tainted,
+        pinned=meta.pinned,
+        resting=resting,
+        rest_reason=reason,
+        last_read_at=meta.last_read_at,
+        merged_into=meta.merged_into,
+        version=meta.version,
     )

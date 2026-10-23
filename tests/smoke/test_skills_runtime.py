@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -362,7 +363,7 @@ def _learned(agent_id: str) -> Playbook:
         run_id="run-earlier",
         agent_id=agent_id,
         goal="Check the claim",
-        written_at=1_760_000_000.0,
+        written_at=time.time(),
         acting_steps=4,
         tainted=False,
     )

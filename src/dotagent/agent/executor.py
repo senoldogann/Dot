@@ -4,10 +4,12 @@ import asyncio
 import time
 from collections.abc import Callable, Coroutine, Mapping, Sequence
 from dataclasses import dataclass, replace
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotagent.agent.authorization import Authorization, StepDecision
 from dotagent.agent.gate import RunGate, hold_note, masked_action
+from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
 from dotagent.core.errors import (
     ApprovalParked,
     ApprovalRejected,
@@ -38,6 +40,8 @@ log = get_logger(__name__)
 
 _EVENT_TEXT_CHARS: int = 4000
 _BROKEN_ARGUMENTS_CHARS: int = 600
+# The kinds of action whose target does not show what the call acts on: an MCP call's is the name of its server.
+_BY_ARGUMENTS: frozenset[str] = frozenset({"mcp", "mcp_read"})
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,21 @@ def reached_sites(call: ToolCall, action: ActionInfo | None) -> tuple[str, ...]:
 def _site(call: ToolCall, action: ActionInfo | None) -> str:
     """Where a call acted, for the statistics and the site of a learned skill: the first site it reached."""
     return next(iter(reached_sites(call, action)), "")
+
+
+def _names_dot(call: ToolCall, action: ActionInfo | None, ctx: ToolContext) -> str:
+    """What the arguments of an MCP call name that Dot guards or loads, or ``""`` (item 585). The policy knows nothing
+    of what an MCP server does with its arguments, and the step's target is the server's name, so the skill bar
+    (:func:`dotagent.agent.playbooks.touched_dot`) could not tell a write of Dot's configuration through a server of
+    files from a write of a note. It is decided here, where the call has been classified and its arguments and the
+    places Dot guards are at hand, and stored with the step."""
+    if action is None or action.kind not in _BY_ARGUMENTS:
+        return ""
+    runtime = ctx.runtime
+    names: tuple[str, ...] = dot_names(
+        (*runtime.protected, *runtime.dot_paths), daemon_addresses(runtime.config.server.port), Path.home()
+    )
+    return arguments_name_dot(call.arguments, names) or ""
 
 
 def batch_steps(arguments: JsonObject) -> int:
@@ -295,6 +314,9 @@ async def _execute_one(
             # inside a batch is not one of these: the batch is, and a step of it that asked has its policy event.
             "decision": None if decision is None else decision.model_dump(mode="json"),
             "flags": [] if action is None else list(action.flags),
+            # What an MCP call's arguments name of Dot's own places, address or program, which its target does not show
+            # (item 585): a place of Dot's, not a secret, so it is stored as it is.
+            "names_dot": _names_dot(call, action, ctx),
         },
         True,
     )

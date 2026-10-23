@@ -543,3 +543,70 @@ such a name is left out and reported, since a run is told that a `taught-` skill
 Delegated runs, chats and evals (which always run without learned skills) write none. `dotx stats` counts the skills
 written, retired and read, and compares, per host, the runs that read a skill with the runs on that host that did not
 (act calls and seconds a run).
+
+**A higher bar, versions, rest and merging (item 585).** A skill is written only from a run that was no chat-mode run,
+did not change Dot itself and whose steps the review model judges a procedure you will likely ask for again: its answer
+to the call that writes the skill has one more field, `recurs`, which is required (an answer without it is asked for
+again), and a question answered, a lookup or a job done once gives no skill. The skip is logged (`playbook_skipped`,
+with the reason). A run changed Dot itself when a step of it, or of a run it delegated (a helper's change is the run's),
+was flagged by the policy as a change of Dot's own files (`self_change`) or, of the steps that are not reads, was
+flagged `secret_access` or `protected_read` (the shell guard's verdict on a line, which a `yolo` run is let carry out:
+it sees a working folder, a link or capital letters that the words of the line do not show), was an MCP call whose
+arguments name a place Dot guards or loads, or named one in its own words (its configuration, keys, database, code,
+skills or playbooks, as a path in any letter case, or with `~` or `$HOME` for the home folder), the daemon's address, or
+in a command Dot's own program (`dotx`, `dotagent`): such a run gives no skill whatever the model says, and the model is
+not asked, so that a skill never teaches a later run to do to Dot what a run did. A command, or another step that acts,
+which the guard flagged for reaching a secret or the clipboard gives no skill for the same reason; a read, which only
+looks, does not. What none of these reads is not seen: a command that builds a path as it runs, in a way the guard does
+not flag, and an MCP server that takes a path relative to a folder of its own; the sandbox holds the commands outside
+`yolo`, and no sandbox of Dot's holds an MCP server (see [Safety](safety.md)). Your **Save from a chat** is not asked
+whether the steps recur, since you chose, but a chat-mode run and a run that changed Dot itself are refused there too,
+with why.
+
+A rewrite by a later run, a restore and a merge keep the file they replace, whole, as a version
+(`.versions/<n>.md` in the skill's folder, a hidden one, so a run is not told it comes with the skill), write the
+record before the file (a disk that fills between the two leaves the older steps under the newer mark, never new
+steps under a record that says they carry less of outside content than they do), and the record notes how each
+version came to be, the run that made it and whether its steps carry the mark of outside
+content, as that version had it: a restore brings back the mark of the version it puts back, and a merge is marked
+when any skill it was made from is. Customize › Skills shows **Versions (N)** on a skill that has more than one:
+a dialog, the newest first, with how each was made, its mark and the steps it changed from the version before it,
+and **Restore**, which asks first and makes the version a new version of its own, so that it too can be taken
+back. `GET /api/skills/learned/{name}/versions`, `POST /api/skills/learned/{name}/restore` (`{"version": 2}`),
+`dotx skills versions NAME` and `dotx skills restore NAME N` do the same. A skill written before the versions has
+one, with no note of how it came to be, and its first rewrite keeps the file as it was.
+
+A learned or taught skill that no run read for `[agent] skill_rest_days` (60) days rests: no run is offered it (its
+prompt, the `skill` tool, `find_help` and the composer's picks leave it out), the page shows it as **Resting**, last in
+its section, and nothing of it is deleted nor does it retire for that; the read is dated where it happens: when a run
+reads the skill with the `skill` tool, or starts with it picked in the composer, the skill's `last_read_at` is written
+then, whatever the run is (a chat, a helper's run, a run that is stopped afterwards) and however it ends, at most once
+an hour for a skill, under the lock of the playbooks, and a date that cannot be written is logged and never fails the
+read. The counts of uses and failures (two failures in a row retire a skill) are another thing and stay where they were:
+a task run of its own that ended done or failed counts them. A skill whose record counts uses but not when a run last
+read it (written before the date was kept) is given that date on the first night, so that it rests after the days pass
+and not at once. **Wake** (`POST /api/skills/learned/{name}/wake`, `dotx skills wake NAME`) offers it again; **Pin**
+(`PUT /api/skills/learned/{name}/pin`, `dotx skills pin NAME`) keeps it from resting, and a skill can be put to rest by
+hand (`POST /api/skills/learned/{name}/rest`, `dotx skills rest NAME`). Only you delete a skill: **Drop** stays yours,
+on the page and with `dotx playbooks drop`. `dotx playbooks list` says which skills rest, which are pinned and which
+were rewritten.
+
+Each night the review model is asked about the pairs of learned skills of one owner that are awake, not pinned and
+not taught and whose kinds are at least `[agent] skill_merge_similarity` (0.75) close by their embeddings, the
+closest first. When it says a pair is one procedure, a second call writes the merged steps, secrets masked, and
+the merge waits as a card under **Waiting for your yes**
+(`GET /api/skills/proposals`, `dotx skills proposals`) that shows everything a yes would write to the first skill:
+its name, description, kind of work, when it fits, steps and parameters, each as the file will keep it (one line) and
+against what the skill says now, a line struck through for what goes and marked for what is written, and what happens
+to each skill: at most `skill_proposals_per_night` (3) a night, and ten waiting. The description is a line of every
+run's instructions, so it is never left off the card. Your **Merge** (`POST /api/skills/proposals/{id}/accept`,
+`dotx skills accept ID`) writes exactly those fields as a new version of the first skill, with the runs and the use
+counts of both, and puts the other to rest, `merged_into` naming the first; the merged skill is offered to every
+agent only when both skills were (sharing is yours to give, skill by skill). Restore on the first and Wake on the
+other undo it. A proposal whose skills changed since is
+refused (409) and says why; **No** (`DELETE /api/skills/proposals/{id}`, `dotx skills dismiss ID`) drops it, and
+the pair is proposed again only after one of them changes. Nothing is written to a skill before your yes.
+
+A run that reads, with the `skill` tool, a learned skill that may carry outside content (its record says so, or is
+older than the mark) is untrusted from the read, as one that read a web page, and its lessons are marked; so is a
+run you started with such a skill picked in the composer, whose steps are in its first message (item 585).

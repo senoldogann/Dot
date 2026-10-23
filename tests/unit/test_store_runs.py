@@ -8,7 +8,7 @@ from pathlib import Path
 from dotagent.agent.gate import TAINT_EVENTS
 from dotagent.store.db import Store
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
-from dotagent.store.models import EventRecord, RunRecord, RunStatus, ThreadRecord
+from dotagent.store.models import EventRecord, ResultStep, RunRecord, RunStatus, ThreadRecord
 
 
 async def _run_with_status(store: Store, thread: ThreadRecord, status: RunStatus) -> RunRecord:
@@ -191,3 +191,107 @@ async def test_the_runs_and_approvals_are_indexed_for_their_lookups(tmp_path: Pa
     finally:
         connection.close()
     assert {"runs_thread", "runs_parent", "runs_agent", "approvals_status"} <= names
+
+
+async def test_the_steps_of_a_run_come_back_as_they_were_stored_with_what_their_arguments_named(
+    tmp_path: Path,
+) -> None:
+    """What the skill bar reads (item 585): the tool, the kind, the target and the flags of each step, and what an MCP
+    call's arguments named of Dot's own, which a step stored by a Dot older than that has not."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        thread: ThreadRecord = await store.create_thread("t", "test")
+        run: RunRecord = await _run_with_status(store, thread, "running")
+        await store.add_event(run.id, "tool_call", {"call_id": "c1", "tool": "shell"})
+        await store.add_event(
+            run.id,
+            "tool_result",
+            {"tool": "shell", "kind": "shell", "target": "ls", "flags": ["secret_access", "outside_workspace"]},
+        )
+        await store.add_event(
+            run.id,
+            "tool_result",
+            {
+                "tool": "mcp__fs__write_file",
+                "kind": "mcp",
+                "target": "fs",
+                "flags": ["destructive"],
+                "names_dot": "~/.dot/config.toml",
+            },
+        )
+        await store.add_event(run.id, "tool_result", {"tool": "finish", "kind": "meta"})
+        assert await store.result_steps(run.id) == [
+            ResultStep(tool="shell", kind="shell", target="ls", flags=("secret_access", "outside_workspace")),
+            ResultStep(
+                tool="mcp__fs__write_file",
+                kind="mcp",
+                target="fs",
+                flags=("destructive",),
+                names_dot="~/.dot/config.toml",
+            ),
+            ResultStep(tool="finish", kind="meta", target="", flags=()),
+        ]
+        assert await store.result_steps("run_none") == []
+    finally:
+        await store.close()
+
+
+async def test_the_steps_of_a_run_are_those_of_its_family_with_the_helpers_steps_marked(
+    tmp_path: Path,
+) -> None:
+    """A helper that changes Dot's files is its parent's doing for the skill bar (item 585): the steps of a run come
+    back with those of every run it delegated, in the order they were taken, the helpers' marked; those of a run that
+    is no kin of it, and of the run that delegated it, do not."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        thread: ThreadRecord = await store.create_thread("t", "test")
+        parent: RunRecord = await _run_with_status(store, thread, "running")
+        stranger: RunRecord = await _run_with_status(store, thread, "running")
+
+        async def helper_of(run: RunRecord) -> RunRecord:
+            return await store.create_run(
+                thread.id,
+                "part",
+                "task",
+                "ollama:m",
+                run.id,
+                "delegate",
+                "medium",
+                "standard",
+                None,
+                "ask",
+                False,
+                None,
+                None,
+                None,
+            )
+
+        child: RunRecord = await helper_of(parent)
+        grandchild: RunRecord = await helper_of(child)
+        for run, tool in (
+            (parent, "read_file"),
+            (child, "write_file"),
+            (stranger, "shell"),
+            (parent, "delegate"),
+            (grandchild, "shell"),
+            (child, "finish"),
+        ):
+            await store.add_event(run.id, "tool_result", {"tool": tool, "kind": "write", "target": run.id})
+        steps = await store.result_steps(parent.id)
+        assert [(step.tool, step.target == parent.id, step.helper) for step in steps] == [
+            ("read_file", True, False),
+            ("write_file", False, True),
+            ("delegate", True, False),
+            ("shell", False, True),
+            ("finish", False, True),
+        ]
+        assert {step.target for step in steps if step.helper} == {child.id, grandchild.id}
+        # A helper's own steps are its family's too, and nothing of its parent's or a stranger's is among them.
+        assert [(step.tool, step.helper) for step in await store.result_steps(child.id)] == [
+            ("write_file", False),
+            ("shell", True),
+            ("finish", False),
+        ]
+        assert [(step.tool, step.helper) for step in await store.result_steps(stranger.id)] == [("shell", False)]
+    finally:
+        await store.close()

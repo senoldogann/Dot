@@ -40,8 +40,11 @@ DRAFT: JsonObject = {
 }
 
 
-def _turn(arguments: JsonObject) -> ScriptedTurn:
-    return ScriptedTurn(text="", calls=(ScriptedCall(tool=PLAYBOOK_TOOL, arguments=arguments),))
+def _turn(arguments: JsonObject, recurs: bool | None = True) -> ScriptedTurn:
+    """The writer's answer; ``recurs``, its judgement of whether the steps will come back (item 585), is left out with
+    ``None``."""
+    given: JsonObject = arguments if recurs is None else {**arguments, "recurs": recurs}
+    return ScriptedTurn(text="", calls=(ScriptedCall(tool=PLAYBOOK_TOOL, arguments=given),))
 
 
 class AskedProvider(ScriptedProvider):

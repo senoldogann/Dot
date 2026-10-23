@@ -10,6 +10,8 @@ from dotagent.agent.authorization import StepDecision
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import RunLessons
 from dotagent.agent.resume import CutOff
+from dotagent.agent.skill_history import VersionDetail
+from dotagent.agent.skill_proposals import ProposalView
 from dotagent.browser.look import PageLook
 from dotagent.browser.profiles import ProfileView
 from dotagent.config import (
@@ -736,7 +738,11 @@ class LearnedSkillView(FrozenModel):
     """A skill Dot or an agent learned from its own work (:mod:`dotagent.agent.playbooks`): its name and description,
     the kind of work, where it acted, the runs it comes from, how it fared (``uses`` done after reading it,
     ``failures``), whether it is retired, whose it is (``agent_id``, ``None`` for Dot's) and whether an agent's is
-    ``shared`` with every run (item 94)."""
+    ``shared`` with every run (item 94). Item 585 added: ``taught`` (the owner showed it), ``tainted`` (its steps may
+    carry content third parties can author; ``None`` for a record older than the mark, offered as if they did),
+    ``pinned``, ``resting`` and why (``rest_reason``: ``disuse`` for no run reading it for the days of ``rest_days``,
+    ``owner`` for their word, ``merged`` for a merge that put it aside, ``merged_into`` naming the skill), when a run
+    last read it and its ``version``."""
 
     name: str
     description: str
@@ -750,6 +756,14 @@ class LearnedSkillView(FrozenModel):
     updated_at: float
     agent_id: str | None
     shared: bool
+    taught: bool
+    tainted: bool | None
+    pinned: bool
+    resting: bool
+    rest_reason: Literal["disuse", "owner", "merged"] | None
+    last_read_at: float | None
+    merged_into: str | None
+    version: int
 
 
 class LearningHealthView(FrozenModel):
@@ -795,7 +809,32 @@ class HarnessRequest(FrozenModel):
 
 
 class LearnedSkillsView(FrozenModel):
+    """The learned skills, active first, then the retired ones, and the days after which a skill no run read rests
+    (``[agent] skill_rest_days``, item 585)."""
+
     items: tuple[LearnedSkillView, ...]
+    rest_days: int
+
+
+class SkillVersionsView(FrozenModel):
+    """The versions of a learned skill, the oldest first and its own now last, each with what its file says (item 585,
+    ``GET /api/skills/learned/{name}/versions``)."""
+
+    name: str
+    items: tuple[VersionDetail, ...]
+
+
+class SkillRestoreRequest(FrozenModel):
+    """The version of a learned skill to put back as its steps (item 585)."""
+
+    version: Annotated[int, Field(ge=1)]
+
+
+class SkillProposalsView(FrozenModel):
+    """The changes to learned skills that wait for the owner's yes (item 585): each with why it cannot be applied now,
+    if it cannot, and what its skills say now."""
+
+    items: tuple[ProposalView, ...]
 
 
 class SkillShareRequest(FrozenModel):

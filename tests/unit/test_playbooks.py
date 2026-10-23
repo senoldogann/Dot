@@ -18,6 +18,7 @@ from dotagent.agent.playbooks import (
     RETIRED_DIR,
     Playbook,
     PlaybookMeta,
+    SkillVersion,
     acting_digest,
     acting_steps,
     distils,
@@ -180,6 +181,10 @@ def test_a_playbook_is_a_skill_the_catalog_loads(tmp_path: Path) -> None:
         agent_id=None,
         shared=False,
         tainted=False,
+        version=1,
+        versions=(
+            SkillVersion(n=1, at=1_700_000_000.0, run_id="run-1", change="learned", tainted=False, acting_steps=3),
+        ),
     )
     with pytest.raises(FileExistsError):
         write_playbook(tmp_path, _playbook())
@@ -235,7 +240,7 @@ def test_a_learned_skill_the_loader_cannot_read_is_left_out_and_the_others_are_s
     entries = list_playbooks(tmp_path)
     assert [entry.skill.name for entry in entries] == [_playbook().name]
     catalog: SkillCatalog = load_catalog((SkillRoot(path=tmp_path, source="learned"),))
-    assert [skill.name for skill in offered_skills(catalog.skills, entries, None)] == [_playbook().name]
+    assert [skill.name for skill in offered_skills(catalog.skills, entries, None, ())] == [_playbook().name]
     assert [problem.path for problem in catalog.problems] == [broken]
 
 
@@ -260,7 +265,7 @@ def test_a_learned_skill_with_an_unreadable_record_or_no_utf8_text_is_left_out_a
         ("playbook_unreadable", str(undecodable)),
     ]
     catalog: SkillCatalog = load_catalog((SkillRoot(path=tmp_path, source="learned"),))
-    assert [skill.name for skill in offered_skills(catalog.skills, entries, None)] == [_playbook().name]
+    assert [skill.name for skill in offered_skills(catalog.skills, entries, None, ())] == [_playbook().name]
 
 
 def _counted(meta: PlaybookMeta | None) -> PlaybookMeta:
@@ -419,7 +424,7 @@ OWN_STEPS: tuple[str, ...] = (
 
 def _offered(root: Path) -> tuple[Skill, ...]:
     catalog: SkillCatalog = load_catalog((SkillRoot(path=root, source="learned"),))
-    return offered_skills(catalog.skills, list_playbooks(root), None)
+    return offered_skills(catalog.skills, list_playbooks(root), None, ())
 
 
 def _as_written(root: Path) -> tuple[Skill, ...]:
@@ -509,7 +514,8 @@ def test_a_clean_run_of_its_kind_or_the_owner_clears_the_mark_and_a_tainted_run_
     assert (meta.tainted, meta.tainted_runs, meta.runs) == (False, ("run-1",), ("run-1", "run-2"))
     assert _offered(tmp_path) == _as_written(tmp_path)
     (entry,) = list_playbooks(tmp_path)
-    assert render_entry(entry).split("  ")[2] == "[used 0, failed 0]"
+    # The listing says the skill was rewritten, and nothing of a mark.
+    assert render_entry(entry).split("  ")[2] == "[used 0, failed 0, version 2]"
     assert len(render_list((entry,), tmp_path)) == 2
     # A run that read such content rewrites the steps: the mark is back.
     update_playbook(tmp_path, tainted.name, tainted.model_copy(update={"run_id": "run-3"}))
@@ -537,8 +543,8 @@ def test_a_skill_draft_is_written_with_its_secrets_masked() -> None:
     )
     masked: PlaybookDraft = redacted_draft(draft, (held,))
     assert masked.description == "Sign in with *** and search."
-    assert masked.steps == ("Log in with password: *** and the key ***.", "Fill the search field (ref e7).")
-    assert masked.parameters == ("<key>: ***",)
+    assert masked.steps == ["Log in with password: *** and the key ***.", "Fill the search field (ref e7)."]
+    assert masked.parameters == ["<key>: ***"]
     assert (masked.kind, masked.when) == (draft.kind, draft.when)
 
 

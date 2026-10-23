@@ -70,9 +70,12 @@ from dotagent.agent.review import (
     owner_writer_for,
     shorten_reason,
 )
+from dotagent.agent.skill_history import settle_read_dates
+from dotagent.agent.skill_proposals import propose_merges
 from dotagent.agent.verify import CallFact
 from dotagent.core.errors import StoreError
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import playbooks_dir
 from dotagent.core.text import redact_secrets
 from dotagent.evals import EVAL_SOURCE
 from dotagent.memory.lifecycle import forget_proposals, purge_trash
@@ -647,6 +650,17 @@ async def _describe_owner(runtime: Runtime, runs: Sequence[RunRecord], now: floa
     return True
 
 
+async def _tidy_skills(runtime: Runtime, now: float) -> int:
+    """The learned skills' part of a night (item 585): a skill that counts uses and has no date of its last read is
+    given one, so that it rests after the days pass and not at the first start; then the review model is asked which
+    close pairs of skills are one procedure, and a merge is proposed to the owner for each. Returns how many were
+    proposed; nothing is written to a skill. Nothing is done while learned skills are off."""
+    if not runtime.config.agent.playbooks:
+        return 0
+    await asyncio.to_thread(settle_read_dates, playbooks_dir(), now)
+    return await propose_merges(runtime, now)
+
+
 async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Reflection:
     """One reflection at ``now`` (see the module). ``deciding`` is the run manager's lock of the owner's decisions on
     lessons. The reflection is recorded before it returns; an error on the way (the store, the embedder) raises and
@@ -674,6 +688,7 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
     merged += await merge_near_duplicates(runtime, owner_saved, now)
     purged: int = await purge_trash(runtime.memory, now)
     to_forget: int = len(await forget_proposals(runtime.memory, now))
+    skills_proposed: int = await _tidy_skills(runtime, now)
     owner_updated: bool = await _describe_owner(runtime, runs, now) if runs else False
     journal: str | None = None
     if runs or merged or retired or outdated:
@@ -695,6 +710,7 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         outdated=outdated,
         to_forget=to_forget,
         purged=purged,
+        skills_proposed=skills_proposed,
     )
     await store.kv_set(REFLECTION_KEY, reflection.model_dump_json())
     log.info(
@@ -708,5 +724,6 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         owner_updated=owner_updated,
         to_forget=to_forget,
         purged=purged,
+        skills_proposed=skills_proposed,
     )
     return reflection
