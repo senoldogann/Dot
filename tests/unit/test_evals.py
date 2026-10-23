@@ -401,6 +401,15 @@ def test_asking_for_a_task_that_does_not_exist_names_the_known_ones() -> None:
     ]
 
 
+def test_an_eval_run_works_in_dots_own_chrome_whatever_the_owners_browser_mode() -> None:
+    """A measurement never touches the owner's Chrome (item 579): with campaigns following the browser mode, the mode
+    itself is Dot's own in an eval, headless, for a campaign task as for any other."""
+    default: AppConfig = load_default_config()
+    owner: AppConfig = default.model_copy(update={"browser": default.browser.model_copy(update={"mode": "attach"})})
+    measured: AppConfig = eval_config(owner)
+    assert (measured.browser.mode, measured.browser.headless) == ("own", True)
+
+
 def test_an_eval_run_needs_the_key_of_the_review_model_when_an_attempt_checks_the_end_of_its_run() -> None:
     config: AppConfig = eval_config(load_default_config())
     measured: str = "openai:gpt-5.5"

@@ -75,11 +75,11 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    procedures, the checks of the domain). The second usually becomes a learned skill rather than a habit. Every edit
    names the moment of the run that motivates it; a proposal with no such moment is `KEEP`.
 2. **Probe.** Each candidate runs the same work as the current harness: the eval tasks that are safe to repeat, in a
-   throwaway home with the exclusions of an eval (no MCP servers, no desktop, a headless browser, no learning), within
-   a budget of tasks, model calls and time. What comes back is a scorecard per run (the ending, the steps, the tokens,
-   the seconds, the tool errors, the approvals asked, the checks passed) and a *contrast* with the current harness:
-   the edit helped, changed nothing, or hurt. A probe says how a candidate behaved, not that it is right: runs vary,
-   and the models share their blind spots.
+   throwaway home with the exclusions of an eval (no MCP servers, no desktop, Dot's own Chrome headless, no learning),
+   within a budget of tasks, model calls and time. What comes back is a scorecard per run (the ending, the steps, the
+   tokens, the seconds, the tool errors, the approvals asked, the checks passed) and a *contrast* with the current
+   harness: the edit helped, changed nothing, or hurt. A probe says how a candidate behaved, not that it is right: runs
+   vary, and the models share their blind spots.
 3. **Compose.** A composer reads the candidates, their diffs and the contrasts, and keeps, revises or drops each edit,
    each decision tied to an observation; or it keeps the current harness. The composed version is played on the scoring
    set in its turn and survives, as `probed`, when it did better than the base, with the decisions and the evidence in

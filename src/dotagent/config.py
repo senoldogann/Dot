@@ -265,7 +265,8 @@ class AgentConfig(FrozenModel):
     campaign_wait_hours: float = Field(ge=0, allow_inf_nan=False)
     campaign_patience_sessions: int = Field(ge=1)
     campaign_max_sessions: int = Field(ge=0)
-    # The Chrome a campaign's sessions work in unless its start says otherwise.
+    # Read by nothing since item 579, which has a campaign follow [browser] mode; kept so that an older config.toml
+    # that sets it still loads.
     campaign_browser: BrowserMode
     consult_max_per_run: int = Field(ge=0)
     # At least the floor a run's tool output keeps however small the model's window (dotagent.agent.scaffold).

@@ -866,7 +866,7 @@ class RunManager:
         ``thread_id`` (a new thread when ``None``), which becomes the campaign's conversation. Every session keeps the
         model, reasoning level, speed, choice for one message (item 251: the campaign is that message's work, and the
         level the choice asks for is the campaign's) and approval mode the opening one starts with (``None`` takes the
-        configured one), and works in the Chrome ``browser`` names (``None``: ``[agent] campaign_browser``); a campaign
+        configured one), and works in the Chrome ``browser`` names (``None``: the daemon's browser mode); a campaign
         that asks for the owner's Chrome is refused while that Chrome is closed or does not allow the connection, so
         that its sessions do not fail one after the other.
 
@@ -887,7 +887,8 @@ class RunManager:
         await self._check_once(parse_model_ref(model_ref), once)
         level: Effort = runtime.config.models.effort if effort is None else effort
         approval_mode: ApprovalMode = runtime.config.policy.approvals if approvals is None else approvals
-        chrome: BrowserMode = runtime.config.agent.campaign_browser if browser is None else browser
+        # The mode the daemon works in now, which Settings › Browser switches while it runs, as each session reads it.
+        chrome: BrowserMode = runtime.browser.mode if browser is None else browser
         if chrome == "attach":
             await asyncio.to_thread(read_debug_endpoint, chrome_data_dir())
         thread: ThreadRecord = (
@@ -905,7 +906,7 @@ class RunManager:
             once,
             approval_mode,
             [file.path for file in files],
-            chrome,
+            browser,
         )
         try:
             run, _ = await self._launch(

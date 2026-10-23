@@ -33,7 +33,8 @@ from dotagent.agent.loop import CAMPAIGN_TARGETS_EVENT, RunOpening
 from dotagent.agent.manager import RunHandle, RunManager, thread_title
 from dotagent.agent.reflection import REFLECTION_OFF
 from dotagent.agent.review import GOAL_TOOL
-from dotagent.config import AppConfig, load_default_config
+from dotagent.browser.modes import browser_data_dir
+from dotagent.config import AppConfig, BrowserConfig, load_default_config
 from dotagent.core.errors import BrowserError, StoreError
 from dotagent.core.paths import db_path, failsafe_path
 from dotagent.core.types import JsonObject
@@ -335,9 +336,10 @@ async def test_a_session_started_by_the_scheduler_reads_the_brief_and_only_an_ac
     assert "# Campaign\nThis run is session 2 of a campaign" in _system(steps[0])
     brief: str = _first_user(steps[0])
     assert brief.startswith(f"This is session 2 of a campaign. Its goal:\n{GOAL}\n\n")
-    # The eval configuration keeps campaigns on Dot's own Chrome; the brief says so.
+    # A campaign started without a Chrome follows the daemon's browser mode at each session, Dot's own here; the brief
+    # says so.
     assert "Browser: Dot's own Chrome (own)" in brief
-    assert campaign.browser == "own"
+    assert campaign.browser is None
     assert f"Targets: {TARGETS}\nVerified by: {VERIFICATION}\n\n" in brief
     assert "- [progress, 0 min ago] Wrote 5 leads to leads.csv. (leads 5)\n" in brief
     assert "Session 1 ended 0 min ago (done).\nIts answer: 5 of 50 leads are in leads.csv." in brief
@@ -779,6 +781,34 @@ async def test_a_campaign_that_asks_for_the_owners_chrome_is_refused_while_that_
         )
         assert opening.campaign_id is not None
         assert (await runtime.store.get_campaign(opening.campaign_id)).browser == "own"
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await manager.wait(opening.id)
+
+
+async def test_a_campaign_without_a_chrome_is_checked_against_the_mode_the_daemon_works_in_now(
+    login_env: dict[str, str],
+) -> None:
+    """Item 579: a campaign started without a Chrome follows the browser mode, so its start checks the mode the daemon
+    works in now, which Settings › Browser switches while it runs, not the one it started with: switched to the owner's
+    Chrome, closed here, the campaign is refused before it is stored; switched back to Dot's own, it starts."""
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(_PROVIDER, [_turn(_targets()), _finish("Nothing to do.")])
+    )
+    async with _session(_config(60.0), login_env, model, Notices()) as (runtime, manager):
+        own: BrowserConfig = runtime.browser.config
+        assert own.mode == "own"
+        await runtime.browser.switch(own.model_copy(update={"mode": "attach"}), browser_data_dir("attach", own.profile))
+        with pytest.raises(BrowserError, match="Chrome is not running"):
+            await manager.start_campaign(
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), None
+            )
+        assert await runtime.store.list_campaigns() == []
+        await runtime.browser.switch(own, browser_data_dir("own", own.profile))
+        opening: RunRecord = await manager.start_campaign(
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), None
+        )
+        assert opening.campaign_id is not None
+        assert (await runtime.store.get_campaign(opening.campaign_id)).browser is None
         async with asyncio.timeout(_TIME_LIMIT_S):
             await manager.wait(opening.id)
 
