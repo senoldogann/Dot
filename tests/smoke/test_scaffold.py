@@ -20,7 +20,7 @@ from structlog.testing import capture_logs
 from dotagent.agent.compact import estimate_tokens
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, Tier, load_default_config
-from dotagent.core.errors import ProviderError, ProviderRateLimitError
+from dotagent.core.errors import ProviderError, ProviderRateLimitError, ProviderTransportError
 from dotagent.core.types import FrozenModel, JsonObject, JsonValue
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home, seed_workspace
@@ -170,6 +170,16 @@ class BrokenFastProvider(WindowedProvider):
         if request.model == _BROKEN_FAST:
             raise ProviderError("the fast model is down", {"model": request.model})
         return await super().complete(request, sink)
+
+
+class UnreadableFastProvider(WindowedProvider):
+    """The scripted model next to a fast model, ``broken``, that its server can tell nothing of: an Ollama model that is
+    not pulled, or a server that is not running. The run's own model is read as it was."""
+
+    async def model_info(self, model: str) -> ModelInfo:
+        if model == _BROKEN_FAST:
+            raise ProviderTransportError("connection refused", {"model": model})
+        return await super().model_info(model)
 
 
 class RateLimitedFastProvider(WindowedProvider):
@@ -383,6 +393,29 @@ async def test_a_fast_model_that_fails_leaves_the_summary_to_the_runs_own_model_
     for compaction in played.compactions:
         assert (compaction["method"], compaction["model"]) == ("model", own)
         assert compaction["fast_problem"] == "the fast model is down"
+
+
+async def test_a_fast_model_whose_window_cannot_be_read_leaves_the_summary_to_the_runs_own_model(
+    login_env: dict[str, str],
+) -> None:
+    """Item 552: the window of an Ollama model is read from its server, which may not be running; that is the fast
+    model's problem, named as any other, and no reason to fail the run."""
+    config: AppConfig = _config({}, 6)
+    down: AppConfig = config.model_copy(
+        update={"models": config.models.model_copy(update={"fast": f"{_PROVIDER}:{_BROKEN_FAST}"})}
+    )
+    played: Played = await _play_with(
+        down, login_env, UnreadableFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), _SMALL_WINDOW)
+    )
+    assert played.record.status == "done", played.record
+    assert len(played.compactions) > 1
+    own: str = parse_model_ref(SCRIPTED_MODEL).label
+    for compaction in played.compactions:
+        assert (compaction["method"], compaction["model"], compaction["fast_problem"]) == (
+            "model",
+            own,
+            "connection refused",
+        )
 
 
 async def test_a_fast_model_paused_after_a_rate_limit_is_not_asked_again_and_the_runs_own_model_writes_at_once(

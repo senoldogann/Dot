@@ -4,6 +4,7 @@ the daemon resumes on its own, and what the resumed run is told."""
 from dotagent.agent.compact import pending_calls
 from dotagent.agent.plan import EMPTY_PLAN, PlanItem, PlanPayload
 from dotagent.agent.resume import (
+    REPEATABLE_META_TOOLS,
     RESUME_SOURCE,
     CallEnd,
     InterruptedCall,
@@ -14,8 +15,10 @@ from dotagent.agent.resume import (
     resumed_event_data,
     resumes_on_start,
 )
+from dotagent.config import load_default_config
 from dotagent.llm.types import Message, ToolCall, assistant_message, tool_message, user_message
 from dotagent.policy.types import ActionKind
+from dotagent.runtime import _tool_groups
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_SHUTDOWN, RESULT_STOPPED
@@ -103,6 +106,32 @@ def test_the_daemon_resumes_on_its_own_only_runs_of_the_web_ui_whose_calls_cut_o
     assert not resumes_on_start(RESTARTED, "run_2", [read])
     for source in ("cli", SCHEDULE_SOURCE, RESUME_SOURCE):
         assert not resumes_on_start(_run("failed", RESULT_RESTARTED, source, None), "run_1", [read])
+
+
+def test_a_meta_call_is_repeated_only_when_a_second_call_sets_what_the_first_set() -> None:
+    """Item 552: the kind ``meta`` is the kind of tools that make an agent, show a notification or a page and ask the
+    owner, as well as of the plan and the help; a run cut off in one of those is not resumed on its own, nor told that
+    the call only reads."""
+    # The plan and the groups of tools are set again, a question the end of the daemon closed is asked again.
+    for tool in ("update_plan", "mark_plan_step", "use_tools", "skill", "schedule_list", "find_help", "ask_user"):
+        assert resumes_on_start(RESTARTED, "run_1", [_call(tool, "meta", "cut_off", "")]), tool
+    for tool in ("create_agent", "notify", "show_page", "consult", "campaign_targets"):
+        assert not resumes_on_start(RESTARTED, "run_1", [_call(tool, "meta", "cut_off", "")]), tool
+    resumption: Resumption = Resumption(
+        from_run_id="run_1",
+        cut_off="daemon_restarted",
+        automatic=True,
+        calls=(_call("create_agent", "meta", "cut_off", ""), _call("find_help", "meta", "cut_off", "")),
+        plan=EMPTY_PLAN,
+    )
+    note: str = resume_note(GOAL, resumption)
+    assert "create_agent {}: it was cut off while it ran and may have changed something" in note
+    assert "find_help {}: it was cut off while it ran. It only reads, so it may run again." in note
+
+
+def test_the_meta_tools_named_repeatable_are_tools_that_exist() -> None:
+    names: set[str] = {tool.spec.name for group in _tool_groups(load_default_config(), False) for tool in group}
+    assert names >= REPEATABLE_META_TOOLS, REPEATABLE_META_TOOLS - names
 
 
 def test_the_resumed_run_is_told_how_each_call_of_the_step_ended_and_takes_over_the_plan() -> None:

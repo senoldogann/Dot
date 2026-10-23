@@ -179,6 +179,8 @@ class ChatState(FrozenModel):
     usage: Usage
     finish: str
     done: bool
+    # Whether the model declined: a refusal came in the stream (item 552).
+    refused: bool = False
 
 
 def initial_chat_state(model: str) -> ChatState:
@@ -301,6 +303,12 @@ def fold_chat_event(
     if content:
         text += content
         deltas.append(StreamDelta(kind="text", text=content))
+    # A model that declines says so in ``refusal`` and not in ``content``: its words reach the owner as an answer's do,
+    # and the reply says it declined (item 552).
+    refusal: str = get_str(delta, "refusal")
+    if refusal:
+        text += refusal
+        deltas.append(StreamDelta(kind="text", text=refusal))
     calls: tuple[PartialCall, ...] = state.calls
     for entry in get_objects(delta, "tool_calls"):
         calls = _fold_call(calls, entry)
@@ -313,6 +321,7 @@ def fold_chat_event(
             "details": merge_details(state.details, pieces) if pieces else state.details,
             "usage": _usage_of(usage_object) if usage_object else state.usage,
             "finish": get_str(choice, "finish_reason") or state.finish,
+            "refused": state.refused or bool(refusal),
         }
     )
     return new_state, tuple(deltas)
@@ -345,14 +354,17 @@ def _tool_calls_of(slots: tuple[PartialCall, ...]) -> tuple[ToolCall, ...]:
 
 def chat_reply(state: ChatState) -> ModelReply:
     calls: tuple[ToolCall, ...] = _tool_calls_of(state.calls)
+    # A model that declined and made no call has not answered: its reply ends as the Messages codec ends Anthropic's
+    # refusal (item 552).
+    declined: bool = state.refused and not calls
     return ModelReply(
         model=state.model,
         text=state.text,
         thinking=state.thinking,
         tool_calls=calls,
         usage=state.usage,
-        finish=_finish_of(state, bool(calls)),
-        raw_finish=state.finish,
+        finish="other" if declined else _finish_of(state, bool(calls)),
+        raw_finish="refusal" if declined else state.finish,
         raw=state.details,
     )
 

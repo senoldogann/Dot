@@ -189,7 +189,11 @@ answer keeps its words, Ollama's too.
   time it out. The run's timeline shows the agent's text and thinking as they come, each tool call (`opencode_bash`,
   `opencode_edit`, `browser_open`, ...) with its result and each step with its tokens; your messages reach the agent
   while it works, and Stop stops it. A chat keeps its OpenCode session from run to run, so the agent remembers it, and a
-  session that missed what the chat said on another model hears it with the next message. What Dot's own runs bring
+  session that missed what the chat said on another model hears it with the next message. The run's limits
+  (`run_max_minutes`, `run_max_tokens`) bind the agent as they bind Dot's own loop (item 552): the first step that ends
+  past one while the agent goes on tells it to stop and answer, and an agent that goes on two steps after that is
+  stopped and the run ends failed. A reply that stopped at the model's output limit ends the run failed too ("the
+  model's replies were cut short"), not done with half an answer. What Dot's own runs bring
   besides (the memory recalled at the start, the checks of a finish, lessons and playbooks) a run here does not have,
   and a free model cannot be the fast, review or vision model, whose calls are Dot's own. Zen's terms of the free models
   apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may use what is sent to them to improve their models

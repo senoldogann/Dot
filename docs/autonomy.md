@@ -221,7 +221,10 @@ late for it, as for any run that has ended: an answer to a question it left stay
 timeline shows when the limit was reached. The limits are those of one run: a resumed run, or one that an answer
 starts, begins with a new clock and a new count, and a delegated run has the limits of its own while its tokens also
 count toward its parent's, which sees them when the delegation returns. Delegated and scheduled runs have the same
-limits; an eval run is cut by its task's own (300 s, 600000 tokens), whatever yours are.
+limits; an eval run is cut by its task's own (300 s, 600000 tokens), whatever yours are. A run on a Zen model of
+OpenCode (item 552) has them too, read between the agent's steps: the first step that ends past a limit while the agent
+goes on tells it to stop and answer, and an agent that still goes on two steps after that is stopped and the run ends
+failed, with the same words and the timeline's line.
 
 **The progress watchdog.** After every step in which a run used tools, Dot compares what it called and what came back
 (screenshots included) with the steps before. By default it looks for the same step `stall_limit` times in a row: the
@@ -255,7 +258,8 @@ By default (`resume = "safe"` in `[agent]`, item 248) the daemon also resumes ru
 the web UI, cut off at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a
 question to you counts: it is asked again). A run of `dotx run`, of a schedule or of an eval, a run that itself resumed
 another (so a run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have
-changed something (a command, a write, a click, or a delegation, whose run may have done anything) wait for you. `resume
+changed something (a command, a write, a click, an agent it made, a notification or a page it showed (item 552), or a
+delegation, whose run may have done anything) wait for you. `resume
 = "off"` leaves every such run to you; **Go on after a restart** in Settings › System › Daemon writes the choice into
 the config file (item 231), and the daemon's next start reads it. The new run's turn opens with a line with a bolt
 (item 299): "Dot restarted and resumed this turn" when the daemon went on with it by itself, else

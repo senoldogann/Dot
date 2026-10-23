@@ -44,7 +44,8 @@ is the answer (a small model that is offered both writes the call out as text).
   a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section (a
   section is there as a heading, not as a word of a sentence) is asked again once with the missing sections named and
   the first draft carried along; when the fast model gives no text,
-  a summary far too long, an error or a timeout, the run's own model writes it, and while the fast model is paused after
+  a summary far too long, an error or a timeout, or when its window cannot be read (an Ollama model whose server does not
+  answer, item 552), the run's own model writes it, and while the fast model is paused after
   a quota, rate-limit or key error (see `standby`) the run's own model writes it without asking the fast one (item 240);
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
   and the event says so with the reason. In the conversation a compaction is a quiet line across the column where it
@@ -152,7 +153,13 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - A reply the model service cut short (at its output limit, or for another abnormal reason it gave) is never taken
   as the answer, in any mode: the model is told how the reply ended and asked to go on with its tools or give the
   complete answer again in fewer words. Each such reply counts as a nudge; after `finish_nudges` of them in a row the
-  run fails with "The model's replies were cut short" and the reason the last one ended with.
+  run fails with "The model's replies were cut short" and the reason the last one ended with. A reply in which the
+  model declined (it ends with `refusal`: Anthropic's stop reason, and a refusal of an OpenAI model, on either of its
+  wires) is one of them, so a run does not end done with a refusal for its answer (item 552); the review model's refusal
+  is known for one too.
+- A `finish` in the same reply as a call that did not work (an error, a refusal of the policy, a step kept for you; the
+  plan's bookkeeping apart) does not end the run: its answer was written before the model saw the result. The run is
+  sent back once with a note naming the call, and the timeline's data has a `finish_after_failure` event (item 552).
 - A reply the service's content filter stopped (it ends with `content_filter`) is no nudge: asked again with the same
   conversation the model is stopped again (item 437). The run moves to a standby model at once (see
   [Helpers and standby](models.md#models-and-providers)), and the model is not paused for other runs; with no standby
