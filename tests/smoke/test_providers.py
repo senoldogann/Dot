@@ -121,8 +121,15 @@ async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
             assert sideways <= 0
             await wide.screenshot(path=str(tmp_path / "wide-dark.png"))
 
+            # The list is a group of buttons, not a listbox whose arrow keys would have to move through it, and the
+            # provider open is marked as the current one (item 559).
+            assert await wide.locator(".providers-list").get_attribute("role") == "group"
+            assert await rows.locator("xpath=self::*[@role]").count() == 0
+            assert await rows.first.get_attribute("aria-current") == "true"
             await rows.filter(has_text="Anthropic").click()
             assert (await wide.locator(".provider-title").text_content()) == "Anthropic"
+            assert await rows.filter(has_text="Anthropic").get_attribute("aria-current") == "true"
+            assert await wide.locator(".provider-item[aria-current]").count() == 1
             await wide.screenshot(path=str(tmp_path / "wide-dark-anthropic.png"))
             assert wide_errors == []
             await wide.context.close()
@@ -148,6 +155,10 @@ async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
             await phone.wait_for_timeout(300)
             assert await layout.get_attribute("data-open") == "false"
             assert await phone.locator(".provider-panel").is_visible() is False
+            # Back gives the focus to the provider that was open, not to the first of the list (item 559).
+            opened = await phone.evaluate("document.activeElement.querySelector('.provider-name')?.textContent")
+            assert opened == "TypeSafe", opened
+            assert await phone.locator(".provider-item[aria-current]").count() == 0
             assert phone_errors == []
             await phone.context.close()
         finally:

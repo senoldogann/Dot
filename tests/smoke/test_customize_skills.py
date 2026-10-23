@@ -266,3 +266,57 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         await phone.close()
                     finally:
                         await browser.close()
+
+
+async def test_a_skills_page_that_could_not_be_read_offers_try_again_as_the_other_tabs_do(
+    login_env: dict[str, str],
+) -> None:
+    """Item 559: Skills said "This could not be loaded" with no way to read again but to leave the page and come back,
+    for its skills and for the part that lists what other apps set up; Plugins and Connectors have Try again. Each read
+    fails once here, as a daemon whose store is busy fails it, and the next read answers."""
+    with scratch_home() as home, eval_environment(home, {}):
+        _home_skills(home)
+        async with _daemon(login_env, _config(), []) as (runtime, manager, _model), _served(runtime, manager) as served:
+            failing: dict[str, int] = {"learned": 1, "elsewhere": 1}
+
+            async def busy_once(route: Route) -> None:
+                read: str = route.request.url.rsplit("/", 1)[-1]
+                if failing[read] > 0:
+                    failing[read] -= 1
+                    await route.fulfill(
+                        status=500,
+                        content_type="application/json",
+                        body='{"message": "the store is busy", "context": {}}',
+                    )
+                    return
+                await route.continue_()
+
+            async with async_playwright() as playwright:
+                browser: Browser = await playwright.chromium.launch(
+                    channel=runtime.config.browser.channel, headless=True
+                )
+                try:
+                    page: Page = await browser.new_page(
+                        viewport={"width": 1280, "height": 900}, color_scheme="light", reduced_motion="reduce"
+                    )
+                    await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                    await page.route("**/api/skills/learned", busy_once)
+                    await page.route("**/api/skills/elsewhere", busy_once)
+                    await page.goto(ui_url("127.0.0.1", int(served.rpartition(":")[2]), TOKEN))
+                    await page.goto(f"{served}/#/customize/skills")
+                    # The skills could not be read: the page says so, and reads them again on Try again.
+                    again: Locator = page.get_by_role("button", name="Try again")
+                    await expect(page.get_by_text("the store is busy")).to_be_visible()
+                    await expect(again).to_have_count(1)
+                    await again.click()
+                    await expect(_card(page, "own-skill-1")).to_be_visible()
+                    # What other apps set up could not be read either: its part says so, and reads it again.
+                    await expect(page.get_by_text("the store is busy")).to_be_visible()
+                    await expect(again).to_have_count(1)
+                    await again.click()
+                    await expect(page.get_by_text("the store is busy")).to_have_count(0)
+                    await expect(again).to_have_count(0)
+                    await expect(_card(page, "own-skill-1")).to_be_visible()
+                    await page.close()
+                finally:
+                    await browser.close()

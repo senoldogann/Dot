@@ -163,7 +163,9 @@ currency, so list sites that bill in one currency. Empty by default.
    Words that cover every action ("Dot can run everything without asking me") draft a rule for every tool ("For every
    use of any tool: Dot does it without asking."), which the protections that are always on still bound; words that
    make no rule are answered with the reason, in English.
-   An approval card offers *Make a rule of this*, which opens the tab with a sentence about the action in the box.
+   An approval card offers *Make a rule of this*, which opens the tab with a sentence about the action in the box; the
+   card of what no rule decides (money, credentials, a message or a post in your name, a login from your password
+   manager, a change of Dot's own files) offers none and says so (items 429 and 559).
 7. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
    when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 

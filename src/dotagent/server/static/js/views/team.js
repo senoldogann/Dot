@@ -38,7 +38,8 @@ export function messageRow(message) {
         "div",
         { class: "row team-heads" },
         memberLink(message.from_id, message.from_name),
-        el("span", { class: "team-arrow", "aria-label": "to" }, icon("arrowRight")),
+        // The word is text, which a screen reader reads; a label on a plain span it does not (item 559).
+        el("span", { class: "team-arrow" }, icon("arrowRight"), el("span", { class: "visually-hidden" }, "to")),
         memberLink(message.to_id, message.to_name),
         statusBadge(message.status),
       ),

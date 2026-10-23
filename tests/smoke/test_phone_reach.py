@@ -19,7 +19,7 @@ from typing import Literal
 import httpx
 import pytest
 import Quartz
-from playwright.async_api import Browser, BrowserContext, FloatRect, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, FloatRect, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
@@ -333,6 +333,97 @@ async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins:
         finally:
             await chromium.close()
             await webkit.close()
+
+
+async def _refuse_awake(route: Route) -> None:
+    """The answer of a daemon that cannot write the setting down (its config file is out of reach)."""
+    if route.request.method != "POST":
+        await route.continue_()
+        return
+    body: str = '{"message": "config.toml could not be written", "context": {}}'
+    await route.fulfill(status=500, content_type="application/json", body=body)
+
+
+@pytest.mark.browser
+async def test_a_switch_the_daemon_refused_says_so_and_not_that_it_was_done(stand_ins: Path) -> None:
+    """Item 559: the switch that keeps the Mac awake said what the change was, in green, before the daemon's answer was
+    known, so one it refused showed the words of the change that never happened and its error under them. The words
+    come once the Mac is changed, and a refused switch tells the error alone and stays as it was."""
+    async with _daemon([]) as (runtime, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            await page.goto(f"{address}/#/settings/phone")
+            awake: Locator = page.get_by_role("switch", name="Keep this Mac awake while it charges")
+            await expect(awake).to_have_attribute("aria-checked", "false")
+            await page.route("**/api/phone/awake", _refuse_awake)
+            await awake.click()
+            await expect(page.locator(".toast.error")).to_have_text("config.toml could not be written")
+            await expect(awake).to_have_attribute("aria-checked", "false")
+            # Counted at once, not waited for: a toast of "done" would be gone in a few seconds, and so pass a wait.
+            assert await page.locator(".toast.ok").count() == 0
+            assert not runtime.awake.on
+            await page.unroute("**/api/phone/awake", _refuse_awake)
+            await awake.click()
+            await expect(awake).to_have_attribute("aria-checked", "true")
+            await expect(page.locator(".toast.ok")).to_have_text("This Mac stays awake while it charges.")
+            await awake.click()
+            await expect(awake).to_have_attribute("aria-checked", "false")
+            await page.close()
+        finally:
+            await browser.close()
+
+
+# What the page makes and lets go of with ``URL.createObjectURL`` and ``URL.revokeObjectURL``.
+_WATCH_BLOBS: str = """() => {
+  window.__blobs = { made: [], revoked: [] };
+  const make = URL.createObjectURL.bind(URL);
+  const revoke = URL.revokeObjectURL.bind(URL);
+  URL.createObjectURL = (object) => {
+    const url = make(object);
+    window.__blobs.made.push(url);
+    return url;
+  };
+  URL.revokeObjectURL = (url) => {
+    window.__blobs.revoked.push(url);
+    return revoke(url);
+  };
+}"""
+
+
+@pytest.mark.browser
+async def test_a_qr_code_that_comes_after_the_tab_was_left_is_let_go_of(stand_ins: Path) -> None:
+    """Item 559: a QR code read from the daemon is a ``blob:`` URL, and one whose answer came after Settings › Phone was
+    left was kept in a list that nothing read again, so it stayed as long as the page. It is let go of as it is made."""
+    async with _daemon([]) as (_runtime, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.add_init_script(f"({_WATCH_BLOBS})()")
+            holding: asyncio.Event = asyncio.Event()
+            release: asyncio.Event = asyncio.Event()
+
+            async def late(route: Route) -> None:
+                holding.set()
+                await release.wait()
+                await route.continue_()
+
+            await page.route("**/api/phone/qr/tailscale", late)
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            await page.goto(f"{address}/#/settings/phone")
+            await asyncio.wait_for(holding.wait(), 30)
+            # The tab is left before the code is there; the code then comes.
+            await page.evaluate("location.hash = '#/agents'")
+            await expect(page.locator(".agent-row").first).to_be_visible()
+            before: int = await page.evaluate("window.__blobs.made.length")
+            release.set()
+            await page.wait_for_function("(count) => window.__blobs.made.length > count", arg=before)
+            made: str = await page.evaluate(f"window.__blobs.made[{before}]")
+            await page.wait_for_function("(url) => window.__blobs.revoked.includes(url)", arg=made, timeout=3000)
+            await page.close()
+        finally:
+            await browser.close()
 
 
 async def test_tailscale_is_opened_in_the_app_store_while_it_is_missing(opener: Path) -> None:

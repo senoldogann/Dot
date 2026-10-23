@@ -266,13 +266,14 @@ export function mount(root, ctx) {
       label: "Keep this Mac awake while it charges",
       hint: "So the phone reaches Dot away from home. A closed lid still puts a MacBook to sleep.",
       read: () => phone.keep_awake,
+      // The words follow the change once it is made (item 559): a switch that failed says so alone.
       write: async (on) => {
         phone = await api.post("/phone/awake", { on });
+        toast("ok", phone.keep_awake ? "This Mac stays awake while it charges." : "This Mac sleeps as it would.");
       },
       onToggled: () => {
         if (!disposed) {
           awake.paint();
-          toast("ok", phone.keep_awake ? "This Mac stays awake while it charges." : "This Mac sleeps as it would.");
         }
       },
     });
@@ -321,7 +322,12 @@ export function mount(root, ctx) {
     let asked = codes.get(key);
     if (asked === undefined) {
       asked = blobUrl(`/phone/qr/${opens}`).then((url) => {
-        made.push(url);
+        // One that comes after the tab was left is let go of at once (item 559): nothing shows it, nor lets it go later.
+        if (disposed) {
+          URL.revokeObjectURL(url);
+        } else {
+          made.push(url);
+        }
         return url;
       });
       codes.set(key, asked);

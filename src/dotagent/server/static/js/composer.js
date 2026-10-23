@@ -18,7 +18,7 @@ import { openMenu } from "./menu.js";
 import { markdownMirror } from "./mirror.js";
 import { loadPalette } from "./palette.js";
 import { arePicks, createPicks } from "./picks.js";
-import { clearPref, readPref, writePref } from "./prefs.js";
+import { readPref, removePref, writePref } from "./prefs.js";
 import { takesSnapshots } from "./snapshots.js";
 import { filterGroups, menuSections, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
 import { openTeachPanel } from "./teach.js";
@@ -44,7 +44,7 @@ function readDraft(key) {
   } catch (error) {
     console.warn("a draft could not be read and is dropped", { key, error });
   }
-  clearPref(`${DRAFT_PREFIX}${key}`);
+  removePref(`${DRAFT_PREFIX}${key}`);
   return null;
 }
 
@@ -62,7 +62,7 @@ export function moveDraft(fromKey, toKey) {
     return;
   }
   keepDraft(toKey, draft);
-  clearPref(`${DRAFT_PREFIX}${fromKey}`);
+  removePref(`${DRAFT_PREFIX}${fromKey}`);
 }
 
 /** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`; never plain Return on a touch screen), autosize up to `maxPx`, the slash
@@ -308,7 +308,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     }
     const files = attachments.ready();
     if (textarea.value.trim() === "" && files.length === 0 && picks.count() === 0) {
-      clearPref(key);
+      removePref(key);
       return;
     }
     writePref(key, JSON.stringify({ text: textarea.value, files, picks: picks.saved() }));

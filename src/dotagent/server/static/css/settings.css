@@ -683,7 +683,7 @@
   background: var(--surface-2);
 }
 
-.provider-item[aria-selected="true"] {
+.provider-item[aria-current="true"] {
   background: var(--surface-3);
 }
 

@@ -1422,13 +1422,14 @@ function buildBrowser(isDisposed, head) {
     hint:
       "Off, Dot's Chrome stays where it is while a run works and the app you were in keeps the focus; the run's page shows the page under Dot's computer either way, and Take over always brings the tab to the front.",
     read: () => view?.raise_window === true,
+    // The words follow the change once it is made (item 559): a switch that failed says so alone.
     write: async (on) => {
       view = await api.post("/browser/raise", { raise_window: on });
+      toast("ok", view.raise_window ? "Chrome comes to the front while working." : "Chrome stays in the background.");
     },
     onToggled: () => {
       if (!isDisposed()) {
         raise.paint();
-        toast("ok", view.raise_window ? "Chrome comes to the front while working." : "Chrome stays in the background.");
       }
     },
   });
@@ -1439,11 +1440,11 @@ function buildBrowser(isDisposed, head) {
     read: () => view?.remote_input === true,
     write: async (on) => {
       view = await api.post("/browser/remote-input", { remote_input: on });
+      toast("ok", view.remote_input ? "A run you hold can be used from the screen." : "A run you hold is used only on the Mac.");
     },
     onToggled: () => {
       if (!isDisposed()) {
         screenInput.paint();
-        toast("ok", view.remote_input ? "A run you hold can be used from the screen." : "A run you hold is used only on the Mac.");
       }
     },
   });
@@ -1455,11 +1456,11 @@ function buildBrowser(isDisposed, head) {
     read: () => view?.enabled === true,
     write: async (on) => {
       view = await api.post("/browser/enabled", { enabled: on });
+      toast("ok", view.enabled ? "Runs may use the browser." : "Runs do not use the browser.");
     },
     onToggled: () => {
       if (!isDisposed()) {
         enabled.paint();
-        toast("ok", view.enabled ? "Runs may use the browser." : "Runs do not use the browser.");
       }
     },
   });
@@ -1959,7 +1960,6 @@ function buildBrowser(isDisposed, head) {
   return { element, load };
 }
 
-/** The look of this browser, how it draws your attention, and the token it is signed in with. */
 /** What Dot is called in the greeting of a new chat and at the head of a run, and what it calls you (item 72): both
  * preferences of this browser. */
 function buildNameCard() {

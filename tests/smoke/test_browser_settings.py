@@ -19,7 +19,7 @@ from typing import Literal
 
 import pytest
 from PIL import Image
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.browser.look import PageLook
@@ -333,6 +333,47 @@ async def test_settings_browser_sets_the_browser_rows_and_keeps_them(tmp_path: P
                 await _changed(page, "/api/browser/look", looks.get_by_role("button", name="System").click)
                 await _changed(page, "/api/browser/look", partial(zoom.select_option, "100"))
                 await page.close()
+        finally:
+            await browser.close()
+
+
+async def _refuse_the_change(route: Route) -> None:
+    """The answer of a daemon that cannot write the setting down (its config file is out of reach)."""
+    if route.request.method != "POST":
+        await route.continue_()
+        return
+    body: str = json.dumps({"message": "config.toml could not be written", "context": {}})
+    await route.fulfill(status=500, content_type="application/json", body=body)
+
+
+@pytest.mark.browser
+async def test_a_switch_the_daemon_refused_says_so_and_not_that_it_was_done() -> None:
+    """Item 559: a switch of Settings › Browser said what the change was, in green, before the answer of the daemon was
+    known, so one it refused showed the words of the change that never happened and its error under them. The words
+    come once the daemon has made the change, and a refused switch tells the error alone and stays as it was."""
+    async with _daemon(()) as (_manager, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await _page(browser, address, 1280, "light")
+            await page.goto(f"{address}/#/settings/browser")
+            front: Locator = page.get_by_role("switch", name="Bring Chrome to the front while working")
+            stood: str | None = await front.get_attribute("aria-checked")
+            assert stood in ("true", "false")
+            await page.route("**/api/browser/raise", _refuse_the_change)
+            await front.click()
+            await expect(page.locator(".toast.error")).to_have_text("config.toml could not be written")
+            await expect(front).to_have_attribute("aria-checked", stood)
+            # Counted at once, not waited for: a toast of "done" would be gone in a few seconds, and so pass a wait.
+            assert await page.locator(".toast.ok").count() == 0
+            await page.unroute("**/api/browser/raise", _refuse_the_change)
+            await front.click()
+            now: str = "false" if stood == "true" else "true"
+            await expect(front).to_have_attribute("aria-checked", now)
+            words: str = (
+                "Chrome comes to the front while working." if now == "true" else "Chrome stays in the background."
+            )
+            await expect(page.locator(".toast.ok")).to_have_text(words)
+            await page.close()
         finally:
             await browser.close()
 

@@ -20,8 +20,10 @@ not have, a call with the wrong arguments, a union read without a check. `noImpl
 the modules carry their JSDoc. Biome's formatter is configured but off, as the scripts were not written to its line
 width; it is switched on in one commit of its own. `tests/unit/test_static_ui.py` reads the scripts the way the browser
 would: every import names an export of a script that is there, no export is left that nothing imports (the tests count
-as importers), the page has no inline code, its `modulepreload` links name every module `main.js` reaches at the start,
-and the pages loaded on demand (`import()` in main.js's route table: everything but the chat and the home) exist.
+as importers; a script imported whole counts for the names its importer reaches through the name it gave it, and a page
+loaded on demand for its `mount`: item 559), the page has no inline code, its `modulepreload` links name every module
+`main.js` reaches at the start, and the pages loaded on demand (`import()` in main.js's route table: everything but the
+chat and the home) exist.
 
 The tests prefer real calls to mocks: the smoke tests start the real server, a headless Chrome against a local fixture
 server, a real MCP server process and real Ollama models, and the unit tests cover pure functions. Tests that need a

@@ -170,6 +170,8 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await expect(page.get_by_role("dialog")).to_have_count(0)
             await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Connectors")
             await expect(button).to_have_attribute("data-current", "")
+            # The styles read data-current, a screen reader aria-current, as the links of the pages give it (item 559).
+            await expect(button).to_have_attribute("aria-current", "page")
             await expect(page.locator(".customize-hero-title")).to_have_text("Connect your apps")
             titles: Locator = page.locator(".plugin-section-title")
             await expect(titles).to_have_text([_TITLES[section] for section in shown_sections])
@@ -206,6 +208,7 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             async with page.expect_response(lambda response: response.url.endswith("/api/mcp/servers")):
                 await page.get_by_role("link", name="Agents").click()
             await expect(button).not_to_have_attribute("data-current", "")
+            await expect(button).not_to_have_attribute("aria-current", "page")
             await expect(marks).to_have_count(1)
             assert errors == []
 

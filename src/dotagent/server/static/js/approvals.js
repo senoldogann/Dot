@@ -144,8 +144,9 @@ function takeoverOffer(runId, onUseHere) {
 
 // What the policy asks the owner about in every mode that asks, whatever their rules say (item 429): a rule offered for
 // it would never apply. A yolo run asks nothing at all (item 443), so no card of these comes its way.
-// A login filled from the password manager (item 493) is asked as a message is, in every mode but yolo.
-const GUARDED_FLAGS = new Set(["financial", "credential", "message_send", "public_post", "vault_fill"]);
+// A login filled from the password manager (item 493) is asked as a message is, in every mode but yolo, and a change of
+// Dot's own files (`self_change`, item 398) before any rule is read (`own_files` in policy/engine.py, item 559).
+const GUARDED_FLAGS = new Set(["financial", "credential", "message_send", "public_post", "vault_fill", "self_change"]);
 
 /** Whether the owner answers `approval` in every mode that asks, whatever their rules say (item 429). */
 function guarded(approval) {

@@ -37,16 +37,20 @@ function conversation(runs) {
 }
 
 /**
- * The runs before `run` in its thread, as `{ earlier, read }` (oldest first). A run the thread does not list, such as a
- * delegated one, stands alone: the list is empty. `read` holds what the last turn did (`READ_FIRST`), a run's id to
- * `{ events }`, or to `{ error }`, why they could not be read. Nothing more is read once `signal` aborted.
+ * The runs before `run` in its thread, as `{ earlier, read, cut }` (oldest first). A run the thread does not list, such
+ * as a delegated one, stands alone: the list is empty. `read` holds what the last turn did (`READ_FIRST`), a run's id to
+ * `{ events }`, or to `{ error }`, why they could not be read. `cut` says that the chat has runs before those read,
+ * which the page does not show (item 559): it reads the newest `THREAD_LIMIT` of them, the most `GET /runs` gives.
+ * Nothing more is read once `signal` aborted.
  */
 export async function loadHistory(run, signal) {
   const found = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${THREAD_LIMIT}`);
+  const full = found.length === THREAD_LIMIT;
   const runs = conversation(found);
   const at = runs.findIndex((candidate) => candidate.id === run.id);
   if (at === -1) {
-    return { earlier: [], read: new Map() };
+    // A run of the chat older than those read has its earlier turns among the runs not read.
+    return { earlier: [], read: new Map(), cut: full && run.parent_run_id === null };
   }
   const earlier = runs.slice(0, at);
   const last = earlier.slice(-READ_FIRST).filter((past) => FINISHED.has(past.status));
@@ -60,7 +64,7 @@ export async function loadHistory(run, signal) {
       read.set(past.id, { events: outcome.value });
     }
   });
-  return { earlier, read };
+  return { earlier, read, cut: full };
 }
 
 /**
@@ -335,21 +339,21 @@ function turn(past, editFromHereOf, eager, known, signal) {
 }
 
 /**
- * The earlier turns of the conversation (`loadHistory`'s `{ earlier, read }`) as one block, or null when there are
- * none. `editFromHereOf(run)` gives what
+ * The earlier turns of the conversation (`loadHistory`'s `{ earlier, read, cut }`) as one block, or null when there
+ * are none. `editFromHereOf(run)` gives what
  * rewinds the chat to before the message of an earlier run (item 282), or null where it cannot be; `signal` ends with
  * the page, and what the turns read with it.
  */
-export function earlierTurns({ earlier, read }, editFromHereOf, signal) {
-  if (earlier.length === 0) {
+export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal) {
+  if (earlier.length === 0 && !cut) {
     return null;
   }
   const shown = earlier.slice(-SHOWN_TURNS);
   const left = earlier.length - shown.length;
-  return el(
-    "div",
-    { class: "history", role: "region", "aria-label": "Earlier in this conversation" },
-    left === 0
+  // A chat of more runs than the page reads says so, with no count and no first run (item 559): it knows neither.
+  const note = cut
+    ? el("div", { class: "note" }, icon("list"), el("span", null, `Earlier runs of this chat are not shown: the page reads its latest ${THREAD_LIMIT}.`))
+    : left === 0
       ? null
       : el(
           "div",
@@ -357,7 +361,11 @@ export function earlierTurns({ earlier, read }, editFromHereOf, signal) {
           icon("list"),
           el("span", null, `${plural(left, "earlier run is", "earlier runs are")} not shown.`),
           el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first run"),
-        ),
+        );
+  return el(
+    "div",
+    { class: "history", role: "region", "aria-label": "Earlier in this conversation" },
+    note,
     shown.map((past, index) => turn(past, editFromHereOf, index >= shown.length - EAGER_TURNS, read.get(past.id), signal)),
   );
 }

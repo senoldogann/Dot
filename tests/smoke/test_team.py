@@ -223,6 +223,9 @@ async def test_a_run_messages_an_agent_and_reads_its_reply_and_the_team_page_sho
             assert len(rows) == 1 and "Dot" in rows[0] and "Scout" in rows[0] and "Two sources: A and B." in rows[0], (
                 rows
             )
+            # The arrow between the names is the word "to" in text a screen reader reads: a label on a plain span it
+            # does not read (item 559).
+            assert await page_ui.locator(".team-row .team-arrow").text_content() == "to"
             await page_ui.screenshot(path=str(out / "team.png"))
             await page_ui.goto(f"http://{host}:{port}/#/agents/{agent_id}")
             await page_ui.wait_for_timeout(_SETTLE_MS)

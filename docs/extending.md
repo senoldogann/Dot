@@ -185,12 +185,14 @@ The ways a service connects:
   over standard input and output: Memory, Sequential Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation,
   and with a key (**MCP · On this Mac · Key**) Brave Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana
   and Atlassian (API token); a value the owner knows, such as a site's address, is asked for with the keys, without a
-  link. A service that takes a key asks for it under its tile and on its page, with where to get one; Dot keeps each in
-  its `.env` (mode 0600) under `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the server's headers or
-  environment refer to it as `${...}`, so the value is in no record and leaves the daemon only to the service;
-  **Remove** takes the key out of `.env` with the service's own server, and nothing else does (`keep` in `routes_mcp.py`
-  says so): a try that fails leaves the key for **Try again**, an add after a failed one writes it anew, and a daemon's
-  restart forgets a failed try but not its key. The addresses, keys and commands are as the services' own docs read on
+  link. A service that takes a key asks for it under its tile, in a form over the tile's link so that it can be clicked,
+  and on its page, with where to get one; a key typed and then cancelled is gone when the form opens again (item 559);
+  Dot keeps each in its `.env` (mode 0600) under `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the
+  server's headers or environment refer to it as `${...}`, so the value is in no record and leaves the daemon only to
+  the service; **Remove** takes the key out of `.env` with the service's own server, and nothing else does (`keep` in
+  `routes_mcp.py` says so): a try that fails leaves the key for **Try again**, an add after a failed one writes it
+  anew, and a daemon's restart forgets a failed try but not its key. The addresses, keys and commands are as the
+  services' own docs read on
   2026-10-19, and item 505's on 2026-10-21 (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once
   it answered with its tools, which go to the runs that start next, without a restart. A server that asks for a sign-in
   gets one in the browser you are using: its tile says **Waiting for your sign-in**, and its page has **Open the sign-in

@@ -21,7 +21,7 @@ import { emptyPanel, errorPanel, foldGroup, loadingPanel, segmented } from "../p
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 /** Drop a learned skill after a confirmation; resolves to the list after it, or null when the owner kept it. */
-export async function dropSkill(skill) {
+async function dropSkill(skill) {
   const confirmed = await confirmDialog({
     title: `Drop ${skill.name}?`,
     message: "The skill is removed; a later run of its kind may learn it again.",
@@ -38,7 +38,7 @@ export async function dropSkill(skill) {
 }
 
 /** Offer an agent's skill to every run, or to the agent's alone again; resolves to the list after it. */
-export async function shareSkill(skill, shared) {
+async function shareSkill(skill, shared) {
   const page = await api.put(`/skills/learned/${encodeURIComponent(skill.name)}`, { shared });
   toast("ok", shared ? `${skill.name} is offered to every run.` : `${skill.name} is ${skill.agentName}'s alone again.`);
   return page.items;
@@ -89,7 +89,7 @@ export function skillRow(skill, onChanged) {
 }
 
 /** The skills with the name of the agent each belongs to, from the agents list. */
-export function withAgentNames(items, agents) {
+function withAgentNames(items, agents) {
   const names = new Map(agents.map((row) => [row.record.id, row.record.name]));
   return items.map((skill) => ({ ...skill, agentName: skill.agent_id === null ? null : names.get(skill.agent_id) ?? null }));
 }
@@ -158,7 +158,7 @@ async function askAndChange(dialog, body, done) {
  * Add a skill or an MCP server found elsewhere to Dot, or take it back, once the owner says yes; resolves to what is
  * found after it, or null when the owner said no.
  */
-export function changeFound(kind, item, added) {
+function changeFound(kind, item, added) {
   const done = !added ? `Removed ${item.name}.` : kind === "skill" ? `Added ${item.name}; runs are offered it.` : `Added ${item.name}; Dot starts it the next time it starts.`;
   return askAndChange(foundDialog(kind, item, added), { kind, agent: item.agent, name: item.name, added }, done);
 }
@@ -267,7 +267,7 @@ function importDialog(found) {
  * Import what the owner chooses of `found` (item 219): one request adds them all, and a toast says what was added and
  * what could not be; resolves to what is found after it, or null when the owner chose nothing.
  */
-export async function importFound(found) {
+async function importFound(found) {
   const items = await importDialog(found);
   if (items === null || items.length === 0) {
     return null;
@@ -379,7 +379,7 @@ function foundHead() {
  * added that its agent no longer has, then what was left out. `onFound` gets what is found after the owner adds or
  * removes one (item 165).
  */
-export function foundSection(found, onFound) {
+function foundSection(found, onFound) {
   const agents = new Map();
   for (const skill of found.skills) {
     agents.set(skill.agent, [...(agents.get(skill.agent) ?? []), skill]);
@@ -610,7 +610,13 @@ export function mount(root) {
 
   function foundPart() {
     if (foundError !== null) {
-      return [foundHead(), errorPanel(foundError)];
+      // Read again on Try again (item 559), as the tabs of Plugins and Connectors offer.
+      const retry = () => {
+        foundError = null;
+        paint();
+        loadFound();
+      };
+      return [foundHead(), errorPanel(foundError, retry)];
     }
     return found === null ? [foundHead(), loadingPanel()] : foundSection(found, foundChanged);
   }
@@ -798,7 +804,12 @@ export function mount(root) {
       paint();
     } catch (error) {
       if (!disposed) {
-        holder.replaceChildren(errorPanel(error));
+        holder.replaceChildren(
+          errorPanel(error, () => {
+            holder.replaceChildren(loadingPanel());
+            attempt(load);
+          }),
+        );
       }
     }
   }

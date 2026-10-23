@@ -329,8 +329,8 @@ function zoneList() {
 }
 
 /**
- * The form that creates a schedule (`view` null) or changes one. `onSaved()` runs after the daemon accepted it;
- * `onCancel` is null for the creation form, which stays on the page.
+ * The form that creates a schedule (`view` null) or changes one. `onSaved()` runs after the daemon accepted it, and
+ * `onCancel()` on Cancel: the creation form hides, an edit gives its schedule's row back.
  */
 function scheduleForm({ view, onSaved, onCancel }) {
   const record = view === null ? null : view.record;
@@ -553,7 +553,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
     at.value = view.run_at_input ?? "";
   }
   const save = el("button", { class: "btn primary", type: "button" }, icon(record === null ? "plus" : "check"), record === null ? "Add schedule" : "Save changes");
-  const cancel = onCancel === null ? null : el("button", { class: "btn ghost", type: "button", onclick: onCancel }, "Cancel");
+  const cancel = el("button", { class: "btn ghost", type: "button", onclick: onCancel }, "Cancel");
 
   async function submit() {
     const nameText = name.value.trim();
@@ -598,11 +598,8 @@ function scheduleForm({ view, onSaved, onCancel }) {
     save.disabled = true;
     try {
       if (record === null) {
+        // The page makes the form anew for the next one (`newScheduleForm`), its choices back at their defaults.
         await api.post("/schedules", body);
-        name.value = "";
-        goal.value = "";
-        cron.value = "";
-        at.value = "";
         toast("ok", "Schedule added.");
       } else {
         await api.patch(`/schedules/${record.id}`, { ...body, enabled: enabled.getAttribute("aria-checked") === "true" });
@@ -804,15 +801,22 @@ export function mount(root, ctx) {
     formSlot.hidden = true;
     paintOpener(addButton, "New schedule", false);
   };
-  const form = scheduleForm({
-    view: null,
-    onSaved: async () => {
-      closeForm();
-      await reload();
-    },
-    onCancel: closeForm,
-  });
-  formSlot.append(form.element);
+  // The form that adds a schedule, made anew once one is added (item 559): the next starts from the defaults, not from
+  // the last one's choices (its approvals and its agent among them), which a schedule that runs unattended would take
+  // unless the owner noticed them.
+  function newScheduleForm() {
+    const form = scheduleForm({
+      view: null,
+      onSaved: async () => {
+        closeForm();
+        newScheduleForm();
+        await reload();
+      },
+      onCancel: closeForm,
+    });
+    formSlot.replaceChildren(form.element);
+  }
+  newScheduleForm();
   ctx.setTitle("Schedules");
   root.append(
     pageHead("Schedules", "Goals that Dot runs by itself, once or on a repeating schedule.", null),

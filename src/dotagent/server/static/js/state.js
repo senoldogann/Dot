@@ -71,16 +71,32 @@ export function onStreamBack(listener) {
   return () => backListeners.delete(listener);
 }
 
+/** Read the status and the approvals that wait; each is shown as soon as it is read, so that one that fails does not
+ * keep the other (the emergency stop's banner, the count of what waits) as it was (item 559). Throws what failed. */
 export async function refresh() {
-  const [status, approvals] = await Promise.all([api.get("/status"), api.get("/approvals?status=pending&limit=100")]);
-  snapshot.status = status;
-  snapshot.approvals = approvals;
-  snapshot.outdated = status.pages !== OWN_PAGES;
-  announce();
+  const [status, approvals] = await Promise.allSettled([api.get("/status"), api.get("/approvals?status=pending&limit=100")]);
+  if (status.status === "fulfilled") {
+    snapshot.status = status.value;
+    snapshot.outdated = status.value.pages !== OWN_PAGES;
+  }
+  if (approvals.status === "fulfilled") {
+    snapshot.approvals = approvals.value;
+  }
+  if (status.status === "fulfilled" || approvals.status === "fulfilled") {
+    announce();
+  }
+  if (status.status === "rejected") {
+    throw status.reason;
+  }
+  if (approvals.status === "rejected") {
+    throw approvals.reason;
+  }
 }
 
+// A read that fails is told as the pages tell theirs (item 559): the waiting pill, the tab's count and the emergency
+// stop's banner would otherwise stand as they were while the page says it is live.
 const refreshSoon = debounce(() => {
-  refresh().catch((error) => console.warn("status refresh failed", error));
+  refresh().catch((error) => readFailed("Dot's status", error));
 }, 120);
 
 let modelsPending = null;

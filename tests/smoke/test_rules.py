@@ -17,6 +17,7 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 from dotagent.agent.manager import RunManager
 from dotagent.agent.review import RULE_TOOL
 from dotagent.config import load_config
+from dotagent.core.paths import skills_dir
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
@@ -175,6 +176,12 @@ async def test_a_rule_said_in_plain_words_is_drafted_read_back_and_added(
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"http://{host}:{port}/#/settings/rules")
+            # What a yolo run keeps is all of it: it keeps a secret from going out when it has read untrusted content,
+            # and has the review model judge what that content may be after (item 525), as safety.md says (item 559).
+            await expect(page.locator(".rule-always-note")).to_contain_text(
+                "One that has read untrusted content still has a secret refused on the way out, and a step that "
+                "content may be after judged by the review model."
+            )
             await page.get_by_role("button", name="New rule").click()
             # The button that opened the forms shuts them: a cross and Close, not the plus of New rule (item 437).
             opener: Locator = page.locator(".set-actions").get_by_role("button", name="Close")
@@ -353,6 +360,59 @@ async def test_a_card_the_guard_raised_offers_no_rule_and_says_why(
         async with asyncio.timeout(_RUN_WAIT_S):
             ended: RunRecord = await manager.wait(run.id)
     assert ended.status == "done", ended
+
+
+async def test_a_card_for_a_change_of_dots_own_files_offers_no_rule_and_says_why(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 559: the policy asks about a change of Dot's own files before it reads a rule (item 398), in every mode but
+    yolo, so its card offers no rule, which would never apply, and says so, as the card of a message in the user's
+    name does. The card is refused at the end, so nothing is written."""
+    own: Path = skills_dir() / "tide-notes" / "SKILL.md"
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            _turn("write_file", {"path": str(own), "content": "# The tide\n\nHigh water at noon.\n"}),
+            _turn(FINISH_TOOL, {"answer": "The skill was not written.", "success": True}),
+        ],
+    )
+    run: RunRecord = await manager.start(
+        "Write a skill about the tide",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "ask",
+        False,
+        (),
+    )
+    asked: ApprovalRecord = await _pending(runtime, run.id)
+    assert asked.tool == "write_file" and "self_change" in asked.args["flags"], asked
+    host, port = _address(client)
+    try:
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="dark")
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
+                await expect(page.get_by_text("no rule turns that off").first).to_be_visible()
+                await expect(page.get_by_role("link", name="Make a rule of this")).to_have_count(0)
+                await page.screenshot(path=str(tmp_path / "own-files-1280-dark.png"))
+                await page.close()
+            finally:
+                await browser.close()
+    finally:
+        if (await runtime.store.get_approval(asked.id)).status == "pending":
+            await manager.decide(asked.id, False, "test", "")
+        async with asyncio.timeout(_RUN_WAIT_S):
+            ended: RunRecord = await manager.wait(run.id)
+    assert ended.status == "done", ended
+    assert not await asyncio.to_thread(own.exists)
 
 
 async def _fresh_rules(client: httpx.AsyncClient) -> list[str]:
