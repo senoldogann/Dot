@@ -7,6 +7,7 @@ import io
 import re
 from collections.abc import Sequence
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -383,10 +384,16 @@ class _FailingHub:
         raise self._error
 
 
+def _context_of_a_run() -> ToolContext:
+    """The run's context as far as the tools of MCP look at it: the runtime's names of the servers that come with Dot
+    (none here: the server of these tests is no built-in one, so its calls are handed on as they are, item 583)."""
+    return cast(ToolContext, SimpleNamespace(runtime=SimpleNamespace(builtin_names=frozenset())))
+
+
 async def _run_failing(error: McpError) -> ToolResult:
     registered = build_mcp_tools(cast(McpHub, _FailingHub(_tool("read", True, None, None), error)))[0]
-    prepared = await registered.prepare({}, cast(ToolContext, None))
-    return await prepared.run(cast(ToolContext, None))
+    prepared = await registered.prepare({}, _context_of_a_run())
+    return await prepared.run(_context_of_a_run())
 
 
 async def test_a_call_the_server_rejected_comes_back_fenced_and_untrusted_and_any_other_failure_is_raised() -> None:

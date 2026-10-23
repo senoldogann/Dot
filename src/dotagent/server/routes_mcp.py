@@ -20,13 +20,15 @@ from fastapi.responses import HTMLResponse
 from pydantic import JsonValue, ValidationError
 
 from dotagent.config import McpServerConfig
+from dotagent.config_edit import set_builtin_server
 from dotagent.connections.directory import logo_of_service, mark_of_service
 from dotagent.core.errors import ConfigError, DotError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import added_servers_path, connected_servers_path, env_file_path, plugins_dir
+from dotagent.core.paths import added_servers_path, config_path, connected_servers_path, env_file_path, plugins_dir
 from dotagent.help.added import read_added_servers
 from dotagent.help.added import remove_server as take_back_added_server
 from dotagent.help.elsewhere import dot_server_name
+from dotagent.mcp.builtin import builtin_servers, switch_of
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService
 from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_connected, read_connected
 from dotagent.mcp.hub import McpHub
@@ -53,6 +55,7 @@ from dotagent.server.views import (
     McpServersView,
     McpServerView,
     McpServiceView,
+    McpSwitch,
     ServiceSecretView,
 )
 from dotagent.tools.mcp import refresh_mcp_tools
@@ -95,12 +98,13 @@ def _answer(callback: Callback) -> HTMLResponse:
     return HTMLResponse(render(callback), status_code=status_of(callback.outcome))
 
 
-def _address(config: McpServerConfig) -> str:
+def _address(config: McpServerConfig, origin: McpOrigin) -> str:
     """Where the server is, as the page and the API show it: a key put in its URL or in an argument of its command is
-    the owner's, and is not given back (item 558)."""
+    the owner's, and is not given back (item 558). A server that comes with Dot is started on the Python Dot runs on,
+    whose path says nothing to the owner: it shows as ``python``."""
     if config.url is not None:
         return shown_url(config.url)
-    return shown_command(config.command or "", config.args)
+    return shown_command("python" if origin == "builtin" else config.command or "", config.args)
 
 
 def service_of(config: McpServerConfig) -> str | None:
@@ -248,15 +252,30 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
     sign_ins: SignIns = SignIns()
     # The tries under way, and the last failed try of a server Dot does not have, by server name.
     tries: dict[str, _Try] = {}
+    # One switch of a server that comes with Dot at a time, so that two pages do not leave the file and the hub apart.
+    switching: asyncio.Lock = asyncio.Lock()
 
     def page_origin(origin: str) -> str:
         if not origin_is_local(origin, ctx.port, reach):
             raise ConfigError("the page's origin is not an address of this server", {"origin": origin})
         return origin
 
+    def builtin_now(name: str) -> McpServerConfig | None:
+        """The server that comes with Dot called ``name`` as Dot starts it now, switched on; ``None`` for a name that
+        none has."""
+        return next(
+            (
+                one.model_copy(update={"enabled": True})
+                for one in builtin_servers(ctx.runtime.config)
+                if one.name == name
+            ),
+            None,
+        )
+
     def known(record: ConnectedServers) -> dict[str, tuple[McpServerConfig, McpOrigin]]:
         """Every server Dot has, by name, with where it is set up: its config's first, then the plugins', the other
-        agents', those added on the Connectors page (``record``), and the tries of servers it does not have yet."""
+        agents', those added on the Connectors page (``record``), those that come with Dot (item 583), also when
+        switched off, and the tries of servers it does not have yet."""
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = {}
         for config in ctx.runtime.config.mcp:
             servers.setdefault(config.name, (config, "config"))
@@ -270,9 +289,17 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
                     servers.setdefault(config.name, (config, "plugin"))
         recorded: frozenset[str] = frozenset(config.name for config in record.servers)
         for name, config in running.items():
-            servers.setdefault(name, (config, "connected" if name in recorded else "elsewhere"))
+            origin: McpOrigin = (
+                "builtin" if name in ctx.runtime.builtin_names else "connected" if name in recorded else "elsewhere"
+            )
+            servers.setdefault(name, (config, origin))
         for config in record.servers:
             servers.setdefault(config.name, (config, "connected"))
+        # A server that comes with Dot and is switched off runs nowhere: it is listed for its switch.
+        for name in ctx.runtime.builtin_names:
+            off: McpServerConfig | None = builtin_now(name)
+            if off is not None:
+                servers.setdefault(name, (off.model_copy(update={"enabled": False}), "builtin"))
         for name, attempt in tries.items():
             servers.setdefault(name, (attempt.config, attempt.origin))
         return servers
@@ -312,7 +339,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             name=config.name,
             origin=origin,
             plugin=plugin_of(config.name) if origin == "plugin" else None,
-            address=_address(config),
+            address=_address(config, origin),
             service=service if origin == "connected" else None,
             mark=None if service is None else mark_of_service(service),
             state=state,
@@ -455,14 +482,18 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
     @router.post("/api/mcp/servers/{name}/connect")
     async def connect_again(name: str, body: McpReconnect) -> McpServerView:
         """Connect the server ``name`` again: tried once more, and signed in to again when it asks. One added on the
-        Connectors page, or one of Dot's config that signs in (``oauth = true``)."""
+        Connectors page, one of Dot's config that signs in (``oauth = true``), or one that comes with Dot and is on."""
         page: str = page_origin(body.origin)
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(name)
         if found is None:
             raise NotFoundError("Dot has no MCP server of this name", {"server": name})
         config, origin = found
-        if origin != "connected" and not (origin == "config" and config.oauth):
+        if origin == "builtin":
+            if not config.enabled:
+                raise RunConflict("this MCP server is switched off: switch it on", {"server": name, "set_up": origin})
+            config = builtin_now(name) or config
+        if origin not in ("connected", "builtin") and not (origin == "config" and config.oauth):
             raise RunConflict(
                 "this MCP server is set up elsewhere; connect it again there", {"server": name, "set_up": origin}
             )
@@ -514,6 +545,45 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         log.info("mcp_tools_chosen", server=name, tools=len(kept.allow))
         return view(kept, "connected")
 
+    @router.put("/api/mcp/servers/{name}/switch")
+    async def switch_server(name: str, body: McpSwitch) -> McpServersView:
+        """Switch a server that comes with Dot (item 583) on or off: off stops it now, and its tools leave the runs that
+        start after; on starts it, and its tools go to the runs that start after. The config file keeps it as
+        ``[builtin_mcp]``. One that cannot start, or a config file that cannot be changed, leaves the switch as it
+        was."""
+        async with switching:
+            found: tuple[McpServerConfig, McpOrigin] | None = (await everything()).get(name)
+            if found is None:
+                raise NotFoundError("Dot has no MCP server of this name", {"server": name})
+            config, origin = found
+            switch = switch_of(name)
+            if origin != "builtin" or switch is None:
+                raise RunConflict(
+                    "this MCP server does not come with Dot, so it has no switch", {"server": name, "set_up": origin}
+                )
+            current: _Try | None = tries.get(name)
+            if current is not None and current.running():
+                raise RunConflict("Dot is trying this server already", {"server": name})
+            if body.on:
+                was_on: bool = name in hub.configs()
+                # Connected first and kept after: a server that cannot start leaves the file as it was, and a file that
+                # cannot be changed leaves the server as it was.
+                await hub.connect(builtin_now(name) or config.model_copy(update={"enabled": True}))
+                try:
+                    await asyncio.to_thread(set_builtin_server, config_path(), switch, True)
+                except (ConfigError, OSError):
+                    if not was_on:
+                        await hub.disconnect(name)
+                        refresh_mcp_tools(ctx.runtime.registry, hub)
+                    raise
+            else:
+                await asyncio.to_thread(set_builtin_server, config_path(), switch, False)
+                await hub.disconnect(name)
+            refresh_mcp_tools(ctx.runtime.registry, hub)
+            tries.pop(name, None)
+            log.info("mcp_server_switched", server=name, on=body.on)
+            return await listing()
+
     @router.delete("/api/mcp/servers/{name}")
     async def remove_server(name: str) -> McpServersView:
         """Remove a server added on the Connectors page, or let go of a try: its tools leave the runs that start after,
@@ -540,6 +610,11 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             raise RunConflict(
                 f"this MCP server comes with the plugin {plugin_of(name)}: remove the plugin",
                 {"server": name, "set_up": found[1], "plugin": plugin_of(name)},
+            )
+        if found[1] == "builtin":
+            raise RunConflict(
+                "this MCP server comes with Dot: switch it off, which keeps it from starting",
+                {"server": name, "set_up": found[1]},
             )
         if found[1] != "connected":
             raise RunConflict(

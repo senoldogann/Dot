@@ -1,4 +1,5 @@
-"""``dotx mcp``: start the configured MCP servers once and show the tools each offers, or why one does not start."""
+"""``dotx mcp``: start the configured MCP servers, and those that come with Dot (item 583), once and show the tools
+each offers, or why one does not start."""
 
 import asyncio
 import sys
@@ -10,6 +11,7 @@ from dotagent.config import AppConfig, McpServerConfig, load_user_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.paths import config_path
+from dotagent.mcp.builtin import builtin_servers, switch_of
 from dotagent.mcp.hub import ServerReport, inspect_servers
 from dotagent.mcp.types import McpTool
 from dotagent.plugins.catalog import load_plugins
@@ -54,20 +56,26 @@ def _failure_lines(report: ServerReport) -> list[str]:
     return lines
 
 
-def render_report(report: ServerReport) -> str:
-    """One server as text: its tools, or the reason it failed with everything that helps to fix it."""
+def render_report(report: ServerReport, built_in: bool = False) -> str:
+    """One server as text: its tools, or the reason it failed with everything that helps to fix it. A server that comes
+    with Dot (``built_in``, item 583) is marked, and a switched off one says which setting turns it on."""
+    name: str = f"{report.server} (built-in)" if built_in else report.server
     if not report.enabled:
-        return f"{report.server}: disabled (enabled = false)"
+        switch: str = f"[builtin_mcp] {switch_of(report.server)} = false" if built_in else "enabled = false"
+        return f"{name}: disabled ({switch})"
     if report.error is not None:
-        return "\n".join([f"{report.server}: FAILED", *_failure_lines(report)])
-    header: str = f"{report.server}: ready, {len(report.tools)} of {report.listed} tools offered to the model"
+        return "\n".join([f"{name}: FAILED", *_failure_lines(report)])
+    header: str = f"{name}: ready, {len(report.tools)} of {report.listed} tools offered to the model"
     return "\n".join([header, *(render_tool(tool) for tool in report.tools), f"  server log: {report.log}"])
 
 
 async def cmd_mcp_list(command: McpListCommand) -> int:
     config: AppConfig = load_user_config()
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
-    servers: tuple[McpServerConfig, ...] = (*config.mcp, *plugins.servers())
+    configured: tuple[McpServerConfig, ...] = (*config.mcp, *plugins.servers())
+    bundled: tuple[McpServerConfig, ...] = builtin_servers(config, frozenset(server.name for server in configured))
+    built_in: frozenset[str] = frozenset(server.name for server in bundled)
+    servers: tuple[McpServerConfig, ...] = (*configured, *bundled)
     if not servers:
         sys.stdout.write(
             f"No MCP servers are configured. Add [[mcp]] tables to {config_path()}, or install a plugin with one.\n"
@@ -78,7 +86,7 @@ async def cmd_mcp_list(command: McpListCommand) -> int:
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     reports: tuple[ServerReport, ...] = await inspect_servers(servers, login_env)
     for report in reports:
-        sys.stdout.write(f"{render_report(report)}\n")
+        sys.stdout.write(f"{render_report(report, report.server in built_in)}\n")
     return 1 if any(report.error is not None for report in reports) else 0
 
 

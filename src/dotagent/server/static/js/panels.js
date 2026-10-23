@@ -343,8 +343,9 @@ export function field(label, control, hint) {
   );
 }
 
-/** The switch of a setting: a button that writes the opposite of what `read()` says, and calls `onToggled` once it is done. */
-function switchToggle({ label, read, write, onToggled }) {
+/** The switch of a setting: a button that writes the opposite of what `read()` says, and calls `onToggled` once it is done.
+ * It starts unchecked: the caller sets `aria-checked` from what it read. */
+export function switchToggle({ label, read, write, onToggled }) {
   return el("button", {
     class: "switch",
     type: "button",

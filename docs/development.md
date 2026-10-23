@@ -50,6 +50,22 @@ while it runs. A test that needs a key of its own sets one under a name it makes
 process gives it a key variable no source has. The tests that do use your keys look for them as they run (a module
 that asked as it was read made every run, the offline ones too, wait for the Keychain, and stop at its prompt).
 
+The web-research server that comes with Dot (item 583) is out of every test that does not ask for it: its package is
+installed where the tests run, so each of the runtimes a test builds would start a Python process of its own, and its
+tools would be among those a test counts. `tests/conftest.py` looks for the package under a name nothing has, for the
+whole run; a test of the server asks for the real name back (the `web_research_comes` fixture, or a module fixture that
+sets `builtin.WEB_RESEARCH_PACKAGE`, as `tests/smoke/test_builtin_mcp.py` does). A `dotx` or a daemon that a test starts
+as a child process finds the package: its config says `[builtin_mcp] web_research = false` where the test counts
+servers.
+
+The calls of that server's tools are judged by the rules of Dot's own `web_search`, `web_fetch` and `web_crawl`, which
+are one function each in `tools/web.py` (`search_flags`, `checked_address`); `tools/mcp.py` calls the same functions, so
+a rule added to those tools goes in them and binds the server's tools too (`tests/smoke/test_builtin_mcp.py` changes a
+rule and watches both). The same file lists the string arguments of the server's tools as Dot sees them, and fails for
+one that Dot neither judges (`mcp/builtin.py`) nor lists as staying inside the server, with what the server does with it
+(`STAYS_IN_THE_SERVER`): raising `dotagent-web-research` to a version that takes a new string is a failing test, and
+not a call that Dot does not judge.
+
 The smoke tests of the eval runner (`tests/smoke/test_evals_runner.py`) need no service at all: a scripted model
 plays the real loop, tools, policy and store. The two that play the form task in a headless Chrome (it and the whole
 catalog's check) are marked `browser`, so that `-m "not browser"` starts none; the gate plays the catalog with
@@ -79,7 +95,10 @@ note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama serve
 shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved later cannot change what
 runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and when asked,
 `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for `uv.lock`,
-cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). When something under
+cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). Its export of
+`uv.lock` leaves `dotagent-web-research` out while uv gets it from its repository (item 583): that requirement has
+no hash, which `pip-audit --disable-pip` refuses. Its own repository audits it, and what it depends on is still
+exported and audited. When something under
 `.github/` changes, every week and when asked, `.github/workflows/zizmor.yml` audits the workflows and Dependabot's file
 with [zizmor](https://docs.zizmor.sh/audits/) (item 487): an event's text run as a script, a checkout that keeps its
 token, an action pinned by a commit its repository does not have, a known vulnerable action, a cache read by a release,
@@ -123,6 +142,23 @@ with its section `## <version> (<date>)` in `CHANGELOG.md`, which `uv run python
 raises the version. It is made from one commit of `main`, in two parts: the
 desktop app, built on a Mac, and the Python package, which the release's tag publishes on PyPI. A version is released
 once: the next release raises it in the five files first.
+
+### The package, and what it depends on that PyPI must have first
+
+Dot's package depends on `dotagent-web-research==1.2.0` (item 583), the MCP server that comes with Dot. That version is
+not on PyPI yet, so `[tool.uv.sources]` in `pyproject.toml` names its repository at a fixed commit (`e8052177`,
+web-research's `.env` fix, on its pull request #6; to be moved to the merge commit when that merges), which is where `uv
+sync` and `uv.lock` get it. **A uv source is not carried into the built wheel.** The wheel and the sdist ask PyPI for
+`dotagent-web-research==1.2.0` (`Requires-Dist` in their metadata, checked by `uv build` and `unzip -p dist/*.whl
+'*/METADATA'`), so `pip install dotagent-macos` fails, naming that requirement, until PyPI has it. So PyPI must have
+`dotagent-web-research` 1.2.0 **before** `dotagent-macos` 0.2.0 is published, which the tag does: upload it first, from
+its own repository's release; then, in the commit that raises the version, take `[tool.uv.sources]` out and run `uv
+lock` again, which then reads the package from PyPI and writes its hashes, and take `--no-emit-package
+dotagent-web-research` out of the `uv export` of `.github/workflows/audit.yml` (below); then tag and release the app as
+below. A tag cut before PyPI has the dependency publishes a package that nobody can install until it does, and a version
+once published is never replaced. **The name `dotagent-web-research` is open on PyPI until it is uploaded**, and a wheel
+that asks for `dotagent-web-research==1.2.0` takes whatever PyPI holds under it: upload the package, or reserve the
+name, under the owner's own account before 0.2.0 is published, the earlier the better.
 
 ### The desktop app
 

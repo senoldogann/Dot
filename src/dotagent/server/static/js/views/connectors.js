@@ -7,7 +7,8 @@
 // with it, each way it connects with where it stands and its step, its tools, where its data goes. The services, where
 // they stand and their steps are catalogue.js's; a service Dot has no way to reach is not listed (item 542). Under the
 // sections, an MCP server of one's own by its address; Connected lists too the servers that come from Dot's config, a
-// plugin or another agent of the Mac. The plugins Dot installs are Plugins' (views/plugins.js).
+// plugin or another agent of the Mac, and the one that comes with Dot, whose switch is on its tile (item 583). The
+// plugins Dot installs are Plugins' (views/plugins.js).
 
 import { accountsCard } from "../accounts.js";
 import { createCatalogue, MCP_STATE_TONES, MCP_STATE_WORDS, pluginMark, serviceWords, STATE_WORDS, STEP_LABELS, WAY_NAMES, CONNECTED_STATES } from "../catalogue.js";
@@ -15,7 +16,7 @@ import { customizeHead } from "../customizehead.js";
 import { el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { markContent, markTile } from "../marks.js";
-import { emptyPanel, errorPanel, field, loadingPanel, segmented } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, segmented, switchToggle } from "../panels.js";
 import { attempt } from "../ui.js";
 
 /** The sections of the services, in the order the page shows them and its chips name them (items 492 and 545). */
@@ -36,6 +37,7 @@ const MCP_ORIGIN_WORDS = {
   config: "Set up in Dot's config: take its [[mcp]] block out of config.toml to remove it.",
   plugin: "Comes with one of Dot's plugins; Remove plugin takes the plugin out.",
   elsewhere: "Added from another agent of this Mac (Customize › Skills › Found on this Mac).",
+  builtin: "Comes with Dot: it searches the web and reads pages.",
 };
 // A server's tile names this many of its tools.
 const SHOWN_TOOLS = 6;
@@ -84,22 +86,22 @@ function serverGuide(server) {
     case "left_out":
       return server.error;
     case "disabled":
-      return "Switched off in Dot's config.";
+      return server.origin === "builtin" ? "Switched off. Its switch starts it." : "Switched off in Dot's config.";
     default:
       return null;
   }
 }
 
 /** The buttons of an MCP server of `catalogue`: its sign-in page while Dot waits for one, Sign in again or Try again,
- * Remove for one added here or from another agent, and Remove plugin for one of a plugin (item 497); null when it has
- * none. */
+ * Remove for one added here or from another agent, and Remove plugin for one of a plugin (item 497); the one that comes
+ * with Dot has its switch, and Try again when it was left out (item 583); null when it has none. */
 function serverActions(catalogue, server, service) {
   const working = server.state === "trying" || server.state === "signing_in";
   const actions = [];
   if (server.state === "signing_in" && server.link !== null) {
     actions.push(el("a", { class: "btn sm primary", href: server.link, target: "_blank", rel: "noopener noreferrer" }, icon("external"), "Open the sign-in page"));
   }
-  const again = server.origin === "connected" || (server.origin === "config" && server.signs_in);
+  const again = server.origin === "connected" || server.origin === "builtin" || (server.origin === "config" && server.signs_in);
   const acting = catalogue.busy(`server:${server.name}`);
   if (again && !working && (server.signs_in || server.state === "left_out")) {
     const button = el("button", { class: "btn sm", type: "button", disabled: acting }, server.signs_in ? "Sign in again" : "Try again");
@@ -113,6 +115,14 @@ function serverActions(catalogue, server, service) {
   }
   if (server.origin === "connected" || server.origin === "elsewhere") {
     actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.remove(server, service)) }, "Remove"));
+  }
+  if (server.origin === "builtin") {
+    // The server is on while it is not switched off: left out, it is still on, and Try again starts it once more.
+    const on = server.state !== "disabled";
+    const toggle = switchToggle({ label: `Use ${server.name}`, read: () => on, write: (next) => catalogue.switchServer(server, next), onToggled: () => undefined });
+    toggle.setAttribute("aria-checked", String(on));
+    toggle.disabled = acting || working;
+    actions.push(toggle);
   }
   if (server.origin === "plugin" && server.plugin !== null) {
     actions.push(
@@ -324,7 +334,13 @@ export function mount(root, ctx) {
         el("div", { class: "mono plugin-address" }, server.address),
         server.tools.length === 0 ? null : el("div", { class: "plugin-does" }, toolLine(server.tools)),
         server.origin in MCP_ORIGIN_WORDS ? el("div", { class: "plugin-does" }, MCP_ORIGIN_WORDS[server.origin]) : null,
-        el("div", { class: "plugin-meta" }, el("span", { class: "chip" }, "MCP"), el("span", { class: `badge ${MCP_STATE_TONES[server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[server.state] ?? server.state)),
+        el(
+          "div",
+          { class: "plugin-meta" },
+          el("span", { class: "chip" }, "MCP"),
+          server.origin === "builtin" ? el("span", { class: "chip" }, "Built in") : null,
+          el("span", { class: `badge ${MCP_STATE_TONES[server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[server.state] ?? server.state),
+        ),
         serverGuide(server) === null ? null : el("div", { class: "plugin-guide" }, serverGuide(server)),
       ),
       serverActions(catalogue, server, null),

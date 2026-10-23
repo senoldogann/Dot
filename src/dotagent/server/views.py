@@ -1334,21 +1334,23 @@ class GalleryView(FrozenModel):
     others: tuple[InstalledPluginView, ...]
 
 
-type McpOrigin = Literal["config", "plugin", "elsewhere", "connected"]
+type McpOrigin = Literal["config", "plugin", "elsewhere", "connected", "builtin"]
 type McpServerState = Literal["ready", "left_out", "disabled", "trying", "signing_in"]
 
 
 class McpServerView(FrozenModel):
     """One MCP server Dot has, as Customize › Connectors shows it (item 279). ``origin`` is where it is set up: Dot's
-    config, a plugin (``plugin`` names it), another agent of the Mac (Customize › Skills › Found on this Mac), or the
-    Connectors page itself. Remove takes out one added on the page or from another agent (item 497); one of a plugin
-    goes with its plugin, and one of the config is the owner's to take out of it. ``address`` is its URL or its command.
-    ``state``: its tools are offered to runs (``ready``, with ``tools``, their names on the server), it was left out
-    (``error`` says why), it is switched off in the config, or Dot tries it now, waiting for the owner to sign in on
-    ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the owner's account, and Sign in again renews that.
-    ``mark``: its service's, the one the service's tile wears (item 477), ``None`` for a server of no service (Dot's own
-    icon, item 581). ``picks_tools``: the owner may choose on the page which of its tools to offer (``allow``): of one
-    that runs, to cut its tools down, and of one left out with an allow list, to choose the list again."""
+    config, a plugin (``plugin`` names it), another agent of the Mac (Customize › Skills › Found on this Mac), the
+    Connectors page itself, or Dot (``builtin``, item 583: it comes with Dot, and ``[builtin_mcp]`` switches it, on
+    the page too, listed switched off as well). Remove takes out one added on the page or from another agent (item
+    497); one of a plugin goes with its plugin, and one of the config is the owner's to take out of it. ``address`` is
+    its URL or its command. ``state``: its tools are offered to runs (``ready``, with ``tools``, their names on the
+    server), it was left out (``error`` says why), it is switched off in the config, or Dot tries it now, waiting for
+    the owner to sign in on ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the owner's account, and
+    Sign in again renews that. ``mark``: its service's, the one the service's tile wears (item 477), ``None`` for a
+    server of no service (Dot's own icon, item 581). ``picks_tools``: the owner may choose on the page which of its
+    tools to offer (``allow``): of one that runs, to cut its tools down, and of one left out with an allow list, to
+    choose the list again."""
 
     name: str
     origin: McpOrigin
@@ -1436,6 +1438,12 @@ class McpReconnect(FrozenModel):
     """``POST /mcp/servers/{name}/connect``: the page's own origin, as in :class:`McpServerAdd`."""
 
     origin: str
+
+
+class McpSwitch(FrozenModel):
+    """``PUT /mcp/servers/{name}/switch``: whether a server that comes with Dot is on (item 583)."""
+
+    on: bool
 
 
 class KeyView(FrozenModel):
