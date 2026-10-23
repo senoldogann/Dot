@@ -2,7 +2,8 @@
 
 Everything here blocks (accessibility calls, CGEvent posting) and runs on the session's single worker thread.
 ``inspect_step`` only reads. ``execute_step`` re-reads everything it depends on, because a human approval may have taken
-minutes between the two, and is the only function that moves the pointer or presses keys.
+minutes between the two, refuses a step whose target is no longer the one that was reviewed, and is the only function
+that moves the pointer or presses keys.
 """
 
 import time
@@ -41,6 +42,10 @@ _TOGGLE_ROLES: frozenset[str] = frozenset({"AXCheckBox", "AXRadioButton"})
 _WIDE_TOGGLE_PT: float = 48.0
 _TOGGLE_BOX_PT: float = 10.0
 _ACTION_UNSUPPORTED: frozenset[int] = frozenset({-25206, -25208})
+# What an application answers when it has nothing to say about a point, which is not the same as not answering: it has
+# no such attribute, does not implement accessibility, or gives no value. A click there is a click on nothing, since
+# coordinates are for what accessibility does not show (item 555).
+_SAYS_NOTHING: frozenset[int] = frozenset({-25205, -25208, -25212})
 _WHEEL_CHUNK_PX: int = 400
 _DRAG_PX_PER_MOVE: float = 12.0
 _MIN_DRAG_MOVES: int = 8
@@ -56,10 +61,12 @@ _NO_APP: AppInfo = AppInfo(
 
 @dataclass(frozen=True, slots=True)
 class Inspection:
-    """What a reviewer needs to judge a step: its context, and a short description of what it touches."""
+    """What a reviewer needs to judge a step: its context, and a short description of what it touches. ``pid`` is the
+    application it touches (0 for none), which a step approved after a wait is compared against (item 555)."""
 
     context: StepContext
     target: str
+    pid: int = 0
 
 
 # What a step does at a secure text field, on the worker thread: called with the step's inspection and what the step
@@ -109,13 +116,14 @@ class StepEnv:
 @dataclass(frozen=True, slots=True)
 class Target:
     """What a step acts upon: the control (if one was found), the application it belongs to and the title of the
-    window it is in (``None`` when there is none)."""
+    window it is in (``None`` when there is none); for a step that presses Return, the default button of that window."""
 
     ref: int | None
     state: ElementState | None
     owner: AppInfo
     point: Point | None
     window: str | None
+    default_button: Element | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,6 +256,12 @@ def _window_title(element: AXElement | None, app: AXElement, pid: int) -> str | 
     return None if window is None else ax.title_of(window, pid)
 
 
+def _default_button(element: AXElement | None, app: AXElement, pid: int) -> Element | None:
+    """The button Return presses in the window or sheet ``element`` is in (item 555), as the control it is."""
+    state: ElementState | None = ax.default_button_of(element, app, pid)
+    return None if state is None else Element(role=state.role, name=state.label)
+
+
 def _app_window_title(env: StepEnv, owner: AppInfo) -> str | None:
     """The title of the focused window of ``owner``; ``None`` for the desktop itself."""
     if owner.pid == _NO_APP.pid:
@@ -258,7 +272,7 @@ def _app_window_title(env: StepEnv, owner: AppInfo) -> str | None:
     return _window_title(None, root, owner.pid)
 
 
-def _peek_ref(env: StepEnv, raw: str) -> Target:
+def _peek_ref(env: StepEnv, raw: str, presses_return: bool = False) -> Target:
     number, element = _element_for(env, raw)
     return Target(
         ref=number,
@@ -266,6 +280,7 @@ def _peek_ref(env: StepEnv, raw: str) -> Target:
         owner=env.app,
         point=None,
         window=_window_title(element, env.app_element, env.app.pid),
+        default_button=_default_button(element, env.app_element, env.app.pid) if presses_return else None,
     )
 
 
@@ -279,42 +294,63 @@ def _to_points(env: StepEnv, x: float, y: float) -> Point:
     return point
 
 
-def _hit_test(env: StepEnv, point: Point) -> tuple[ElementState | None, int | None]:
-    """The control under a point and the application it belongs to; ``(None, None)`` when the application will not
-    say."""
+@dataclass(frozen=True, slots=True)
+class _Hit:
+    """What accessibility finds under a point: the control, the application it belongs to and the title of its window.
+    ``failed`` is why the application would not say, which is not the same as there being nothing there (``state`` and
+    ``pid`` are then ``None`` as well)."""
+
+    state: ElementState | None
+    pid: int | None
+    title: str | None
+    failed: str | None = None
+
+
+def _hit_test(env: StepEnv, point: Point) -> _Hit:
+    """The control under a point, the application it belongs to and the title of its window (item 555)."""
     try:
         found: AXElement | None = ax.element_at(point, env.config.ax_timeout_s)
         if found is None:
-            return None, None
+            return _Hit(None, None, None)
         pid: int = ax.pid_of(found)
         control: AXElement = ax.enclosing(found, pid, DESKTOP_CLICKABLE_ROLES, _HIT_TEST_HOPS)
-        return ax.read_state(control, pid), pid
+        window: AXElement | None = ax.window_of(found, pid)
+        title: str | None = None if window is None else ax.title_of(window, pid)
+        return _Hit(ax.read_state(control, pid), pid, title)
     except DesktopPermissionError:
         raise
     except DesktopError as error:
         _log.warning("hit_test_failed", x=point.x, y=point.y, error=error.message, **error.context)
-        return None, None
+        if error.context.get("code") in _SAYS_NOTHING:
+            return _Hit(None, None, None)
+        return _Hit(None, None, None, error.message)
 
 
 def _peek_point(env: StepEnv, x: float, y: float) -> Target:
     point: Point = _to_points(env, x, y)
     window = screen.window_at(point, screen.windows_on_screen())
-    state, pid = _hit_test(env, point)
-    if pid is not None:
-        owner: AppInfo = _app_for(env, pid, window.owner if window is not None and window.pid == pid else "")
+    hit: _Hit = _hit_test(env, point)
+    if hit.failed is not None:
+        # A click on a control nobody read could be on a Pay, a Send or a Delete, or in Dot's own window: it does not
+        # go as a click on nothing (item 555), as a ref that cannot be read does not either.
+        raise DesktopError(
+            f"the application under ({x:g}, {y:g}) did not say what is there ({hit.failed}), so nothing was done; take "
+            "a new desktop_snapshot and press or click by ref, or try again",
+            {"x": x, "y": y},
+        )
+    if hit.pid is not None:
+        owner: AppInfo = _app_for(env, hit.pid, window.owner if window is not None and window.pid == hit.pid else "")
     elif window is not None:
         owner = _app_for(env, window.pid, window.owner)
     else:
         owner = _NO_APP
-    # The window under the point, as the window server names it, when it is the owner's; else its focused one.
-    title: str | None = window.title if window is not None and window.pid == owner.pid and window.title else None
-    return Target(
-        ref=None,
-        state=state,
-        owner=owner,
-        point=point,
-        window=title if title is not None else _app_window_title(env, owner),
-    )
+    # The title of the window the control is in, from accessibility, which gives it whether or not macOS lets Dot see
+    # the screen; else the window server's, when the window is the owner's (it is empty without Screen Recording); else
+    # the owner's focused window, which need not be the one under the point (item 555).
+    title: str | None = hit.title
+    if not title and window is not None and window.pid == owner.pid:
+        title = window.title
+    return Target(ref=None, state=hit.state, owner=owner, point=point, window=title or _app_window_title(env, owner))
 
 
 def _window_frame(env: StepEnv) -> Rect:
@@ -350,15 +386,17 @@ def _context(target: Target, lines: Mapping[str, str]) -> StepContext:
         element=None if state is None else Element(role=state.role, name=state.label),
         secure=state is not None and state.secure(),
         line=lines.get(target.owner.name) if role == "terminal" else None,
+        default_button=target.default_button,
     )
 
 
 def _inspection(env: StepEnv, lines: Mapping[str, str], target: Target) -> Inspection:
-    return Inspection(context=_context(target, lines), target=_where(target, env.scale))
+    return Inspection(context=_context(target, lines), target=_where(target, env.scale), pid=target.owner.pid)
 
 
-def _keyboard_target(env: StepEnv) -> Target:
-    """The focused field of the application that has the keyboard, provided that is the one the steps expect."""
+def _keyboard_target(env: StepEnv, presses_return: bool = False) -> Target:
+    """The focused field of the application that has the keyboard, provided that is the one the steps expect; for a
+    step that presses Return, with the default button of its window."""
     pid: int | None = apps.frontmost_pid()
     if pid is None:
         raise DesktopError("no application has the keyboard focus right now; activate one first", {})
@@ -373,7 +411,14 @@ def _keyboard_target(env: StepEnv) -> Target:
     root: AXElement = env.app_element if pid == env.app.pid else ax.app_element(pid, env.config.ax_timeout_s)
     focused: AXElement | None = ax.focused_element(root, pid)
     state: ElementState | None = None if focused is None else ax.read_state(focused, pid)
-    return Target(ref=None, state=state, owner=owner, point=None, window=_window_title(focused, root, pid))
+    return Target(
+        ref=None,
+        state=state,
+        owner=owner,
+        point=None,
+        window=_window_title(focused, root, pid),
+        default_button=_default_button(focused, root, pid) if presses_return else None,
+    )
 
 
 def _require_keyboard(env: StepEnv) -> None:
@@ -402,9 +447,22 @@ def refuse_secrets(context: StepContext) -> None:
         raise DesktopError(f"{context.app} holds passwords or keys; it is never controlled", {"app": context.app})
 
 
+def _presses_return(step: Step) -> bool:
+    """Whether a step presses Return with no modifier, the key or a line break typed: it presses the default button of
+    the window the keyboard is in (item 555)."""
+    if step.action == "type":
+        text: str = step.text or ""
+        return "\n" in text or "\r" in text
+    if step.action == "key" and step.key is not None:
+        chord = parse_chord(step.key)
+        return chord.key == "return" and not chord.modifiers
+    return False
+
+
 def inspect_step(env: StepEnv, step: Step, lines: Mapping[str, str]) -> Inspection:
     """What the step touches, read from the machine right now: the application, the control and whether it is secret;
     ``lines`` holds the command line of each terminal application as far as Dot typed it."""
+    presses_return: bool = _presses_return(step)
     match step.action:
         case "click" | "double_click" | "right_click" | "hover" | "scroll":
             return _inspection(env, lines, _peek(env, step.ref, step.x, step.y))
@@ -414,10 +472,10 @@ def inspect_step(env: StepEnv, step: Step, lines: Mapping[str, str]) -> Inspecti
             return _inspection(env, lines, _peek_ref(env, _required(step.ref, "ref")))
         case "type" | "paste":
             if step.ref is not None:
-                return _inspection(env, lines, _peek_ref(env, step.ref))
-            return _inspection(env, lines, _keyboard_target(env))
+                return _inspection(env, lines, _peek_ref(env, step.ref, presses_return))
+            return _inspection(env, lines, _keyboard_target(env, presses_return))
         case "key":
-            return _inspection(env, lines, _keyboard_target(env))
+            return _inspection(env, lines, _keyboard_target(env, presses_return))
         case "menu" | "wait":
             return _inspection(
                 env,
@@ -478,7 +536,7 @@ def _bring_into_view(env: StepEnv, number: int, element: AXElement) -> Rect:
 def _check_uncovered(env: StepEnv, number: int, state: ElementState, point: Point) -> None:
     if state.role in _MENU_ROLES:
         return
-    _, pid = _hit_test(env, point)
+    pid: int | None = _hit_test(env, point).pid
     if pid is not None and pid != env.app.pid:
         covering: AppInfo = _app_for(env, pid, "")
         raise DesktopError(
@@ -683,12 +741,37 @@ def _activate(env: StepEnv, step: Step) -> Effect:
     return Effect(detail=f"{app.name} is in front", pointer=None, opens_ui=True, switched_to=app)
 
 
-def execute_step(env: StepEnv, step: Step) -> Effect:
-    """Perform one step. The failsafe is checked first and the context re-read, since time passed after the review."""
+def _changed_since(reviewed: Inspection, fresh: Inspection) -> bool:
+    """Whether a step would touch something else than the review judged: another application, kind of window, control
+    or label, a default button that is another, or a field that turned secret (the command line a terminal holds is
+    not compared: the review reads it from what Dot typed, the step does not)."""
+    before: StepContext = reviewed.context
+    after: StepContext = fresh.context
+    return (reviewed.pid, before.role, before.app, before.element, before.secure, before.default_button) != (
+        fresh.pid,
+        after.role,
+        after.app,
+        after.element,
+        after.secure,
+        after.default_button,
+    )
+
+
+def execute_step(env: StepEnv, step: Step, reviewed: Inspection) -> Effect:
+    """Perform one step. The failsafe is checked first and the context re-read, since time passed after the review: a
+    question to the owner takes minutes, and a page can put another control where the one they approved was. A step that
+    would touch something else than ``reviewed``, what the review judged and the owner approved, is not performed (item
+    555)."""
     check_failsafe(env)
     # Performing a step does not depend on what Dot typed on a terminal's line, only judging it does.
     inspection: Inspection = inspect_step(env, step, {})
     refuse_secrets(inspection.context)
+    if _changed_since(reviewed, inspection):
+        raise DesktopError(
+            f"the screen changed after this step was reviewed: it was to touch {reviewed.target}, and it would now "
+            f"touch {inspection.target}; nothing was done. Take a new desktop_snapshot and look again",
+            {"reviewed": reviewed.target, "now": inspection.target},
+        )
     match step.action:
         case "click":
             return _click(env, step, inspection, 1)

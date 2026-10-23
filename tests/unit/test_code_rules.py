@@ -48,16 +48,26 @@ def test_the_answer_of_mail_is_age_sender_subject_and_content() -> None:
     assert parse_mail_result("") is None
 
 
+_CHAT_SCHEMA: str = (
+    "CREATE TABLE handle (ROWID INTEGER PRIMARY KEY, id TEXT);"
+    "CREATE TABLE message (ROWID INTEGER PRIMARY KEY, date INTEGER, handle_id INTEGER, text TEXT, "
+    "attributedBody BLOB, is_from_me INTEGER);"
+)
+
+
+def _add_message(
+    connection: sqlite3.Connection, number: int, row: tuple[float, str, str | None, bytes | None, int]
+) -> None:
+    date, handle, text, body, from_me = row
+    connection.execute("INSERT INTO handle VALUES (?, ?)", (number, handle))
+    connection.execute("INSERT INTO message VALUES (?, ?, ?, ?, ?, ?)", (number, date, number, text, body, from_me))
+
+
 def _chat_db(path: Path, rows: list[tuple[float, str, str | None, bytes | None, int]]) -> None:
     connection: sqlite3.Connection = sqlite3.connect(path)
-    connection.executescript(
-        "CREATE TABLE handle (ROWID INTEGER PRIMARY KEY, id TEXT);"
-        "CREATE TABLE message (ROWID INTEGER PRIMARY KEY, date INTEGER, handle_id INTEGER, text TEXT, "
-        "attributedBody BLOB, is_from_me INTEGER);"
-    )
-    for number, (date, handle, text, body, from_me) in enumerate(rows, start=1):
-        connection.execute("INSERT INTO handle VALUES (?, ?)", (number, handle))
-        connection.execute("INSERT INTO message VALUES (?, ?, ?, ?, ?, ?)", (number, date, number, text, body, from_me))
+    connection.executescript(_CHAT_SCHEMA)
+    for number, row in enumerate(rows, start=1):
+        _add_message(connection, number, row)
     connection.commit()
     connection.close()
 
@@ -85,3 +95,26 @@ def test_messages_are_read_newest_first_within_the_window_from_the_sender(tmp_pa
     assert read_messages(db, "", 1, now + 3000) is None
     with pytest.raises(DesktopPermissionError, match="Full Disk Access"):
         read_messages(tmp_path / "missing" / "chat.db", "", 10, now)
+
+
+def test_a_message_that_has_just_arrived_and_waits_in_the_write_ahead_log_is_read(tmp_path: Path) -> None:
+    """The audit's F10: Messages keeps chat.db in WAL mode, where a message that has just arrived stays in the -wal file
+    until a checkpoint, and ``immutable=1`` made SQLite skip that file: the code that was just sent was not there."""
+    now: float = time.time()
+    nanoseconds = lambda age_s: int((now - age_s - _APPLE_EPOCH) * 1e9)  # noqa: E731
+    db: Path = tmp_path / "chat.db"
+    writer: sqlite3.Connection = sqlite3.connect(db)
+    try:
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.executescript(_CHAT_SCHEMA)
+        _add_message(writer, 1, (nanoseconds(3600), "+15550100", "Old code 111111", None, 0))
+        writer.commit()
+        writer.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        _add_message(writer, 2, (nanoseconds(5), "+15550100", "Your Shop code is 991122", None, 0))
+        writer.commit()
+        assert (tmp_path / "chat.db-wal").stat().st_size > 0
+        found: FoundMessage | None = read_messages(db, "", 10, now)
+    finally:
+        writer.close()
+    assert found is not None and found.text == "Your Shop code is 991122"

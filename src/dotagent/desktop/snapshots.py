@@ -172,14 +172,16 @@ def capture_front_window(desktop: DesktopConfig, with_text: bool) -> Capture:
     window: WindowInfo | None = _front_window(pid, windows)
     if window is None:
         raise DesktopError("the application in front has no window on the screen", {"pid": pid})
-    app: AppInfo | None = next((running for running in apps.list_apps() if running.pid == pid), None)
+    running: tuple[AppInfo, ...] = apps.list_apps()
+    app: AppInfo | None = next((candidate for candidate in running if candidate.pid == pid), None)
     role: safety.AppRole = safety.window_role(window.owner, None if app is None else app.bundle_id, window.title)
     if role == "dot":
         raise DesktopError("the window in front is Dot's own; switch to the window to capture", {"app": window.owner})
     if role == "secrets":
         raise DesktopError("the window in front belongs to a password manager, which is never captured", {})
     picture = capture.capture_native(window.bounds, desktop.capture_timeout_s)
-    picture, _ = capture.black_out(picture, window.bounds, safety.hidden_regions(windows))
+    bundles: dict[int, str | None] = {candidate.pid: candidate.bundle_id for candidate in running}
+    picture, _ = capture.black_out(picture, window.bounds, safety.hidden_regions(windows, bundles))
     width, height = capture.zoom_size(window.bounds, picture.size, _MAX_EDGE)
     text: str = ""
     if with_text:

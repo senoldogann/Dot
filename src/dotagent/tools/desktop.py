@@ -9,6 +9,7 @@ before it runs; a step that turns out riskier than what was approved goes back t
 import base64
 import os
 import secrets
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -16,6 +17,7 @@ from pydantic import Field
 
 from dotagent.config import AppConfig
 from dotagent.core.errors import DesktopError, ToolInputError
+from dotagent.core.text import truncate_tail
 from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
 from dotagent.desktop.apps import bundle_path
 from dotagent.desktop.render import (
@@ -28,7 +30,7 @@ from dotagent.desktop.render import (
     render_snapshot,
     render_text_read,
 )
-from dotagent.desktop.safety import StepContext, assess_step, exceeds, is_secrets_app, reaches_a_shell
+from dotagent.desktop.safety import StepContext, assess_step, exceeds, is_secrets_app, reaches_a_shell, shell_input
 from dotagent.desktop.session import StepReview
 from dotagent.desktop.types import (
     ActOutcome,
@@ -66,6 +68,10 @@ _NONCE_BYTES: int = 8
 _HEADROOM_CHARS: int = 3500  # room next to the window body for steps, notes and the fence lines
 _READ_HEADROOM_CHARS: int = 1500
 _SUMMARY_CHARS: int = 240
+# What a card of a step that may run a command keeps of what the judgement found in it, and how much of the lines it
+# shows (as many as terminal_send takes): the owner reads the whole command (item 555).
+_REASONS_CHARS: int = 120
+_TARGET_CHARS: int = 10_000
 _LABEL_CHARS: int = 50
 _DEFAULT_READ_CHARS: int = 6000
 _QUICK_TIMEOUT_S: float = 45.0
@@ -369,6 +375,24 @@ def _batch_kind(steps: list[Step], contexts: tuple[StepContext, ...]) -> ActionK
     return "shell" if shell else "desktop_input"
 
 
+def _shell_target(steps: Sequence[Step], contexts: Sequence[StepContext], fallback: str) -> str:
+    """What the owner is asked to let run (item 555): the lines the steps put to run, as they will be read, else
+    ``fallback``, the control or the application."""
+    shown: list[str] = [
+        text for step, context in zip(steps, contexts, strict=True) if (text := shell_input(step, context)) is not None
+    ]
+    return truncate_tail("\n".join(shown), _TARGET_CHARS) if shown else fallback
+
+
+def _described(summary: str, kind: ActionKind, assessment: StepAssessment) -> str:
+    """The summary of a step that may run a command, with what the judgement found in it (item 555); any other
+    step's summary as it is."""
+    if kind != "shell" or not assessment.reasons:
+        return summary
+    found: str = _clip("; ".join(assessment.reasons), _REASONS_CHARS)
+    return f"{_clip(summary, _SUMMARY_CHARS - _REASONS_CHARS - 3)} — {found}"
+
+
 def _act_tool() -> RegisteredTool:
     async def classify(args: ActArgs, ctx: ToolContext) -> ActionInfo:
         steps: list[Step] = first_steps(args.steps, ctx.runtime.config.desktop.max_batch_steps)
@@ -383,7 +407,11 @@ def _act_tool() -> RegisteredTool:
         summary: str = f"{app}: " + "; ".join(
             _step_label(step, context) for step, context in zip(steps, contexts, strict=True)
         )
-        return _action(DESKTOP_ACT_TOOL, _batch_kind(steps, contexts), assessment.risk, summary, app, assessment.flags)
+        kind: ActionKind = _batch_kind(steps, contexts)
+        target: str = _shell_target(steps, contexts, app) if kind == "shell" else app
+        return _action(
+            DESKTOP_ACT_TOOL, kind, assessment.risk, _described(summary, kind, assessment), target, assessment.flags
+        )
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         async def review(step_review: StepReview) -> None:
@@ -399,15 +427,12 @@ def _act_tool() -> RegisteredTool:
             reaches_shell: bool = kind == "shell" and authorized.kind != "shell"
             if not reaches_shell and not exceeds(live, authorized.risk, authorized.flags):
                 return
+            summary: str = f"{step_review.context.app}: {_step_label(step_review.step, step_review.context)}"
+            target: str = step_review.target or step_review.context.app
+            if kind == "shell":
+                target = _shell_target([step_review.step], [step_review.context], target)
             await ctx.gate.authorize(
-                _action(
-                    DESKTOP_ACT_TOOL,
-                    kind,
-                    live.risk,
-                    f"{step_review.context.app}: {_step_label(step_review.step, step_review.context)}",
-                    step_review.target or step_review.context.app,
-                    live.flags,
-                )
+                _action(DESKTOP_ACT_TOOL, kind, live.risk, _described(summary, kind, live), target, live.flags)
             )
 
         # A secure field is the user's outside yolo (item 429): the step's review hands a credential to them, and a

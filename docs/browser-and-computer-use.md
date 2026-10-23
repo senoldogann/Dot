@@ -346,17 +346,48 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
   by its ref or a point by its coordinates. `press`, `focus` and `set_value` work through accessibility without moving
   the pointer; `click`, `hover`, `scroll` and `drag` are real pointer events; `type`, `paste` and `key` are keyboard
   events. A `type` text longer than `paste_threshold_chars` (40) without a line break or a tab goes in through the
-  clipboard, which is put back afterwards, unless the field is secure, is for a credential or a payment, or cannot be
-  read, or the text looks like a key. After steps that changed something, the window is read once the application has
+  clipboard, which is put back afterwards (also when the clipboard refuses the text or the paste fails, item 555),
+  unless the field is secure, is for a credential or a payment, or cannot be read, or the text looks like a key. After
+  steps that changed something, the window is read once the application has
   announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
   without announcing anything in between shows in the next view.
 - In a terminal application (Terminal, iTerm2, Ghostty and the like) text and keys are shell input. Dot keeps the
   command line it typed there since the line was last empty and judges it whole, as a `shell` command, when Return or
   a Ctrl- key that may run it goes in, so a command typed in parts is judged as one, from the home folder. After a
   click, a focus, a menu, a drag, a Cmd shortcut or an arrow key the line cannot be told, and the next Return asks, as
-  the first one in a terminal Dot has not typed into does; Ctrl-C starts a line Dot knows again.
+  the first one in a terminal Dot has not typed into does; Ctrl-C starts a line Dot knows again. Other steps there run
+  commands too, which Dot cannot read: the Run button of Terminal's New Command dialog, a menu item (Shell › New
+  Command…, Edit › Paste), the value of a field set, a press or a click anywhere in its window, a drag. Each is judged
+  as the Return of a line it cannot tell, a `shell` step that every preset asks about (item 555); a `hover`, a `scroll`,
+  a `focus`, an `activate` and a quit are not. The card of such a question shows the command lines the step runs, as
+  Dot typed them from the line it knows (key-like text masked), and what the judgement found in the step.
+- An editor with a terminal of its own and an application that runs scripts (VS Code and its forks Cursor and
+  Windsurf, Zed, the JetBrains IDEs, Script Editor, Automator, Shortcuts) are no terminal: what is typed in them is
+  mostly code, so it is not read as shell lines. What asks, as a step about `privilege` (item 555), is the step that
+  runs what is written there: a line break typed or pasted, Return, F5 or Cmd-R, a button or a menu item whose name
+  says that it runs (run, play, execute, debug). That is all Dot reads of them. It does not read the command typed in
+  the terminal of any other editor or application that runs what it is given, a button that runs under another name,
+  or a line of the clipboard that a paste puts to a program that does not wait for Return (`desktop_clipboard_write`,
+  then a paste): the guard reads what Dot types into a terminal application, not what another application makes of it.
+- Return presses the button that has the keyboard and the default button of the window (item 555): a `key` step of
+  Return, Enter or Space, and a `type` text with a line break, are judged by the names of those buttons as a click on
+  them is, so Return on a Pay, a Send or a Delete asks as the click does.
+- A click at coordinates is judged by the control accessibility finds under the point and by the title of that
+  control's own window, so that Dot's own window is known behind another one whether or not macOS lets Dot see the
+  screen (item 555). An application that does not say what is there (busy, or not answering) gets no click: the step
+  fails and tells the run to take a snapshot, which wakes the accessibility of an application that builds it on demand,
+  and press or click by ref, or to try again. An application that has nothing to say there (it does not implement
+  accessibility, or gives no value) is a click on nothing, as before, since coordinates are for what accessibility
+  does not show.
+- A step the owner was asked about is read again before it goes (item 555): when the application, the kind of window,
+  the control, its name or the default button is no longer what the question was about (a page put a "Buy now" where
+  the "Send" was while they decided), the step is not done and the run is told to look again. While a batch waits for
+  the owner's answer it holds the desktop, as they may be doing the step themselves on this screen; a run that asks for
+  the desktop meanwhile is told so at once, instead of waiting until its own tool times out.
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels
-  (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920).
+  (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920). The windows of password
+  managers and Keychain Access are painted black, known by their application's bundle id and not only by its name,
+  which is in the language of the Mac (item 555).
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields outside `yolo`, where the step is the user's; in `yolo` the run types the field itself (item 443),
   and a step the review sees take a credential keeps that reason in its record (item 429, see

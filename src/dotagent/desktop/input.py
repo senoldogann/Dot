@@ -369,15 +369,20 @@ def write_clipboard(text: str) -> None:
 
 
 def paste_text(source: EventSource, text: str, settle_s: float) -> None:
-    """Paste ``text`` through the clipboard and put the previous clipboard back unless someone changed it meanwhile."""
+    """Paste ``text`` through the clipboard and put the previous clipboard back unless someone changed it meanwhile,
+    also when the clipboard refuses the text or the keys cannot be posted, not only when the paste goes through
+    (item 555)."""
     pasteboard: PasteboardLike = NSPasteboard.generalPasteboard()
     previous: PasteboardSnapshot = _snapshot_pasteboard(pasteboard)
     pasteboard.clearContents()
-    if not pasteboard.setString_forType_(text, _PLAIN_TEXT_TYPE):
-        raise DesktopError("the clipboard refused the text", {"chars": len(text)})
-    pasteboard.setString_forType_("", _TRANSIENT_TYPE)  # clipboard managers skip transient items
     ours: int = pasteboard.changeCount()
-    post(chord_events(source, Chord(key="v", modifiers=("cmd",))))
-    time.sleep(settle_s)  # the target reads the pasteboard asynchronously (Electron needs 100-300 ms)
-    if pasteboard.changeCount() == ours:
-        _restore_pasteboard(pasteboard, previous)
+    try:
+        if not pasteboard.setString_forType_(text, _PLAIN_TEXT_TYPE):
+            raise DesktopError("the clipboard refused the text", {"chars": len(text)})
+        pasteboard.setString_forType_("", _TRANSIENT_TYPE)  # clipboard managers skip transient items
+        ours = pasteboard.changeCount()
+        post(chord_events(source, Chord(key="v", modifiers=("cmd",))))
+        time.sleep(settle_s)  # the target reads the pasteboard asynchronously (Electron needs 100-300 ms)
+    finally:
+        if pasteboard.changeCount() == ours:
+            _restore_pasteboard(pasteboard, previous)
