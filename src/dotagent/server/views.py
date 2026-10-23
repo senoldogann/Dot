@@ -50,6 +50,7 @@ from dotagent.store.models import (
     ChatChoices,
     ChatMode,
     HarnessVersion,
+    MemoryOrder,
     MemoryRecord,
     MemoryScore,
     NotifyLevel,
@@ -239,8 +240,12 @@ class ApprovalsQuery(FrozenModel):
 
 
 class MemoriesQuery(FrozenModel):
+    """A page of the notes, in the ``order`` asked: the ones changed last first, the ones used last first, the most
+    used first or the least used first (item 584)."""
+
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
+    order: MemoryOrder = "changed"
 
 
 class FiringsQuery(FrozenModel):
@@ -1025,15 +1030,80 @@ class CampaignDetail(FrozenModel):
 
 
 class MemoryPage(FrozenModel):
-    """A page of the notes, newest change first; ``resting`` names the items that rest
-    (:func:`dotagent.memory.service.resting`), so the page can group them; ``scores`` says, per item some run was
+    """A page of the notes, in the order asked (the ones changed last first by default); ``resting`` names the items
+    that rest (:func:`dotagent.memory.service.resting`), so the page can group them, and ``rested`` says since when each
+    that rests by a date does (:func:`dotagent.memory.lifecycle.rested_since`); ``scores`` says, per item some run was
     handed, how those runs ended; ``agents`` names the agents, by id, so the page can say whose a lesson is."""
 
     total: int
     items: list[MemoryRecord]
     resting: list[str]
+    rested: dict[str, float]
     scores: dict[str, MemoryScore]
     agents: dict[str, str]
+
+
+class ForgetProposalView(FrozenModel):
+    """A note proposed to the owner for forgetting, and since when it rests (item 584)."""
+
+    record: MemoryRecord
+    rested_since: float
+
+
+class ForgetProposalsView(FrozenModel):
+    """The notes that have rested for ``forget_after_days``, the longest first, and the days a forgotten note waits in
+    the trash (item 584): ``GET /api/memories/proposals``."""
+
+    items: list[ForgetProposalView]
+    forget_after_days: int
+    trash_days: int
+
+
+class NoteIdsRequest(FrozenModel):
+    """The notes the owner decides on, by id, as the page showed them (item 584): a note proposed since is not among
+    them."""
+
+    ids: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]] = Field(
+        min_length=1, max_length=500
+    )
+
+
+class ProposalOutcome(FrozenModel):
+    """What the owner's Forget or Keep on proposed notes did (item 584): the notes it did it to, and the ids it left
+    alone because they were not proposed any more."""
+
+    done: list[MemoryRecord]
+    skipped: list[str]
+
+
+class TrashedNote(FrozenModel):
+    """A note in the trash: the note, when it went there and when the reflection deletes it for good."""
+
+    record: MemoryRecord
+    trashed_at: float
+    purged_at: float
+
+
+class TrashView(FrozenModel):
+    """The notes the owner forgot, the newest first and at most 200 of them (item 584), how many the trash holds in all
+    and how long a note is kept."""
+
+    items: list[TrashedNote]
+    total: int
+    trash_days: int
+
+
+class PinRequest(FrozenModel):
+    """Pin a note, so that it never rests, or take the pin off (item 584)."""
+
+    pinned: StrictBool
+
+
+class UnmergeView(FrozenModel):
+    """A merge taken back (item 584): the merged note, now in the trash, and the notes that woke."""
+
+    merged: MemoryRecord
+    woken: list[MemoryRecord]
 
 
 class ScheduleAgent(FrozenModel):

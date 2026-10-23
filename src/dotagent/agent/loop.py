@@ -218,6 +218,7 @@ from dotagent.llm.types import (
     user_message,
 )
 from dotagent.llm.typesafe import ChoiceAnswer
+from dotagent.memory.lifecycle import Gone, notes_gone
 from dotagent.memory.render import render_note
 from dotagent.memory.service import (
     LiveNotes,
@@ -1927,15 +1928,22 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # handed again), the notes forgotten since a message was handed them (their old text stays in the chat), and the
     # fitting skills the instructions leave out.
     carried: str = "\n".join(message.content for message in history if message.role == "user")
-    fresh_notes: list[str] = notes_missing([render_note(record) for record in remembered], carried)
     handed_before: set[str] = handed_note_ids(carried) - {record.id for record in remembered}
-    still: set[str] = {record.id for record in await runtime.store.get_memories(sorted(handed_before))}
-    forgotten: list[str] = forgotten_unnamed(sorted(handed_before - still), carried)
+    # A note the chat quotes that was forgotten, or that a merge put aside (item 584), is named as forgotten; the note
+    # a merge made of it, which the chat does not carry, is handed in its place.
+    away: Gone = await notes_gone(runtime.memory, handed_before, run.agent_id, time.time())
+    forgotten: list[str] = forgotten_unnamed(list(away.gone), carried)
+    stood_in: list[MemoryRecord] = [
+        record for record in away.stand_in if record.id not in {note.id for note in remembered}
+    ]
+    fresh_notes: list[str] = notes_missing([render_note(record) for record in (*remembered, *stood_in)], carried)
+    if stood_in_fresh := [record.id for record in stood_in if render_note(record) in fresh_notes]:
+        await runtime.store.mark_memories_used(run.id, stood_in_fresh, memory_seen_at, "start")
     listed_names: set[str] = {skill.name for skill in listing.skills}
     extra_skills: list[Skill] = [skill for skill in fitting.skills if skill.name not in listed_names][
         :_TURN_SKILLS_MOST
     ]
-    recalled_ids: list[str] = [record.id for record in remembered]
+    recalled_ids: list[str] = [record.id for record in (*remembered, *stood_in)]
 
     async def recalled_now(present: str) -> str:
         """The notes recalled for this message that the context ``present`` (its user messages) no longer carries, as

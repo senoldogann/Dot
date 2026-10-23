@@ -28,6 +28,7 @@ not asked twice.
 """
 
 import asyncio
+import math
 import re
 from collections.abc import Sequence
 from typing import Literal
@@ -50,16 +51,20 @@ from dotagent.agent.review import (
 from dotagent.agent.sites import site_tags
 from dotagent.agent.verify import CallFact
 from dotagent.config import LessonsMode
-from dotagent.core.errors import DotError, NotFoundError, RunConflict
+from dotagent.core.errors import DotError, InvalidValueError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search, redact_known, redact_secrets
 from dotagent.core.types import FrozenModel
+from dotagent.harness.components import rules_of
+from dotagent.harness.service import adopted_text
+from dotagent.memory.ranking import Vector
 from dotagent.memory.service import MemoryHit, SavedMemory, normalize_text, recall_for, save_memory
 from dotagent.memory.words import lowercase, search_terms
+from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, RunMode, RunStatus
+from dotagent.store.models import EventRecord, RunMode, RunRecord, RunStatus
 
 log = get_logger(__name__)
 
@@ -317,11 +322,42 @@ def _says_it(lesson: str, hit: MemoryHit, threshold: float) -> bool:
     return same_way_round(lesson, hit.record.content) and (close or repeats(lesson, hit.record.content))
 
 
+async def repeating_rules(runtime: Runtime, texts: Sequence[str], rules: Sequence[str]) -> dict[str, str]:
+    """Of ``texts`` (lessons, or notes), the ones that say what a rule of the adopted harness says already (item 584),
+    each with the rule: by the words (:func:`repeats`) or, with embeddings on, by the meaning, the same way round
+    (:func:`same_way_round`) and at least ``[memory] similar_threshold`` close. The adopted habits and tool guidance
+    are in every run's prompt, so a lesson that repeats one adds a line to the memory and nothing to a run. An
+    embedding service that fails raises its error."""
+    found: dict[str, str] = {}
+    if not texts or not rules:
+        return found
+    for text in texts:
+        rule: str | None = next((line for line in rules if repeats(text, line)), None)
+        if rule is not None:
+            found[text] = rule
+    embedder = runtime.memory.embedder
+    left: list[str] = [text for text in texts if text not in found]
+    if embedder is None or not left:
+        return found
+    vectors: list[Vector] = await embedder.embed([*left, *rules])
+    for text, vector in zip(left, vectors, strict=False):
+        for line, other in zip(rules, vectors[len(left) :], strict=True):
+            close: bool = (
+                len(vector) == len(other) and math.sumprod(vector, other) >= runtime.config.memory.similar_threshold
+            )
+            if close and same_way_round(text, line):
+                found[text] = line
+                break
+    return found
+
+
 async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, ...]) -> tuple[str, ...]:
     """The lessons the review model draws from a run, without the ones that are not lessons or that a note the run's
-    agent is handed already says (another agent's lesson is not the run's to know). A review model or an embedding
-    service that fails raises its error."""
+    agent is handed already says (another agent's lesson is not the run's to know), nor the ones that repeat a habit or
+    a line of tool guidance the adopted harness gives every run (item 584). A review model or an embedding service that
+    fails raises its error."""
     agent_id: str | None = await _agent_of(runtime.store, case.run_id)
+    habits: tuple[str, ...] = rules_of((await adopted_text(runtime.store))[0])
     # A note saved while reading outside content is not shown to the model that writes the lessons (item 384), so its
     # words cannot pass into a lesson of a clean run, which would be saved unmarked.
     known: tuple[str, ...] = tuple(
@@ -345,17 +381,22 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
             answer=case.answer,
             known=known,
             reached_goal=case.reached_goal,
+            habits=habits,
         )
     )
     kept: tuple[str, ...] = kept_lessons(
         proposal.lessons,
-        (case.goal, *known),
+        (case.goal, *known, *habits),
         min(_MAX_CHARS, runtime.config.memory.max_chars),
         await asyncio.to_thread(known_secrets),
     )
     threshold: float = runtime.config.memory.similar_threshold
+    said: dict[str, str] = await repeating_rules(runtime, kept, habits)
     fresh: list[str] = []
     for lesson in kept:
+        if lesson in said:
+            log.info("lesson_repeats_a_habit", run_id=case.run_id, habit=said[lesson])
+            continue
         hits: list[MemoryHit] = await recall_for(runtime.memory, lesson, _LIKE_NOTES, agent_id)
         if not any(_says_it(lesson, hit, threshold) for hit in hits):
             fresh.append(lesson)
@@ -659,3 +700,34 @@ async def undo_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, ind
         log.info("lesson_undone", run_id=run_id, index=index, memory_id=lesson.memory_id, forgotten=forgotten)
         await _emit_dismissed(runtime, run_id, index, "owner", None)
     return forgotten
+
+
+async def propose_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, words: str) -> LessonView:
+    """Propose a lesson from the owner's words about the run ``run_id`` (item 584, which item 586's reactions call): the
+    words are checked as any lesson is (:func:`lesson_problem`: one line of 20 to 300 characters, no secret, no
+    address, no path in a home folder) and wait on the run's page as one more of its lessons, to be saved with Save or
+    dropped with Dismiss (:func:`save_lesson`, :func:`dismiss_lesson`), as the reflection's lessons wait under
+    ``propose``: nothing is saved to memory here, whatever ``[agent] lessons`` says, since the words come before the
+    owner has read them back as a lesson. The lessons the run has are kept as they are, with their numbers, and the new
+    one comes last; the same words twice are one lesson. Words that a note the run's owner is handed already says are a
+    conflict naming it. It holds ``deciding`` like the other decisions on lessons, so a decision that runs at the same
+    time sees the list before or after. An unknown run is not found."""
+    run: RunRecord = await runtime.store.get_run(run_id)
+    text: str = " ".join(words.split())
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    problem: str | None = lesson_problem(text, min(_MAX_CHARS, runtime.config.memory.max_chars), secrets)
+    if problem is not None:
+        raise InvalidValueError(f"the words are not a lesson ({problem})", {"run_id": run_id, "chars": len(text)})
+    for hit in await recall_for(runtime.memory, text, _LIKE_NOTES, run.agent_id):
+        if _says_it(text, hit, runtime.config.memory.similar_threshold):
+            raise RunConflict("a saved note says this already", {"run_id": run_id, "memory_id": hit.record.id})
+    async with deciding:
+        held: RunLessons | None = await run_lessons(runtime.store, run_id)
+        texts: list[str] = [] if held is None else [lesson.text for lesson in held.lessons]
+        if text not in texts:
+            tainted: bool = (held is not None and held.tainted) or await runtime.store.read_outside(
+                run_id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS)
+            )
+            texts.append(text)
+            await runtime.bus.emit(run_id, LESSONS_PROPOSED, {"lessons": list(texts), "tainted": tainted}, True)
+        return await _lesson_of(runtime.store, run_id, texts.index(text))

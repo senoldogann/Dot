@@ -11,12 +11,16 @@ unless the older is one the owner saved, off the event loop, and the other rests
 ``[agent] lesson_rest_days`` to the ``rest`` tag, after which a search no longer finds them and the Memory page still
 lists them; it puts aside the notes newer ones made outdated (item 306, :func:`outdated_pairs`: the review model
 judges each older note against a newer one close to it, and one it calls outdated rests and names the note that
-replaced it, so the Memory page still lists it and the owner can wake it); and it writes one journal note of the days
-it read (:func:`journal_span`), tagged ``journal``, when anything happened, which names the lessons that were saved,
-not the ones left out or waiting for the owner. A lesson the owner saved from a run's page
-is never folded away, retired nor put aside, and neither is a note the owner wrote. Whether a run read
-content third parties can author is read from all its results, not only the ones its digest shows. The last reflection
-is kept in the store's key/value table, so the next one knows where to start and the Activity list can show it.
+replaced it, so the Memory page still lists it and the owner can wake it); it merges the notes the review model says
+say the same in other words (item 584, :func:`dotagent.agent.consolidate.merge_near_duplicates`: the sources rest,
+whole, and the Memory page can undo the merge); it counts the notes that have rested long enough to be proposed to the
+owner for forgetting and deletes for good the ones in the trash for longer than ``[memory] trash_days``, which the
+owner forgot (nothing else is ever deleted); and it writes one journal note of the days it read
+(:func:`journal_span`), tagged ``journal``, when anything happened, which names the lessons that were saved, not the
+ones left out or waiting for the owner. A lesson the owner saved from a run's page is never folded away, retired, put
+aside nor merged, and neither is a note the owner wrote or pinned. Whether a run read content third parties can author
+is read from all its results, not only the ones its digest shows. The last reflection is kept in the store's
+key/value table, so the next one knows where to start and the Activity list can show it.
 
 The scheduler fires it at ``[agent] reflection_time`` (:func:`reflection_due`), ``dotx reflect`` runs it by hand. Every
 function here is pure except the ones that take the store or the runtime.
@@ -30,6 +34,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from dotagent.agent.consolidate import merge_near_duplicates, rest_repeating_habits
 from dotagent.agent.lessons import (
     LESSON_TAG,
     LESSONS_FAILED,
@@ -70,6 +75,7 @@ from dotagent.core.errors import StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets
 from dotagent.evals import EVAL_SOURCE
+from dotagent.memory.lifecycle import forget_proposals, purge_trash
 from dotagent.memory.ranking import Vector
 from dotagent.memory.service import (
     CORE_TAG,
@@ -347,11 +353,12 @@ def outdated_pairs(
 ) -> list[tuple[MemoryRecord, MemoryRecord]]:
     """The pairs (older, newer) of ``notes`` the outdated judge is asked about (item 306): the newer one written or
     changed since the last reflection (``since``), by a run or by the owner; the older one Dot's own, written before it,
-    the same agent's, close to it (:func:`_closeness`), its closest such newer note, and in one pair at most. Neither
-    rests nor ran out of time, and none is a journal note; a standing note (``core``), a note the owner wrote and a
-    lesson the owner saved (``owner_saved``) are never the older one, and a note saved while reading outside content
-    (``tainted``) is never the newer one of a clean older note (item 557): page content does not put a trusted fact
-    aside. The newest pairs first, at most :data:`MOST_OUTDATED_PAIRS`."""
+    the same agent's, close to it (:func:`_closeness`), and each note in one pair at most. Neither rests nor ran out of
+    time, and none is a journal note; a standing note (``core``), a note the owner wrote and a note the owner saved or
+    pinned (``owner_saved``) are never the older one, and a note saved while reading outside content (``tainted``) is
+    never the newer one of a clean older note (item 557): page content does not put a trusted fact aside. The closest
+    pairs first (item 584: the likeliest repeats and corrections are asked about before the others, newest first among
+    equals), at most :data:`MOST_OUTDATED_PAIRS`."""
     awake: list[MemoryRecord] = [
         note for note in notes if REST_TAG not in note.tags and JOURNAL_TAG not in note.tags and not expired(note, now)
     ]
@@ -360,23 +367,25 @@ def outdated_pairs(
         for note in awake
         if note.source_run is not None and CORE_TAG not in note.tags and note.id not in owner_saved
     ]
+    found: list[tuple[float, MemoryRecord, MemoryRecord]] = [
+        (closeness, older, newer)
+        for newer in sorted((note for note in awake if _written(note) >= since), key=_written, reverse=True)
+        for older in olders
+        if older.id != newer.id
+        and older.agent_id == newer.agent_id
+        and not (newer.tainted and not older.tainted)
+        and _written(older) < _written(newer)
+        and (closeness := _closeness(older, newer, vectors, threshold)) is not None
+    ]
     pairs: list[tuple[MemoryRecord, MemoryRecord]] = []
-    taken: set[str] = set()
-    for newer in sorted((note for note in awake if _written(note) >= since), key=_written, reverse=True):
-        close: list[tuple[float, MemoryRecord]] = [
-            (closeness, older)
-            for older in olders
-            if older.id != newer.id
-            and older.id not in taken
-            and older.agent_id == newer.agent_id
-            and not (newer.tainted and not older.tainted)
-            and _written(older) < _written(newer)
-            and (closeness := _closeness(older, newer, vectors, threshold)) is not None
-        ]
-        if not close:
+    older_taken: set[str] = set()
+    newer_taken: set[str] = set()
+    # A stable sort: of equally close pairs the one of the newest note comes first, as the list was made.
+    for _, older, newer in sorted(found, key=lambda pair: -pair[0]):
+        if older.id in older_taken or newer.id in newer_taken:
             continue
-        older: MemoryRecord = max(close, key=lambda found: found[0])[1]
-        taken.add(older.id)
+        older_taken.add(older.id)
+        newer_taken.add(newer.id)
         pairs.append((older, newer))
         if len(pairs) == MOST_OUTDATED_PAIRS:
             break
@@ -534,7 +543,7 @@ async def _retire(runtime: Runtime, notes: Sequence[MemoryRecord], now: float, o
     retired: int = 0
     aged: list[MemoryRecord] = to_retire(notes, now, runtime.config.agent.lesson_rest_days, owner_saved)
     for note in aged:
-        await runtime.store.set_memory_tags(note.id, (*note.tags, REST_TAG))
+        await runtime.store.rest_memory(note.id, (*note.tags, REST_TAG), now)
         log.info(
             "lesson_retired",
             memory_id=note.id,
@@ -547,7 +556,7 @@ async def _retire(runtime: Runtime, notes: Sequence[MemoryRecord], now: float, o
     left: list[MemoryRecord] = [note for note in notes if note.id not in rested]
     scores: dict[str, MemoryScore] = await recent_scores(runtime.memory, [note.id for note in left], now)
     for note, score in to_retire_by_score(left, scores, runtime.config.memory.score_min_uses, owner_saved):
-        await runtime.store.set_memory_tags(note.id, (*note.tags, REST_TAG))
+        await runtime.store.rest_memory(note.id, (*note.tags, REST_TAG), now)
         log.info(
             "lesson_retired",
             memory_id=note.id,
@@ -654,12 +663,17 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         await _learn(runtime, deciding, runs) if runtime.config.agent.lessons != "off" and runs else ([], [], False)
     )
     own: list[MemoryRecord] = _own(await store.memories_with_tag(LESSON_TAG, _LESSON_NOTES))
-    owner_saved: set[str] = await store.owner_saved_memory_ids()
+    # The notes no reflection folds, retires, puts aside or merges: a lesson the owner saved, a note the owner pinned.
+    owner_saved: set[str] = await store.owner_saved_memory_ids() | await store.pinned_memory_ids()
     vectors: dict[str, Vector] = dict(await store.all_memory_vectors()) if runtime.memory.embedder is not None else {}
     merged: int = await merge_duplicates(store, own, vectors, owner_saved)
     kept: list[MemoryRecord] = _own(await store.memories_with_tag(LESSON_TAG, _LESSON_NOTES)) if merged else own
     retired: int = await _retire(runtime, kept, now, owner_saved)
     outdated: int = await _put_aside_outdated(runtime, vectors, since, now, owner_saved)
+    retired += await rest_repeating_habits(runtime, owner_saved, now)
+    merged += await merge_near_duplicates(runtime, owner_saved, now)
+    purged: int = await purge_trash(runtime.memory, now)
+    to_forget: int = len(await forget_proposals(runtime.memory, now))
     owner_updated: bool = await _describe_owner(runtime, runs, now) if runs else False
     journal: str | None = None
     if runs or merged or retired or outdated:
@@ -679,6 +693,8 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         journal=journal,
         owner_updated=owner_updated,
         outdated=outdated,
+        to_forget=to_forget,
+        purged=purged,
     )
     await store.kv_set(REFLECTION_KEY, reflection.model_dump_json())
     log.info(
@@ -690,5 +706,7 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         outdated=outdated,
         journal=journal,
         owner_updated=owner_updated,
+        to_forget=to_forget,
+        purged=purged,
     )
     return reflection

@@ -43,7 +43,16 @@ from dotagent.agent.learning_health import (
     quiet_limit,
     record_learning,
 )
-from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
+from dotagent.agent.lessons import (
+    LESSONS_FAILED,
+    LessonCase,
+    LessonView,
+    dismiss_lesson,
+    learn,
+    propose_lesson,
+    save_lesson,
+    undo_lesson,
+)
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
@@ -1766,6 +1775,13 @@ class RunManager:
     async def undo_lesson(self, run_id: str, index: int) -> bool:
         """Take back the save of a lesson of a run (see :func:`dotagent.agent.lessons.undo_lesson`)."""
         return await undo_lesson(self._runtime, self._deciding, run_id, index)
+
+    async def propose_lesson(self, run_id: str, words: str) -> LessonView:
+        """Propose a lesson from the owner's words about a run, to wait on the run's page for Save or Dismiss (item 584,
+        see :func:`dotagent.agent.lessons.propose_lesson`): after the lessons the run's own end is drawing, so that the
+        list they leave is the one the new lesson is added to."""
+        await self.learned(run_id)
+        return await propose_lesson(self._runtime, self._deciding, run_id, words)
 
     async def shutdown(self) -> None:
         """Stop every live run. They end as cancelled with a result that says the daemon shut down, so the owner can

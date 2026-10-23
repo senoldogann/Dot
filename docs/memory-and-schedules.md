@@ -32,6 +32,21 @@ handed is not repeated while its text stands, comes again when it changed (a cor
 update), and is named as forgotten when it was, since the old text stays in the chat; a note folded into a summary, in
 the run or since, is handed again after the summary, as it stands then.
 
+The notes can be put in order, pinned, merged and forgotten with your yes (item 584). **Sort by**, over the notes'
+card and outside the choices and the search, lists them by when they were changed, when a run was last handed them,
+how often, or the least used first (the notes no run was handed come first); a search lists by how well a note
+matches, and the choice is off while it runs. The pin on a note's row keeps it awake: a pinned note never rests, and
+pinning one that rests wakes it. A note that rests says since when ("Resting since 13 Oct"). A note the nightly
+reflection merged into another says "Merged into another note", and the note that merged them says "Merged from 2
+notes" and has **Undo this merge**: the notes it took in wake apart and the merged note goes to the trash.
+**Proposed to forget** is a card above the notes, there while a note has rested for `[memory] forget_after_days`
+(90): each note with **Keep** (it wakes, and is proposed again only after as long a rest) and **Forget**, and
+**Forget all N**, which asks first and forgets the notes the card lists, all in sight in a box that scrolls. Nothing
+is forgotten before you press one of them. A note you forget (there, in the list, with `dotx memory forget`, or by
+the agent's `memory_forget`) is not deleted: it waits in the trash for `[memory] trash_days` (30), listed as
+**Forgotten notes** under the notes with when each is deleted for good, **Restore** (it comes back awake) and
+**Delete for good**; the nightly reflection deletes the notes that stayed longer, and no others.
+
 How learning fares, the last card, says for the reflection, the lessons and the skills when each last went well and,
 for one that failed, how many times in a row and why. A work with neither a success nor a failure recorded (one that
 had nothing to learn from leaves no mark) says "nothing recorded yet", not that it has not gone well. Learning that
@@ -43,8 +58,14 @@ before it ends (item 557).
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
 dotx memory search --limit 5 how do I like my answers
-dotx memory list
-dotx memory forget NOTE_ID
+dotx memory list --order used   # changed (the default), used, most_used or least_used
+dotx memory forget NOTE_ID      # to the trash for [memory] trash_days, not deleted
+dotx memory proposals           # the notes that rested for [memory] forget_after_days and wait for your yes
+dotx memory forget --proposed   # forget them all (they go to the trash); dotx memory keep NOTE_ID... wakes some
+dotx memory trash               # the notes you forgot, with when each is deleted for good
+dotx memory restore NOTE_ID     # bring one back from the trash, awake (dotx memory purge NOTE_ID deletes it for good)
+dotx memory pin NOTE_ID         # a pinned note never rests (dotx memory unpin NOTE_ID takes it off)
+dotx memory unmerge NOTE_ID     # take back a merge: its sources wake apart, the merged note goes to the trash
 dotx memory reindex      # embed every note again, for example after changing [memory] embed_model
 ```
 
@@ -64,7 +85,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
   (90), counted from when it was last handed or written, rests: the Memory page lists it under "Resting", a search
-  still finds it, but runs no longer start with it on its own. Your notes and the `core` ones never rest that way.
+  still finds it, but runs no longer start with it on its own. Your notes, the `core` ones and the ones you pinned
+  never rest that way.
 - A note can hold for a while (item 306): `memory_save` takes `valid_days` for a fact that is true only so long (a
   trip, a deadline, an offer). The model is told until when it holds ("holds until 2026-10-20"); once that day passes
   the note rests, whoever wrote it, and neither a run nor a search is handed it; the Memory page says "Holds until …",
@@ -85,8 +107,43 @@ dotx memory reindex      # embed every note again, for example after changing [m
   run is told how many more changed; `memory_search` finds them). A change of tags alone, such as the nightly `rest` or
   merged tags, is no change: the note keeps its date, so an old fact retagged at night does not pass for newer than its
   correction.
-- Two tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
-  days, which searches skip (the list and the page still show it; take the tag off to wake it).
+- Three tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
+  days, which searches skip (the list and the page still show it; take the tag off to wake it), and
+  `keep-separate` on the notes whose merge you took back, which no night merges again (take it off to let them).
+- The night merges notes that say the same in other words (item 584). Besides the fold of two lessons that say the
+  same the same way round, which asks no model, the reflection shows the review model the notes of Dot's that are
+  awake and not pinned, not yours and not a journal, whose embeddings are at least `merge_similarity` (0.80) close
+  to each other, of one agent, both saved while reading outside content or neither, both saying yes or both saying
+  no (a note and its correction stay for the outdated check, which now asks about the closest pairs first); it says
+  which say the same thing and whose words say it best, at most `merges_per_night` (20) a night, the closest groups
+  first. The groups of notes saved while reading outside content are asked about in a question of their own, apart from
+  the others, so that no word a page put in a note is read beside a clean group, whose verdict it could try to steer;
+  a note you pin or forget while the model answers keeps its group out of that night's merges (it is asked about
+  again), and the rest of the night goes on. The merge is one new note with the words of that source (no model writes new words, so nothing a page put
+  in a note is rewritten), the tags of all of them, their uses added up and the dates of the oldest and the newest,
+  and the mark of outside content if any of them has it. Every source rests, whole, and names the merged note, so
+  nothing is deleted; the merged note lists what it was made of (`merged_from`, with each source's run, dates, tags
+  and uses). **Undo this merge** (`POST /api/memories/{id}/unmerge`, `dotx memory unmerge`) wakes the sources, tags
+  them `keep-separate` and puts the merged note in the trash. A note you wrote, a lesson you saved, a pinned note, a
+  `core` note and a journal are never merged, and the merges never touch What Dot knows about you. A chat that was
+  handed a note that was merged away since is handed the merged note in its place and told the old one is gone.
+- A lesson that says what the adopted harness's habits or tool guidance say already (they are in every prompt, so the
+  lesson adds a line to the memory and nothing to a run) is not drawn, and one saved before the rule was adopted rests
+  at night, unless you saved it or pinned it (item 584; [the harness](harness.md)). The night checks a lesson once for
+  each version of the harness: it remembers which lessons it found to repeat no rule, and asks the embedding service for
+  nothing on a night with no new or rewritten lesson and no new version.
+- Nothing is forgotten without you (item 584). A note that has rested for `forget_after_days` (90; counted from its
+  `rest` tag, or from its last use or write plus `rest_days` for one that rested before dates were kept) is proposed
+  to you, never deleted: **Proposed to forget** and `dotx memory proposals` list them, the longest resting first,
+  and your notes, the `core` ones, the pinned ones and the lessons you saved are never among them. **Forget** and
+  **Forget all** (`POST /api/memories/proposals/forget`, `dotx memory forget --proposed`) name the notes by the ids
+  the page showed, so a note that became a proposal after the page was drawn is not forgotten unseen; **Keep**
+  (`POST /api/memories/proposals/keep`, `dotx memory keep`) wakes a note, which is proposed again only after as
+  long a rest. A note you forget, from there or from any other Forget, goes to the trash for `trash_days` (30),
+  whole with its embedding: `GET /api/memories/trash` and `dotx memory trash` list it (the newest 200, and say how
+  many notes the trash holds in all), `POST /api/memories/trash/{id}/restore` and `dotx memory restore` bring it
+  back awake, `DELETE /api/memories/trash/{id}` and `dotx memory purge` delete it at once, and the reflection
+  deletes the notes that stayed longer, and none else. A note in the trash is in no search, list or count.
 - `memory_update` lets the agent correct a note in place, and the note is then the agent's, even one you wrote: the
   prompt no longer shows the model's words as yours. You edit one on the Memory page or with `PATCH /api/memories/{id}`,
   and it keeps its author. The page also shows who wrote each note and how often runs used it.

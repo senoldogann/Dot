@@ -13,6 +13,22 @@ from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import InvalidValueError, NotFoundError, RunConflict
 from dotagent.events import SYSTEM_RUN_ID
+from dotagent.memory.lifecycle import (
+    Decided,
+    ForgetProposal,
+    Unmerged,
+    delete_for_good,
+    forget_proposals,
+    forget_proposed,
+    keep_proposed,
+    pin_memory,
+    rested_since,
+    restore_note,
+    trash_of,
+    trash_total,
+    undo_merge,
+    unpin_memory,
+)
 from dotagent.memory.service import (
     MemoryHit,
     MemoryIndex,
@@ -48,11 +64,16 @@ from dotagent.server.rule_replay import candidate_rule, preview_rule, rules_usag
 from dotagent.server.rule_shadow import rule_views
 from dotagent.server.views import (
     FiringsQuery,
+    ForgetProposalsView,
+    ForgetProposalView,
     LearningHealthView,
     MemoriesQuery,
     MemoryPage,
     MemoryRequest,
+    NoteIdsRequest,
     OwnerLinesRequest,
+    PinRequest,
+    ProposalOutcome,
     RuleDraftRequest,
     RuleEnabledRequest,
     RuleMoveRequest,
@@ -67,6 +88,9 @@ from dotagent.server.views import (
     ScheduleUpdateRequest,
     ScheduleView,
     SearchQuery,
+    TrashedNote,
+    TrashView,
+    UnmergeView,
 )
 from dotagent.store.db import Store
 from dotagent.store.models import (
@@ -213,21 +237,85 @@ def memories_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/memories")
     async def list_memories(query: Annotated[MemoriesQuery, Query()]) -> MemoryPage:
-        items: list[MemoryRecord] = await index.store.list_memories(query.limit, query.offset)
+        items: list[MemoryRecord] = await index.store.list_memories(query.limit, query.offset, query.order)
         now: float = time.time()
         ids: list[str] = [record.id for record in items]
         recent: dict[str, MemoryScore] = await recent_scores(index, ids, now)
+        resting_ids: list[str] = [
+            record.id
+            for record in items
+            if resting(record, now, index.config.rest_days, recent.get(record.id), index.config.score_min_uses)
+        ]
+        dated: dict[str, float] = {}
+        for record in items:
+            since: float | None = rested_since(record, now, index.config.rest_days)
+            if record.id in resting_ids and since is not None:
+                dated[record.id] = since
         return MemoryPage(
             total=await index.store.count_memories(),
             items=items,
-            resting=[
-                record.id
-                for record in items
-                if resting(record, now, index.config.rest_days, recent.get(record.id), index.config.score_min_uses)
-            ],
+            resting=resting_ids,
+            rested=dated,
             scores=await index.store.memory_scores(ids, 0.0),
             agents={agent.id: agent.name for agent in await index.store.list_agents()},
         )
+
+    @router.get("/memories/proposals")
+    async def memory_proposals() -> ForgetProposalsView:
+        """The notes that have rested for ``[memory] forget_after_days``, the longest first (item 584): nothing is
+        forgotten until the owner says so (``POST /memories/proposals/forget``)."""
+        found: list[ForgetProposal] = await forget_proposals(index, time.time())
+        return ForgetProposalsView(
+            items=[
+                ForgetProposalView(record=proposal.record, rested_since=proposal.rested_since) for proposal in found
+            ],
+            forget_after_days=index.config.forget_after_days,
+            trash_days=index.config.trash_days,
+        )
+
+    @router.post("/memories/proposals/forget")
+    async def forget_proposed_notes(request: NoteIdsRequest) -> ProposalOutcome:
+        """Forget the notes of ``ids`` that are still proposed: they go to the trash, where they wait ``[memory]
+        trash_days`` and can be restored; the others are left alone and named in ``skipped``."""
+        decided: Decided = await forget_proposed(index, request.ids, time.time())
+        return ProposalOutcome(done=list(decided.done), skipped=list(decided.skipped))
+
+    @router.post("/memories/proposals/keep")
+    async def keep_proposed_notes(request: NoteIdsRequest) -> ProposalOutcome:
+        """Keep the notes of ``ids``: they wake, written anew, and are proposed again only after as long a rest."""
+        decided: Decided = await keep_proposed(index, request.ids, time.time())
+        return ProposalOutcome(done=list(decided.done), skipped=list(decided.skipped))
+
+    @router.get("/memories/trash")
+    async def memory_trash() -> TrashView:
+        """The notes the owner forgot, the newest first, with when each is deleted for good."""
+        return await _trash_view()
+
+    async def _trash_view() -> TrashView:
+        days: int = index.config.trash_days
+        return TrashView(
+            items=[
+                TrashedNote(
+                    record=found.record, trashed_at=found.trashed_at, purged_at=found.trashed_at + days * 86400.0
+                )
+                for found in await trash_of(index)
+            ],
+            total=await trash_total(index),
+            trash_days=days,
+        )
+
+    @router.post("/memories/trash/{memory_id}/restore")
+    async def restore_memory_note(memory_id: str) -> MemoryRecord:
+        """Bring a forgotten note back from the trash, awake (404 for one that is not there)."""
+        return await restore_note(index, memory_id, time.time())
+
+    @router.delete("/memories/trash/{memory_id}")
+    async def delete_trashed_note(memory_id: str) -> TrashView:
+        """Delete a forgotten note for good, at the owner's word (404 for one that is not in the trash); the trash after
+        it."""
+        if not await delete_for_good(index, memory_id):
+            raise NotFoundError("the note is not in the trash", {"memory_id": memory_id})
+        return await _trash_view()
 
     @router.get("/memories/owner")
     async def get_owner_section() -> OwnerSection:
@@ -275,7 +363,22 @@ def memories_router(ctx: ServerContext) -> APIRouter:
 
     @router.delete("/memories/{memory_id}")
     async def delete_memory(memory_id: str) -> MemoryRecord:
+        """Forget a note: it goes to the trash, from which it can be restored (item 584)."""
         return await forget_memory(index, memory_id)
+
+    @router.put("/memories/{memory_id}/pin")
+    async def pin_memory_note(memory_id: str, request: PinRequest) -> MemoryRecord:
+        """Pin a note, so that it never rests (a resting note wakes), or take the pin off (item 584)."""
+        if request.pinned:
+            return await pin_memory(index, memory_id, time.time())
+        return await unpin_memory(index, memory_id)
+
+    @router.post("/memories/{memory_id}/unmerge")
+    async def unmerge_memory_note(memory_id: str) -> UnmergeView:
+        """Take back the merge that made a note: its sources wake and it goes to the trash (item 584; 422 for a note no
+        merge made)."""
+        undone: Unmerged = await undo_merge(index, memory_id, time.time())
+        return UnmergeView(merged=undone.merged, woken=list(undone.woken))
 
     return router
 

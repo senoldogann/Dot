@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Concatenate, Literal
 
 import aiosqlite
+from pydantic import TypeAdapter
 
 from dotagent.core.errors import InvalidValueError, NotFoundError, RunConflict, StoreError
 from dotagent.core.ids import new_id
@@ -59,9 +60,11 @@ from dotagent.store.models import (
     HarnessStep,
     HarnessStepState,
     HarnessVersion,
+    MemoryOrder,
     MemoryRecord,
     MemoryScore,
     MemoryUseHow,
+    MergedSource,
     PushSubscription,
     QueuedMessage,
     ReactionName,
@@ -80,6 +83,7 @@ from dotagent.store.models import (
     StepRow,
     ThreadRecord,
     ThreadSummary,
+    TrashedMemory,
     UnattendedCount,
     UnattendedRun,
     WorkingRun,
@@ -186,6 +190,10 @@ CREATE TABLE IF NOT EXISTS memory_uses (
 );
 CREATE INDEX IF NOT EXISTS memory_uses_memory ON memory_uses(memory_id);
 CREATE INDEX IF NOT EXISTS memory_uses_run ON memory_uses(run_id);
+CREATE TABLE IF NOT EXISTS memory_trash (
+    id TEXT PRIMARY KEY, trashed_at REAL NOT NULL, note TEXT NOT NULL, dim INTEGER, vec BLOB
+);
+CREATE INDEX IF NOT EXISTS memory_trash_at ON memory_trash(trashed_at);
 CREATE TABLE IF NOT EXISTS schedules (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, cron TEXT, run_at REAL, goal TEXT NOT NULL,
     mode TEXT NOT NULL, enabled INTEGER NOT NULL, created_at REAL NOT NULL, last_run_at REAL,
@@ -765,10 +773,36 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
     )
 
 
-# The note with a text that a run of an agent (the second value; NULL for Dot) is handed: its own first, else Dot's.
+# The note with a text that a run of an agent (the second value; NULL for Dot) is handed: its own first, else Dot's, and
+# one that no merge put aside before one that did (item 584: the merged note stands for the notes it was made of).
 _SAME_TEXT: str = (
-    "SELECT * FROM memories WHERE content = ? AND (agent_id IS ? OR agent_id IS NULL) ORDER BY agent_id IS NULL LIMIT 1"
+    "SELECT * FROM memories WHERE content = ? AND (agent_id IS ? OR agent_id IS NULL)"
+    " ORDER BY merged_into IS NOT NULL, agent_id IS NULL LIMIT 1"
 )
+# The orders of the list of notes (item 584), by the name :data:`MemoryOrder` gives: SQL written here, never taken from
+# a request.
+_MEMORY_ORDERS: dict[str, str] = {
+    "changed": "updated_at DESC",
+    "used": "last_used_at IS NULL, last_used_at DESC, updated_at DESC",
+    "most_used": "used_count DESC, last_used_at DESC, updated_at DESC",
+    "least_used": "used_count ASC, last_used_at ASC, updated_at ASC",
+}
+
+
+# The sources of a merged note, as the column ``merged_from`` keeps them (item 584): a JSON list.
+_MERGED_SOURCES: TypeAdapter[tuple[MergedSource, ...]] = TypeAdapter(tuple[MergedSource, ...])
+
+
+def _merged_sources(text: str | None, memory_id: str) -> tuple[MergedSource, ...]:
+    """The notes a merged note was made of, from its column; none for a note no merge made."""
+    if text is None:
+        return ()
+    try:
+        return _MERGED_SOURCES.validate_json(text)
+    except ValueError as exc:
+        raise StoreError(
+            "the sources of a merged note cannot be read", {"memory_id": memory_id, "error": str(exc)}
+        ) from exc
 
 
 def _memory(row: aiosqlite.Row) -> MemoryRecord:
@@ -786,7 +820,35 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         expires_at=row["expires_at"],
         replaced_by=row["replaced_by"],
         tainted=bool(row["tainted"]),
+        merged_into=row["merged_into"],
+        merged_from=_merged_sources(row["merged_from"], row["id"]),
+        pinned_at=row["pinned_at"],
+        rested_at=row["rested_at"],
     )
+
+
+def _merged_source(note: MemoryRecord) -> MergedSource:
+    """What a note was when a merge took it in (:class:`MergedSource`)."""
+    return MergedSource(
+        id=note.id,
+        source_run=note.source_run,
+        agent_id=note.agent_id,
+        created_at=note.created_at,
+        updated_at=note.updated_at,
+        last_used_at=note.last_used_at,
+        used_count=note.used_count,
+        tags=note.tags,
+        tainted=note.tainted,
+    )
+
+
+def _trashed(row: aiosqlite.Row) -> TrashedMemory:
+    """A row of the trash: the note as it was, and when it was forgotten."""
+    try:
+        record: MemoryRecord = MemoryRecord.model_validate_json(row["note"])
+    except ValueError as exc:
+        raise StoreError("a note of the trash cannot be read", {"memory_id": row["id"], "error": str(exc)}) from exc
+    return TrashedMemory(record=record, trashed_at=row["trashed_at"])
 
 
 def _schedule(row: aiosqlite.Row) -> ScheduleRecord:
@@ -896,6 +958,12 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("replaced_by", "TEXT"),
     # The note was saved while its run had read content third parties can author; an older note was not.
     ("tainted", "INTEGER NOT NULL DEFAULT 0"),
+    # Item 584: the merged note a resting note was merged into, the sources of a merged note (JSON), when the owner
+    # pinned a note and when it began to rest. NULL for every note there was: none was merged, pinned or dated.
+    ("merged_into", "TEXT"),
+    ("merged_from", "TEXT"),
+    ("pinned_at", "REAL"),
+    ("rested_at", "REAL"),
 )
 # The status of a schedule switched off because the agent its runs ran as was deleted (item 462); switching it on
 # again, as Dot or as another agent, clears it as it clears item 458's.
@@ -3824,8 +3892,12 @@ class Store:
         by_id: dict[str, MemoryRecord] = {record.id: record for record in (_memory(row) for row in rows)}
         return [by_id[identifier] for identifier in ids if identifier in by_id]
 
-    async def list_memories(self, limit: int, offset: int) -> list[MemoryRecord]:
-        rows = await self._all("SELECT * FROM memories ORDER BY updated_at DESC LIMIT ? OFFSET ?", (limit, offset))
+    async def list_memories(self, limit: int, offset: int, order: MemoryOrder = "changed") -> list[MemoryRecord]:
+        """The notes in ``order`` (item 584): the ones changed last first, the ones used last first (never used, last),
+        the most used first, or the least used first (never used, first)."""
+        rows = await self._all(
+            f"SELECT * FROM memories ORDER BY {_MEMORY_ORDERS[order]} LIMIT ? OFFSET ?", (limit, offset)
+        )
         return [_memory(row) for row in rows]
 
     async def count_memories(self) -> int:
@@ -3924,7 +3996,8 @@ class Store:
         vector stay."""
         tag_text: str = ",".join(tags)
         await self._db.execute(
-            "UPDATE memories SET tags = ?, updated_at = ?, expires_at = ?, replaced_by = NULL WHERE id = ?",
+            "UPDATE memories SET tags = ?, updated_at = ?, expires_at = ?, replaced_by = NULL, merged_into = NULL,"
+            " rested_at = NULL WHERE id = ?",
             (tag_text, when, expires_at, memory_id),
         )
         await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
@@ -3937,11 +4010,278 @@ class Store:
         and says what replaced it; its text, its vector and ``updated_at`` stay, as with :meth:`set_memory_tags`."""
         tag_text: str = ",".join(tags)
         await self._db.execute(
-            "UPDATE memories SET tags = ?, replaced_by = ? WHERE id = ?", (tag_text, replaced_by, memory_id)
+            "UPDATE memories SET tags = ?, replaced_by = ?, rested_at = COALESCE(rested_at, ?) WHERE id = ?",
+            (tag_text, replaced_by, time.time(), memory_id),
         )
         await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
         await self._db.commit()
         return await self.get_memory(memory_id)
+
+    @_writing
+    async def rest_memory(self, memory_id: str, tags: Sequence[str], when: float) -> MemoryRecord:
+        """Put a note to rest (item 584): it takes ``tags`` (which hold ``rest``) and, when it has no date yet, ``when``
+        as the day it began to rest (``rested_at``, which the proposal to forget counts from); its text, its vector and
+        ``updated_at`` stay, as with :meth:`set_memory_tags`."""
+        tag_text: str = ",".join(tags)
+        await self._db.execute(
+            "UPDATE memories SET tags = ?, rested_at = COALESCE(rested_at, ?) WHERE id = ?", (tag_text, when, memory_id)
+        )
+        await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
+        await self._db.commit()
+        return await self.get_memory(memory_id)
+
+    @_writing
+    async def set_memory_pin(self, memory_id: str, pinned_at: float | None) -> MemoryRecord:
+        """Pin a note at ``pinned_at``, or unpin it with ``None`` (item 584): a pinned note never rests. Nothing else of
+        the note changes: waking it is :meth:`wake_memory`'s."""
+        updated = await self._db.execute("UPDATE memories SET pinned_at = ? WHERE id = ?", (pinned_at, memory_id))
+        if updated.rowcount == 0:
+            raise NotFoundError("memory not found", {"memory_id": memory_id})
+        await self._db.commit()
+        return await self.get_memory(memory_id)
+
+    async def merge_memories(self, source_ids: Sequence[str], keep_id: str, rest_tag: str, when: float) -> MemoryRecord:
+        """Merge the notes ``source_ids`` into one new note (item 584), in one transaction: the new note has the words
+        of the source ``keep_id``, the tags of all of them (the kept one's first), their uses added up, the dates of the
+        oldest written and the newest changed, the vector of the kept one, and is from outside content if any source was
+        (``tainted``: taken from the sources here, so no caller can leave the mark off); ``merged_from`` keeps what each
+        source was. Each source rests (it takes ``rest_tag`` and ``when`` as the day it began to rest) and names the new
+        note in ``merged_into``; nothing of it is deleted. Two notes at least, each once, none resting, all of one agent
+        (or all Dot's) and none the owner's own, are merged: anything else is an error and changes nothing."""
+
+        async def statements() -> MemoryRecord:
+            sources: list[MemoryRecord] = []
+            for identifier in source_ids:
+                row: aiosqlite.Row | None = await self._one("SELECT * FROM memories WHERE id = ?", (identifier,))
+                if row is None:
+                    raise NotFoundError("memory not found", {"memory_id": identifier})
+                sources.append(_memory(row))
+            kept: MemoryRecord | None = next((note for note in sources if note.id == keep_id), None)
+            if kept is None or len(sources) < 2 or len({note.id for note in sources}) != len(sources):
+                raise InvalidValueError(
+                    "a merge takes two notes at least, each once, and keeps the words of one of them",
+                    {"sources": ", ".join(source_ids), "keep": keep_id},
+                )
+            if len({note.agent_id for note in sources}) != 1 or any(rest_tag in note.tags for note in sources):
+                raise InvalidValueError(
+                    "notes of different agents, and notes that rest, are not merged", {"sources": ", ".join(source_ids)}
+                )
+            if any(note.source_run is None for note in sources):
+                # A note the owner wrote stays as they wrote it, and a merged note of one would be taken for theirs.
+                raise InvalidValueError(
+                    "a note the owner wrote is not merged with others", {"sources": ", ".join(source_ids)}
+                )
+            ordered: list[MemoryRecord] = [kept, *(note for note in sources if note.id != keep_id)]
+            tags: tuple[str, ...] = tuple(dict.fromkeys(tag for note in ordered for tag in note.tags))
+            used: list[float] = [note.last_used_at for note in ordered if note.last_used_at is not None]
+            merged_id: str = new_id("mem")
+            tag_text: str = ",".join(tags)
+            await self._db.execute(
+                "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at,"
+                " tainted, used_count, last_used_at, merged_from) VALUES(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)",
+                (
+                    merged_id,
+                    kept.content,
+                    tag_text,
+                    min(note.created_at for note in ordered),
+                    max(note.updated_at for note in ordered),
+                    kept.source_run,
+                    kept.agent_id,
+                    int(any(note.tainted for note in ordered)),
+                    sum(note.used_count for note in ordered),
+                    max(used) if used else None,
+                    _MERGED_SOURCES.dump_json(tuple(_merged_source(note) for note in ordered)).decode(),
+                ),
+            )
+            await self._db.execute(
+                "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
+                (merged_id, fold_search(kept.content), fold_search(tag_text)),
+            )
+            await self._db.execute(
+                "INSERT INTO memory_vectors(id, dim, vec) SELECT ?, dim, vec FROM memory_vectors WHERE id = ?",
+                (merged_id, keep_id),
+            )
+            for note in ordered:
+                resting: str = ",".join((*note.tags, rest_tag))
+                await self._db.execute(
+                    "UPDATE memories SET tags = ?, merged_into = ?, rested_at = ? WHERE id = ?",
+                    (resting, merged_id, when, note.id),
+                )
+                await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(resting), note.id))
+            return await self.get_memory(merged_id)
+
+        return await self._unit(statements)
+
+    async def unmerge_memory(
+        self, merged_id: str, rest_tag: str, separate_tag: str, when: float
+    ) -> tuple[MemoryRecord, list[MemoryRecord]]:
+        """Take a merge back (item 584), in one transaction: the merged note goes to the trash and each source that
+        this merge still holds aside wakes (its ``rest_tag`` and its ``merged_into`` come off) with ``separate_tag``,
+        which tells the nightly merge to leave it apart from the others. A source forgotten since, or woken by the
+        owner, is left as it is. Returns the merged note and the sources woken."""
+
+        async def statements() -> tuple[MemoryRecord, list[MemoryRecord]]:
+            row: aiosqlite.Row | None = await self._one("SELECT * FROM memories WHERE id = ?", (merged_id,))
+            if row is None:
+                raise NotFoundError("memory not found", {"memory_id": merged_id})
+            merged: MemoryRecord = _memory(row)
+            if not merged.merged_from:
+                raise InvalidValueError("the note was not made by merging others", {"memory_id": merged_id})
+            woken: list[MemoryRecord] = []
+            for source in merged.merged_from:
+                found: aiosqlite.Row | None = await self._one("SELECT * FROM memories WHERE id = ?", (source.id,))
+                if found is None or _memory(found).merged_into != merged_id:
+                    continue
+                awake: tuple[str, ...] = tuple(tag for tag in _memory(found).tags if tag != rest_tag)
+                tag_text: str = ",".join(dict.fromkeys((*awake, separate_tag)))
+                await self._db.execute(
+                    "UPDATE memories SET tags = ?, merged_into = NULL, rested_at = NULL WHERE id = ?",
+                    (tag_text, source.id),
+                )
+                await self._db.execute(
+                    "UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), source.id)
+                )
+                woken.append(await self.get_memory(source.id))
+            await self._trash_in(merged, when)
+            return merged, woken
+
+        return await self._unit(statements)
+
+    async def trash_memory(self, memory_id: str, when: float) -> MemoryRecord:
+        """Forget a note the way the owner does (item 584): it leaves the notes, their search index and their vectors
+        and is kept whole in the trash, with its vector, from ``when``, until it is restored or purged. Returns the
+        note; one that is not there is not found."""
+
+        async def statements() -> MemoryRecord:
+            row: aiosqlite.Row | None = await self._one("SELECT * FROM memories WHERE id = ?", (memory_id,))
+            if row is None:
+                raise NotFoundError("memory not found", {"memory_id": memory_id})
+            record: MemoryRecord = _memory(row)
+            await self._trash_in(record, when)
+            return record
+
+        return await self._unit(statements)
+
+    async def _trash_in(self, record: MemoryRecord, when: float) -> None:
+        """The statements that move a note to the trash, in the caller's transaction."""
+        vector: aiosqlite.Row | None = await self._one("SELECT dim, vec FROM memory_vectors WHERE id = ?", (record.id,))
+        await self._db.execute(
+            "INSERT OR REPLACE INTO memory_trash(id, trashed_at, note, dim, vec) VALUES(?, ?, ?, ?, ?)",
+            (
+                record.id,
+                when,
+                record.model_dump_json(),
+                None if vector is None else int(vector["dim"]),
+                None if vector is None else bytes(vector["vec"]),
+            ),
+        )
+        await self._db.execute("DELETE FROM memories WHERE id = ?", (record.id,))
+        await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (record.id,))
+        await self._db.execute("DELETE FROM memory_vectors WHERE id = ?", (record.id,))
+
+    async def restore_memory(self, memory_id: str, rest_tag: str, when: float) -> MemoryRecord:
+        """Bring a note back from the trash (item 584), awake: its ``rest_tag`` comes off, what put it aside
+        (``replaced_by``, ``merged_into``, ``rested_at``) is cleared and it is written anew at ``when``, so that it does
+        not rest again at once. Its vector comes back with it. A note that is not in the trash is not found."""
+
+        async def statements() -> MemoryRecord:
+            row: aiosqlite.Row | None = await self._one("SELECT * FROM memory_trash WHERE id = ?", (memory_id,))
+            if row is None:
+                raise NotFoundError("the note is not in the trash", {"memory_id": memory_id})
+            if await self._one("SELECT 1 FROM memories WHERE id = ?", (memory_id,)) is not None:
+                raise InvalidValueError("a note with this id is there already", {"memory_id": memory_id})
+            kept: MemoryRecord = _trashed(row).record
+            record: MemoryRecord = kept.model_copy(
+                update={
+                    "tags": tuple(tag for tag in kept.tags if tag != rest_tag),
+                    "updated_at": when,
+                    "replaced_by": None,
+                    "merged_into": None,
+                    "rested_at": None,
+                }
+            )
+            tag_text: str = ",".join(record.tags)
+            await self._db.execute(
+                "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, used_count,"
+                " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at)"
+                " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL)",
+                (
+                    record.id,
+                    record.content,
+                    tag_text,
+                    record.created_at,
+                    record.updated_at,
+                    record.source_run,
+                    record.agent_id,
+                    record.used_count,
+                    record.last_used_at,
+                    record.expires_at,
+                    int(record.tainted),
+                    _MERGED_SOURCES.dump_json(record.merged_from).decode() if record.merged_from else None,
+                    record.pinned_at,
+                ),
+            )
+            await self._db.execute(
+                "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
+                (record.id, fold_search(record.content), fold_search(tag_text)),
+            )
+            if row["vec"] is not None:
+                await self._db.execute(
+                    "INSERT INTO memory_vectors(id, dim, vec) VALUES(?, ?, ?)",
+                    (record.id, int(row["dim"]), bytes(row["vec"])),
+                )
+            await self._db.execute("DELETE FROM memory_trash WHERE id = ?", (memory_id,))
+            return record
+
+        return await self._unit(statements)
+
+    async def trashed_memories(self, limit: int) -> list[TrashedMemory]:
+        """The notes in the trash, the newest forgotten first."""
+        rows = await self._all("SELECT * FROM memory_trash ORDER BY trashed_at DESC LIMIT ?", (limit,))
+        return [_trashed(row) for row in rows]
+
+    async def count_trashed(self) -> int:
+        row = await self._one("SELECT COUNT(*) AS n FROM memory_trash", ())
+        return 0 if row is None else int(row["n"])
+
+    @_writing
+    async def delete_trashed(self, memory_id: str) -> bool:
+        """Delete a note of the trash for good (item 584), the owner's choice; whether it was there."""
+        cursor = await self._db.execute("DELETE FROM memory_trash WHERE id = ?", (memory_id,))
+        await self._db.commit()
+        return cursor.rowcount > 0
+
+    @_writing
+    async def purge_memory_trash(self, before: float) -> int:
+        """Delete the notes forgotten before ``before`` for good (item 584), which the nightly reflection does with what
+        was in the trash for ``[memory] trash_days``; returns how many."""
+        cursor = await self._db.execute("DELETE FROM memory_trash WHERE trashed_at < ?", (before,))
+        await self._db.commit()
+        return int(cursor.rowcount)
+
+    async def resting_candidates(
+        self, rest_tag: str, idle_before: float, now: float, not_from: Sequence[str] = ()
+    ) -> list[MemoryRecord]:
+        """The notes the reflection may find rested long enough to propose forgetting (item 584): the agent's own (a
+        note the owner wrote is none, and none is one of the sources in ``not_from``, which the reflection's journal of
+        a day is), not pinned, that carry ``rest_tag``, or whose last write or use is before ``idle_before``, or whose
+        time ran out by ``now``. Oldest activity first. The reflection decides which of them have rested long enough."""
+        apart: str = ",".join("?" for _ in not_from)
+        rows = await self._all(
+            "SELECT * FROM memories WHERE source_run IS NOT NULL AND pinned_at IS NULL"
+            f"{f' AND source_run NOT IN ({apart})' if not_from else ''} AND ("
+            " instr(',' || tags || ',', ?) > 0"
+            " OR MAX(created_at, updated_at, COALESCE(last_used_at, 0)) < ?"
+            " OR (expires_at IS NOT NULL AND expires_at <= ?)"
+            ") ORDER BY MAX(created_at, updated_at, COALESCE(last_used_at, 0))",
+            (*not_from, f",{rest_tag},", idle_before, now),
+        )
+        return [_memory(row) for row in rows]
+
+    async def pinned_memory_ids(self) -> set[str]:
+        """The notes the owner pinned (item 584), which no reflection folds, retires, puts aside or merges."""
+        rows = await self._all("SELECT id FROM memories WHERE pinned_at IS NOT NULL", ())
+        return {str(row["id"]) for row in rows}
 
     async def memories_with_tag(self, tag: str, limit: int) -> list[MemoryRecord]:
         """The most recently changed memories carrying ``tag`` (tags never contain commas)."""

@@ -16,7 +16,8 @@ run needs, sent where the configuration points:
   `yolo`, see Secrets below) and the screenshots the run takes or is given. By default
   every role (`main`, `vision`, `fast`, `review`) is a cloud model of Ollama: the Ollama server on this Mac passes each
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
-  playbooks and the nightly reflection to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
+  playbooks and the nightly reflection (which shows `review` the notes it considers merging or putting aside) to
+  `review`, the shortening of a long run's conversation to `fast`. OpenAI,
   OpenCode Go, Anthropic and OpenRouter get it only when a role, a helper or a standby model names one of their models;
   OpenRouter passes each call on to the lab whose model it is. OpenCode Zen's free models (`opencode:`) get the whole
   conversation of a run that runs on one, through OpenCode's own agent, and the providers of some of them may use what

@@ -314,7 +314,9 @@ the same note, also one that rested, which is awake again. Delegated runs, chats
 and evals (which always run without lessons) are not asked at their end; the nightly reflection asks about the failed
 and the stopped ones, once each (a run whose lessons were drawn and none kept says so). `"off"` learns nothing. Every
 note a run is handed (at its start, by `memory_search`, or changed while it ran) is recorded with how the run ended, so
-the Memory page says "Handed to 5 runs, 4 done" under a note and `dotx stats` scores the notes.
+the Memory page says "Handed to 5 runs, 4 done" under a note and `dotx stats` scores the notes. The lessons are
+also compared with the adopted harness (item 584): the model is shown its habits and tool guidance, which every
+run's prompt has, and a lesson that says what one of those rules says is dropped like a repeat of a saved note.
 
 **Reflection.** Once a day at `[agent] reflection_time` (`"03:30"` in `[scheduler] timezone`; `"off"` never), the
 daemon reflects on the runs that ended since the last reflection (the last day, the first time): it asks the review
@@ -325,13 +327,15 @@ draws none), and it reads whether such a run read content others can write from 
 notes of one agent that say the same, the same way round, into the newer one, or into the older one when you saved
 that one yourself (by the embeddings when both have one, by the words otherwise, compared off the daemon's event loop;
 a resting lesson is left alone, so one learnt again does not take its rest, and two you saved stay two; the one
-folded away rests and names the one it was folded into, so nothing the reflection does deletes a note); it rests a
+folded away rests and names the one it was folded into, so nothing the reflection does deletes a note, but for the
+trash below); it rests a
 lesson that no run was handed, and that was not written again, for `lesson_rest_days` (60), or whose score says it did
 not help (handed to `[memory] score_min_uses` runs in the last `score_days`, more of which failed than ended done); a
 lesson you saved yourself is never folded away nor retired, and a note saved while reading outside content never folds
 away nor puts aside a clean older one (item 557). It also puts aside a note of Dot's that a newer note,
 written or changed since the last reflection, made outdated (item 306): the review model reads each such pair of notes
-close in meaning (at most 12 a night; your notes, the lessons you saved and the `core` notes are never the older one)
+close in meaning (at most 12 a night, the closest pairs first; your notes, the lessons you saved, the pinned notes and
+the `core` notes are never the older one)
 and keeps the older one when in doubt; the one it calls outdated rests, names the note that replaced it (the Memory page
 says "Replaced by another note") and the log line `note_outdated` says which. It rests a lesson by tagging
 it `rest`, after which searches skip it while `dotx memory list` and the Memory page still show it, and the log line
@@ -354,6 +358,16 @@ stop unseen at a run's end either: lessons that could not be drawn leave `lesson
 skill work that failed `playbook_failed`, and `dotx stats` counts the runs of each. The card of a run's lessons arrives
 folded (item 374); its head says "could not be drawn" in red, or how many lessons wait for your decision in amber,
 else how many there are, and opened it shows why, or the lessons.
+
+**The reflection tidies the notes and forgets none (item 584).** In the same night it rests the lessons that say what
+a rule of the adopted habits or tool guidance says already (log line `lesson_retired`, reason `habit`); it shows the
+review model the notes that are at least `[memory] merge_similarity` (0.80) close in meaning and merges the ones it
+says are the same, at most `merges_per_night` (20) a night (the merged note keeps one source's words, the sources
+rest whole, and **Undo this merge** on the Memory page brings them back); it counts the notes that rested for
+`forget_after_days` (90) as proposals for you to forget or keep, and forgets none; and it deletes from the trash the
+notes you forgot more than `trash_days` (30) ago, the only thing it deletes. A note you wrote, a lesson you saved, a
+pinned note, a `core` note and a journal are never merged, rested or proposed by it, and none of it writes What Dot
+knows about you. `dotx reflect` says what it did, among it how many notes wait for you to forget or keep them.
 
 **Taking back the file changes of a run.** Under the answer of a chat's run, its line of what it changed has an
 **Undo**, which does what follows for the files it lists (item 597).
