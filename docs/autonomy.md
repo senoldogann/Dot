@@ -355,7 +355,9 @@ skill work that failed `playbook_failed`, and `dotx stats` counts the runs of ea
 folded (item 374); its head says "could not be drawn" in red, or how many lessons wait for your decision in amber,
 else how many there are, and opened it shows why, or the lessons.
 
-**Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
+**Taking back the file changes of a run.** Under the answer of a chat's run, its line of what it changed has an
+**Undo**, which does what follows for the files it lists (item 597).
+Before `write_file` or `edit_file` changes a file, the run notes the change
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
 the change cannot be noted (a full disk, say), the file is not changed and the model is told why; a note the disk cut
 short is left out of the journal, so the run's next change is noted after it and `dotx undo` still reads it. The side
