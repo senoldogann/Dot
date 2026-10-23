@@ -3,6 +3,7 @@
 import asyncio
 import http.cookiejar
 import socket
+import zlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
@@ -31,6 +32,10 @@ _RETRY: RetryPolicy = RetryPolicy(attempts=2, base_delay_s=0.4, max_delay_s=2.0)
 _REDIRECT_STATUS: frozenset[int] = frozenset({301, 302, 303, 307, 308})
 _ACCEPT: str = "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf;q=0.8,text/plain;q=0.7,*/*;q=0.5"
 _ACCEPT_LANGUAGE: str = "en-US,en;q=0.9,tr;q=0.8"
+# The content codings Dot asks for, and reads (:func:`read_capped`): httpx asks for these two when it has no library
+# for another, and the request says so itself, so that a library added later does not change what servers send.
+ACCEPT_ENCODING: str = "gzip, deflate"
+_CODINGS: frozenset[str] = frozenset({"gzip", "x-gzip", "deflate"})
 # What a browser sends with the address bar's navigation (item 98); a wall that looks for them lets the request by.
 _NAVIGATION_HEADERS: dict[str, str] = {
     "Sec-Fetch-Dest": "document",
@@ -49,6 +54,7 @@ def request_headers(method: str, user_agent: str, extra: Mapping[str, str]) -> d
         "User-Agent": user_agent,
         "Accept": _ACCEPT,
         "Accept-Language": _ACCEPT_LANGUAGE,
+        "Accept-Encoding": ACCEPT_ENCODING,
         **navigation,
         **extra,
     }
@@ -302,7 +308,7 @@ class WebClient:
                     response.headers.get("location") if response.status_code in _REDIRECT_STATUS else None
                 )
                 media_type, charset = _split_content_type(response.headers.get("content-type", ""))
-                body, truncated = (b"", False) if location is not None else await _read_capped(response, max_bytes)
+                body, truncated = (b"", False) if location is not None else await read_capped(response, max_bytes)
             finally:
                 await response.aclose()
         except _TRANSIENT_ERRORS as exc:
@@ -338,13 +344,57 @@ def _document(url: str, exchange: _Exchange, redirected_from: tuple[str, ...]) -
     )
 
 
-async def _read_capped(response: httpx.Response, max_bytes: int) -> tuple[bytes, bool]:
-    """The (decoded) body up to ``max_bytes``, and whether more would have followed."""
+def _content_codings(header: str) -> list[str]:
+    """The codings a ``Content-Encoding`` header lists, in the order they were applied, ``identity`` left out."""
+    return [token for token in (part.strip().lower() for part in header.split(",")) if token and token != "identity"]
+
+
+class _Inflater:
+    """One layer of gzip or deflate, undone piece by piece with a limit on what a piece may inflate to: zlib stops when
+    the room is used, and a few hundred bytes of nested compression do not become gigabytes in one call (item 554)."""
+
+    def __init__(self, coding: str) -> None:
+        self._first: bool = True
+        self._deflate: bool = coding == "deflate"
+        window: int = zlib.MAX_WBITS if self._deflate else zlib.MAX_WBITS | 16
+        self._inflater: zlib._Decompress = zlib.decompressobj(window)
+
+    def decode(self, data: bytes, room: int) -> bytes:
+        """At most ``room`` bytes (at least 1) of what ``data`` inflates to. The rest of a piece that would inflate to
+        more is not decoded: the caller stops reading then."""
+        first: bool = self._first
+        self._first = False
+        try:
+            return self._inflater.decompress(data, room)
+        except zlib.error:
+            # A deflate body that comes without the zlib header, as some servers send it: read raw (httpx does too).
+            if not (first and self._deflate):
+                raise
+            self._inflater = zlib.decompressobj(-zlib.MAX_WBITS)
+            return self._inflater.decompress(data, room)
+
+
+async def read_capped(response: httpx.Response, max_bytes: int) -> tuple[bytes, bool]:
+    """The body up to ``max_bytes``, its content coding undone, and whether more would have followed. It is read as it
+    comes and decoded here, not by httpx, which inflates each piece of the body whole: a body that is compressed twice
+    (``Content-Encoding: gzip, gzip``) and a few hundred bytes long inflated to gigabytes in one call, whatever the cap
+    (item 554). Dot asks for gzip and deflate, once; an answer in more codings, or in another, is refused."""
+    codings: list[str] = _content_codings(response.headers.get("content-encoding", ""))
+    if len(codings) > 1 or any(coding not in _CODINGS for coding in codings):
+        raise WebError(
+            "the answer is compressed in a way the web tools do not read (gzip or deflate, once)",
+            {"content_encoding": _shown(response.headers.get("content-encoding", ""))},
+        )
+    inflater: _Inflater | None = _Inflater(codings[0]) if codings else None
     chunks: list[bytes] = []
     size: int = 0
-    async for chunk in response.aiter_bytes():
-        chunks.append(chunk)
-        size += len(chunk)
+    async for raw in response.aiter_raw():
+        try:
+            piece: bytes = raw if inflater is None else inflater.decode(raw, max_bytes + 1 - size)
+        except zlib.error as exc:
+            raise WebError("the answer could not be decompressed", {"error": _shown(str(exc))}) from exc
+        chunks.append(piece)
+        size += len(piece)
         if size > max_bytes:
             return b"".join(chunks)[:max_bytes], True
     return b"".join(chunks), False

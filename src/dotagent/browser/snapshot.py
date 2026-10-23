@@ -509,13 +509,21 @@ _FIELD_ROLES: frozenset[str] = frozenset({"textbox", "searchbox", "spinbutton", 
 _VALUE_ROLE: str = "text"
 
 
+def _is_chosen_option(line: SnapshotLine) -> bool:
+    """Whether ``line`` is the chosen option of a collapsed dropdown, which lists its options without refs."""
+    return line.role == "option" and line.ref is None and "selected" in line.attrs
+
+
 def filled_fields(lines: Sequence[SnapshotLine]) -> tuple[SnapshotLine, ...]:
     """The lines of fields that show a value: a text box, search box, spin button or combo box with a ref, whose value
-    is on its own line or, as a field with a placeholder shows it, on a ``text`` line right under it. An empty field
-    shows nothing, and stays as it is."""
+    is on its own line or, as a field with a placeholder shows it, on a ``text`` line right under it, or, as a
+    collapsed dropdown shows it, as the option marked selected (item 554). An empty field shows nothing, and stays as
+    it is."""
     parents: list[int | None] = _parents(lines)
     holding: set[int] = {
-        parent for index, parent in enumerate(parents) if parent is not None and lines[index].role == _VALUE_ROLE
+        parent
+        for index, parent in enumerate(parents)
+        if parent is not None and (lines[index].role == _VALUE_ROLE or _is_chosen_option(lines[index]))
     }
     return tuple(
         line
@@ -525,6 +533,12 @@ def filled_fields(lines: Sequence[SnapshotLine]) -> tuple[SnapshotLine, ...]:
 
 
 def _without_value(line: SnapshotLine) -> SnapshotLine:
+    if _is_chosen_option(line):
+        return replace(
+            line,
+            text=line.text.removesuffix(" [selected]"),
+            attrs=tuple(attr for attr in line.attrs if attr != "selected"),
+        )
     if not line.inline:
         return line
     return replace(line, text=line.text.removesuffix(line.inline) + HIDDEN_VALUE, inline=HIDDEN_VALUE)
@@ -532,12 +546,15 @@ def _without_value(line: SnapshotLine) -> SnapshotLine:
 
 def hide_values(lines: Sequence[SnapshotLine], refs: frozenset[str]) -> tuple[SnapshotLine, ...]:
     """``lines`` with the value of each field whose ref is in ``refs`` shown as :data:`HIDDEN_VALUE`, on the field's
-    own line and on the ``text`` lines right under it; its name, its ref and its placeholder stay, so the field can
-    still be found and filled. Done before a view is drawn, searched or compared, so none of them sees the value."""
+    own line and on the ``text`` lines right under it, and a dropdown's choice shown as none of its options being
+    selected; its name, its ref and its placeholder stay, so the field can still be found and filled. Done before a
+    view is drawn, searched or compared, so none of them sees the value."""
     parents: list[int | None] = _parents(lines)
     hidden: set[int] = {index for index, line in enumerate(lines) if line.ref is not None and line.ref in refs}
     return tuple(
-        _without_value(line) if index in hidden or (line.role == _VALUE_ROLE and parents[index] in hidden) else line
+        _without_value(line)
+        if index in hidden or ((line.role == _VALUE_ROLE or _is_chosen_option(line)) and parents[index] in hidden)
+        else line
         for index, line in enumerate(lines)
     )
 

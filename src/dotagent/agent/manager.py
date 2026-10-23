@@ -1464,6 +1464,7 @@ class RunManager:
         # the moment the run is held, so that an end that comes meanwhile ends it.
         self._holds[run_id] = _Hold(hold=ScreenHold(False), browser=browser)
         try:
+            await self._clean_for_owner(run_id, browser, handle.thread_id)
             url: str | None = await browser.focus(handle.thread_id)
         except BaseException:
             # No tab came to the front for the user: the run goes on.
@@ -1488,6 +1489,13 @@ class RunManager:
             )
         handle.gate.hold()
         self._holds[run_id] = _Hold(hold=ScreenHold(True), browser=browser)
+        try:
+            await self._clean_for_owner(run_id, browser, handle.thread_id)
+        except BaseException:
+            # The owner can use no page of the run: the run goes on.
+            self._end_hold(run_id, handle.thread_id)
+            handle.gate.release()
+            raise
         url: str | None = browser.current_url(handle.thread_id)
         await self._runtime.bus.emit(
             run_id,
@@ -1496,6 +1504,15 @@ class RunManager:
             True,
         )
         return url
+
+    async def _clean_for_owner(self, run_id: str, browser: BrowserSession, thread_id: str) -> None:
+        """Give the owner a page no script of the run runs in (:meth:`BrowserSession.clean_for_owner`, item 554): they
+        take the run over to type what it may not, and a script it ran may have left a listener that copies it. A page
+        that could not be given so is logged, and the takeover goes on: the page is theirs to use."""
+        try:
+            await browser.clean_for_owner(thread_id)
+        except BrowserError as error:
+            log.warning("takeover_page_not_cleaned", run_id=run_id, error=error.message)
 
     async def send_input(self, run_id: str, batch: InputBatch) -> InputResult:
         """Do the owner's input on the page of a run they hold (item 470), as the run's browser does it

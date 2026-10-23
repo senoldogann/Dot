@@ -134,7 +134,7 @@ async def test_the_tabs_dot_opens_and_a_quiet_read_leave_the_front_where_it_was(
     await _finder_in_front()
     fronts: set[str] = await _fronts_during(lambda: browser.new_tab("first", f"{site}/other", True))
     fronts |= await _fronts_during(lambda: browser.open_url("second", site, True))
-    fronts |= await _fronts_during(lambda: browser.read_page(f"{site}/other"))
+    fronts |= await _fronts_during(lambda: browser.read_page(f"{site}/other", public_only=False))
     assert fronts == {_FINDER}
 
 

@@ -67,7 +67,7 @@ from dotagent.browser.driver import (
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
 from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers, taken_in, watch_births
-from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.profile_lock import held_for_start, profile_holder_pid
 from dotagent.browser.profiles import (
     HIDE_CRASH_BUBBLE,
     INCOGNITO_PROFILE,
@@ -133,6 +133,7 @@ from dotagent.core.types import JsonObject
 from dotagent.desktop.types import AppInfo
 from dotagent.store.models import BrowserMode
 from dotagent.vault.masking import in_address, mask_error, masked
+from dotagent.web.addresses import is_private_text, non_public_address
 
 _log = get_logger("dotagent.browser.session")
 
@@ -201,6 +202,21 @@ _FAIL_REASON: str = "BlockedByClient"
 # What Chrome answers to a verdict for a request the page cancelled or finished while the verdict was being made.
 _REQUEST_GONE: str = "Invalid InterceptionId"
 _FORBIDDEN_MESSAGE: str = "this URL may not be opened"
+# Chrome's own error page, which a tab shows where a page failed to load or a request of it was refused.
+_ERROR_PAGE: str = "chrome-error://"
+_LOAD_FAILED_NOTE: str = "the page failed to load (Chrome error page)"
+# What the tab says of itself when the owner took the run over after a script of the run ran in the chat (item 554).
+_SCRIPTED_NOTE: str = (
+    "a script of this run ran in this chat's tabs and could have copied what is typed there: when the user took over, "
+    "the other tabs were closed and this page was opened again"
+)
+# The title a tab list gives a tab on a URL the rules forbid, which is not read (item 554).
+_UNREAD_TITLE: str = "(not read: a URL that may not be opened; switching to the tab resets it)"
+# The longest address a note on a tab carries whole.
+_SHOWN_URL_CHARS: int = 300
+# The schemes of a frame's address that the URL rules judge: the others (about:, data:, blob:, an extension's, Chrome's
+# error page) reach no server, or are not a site's.
+_WEB_SCHEMES: frozenset[str] = frozenset({"http", "https"})
 # A request whose address carries a password or a one-time code filled from the password manager (item 493): an
 # address is written into the views of the page, Chrome's history and Dot's log, and shortened where it is long.
 _CARRIES_SECRET: str = "its address would carry a password or a code filled from your password manager"
@@ -363,6 +379,25 @@ def no_runs_at_work() -> frozenset[str]:
     return frozenset()
 
 
+def _within(frame: PlaywrightFrame, frames: Sequence[PlaywrightFrame]) -> bool:
+    """Whether ``frame`` is one of ``frames`` or lies inside one of them."""
+    current: PlaywrightFrame | None = frame
+    while current is not None:
+        if current in frames:
+            return True
+        current = current.parent_frame
+    return False
+
+
+def _judged_in_frame(url: str) -> bool:
+    """Whether the URL rules judge a frame at ``url``: an address of the web, or one that cannot be read as any. The
+    other schemes (``about:``, ``data:``, ``blob:``, an extension's, Chrome's error page) reach no server of the web."""
+    try:
+        return urlsplit(url).scheme in _WEB_SCHEMES
+    except ValueError:
+        return True
+
+
 def blocked_by_rules(error: BrowserError) -> bool:
     """Whether a navigation failed because a request of it was refused by the URL rules: Chrome reports an aborted or
     failed request as ``net::ERR_BLOCKED_BY_CLIENT``."""
@@ -424,10 +459,12 @@ class RenderedDocument:
     html: str
 
 
-def _note_main_status(page: Page, response: Response, statuses: list[int]) -> None:
-    """Keep the status of each main-frame document response, so a bot wall that reloads into the page is read right."""
+def _note_main_status(page: Page, response: Response, statuses: list[int], documents: list[Response]) -> None:
+    """Keep the status of each main-frame document response, so a bot wall that reloads into the page is read right,
+    and the response itself, which says what Chrome connected to (:meth:`BrowserSession._require_public`)."""
     if response.frame == page.main_frame and response.request.is_navigation_request():
         statuses.append(response.status)
+        documents.append(response)
 
 
 async def _close_given_up(launching: asyncio.Task[BrowserContext]) -> None:
@@ -561,6 +598,13 @@ class BrowserSession:
                 return await self._attach()
 
     async def _launch_own(self) -> _Opened:
+        """Start Dot's own Chrome (:meth:`_start_own`) with the profile held for the start (item 554): an import of
+        sign-ins (``dotx browser import-chrome``) swaps files into a profile that no Chrome has open, and runs not at
+        all while a Chrome is starting on it; a start is refused while an import is under way."""
+        with held_for_start(self._profile):
+            return await self._start_own()
+
+    async def _start_own(self) -> _Opened:
         """Start Dot's own Chrome on its own profile, taking DevTools connections on ``[browser] debug_port`` when
         one is set (item 265): a port another program holds stops the start, so that a script told the address does not
         reach that program instead."""
@@ -942,11 +986,25 @@ class BrowserSession:
             if self._playwright is not None:
                 await self._playwright.stop()
                 self._playwright = None
-            # What Incognito kept goes with its Chrome (item 355).
-            if self._config.mode == "own" and self._config.profile == INCOGNITO_PROFILE and context is not None:
-                await asyncio.to_thread(empty_incognito)
+            # What Incognito kept goes with its Chrome (item 355), also when that Chrome ended before Dot let go of it:
+            # the owner quit it, or it crashed (item 554).
+            if self._config.mode == "own" and self._config.profile == INCOGNITO_PROFILE:
+                await self._empty_incognito()
             self._threads.clear()
             self._initial_pages = []
+
+    async def _empty_incognito(self) -> None:
+        """Empty Incognito's folder, unless a Chrome holds it now: a window that Sign in… opened is not Dot's to take
+        the folder from, and the next start of Dot's own Chrome on Incognito empties it (item 355)."""
+        try:
+            holder: int | None = await asyncio.to_thread(profile_holder_pid, self._profile)
+        except BrowserError as error:
+            _log.warning("browser_incognito_not_emptied", error=error.message)
+            return
+        if holder is not None:
+            _log.info("browser_incognito_held", pid=holder)
+            return
+        await asyncio.to_thread(empty_incognito)
 
     async def _detach(self, browser: Browser) -> None:
         """Close the tabs Dot opened in the Chrome of the user, then drop the connection (Chrome keeps running)."""
@@ -1079,7 +1137,8 @@ class BrowserSession:
 
     async def _adopt_popup(self, page: Page) -> None:
         """A page that a tab of ours opened belongs to the same thread; any other new page is not ours to touch. A popup
-        that closes itself while this runs (a sign-in callback) is a note on its opener, not an error."""
+        that closes itself while this runs (a sign-in callback) is a note on its opener, not an error. One taken in on
+        a URL the rules forbid is reset at once (:meth:`_leave_refused_popup`)."""
         try:
             opener: Page | None = await page.opener()
         except Exception as error:  # noqa: BLE001 - _popup_lost raises it unless the page or the browser is gone
@@ -1107,8 +1166,33 @@ class BrowserSession:
             thread.tabs.append(tab)
             add_note(opener_tab, f"a new tab opened as tab {len(thread.tabs)}")
             await self._enforce_cap(thread)
+            await self._leave_refused_popup(opener_tab, tab)
         finally:
             taken_in(opener_tab, tab)
+
+    async def _leave_refused_popup(self, opener: Tab, tab: Tab) -> None:
+        """Reset ``tab``, a popup taken in on a URL the rules forbid, to a blank page, and say so on its opener (item
+        554). Chrome tells of a popup only once its page answered (:func:`watch_births`), so in Dot's own Chrome the
+        hops of its first redirect were sent before its guard was up (nothing of what they answered is read), and the
+        Chrome of the user holds no request at all. Every read of the tab checks it again
+        (:meth:`_enforce_landing`); a popup that closed meanwhile has nothing left to reset."""
+        try:
+            await self._enforce_landing(tab)
+        except ForbiddenUrlError as refused:
+            address: str = truncate_middle(self._shown(refused.url), _SHOWN_URL_CHARS)
+            add_note(
+                opener,
+                f"the new tab went to a URL that may not be opened ({address}: {refused.reason}); it was reset to a "
+                "blank page",
+            )
+        except (BrowserError, PlaywrightError) as error:
+            if tab.page.is_closed():
+                return
+            _log.warning(
+                "browser_popup_unchecked",
+                url=truncate_middle(self._shown(tab.page.url), _LAUNCH_ERROR_CHARS),
+                error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
+            )
 
     def _keeps_front(self) -> bool:
         """Whether Dot gives the front of the Mac back when its own Chrome takes it (item 118): a visible window that
@@ -1284,13 +1368,27 @@ class BrowserSession:
             return Viewport(width=config.viewport_width, height=config.viewport_height)
         return await measure_viewport(tab.page)
 
+    async def _read_held[T](self, tab: Tab, read: Callable[[], Awaitable[T]]) -> T:
+        """What ``read`` gives of the page of ``tab``, with the URL rules held on either side of it (item 554): a page
+        that went to a URL they forbid before the read is left first, and one that went there while it was read fails
+        the call, so that nothing read of it is shown."""
+        await self._enforce_landing(tab)
+        result: T = await read()
+        await self._enforce_landing(tab, after_read=True)
+        return result
+
     async def _capture(self, tab: Tab, hide_secrets: bool) -> _Capture:
+        """The page as the model reads it, under the URL rules (:meth:`_read_held`)."""
         config: BrowserConfig = self._config
-        # The window's size is read alongside the snapshot, not before it (item 342): in the Chrome of the user it is
-        # one more round trip to the page on every capture, and the two reads do not depend on each other.
-        viewport, lines = await asyncio.gather(
-            self._viewport(tab), capture_lines(tab.page, _ms(config.action_timeout_s), hide_secrets)
-        )
+
+        async def read() -> tuple[Viewport, tuple[SnapshotLine, ...]]:
+            # The window's size is read alongside the snapshot, not before it (item 342): in the Chrome of the user it
+            # is one more round trip to the page on every capture, and the two reads do not depend on each other.
+            return await asyncio.gather(
+                self._viewport(tab), capture_lines(tab.page, _ms(config.action_timeout_s), hide_secrets)
+            )
+
+        viewport, lines = await self._read_held(tab, read)
         kept: tuple[SnapshotLine, ...] = viewport_filter(
             lines, viewport.width, viewport.height, config.viewport_margin_px
         )
@@ -1313,11 +1411,22 @@ class BrowserSession:
         return await self._capture(tab, hide_secrets)
 
     async def _tab_title(self, tab: Tab) -> str:
+        """The title of ``tab``'s page; a page on a URL the rules forbid is not read (item 554), its title included: a
+        tab in the background a popup's redirect or a page's own timer sent there is reset when it is switched to."""
+        if not self._may_show(tab.page.url):
+            return _UNREAD_TITLE
         try:
             return await page_title(tab.page)
         except BrowserError as error:
             _log.warning("browser_tab_title_unavailable", error=error.message)
             return "(title unavailable)"
+
+    def _may_show(self, url: str) -> bool:
+        """Whether a page at ``url`` may be read: one the URL rules allow, a blank one, or Chrome's own error page."""
+        if url.startswith(_ERROR_PAGE) or url in _BLANK_URLS:
+            return True
+        config: BrowserConfig = self._config
+        return check_browser_url(url, config.allowed_hosts, config.blocked_hosts, self._server).allowed
 
     async def _summaries(self, thread: ThreadTabs) -> tuple[TabSummary, ...]:
         tabs: list[Tab] = list(thread.tabs)
@@ -1590,15 +1699,20 @@ class BrowserSession:
             config.navigation_backoff_ms,
         )
 
-    async def _enforce_landing(self, tab: Tab) -> None:
-        """A redirect or click may have ended on a URL the rules forbid; leave it before anything is read from it. One
-        the rules refused on the way shows Chrome's error page, which is left the same way."""
+    async def _enforce_landing(self, tab: Tab, *, after_read: bool = False) -> None:
+        """A redirect, a click, a script or a page's own timer may have sent the tab to a URL the rules forbid; leave it
+        before anything is read from it or done in it. Every operation that reads a run's tab or acts in it asks this
+        first (item 554): a popup's first redirect is not held in Dot's own Chrome, and the Chrome of the user holds
+        none of its requests. One the rules refused on the way shows Chrome's error page, which is left the same way. A
+        frame of the page on such a URL is left for a blank page (:meth:`_leave_refused_frames`); with ``after_read``,
+        the check that follows a read, a frame left fails the call, since the read may hold its page."""
         landed: str = tab.page.url
         config: BrowserConfig = self._config
-        if landed.startswith("chrome-error://"):
+        if landed.startswith(_ERROR_PAGE):
             refused: _Refusal | None = self._refusals.pop(tab.page, None)
             if refused is None:
-                add_note(tab, "the page failed to load (Chrome error page)")
+                if _LOAD_FAILED_NOTE not in tab.notes:
+                    add_note(tab, _LOAD_FAILED_NOTE)
                 return
             await self._blank(tab.page)
             raise ForbiddenUrlError(
@@ -1612,6 +1726,7 @@ class BrowserSession:
         if verdict.allowed:
             # The page is where it may be: a refusal on the way there, which it then left, is over.
             self._refusals.pop(tab.page, None)
+            await self._leave_refused_frames(tab, after_read)
             return
         await self._blank(tab.page)
         raise ForbiddenUrlError(
@@ -1620,6 +1735,56 @@ class BrowserSession:
             verdict.reason,
             "document",
         )
+
+    async def _leave_refused_frames(self, tab: Tab, after_read: bool) -> None:
+        """Send each frame of the page that is on a URL the rules forbid to a blank page (item 554), so that nothing of
+        it is read or done: a frame of another site, which Chrome runs as a target of its own, is not reached by the
+        tab's guard (:meth:`_guard_hops`), so the hops of its redirects are not held, and the Chrome of the user holds
+        no request of a frame at all. A frame that cannot be left takes the tab with it. After a read
+        (``after_read``) a frame left fails the call: the read may hold what the frame showed."""
+        config: BrowserConfig = self._config
+        left: list[PlaywrightFrame] = []
+        refusal: ForbiddenUrlError | None = None
+        for frame in tab.page.frames:
+            if frame is tab.page.main_frame or frame.is_detached() or _within(frame, left):
+                continue
+            url: str = frame.url
+            if not _judged_in_frame(url):
+                continue
+            verdict: UrlVerdict = check_browser_url(url, config.allowed_hosts, config.blocked_hosts, self._server)
+            if verdict.allowed:
+                continue
+            try:
+                await frame.goto("about:blank", wait_until="commit", timeout=_ms(config.navigation_timeout_s))
+            except PlaywrightError as error:
+                if frame.is_detached():
+                    continue
+                await self._blank(tab.page)
+                raise ForbiddenUrlError(
+                    "a frame of the page is on a URL that may not be opened and could not be left; the tab was reset "
+                    "to a blank page",
+                    url,
+                    verdict.reason,
+                    "document",
+                ) from error
+            left.append(frame)
+            shown: str = truncate_middle(self._shown(url), _SHOWN_URL_CHARS)
+            _log.info("browser_frame_left", url=shown)
+            add_note(
+                tab,
+                f"a frame of the page was on a URL that may not be opened ({shown}: {verdict.reason}); it was left "
+                "for a blank page",
+            )
+            if refusal is None:
+                refusal = ForbiddenUrlError(
+                    "a frame of the page went to a URL that may not be opened while the page was read; it was left "
+                    "for a blank page and nothing of this read is shown: read the page again",
+                    url,
+                    verdict.reason,
+                    "document",
+                )
+        if after_read and refusal is not None:
+            raise refusal
 
     async def _load(self, thread: ThreadTabs, tab: Tab, url: str, hide_secrets: bool) -> PageView:
         self._require_allowed(url)
@@ -1696,12 +1861,42 @@ class BrowserSession:
         results), so it does not count; the user's Chrome is not used for searches."""
         return self._config.mode == "own" and not self._config.headless
 
-    async def read_page(self, url: str) -> RenderedDocument:
-        """Read ``url`` (:meth:`_read_page`) as a use of Chrome that the idle close waits for."""
+    async def read_page(self, url: str, *, public_only: bool) -> RenderedDocument:
+        """Read ``url`` (:meth:`_read_page`) as a use of Chrome that the idle close waits for. ``public_only`` is the
+        rule of the web tools (``[web] allow_private_hosts`` off): the page is given back only when it was served from
+        public addresses (:meth:`_require_public`)."""
         with self._in_use():
-            return await self._read_page(url)
+            return await self._read_page(url, public_only)
 
-    async def _read_page(self, url: str) -> RenderedDocument:
+    async def _require_public(self, landed: str, documents: Sequence[Response]) -> None:
+        """The rule of the web tools for a page the browser read for them, which the plain client holds by connecting
+        to checked addresses only (item 554): each document of the way, redirects included, and the page it ended on
+        were served from public addresses. What Chrome connected to is asked of each response, so a name that was
+        pointed at the local network after it was looked at shows too; the host of the page that landed is looked at as
+        the plain client looks at one. What was served from a private or local address is not given back: the request
+        for it, which a redirect of the page may have sent, a plain request would not have."""
+        private: str | None = None
+        for response in documents:
+            try:
+                served = await response.server_addr()
+            except PlaywrightError:
+                continue
+            if served is not None and is_private_text(served["ipAddress"]):
+                private = served["ipAddress"]
+                break
+        if private is None:
+            host: str = urlsplit(landed).hostname or ""
+            private = await non_public_address(host) if host else None
+        if private is not None:
+            raise ForbiddenUrlError(
+                "the page is on a private or local network address; the web tools only reach the public internet "
+                "(web.allow_private_hosts)",
+                self._shown(landed),
+                f"it was served from {private}",
+                "document",
+            )
+
+    async def _read_page(self, url: str, public_only: bool) -> RenderedDocument:
         """Read ``url`` in a tab of its own, one no thread owns and that closes when the read is over: the address the
         page ended on, the status of its last main response and its HTML after JavaScript ran and the page settled. A
         page that answered with a bot wall gets a few seconds to pass its own check first. For the web tools, when a
@@ -1717,7 +1912,8 @@ class BrowserSession:
                 "opening a tab failed", {"error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
             ) from error
         statuses: list[int] = []
-        page.on("response", lambda response: _note_main_status(page, response, statuses))
+        documents: list[Response] = []
+        page.on("response", lambda response: _note_main_status(page, response, statuses, documents))
         try:
             if config.mode == "own":
                 await self._guard_hops(page)
@@ -1742,6 +1938,8 @@ class BrowserSession:
                 raise ForbiddenUrlError(
                     "the page ended up on a URL that may not be opened", landed, verdict.reason, "document"
                 )
+            if public_only:
+                await self._require_public(landed, documents)
             try:
                 html: str = await page.content()
             except PlaywrightError as error:
@@ -1814,7 +2012,9 @@ class BrowserSession:
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             # Masked before it is cut into slices, so that no slice holds a part of a value (items 493 and 533).
-            page_text: str = await visible_text(tab.page, ref, _ms(self._config.action_timeout_s))
+            page_text: str = await self._read_held(
+                tab, lambda: visible_text(tab.page, ref, _ms(self._config.action_timeout_s))
+            )
             text: str = squeeze_text(self.held_back(thread_id, page_text))
             return TextView(
                 url=tab.page.url, text=text[offset : offset + max_chars], offset=offset, total_chars=len(text)
@@ -1824,10 +2024,14 @@ class BrowserSession:
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             config: BrowserConfig = self._config
-            viewport: Viewport = await self._viewport(tab)
-            shot: bytes = await screenshot_jpeg(
-                tab.page, config.screenshot_quality, _ms(config.action_timeout_s), hide_secrets
-            )
+
+            async def take() -> tuple[Viewport, bytes]:
+                viewport: Viewport = await self._viewport(tab)
+                return viewport, await screenshot_jpeg(
+                    tab.page, config.screenshot_quality, _ms(config.action_timeout_s), hide_secrets
+                )
+
+            viewport, shot = await self._read_held(tab, take)
             # Chrome's zoom is left out of Playwright's CSS pixels: the picture is redrawn at the page's own size.
             data: bytes = await asyncio.to_thread(
                 jpeg_of_size, shot, viewport.width, viewport.height, config.screenshot_quality
@@ -1976,6 +2180,35 @@ class BrowserSession:
             return None
         await bring_to_front(tab.page)
         return tab.page.url
+
+    async def clean_for_owner(self, thread_id: str) -> bool:
+        """Give the owner who takes the run over a page that no script of the run runs in (item 554). A script of the
+        run (``browser_eval``) may have left a listener in the page, or in a tab it opened, that copies what is typed,
+        and the owner is sent to the browser for exactly what a run may not type itself: a password, a code, a card
+        number. So when a script ran in a tab of the chat (:attr:`ThreadTabs.scripted`), the chat's other tabs are
+        closed and the current one is opened again from its address, as a new document: a listener lives in its
+        document. A page that was the answer of a form is asked for again by its address, and the form is not sent
+        again. Returns whether it did so; a chat no script ran in is left as it is."""
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        if thread is None or not thread.scripted or not thread.tabs:
+            return False
+        async with self._locked(thread_id) as thread:
+            tab: Tab | None = self._tab_of(thread_id)
+            for other in [one for one in thread.tabs if one is not tab]:
+                await self._close_tab_object(thread, other)
+            if tab is None or not thread.scripted:
+                return False
+            address: str = tab.page.url
+            tab.lines, tab.rendered = (), ""
+            await self._blank(tab.page)
+            thread.scripted = False
+            add_note(tab, _SCRIPTED_NOTE)
+            if address not in _BLANK_URLS and not address.startswith("about:blank"):
+                try:
+                    await self._navigate_checked(tab.page, address, self._config.navigation_attempts)
+                except BrowserError as error:
+                    add_note(tab, f"the page could not be opened again: {error.message}")
+            return True
 
     @property
     def teaching(self) -> Recording | None:
@@ -2212,6 +2445,9 @@ class BrowserSession:
         the user takes over stops it too."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
+            # Before a step as well as after (item 554): a page that went to a URL the rules forbid since it was last
+            # read takes no click.
+            await self._enforce_landing(tab)
             tab.accept_confirms = accept_confirms
             try:
                 reports, stopped = await self._run_steps(thread, tab, steps, secret_field)
@@ -2238,6 +2474,7 @@ class BrowserSession:
         """Scroll the current tab by ``pixels``, or by most of the page area the model sees when ``pixels`` is None."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
+            await self._enforce_landing(tab)
             viewport: Viewport = await self._viewport(tab)
             distance: int = pixels if pixels is not None else round(viewport.height * _SCROLL_SHARE)
             await scroll_page(
@@ -2254,6 +2491,8 @@ class BrowserSession:
         page is read."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
+            # Not waited on a page that went to a URL the rules forbid (item 554): the answer would tell what it shows.
+            await self._enforce_landing(tab)
             started: float = time.monotonic()
             appeared: bool = await wait_for_text(tab.page, text, _ms(timeout_s))
             waited_s: float = time.monotonic() - started
@@ -2279,6 +2518,7 @@ class BrowserSession:
         secret fields hidden, in every mode."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
+            await self._enforce_landing(tab)
             if not fills_on(tab.page.url):
                 raise BrowserError(
                     "this page is not one of the login's sites: Dot fills a login only on its own site",
@@ -2362,6 +2602,8 @@ class BrowserSession:
                     {"tabs": len([one for one in thread.tabs if one.vault_held])},
                 )
             tab: Tab = await self._current_tab(thread)
+            # No script runs in a page on a URL the rules forbid (item 554): it would read the page, and act in it.
+            await self._enforce_landing(tab)
             if hide_secrets and await holds_secret_field(tab.page):
                 raise BrowserError(
                     "a script stays off a page that holds a password, one-time-code or card field: it could read what "
@@ -2442,6 +2684,7 @@ class BrowserSession:
         """Click the upload control ``ref`` and give the file chooser it opens ``paths``."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
+            await self._enforce_landing(tab)
             tab.expect_chooser = True
             try:
                 await upload_files(tab.page, ref, list(paths), _ms(self._config.action_timeout_s))

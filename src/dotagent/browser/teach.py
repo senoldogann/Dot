@@ -78,6 +78,12 @@ TEACH_SCRIPT: str = """
 
 StepKind = Literal["page", "click", "fill", "choice", "enter"]
 
+# The most steps a recording keeps (item 554). What a person shows is some tens of steps; the binding the recorder
+# reports through is in the page's own world, where the page's script can call it too, and a list that grows without
+# end would fill the daemon and the skill writer's request.
+MAX_STEPS: int = 400
+FULL_NOTE: str = f"(the recording is full: the steps after the first {MAX_STEPS} were not kept)"
+
 
 # How long a part of an address's path may be before a recording will not carry it: a path part that long is an
 # identifier more often than a word, and a reset or share link carries its token there (`/reset/<token>`, `/s/<id>`).
@@ -166,13 +172,20 @@ class Recording:
     started_at: float = field(default_factory=time.time)
     steps: list[TaughtStep] = field(default_factory=list)
 
+    @property
+    def full(self) -> bool:
+        """Whether the recording keeps no more steps (:data:`MAX_STEPS`)."""
+        return len(self.steps) >= MAX_STEPS
+
     def take(self, source: dict[str, object], payload: str) -> None:
         """Take what the page ``source`` reports as a step, when it is the recorded page: a step of a tab the owner
-        opened elsewhere is not part of what they showed Dot here."""
+        opened elsewhere is not part of what they showed Dot here. A recording that is full takes no more (item 554)."""
         if source.get("page") is not self.page:
             return
         step: TaughtStep | None = taught_step(payload)
         if step is None:
+            return
+        if self.full:
             return
         last: TaughtStep | None = self.steps[-1] if self.steps else None
         if step.kind == "page" and last is not None and last.kind == "page" and last.label == step.label:
@@ -191,5 +204,9 @@ class Recording:
             self.steps.append(TaughtStep(kind="page", label=address))
 
     def digest(self) -> str:
-        """The steps as the skill writer reads them: one line each, numbered."""
-        return "\n".join(f"{number}. {step.line}" for number, step in enumerate(self.steps, start=1))
+        """The steps as the skill writer reads them: one line each, numbered, and a last line that says so when the
+        recording was full and later steps were not kept."""
+        lines: list[str] = [f"{number}. {step.line}" for number, step in enumerate(self.steps, start=1)]
+        if self.full:
+            lines.append(FULL_NOTE)
+        return "\n".join(lines)

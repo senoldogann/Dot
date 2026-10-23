@@ -421,6 +421,31 @@ async def test_dots_chrome_works_on_the_profile_in_use_and_incognito_keeps_nothi
 
 
 @pytest.mark.browser
+async def test_incognito_is_emptied_when_its_chrome_ended_before_dot_let_go(site: str, headless: BrowserConfig) -> None:
+    """Item 554: the owner quits Dot's Chrome (Cmd+Q) while it is on Incognito, or it crashes: the folder kept what the
+    Chrome left, until the switch to another profile found no Chrome to close and left it. It goes then, as it goes with
+    a Chrome Dot closes, unless another Chrome holds the folder."""
+    server: ServerConfig = load_default_config().server
+    with scratch_home() as home, eval_environment(home, {}):
+        session: BrowserSession = BrowserSession(
+            headless, server, browser_data_dir("own", DEFAULT_PROFILE), home / "downloads", no_runs_at_work
+        )
+        try:
+            await session.use_profile(INCOGNITO_PROFILE)
+            await session.open_url("quit", site, True)
+            assert await _chrome_worked_in(profile_dir(INCOGNITO_PROFILE))
+            context = session._context
+            assert context is not None
+            await context.close()
+            await asyncio.sleep(0.5)
+            assert not session.connected and await asyncio.to_thread(profile_dir(INCOGNITO_PROFILE).exists)
+            await session.use_profile(DEFAULT_PROFILE)
+            assert not await asyncio.to_thread(profile_dir(INCOGNITO_PROFILE).exists)
+        finally:
+            await session.aclose()
+
+
+@pytest.mark.browser
 async def test_settings_browser_adds_uses_and_deletes_a_profile(tmp_path: Path) -> None:
     async with _daemon(()) as (_manager, address), async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)

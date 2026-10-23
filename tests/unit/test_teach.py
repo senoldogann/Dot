@@ -8,7 +8,7 @@ import pytest
 
 from dotagent import teach as teach_module
 from dotagent.agent.playbooks import list_playbooks, retires
-from dotagent.browser.teach import Recording, TaughtStep, taught_step
+from dotagent.browser.teach import FULL_NOTE, MAX_STEPS, Recording, TaughtStep, taught_step
 from dotagent.teach import TaughtSkill, save_taught_skill
 
 
@@ -88,6 +88,22 @@ def test_a_recording_takes_the_steps_of_its_own_page_only() -> None:
     recording.take({"page": page}, "not json")
     assert [step.line for step in recording.steps] == ['Clicked "Sign in"']
     assert recording.digest() == '1. Clicked "Sign in"'
+
+
+def test_a_recording_keeps_a_few_hundred_steps_and_says_when_it_is_full() -> None:
+    """Item 554: the page's own script can call the recorder's binding, so a page can add steps in a loop; the list
+    stops growing at a few hundred, and the skill writer is told the rest was not kept."""
+    page = object()
+    recording: Recording = Recording(thread_id="t", page=page, tab_index=0)
+    for number in range(MAX_STEPS + 50):
+        recording.take({"page": page}, _reported(kind="click", label=f"Forged {number}"))
+    assert len(recording.steps) == MAX_STEPS and recording.full
+    assert recording.steps[-1].label == f"Forged {MAX_STEPS - 1}"
+    assert recording.digest().splitlines()[-1] == FULL_NOTE
+    assert len(recording.digest().splitlines()) == MAX_STEPS + 1
+    short: Recording = Recording(thread_id="t", page=page, tab_index=0)
+    short.take({"page": page}, _reported(kind="click", label="Sign in"))
+    assert not short.full and FULL_NOTE not in short.digest()
 
 
 def test_a_taught_skill_is_written_under_its_own_header_and_is_never_retired(

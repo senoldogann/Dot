@@ -281,19 +281,26 @@ class _Crawl:
         kind: DocumentKind = document_kind(document.media_type, document.body[:512])
         page: ReadablePage
         links: tuple[str, ...] = ()
-        match kind:
-            case "html":
-                html: str = decode_body(document.body[: self.config.fetch_max_bytes], document.charset)
-                page = await asyncio.to_thread(html_to_text, html, document.url)
-                links = await asyncio.to_thread(page_links, html, document.url)
-            case "pdf":
-                page = ReadablePage(
-                    title="", description="", text=await asyncio.to_thread(pdf_to_text, document.body, document.url)
-                )
-            case "text":
-                page = ReadablePage(title="", description="", text=decode_body(document.body, document.charset))
-            case "binary":
-                return SkippedPage(url=url, reason=f"not a page, a PDF or a text file ({document.media_type})")
+        # A page that cannot be read (a character set nobody knows, a locked PDF, one cut short) is left out with its
+        # reason, as one that cannot be fetched is: it does not fail the pages read already (item 554).
+        try:
+            match kind:
+                case "html":
+                    html: str = decode_body(document.body[: self.config.fetch_max_bytes], document.charset)
+                    page = await asyncio.to_thread(html_to_text, html, document.url)
+                    links = await asyncio.to_thread(page_links, html, document.url)
+                case "pdf":
+                    page = ReadablePage(
+                        title="",
+                        description="",
+                        text=await asyncio.to_thread(pdf_to_text, document.body, document.url),
+                    )
+                case "text":
+                    page = ReadablePage(title="", description="", text=decode_body(document.body, document.charset))
+                case "binary":
+                    return SkippedPage(url=url, reason=f"not a page, a PDF or a text file ({document.media_type})")
+        except WebError as error:
+            return SkippedPage(url=url, reason=error.message)
         text: str = page.text
         rendered: bool = False
         problem: str = ""
@@ -320,6 +327,19 @@ class _Crawl:
         )
 
 
+async def _read_side_by_side(state: _Crawl, urls: Sequence[str], depth: int) -> list[CrawledPage | SkippedPage]:
+    """Read ``urls`` at once. One read that fails takes the others down with it: none is left reading, a render in the
+    run's browser tab included, after the call that asked for them has ended (item 554)."""
+    try:
+        async with asyncio.TaskGroup() as group:
+            reads: list[asyncio.Task[CrawledPage | SkippedPage]] = [
+                group.create_task(state.read(url, depth)) for url in urls
+            ]
+    except BaseExceptionGroup as failed:
+        raise failed.exceptions[0] from None
+    return [read.result() for read in reads]
+
+
 async def crawl(
     web: WebClient,
     config: WebConfig,
@@ -342,6 +362,9 @@ async def crawl(
     pages: list[CrawledPage] = []
     skipped: list[SkippedPage] = []
     depth: int = 0
+    # The links of the level being read, which are the next level's once this one is done (item 554): a level cut by the
+    # page limit, some of whose pages were left out, goes on at the same depth, and what it linked to waits for it.
+    next_links: list[str] = []
     while frontier and len(pages) < max_pages and depth <= max_depth:
         batch: list[str] = frontier[: max_pages - len(pages)]
         frontier = frontier[len(batch) :]
@@ -353,11 +376,7 @@ async def crawl(
                 if config.crawl.robots == "report":
                     await state.allowed(url)
                 fetchable.append(url)
-        results: list[CrawledPage | SkippedPage] = list(
-            await asyncio.gather(*(state.read(url, depth) for url in fetchable))
-        )
-        next_links: list[str] = []
-        for result in results:
+        for result in await _read_side_by_side(state, fetchable, depth):
             if isinstance(result, SkippedPage):
                 skipped.append(result)
             else:
@@ -367,11 +386,9 @@ async def crawl(
             depth += 1
             frontier = list(plan_frontier(next_links, scope, tuple(seen)))
             seen.update(dict.fromkeys(frontier))
-        else:
-            # The level was cut by the page limit: what is left of it still counts as the frontier.
-            fresh: tuple[str, ...] = plan_frontier(next_links, scope, tuple(seen))
-            seen.update(dict.fromkeys(fresh))
-            frontier.extend(fresh)
+            next_links = []
+    # What was found within the scope and not read: the rest of the level the limit cut, and what its pages linked to.
+    left: int = len(frontier) + len(plan_frontier(next_links, scope, tuple(seen)))
     return CrawlResult(
         start=first,
         scope=scope,
@@ -381,6 +398,6 @@ async def crawl(
             hosts=tuple(host for host, rules in state.robots.items() if rules is not None),
             disallowed=tuple(dict.fromkeys(state.disallowed)),
         ),
-        frontier_left=len(frontier),
+        frontier_left=left,
         seconds=time.monotonic() - started,
     )

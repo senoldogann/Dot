@@ -15,6 +15,7 @@ from dotagent.browser.snapshot import (
     SnapshotLine,
     filled_fields,
     find_lines,
+    fold_options,
     hide_values,
     parse_snapshot,
     render_lines,
@@ -73,6 +74,29 @@ def test_a_marked_fields_value_is_hidden_on_its_line_and_its_text_line_and_the_r
     # A search finds the field by its name, never by its value.
     assert find_lines(hidden, "hunter2", 10) == ()
     assert any("[hidden]" in hit for hit in find_lines(hidden, "Pass", 10))
+
+
+# A card's expiry in dropdowns, as Chrome's snapshot lists a collapsed one: its options without refs, the chosen one
+# marked (item 554).
+DROPDOWNS: str = """- generic [active] [ref=e1]:
+  - combobox "Expiry month" [ref=e2]:
+    - option "01" [box=0,0,0,0]
+    - option "02" [selected] [box=0,0,0,0]
+  - combobox "Country" [ref=e3]:
+    - option "Norway" [selected] [box=0,0,0,0]
+    - option "Sweden" [box=0,0,0,0]
+  - combobox "Empty" [ref=e4]:
+    - option "None" [box=0,0,0,0]
+"""
+
+
+def test_the_choice_of_a_dropdown_the_page_marks_secret_is_hidden_and_the_others_stay() -> None:
+    lines: tuple[SnapshotLine, ...] = parse_snapshot(DROPDOWNS)
+    assert [line.ref for line in filled_fields(lines)] == ["e2", "e3"]
+    view: str = render_lines(fold_options(hide_values(lines, frozenset({"e2"}))))
+    assert 'combobox "Expiry month" [ref=e2]: options "01", "02"' in view and '"02" [selected]' not in view
+    assert 'combobox "Country" [ref=e3]: options "Norway" [selected], "Sweden"' in view
+    assert find_lines(hide_values(lines, frozenset({"e2"})), "selected", 10) == ()
 
 
 def test_a_ref_written_into_a_name_and_a_quoted_key_are_not_mistaken() -> None:

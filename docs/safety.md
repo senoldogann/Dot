@@ -25,7 +25,9 @@ shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, s
   `[web] anthropic_search = "off"` leaves it out.
 - **To the sites a run visits: its requests.** The web tools fetch public addresses only, unless
   `[web] allow_private_hosts` allows more (the owner's SearXNG instance is configuration and is reached wherever it
-  is, a loopback one too); Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
+  is, a loopback one too); a page the browser reads for them in place of a plain request a site turned away is held
+  to the same rule, and one it was served from a private address is not given back (item 554, see
+  [Tools](runs.md#tools)); Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
   when it is attached). `web_extract` sends what it read to the `fast` model, and a page a run shows in the conversation
   loads its libraries from public CDNs (see [Tools](runs.md#tools)).
 - **From the shell: whatever a command sends.** The sandbox closes Dot's own files, not the network; a run that has read
@@ -317,7 +319,11 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   field's name and ref stay, so it can still be found and filled. A value you type during a takeover, or one a page
   fills in, stays out of the model's conversation that way; typed from the screen that shows the page (item 470), it
   goes to the page and nowhere else: the daemon keeps how many clicks and scrolls there were and whether anything was
-  typed, and a failure of the page is told without what you typed. You act there, not Dot: nothing passes the policy,
+  typed, and a failure of the page is told without what you typed. A script of the run (`browser_eval`) could have
+  left a listener in the page, or in a tab it opened, that copies what you type there, so taking over a chat in which
+  one ran closes the chat's other tabs and opens the page again from its address first, a new document with no script
+  of the run in it (item 554); a form the page was the answer of is not sent again, and the run is told in its next view.
+  You act there, not Dot: nothing passes the policy,
   and in Dot's own Chrome the URL rules judge where your taps lead as they judge a run's; in your own Chrome (`attach`)
   they do not, as for a run's clicks. In `yolo` nothing is masked (item 443): the run reads all it is shown. A page
   script (`browser_eval`) reads a field's value whole, a value Chrome filled in from its password manager too, so

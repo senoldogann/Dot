@@ -204,13 +204,13 @@ def test_a_workbooks_drawing_is_its_sheets_and_any_other_drawing_its_page() -> N
     assert drawn_pages("<html><body><p>A letter</p></body></html>") == (DrawnPage(name="", file="Preview.html"),)
 
 
-def _pdf_with_text(path: Path, text: str) -> Path:
+def _pdf_with_text(path: Path, text: str, media_box: bytes = b"0 0 200 100") -> Path:
     """A one-page PDF that says ``text`` in Helvetica, written by hand with its cross-reference table."""
     content: bytes = b"BT /F1 24 Tf 20 40 Td (" + text.encode("ascii") + b") Tj ET"
     objects: list[bytes] = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R"
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [" + media_box + b"] /Contents 4 0 R"
         b" /Resources << /Font << /F1 5 0 R >> >> >>",
         b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
@@ -226,6 +226,18 @@ def _pdf_with_text(path: Path, text: str) -> Path:
     out += b"trailer\n<< /Root 1 0 R /Size %d >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
     path.write_bytes(out)
     return path
+
+
+@pytest.mark.parametrize("box", [b"0 0 0 792", b"0 0 612 0"])
+def test_a_page_with_no_width_or_no_height_is_refused_and_not_divided_by(tmp_path: Path, box: bytes) -> None:
+    """A crop box with a side of nothing (a malformed PDF) raised a ZeroDivisionError, which the daemon answered as a
+    fault of its own; it is a page like the others that cannot be drawn (item 554)."""
+    flat: Path = _pdf_with_text(tmp_path / "flat.pdf", "Hello", box)
+    assert len(page_sizes(flat)) == 1
+    with pytest.raises(InvalidValueError) as refused:
+        page_png(flat, 1, 600)
+    assert refused.value.message == "the page has no size"
+    assert refused.value.context == {"path": str(flat), "page": 1}
 
 
 def test_a_pdf_gives_its_text_for_the_copy_up_to_the_room_it_has(tmp_path: Path) -> None:

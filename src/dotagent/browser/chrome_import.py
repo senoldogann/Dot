@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from dotagent.browser.keychain import marker_path, write_keychain_mode
-from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.profile_lock import held_for_import, profile_holder_pid
 from dotagent.browser.profiles import keep_session_cookies
 from dotagent.core.errors import BrowserError
 from dotagent.core.paths import browser_incognito_dir
@@ -262,10 +262,19 @@ def import_chrome_profile(data_dir: Path, profile_name: str, dot_profile: Path) 
             },
         )
     _require_closed(data_dir, "Chrome", "quit it (Cmd+Q) so its files are complete")
-    _require_closed(dot_profile, "Dot's browser", "stop the Dot service (dotx service uninstall) or close its window")
-    source: Path = data_dir / profile_name
+    # Held until the files are in place (item 554): the Dot service starts its Chrome on a profile that is not open, and
+    # one that started during the copy would write to the files this import moves away from under it. It is looked at
+    # again under the lock, which a start that is under way holds until its Chrome holds the profile.
+    with held_for_import(dot_profile):
+        _require_closed(
+            dot_profile, "Dot's browser", "stop the Dot service (dotx service uninstall) or close its window"
+        )
+        return _replace_sign_ins(data_dir / profile_name, dot_profile)
+
+
+def _replace_sign_ins(source: Path, dot_profile: Path) -> ImportReport:
+    """The import itself, with Dot's profile held and closed (:func:`import_chrome_profile`)."""
     staging: Path = dot_profile / _STAGING
-    dot_profile.mkdir(mode=0o700, parents=True, exist_ok=True)
     if (staging / _ASIDE).is_dir() and any((staging / _ASIDE).iterdir()):
         raise BrowserError(
             "an earlier import left files of this profile in its staging folder: if that import failed and could not "

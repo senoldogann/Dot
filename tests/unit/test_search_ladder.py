@@ -20,10 +20,12 @@ from dotagent.web.search import (
     climb,
     parse_brave,
     parse_searxng,
+    search,
+    search_ollama,
     search_searxng,
     searxng_search_url,
 )
-from dotagent.web.types import SearchHit
+from dotagent.web.types import FetchedDocument, SearchHit
 
 # The result markup of search.brave.com/search, cut to what the parser reads: a web snippet with its link, title and
 # description (the class names carry build hashes), a nested block that is not a result, and a snippet that is not web.
@@ -166,11 +168,82 @@ async def test_a_failed_engine_says_its_status_and_body_in_its_reason_and_in_the
 def test_the_memory_answers_the_same_query_with_its_age_and_forgets_old_ones() -> None:
     memory: AnswerMemory = AnswerMemory()
     outcome: SearchOutcome = SearchOutcome(hits=(_hit("https://a.example"),), engine="brave", skipped=(), age_s=0.0)
-    memory.keep("Bittium  careers", outcome, 1000.0)
-    recalled: SearchOutcome | None = memory.recall("bittium careers", 1000.0 + 90.0)
+    memory.keep("Bittium  careers", _RUNGS, 5, outcome, 1000.0)
+    recalled: SearchOutcome | None = memory.recall("bittium careers", _RUNGS, 5, 1000.0 + 90.0)
     assert recalled is not None and recalled.age_s == 90.0 and recalled.hits == outcome.hits
-    assert memory.recall("bittium careers", 1000.0 + MEMORY_S + 1.0) is None
-    assert memory.recall("other", 1000.0) is None
+    assert memory.recall("bittium careers", _RUNGS, 5, 1000.0 + MEMORY_S + 1.0) is None
+    assert memory.recall("other", _RUNGS, 5, 1000.0) is None
+
+
+def test_the_memory_answers_a_smaller_ask_from_a_larger_one_and_never_a_larger_from_a_smaller() -> None:
+    """Item 554: a query asked for two results and, within ten minutes, for ten, is a new search; and a query asked
+    on another ladder (the search backend was changed) is not answered by the engine of the first."""
+    memory: AnswerMemory = AnswerMemory()
+    two: SearchOutcome = SearchOutcome(hits=(_hit("https://a.example"),), engine="brave", skipped=(), age_s=0.0)
+    memory.keep("q", _RUNGS, 2, two, 1000.0)
+    assert memory.recall("q", _RUNGS, 2, 1001.0) is not None and memory.recall("q", _RUNGS, 1, 1001.0) is not None
+    assert memory.recall("q", _RUNGS, 10, 1001.0) is None
+    assert memory.recall("q", ("brave",), 2, 1001.0) is None
+    ten: SearchOutcome = SearchOutcome(hits=(_hit("https://b.example"),), engine="brave", skipped=(), age_s=0.0)
+    memory.keep("q", _RUNGS, 10, ten, 1002.0)
+    kept: SearchOutcome | None = memory.recall("q", _RUNGS, 8, 1003.0)
+    assert kept is not None and kept.hits == ten.hits
+    # An answer of few hits is still the answer to the count it was asked for: asking again does not climb again.
+    assert memory.recall("q", _RUNGS, 10, 1003.0) is not None
+
+
+class _OllamaThatLimits:
+    """The web client of an Ollama key whose allowance is used up: every search answers HTTP 429."""
+
+    async def post_json(self, url: str, headers: dict[str, str], body: bytes, max_bytes: int) -> FetchedDocument:
+        return FetchedDocument(
+            url=url,
+            status=429,
+            media_type="application/json",
+            charset="utf-8",
+            body=b'{"error": "weekly limit reached"}',
+            truncated=False,
+            redirected_from=(),
+        )
+
+
+async def test_an_ollama_key_that_is_limited_sits_out_like_the_other_engines_that_limit() -> None:
+    """Item 554: the 429 was an error of its own, so every search spent a round trip on Ollama first and listed it as
+    skipped each time; it benches the rung for ``BENCH_S`` now."""
+    with pytest.raises(WebThrottledError, match="limiting this key"):
+        await search_ollama(_OllamaThatLimits(), "key", "reaktor", 5)  # type: ignore[arg-type]
+
+    async def ollama(query: str, max_results: int) -> tuple[SearchHit, ...]:
+        return await search_ollama(_OllamaThatLimits(), "key", query, max_results)  # type: ignore[arg-type]
+
+    attempts: dict[SearchEngine, Attempt] = {"ollama": ollama, "duckduckgo": _answering("https://ddg.example/1")}
+    bench: EngineBench = EngineBench()
+    outcome: SearchOutcome = await climb(("ollama", "duckduckgo"), attempts, bench, "q", 5, lambda: 0.0)
+    assert outcome.engine == "duckduckgo" and bench.remaining("ollama", 1.0) == BENCH_S["ollama"] - 1.0
+    again: SearchOutcome = await climb(("ollama", "duckduckgo"), attempts, bench, "q2", 5, lambda: 30.0)
+    assert again.skipped[0].engine == "ollama" and "benched for 1 more min" in again.skipped[0].reason
+
+
+async def test_a_larger_ask_climbs_the_ladder_again_and_a_smaller_one_does_not() -> None:
+    client: WebClient = WebClient(load_default_config().web, (), ())
+    asked: list[int] = []
+
+    async def counting(query: str, max_results: int) -> tuple[SearchHit, ...]:
+        asked.append(max_results)
+        return tuple(_hit(f"https://example.com/{number}") for number in range(max_results))
+
+    attempts: dict[SearchEngine, Attempt] = {"duckduckgo": counting, "brave": counting}
+    try:
+        small: SearchOutcome = await search(client, _RUNGS, attempts, "reaktor", 2)
+        assert len(small.hits) == 2 and asked == [2]
+        again: SearchOutcome = await search(client, _RUNGS, attempts, "reaktor", 1)
+        assert len(again.hits) == 1 and asked == [2]
+        large: SearchOutcome = await search(client, _RUNGS, attempts, "reaktor", 10)
+        assert len(large.hits) == 10 and asked == [2, 10] and large.age_s == 0.0
+        other: SearchOutcome = await search(client, ("brave",), attempts, "reaktor", 10)
+        assert other.engine == "brave" and asked == [2, 10, 10]
+    finally:
+        await client.aclose()
 
 
 def test_the_header_accounts_for_the_rungs_skipped_and_a_remembered_answer() -> None:

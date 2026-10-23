@@ -102,6 +102,23 @@ def test_a_limiting_or_unavailable_service_benches_the_rung_and_another_error_fa
         parse_anthropic(b'{"content": "no"}', "q", 5)
 
 
+def test_an_answer_with_no_search_in_it_is_no_answer_and_a_search_that_found_nothing_is() -> None:
+    """Item 554: the relay may answer or decline without using the tool, which is no result of a search: the ladder asks
+    the next rung and the empty answer is not kept. A search that ran and found nothing has its result block."""
+    declined: bytes = json.dumps(
+        {"content": [{"type": "text", "text": "I cannot search for that.", "citations": None}]}
+    ).encode()
+    with pytest.raises(WebError, match="did not search") as refused:
+        parse_anthropic(declined, "q", 5)
+    assert not isinstance(refused.value, WebThrottledError) and refused.value.context == {"query": "q"}
+    with pytest.raises(WebError, match="did not search"):
+        parse_anthropic(b'{"content": []}', "q", 5)
+    nothing: bytes = json.dumps(
+        {"content": [{"type": "web_search_tool_result", "tool_use_id": "srvtoolu_1", "content": []}]}
+    ).encode()
+    assert parse_anthropic(nothing, "q", 5) == ()
+
+
 def _sample(tool: str, ok: bool, text: str) -> ToolSample:
     return ToolSample(model="m", tool=tool, ok=ok, seconds=0.1, waited_s=0.0, text=text)
 

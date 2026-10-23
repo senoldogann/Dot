@@ -666,6 +666,40 @@ async def test_a_run_that_ends_held_ends_at_once_and_lets_go_of_the_press_left_d
         await manager.send_input(run.id, InputBatch.model_validate(_events(_PRESS)))
 
 
+@pytest.mark.browser
+async def test_a_run_held_after_a_script_ran_gives_the_owner_a_page_the_script_is_not_in(
+    runtime: Runtime, manager: RunManager, site: _Site
+) -> None:
+    """Item 554: the owner takes the run over to type what it may not, and a script it ran may have left a listener
+    that copies it: a hold, from the screen, opens the page again, a new document; a script that ran in the chat is no
+    longer one of the chat's afterwards."""
+    listener: str = "() => { window.__copied = ['listening']; return 1; }"
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            _call("browser_open", {"url": f"{site.base}/play"}),
+            _call("browser_eval", {"script": listener}),
+            _call("shell", {"command": "sleep 5"}),
+            _FINISH,
+            _FINISH,
+        ],
+    )
+    run: RunRecord = await manager.start(
+        "Wait", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    try:
+        await _results(runtime, run.id, 2)
+        thread = runtime.browser._threads[run.thread_id]
+        assert thread.scripted
+        await manager.take_over_on_screen(run.id, "test", False)
+        assert not thread.scripted
+        assert await _on_the_page(runtime, run.thread_id, "typeof window.__copied") == "undefined"
+    finally:
+        manager.cancel(run.id)
+        async with asyncio.timeout(_RUN_WAIT_S):
+            await manager.wait(run.id)
+
+
 async def _on_the_page(runtime: Runtime, thread_id: str, script: str) -> object:
     return await _read(runtime.browser, thread_id, script)
 

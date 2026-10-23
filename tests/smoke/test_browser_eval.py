@@ -27,7 +27,7 @@ from dotagent.agent.gate import RunGate
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.browser.session import BrowserSession, no_runs_at_work
-from dotagent.browser.types import ScriptRun
+from dotagent.browser.types import PageView, ScriptRun
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError, ForbiddenUrlError
 from dotagent.core.paths import workspace_dir
@@ -53,6 +53,7 @@ _PAGES: dict[str, str] = {
     "/mine": "<!doctype html><title>The user's page</title>",
     "/login": '<!doctype html><title>Sign in</title><input type="password" aria-label="Password" value="hunter2">',
     "/slow": "<!doctype html><title>Slow page</title><h1>Late</h1>",
+    "/sign-in": '<!doctype html><title>Sign in</title><input id="name" aria-label="Name"><p id="marker">first load</p>',
 }
 # How long /slow takes to answer: far longer than a script's value takes to come back.
 _SLOW_S: float = 1.5
@@ -386,3 +387,43 @@ async def test_the_cookies_a_script_ran_with_stay_out_of_every_later_result_of_t
     for name in ("browser_read_text", "browser_snapshot"):
         seen: ToolResult = await (await tools[name].prepare({}, ctx)).run(ctx)
         assert "abcdef0123456789" not in seen.text and "[hidden]" in seen.text, (name, seen.text)
+
+
+_LISTENER: str = (
+    "() => { window.__copied = []; document.addEventListener('input', (e) => window.__copied.push(e.target.value), "
+    "true); window.open('/other'); return 'listening'; }"
+)
+
+
+async def test_a_page_a_script_ran_in_is_opened_again_for_the_owner_who_takes_the_run_over(
+    browser: BrowserSession, site: str
+) -> None:
+    """A listener a script left in the page, or a tab it opened, copies what the owner types when they take the run
+    over for a password (item 554): the chat's other tabs are closed and the page is opened again, a new document, with
+    a note for the run. A chat no script ran in is left as it is."""
+    await browser.open_url("owner", f"{site}/sign-in", True)
+    await browser.run_script("owner", _LISTENER, 5.0, False)
+    thread = browser._threads["owner"]
+    assert len(thread.tabs) == 2 and thread.scripted
+    tab = browser._tab_of("owner")
+    assert tab is not None
+    await tab.page.fill("#name", "typed before")
+    assert await tab.page.evaluate("window.__copied") == ["typed before"]
+
+    assert await browser.clean_for_owner("owner") is True
+    assert len(thread.tabs) == 1 and not thread.scripted
+    assert browser.current_url("owner") == f"{site}/sign-in"
+    assert await tab.page.evaluate("typeof window.__copied") == "undefined"
+    await tab.page.fill("#name", "typed after")
+    assert await tab.page.evaluate("typeof window.__copied") == "undefined"
+    view: PageView = await browser.snapshot("owner", True)
+    assert any("a script of this run ran" in note for note in view.notes), view.notes
+    assert await browser.clean_for_owner("owner") is False
+
+    await browser.open_url("plain", f"{site}/sign-in", True)
+    plain = browser._tab_of("plain")
+    assert plain is not None
+    await plain.page.fill("#name", "kept")
+    assert await browser.clean_for_owner("plain") is False
+    assert await plain.page.input_value("#name") == "kept"
+    assert await browser.clean_for_owner("never-used") is False
