@@ -253,9 +253,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `vision` model's
   description. A Word document (`.docx`) reads as its paragraphs and tables in order, headings and list items marked as
   Markdown marks them; a workbook (`.xlsx`, `.xlsm`) sheet by sheet, each cell after its address and a formula with the
-  value Excel last worked out for it (up to 100,000 cells); a presentation (`.pptx`) slide by slide, with its tables,
-  its charts' series and its notes; `read_file` reads such a file on disk the same way. A file of before 2007 (`.doc`,
-  `.xls`, `.ppt`) or one locked with a password is refused, saying what to save instead. Anything else is refused at
+  value Excel last worked out for it (up to 100,000 cells, and 50 places of its rows for each of those, so that a sheet
+  whose rows run far to the right with little in them is read in part, and the text says where it stops); a
+  presentation (`.pptx`) slide by slide, with its tables, its charts' series and its notes; `read_file` reads such a
+  file on disk the same way. A file of before 2007 (`.doc`,
+  `.xls`, `.ppt`) or one locked with a password is refused, saying what to save instead, and so is a package that is
+  damaged, or has a part packed in a way Office does not use, as a file that cannot be read. Anything else is refused at
   upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one named like a file
   Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
 - A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269) and
@@ -315,9 +318,12 @@ a file's size and a run's copies, under [Autonomy](autonomy.md)), and what a com
 command from writing a file. Any error of a tool fails that
 call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the log
 keeps its traceback) and goes on. `edit_file` changes the text it is given and nothing else: a file that breaks its
-lines with CRLF keeps them, in the new text too, and a file that is not UTF-8 text is refused, saying so, for the shell
-to change. `read_file` reads a long file in pages of lines, the text of a PDF too, each page ending with the line to go
-on from, so no part of it is out of reach. A shell command runs with the `PATH` of your login shell, in its own process
+lines with CRLF keeps them, in the new text too, a file that is not UTF-8 text is refused, saying so, for the shell
+to change, and an empty text to replace is refused (item 556). A file the file tools make gets the permission bits
+any program's new file gets (`0666` less your umask), and a file that was there keeps its own. `read_file` reads a
+long file in pages of lines, the text of a PDF too, each page ending with the line to go on from, so no part of it is
+out of reach; an image goes to the model as an image, an iPhone's HEIC photo too, which macOS draws first (item
+556). A shell command runs with the `PATH` of your login shell, in its own process
 group (cancelling a run ends the whole group) and under a timeout (`[shell] default_timeout_s`, at most
 `max_timeout_s`). An AppleScript (`apple_script`) ends with its call as well: one whose run is stopped or whose call
 times out is killed. `web_search` climbs a ladder of engines until one answers (`[web] search_backend`, default `auto`;
@@ -384,7 +390,8 @@ counts as untrusted content as the crawl did (item 494).
 **Notes of a run.** `write_notes(content, append)` keeps the notes of a run in one Markdown file,
 `<home>/workspace/notes/<run id>.md`: a long research run writes what it found there as it goes, with sources, instead
 of holding it all in its context, and names the file in its answer. The file is in the undo journal like any file write.
-It is the only file a `research` run may write.
+It is the only file a `research` run may write, and the write lands on that file or nowhere: a link at the notes folder
+or at the file, which a command of a `task` run can make, is refused, never followed (item 556).
 
 **Pages in the conversation.** `show_page(title, html)` shows you a page the run writes in HTML, in the conversation: a
 chart, a table, a diagram, a 3D view, a mockup. It sits under its title in a frame as wide as the conversation and as

@@ -1,6 +1,7 @@
 """Notes written at once (item 144), on real SQLite: a note saved twice at once, by two runs or two processes, stays one
 note with the tags of both saves (an embedder that takes its time lets both saves look for the text before either adds
-it), and a note another process adds while a store opens and rewrites the search index stays in the index."""
+it), and a note another process adds while a store opens and rewrites the search index stays in the index. A note
+deleted while its rewrite waits on the embedding leaves no row of it in the index or the vectors (item 556)."""
 
 import asyncio
 import sqlite3
@@ -11,9 +12,10 @@ from pathlib import Path
 import pytest
 
 from dotagent.config import AppConfig, load_config
+from dotagent.core.errors import NotFoundError
 from dotagent.core.text import fold_search
 from dotagent.memory.ranking import Vector
-from dotagent.memory.service import MemoryIndex, SavedMemory, save_memory
+from dotagent.memory.service import MemoryIndex, SavedMemory, rewrite_memory_note, save_memory
 from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord
 
@@ -88,3 +90,28 @@ async def test_a_note_another_process_adds_while_a_store_opens_stays_in_the_sear
     finally:
         other.close()
     assert indexed == sorted([first.id, "mem_other"])
+
+
+async def test_a_note_deleted_while_its_rewrite_waits_on_the_embedding_leaves_nothing_of_it_in_the_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    config: AppConfig = load_config(tmp_path / "config.toml")
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    index: MemoryIndex = MemoryIndex(store=store, embedder=_SlowEmbedder(), config=config.memory)
+    try:
+        saved: SavedMemory = await save_memory(index, NOTE, ["finance"], None, None, None, False)
+        rewriting: asyncio.Task[MemoryRecord] = asyncio.create_task(
+            rewrite_memory_note(index, saved.record.id, OTHER, ["receipts"], "run_1", False)
+        )
+        # The rewrite found the note, and waits on the embedder; the owner deletes the note meanwhile.
+        await asyncio.sleep(_EMBED_S / 2)
+        assert await store.delete_memory(saved.record.id)
+        with pytest.raises(NotFoundError):
+            await rewriting
+        vectors: list[tuple[str, tuple[float, ...]]] = await store.all_memory_vectors()
+        async with store._db.execute("SELECT id FROM memories_fts") as cursor:
+            indexed: list[str] = [str(row["id"]) for row in await cursor.fetchall()]
+    finally:
+        await store.close()
+    assert (vectors, indexed) == ([], [])

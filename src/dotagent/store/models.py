@@ -22,8 +22,9 @@ ChatMode = Literal["auto", "task", "chat", "research"]
 ChatLineRole = Literal["user", "assistant"]
 # How a run was handed a note: at its start, by a memory_search call, or as a note changed while it ran.
 MemoryUseHow = Literal["start", "search", "live", "site"]
-# ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (it is never
-# expired; answering it carries the work on in its thread).
+# ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (answering
+# it carries the work on in its thread; it stays until it is answered, and expires when its chat is rewound to before
+# its run, when its campaign is deleted, or when the time a kept step has runs out: ``kept_until``).
 ApprovalStatus = Literal["pending", "left", "approved", "denied", "expired"]
 # The application a draft goes out with (item 314): ``mail`` an email by Mail, ``message`` an iMessage by Messages.
 DraftChannel = Literal["mail", "message"]

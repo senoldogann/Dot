@@ -150,6 +150,7 @@ CREATE TABLE IF NOT EXISTS queue_claims (
     thread_id TEXT PRIMARY KEY, message_id TEXT NOT NULL, owner TEXT NOT NULL, claimed_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS run_stops (run_id TEXT PRIMARY KEY, asked_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS run_taints (run_id TEXT PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS sent_messages (key TEXT PRIMARY KEY, sent_at REAL NOT NULL, target TEXT);
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL
@@ -233,7 +234,9 @@ _EXTENSIONS: dict[str, str] = {
 }
 
 
-# How long a write waits for another writer; the same 10 s as the busy timeout of the shared connection.
+# The events that say a lesson is the owner's (item 556): ``owner_saved_memory_ids`` reads them, so a prune leaves them.
+# An event stored before ``by`` was written is the owner's (``_SavedData``).
+_OWNER_SAVED_LESSON: str = "kind = 'lesson_saved' AND coalesce(json_extract(data, '$.by'), 'owner') = 'owner'"
 
 # A screenshot saved this recently may belong to a message or event that is not stored yet, so deleting a chat leaves it
 # for ``orphan_images`` to find later.
@@ -801,13 +804,13 @@ def _option_values(options: ScheduleOptions) -> _OptionValues:
     )
 
 
+# The kv key that names the adopted version of the harness (item 389); absent while none is adopted.
+HARNESS_ADOPTED_KEY: str = "harness.adopted"
+
 # Columns of ``runs`` added after the first version, with the definition that gives the rows of an older database the
 # value those runs had in effect: no reasoning level kept, ``ask``, no goal mode, no campaign, no owner (a run of a
 # process of before owners, which a daemon that starts takes for gone, as it took every run then), the standard speed,
 # no choice for one message (item 251).
-# The kv key that names the adopted version of the harness (item 389); absent while none is adopted.
-HARNESS_ADOPTED_KEY: str = "harness.adopted"
-
 _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("effort", "TEXT"),
     ("approvals", "TEXT NOT NULL DEFAULT 'ask'"),
@@ -1068,13 +1071,27 @@ class Store:
     async def open(cls, path: Path, image_dir: Path) -> "Store":
         await asyncio.to_thread(_prepare_dirs, path, image_dir)
         connection: aiosqlite.Connection = await aiosqlite.connect(path)
-        connection.row_factory = aiosqlite.Row
-        await connection.execute("PRAGMA journal_mode=WAL")
-        await connection.execute("PRAGMA synchronous=NORMAL")
-        await connection.execute("PRAGMA busy_timeout=10000")
-        await connection.executescript(_SCHEMA)
-        await _add_missing_columns(connection)
-        await _refresh_memory_index(connection)
+        try:
+            connection.row_factory = aiosqlite.Row
+            await connection.execute("PRAGMA journal_mode=WAL")
+            await connection.execute("PRAGMA synchronous=NORMAL")
+            await connection.execute("PRAGMA busy_timeout=10000")
+            await connection.executescript(_SCHEMA)
+            await _add_missing_columns(connection)
+            await _refresh_memory_index(connection)
+        except BaseException as error:
+            # The connection's worker thread is not a daemon: left running, it keeps the process alive after the error
+            # (item 556), and a daemon that never exits is never started again by launchd.
+            with contextlib.suppress(Exception):
+                await connection.close()
+            if isinstance(error, sqlite3.Error):
+                raise StoreError(
+                    "the database is locked by another process"
+                    if _is_locked(error)
+                    else "the database cannot be opened",
+                    {"path": str(path), "error": str(error)},
+                ) from error
+            raise
         return cls(connection, path, image_dir)
 
     async def close(self) -> None:
@@ -1551,6 +1568,7 @@ class Store:
         await self._db.execute(f"{doomed} DELETE FROM approvals WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM shown_pages WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM drafts WHERE run_id IN (SELECT id FROM doomed)", named)
+        await self._db.execute(f"{doomed} DELETE FROM run_taints WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM runs WHERE id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"DELETE FROM messages WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM message_archive WHERE thread_id IN ({marks})", named)
@@ -1639,25 +1657,56 @@ class Store:
         return await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
 
     async def events_of_runs_ended_before(self, before: float) -> tuple[int, int]:
-        """How many runs that ended before ``before`` still have events, and how many events they have."""
+        """How many runs that ended before ``before`` still have events a prune deletes, and how many events they have
+        (:meth:`delete_events_of_runs_ended_before`)."""
         row = await self._one(
             "SELECT COUNT(DISTINCT run_id) AS runs, COUNT(*) AS events FROM events WHERE run_id IN"
-            " (SELECT id FROM runs WHERE finished_at IS NOT NULL AND finished_at < ?)",
+            f" (SELECT id FROM runs WHERE finished_at IS NOT NULL AND finished_at < ?) AND NOT ({_OWNER_SAVED_LESSON})",
             (before,),
         )
         return (0, 0) if row is None else (int(row["runs"]), int(row["events"]))
 
     @_writing
-    async def delete_events_of_runs_ended_before(self, before: float) -> int:
+    async def delete_events_of_runs_ended_before(self, before: float, taint_kinds: Sequence[str]) -> int:
         """Delete the events of the runs that ended before ``before``, and the pages they showed and the drafts they
         wrote, which the conversation showed; the runs stay. Returns how many events went. The screenshots those events
-        named become orphans for :meth:`orphan_images`."""
+        named become orphans for :meth:`orphan_images`.
+
+        Two things the events said outlive them (item 556), as nothing else records them: that a run ended tainted,
+        which decides how a run that resumes it or builds on it starts (:meth:`pruned_run_tainted`), read from the
+        newest of its events of ``taint_kinds`` as :func:`dotagent.agent.gate.tainted_after` reads them; and that the
+        owner saved a lesson from a run, which keeps the nightly reflection from folding or resting it
+        (:meth:`owner_saved_memory_ids`): those events stay."""
         ended: str = "SELECT id FROM runs WHERE finished_at IS NOT NULL AND finished_at < ?"
-        cursor = await self._db.execute(f"DELETE FROM events WHERE run_id IN ({ended})", (before,))
+        await self._db.execute(
+            "INSERT OR IGNORE INTO run_taints(run_id) SELECT e.run_id FROM events AS e WHERE e.id IN"
+            f" (SELECT MAX(id) FROM events WHERE kind IN ({','.join('?' * len(taint_kinds))})"
+            f" AND run_id IN ({ended}) GROUP BY run_id)"
+            " AND json_type(e.data, '$.tainted') = 'true'"
+            " AND (e.kind != 'steer' OR json_type(e.data, '$.vouches') = 'false')",
+            (*taint_kinds, before),
+        )
+        cursor = await self._db.execute(
+            f"DELETE FROM events WHERE run_id IN ({ended}) AND NOT ({_OWNER_SAVED_LESSON})", (before,)
+        )
         await self._db.execute(f"DELETE FROM shown_pages WHERE run_id IN ({ended})", (before,))
         await self._db.execute(f"DELETE FROM drafts WHERE run_id IN ({ended})", (before,))
         await self._db.commit()
         return cursor.rowcount
+
+    async def pruned_run_tainted(self, run_id: str) -> bool:
+        """Whether the run ``run_id`` ended tainted, as :meth:`delete_events_of_runs_ended_before` recorded it before it
+        deleted the events that said so (item 556); False for a run it recorded nothing of."""
+        return await self._one("SELECT 1 FROM run_taints WHERE run_id = ?", (run_id,)) is not None
+
+    async def archived_messages(self) -> tuple[int, int]:
+        """How many messages the chats keep aside in earlier versions of their history (:meth:`replace_messages`), and
+        their size in bytes. Nothing deletes them but the deletion or the rewinding of their chat, and the screenshots
+        they name stay with them (item 556)."""
+        row = await self._one(
+            "SELECT COUNT(*) AS messages, COALESCE(SUM(LENGTH(body)), 0) AS bytes FROM message_archive", ()
+        )
+        return (0, 0) if row is None else (int(row["messages"]), int(row["bytes"]))
 
     async def orphan_images(self, now: float, grace_s: float) -> list[Path]:
         """The screenshot files that nothing names: what chats deleted before their files went with them left behind.
@@ -1751,10 +1800,13 @@ class Store:
         await self._unit(statements)
 
     async def load_messages(self, thread_id: str, keep_recent_images: int) -> list[Message]:
-        """Load a thread's history; only the newest ``keep_recent_images`` screenshots are re-inflated."""
-        rows: list[aiosqlite.Row] = await self._all(
-            "SELECT body FROM messages WHERE thread_id = ? ORDER BY seq", (thread_id,)
-        )
+        """Load a thread's history; only the newest ``keep_recent_images`` screenshots are re-inflated. The read waits
+        for the write under way (item 556): the connection shows its own half-done writes to a read, so one that landed
+        between the delete and the insert of :meth:`replace_messages` found the history empty."""
+        async with self._write_lock:
+            rows: list[aiosqlite.Row] = await self._all(
+                "SELECT body FROM messages WHERE thread_id = ? ORDER BY seq", (thread_id,)
+            )
         bodies: list[str] = [str(row["body"]) for row in rows]
 
         def decode_all() -> list[Message]:
@@ -2342,7 +2394,10 @@ class Store:
 
     async def first_event_id_since(self, since: float) -> int:
         """The id of the first event at or after ``since``, one past the last event when none is; found by halving the
-        ids, which grow with the time, so no read walks the whole table (it has no index on the time, item 469)."""
+        ids, which grow with the time, so no read walks the whole table (it has no index on the time, item 469). The
+        ends of runs are not probed (item 556): the end of a run closed after its process went is stored at the run's
+        last sign of life, which may be days before the events stored beside it, and a probe that landed on one made
+        the search go on past events that are in the time asked for."""
         bounds = await self._one("SELECT MIN(id) AS low, MAX(id) AS high FROM events", ())
         if bounds is None or bounds["low"] is None:
             return 0
@@ -2350,7 +2405,9 @@ class Store:
         high: int = int(bounds["high"]) + 1
         while low < high:
             middle: int = (low + high) // 2
-            row = await self._one("SELECT id, ts FROM events WHERE id >= ? ORDER BY id LIMIT 1", (middle,))
+            row = await self._one(
+                "SELECT id, ts FROM events WHERE id >= ? AND kind != 'run_finished' ORDER BY id LIMIT 1", (middle,)
+            )
             if row is None or float(row["ts"]) >= since:
                 high = middle if row is None else min(middle, int(row["id"]))
             else:
@@ -3447,10 +3504,14 @@ class Store:
     ) -> MemoryRecord:
         """The statements of a rewrite, committed together; ``mark`` is how the note's mark is set from ``tainted``."""
         tag_text: str = ",".join(tags)
-        await self._db.execute(
+        updated = await self._db.execute(
             f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark} WHERE id = ?",
             (content, tag_text, time.time(), source_run, tainted, memory_id),
         )
+        if updated.rowcount == 0:
+            # The note was deleted while its rewrite waited on the embedding (item 556): nothing of it is written, as
+            # an index row or a vector for a note that is not there would take a place in the next search.
+            raise NotFoundError("memory not found", {"memory_id": memory_id})
         await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (memory_id,))
         await self._db.execute(
             "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
@@ -3677,12 +3738,10 @@ class Store:
         await self._db.commit()
 
     async def owner_saved_memory_ids(self) -> set[str]:
-        """The notes the owner saved as lessons from a run's page (a ``lesson_saved`` event by the owner)."""
+        """The notes the owner saved as lessons from a run's page (a ``lesson_saved`` event by the owner, which a prune
+        leaves)."""
         rows = await self._all(
-            "SELECT json_extract(data, '$.memory_id') AS memory_id FROM events"
-            # An event stored before ``by`` was written is the owner's (``_SavedData``).
-            " WHERE kind = 'lesson_saved' AND coalesce(json_extract(data, '$.by'), 'owner') = 'owner'",
-            (),
+            f"SELECT json_extract(data, '$.memory_id') AS memory_id FROM events WHERE {_OWNER_SAVED_LESSON}", ()
         )
         return {str(row["memory_id"]) for row in rows if row["memory_id"] is not None}
 

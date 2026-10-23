@@ -5,6 +5,7 @@ import sqlite3
 import time
 from pathlib import Path
 
+from dotagent.agent.gate import TAINT_EVENTS
 from dotagent.store.db import Store
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.models import EventRecord, RunRecord, RunStatus, ThreadRecord
@@ -171,7 +172,7 @@ async def test_a_closed_run_whose_events_were_pruned_gets_none_back(tmp_path: Pa
         await store.add_event(run.id, "run_queued", {})
         assert await store.mark_interrupted_runs(()) == 1
         # What dotx prune does: the events of the runs that ended before its cut go, and the runs stay.
-        assert await store.delete_events_of_runs_ended_before(time.time() + 60) == 2
+        assert await store.delete_events_of_runs_ended_before(time.time() + 60, TAINT_EVENTS) == 2
         assert await store.mark_interrupted_runs(()) == 0
         assert await store.list_events(run.id, 0, 10) == []
     finally:
