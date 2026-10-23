@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "installer",
+  "description": "The installer's own page (item 575), in the window that has this label and nowhere else, may run the install commands of the shell, drag the window by its bars and zoom it with a double click there. The capability is for local pages: it has no remote entry, so a page from an address cannot use it, and no other window, the daemon's pages included, is named here.",
+  "local": true,
+  "windows": ["installer"],
+  "permissions": [
+    "allow-installer-inspect",
+    "allow-installer-status",
+    "allow-installer-start",
+    "allow-installer-retry",
+    "allow-installer-open",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize"
+  ]
+}

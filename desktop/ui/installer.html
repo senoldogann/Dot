@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set up Dot</title>
+  <link rel="stylesheet" href="installer.css">
+</head>
+<body>
+  <header data-tauri-drag-region></header>
+  <main>
+    <svg class="wordmark" viewBox="-104 -184 600 288" width="112" role="img" aria-label="Dot">
+      <path class="letter" d="M83 -163V83M83 0A83 83 0 1 1 -83 0A83 83 0 1 1 83 0"/>
+      <g transform="translate(244 0)">
+        <circle class="disc" r="100"/>
+        <path class="eye" d="M-10.5 -11.5a10.5 10.5 0 0 1 21 0v23a10.5 10.5 0 0 1 -21 0z" transform="matrix(1.098 -0.112 0.101 1.109 -17.3 -9.14)"/>
+        <path class="eye" d="M-10.5 -11.5a10.5 10.5 0 0 1 21 0v23a10.5 10.5 0 0 1 -21 0z" transform="matrix(1.030 -0.045 0.101 1.109 37.32 -13.26)"/>
+      </g>
+      <path class="letter" d="M413 -133V36A47 47 0 0 0 460 83H476M383 -83H469"/>
+    </svg>
+    <h1>Set up Dot</h1>
+    <p class="muted" id="outside" hidden>This page is the installer of the Dot app. Open the Dot app to set Dot up.</p>
+
+    <section data-screen="mac" aria-labelledby="mac-title" hidden>
+      <h2 id="mac-title">What this Mac has</h2>
+      <ul class="rows" id="mac-rows"></ul>
+      <p class="muted" id="resuming" hidden>A setup of Dot stopped before it finished. This goes on from there.</p>
+      <p class="muted" id="resuming-models" hidden>Its models are set up already, so Continue goes straight on to the rest.</p>
+      <p class="problem" id="mac-problem" role="alert" hidden></p>
+      <div class="buttons">
+        <button type="button" class="secondary" id="mac-again">Check again</button>
+        <button type="button" class="primary" id="mac-next">Continue</button>
+      </div>
+    </section>
+
+    <section data-screen="models" aria-labelledby="models-title" hidden>
+      <h2 id="models-title">Which models should Dot use?</h2>
+      <div class="providers" id="providers" role="radiogroup" aria-labelledby="models-title"></div>
+      <p class="muted" id="ollama-note" hidden></p>
+      <label class="field" id="model-field" hidden>
+        <span>Model</span>
+        <input id="model" type="text" list="model-options" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <datalist id="model-options"></datalist>
+      </label>
+      <label class="field" id="key-field" hidden>
+        <span id="key-label">API key</span>
+        <input id="key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <p class="muted" id="key-note" hidden>The key is stored on this Mac, in Dot's own file, and goes only to the service it belongs to.</p>
+      <p class="problem" id="models-problem" role="alert" hidden></p>
+      <div class="buttons">
+        <button type="button" class="secondary" id="models-back">Back</button>
+        <button type="button" class="secondary" id="ollama-again" hidden>Check again</button>
+        <button type="button" class="primary" id="install" disabled>Install Dot</button>
+      </div>
+    </section>
+
+    <section data-screen="install" aria-labelledby="install-title" hidden>
+      <h2 id="install-title">Installing Dot</h2>
+      <ol class="steps" id="steps" aria-live="polite"></ol>
+      <div class="failure" id="failure" role="alert" hidden>
+        <h3 id="failure-title"></h3>
+        <p id="failure-message"></p>
+        <pre id="failure-output"></pre>
+        <p id="failure-fix"></p>
+        <div class="buttons">
+          <button type="button" class="secondary" id="failure-change">Change the models</button>
+          <button type="button" class="secondary" id="failure-log">Show the log</button>
+          <button type="button" class="primary" id="failure-again">Try again</button>
+        </div>
+      </div>
+      <p class="muted" id="done" hidden>This window opens Dot by itself.</p>
+    </section>
+  </main>
+  <script type="module" src="installer.js"></script>
+</body>
+</html>

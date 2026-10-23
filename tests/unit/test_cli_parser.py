@@ -3,7 +3,7 @@
 import pytest
 
 from dotagent.cli import build_parser, parse_command
-from dotagent.cli_commands import RunCommand
+from dotagent.cli_commands import RunCommand, ServiceInstallCommand
 
 
 @pytest.mark.parametrize("browser", ["own", "attach"])
@@ -24,6 +24,15 @@ def test_the_help_of_a_run_lists_the_browsers(capsys: pytest.CaptureFixture[str]
     with pytest.raises(SystemExit):
         build_parser().parse_args(["run", "--help"])
     assert "--browser {own,attach}" in capsys.readouterr().out
+
+
+def test_service_install_takes_the_launcher_the_desktop_app_carries() -> None:
+    """Item 575: ``--launcher`` names the prebuilt program for Dot.app; left out, it is none (and DOT_APP_LAUNCHER, or
+    clang, decides)."""
+    named = parse_command(build_parser(), ["service", "install", "--launcher", "/Applications/Dot.app/launcher"])
+    assert isinstance(named, ServiceInstallCommand) and named.launcher == "/Applications/Dot.app/launcher"
+    plain = parse_command(build_parser(), ["service", "install"])
+    assert isinstance(plain, ServiceInstallCommand) and plain.launcher is None
 
 
 def test_the_help_of_prune_names_everything_that_apply_deletes(capsys: pytest.CaptureFixture[str]) -> None:

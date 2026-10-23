@@ -268,6 +268,7 @@ class UrlCommand(FrozenModel):
 
 class ServiceInstallCommand(FrozenModel):
     name: Literal["service-install"]
+    launcher: str | None
 
 
 class ServiceUninstallCommand(FrozenModel):

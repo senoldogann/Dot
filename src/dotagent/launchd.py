@@ -11,9 +11,12 @@ it exits would restart the daemon over and over.
 """
 
 import asyncio
+import contextlib
 import os
 import plistlib
 import re
+import stat
+import tempfile
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -22,6 +25,7 @@ from typing import TypedDict
 from dotagent.core.errors import ServiceError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
+from dotagent.dot_app import tools_path
 
 log = get_logger(__name__)
 
@@ -34,6 +38,10 @@ RESTART_POLL_S: float = 5.0
 RESTART_WAIT_LIMIT_S: float = 2 * 60 * 60
 # What launchd gives a job is only /usr/bin:/bin:/usr/sbin:/sbin; shell commands of the agent get the login shell's own.
 SERVICE_PATH: str = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# The folder of the tools the desktop app carries (ripgrep, uv; item 575), put before SERVICE_PATH in a job's PATH when
+# ``dotx service install`` is started with it set, or finds it in Dot's home (``dot_app.tools_path``), so that Dot's
+# search finds ripgrep with no Homebrew.
+TOOLS_ENV: str = "DOT_APP_TOOLS"
 
 _LAUNCHCTL: str = "/bin/launchctl"
 # ``bootout`` waits until the job has exited, which may take as long as the job's exit timeout.
@@ -43,6 +51,8 @@ _NOT_LOADED_CODE: int = 113
 _UNLOAD_WAIT_S: float = 20.0
 _UNLOAD_POLL_S: float = 0.25
 _PLIST_MODE: int = 0o644
+# The most of a property list that is read back to be restored: the lists of Dot's jobs are a couple of kilobytes.
+_PLIST_READ_LIMIT: int = 1 << 20
 # A job that fails to start is tried again after this many seconds, not in a tight loop.
 _THROTTLE_S: int = 30
 # The daemon closes its runs, its schedules and its browser when it is asked to stop; launchd kills it after this.
@@ -167,10 +177,29 @@ def restart_job_path(home: Path) -> Path:
     return home / f"{RESTART_LABEL}.plist"
 
 
+def service_path(environ: Mapping[str, str], home: Path | None = None) -> str:
+    """The ``PATH`` of a job: :data:`SERVICE_PATH`, with the folder of the desktop app's tools before it. That folder is
+    the one ``environ`` names in :data:`TOOLS_ENV`, which only the desktop app's own steps set; else, with Dot's
+    ``home`` given, the one the app keeps in it, when it is there: a ``dotx service install`` typed in a terminal on an
+    install of the app, as the README tells, writes the job with ripgrep on its path all the same. A folder is one
+    full path (a ``:`` would make it two, a newline would break the property list's line); one found in ``home`` that
+    is not is left out."""
+    tools: str = environ.get(TOOLS_ENV, "")
+    if tools == "" and home is not None:
+        kept: str = str(tools_path(home))
+        if tools_path(home).is_dir() and kept.startswith("/") and ":" not in kept and "\n" not in kept:
+            tools = kept
+    if tools == "":
+        return SERVICE_PATH
+    if not tools.startswith("/") or ":" in tools or "\n" in tools:
+        raise ServiceError(f"{TOOLS_ENV} is not one full path", {"value": _clip(tools, _OUTPUT_CHARS)})
+    return f"{tools}:{SERVICE_PATH}"
+
+
 def _job_environment(home: Path, logs: Path, environ: Mapping[str, str]) -> dict[str, str]:
     """What a job of Dot runs with: launchd's own environment has no ``/opt/homebrew``; ``DOT_HOME`` and
     ``DOT_LOG_DIR`` are handed on when ``environ`` sets them."""
-    environment: dict[str, str] = {"PATH": SERVICE_PATH}
+    environment: dict[str, str] = {"PATH": service_path(environ, home)}
     if environ.get("DOT_HOME", "") != "":
         environment["DOT_HOME"] = str(home)
     if environ.get("DOT_LOG_DIR", "") != "":
@@ -362,12 +391,24 @@ async def _wait_until_unloaded(target: str) -> None:
 
 
 def _write_plist(path: Path, content: bytes) -> None:
-    """Replace the property list in one step; launchd refuses a file that others may write to."""
+    """Replace the property list in one step; launchd refuses a file that others may write to.
+
+    The new file is made by ``mkstemp`` in the same folder, which makes a name that is not there and so writes through
+    no link, and ``os.replace`` puts it at the name, replacing what is there without following it. The restart job's
+    list is in Dot's home, a place a command of a run may write, and the staging name used to be a fixed one: a link
+    left at it was written through, and the file it led to was given the list's mode (item 441, which the upgrade of the
+    desktop app (item 575) runs at every update)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    staging: Path = path.with_name(f".{path.name}.tmp")
-    staging.write_bytes(content)
-    os.chmod(staging, _PLIST_MODE)
-    os.replace(staging, path)
+    descriptor, staging = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as file:
+            os.fchmod(file.fileno(), _PLIST_MODE)
+            file.write(content)
+        os.replace(staging, path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(staging)
+        raise
 
 
 def _remove_file(path: Path) -> bool:
@@ -378,7 +419,31 @@ def _remove_file(path: Path) -> bool:
 
 
 def _read_file(path: Path) -> bytes | None:
-    return path.read_bytes() if path.exists() else None
+    """The property list that is at ``path`` now, for :func:`_put_back` to restore when the new job does not load:
+    ``None`` when there is none, and when what is there is not a plain file. A link left at the name would hand back
+    what it leads to (a file the sandbox seals, say) as a plain file of Dot's own, and a FIFO would hold the read for
+    ever, so the name is opened with ``O_NOFOLLOW`` and ``O_NONBLOCK`` and what was opened is checked, on the
+    descriptor, to be a regular file of a size a property list has. What is not is not read, and the new list replaces
+    it at the name, as it replaces any file there."""
+    try:
+        descriptor: int = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        log.warning("property_list_not_read", path=str(path), error=str(exc))
+        return None
+    with contextlib.ExitStack() as opened:
+        opened.callback(os.close, descriptor)
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            log.warning("property_list_not_a_plain_file", path=str(path))
+            return None
+        os.set_blocking(descriptor, True)
+        with os.fdopen(descriptor, "rb", closefd=False) as file:
+            content: bytes = file.read(_PLIST_READ_LIMIT + 1)
+    if len(content) > _PLIST_READ_LIMIT:
+        log.warning("property_list_too_long", path=str(path), limit=_PLIST_READ_LIMIT)
+        return None
+    return content
 
 
 async def _install(label: str, plist: Path, content: bytes, uid: int) -> bool:

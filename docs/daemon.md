@@ -785,7 +785,10 @@ dotx service uninstall   # stop the daemon and remove the job
   blocked (the run that asked included, so it has to end first, and a run that waits for an answer works too), then
   restarts the daemon as `service restart` does, waits for the health check, writes what it did to `dotx.log`
   (`restart_when_idle_waiting`, `_idle`, `_restarted`, `_gave_up` after 2 hours without a restart, `_failed`, `_crashed`
-  with a traceback), unloads itself and deletes its property list. Asking while one is on its way changes nothing
+  with a traceback), unloads itself and deletes its property list. The list is written to a new file made in Dot's home
+  and put in place in one step, and the one that was there is read without following a link or waiting for a FIFO (a
+  command of a run may leave either in Dot's home, and the upgrade of the desktop app, item 575, asks for this restart
+  at every update). Asking while one is on its way changes nothing
   (replacing it could stop it between unloading the daemon's job and loading it again), so there is never more than one;
   `service status` shows a `restart` line that says whether one waits, and `service uninstall` cancels it. A job that a
   run made with `launchctl submit` is started again by launchd each time its script exits, which restarted the daemon
@@ -796,8 +799,19 @@ dotx service uninstall   # stop the daemon and remove the job
   Screen Recording, Automation and the folders you allow go to Dot. Before, the job ran Python itself: macOS named
   `python3.13`, and a grant went to that Python binary alone, so the next one (a uv update, another version) had none.
   `service install` builds the app with clang (Xcode's Command Line Tools; `xcode-select --install` when it says they
-  are missing) and signs it ad hoc. macOS knows such an app by the hash of its code, so the app is built again only when
-  its source or its Info.plist change; otherwise it stays as it is, with what you granted it. A run's commands cannot
+  are missing) and signs it ad hoc; given a program built and signed already (`--launcher PATH`, or `DOT_APP_LAUNCHER`:
+  the desktop app carries one, item 575) it copies that in place of the clang build, so that the Tools are not needed,
+  and signs the app ad hoc the same, and `DOT_APP_TOOLS` names a folder (the app's `rg` and `uv`) that the job's `PATH`
+  begins with. Only the desktop app's own steps set those two variables, so `dotx service install` (and `dotx setup`,
+  which installs the service) typed in a terminal on an install of the app, as the README tells, finds both in Dot's
+  home: the folder is `runtime/app-tools` when it is there, and the program is the one the app was made from, which
+  Dot.app keeps (`Contents/Resources/launcher.program`, with its hash) and makes the app again from when its Info.plist
+  has changed; so nothing asks for Homebrew's ripgrep or for Xcode's tools. A program that changed is the desktop app's
+  to bring, with `--launcher`; an app that keeps none (one built with clang) is built with clang as before, and when
+  clang is missing the error names the desktop app's program as the way. macOS knows such an app by the hash of its
+  code, so the app is built again only when its source or its Info.plist change (an app made from a prebuilt program
+  is not made from this package's source, so a change of it alone leaves that app as it is); otherwise it stays as it
+  is, with what you granted it. A run's commands cannot
   change it: the sandbox closes `Dot.app` and the folder it is built in to their writes (item 561, see
   [Safety](safety.md#safety)). It is not the desktop
   shell's window app (`desktop/`, `dev.dot.desktop`), which also bears the name. Moving from the Python job, grant the
@@ -939,8 +953,75 @@ Left for later: a shortcut of your own.
 
 `desktop/` is a native Mac window around the web UI, built with Tauri 2: a few megabytes, the one web UI, and a
 menu bar item. The daemon stays owned by launchd (`dotx service install`); the shell connects to it and never runs
-the agent itself.
+the agent itself. On a Mac that has no Dot, the shell installs one first (**Installing Dot**, below).
 
+- **Installing Dot** (item 575). With no Dot on the Mac, the app has no daemon to connect to, and it makes one. Its
+  window is the page **Set up Dot** (`desktop/ui/installer.html`, bundled with the app, in the look of the down page),
+  in a window of its own, and it is shown only when nothing of Dot is here: no launchd job of Dot's, no daemon that
+  answers, no `config.toml` and no token in Dot's home (but for an install of the app's own that stopped, items 4 and
+  5). Where any is (the owner's checkout, a Dot installed by hand), the app shows what it always showed, the UI or
+  the page that says Dot is down, and never the installer; each step asks again before it runs, so a Dot that
+  appears while the page is open stops the install. The steps, from the shell
+  (`desktop/src-tauri/src/installer.rs`), with the output of each kept in `installer.log` of Dot's log folder (the key
+  masked) and listed on the page:
+  1. **What the Mac has**: macOS 15.2 or later (older only warns: the desktop tools need it, nothing else does),
+     Google Chrome (missing only warns, with a button to Chrome's download page: the browser tools need it) and that
+     the app runs from where an app stays (not from its disk image, nor the place macOS runs a downloaded app from
+     before it is moved).
+  2. **The models**: what `dotx setup` offers, less OpenCode's own agent (the list is `providers.json`, which a test
+     keeps equal to `CHOICES` of `cli_setup.py`): Ollama, when it answers on 127.0.0.1:11434 (its models are listed; a
+     cloud model needs `ollama signin` once), or an API key of OpenAI, Anthropic, OpenRouter or OpenCode Go, in a
+     password field.
+  3. **Install**, one button, four steps. `uv --no-config tool install --python 3.13 dotagent-macos==<the app's
+     version>`, with the `uv` the app carries and `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_PYTHON_INSTALL_DIR` and
+     `UV_CACHE_DIR` under `runtime/` of Dot's home, only Pythons that uv downloads (`UV_PYTHON_PREFERENCE =
+     only-managed`) and no `uv.toml` read; then `dotx setup --model provider:model --no-service` with the key on
+     standard input (`--key-stdin`), never in an argument, an environment variable or a log; then `dotx service install
+     --launcher <the launcher in the app's Resources>`, which copies the program of Dot.app, built and signed in the
+     release, in place of the clang build (so Xcode's Command Line Tools are not needed); then the window waits for
+     the daemon to prove itself and opens the UI as it always does. Dot's commands run with the Python of the package's
+     environment (`python -P -m dotagent`), as the job runs the daemon. Each program is started with a short list of
+     the app's environment (home, temporary folder, language, Dot's folders, and the proxy and certificate settings
+     uv needs behind a company's network) and what the step sets, and nothing else. The job's `PATH` begins with
+     `runtime/app-tools`, a folder of two links, to `rg` and `uv` of the tools in the app's Resources and to nothing
+     else, which the app makes again at every start where the app is: Dot's search finds ripgrep with no Homebrew,
+     moving the app does not lose it, and nothing else that lies in the app's tools folder is on the `PATH` of a
+     daemon that holds the keys of your accounts.
+  4. **A step that fails** says which, what it printed (the key masked) and what to do, and **Try again** goes on from
+     it; the steps that are done are not run again, whichever step failed (the service step too, when launchd loaded the
+     job and the daemon was slow to answer). Before the package is installed nothing is made, and a failed install
+     leaves no marker. A package that PyPI does not have yet (a version reaches PyPI some minutes before its app is
+     published, see [Releasing](development.md#releasing)) is said as that.
+  5. **The marker, and what makes the install complete.** `runtime/app-install.json` records each of the first three
+     steps as it finishes: the package installed (written once `uv` succeeded, with its version), the models set up, and
+     the service installed. The install is **complete when its service is installed**. The fourth step, the wait for the
+     daemon's first answer, is shown to you and decides nothing: when it runs out (the first start can wait for macOS to
+     ask whether Dot may use a folder) and the app is quit, the install is complete all the same, and nothing depends on
+     the app having seen the daemon answer. At every start of the app, a complete install shows what the app always
+     showed, the UI, or the page that says Dot is down where the daemon does not answer, and its package is kept in step
+     (see Updates below). An install with a step missing shows the installer, which goes on from the first step that is
+     not done, as long as no daemon answers and the job is not another program's; with the models done it asks for none
+     and goes on at the service, and `dotx setup` is never run again over a config of yours (a choice of models that
+     reaches it then is refused in words, and **Change the models** is not offered: change them in Settings once Dot is
+     open). What is on the disk adds to what the marker records: a `config.toml` is the models done, a launchd job that
+     is the app's own is the service installed, and the package counts only while its Python is there. A marker that an
+     older build wrote recorded no steps, and what it said instead (that the daemon had answered) is not believed: it is
+     read by the disk alone, each step done only where the disk shows it, so that a marker that claims everything over a
+     package alone leaves the installer to go on and the package alone as it is.
+     **The job is the app's own** when its property list, read as launchd reads it and not as text, is a dictionary with
+     the label of Dot's service and no `Program` of its own, whose `ProgramArguments` begin with Dot.app's program in
+     Dot's home and, exactly, the Python of the package's environment in the runtime folder, as `dotx service install`
+     writes them when the app runs it. A job of a checkout on the same home, whose `PATH` names `runtime/app-tools`, a
+     list that mentions the runtime folder in a comment or in another key, and a job of another program that has that
+     Python for an argument are not it: they are another Dot's, which the installer never runs over and the upgrade
+     never restarts. **A file that a command of a run may have put something else at is not trusted**: the marker, the
+     job's property list and the installer's log are opened without following a link and without waiting for a FIFO (the
+     open does not block, and what was opened is checked to be a plain file), and read only up to the few kilobytes they
+     hold. What is not a plain file is read as no marker, as another program's job and as no log (the app says so of the
+     log on its standard error); it holds nothing up.
+  The page's commands are the shell's own (`installer_inspect`, `installer_status`, `installer_start`,
+  `installer_retry`, `installer_open`), which only the page of that window may call (below). The runtime folder is Dot's
+  own code to the sandbox, like Dot.app: a run's commands cannot change it.
 - **One interface.** The window is the web UI at the size the screenshot tour reviews (1280 × 860, down to a
   phone's 390 wide). The system draws only the traffic lights over the page, on the centre line of the top bars with
   room above and below them; the page keeps room for them in the sidebar's head, as tall as the top bar so that its
@@ -976,7 +1057,12 @@ and Quit. Closing the window keeps the shell in the menu bar.
   to send a notification or drag the window (by its bars, and zoom it with a double click there): the address it reads
   from `config.toml`, and any it read there before since it started. They get no other command of Tauri's core (item
   561): not the image commands, which read a file from disk, nor the menu bar item's and the app menu's, nor events. A
-  page of any other address, another port of the Mac among them, gets nothing from it.
+  page of any other address, another port of the Mac among them, gets nothing from it. The commands of the installer
+  (item 575) are named in the app's manifest (`build.rs`), so each needs a permission of its own, and only
+  `capabilities/installer.json` grants them: to the window `installer` and to local pages, with no remote entry. The
+  window `main` (the UI, the down page), the daemon's pages and any other address are refused, which a test asks of
+  the app built with its real capabilities. The installer window shows its own page and nothing else: it refuses any
+  other address and any new window.
 - **Files** drop into the composer as in the browser.
 - **Updates** (item 432). As it starts, and from **Check for Updates…**, the shell reads `latest.json` of the latest
   release on GitHub (`plugins.updater` in `desktop/src-tauri/tauri.conf.json`). A newer version is offered in a dialog:
@@ -984,8 +1070,19 @@ and Quit. Closing the window keeps the shell in the menu bar.
   version offered, puts it in place of the app and starts the shell again; **Later** leaves it for the next look. The
   look at start says something only when it finds a newer Dot; the one from the menu also says when this Dot is the
   newest, or why it could not look, and that Dot is looking already while a look is under way, so that an update is
-  never installed twice. The dialogs are the system's, shown by the shell itself: no page can show one. Only the shell
-  updates itself: the daemon stays as it was installed, from its checkout or from PyPI.
+  never installed twice. The dialogs are the system's, shown by the shell itself: no page can show one. The daemon stays
+  as it was installed, from its checkout or from PyPI, with one exception (item 575): in an install the app made, its
+  package follows the app. At its start, when the package installed (read from its metadata folder) is older than the
+  app, which has just updated itself, the shell runs `uv --no-config tool install --reinstall
+  dotagent-macos==<the app's version>` and then `dotx service restart --when-idle`, so that the daemon starts again
+  with it once no run works. Only an install the app made and finished (its marker, with the service installed: item 5
+  above) is ever upgraded, whether or not the daemon answers at that start, never a checkout or a Dot installed by
+  hand, and a package newer than the app is left alone. Nothing is done, and `installer.log` says why, while the app
+  runs from where it does not stay (the disk image it came on, or the copy macOS makes of a downloaded app): the links
+  to its tools would point into it, and into nothing once it is ejected, and the daemon would lose `rg`. Nothing is
+  done either while the service's job is another Dot's (a checkout's `dotx service install` took its place: its
+  daemon is not the app's to restart). A failure is told in a dialog with the log's place (`installer.log`), and the
+  package stays as it was.
 
 Build it on your Mac with the Rust toolchain and Node installed:
 
@@ -996,8 +1093,11 @@ npm run build      # desktop/src-tauri/target/release/bundle/macos/Dot.app (and 
 npm run dev        # a debug window with live reload of the shell
 ```
 
-That build is signed ad hoc, for this Mac. The app other Macs install, signed with a Developer ID, notarized and
-updating itself, is a release's, which `desktop/release.sh` builds (see [Releasing](development.md#releasing)). The
+That build is signed ad hoc, for this Mac, and carries none of the tools the installer needs (`uv`, `rg` and the launcher
+of Dot.app, which `desktop/fetch-tools.sh` puts in `desktop/src-tauri/resources/tools`): it never shows the installer,
+and shows what it always showed. The app other Macs install, signed with a Developer ID, notarized and
+updating itself, with those tools in its Resources, signed too, is a release's, which `desktop/release.sh` builds (see
+[Releasing](development.md#releasing)). The
 icons come from Dot's mark: `uv run python desktop/icons/render.py` draws the favicon, the app icon (the mark lit as a
 ball on a dark tile), the three menu bar icons and the web app's icons, and `npm run icons` makes the bundle's set from
 the app icon.

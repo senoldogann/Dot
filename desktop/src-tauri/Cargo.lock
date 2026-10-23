@@ -942,6 +942,8 @@ dependencies = [
  "getrandom 0.4.3",
  "hex",
  "hmac",
+ "libc",
+ "plist",
  "rfd",
  "serde",
  "serde_json",

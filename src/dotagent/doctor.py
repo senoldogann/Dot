@@ -49,6 +49,7 @@ from dotagent.desktop.capture import rect_capture_supported
 from dotagent.desktop.codes import chat_db_path
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.types import Permissions
+from dotagent.dot_app import LAUNCHER_ENV, has_kept_launcher
 from dotagent.help.apps import APP_ROOTS
 from dotagent.llm.calls import log_model_call
 from dotagent.llm.ollama import OllamaProvider
@@ -584,7 +585,11 @@ def _check_screen_capture_support() -> CheckResult:
 
 def _xcode_tools_row(required: bool) -> CheckResult:
     """Xcode's Command Line Tools, with which the service builds Dot.app on this Mac (:mod:`dotagent.dot_app`):
-    ``xcode-select -p`` names their folder, and fails without them, without the dialog that installs them."""
+    ``xcode-select -p`` names their folder, and fails without them, without the dialog that installs them. With a
+    prebuilt program named in ``DOT_APP_LAUNCHER`` (the desktop app's, item 575), or kept in the Dot.app that is there
+    (``dotx setup`` typed in a terminal on an install of the app has no such variable), there is nothing to build."""
+    if os.environ.get(LAUNCHER_ENV, "") != "" or has_kept_launcher(dot_home()):
+        return _result("xcode tools", True, False, "not needed: the desktop app carries the program Dot.app is made of")
     try:
         completed: subprocess.CompletedProcess[str] = subprocess.run(
             [_XCODE_SELECT, "-p"], capture_output=True, text=True, timeout=_PROBE_TIMEOUT_S, check=False

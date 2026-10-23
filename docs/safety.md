@@ -5,7 +5,11 @@
 Dot sends nothing to the people who make it: there is no telemetry and no crash report. The desktop app looks for a
 newer version of itself as it starts and from its menu, a request for `latest.json` of the latest GitHub release that
 carries nothing of yours, and on your yes downloads that version from there ([the desktop
-shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, sent where the configuration points:
+shell](daemon.md#the-desktop-shell)). When it installs Dot on a Mac, and again when an update of the app brings a newer
+package, the `uv` it carries downloads Python (from GitHub) and Dot's package with its dependencies (from PyPI): requests
+that name them and carry nothing of yours. The API key you give its installer goes into Dot's `.env` (mode 0600) and to
+the provider you chose, which `dotx setup` asks for its list of models, and nowhere else. What leaves the Mac is what a
+run needs, sent where the configuration points:
 
 - **To the models: the run's conversation.** Each call sends the goal, the messages, what the tools returned (the text
   of the files and pages the run read, what commands printed, never the value of a secret field of a page outside
@@ -511,7 +515,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
 - Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but changes them only once you
   agree: its own code (the folder its package is imported from, the Python environment it runs in and the Python under
   that, the file of the launchd job that starts the daemon, and the program that job starts it with: `Dot.app` in
-  Dot's home and the folder it is built in, item 561), its plugins and their own files, its skills (with the
+  Dot's home and the folder it is built in, item 561, and the `runtime` folder of Dot's home that the desktop app
+  installs Dot in, item 575), its plugins and their own files, its skills (with the
   `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's records
   of the MCP servers you added from other agents and on Customize › Connectors, the home of the OpenCode server it starts,
   the playbooks it learned and the file of its emergency stop. The file tools ask you before they write there
@@ -563,7 +568,10 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   in Dot's home, the app that starts the daemon, and the folder it is built in, are closed to a command's writes, new
   files and renames, so a command cannot put a program there and then end the daemon (launchd keeps its job and starts
   it again) to have it run outside the sandbox with your rights (item 561). Dot builds the app itself, from outside the
-  sandbox, when `dotx service install` runs.
+  sandbox, when `dotx service install` runs. The same holds for the `runtime` folder of Dot's home, where the desktop
+  app installs Dot's package and Python (item 575): the app runs `uv` from its own bundle and Dot's Python from there
+  at its start, outside the sandbox, so a command may not write there, or move the folder, whether it exists or not
+  yet. `uv` is run with no `uv.toml` read, since the one under `~/.config/uv` is a file a command can write.
 - What the sandbox does not cover: Apple Events, which macOS does not hold a `sandbox-exec` profile to (measured on
   macOS 26: with a rule over the Finder, the terminal apps, System Events and the rest, a script still drove the Finder
   and started an application that was not running), so an AppleScript can have another application act for it, with that

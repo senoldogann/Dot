@@ -64,4 +64,9 @@ that it found none, and what it tried.
   `src/dotagent/server/routes_keys.py`
 - `src/dotagent/undo/`
 - `desktop/src-tauri/capabilities/`, `desktop/src-tauri/tauri.conf.json`
+- `desktop/src-tauri/build.rs` (the commands the app manifest names, each behind a permission of its own)
+- `desktop/src-tauri/src/installer.rs` (what the installer runs and with what environment, never over another Dot)
+- `desktop/tools.lock` (the programs the app carries, pinned by hash)
+- `desktop/fetch-tools.sh` (how those programs are fetched, checked and signed)
+- `desktop/release.sh` (what a release builds, signs and publishes, and in what order)
 - `.github/workflows/`, `pyproject.toml` dependencies
