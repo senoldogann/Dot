@@ -4,7 +4,7 @@ its latest run has ended after it was last seen, a store made before the mark ta
 process that first opened it died part way, and the owner can mark a chat seen or unseen. A chat's choices (item 199):
 a store made before them gains them, a chat keeps those of its first run, or of the next run of a chat from before,
 until its composer picks others. A chat's last line and face (item 277): its latest words in plain words, and its
-agent's face."""
+agent's face. A chat's loop (item 580): the rhythm of the schedule that goes on in it and fires next."""
 
 import asyncio
 import signal
@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from dotagent.core.errors import NotFoundError
 from dotagent.store.db import Store
-from dotagent.store.models import ChatChoices, RunRecord, ThreadRecord
+from dotagent.store.models import ChatChoices, RunRecord, ScheduleOptions, ThreadRecord
 
 
 async def _chat(store: Store, title: str) -> ThreadRecord:
@@ -300,5 +300,55 @@ async def test_a_chat_lists_its_latest_words_on_one_plain_line_and_whose_face_it
             "With Dot": (None, "Done I renamed the file.", "assistant"),
             "With an agent": ("agt_scout", "Find cheap flights", "user"),
         }
+    finally:
+        await store.close()
+
+
+def _options(same_chat: bool | None) -> ScheduleOptions:
+    return ScheduleOptions(
+        model=None,
+        effort=None,
+        speed=None,
+        approvals=None,
+        goal_mode=None,
+        timezone=None,
+        history_runs=None,
+        same_chat=same_chat,
+        stop_after_failures=None,
+        notify=None,
+        agent_id=None,
+    )
+
+
+async def test_a_chat_says_its_loop_the_switched_on_repeating_schedule_that_goes_on_in_it(tmp_path: Path) -> None:
+    """A chat's loop (item 580): of the switched-on repeating schedules whose runs go on in the chat, the one that fires
+    next gives its rhythm and when; a schedule switched off, one that fires once, one that starts a chat of its own and
+    another chat's say nothing of it. A schedule that makes no choice of its own goes on in its chat when
+    `[scheduler] same_chat` says so."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        looping: ThreadRecord = await _chat(store, "Looping")
+        quiet: ThreadRecord = await _chat(store, "Quiet")
+        by_default: ThreadRecord = await _chat(store, "By default")
+        keep = store.add_schedule
+        await keep("Later", "0 */2 * * *", None, "Check later", "task", 9_000.0, _options(True), looping.id, True)
+        await keep("Soon", "*/30 * * * *", None, "Check soon", "task", 5_000.0, _options(True), looping.id, True)
+        await keep("Off", "*/5 * * * *", None, "Off", "task", 1_000.0, _options(True), quiet.id, False)
+        await keep("Once", None, 2_000.0, "Once", "task", 2_000.0, _options(True), quiet.id, True)
+        await keep("Elsewhere", "*/5 * * * *", None, "New chat", "task", 1_000.0, _options(False), quiet.id, True)
+        await keep("Default", "0 * * * *", None, "Hourly", "task", 3_000.0, _options(None), by_default.id, True)
+
+        async def loops(same_chat: bool) -> dict[str, tuple[str | None, float | None]]:
+            return {
+                chat.title: (chat.loop_cron, chat.loop_next_at)
+                for chat in await store.list_thread_summaries(10, same_chat)
+            }
+
+        assert await loops(False) == {
+            "Looping": ("*/30 * * * *", 5_000.0),
+            "Quiet": (None, None),
+            "By default": (None, None),
+        }
+        assert (await loops(True))["By default"] == ("0 * * * *", 3_000.0)
     finally:
         await store.close()

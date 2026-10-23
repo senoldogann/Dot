@@ -765,6 +765,59 @@
   animation: none;
 }
 
+/* A chat's loop (item 580): a mark at the foot of its creature, arrows that turn slowly on a disc of violet and blue
+   whose glow breathes, so that a chat that asks again by itself stands out in the resting list. It is cut out of the
+   row's ground by a ring of that ground; under reduced motion it stands still in its glow. */
+.side-face {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.side-loop {
+  --loop-ring: var(--sidebar);
+  --loop-glow: color-mix(in oklab, var(--mark-violet) 40%, transparent);
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(150deg, var(--mark-violet), var(--mark-blue));
+  box-shadow:
+    0 0 0 2px var(--loop-ring),
+    0 0 6px 1px var(--loop-glow);
+  color: var(--mark-on-hue);
+  animation: loop-glow var(--motion-breath) var(--ease) infinite;
+}
+
+.side-run[aria-current="page"] .side-loop {
+  --loop-ring: var(--surface);
+}
+
+.side-loop .icon {
+  width: 10px;
+  height: 10px;
+  animation: spin var(--motion-turn) linear infinite;
+}
+
+@keyframes loop-glow {
+  50% {
+    box-shadow:
+      0 0 0 2px var(--loop-ring),
+      0 0 12px 3px color-mix(in oklab, var(--mark-violet) 70%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-loop,
+  .side-loop .icon {
+    animation: none;
+  }
+}
+
 .side-chat-text {
   flex: 1;
   min-width: 0;

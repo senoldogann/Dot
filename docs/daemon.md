@@ -16,7 +16,11 @@ days, and a chat opens at its latest run. Each chat wears a creature of Dot's ch
 shows faces (item 277): a chat with an agent the agent's look, a chat with Dot a shape and a colour its own id picks;
 the creature works while the chat's run goes on, waits while the run waits for you and is sad once it failed. Its name
 stands over its last line: the answer of its latest run in plain words, or your message, after "You:", while the run
-works. The creatures rest; only those at work move. Each chat stands once (item 202):
+works. The creatures rest; only those at work move, and the mark of a chat's loop (item 580): a chat that asks again
+by itself, with a loop of `/loop` or a schedule a run of it made that goes on in it, wears at the foot of its creature
+a disc of violet and blue whose arrows turn slowly in a glow that breathes (still when the system reduces motion), its
+row saying how often and when next ("Loops every 30 minutes, next 15:30"); stopped, the loop takes its mark with it.
+Each chat stands once (item 202):
 while its latest run works, a chat leaves its day for the **Working** section above the list, and goes back once the run
 ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,
 **Working** and how long since the run was asked for ("12s", "4m", "1h 5m", read again every second).

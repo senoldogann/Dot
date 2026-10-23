@@ -26,10 +26,9 @@ export function loopOf(text) {
   return found === null ? null : { every: found[1].replace(/\s+/g, ""), message: found[2].trim() };
 }
 
-/** How often a loop asks again, in words, for the rhythms "/loop" makes (scheduler/loops.py); another schedule of the
- * chat (one a run made) is said as the daemon says it. */
-function rhythmWords(view) {
-  const cron = view.record.cron ?? "";
+/** How often a schedule of the rhythm `cron` asks again, in words, for the rhythms "/loop" makes (scheduler/loops.py):
+ * "every 30 minutes", "every hour", "every 2 hours"; null for another rhythm. */
+export function loopRhythm(cron) {
   const minutes = /^\*\/(\d+) \* \* \* \*$/.exec(cron);
   if (minutes !== null) {
     return `every ${minutes[1]} minutes`;
@@ -38,7 +37,12 @@ function rhythmWords(view) {
     return "every hour";
   }
   const hours = /^0 \*\/(\d+) \* \* \*$/.exec(cron);
-  return hours !== null ? `every ${hours[1]} hours` : view.when;
+  return hours !== null ? `every ${hours[1]} hours` : null;
+}
+
+/** How often a loop asks again, in words; another schedule of the chat (one a run made) is said as the daemon says it. */
+function rhythmWords(view) {
+  return loopRhythm(view.record.cron ?? "") ?? view.when;
 }
 
 /**

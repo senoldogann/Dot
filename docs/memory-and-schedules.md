@@ -173,7 +173,8 @@ the firings since item 257: a firing from before names no schedule. The agent ca
 (`schedule_create`): such a schedule goes on in the chat it was made in, with that chat's choices as its composer shows
 them (the ones its first run started with until you picked others: its mode, model, reasoning level, speed, approval
 mode and goal mode; item 291). `/loop 30m <message>` in the box of a run or of a new chat makes such a schedule from the
-composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the nightly reflection at
+composer (items 281 and 400; see [Runs](runs.md)); a chat with such a schedule wears its mark in the sidebar
+(item 580). The scheduler also fires the nightly reflection at
 `[agent] reflection_time` (see Reflection in [Autonomy](autonomy.md)); it is not a schedule and does not count against
 `max_schedules`.
 
