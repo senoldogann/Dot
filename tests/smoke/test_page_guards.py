@@ -381,7 +381,7 @@ async def test_your_lines_are_not_saved_before_they_are_read_nor_after_they_coul
 
     await page.route("**/api/memories/owner", late)
     await page.evaluate("location.hash = '#/settings/memory'")
-    await expect(page.locator("section.set-section").first).to_be_visible()
+    await expect(page.locator("section.notes-section")).to_be_visible()
     await expect(save).to_be_hidden()
     arrive.set()
     await expect(lines).to_have_value(kept)
@@ -390,7 +390,7 @@ async def test_your_lines_are_not_saved_before_they_are_read_nor_after_they_coul
     # A read that fails: no box and no Save, so an empty one cannot be saved over the lines.
     await page.route("**/api/memories/owner", _answer_with_an_error)
     await page.reload()
-    await expect(page.locator("section.set-section").first).to_be_visible()
+    await expect(page.locator("section.notes-section")).to_be_visible()
     await expect(lines).to_be_hidden()
     await expect(save).to_be_hidden()
     await page.unroute("**/api/memories/owner", _answer_with_an_error)

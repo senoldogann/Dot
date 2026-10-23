@@ -2807,6 +2807,70 @@
   padding: var(--space-4) var(--space-5);
 }
 
+/* The life of the notes (item 584), in rules of their own: the order the notes are listed in is a line over them with the
+   choice at its right; the notes proposed to be forgotten and the trash list their rows whole in a box that scrolls
+   inside, so that what Forget all forgets is all in sight; a pinned note's pin is in the accent. */
+.note-order {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.note-order .select {
+  width: auto;
+}
+
+/* A mark of a note keeps to the note's column and its words wrap where the column is narrow: a merged note's "Merged
+   from 2 notes" ran under the buttons beside it at 320 px. */
+.note-meta .badge {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.life-count {
+  margin-left: var(--space-2);
+  color: var(--muted);
+  font-weight: var(--weight-text);
+}
+
+/* The words of the proposals' head take the room, and Forget all stands at their right while both fit. */
+.notes-proposed > .set-section-head > .set-section-text {
+  flex: 1 1 24rem;
+}
+
+.note-proposed-rows {
+  max-height: min(480px, 60vh);
+  max-height: min(480px, 60dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.note-decide {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.note-pin[aria-pressed="true"],
+.note-actions .note-pin[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+@container (max-width: 640px) {
+  .note-order {
+    padding-inline: var(--space-4);
+  }
+
+  .note-decide {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* What Dot knows about you: the reflection's lines, and a box for yours. */
 .set-row .owner-lines {
   margin: var(--space-3) 0 0;

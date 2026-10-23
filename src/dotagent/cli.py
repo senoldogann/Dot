@@ -19,7 +19,7 @@ from dotagent.core.logs import configure_logging, get_logger
 from dotagent.core.paths import ensure_layout, log_dir
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort
 from dotagent.policy.types import ApprovalMode
-from dotagent.store.models import BrowserMode
+from dotagent.store.models import BrowserMode, MemoryOrder
 
 _EFFORT_HELP: str = "reasoning level; the levels a model offers are listed by 'dotx models'"
 _APPROVALS_HELP: str = (
@@ -60,6 +60,14 @@ _FAMILIES: dict[str, str] = {
     "memory-add": "dotagent.cli_memory",
     "memory-search": "dotagent.cli_memory",
     "memory-forget": "dotagent.cli_memory",
+    "memory-proposals": "dotagent.cli_memory",
+    "memory-keep": "dotagent.cli_memory",
+    "memory-trash": "dotagent.cli_memory",
+    "memory-restore": "dotagent.cli_memory",
+    "memory-purge": "dotagent.cli_memory",
+    "memory-pin": "dotagent.cli_memory",
+    "memory-unpin": "dotagent.cli_memory",
+    "memory-unmerge": "dotagent.cli_memory",
     "memory-reindex": "dotagent.cli_memory",
     "harness-list": "dotagent.cli_harness",
     "harness-show": "dotagent.cli_harness",
@@ -261,6 +269,12 @@ def build_parser() -> argparse.ArgumentParser:
     memory_commands = memory.add_subparsers(dest="memory_action", required=True)
     memory_list = memory_commands.add_parser("list", help="show the saved notes, the most recently changed first")
     memory_list.add_argument("--limit", type=int, default=50, help="how many notes to show")
+    memory_list.add_argument(
+        "--order",
+        choices=list(get_args(MemoryOrder.__value__)),
+        default="changed",
+        help="changed: the last changed first; used: the last used first; most_used; least_used: never used first",
+    )
     memory_add = memory_commands.add_parser("add", help="save a note: one short fact")
     memory_add.add_argument("text", nargs="+", help="the note")
     memory_add.add_argument(
@@ -269,8 +283,38 @@ def build_parser() -> argparse.ArgumentParser:
     memory_search = memory_commands.add_parser("search", help="find notes by meaning and by words")
     memory_search.add_argument("query", nargs="+", help="what to look for")
     memory_search.add_argument("--limit", type=int, default=8, help="how many notes to show at most")
-    memory_forget = memory_commands.add_parser("forget", help="delete a note")
-    memory_forget.add_argument("memory_id", help="the id shown in brackets by 'dotx memory list'")
+    memory_forget = memory_commands.add_parser(
+        "forget",
+        help="forget a note: it waits in the trash for [memory] trash_days, where 'dotx memory restore' brings it back",
+    )
+    # One note by its id, or every proposed one: argparse says which is missing, and refuses both.
+    forget_what = memory_forget.add_mutually_exclusive_group(required=True)
+    forget_what.add_argument(
+        "memory_id", nargs="?", default=None, help="the id shown in brackets by 'dotx memory list'"
+    )
+    forget_what.add_argument(
+        "--proposed",
+        action="store_true",
+        help="forget every note 'dotx memory proposals' lists, instead of one by its id",
+    )
+    memory_commands.add_parser(
+        "proposals", help="the notes that rested for [memory] forget_after_days and wait for you to forget or keep them"
+    )
+    memory_keep = memory_commands.add_parser("keep", help="keep proposed notes: they wake and rest again only later")
+    memory_keep.add_argument("memory_ids", nargs="+", help="the ids 'dotx memory proposals' shows")
+    memory_commands.add_parser("trash", help="the notes you forgot, with when each is deleted for good")
+    memory_restore = memory_commands.add_parser("restore", help="bring a forgotten note back from the trash, awake")
+    memory_restore.add_argument("memory_id", help="the id 'dotx memory trash' shows")
+    memory_purge = memory_commands.add_parser("purge", help="delete a note of the trash for good now")
+    memory_purge.add_argument("memory_id", help="the id 'dotx memory trash' shows")
+    memory_pin = memory_commands.add_parser("pin", help="pin a note, so that it never rests (a resting note wakes)")
+    memory_pin.add_argument("memory_id", help="the id shown in brackets by 'dotx memory list'")
+    memory_unpin = memory_commands.add_parser("unpin", help="take the pin off a note")
+    memory_unpin.add_argument("memory_id", help="the id shown in brackets by 'dotx memory list'")
+    memory_unmerge = memory_commands.add_parser(
+        "unmerge", help="take back a merge: the notes it put to rest wake and the merged note goes to the trash"
+    )
+    memory_unmerge.add_argument("memory_id", help="the id of the merged note")
     memory_commands.add_parser("reindex", help="embed every note again, e.g. after changing [memory] embed_model")
 
     harness = commands.add_parser(

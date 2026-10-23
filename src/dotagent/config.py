@@ -546,6 +546,14 @@ class MemoryConfig(FrozenModel):
     score_min_uses: int = Field(ge=1)
     # The most characters Dot's part of the owner section (what it knows about you) holds.
     owner_chars: int = Field(ge=100)
+    # The nightly merge of near-duplicate notes (item 584): how close two notes must be (cosine) for the review model to
+    # be asked whether they say the same thing, and the most merges a night makes (0 for none).
+    merge_similarity: float = Field(gt=0, le=1)
+    merges_per_night: int = Field(ge=0)
+    # After how many days of resting a note is proposed to be forgotten, and for how many days a note the owner forgot
+    # waits in the trash, restorable, before the reflection deletes it.
+    forget_after_days: int = Field(ge=1)
+    trash_days: int = Field(ge=1)
 
 
 class HarnessConfig(FrozenModel):

@@ -26,7 +26,8 @@ e-mail address, a path in a home folder or an account name is refused (a page a 
 proposal, and a prompt is forever), and so is one with a character that does not print (a control, a zero-width or a
 bidi character), which could hide a line from you. The learned skills (`<home>/playbooks`, [Memory and
 schedules](memory-and-schedules.md)) and the notes are harness components too; they keep their own paths, which already
-validate what is written.
+validate what is written. A lesson that repeats a rule of the adopted habits or tool guidance is not drawn, and one
+saved before the rule was adopted rests at night (item 584): the rules are in every prompt already.
 
 Not in the harness, by design: the rules of trust and safety and the secrets line of the prompt, the policy engine, the
 approval gate and your rules, the credentials, `config.toml`, Dot's code, and scripts or hooks the model would run. The

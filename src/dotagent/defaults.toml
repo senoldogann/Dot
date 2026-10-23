@@ -794,6 +794,23 @@ score_min_uses = 3
 # owner_chars characters; it opens the memory part of every prompt. The Memory page shows it first: the lines you
 # write there are yours, kept as they are and never rewritten.
 owner_chars = 1500
+# The nightly reflection merges notes that say the same thing in other words (item 584): of the agent's notes that are
+# awake, not pinned and not saved by you, those whose embeddings are at least merge_similarity close (the same agent's,
+# both saved while reading outside content or neither, and both saying yes or both saying no) are shown to the review
+# model, which says which say the same and whose words say it best. At most merges_per_night merges a night, the
+# closest first; 0 merges nothing. A merge makes one note of them (its words are one source's, its tags all the
+# sources', from outside content if any source was), puts the sources to rest (nothing is deleted) and can be undone on
+# the Memory page.
+merge_similarity = 0.80
+merges_per_night = 20
+# Nothing is forgotten by itself. A note that has rested for forget_after_days days (its rest tag, or no use for
+# rest_days) is proposed to be forgotten: the Memory page lists it, and `dotx memory proposals` too, and only your
+# Forget (the page's, or `dotx memory forget --proposed`) moves it to the trash. Keep wakes a note instead. Your own
+# notes, the standing (core) ones, the ones you pinned and the lessons you saved are never proposed. A note you forget
+# waits in the trash for trash_days days, from where you restore it whole (`dotx memory restore`, the Memory page); the
+# nightly reflection then deletes it for good.
+forget_after_days = 90
+trash_days = 30
 
 [harness]
 # The harness (docs/harness.md): the texts of the adopted version, which every run's system prompt takes after Dot's

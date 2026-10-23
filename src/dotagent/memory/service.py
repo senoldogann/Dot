@@ -35,6 +35,9 @@ JOURNAL_TAG: str = "journal"
 REST_TAG: str = "rest"
 # The source of a note the reflection wrote, in place of a run's id.
 REFLECTION_SOURCE: str = "reflection"
+# The tag of a note the owner took out of a merge (item 584): the nightly merge leaves it apart from the others. The
+# owner can take it off.
+SEPARATE_TAG: str = "keep-separate"
 # The kv key of the owner section (item 93): what Dot knows about the owner, kept by the nightly reflection.
 OWNER_KEY: str = "owner.section"
 # The most lines Dot's part of the owner section holds.
@@ -204,6 +207,13 @@ async def save_memory(
     return SavedMemory(record=record, created=True, similar=similar)
 
 
+def _merged_tags(own: Sequence[str], saved: Sequence[str]) -> tuple[str, ...]:
+    """The tags of a note saved again: its own, then the ones saved now, at most :data:`_MAX_TAGS`, or as many as it
+    had: a note made by a merge holds the tags of every source (item 584), and saving its words again keeps them."""
+    both: tuple[str, ...] = tuple(dict.fromkeys([*own, *normalize_tags(saved)]))
+    return both[: max(_MAX_TAGS, len(own))]
+
+
 async def _saved_again(
     store: Store,
     existing: MemoryRecord,
@@ -212,8 +222,12 @@ async def _saved_again(
 ) -> SavedMemory:
     """The note ``existing``, whose text was saved again with ``tags``, holding until ``expires_at``: the tags are
     merged into its own, and a note the reflection rested (tagged ``rest``), or whose time ran out or changes, is
-    awake, written anew now, since a run found it worth saving again."""
-    merged: tuple[str, ...] = normalize_tags([*existing.tags, *tags])
+    awake, written anew now, since a run found it worth saving again. A note a merge put aside (item 584) is saved
+    again as the note it was merged into: that says it, unless it was forgotten since."""
+    if existing.merged_into is not None:
+        standing: list[MemoryRecord] = await store.get_memories([existing.merged_into])
+        existing = standing[0] if standing else existing
+    merged: tuple[str, ...] = _merged_tags(existing.tags, tags)
     if REST_TAG in existing.tags or existing.expires_at != expires_at:
         awake: tuple[str, ...] = tuple(tag for tag in merged if tag != REST_TAG)
         woken: MemoryRecord = await store.wake_memory(existing.id, awake, time.time(), expires_at)
@@ -237,15 +251,15 @@ def expired(record: MemoryRecord, now: float) -> bool:
 
 
 def resting(record: MemoryRecord, now: float, rest_days: int, score: MemoryScore | None, min_uses: int) -> bool:
-    """Whether a note rests: its time ran out (:func:`expired`), or it is the agent's (the user's notes and the
-    standing ones never rest otherwise) and either the reflection retired it (tagged ``rest``: unused, of no help, or
-    replaced by a newer note), or no run was handed it in ``rest_days`` days since it was last handed or written (item
-    306: a note handed once long ago goes stale like one never handed), or its ``score`` (how the runs handed it
-    lately ended) is negative over at least ``min_uses`` runs. A resting note is not handed to a run on its own; a
-    search still finds it unless it was retired or its time ran out."""
+    """Whether a note rests: its time ran out (:func:`expired`), or it is the agent's (the user's notes, the standing
+    ones and the ones the owner pinned never rest otherwise) and either the reflection retired it (tagged ``rest``:
+    unused, of no help, or replaced by a newer note), or no run was handed it in ``rest_days`` days since it was last
+    handed or written (item 306: a note handed once long ago goes stale like one never handed), or its ``score`` (how
+    the runs handed it lately ended) is negative over at least ``min_uses`` runs. A resting note is not handed to a run
+    on its own; a search still finds it unless it was retired or its time ran out."""
     if expired(record, now):
         return True
-    if record.source_run is None or CORE_TAG in record.tags:
+    if record.pinned_at is not None or record.source_run is None or CORE_TAG in record.tags:
         return False
     if REST_TAG in record.tags:
         return True
@@ -548,7 +562,7 @@ async def _embedded(index: MemoryIndex, content: str) -> tuple[str, Vector | Non
 
 
 async def forget_memory(index: MemoryIndex, memory_id: str) -> MemoryRecord:
-    """Delete a note; returns what was deleted. An unknown id is an error."""
-    record: MemoryRecord = await index.store.get_memory(memory_id)
-    await index.store.delete_memory(memory_id)
-    return record
+    """Forget a note, whoever asks (the owner on the Memory page or with ``dotx memory forget``, a run with
+    ``memory_forget``): it goes to the trash, whole, for ``[memory] trash_days`` (item 584), from which the owner can
+    bring it back (:func:`dotagent.memory.lifecycle.restore_note`). Returns the note. An unknown id is an error."""
+    return await index.store.trash_memory(memory_id, time.time())

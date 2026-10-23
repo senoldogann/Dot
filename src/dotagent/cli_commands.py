@@ -2,15 +2,15 @@
 parser validates into. This module stays light (pydantic and the type aliases only), so that ``dotx --help`` and the
 light commands start without the modules that carry the commands out (:mod:`dotagent.cli` loads those by name)."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, TypeAdapter, model_validator
 
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.types import SnapshotScope
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
-from dotagent.store.models import BrowserMode
+from dotagent.store.models import BrowserMode, MemoryOrder
 
 
 class RunCommand(FrozenModel):
@@ -108,6 +108,7 @@ class DesktopScreenshotCommand(FrozenModel):
 class MemoryListCommand(FrozenModel):
     name: Literal["memory-list"]
     limit: int = Field(ge=1)
+    order: MemoryOrder = "changed"
 
 
 class MemoryAddCommand(FrozenModel):
@@ -123,7 +124,51 @@ class MemorySearchCommand(FrozenModel):
 
 
 class MemoryForgetCommand(FrozenModel):
+    """One note by its id, or, with ``proposed``, every note proposed to be forgotten (item 584)."""
+
     name: Literal["memory-forget"]
+    memory_id: str | None
+    proposed: bool
+
+    @model_validator(mode="after")
+    def _one_or_the_proposed(self) -> Self:
+        if (self.memory_id is not None) == self.proposed:
+            raise ValueError("name one note by its id, or give --proposed for the notes proposed to be forgotten")
+        return self
+
+
+class MemoryProposalsCommand(FrozenModel):
+    name: Literal["memory-proposals"]
+
+
+class MemoryKeepCommand(FrozenModel):
+    name: Literal["memory-keep"]
+    memory_ids: list[str] = Field(min_length=1)
+
+
+class MemoryTrashCommand(FrozenModel):
+    name: Literal["memory-trash"]
+
+
+class MemoryRestoreCommand(FrozenModel):
+    name: Literal["memory-restore"]
+    memory_id: str
+
+
+class MemoryPurgeCommand(FrozenModel):
+    name: Literal["memory-purge"]
+    memory_id: str
+
+
+class MemoryPinCommand(FrozenModel):
+    """Pin a note, so that it never rests, or take the pin off (item 584)."""
+
+    name: Literal["memory-pin", "memory-unpin"]
+    memory_id: str
+
+
+class MemoryUnmergeCommand(FrozenModel):
+    name: Literal["memory-unmerge"]
     memory_id: str
 
 
@@ -431,6 +476,13 @@ type Command = Annotated[
     | MemoryAddCommand
     | MemorySearchCommand
     | MemoryForgetCommand
+    | MemoryProposalsCommand
+    | MemoryKeepCommand
+    | MemoryTrashCommand
+    | MemoryRestoreCommand
+    | MemoryPurgeCommand
+    | MemoryPinCommand
+    | MemoryUnmergeCommand
     | MemoryReindexCommand
     | ScheduleListCommand
     | ScheduleAddCommand

@@ -39,6 +39,20 @@ class HarnessText(FrozenModel):
 
 # Dot's own text alone: what a run takes while no version is adopted.
 NO_HARNESS: HarnessText = HarnessText(habits="", tool_guidance="")
+# The mark before a rule of a component that is a list: a bullet or a number.
+_LIST_MARK: re.Pattern[str] = re.compile(r"^\s*(?:[-*•]|\d{1,2}[.)])\s+")
+
+
+def rules_of(text: HarnessText) -> tuple[str, ...]:
+    """The rules the adopted ``text`` gives a run, one line each, the habits first and then the tool guidance, a
+    bullet or a number before a rule taken off and the blank lines left out: what a lesson is compared with, so that
+    the memory does not learn again what the prompt already says (item 584)."""
+    return tuple(
+        line
+        for name in COMPONENTS
+        for raw in text.component(name).splitlines()
+        if (line := _LIST_MARK.sub("", raw).strip())
+    )
 
 
 def normalized(text: str) -> str:

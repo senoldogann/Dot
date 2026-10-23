@@ -1,10 +1,14 @@
 // Settings › Memory (items 218 and 566): add a note, look things up by meaning or by words, narrow the notes to the lessons, the
 // preferences or the ones saved while a run read outside content, correct a note and forget what is out of date. Under the
-// notes: what Dot knows about you and how its learning fares. The notes are read a page at a time (item 218).
+// notes: what Dot knows about you and how its learning fares. The notes are read a page at a time (item 218). Item 584: the
+// notes can be listed by when and how often they were used, pinned (a pinned note never rests) and, when the nightly
+// reflection merged notes that say the same, the merge taken back; the notes that rested long are proposed to be forgotten,
+// and a forgotten note waits in a trash (memorylife.js).
 
 import { api, query } from "../api.js";
 import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
+import { orderControl, proposedSection, trashSection } from "../memorylife.js";
 import { emptyPanel, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -128,7 +132,25 @@ function lifespan(record) {
         );
   const replaced =
     record.replaced_by !== null && record.tags.includes("rest") ? el("span", { title: record.replaced_by }, "Replaced by another note") : null;
-  return [until, replaced];
+  const merged = record.merged_into === null ? null : el("span", { title: record.merged_into }, "Merged into another note");
+  return [until, replaced, merged];
+}
+
+/** Since when a note rests, for the notes that rest by a date (item 584): nothing for one awake. */
+function restedLine(rested) {
+  return rested === undefined ? null : el("span", { title: dateTimeFull(rested) }, `Resting since ${dateTime(rested)}`);
+}
+
+/** What a merged note says of the notes it was made of (item 584): how many, and that the merge can be taken back. */
+function mergedBadge(record) {
+  return record.merged_from.length === 0
+    ? null
+    : el(
+        "span",
+        { class: "badge b-muted", title: "The nightly reflection merged notes that said the same into this one; Undo the merge brings them back." },
+        icon("layers"),
+        `Merged from ${plural(record.merged_from.length, "note", "notes")}`,
+      );
 }
 
 /** The note in place as a small form: its words and tags, saved with `onSave(content, tags)` or left with `onCancel`. */
@@ -154,11 +176,39 @@ function editForm(record, onSave, onCancel) {
 }
 
 /**
- * One note with its tags, its age, who wrote it and buttons to correct or forget it. `similarity` is null unless the
- * row is a search hit; `actions` is `{ forget(record), edit(record, content, tags) }`.
+ * One note with its tags, its age, who wrote it and buttons to pin, correct or forget it (and to take back the merge that
+ * made it). `similarity` is null unless the row is a search hit; `rested` is since when the note rests, when it does by a
+ * date; `actions` is `{ forget(record), edit(record, content, tags), pin(record), unmerge(record) }`.
  */
-function memoryRow({ record, similarity, score }, actions) {
+function memoryRow({ record, similarity, score, rested }, actions) {
   const row = el("div", { class: "note-row", dataset: { memory: record.id } });
+  const pinned = record.pinned_at !== null;
+  const pin = el(
+    "button",
+    {
+      class: "btn ghost sm icon-only note-pin",
+      type: "button",
+      title: pinned ? "Take the pin off: this note may rest again" : "Pin this note: it never rests",
+      "aria-label": pinned ? "Take the pin off this note" : "Pin this note",
+      "aria-pressed": String(pinned),
+      onclick: () => actions.pin(record),
+    },
+    icon("pin"),
+  );
+  const unmerge =
+    record.merged_from.length === 0
+      ? null
+      : el(
+          "button",
+          {
+            class: "btn ghost sm icon-only",
+            type: "button",
+            title: "Undo this merge: the notes it was made from wake apart, and this note goes to the trash",
+            "aria-label": "Undo this merge",
+            onclick: () => actions.unmerge(record),
+          },
+          icon("undo"),
+        );
   const forget = el(
     "button",
     {
@@ -187,6 +237,8 @@ function memoryRow({ record, similarity, score }, actions) {
           { class: "note-meta" },
           record.tags.map((tag) => el("span", { class: "chip" }, tag)),
           match,
+          pinned ? el("span", { class: "badge b-muted", title: "A pinned note never rests." }, icon("pin"), "Pinned") : null,
+          mergedBadge(record),
           record.tainted
             ? el(
                 "span",
@@ -195,10 +247,10 @@ function memoryRow({ record, similarity, score }, actions) {
                 "From outside content",
               )
             : null,
-          el("span", { class: "note-when" }, ...joined([whose, savedLine(record), ...lifespan(record), used, scoreLine(score)])),
+          el("span", { class: "note-when" }, ...joined([whose, savedLine(record), restedLine(rested), ...lifespan(record), used, scoreLine(score)])),
         ),
       ),
-      el("div", { class: "note-actions" }, edit, forget),
+      el("div", { class: "note-actions" }, unmerge, pin, edit, forget),
     );
   }
   edit.addEventListener("click", () => {
@@ -263,6 +315,8 @@ export function mount(root, ctx) {
   // The ids of the listed notes that rest: no run was handed them for [memory] rest_days, or the reflection retired
   // them. They are listed apart; a search still finds them.
   let resting = new Set();
+  // The order the notes are listed in (item 584): see memorylife.js.
+  let order = "changed";
 
   const content = el("textarea", {
     class: "textarea",
@@ -334,9 +388,13 @@ export function mount(root, ctx) {
   function paint() {
     count.textContent = countText();
     lookedNote.hidden = !(mode === "filtered" && lookedAt < total);
-    lookedNote.textContent = `Looked through the newest ${lookedAt} of ${total} notes.`;
+    lookedNote.textContent =
+      order === "changed"
+        ? `Looked through the newest ${lookedAt} of ${total} notes.`
+        : `Looked through the first ${lookedAt} of ${total} notes in this order.`;
     more.hidden = allDrawn();
     foot.hidden = more.hidden && lookedNote.hidden;
+    orderBox.setDisabled(mode === "search" ? "A search lists the notes by how well they match." : null);
     const rows = new Map();
     const rowOf = (hit) => {
       const shown = JSON.stringify(hit);
@@ -364,12 +422,20 @@ export function mount(root, ctx) {
 
   /** The first `count` notes of the list (fewer when there are fewer), read as many at a time as the route allows. */
   async function readList(count) {
-    let page = await api.get(`/memories${query({ limit: Math.min(count, MOST_READ), offset: 0 })}`);
-    const read = { agents: page.agents, items: [...page.items], scores: { ...page.scores }, resting: [...page.resting], total: page.total };
+    let page = await api.get(`/memories${query({ limit: Math.min(count, MOST_READ), offset: 0, order })}`);
+    const read = {
+      agents: page.agents,
+      items: [...page.items],
+      scores: { ...page.scores },
+      resting: [...page.resting],
+      rested: { ...page.rested },
+      total: page.total,
+    };
     while (read.items.length < Math.min(count, read.total) && page.items.length > 0) {
-      page = await api.get(`/memories${query({ limit: Math.min(count - read.items.length, MOST_READ), offset: read.items.length })}`);
+      page = await api.get(`/memories${query({ limit: Math.min(count - read.items.length, MOST_READ), offset: read.items.length, order })}`);
       read.items.push(...page.items);
       Object.assign(read.scores, page.scores);
+      Object.assign(read.rested, page.rested);
       read.resting.push(...page.resting);
       read.total = page.total;
     }
@@ -397,7 +463,7 @@ export function mount(root, ctx) {
           return;
         }
         agentNames = listed.agents;
-        hits = listed.items.filter(passes).map((record) => ({ record, similarity: null, score: listed.scores[record.id] }));
+        hits = listed.items.filter(passes).map((record) => ({ record, similarity: null, score: listed.scores[record.id], rested: listed.rested[record.id] }));
         total = listed.total;
         lookedAt = listed.items.length;
         resting = new Set(listed.resting);
@@ -410,7 +476,7 @@ export function mount(root, ctx) {
           return;
         }
         agentNames = listed.agents;
-        hits = listed.items.map((record) => ({ record, similarity: null, score: listed.scores[record.id] }));
+        hits = listed.items.map((record) => ({ record, similarity: null, score: listed.scores[record.id], rested: listed.rested[record.id] }));
         total = listed.total;
         resting = new Set(listed.resting);
         mode = "list";
@@ -440,7 +506,7 @@ export function mount(root, ctx) {
     let shown;
     try {
       const record = await api.get(`/memories/${encodeURIComponent(askedId)}`);
-      shown = memoryRow({ record, similarity: null, score: undefined }, rowActions);
+      shown = memoryRow({ record, similarity: null, score: undefined, rested: undefined }, rowActions);
     } catch (error) {
       if (error.status !== 404) {
         throw error;
@@ -458,11 +524,11 @@ export function mount(root, ctx) {
     const mine = ticket;
     more.disabled = true;
     try {
-      const page = await api.get(`/memories${query({ limit: PAGE_SIZE, offset: hits.length })}`);
+      const page = await api.get(`/memories${query({ limit: PAGE_SIZE, offset: hits.length, order })}`);
       if (disposed || mine !== ticket) {
         return;
       }
-      hits = [...hits, ...page.items.map((record) => ({ record, similarity: null, score: page.scores[record.id] }))];
+      hits = [...hits, ...page.items.map((record) => ({ record, similarity: null, score: page.scores[record.id], rested: page.rested[record.id] }))];
       total = page.total;
       resting = new Set([...resting, ...page.resting]);
       paint();
@@ -507,6 +573,36 @@ export function mount(root, ctx) {
     }
     await reload();
     await loadAsked();
+    // A note forgotten is in the trash now, and may have been one that was proposed to be forgotten.
+    await refreshLife();
+  }
+
+  /** Pin a note so that it never rests (a resting note wakes), or take the pin off. */
+  async function pinNote(record) {
+    const pinned = record.pinned_at === null;
+    await api.put(`/memories/${encodeURIComponent(record.id)}/pin`, { pinned });
+    toast("ok", pinned ? "Pinned: this note never rests." : "The pin is off: this note may rest again.");
+    await reload();
+    await loadAsked();
+    await refreshLife();
+  }
+
+  /** Take back the merge that made a note, after a yes: its sources wake apart and it goes to the trash. */
+  async function unmergeNote(record) {
+    const confirmed = await confirmDialog({
+      title: "Undo this merge?",
+      message: `${plural(record.merged_from.length, "note", "notes")} ${record.merged_from.length === 1 ? "wakes" : "wake"} apart, and the reflection does not merge ${record.merged_from.length === 1 ? "it" : "them"} again. The merged note goes to the trash.`,
+      confirmLabel: "Undo the merge",
+      focusCancel: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    await api.post(`/memories/${encodeURIComponent(record.id)}/unmerge`, {});
+    toast("ok", "The merge is undone.");
+    await reload();
+    await loadAsked();
+    await refreshLife();
   }
 
   async function editNote(record, text, tagList) {
@@ -519,6 +615,8 @@ export function mount(root, ctx) {
   const rowActions = {
     forget: (record) => attempt(() => forgetNote(record)),
     edit: (record, text, tagList) => attempt(() => editNote(record, text, tagList)),
+    pin: (record) => attempt(() => pinNote(record)),
+    unmerge: (record) => attempt(() => unmergeNote(record)),
   };
 
   // True while a note is being saved: Enter does not look at the disabled button, so a second press is refused here,
@@ -558,6 +656,27 @@ export function mount(root, ctx) {
     }
   }, SEARCH_DELAY_MS);
 
+  const orderBox = orderControl(order, (id) => {
+    order = id;
+    drawn = PAGE_SIZE;
+    attempt(reload);
+  });
+  // The notes proposed to be forgotten and the trash of the ones the owner forgot (item 584): each is drawn only while it
+  // holds a note, and a decision in either reads the notes again.
+  const lifeHooks = {
+    noteText: (words) => el("div", { class: "note-text" }, codeText(words)),
+    onDecided: () => {
+      if (!disposed) {
+        attempt(reload);
+        attempt(refreshLife);
+      }
+    },
+  };
+  const proposed = proposedSection(lifeHooks);
+  const trash = trashSection(lifeHooks);
+  async function refreshLife() {
+    await Promise.all([proposed.load(), trash.load()]);
+  }
   const narrowing = segmented(FILTERS, filter, (id) => {
     filter = id;
     drawn = PAGE_SIZE;
@@ -669,7 +788,7 @@ export function mount(root, ctx) {
   const notesSection = setSection({
     title: ["Notes", count],
     actions: el("div", { class: "note-tools" }, narrowing.element, el("label", { class: "note-search" }, icon("search"), search)),
-    body: el("div", { class: "set-card note-card" }, holder, foot),
+    body: el("div", { class: "set-card note-card" }, orderBox.element, holder, foot),
   });
   notesSection.classList.add("notes-section");
   const ownerSection = setSection({
@@ -691,8 +810,9 @@ export function mount(root, ctx) {
   learningSection.classList.add("learning-section");
 
   ctx.head.setLead("Notes Dot keeps between runs. It recalls the ones that fit the task at hand.");
-  root.append(asked, el("div", { class: "set-sections" }, composer, notesSection, ownerSection, learningSection));
+  root.append(asked, el("div", { class: "set-sections" }, composer, proposed.element, notesSection, trash.element, ownerSection, learningSection));
   attempt(reload);
+  attempt(refreshLife);
   attempt(loadAsked);
   attempt(loadOwner);
   attempt(loadLearning);

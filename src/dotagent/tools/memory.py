@@ -219,8 +219,9 @@ def _forget_tool() -> RegisteredTool:
     return make_live_tool(
         name="memory_forget",
         description=(
-            "Delete a saved note by its id, for example because it is outdated or wrong. When a fact has changed, "
-            "forget the old note and save the corrected one."
+            "Forget a saved note by its id, for example because it is outdated or wrong. It is no longer recalled or "
+            "found: it goes to the owner's trash, where it waits some days and the owner can restore it (you cannot). "
+            "When a fact has changed, forget the old note and save the corrected one."
         ),
         args_model=ForgetArgs,
         modes=ACTING_MODES,

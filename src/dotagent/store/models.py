@@ -392,13 +392,31 @@ class ReactionRecord(FrozenModel):
     note_id: str | None
 
 
+class MergedSource(FrozenModel):
+    """A note a merged note was made of, as it was when it was merged (item 584): where it came from and when, so that
+    the merged note keeps every source's provenance whatever becomes of the source."""
+
+    id: str
+    source_run: str | None
+    agent_id: str | None
+    created_at: float
+    updated_at: float
+    last_used_at: float | None
+    used_count: int
+    tags: tuple[str, ...]
+    tainted: bool
+
+
 class MemoryRecord(FrozenModel):
     """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``agent_id`` is the
     agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and
     ``last_used_at`` say how often and when a run was handed it. ``expires_at`` is when a note saved for a while stops
     holding (item 306), ``None`` for one that holds until it is changed; ``replaced_by`` is the newer note that made it
     outdated, when the reflection put it aside for that (item 306). ``tainted`` says the note was written while the run
-    that saved it had read content third parties can author: a search that returns it taints the run that read it."""
+    that saved it had read content third parties can author: a search that returns it taints the run that read it.
+    The fields with a default are NULL in a note written before them (item 584): ``merged_from`` names the notes a
+    merged note was made of, ``merged_into`` the merged note a resting one was merged into, ``pinned_at`` is when the
+    owner pinned the note (it never rests) and ``rested_at`` when it began to rest."""
 
     id: str
     content: str
@@ -412,6 +430,22 @@ class MemoryRecord(FrozenModel):
     expires_at: float | None
     replaced_by: str | None
     tainted: bool
+    merged_into: str | None = None
+    merged_from: tuple[MergedSource, ...] = ()
+    pinned_at: float | None = None
+    rested_at: float | None = None
+
+
+class TrashedMemory(FrozenModel):
+    """A note the owner forgot, kept whole for a while so that it can come back (item 584): the note as it was and
+    when it went to the trash."""
+
+    record: MemoryRecord
+    trashed_at: float
+
+
+# How the list of notes is ordered (item 584): by what changed last, by the last use, by the most or the fewest uses.
+type MemoryOrder = Literal["changed", "used", "most_used", "least_used"]
 
 
 class AwakeNotes(FrozenModel):
