@@ -5,6 +5,9 @@ frame that shows them (``static/js/pageframe.js``) all follow what is here."""
 
 # The event of a run that showed a page: ``{"page_id", "title"}``.
 PAGE_EVENT: str = "page_shown"
+# Where the daemon serves a page a run showed, ``/pages/<id>``: the guard sandboxes it, and the browser may open it
+# (item 601).
+PAGES_PREFIX: str = "/pages/"
 # The longest page kept, in characters: a chart that loads its library from a CDN takes a few thousand, an image of its
 # own inlined as data a few hundred thousand.
 PAGE_MAX_CHARS: int = 500_000
@@ -36,3 +39,10 @@ THEME_VARIABLES: tuple[tuple[str, str], ...] = (
     ("--font-sans", 'system-ui, -apple-system, "Segoe UI", sans-serif'),
     ("--font-mono", 'ui-monospace, "SF Mono", Menlo, monospace'),
 )
+
+
+def page_address(host: str, port: int, page_id: str) -> str:
+    """The address of the page ``page_id`` on the daemon at ``host`` and ``port`` (item 601): what ``dotx run`` prints
+    and what show_page gives the run, whose browser may open it."""
+    bracketed: str = f"[{host}]" if ":" in host else host
+    return f"http://{bracketed}:{port}{PAGES_PREFIX}{page_id}"

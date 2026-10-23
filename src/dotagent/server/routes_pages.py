@@ -20,9 +20,8 @@ from html import escape
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-from dotagent.agent.pages import THEME_VARIABLES
+from dotagent.agent.pages import PAGES_PREFIX, THEME_VARIABLES
 from dotagent.server.context import ServerContext
-from dotagent.server.guard import PAGES_PREFIX
 from dotagent.store.models import ShownPage
 
 # What the page is drawn with before its own styles: Dot's colours for light and dark, and type of the conversation's

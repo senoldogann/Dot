@@ -239,7 +239,10 @@ Both modes share what follows.
   `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be signed in there. One page of
   it passes: the one a sign-in comes back to (`/oauth/callback` on this Mac at `[server] port`), which macOS may open in
   Dot's own Chrome when you sign in from Customize; Chrome opens it as a page and nothing else of the interface, and a
-  run whose tab lands there still has the tab reset (item 448). A server of this Mac on another port opens as any site.
+  run whose tab lands there still has the tab reset (item 448). A page a run showed passes too, whatever the lists say
+  (`/pages/<id>` exactly, at the address `show_page` gives the run, item 601): the run opens it to see what it showed.
+  It is sandboxed wherever it opens, so its scripts reach neither the API nor the UI, and anything it loads of the
+  interface stays refused. A server of this Mac on another port opens as any site.
   A file of this Mac (`file:`) opens in neither browser: a page opened from disk could lead the browser to any other
   file, past the rules on reading files. The refusal tells the model what to do instead (item 596): read the file with
   `read_file`, which those rules judge; show a page it made in its workspace with `show_page`, which draws it in the

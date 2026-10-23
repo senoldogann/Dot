@@ -520,7 +520,9 @@ address, each when it is one `read_file` reads without a question (in the worksp
 a crawl's or an MCP answer's) and the page with it stays one page (500,000 characters): a file that would not fit is
 measured before it is read and left out, and the page is shown without it; a page that still comes out longer (a file
 that grew while it was read) is shown as it was written. A sheet a style imports (`@import`) is not written in. The
-answer names the files left out. What a script loads by itself (a module's imports, a fetch) does not load.
+answer names the files left out. What a script loads by itself (a module's imports, a fetch) does not load. The tool's
+answer gives the page's address on this Mac (`/pages/<id>`), which the run's browser may open to see what it showed
+(item 601, [Browser](browser-and-computer-use.md)).
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the

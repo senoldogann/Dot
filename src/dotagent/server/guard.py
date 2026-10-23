@@ -21,7 +21,7 @@ from starlette.datastructures import Headers, MutableHeaders
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from dotagent.agent.pages import LIBRARY_HOSTS
+from dotagent.agent.pages import LIBRARY_HOSTS, PAGES_PREFIX
 from dotagent.core.errors import ConfigError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
@@ -33,7 +33,6 @@ API_PREFIX: str = f"{API_ROOT}/"
 PROOF_PATH: str = f"{API_ROOT}/proof"
 PAIR_PATH: str = f"{API_ROOT}/phone/pair"
 PUBLIC_PATHS: frozenset[str] = frozenset({f"{API_ROOT}/health", PROOF_PATH, PAIR_PATH})
-PAGES_PREFIX: str = "/pages/"
 LOOKS_PREFIX: str = "/looks/"
 
 _PRIVATE_FILE_MODE: int = 0o600

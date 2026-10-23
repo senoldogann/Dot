@@ -15,6 +15,7 @@ from dotagent.agent.pages import (
     PAGE_MAX_CHARS,
     PAGE_TITLE_MAX_CHARS,
     THEME_VARIABLES,
+    page_address,
 )
 from dotagent.core.errors import ToolInputError
 from dotagent.policy.paths import expand_path, within
@@ -46,7 +47,8 @@ _DESCRIPTION: str = (
     "series, and keep still under prefers-reduced-motion. Libraries that fit, in a pinned version: Apache ECharts or "
     "Chart.js for charts, Mermaid for diagrams, D3 for a drawing of your own, three.js for 3D. A page you made in the "
     f"workspace ({', '.join(sorted(PAGE_SUFFIXES))}) is shown by its path instead of html, with the style sheets, "
-    "scripts, pictures and fonts beside it that it names written in; what a script loads by itself does not load."
+    "scripts, pictures and fonts beside it that it names written in; what a script loads by itself does not load. The "
+    "answer gives the page's address, which your browser may open to see what you showed."
 )
 
 
@@ -72,8 +74,9 @@ class ShowPageArgs(ToolArgs):
 def page_file(path: Path, workspace: Path) -> str:
     """The text of the page at the resolved ``path`` that a run shows by its path (item 598): a file of
     :data:`PAGE_SUFFIXES` in ``workspace`` once its links are followed, which no third party wrote (a crawl's page, an
-    MCP answer: item 494), of :data:`PAGE_MAX_CHARS` at most. What the page shows reaches the owner alone, sandboxed;
-    the run reads nothing of it, but it can name no file outside its workspace, nor a page another wrote."""
+    MCP answer: item 494), of :data:`PAGE_MAX_CHARS` at most. The page is drawn for the owner, sandboxed, and the run's
+    browser may open it (item 601): it holds only what the run could read with read_file, so it can name no file outside
+    its workspace, nor a page another wrote."""
     if not within(path, expand_path(str(workspace), workspace)):
         raise ToolInputError(
             f"{path} is not in the workspace: a page is shown by its path when you made it there; give another as html",
@@ -114,10 +117,14 @@ def whole_page_file(path: Path, workspace: Path, protected: tuple[Path, ...], do
     return with_its_files(page_file(path, workspace), path, workspace, protected, dot_paths)
 
 
-def shown_words(page: ShownPage, files: PageFiles | None) -> str:
-    """What show_page tells the run: the page is shown, and, for a page by its path, the files written into it and
-    those left out (item 600)."""
-    words: str = f"The page “{page.title}” is shown to the user in the conversation."
+def shown_words(page: ShownPage, address: str, files: PageFiles | None) -> str:
+    """What show_page tells the run: the page is shown, at ``address`` on this Mac, which its browser may open to see
+    it as the owner does (item 601), and, for a page by its path, the files written into it and those left out (item
+    600)."""
+    words: str = (
+        f"The page “{page.title}” is shown to the user in the conversation. It is at {address}, which your browser may "
+        "open to see it as they do."
+    )
     if files is None:
         return words
     if files.written:
@@ -172,7 +179,8 @@ def _show_page_tool() -> RegisteredTool:
             raise ToolInputError("give the page as html or by its path", {})
         page: ShownPage = await ctx.runtime.store.add_shown_page(ctx.run_id, args.title, html)
         await ctx.runtime.bus.emit(ctx.run_id, PAGE_EVENT, {"page_id": page.id, "title": page.title}, True)
-        return ok(shown_words(page, files))
+        server = ctx.runtime.config.server
+        return ok(shown_words(page, page_address(server.host, server.port, page.id), files))
 
     return make_path_tool(
         name=SHOW_PAGE_TOOL,

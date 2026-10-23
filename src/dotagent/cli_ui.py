@@ -17,6 +17,7 @@ from dotagent.agent.gate import YOLO_DECIDER
 from dotagent.agent.helpers import Unavailable, unavailable_text
 from dotagent.agent.lessons import LessonView, RunLessons
 from dotagent.agent.limits import LimitReached, RunLimits, limit_spent
+from dotagent.agent.pages import page_address
 from dotagent.agent.parking import PERMIT_DECIDER
 from dotagent.agent.plan import StepStatus
 from dotagent.agent.progress import Rung
@@ -28,8 +29,6 @@ from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.runtime import Runtime
 from dotagent.server import UI_SOURCE
-from dotagent.server.guard import PAGES_PREFIX
-from dotagent.server.links import base_url
 from dotagent.store.models import ApprovalRecord, EventRecord
 
 _STDIN_POLL_S: float = 0.2
@@ -455,7 +454,7 @@ class TerminalUi:
             case "page_shown":
                 shown = PageShownPayload.model_validate(data)
                 server = self._runtime.config.server
-                address: str = f"{base_url(server.host, server.port)}{PAGES_PREFIX}{shown.page_id}"
+                address: str = page_address(server.host, server.port, shown.page_id)
                 self._line(self._paint(f"  ▣ page “{shown.title}”: {address}", "36"))
             case "compacted":
                 self._line(self._paint("  ⇲ older context summarised", "2"))
