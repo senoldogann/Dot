@@ -33,7 +33,8 @@ while the daemon runs; a closed lid still puts a MacBook to sleep. The same by h
    the phone too (the token stays in the fragment). Settings › Phone lists the address (item 267).
 3. On the phone, Settings › General › Notifications on (on an iPhone in Dot added to the Home Screen and opened from
    there, where alone iOS lets a page take notifications; its Safari tab says so, item 501): the browser subscribes to
-   the daemon's web push, and from then
+   the daemon's web push, its subscription taken as the browser sends it (`expirationTime` is iOS's to send and Dot
+   keeps nothing of it, item 548), and from then
    on the daemon tells the phone what the desktop notifications say, in the same words, page open or closed, and while
    you look at that run on the phone too: the rule that keeps a notification quiet while you look at its run holds for
    the notifications of a page, not for a push; a tap opens what it tells of. The phone also hears what no page can, as

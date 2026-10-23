@@ -1531,9 +1531,12 @@ class PushKeysPart(FrozenModel):
 
 
 class PushSubscribeRequest(FrozenModel):
-    """``POST /push/subscriptions``: ``PushSubscription.toJSON()`` of the browser."""
+    """``POST /push/subscriptions``: ``PushSubscription.toJSON()`` of the browser. A browser's
+    ``expirationTime`` (a time in milliseconds, or null) is accepted as it sends it and kept by nothing: iOS sends it,
+    and a request that refused it left the phone unable to subscribe (item 548)."""
 
     endpoint: str = Field(min_length=1, max_length=2000, pattern=r"^https://")
+    expiration_time: float | None = Field(default=None, alias="expirationTime")
     keys: PushKeysPart
 
 
