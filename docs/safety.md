@@ -33,7 +33,8 @@ shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, s
 - **To TypeSafe, once its key is saved: the texts it judges.** `judge_items` and the tools of posts and campaigns send
   the texts they judge; with `[judge] provider = "typesafe"` the judge of clicks and checks sends what it judges (a
   button's words, the page's address without its query, its title and visible text). `[judge] provider` is `"none"` by
-  default.
+  default. With `[agent] step_router = true` every step sends the goal and up to 1,500 characters of what the last step
+  brought back, with the secrets Dot holds and keys of a known form masked (item 551).
 - **To a phone, once you turn its notifications on: a line.** A title, up to 140 characters of the question, of a
   draft's recipients and subject (a message's words, item 314) or of the result, and the page to open, encrypted for
   that phone's browser and carried by its maker's push service (see [Dot on the phone](phone.md#dot-on-the-phone)).
@@ -205,8 +206,11 @@ file the line then runs; item 528), and a shell line that sends data out: an upl
 copy to another machine, a change on a code host, inline code that reaches the network or runs a command of it, and a
 read that may reach a protected location, item 531) ask even when the preset or an `allow` rule would let them through;
 only a `preapproved` rule skips the question. A
-project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. A message you send to the run clears the mark;
-your answer to a question of a run you watch does not, whether the run waited for it or went on (item 508), as it
+project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. The error of a call that reached outside marks
+it too when it may hold such words (item 551): what an MCP server answered a call with, which the model reads inside
+the fence as data, and the error of a search whose engines answered with an error page; a failure in transit does not.
+A message you send to the run clears the mark; your answer to a question of a run you watch does not,
+whether the run waited for it or went on (item 508), as it
 answers what the run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts
 once that run has ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a
 resumed run as the run it resumes was when it was cut off, and the run that tells a chat that its command in the
@@ -244,6 +248,16 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
 - The memory tools refuse a note that holds a key-like string or one of the secrets Dot holds (`memory_save`,
   `memory_update`), and tell the model to record where the key lives, not the key. A note you write yourself, with
   `dotx memory add` or on the Memory page, is yours and not refused.
+- What a run records of a step holds none of the secrets Dot holds (item 551), nor a key of a known form (a token, a
+  private key, a password in an address or a header): the call's arguments (item 525) and the summary, the target and
+  the text of its result, its `policy` event, its approval with the card and the push to your phone that ask about it,
+  and the reason kept with its result. So do what the model says and thinks, as it streams and as it is stored, and the
+  answer to a side question (`/btw`). The policy and the review model weigh the step as it is, and a card shows `***`
+  where your own key stood in a command. What streams is masked as it comes, a secret split between two pieces of the
+  stream included: what may still become part of a secret waits for the next piece (the word being written, the start
+  of a key Dot holds, words such as `Bearer` or `password =` until their value has come, the header of a private
+  key), and plain words are shown as they come. A secret in quotes, with spaces in it and introduced by more than a
+  few words, can show its start while it streams; the stored message masks it whole.
 - The browser and desktop tools check every field that would take a password, one-time-code or card text, whatever
   element the step names (a desktop `menu` step that pastes is not). Outside `yolo` they refuse it, and the step is
   yours (item 429), with the browser yours to take over and fill. In `yolo` the run types it (item 443): a code it can

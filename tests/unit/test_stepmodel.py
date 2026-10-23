@@ -40,9 +40,9 @@ def test_the_last_result_is_what_came_after_the_models_last_reply() -> None:
         _message("tool", ""),
         _message("user", "[system note] keep going"),
     ]
-    assert last_result(history) == "file one\n[system note] keep going"
-    assert last_result(history[:1]) == ""
-    state = step_state("Goal " * 500, 3, history, 2, 1)
+    assert last_result(history, ()) == "file one\n[system note] keep going"
+    assert last_result(history[:1], ()) == ""
+    state = step_state("Goal " * 500, 3, history, 2, 1, ())
     assert state.step == 3 and state.failures == 2 and state.failures_in_a_row == 1
     assert len(state.goal) == 2000 and state.goal.endswith("…")
     assert route_state(state) == {
@@ -52,6 +52,21 @@ def test_the_last_result_is_what_came_after_the_models_last_reply() -> None:
         "failures": 2,
         "failures_in_a_row": 1,
     }
+
+
+def test_what_the_judge_is_sent_has_its_secrets_masked_before_it_is_clipped() -> None:
+    """Item 551: TypeSafe is a service outside the Mac, and the goal and the last results can quote a key."""
+    held: str = "correct-horse-battery-staple"
+    key: str = "sk-test-0123456789abcdefghij"
+    history: list[Message] = [
+        _message("assistant", "Reading."),
+        _message("tool", f"{'x' * 1474} the key is {held}, and {key}"),
+    ]
+    state = step_state(f"Use {held} to fetch the report", 1, history, 0, 0, (held,))
+    assert state.goal == "Use *** to fetch the report"
+    assert held not in state.last_result and key not in state.last_result
+    # A cut through the key would have left half of it: masked first, none of it is left.
+    assert held[:12] not in state.last_result and key[:12] not in state.last_result
 
 
 def test_the_choice_offers_the_models_the_run_can_use_and_main_is_always_among_them() -> None:

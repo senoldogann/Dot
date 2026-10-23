@@ -17,7 +17,7 @@ the lessons and playbooks)."""
 
 import asyncio
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import partial
@@ -34,10 +34,11 @@ from dotagent.agent.attachments import (
 )
 from dotagent.agent.authorization import Authorization, StepDecision
 from dotagent.agent.executor import ToolOutcome, execute_calls
-from dotagent.agent.gate import RunGate
+from dotagent.agent.gate import RunGate, masked_action
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOutcome, browser_of
 from dotagent.agent.progress import can_ask_user, question_mode
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
+from dotagent.agent.streammask import StreamMask
 from dotagent.agent.verify import RunFacts, new_facts
 from dotagent.browser.safety import UrlVerdict, browser_host, check_url, host_matches, url_flags
 from dotagent.core.errors import (
@@ -51,11 +52,11 @@ from dotagent.core.errors import (
 from dotagent.core.jsonutil import parse_json_object
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import opencode_dir
-from dotagent.core.text import redact_json, redact_known, redact_secrets, truncate_middle
+from dotagent.core.text import redact_json, redact_known, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.opencode import OpenCodeProvider
 from dotagent.llm.router import ModelRef, parse_model_ref
-from dotagent.llm.types import ChatProvider, Message, ModelInfo, ToolCall, assistant_message
+from dotagent.llm.types import ChatProvider, Message, ModelInfo, StreamDelta, ToolCall, assistant_message
 from dotagent.llm.wire import get_obj, get_str
 from dotagent.mcp.naming import PREFIX as MCP_PREFIX
 from dotagent.opencode.bridge import Door, ToolBridge, new_door, server_config, session_rules
@@ -317,20 +318,23 @@ class _Call:
         self.decision = None
 
 
-def step_result(event: ToolSeen, name: str, call: _Call, text: str, seconds: float, tainted: bool) -> JsonObject:
+def step_result(
+    event: ToolSeen, name: str, call: _Call, text: str, seconds: float, tainted: bool, known: Sequence[str]
+) -> JsonObject:
     """The ``tool_result`` event of one of OpenCode's calls, as the executor writes one of Dot's own: a call that asked
     the gate keeps its action, its flags and what decided it (item 474: ``None`` for one the gate did not let through);
-    one that never asked keeps OpenCode's title as its summary, and no action."""
-    action: ActionInfo | None = call.action
+    one that never asked keeps OpenCode's title as its summary, and no action. The secrets Dot holds (``known``) are
+    masked in what it says of the call, as they are in the executor's (item 551)."""
+    action: ActionInfo | None = None if call.action is None else masked_action(call.action, known)
     return {
         "call_id": event.call_id,
         "tool": name,
         "ok": event.status == "completed",
-        "text": truncate_middle(redact_secrets(text), _EVENT_TEXT_CHARS),
+        "text": truncate_middle(redact_known(text, known), _EVENT_TEXT_CHARS),
         "images": [],
         "seconds": round(seconds, 2),
         "waited_s": round(call.waited_s, 2),
-        "summary": action.summary if action is not None else event.title,
+        "summary": action.summary if action is not None else redact_known(event.title, known),
         "kind": action.kind if action is not None else "",
         "risk": action.risk if action is not None else "",
         "target": action.target if action is not None else "",
@@ -402,10 +406,18 @@ class _Follow:
     added: int = 0
     asks: set[asyncio.Task[None]] = field(default_factory=set)
     idle: bool = False
+    # What the agent writes and thinks, as it comes, masked as the step's stored message is (item 551).
+    stream: StreamMask = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.stream = StreamMask(self.show)
 
     @property
     def runtime(self) -> Runtime:
         return self.agent.runtime
+
+    async def show(self, delta: StreamDelta) -> None:
+        await self.emit("delta", {"kind": delta.kind, "text": delta.text, "step": self.steps + 1}, False)
 
     async def prompt(self, text: str, files: tuple[PromptFile, ...]) -> None:
         self.prompts += 1
@@ -457,6 +469,7 @@ class _Follow:
                     self.answer = answer
             case StepStarted():
                 self.idle = False
+                self.stream.begin(await asyncio.to_thread(known_secrets))
                 self.assistants.setdefault(event.message_id, _Step(started=time.monotonic())).started = time.monotonic()
             case PartSeen():
                 await self.part(event)
@@ -489,7 +502,7 @@ class _Follow:
         if step is None or kind is None:
             return
         step.texts[event.part_id] = step.texts.get(event.part_id, "") + event.text
-        await self.emit("delta", {"kind": kind, "text": event.text, "step": self.steps + 1}, False)
+        await self.stream(StreamDelta(kind=kind, text=event.text))
 
     async def tool(self, event: ToolSeen) -> None:
         step: _Step | None = self.step_of(event.message_id)
@@ -503,11 +516,11 @@ class _Follow:
                 step.tools.append(event.tool.removeprefix(self.door))
             return
         name: str = f"{TOOL_PREFIX}{event.tool}"
+        # The secrets Dot holds are masked word for word, as the executor masks those of its own calls (item 525).
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
         if not call.announced:
             call.announced = True
             step.tools.append(name)
-            # The secrets Dot holds are masked word for word, as the executor masks those of its own calls (item 525).
-            known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
             await self.emit(
                 "tool_call", {"call_id": event.call_id, "tool": name, "args": redact_json(event.input, known)}, True
             )
@@ -517,13 +530,15 @@ class _Follow:
         if ok and call.action is not None:
             self.agent.gate.observe(call.action)
             self.runtime.peers.saw(self.agent.run.id, name, call.action)
-        text: str = redact_known(event.output if ok else event.error, await asyncio.to_thread(known_secrets))
         seconds: float = (
             (event.ended_ms - event.started_ms) / 1000
             if event.ended_ms is not None and event.started_ms is not None
             else 0.0
         )
-        await self.emit("tool_result", step_result(event, name, call, text, seconds, self.agent.gate.tainted), True)
+        result: JsonObject = step_result(
+            event, name, call, event.output if ok else event.error, seconds, self.agent.gate.tainted, known
+        )
+        await self.emit("tool_result", result, True)
 
     async def step_ended(self, event: StepEnded) -> None:
         step: _Step | None = self.step_of(event.message_id)
@@ -537,12 +552,14 @@ class _Follow:
         text: str = step.text("text")
         if text.strip():
             self.answer = text.strip()
+        await self.stream.flush()
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
         await self.emit(
             "assistant",
             {
                 "step": self.steps,
-                "text": redact_secrets(text),
-                "thinking": truncate_middle(redact_secrets(thinking), _THINKING_CHARS),
+                "text": redact_known(text, known),
+                "thinking": truncate_middle(redact_known(thinking, known), _THINKING_CHARS),
                 "thinking_chars": len(thinking),
                 "tool_calls": list(step.tools),
                 "input_tokens": event.input_tokens,

@@ -86,6 +86,8 @@ def tainted_after(events: Sequence[EventRecord]) -> bool:
 
 
 def _describe(info: ActionInfo) -> JsonObject:
+    """A step as a record keeps it (an event, an approval, the context of an error): pass it the step as
+    :func:`masked_action` gives it, which is the one that may be recorded (item 551)."""
     return {
         "tool": info.tool,
         "kind": info.kind,
@@ -95,6 +97,29 @@ def _describe(info: ActionInfo) -> JsonObject:
         "amount": None if info.amount is None else render_amount(info.amount),
         "flags": list(info.flags),
     }
+
+
+def masked_action(info: ActionInfo, known: Sequence[str]) -> ActionInfo:
+    """``info`` as the records of its step show it (its ``tool_result`` and ``policy`` events, its approval and the card
+    of it): the secrets Dot holds (``known``) and keys of a known form masked in its summary and its target, as they are
+    in the arguments of its call (item 551). The policy and the review model weigh the step as it is."""
+    return info.model_copy(
+        update={"summary": redact_known(info.summary, known), "target": redact_known(info.target, known)}
+    )
+
+
+def _masked_reason(decision: Decision, known: Sequence[str]) -> Decision:
+    """``decision`` as a record shows it: the policy's reason may quote the step's summary (a hand-off of a credential,
+    item 429), so it is masked as the summary is."""
+    return decision.model_copy(update={"reason": redact_known(decision.reason, known)})
+
+
+async def _shown(info: ActionInfo, decision: Decision) -> tuple[ActionInfo, Decision]:
+    """The step and the policy's decision of it as their records show them (item 551): what a ``policy`` event, an
+    approval, its card and the error a refusal raises keep of it. The secrets Dot holds are read off the event loop
+    (:func:`dotagent.secrets.known_secrets` reads the env file)."""
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    return masked_action(info, known), _masked_reason(decision, known)
 
 
 def _rejection(outcome: ApprovalOutcome) -> str:
@@ -297,9 +322,10 @@ class RunGate:
         if refusal is None:
             return
         decision: Decision = Decision(verdict="deny", source="pace", reason=refusal, rule_id=None)
+        shown, said = await _shown(info, decision)
         # A refusal before the policy weighs the step: the run's taint as it stands.
-        await self._emit_policy(info, decision, self.tainted)
-        raise PolicyDenied(refusal, {"action": _describe(info), "source": decision.source})
+        await self._emit_policy(shown, said, self.tainted)
+        raise PolicyDenied(refusal, {"action": _describe(shown), "source": decision.source})
 
     async def _space(self, paced: PacedAction) -> None:
         """Wait until a public action comes ``public_spacing_s`` after the last public one on its site."""
@@ -355,7 +381,10 @@ class RunGate:
                 state.host, state.amount.value, state.amount.currency, time.time(), self._run_id
             )
             log.info("spend_recorded", run_id=self._run_id, host=state.host, amount=state.amount.value)
-        return Authorization(note=note, decision=step_decision(decision, answered_by, self._preset, tainted))
+        # The step's result keeps this, and its reason may quote the summary: masked before it is cut to its size, so
+        # that the cut leaves no half of a secret (item 551).
+        _, said = await _shown(info, decision)
+        return Authorization(note=note, decision=step_decision(said, answered_by, self._preset, tainted))
 
     def _capped_site(self, info: ActionInfo) -> str | None:
         """The site of a payment step with an amount on a site with pre-approved caps; ``None`` for any other action."""
@@ -383,15 +412,17 @@ class RunGate:
             # what it would have asked. A refusal is not a question and stands below.
             return await self._waive(info, decision), "yolo"
         if decision.verdict == "deny":
-            await self._emit_policy(info, decision, tainted)
-            raise PolicyDenied(decision.reason, {"action": _describe(info), "source": decision.source})
+            shown, said = await _shown(info, decision)
+            await self._emit_policy(shown, said, tainted)
+            raise PolicyDenied(decision.reason, {"action": _describe(shown), "source": decision.source})
         # An action the owner refused is not put to them, nor to the review model, again until they write (item 456);
         # the policy's event is its record, as a step the owner refuses has (item 474).
         earlier: Declined | None = still_declined(self._declined, declined_key(info), len(self._instructions))
         if earlier is not None:
-            await self._emit_policy(info, decision, tainted)
+            shown, said = await _shown(info, decision)
+            await self._emit_policy(shown, said, tainted)
             log.warning("declined_again_refused", run_id=self._run_id, tool=info.tool)
-            raise ApprovalRejected(refusal_text(earlier), {"action": _describe(info), "note": earlier.note})
+            raise ApprovalRejected(refusal_text(earlier), {"action": _describe(shown), "note": earlier.note})
         allowed: ApprovalRecord | None = await self._kept_answer(info, decision, tainted)
         if allowed is not None:
             return allowed.note.strip(), "user"
@@ -418,20 +449,22 @@ class RunGate:
             return None
         skipped: ApprovalRecord | None = await self._approvals.skipped(digest, parking)
         if skipped is not None:
-            await self._emit_policy(info, decision, tainted)
+            shown, said = await _shown(info, decision)
+            await self._emit_policy(shown, said, tainted)
             log.warning("skipped_step_refused", run_id=self._run_id, tool=info.tool, approval_id=skipped.id)
-            raise ApprovalRejected(skipped_text(skipped.id), {"action": _describe(info), "approval_id": skipped.id})
+            raise ApprovalRejected(skipped_text(skipped.id), {"action": _describe(shown), "approval_id": skipped.id})
         if not asks:
             return None
         allowed: ApprovalRecord | None = await self._approvals.take_permit(digest, parking, time.time())
         if allowed is None:
             return None
+        shown, said = await _shown(info, decision)
         await self._approvals.record_automatic(
             self._run_id,
             info.tool,
-            f"{info.summary} — {decision.reason}",
+            f"{shown.summary} — {said.reason}",
             approval_severity(info),
-            _describe(info),
+            _describe(shown),
             "approved",
             PERMIT_DECIDER,
             f"the user allowed it when it was kept for them ({allowed.id})",
@@ -439,9 +472,12 @@ class RunGate:
         log.info("permit_used", run_id=self._run_id, tool=info.tool, approval_id=allowed.id)
         return allowed
 
-    async def _keep(self, info: ActionInfo, decision: Decision, summary: str, severity: str) -> ApprovalRejected:
+    async def _keep(
+        self, info: ActionInfo, shown: ActionInfo, decision: Decision, summary: str, severity: str
+    ) -> ApprovalRejected:
         """Keep the step ``info`` for the owner (items 482, 483), and what the run is told of it: that it did not happen
-        and waits for them to do it, or for their yes, or, past the caps of the kept steps, a refusal as before."""
+        and waits for them to do it, or for their yes, or, past the caps of the kept steps, a refusal as before. What is
+        kept shows the step as ``shown`` does, and ``summary`` has its secrets masked (item 551)."""
         parking: Parking | None = self._parking
         if parking is None:
             raise RunConflict("this run keeps no step for the owner", {"run_id": self._run_id})
@@ -450,14 +486,14 @@ class RunGate:
             info.tool,
             summary,
             severity,
-            _describe(info),
+            _describe(shown),
             kept_digest(info),
             parking,
         )
         if kept is None:
             return ApprovalRejected(
                 "nobody answered in time, and too many steps wait for the user already, so this one is not kept",
-                {"action": _describe(info)},
+                {"action": _describe(shown)},
             )
         log.info("step_kept", run_id=self._run_id, tool=info.tool, approval_id=kept.record.id, created=kept.created)
         told: str = (
@@ -465,21 +501,21 @@ class RunGate:
             if decision.verdict == "handoff"
             else kept_ask_text(kept.record.id, kept.created)
         )
-        return ApprovalParked(told, {"action": _describe(info), "approval_id": kept.record.id})
+        return ApprovalParked(told, {"action": _describe(shown), "approval_id": kept.record.id})
 
-    async def _emit_policy(self, info: ActionInfo, decision: Decision, tainted: bool) -> None:
+    async def _emit_policy(self, shown: ActionInfo, said: Decision, tainted: bool) -> None:
         """The event of a step the policy asks about, hands off or refuses, with whether the run was tainted when it
         was weighed (item 474): a step that does not go through keeps no decision in its result, so this is its
-        record."""
+        record. The step and the decision are as their records show them (:func:`_shown`, item 551)."""
         await self._bus.emit(
             self._run_id,
             "policy",
             {
-                **_describe(info),
-                "verdict": decision.verdict,
-                "source": decision.source,
-                "reason": decision.reason,
-                "rule_id": decision.rule_id,
+                **_describe(shown),
+                "verdict": said.verdict,
+                "source": said.source,
+                "reason": said.reason,
+                "rule_id": said.rule_id,
                 "tainted": tainted,
             },
             True,
@@ -488,15 +524,16 @@ class RunGate:
     async def _waive(self, info: ActionInfo, decision: Decision) -> str:
         """Yolo: the question is not asked and the refusal does not hold. The action goes ahead and the record says what
         the policy wanted: the action is its summary, the policy's reason its note, each once."""
+        shown, said = await _shown(info, decision)
         await self._approvals.record_automatic(
             self._run_id,
             info.tool,
-            info.summary,
+            shown.summary,
             approval_severity(info),
-            _describe(info),
+            _describe(shown),
             "approved",
             YOLO_DECIDER,
-            decision.reason,
+            said.reason,
         )
         return ""
 
@@ -512,23 +549,21 @@ class RunGate:
             log.info("taint_check_passed", run_id=self._run_id, tool=info.tool, decision=verdict.decision)
             return
         reason: str = shorten_reason(verdict.reason)
-        # A step that does not go through keeps its policy event as its record (item 474).
-        await self._emit_policy(
-            info,
-            Decision(
-                verdict="deny",
-                source="taint",
-                reason=f"this run read outside content, and the review model found the step not asked for: {reason}",
-                rule_id=None,
-            ),
-            True,
+        decision: Decision = Decision(
+            verdict="deny",
+            source="taint",
+            reason=f"this run read outside content, and the review model found the step not asked for: {reason}",
+            rule_id=None,
         )
+        shown, said = await _shown(info, decision)
+        # A step that does not go through keeps its policy event as its record (item 474).
+        await self._emit_policy(shown, said, True)
         await self._approvals.record_automatic(
             self._run_id,
             info.tool,
-            f"{info.summary} — read outside content, and the review model found it not asked for",
+            f"{shown.summary} — read outside content, and the review model found it not asked for",
             approval_severity(info),
-            _describe(info),
+            _describe(shown),
             "denied",
             REVIEWER_DECIDER,
             reason,
@@ -536,7 +571,7 @@ class RunGate:
         log.warning("taint_check_refused", run_id=self._run_id, tool=info.tool)
         raise ApprovalRejected(
             f"this run read outside content, and the review model found this step not asked for by the owner: {reason}",
-            {"action": _describe(info), "note": reason},
+            {"action": _describe(shown), "note": reason},
         )
 
     async def _refuse_carried_secret(self, info: ActionInfo, arguments: JsonObject) -> None:
@@ -548,18 +583,16 @@ class RunGate:
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
         if not carries_secret(info, arguments, known):
             return
-        masked: ActionInfo = info.model_copy(
-            update={"summary": redact_known(info.summary, known), "target": redact_known(info.target, known)}
-        )
+        shown: ActionInfo = masked_action(info, known)
         decision: Decision = Decision(
             verdict="deny",
             source="taint",
             reason="this run read outside content, and the step would send a secret out of the Mac",
             rule_id=None,
         )
-        await self._emit_policy(masked, decision, True)
+        await self._emit_policy(shown, decision, True)
         log.warning("secret_egress_refused", run_id=self._run_id, tool=info.tool)
-        raise PolicyDenied(decision.reason, {"action": _describe(masked), "source": decision.source})
+        raise PolicyDenied(decision.reason, {"action": _describe(shown), "source": decision.source})
 
     async def _review(self, info: ActionInfo, decision: Decision, tainted: bool) -> tuple[str, Answerer]:
         """Auto: the review model answers from the user's instructions; what it cannot tell goes to the user, who then
@@ -571,41 +604,44 @@ class RunGate:
         if verdict.decision == "escalate":
             passed_on: str = f"The review model passed this on to you: {reason}"
             return await self._ask_user(info, decision, passed_on, tainted), "user"
+        shown, said = await _shown(info, decision)
         await self._approvals.record_automatic(
             self._run_id,
             info.tool,
-            f"{info.summary} — {decision.reason}",
+            f"{shown.summary} — {said.reason}",
             approval_severity(info),
-            _describe(info),
+            _describe(shown),
             "approved" if verdict.decision == "approve" else "denied",
             REVIEWER_DECIDER,
             reason,
         )
         if verdict.decision == "deny":
             raise ApprovalRejected(
-                f"the review model refused this action: {reason}", {"action": _describe(info), "note": reason}
+                f"the review model refused this action: {reason}", {"action": _describe(shown), "note": reason}
             )
         return "", "reviewer"
 
     async def _ask_user(self, info: ActionInfo, decision: Decision, passed_on: str, tainted: bool) -> str:
-        await self._emit_policy(info, decision, tainted)
+        # The card, the question and the push to the owner's phone show the step with its secrets masked (item 551).
+        shown, said = await _shown(info, decision)
+        await self._emit_policy(shown, said, tainted)
         severity: str = "handoff" if decision.verdict == "handoff" else approval_severity(info)
-        summary: str = f"{info.summary} — {decision.reason}" + (f". {passed_on}" if passed_on else "")
+        summary: str = f"{shown.summary} — {said.reason}" + (f". {passed_on}" if passed_on else "")
         # A step handed to the owner, or a question whose card shows all of the step and reaches nobody, is kept for
         # them when nobody answers it (items 482, 483): at once while the owner has left the run's last kept step
         # unanswered and written nothing since, else once its question expires.
         keeps: bool = self._parking is not None and (decision.verdict == "handoff" or permit_parkable(info, decision))
         if keeps and self._owner_away:
-            at_once: ApprovalRejected = await self._keep(info, decision, summary, severity)
+            at_once: ApprovalRejected = await self._keep(info, shown, decision, summary, severity)
             if isinstance(at_once, ApprovalParked):
                 raise at_once
             # Past the caps of the kept steps it is asked as before, and refused if nobody answers it.
             self._owner_away = False
         outcome: ApprovalOutcome = await self._approvals.request(
-            self._run_id, info.tool, summary, severity, _describe(info)
+            self._run_id, info.tool, summary, severity, _describe(shown)
         )
         if keeps and outcome.status == "expired" and outcome.decided_by == TIMEOUT_DECIDER:
-            unanswered: ApprovalRejected = await self._keep(info, decision, summary, severity)
+            unanswered: ApprovalRejected = await self._keep(info, shown, decision, summary, severity)
             self._owner_away = isinstance(unanswered, ApprovalParked)
             raise unanswered
         if outcome.status != "approved":
@@ -614,7 +650,7 @@ class RunGate:
             if outcome.status == "denied" and outcome.decided_by in OWNER_DECIDERS and key is not None:
                 kept: Declined = Declined(note=outcome.note.strip(), spoken=len(self._instructions))
                 self._declined = {**self._declined, key: kept}
-            raise ApprovalRejected(_rejection(outcome), {"action": _describe(info), "note": outcome.note})
+            raise ApprovalRejected(_rejection(outcome), {"action": _describe(shown), "note": outcome.note})
         if decision.verdict == "handoff":
-            raise HandedOff(outcome.note or "the user completed this step themselves", {"action": _describe(info)})
+            raise HandedOff(outcome.note or "the user completed this step themselves", {"action": _describe(shown)})
         return outcome.note.strip()

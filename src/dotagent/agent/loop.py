@@ -158,6 +158,7 @@ from dotagent.agent.stepmodel import (
     routed_event,
     step_state,
 )
+from dotagent.agent.streammask import StreamMask
 from dotagent.agent.templates import AgentTeam, team_of
 from dotagent.agent.verify import (
     RunFacts,
@@ -187,7 +188,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
-from dotagent.core.text import CHARS_PER_TOKEN, redact_known, redact_secrets, truncate_middle
+from dotagent.core.text import CHARS_PER_TOKEN, redact_known, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.harness.service import adopted_text
 from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_in_order
@@ -1618,7 +1619,9 @@ async def _route_step(
     service: TypeSafeService | None = runtime.typesafe
     if service is None:
         return None
-    state: JsonObject = route_state(step_state(agent.run.goal, step, history, failures, failures_in_a_row))
+    # TypeSafe is a service outside the Mac: what it is sent has the secrets Dot holds masked (item 551).
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    state: JsonObject = route_state(step_state(agent.run.goal, step, history, failures, failures_in_a_row, known))
     try:
         answers: dict[str, ChoiceAnswer] | None = await service.choices(
             state, (route_question([*(candidate.option for candidate in candidates), "main"]),), agent.run.id
@@ -1953,8 +1956,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     unreachable_since: float | None = None
     asked_again: int = 0
 
-    async def sink(delta: StreamDelta) -> None:
+    async def show(delta: StreamDelta) -> None:
         await runtime.bus.emit(run.id, "delta", {"kind": delta.kind, "text": delta.text, "step": steps}, False)
+
+    # A step's stream is masked as its stored message is: a secret split between two deltas is not shown (item 551).
+    sink: StreamMask = StreamMask(show)
 
     while True:
         if agent.cancel.is_set():
@@ -2061,6 +2067,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
         steps += 1
         asked_at: float = time.monotonic()
+        # The secrets Dot holds, masked in what the step streams and in the message it stores (item 551).
+        held_secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        sink.begin(held_secrets)
         try:
             call: Awaitable[ModelReply] = _complete_in_time(
                 runtime, step_ref, request, sink, step_origin, config.model_call_timeout_s
@@ -2076,6 +2085,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 steps -= 1
                 continue
             reply: ModelReply = heard
+            await sink.flush()
             # A reply the service's content filter stopped is handled as a model that cannot answer this run: a
             # routed step goes back to the run's own model, the run's own model hands over to a standby one.
             filtered: ProviderFilterError | None = filtered_stop(reply, step_ref.label)
@@ -2192,8 +2202,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             "assistant",
             {
                 "step": steps,
-                "text": redact_secrets(reply.text),
-                "thinking": truncate_middle(redact_secrets(reply.thinking), _THINKING_CHARS),
+                "text": redact_known(reply.text, held_secrets),
+                "thinking": truncate_middle(redact_known(reply.thinking, held_secrets), _THINKING_CHARS),
                 "thinking_chars": len(reply.thinking),
                 "tool_calls": [call.name for call in reply.tool_calls],
                 "input_tokens": reply.usage.input_tokens,
@@ -2290,7 +2300,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     await runtime.bus.emit(
                         run.id,
                         SINGLE_ACTION_EVENT,
-                        {"step": steps, "tool": single_now.tool, "target": redact_secrets(single_now.target)},
+                        {
+                            "step": steps,
+                            "tool": single_now.tool,
+                            "target": redact_known(single_now.target, held_secrets),
+                        },
                         True,
                     )
                 continue

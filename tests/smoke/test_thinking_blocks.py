@@ -100,6 +100,9 @@ class ThinkingProvider(ScriptedProvider):
         for at in range(0, len(thought), piece):
             await sink(StreamDelta(kind="thinking", text=thought[at : at + piece]))
         if self._asked == 1:
+            # The thought's last line ends before the model pauses, as a model's line does: the stream shows a word
+            # once it has ended, in case it is the start of a key (item 551).
+            await sink(StreamDelta(kind="thinking", text="\n"))
             await self._hold.wait()
         reply: ModelReply = await super().complete(request, sink)
         if reply.text != "":

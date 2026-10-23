@@ -327,7 +327,8 @@ nodes hold nodes, which `allow` can leave out) is left out, and Dot starts witho
 with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin, and `dotx doctor` warns of a
 missing command or secret. It is tried again when Dot starts again; `enabled = false` stops trying it. Plugins add their
 servers too (see [Skills and plugins](#skills-and-plugins)); their names become `<plugin>-<server>`. MCP results are
-untrusted content. An answer longer than one result holds is kept whole in
+untrusted content, and so is an error that a server answers a call with: the model reads its words inside the fence as
+data, and the run is marked untrusted (item 551). An answer longer than one result holds is kept whole in
 `<workspace>/mcp-results/<server>-<tool>-<time>-<id>.txt` (item 494): the result shows the lines at its start that fit,
 inside the fence, and then says where the file is, how long it is and the line to read on from with `read_file`. The
 stderr of a stdio server goes to `<logs>/mcp-<name>.log`. A tool whose name's first verb

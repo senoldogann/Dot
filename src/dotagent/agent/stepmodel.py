@@ -14,6 +14,7 @@ cannot answer is asked again on the run's model. Every step that another model t
 from collections.abc import Sequence
 from typing import Literal
 
+from dotagent.core.text import redact_known
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Message
 from dotagent.llm.typesafe import ChoiceAnswer, ChoiceQuestion
@@ -73,21 +74,28 @@ def _clip(text: str, limit: int) -> str:
     return text if len(text) <= limit else f"{text[: limit - 1]}…"
 
 
-def last_result(history: Sequence[Message]) -> str:
+def last_result(history: Sequence[Message], known: Sequence[str]) -> str:
     """What the previous step brought back: the messages after the model's last reply (tool results, notes, what the
-    user sent), oldest first; empty when the model has not spoken yet."""
+    user sent), oldest first, with the secrets ``known`` and keys of a known form masked; empty when the model has not
+    spoken yet."""
     spoken: int = next((index for index in range(len(history) - 1, -1, -1) if history[index].role == "assistant"), -1)
     if spoken < 0:
         return ""
     parts: list[str] = [message.content for message in history[spoken + 1 :] if message.content]
-    return _clip("\n".join(parts), _LAST_RESULT_CHARS)
+    # Masked before it is clipped: a cut through a key would leave a half that no pattern knows.
+    return _clip(redact_known("\n".join(parts), known), _LAST_RESULT_CHARS)
 
 
-def step_state(goal: str, step: int, history: Sequence[Message], failures: int, failures_in_a_row: int) -> StepState:
+def step_state(
+    goal: str, step: int, history: Sequence[Message], failures: int, failures_in_a_row: int, known: Sequence[str]
+) -> StepState:
+    """The state of ``step`` for the judge, a service outside the Mac: the goal and what the last step brought back have
+    their secrets masked, those Dot holds (``known``, :func:`dotagent.secrets.known_secrets`) and keys of a known form
+    (item 551)."""
     return StepState(
-        goal=_clip(goal, _GOAL_CHARS),
+        goal=_clip(redact_known(goal, known), _GOAL_CHARS),
         step=step,
-        last_result=last_result(history),
+        last_result=last_result(history, known),
         failures=failures,
         failures_in_a_row=failures_in_a_row,
     )

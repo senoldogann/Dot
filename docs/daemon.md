@@ -279,7 +279,8 @@ its own page. What the model thought in a step is a line of its own there, befor
 the fold before the message the step writes or the answer it ends the run with: a brain where a call has its icon,
 "Thinking…" while the model thinks and "Thought" once it is done, the start of the thought beside it; opened, the whole
 thought: up to 12,000 characters of it, of a longer one its start and its end, its secrets masked; it is there when the
-page is loaded again. A step asked again from its start drops what its failed try streamed. A message streams as it will
+page is loaded again. A thought and a message are masked as they stream too (item 551): a secret split between two
+pieces of the stream is not shown, so the text trails a few words behind and is whole when the step ends. A step asked again from its start drops what its failed try streamed. A message streams as it will
 stay (item 274): formatted as it comes, drawn at most once a frame with the parts already written left as they are, its
 caret at the end of its text, so that its end moves nothing. An answer that ends a run while its page is open is written
 in the same way (item 366), a few words a frame for two seconds at most, into the room it will take, so the page lands

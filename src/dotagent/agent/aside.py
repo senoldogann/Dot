@@ -15,12 +15,13 @@ from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_e
 from dotagent.core.errors import MissingSecretError, ProviderError
 from dotagent.core.ids import new_id
 from dotagent.core.logs import get_logger
-from dotagent.core.text import truncate_middle
+from dotagent.core.text import redact_known, truncate_middle
 from dotagent.core.types import FrozenModel
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import ChatRequest, Message, ModelReply, StreamDelta, system_message, user_message
 from dotagent.runtime import Runtime
+from dotagent.secrets import known_secrets
 from dotagent.store.models import EventRecord, RunRecord
 
 log = get_logger(__name__)
@@ -125,6 +126,9 @@ async def answer_aside(runtime: Runtime, run_id: str, question: str) -> AsideAns
             run.id, ASIDE_FAILED_EVENT, {"id": aside_id, "error": error.message, "model": ref.label}, True
         )
         raise
+    # The model answers from the whole record, the results of the run's tools in it: a secret it quotes is masked in
+    # what is stored and shown, as the run's own replies are (item 551).
+    answer = redact_known(answer, await asyncio.to_thread(known_secrets))
     await runtime.bus.emit(
         run.id, ASIDE_ANSWER_EVENT, {"id": aside_id, "text": answer, "model": ref.label, "attempts": attempts}, True
     )

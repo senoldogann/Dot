@@ -31,7 +31,7 @@ from mcp.types import (
 from pydantic import JsonValue
 
 from dotagent.config import McpServerConfig, McpTransport
-from dotagent.core.errors import McpError
+from dotagent.core.errors import McpError, McpRejected
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_middle
@@ -454,7 +454,7 @@ class McpConnection:
             if _session_gone(exc):
                 raise await self._lost(live, f"running {name}", exc) from exc
             shown: str = truncate_middle(redact_secrets(dumps_compact(arguments)), _SHOWN_ARGUMENT_CHARS)
-            raise McpError(
+            raise McpRejected(
                 "the MCP server rejected the call",
                 {**self._context(), "tool": name, "code": exc.code, "error": exc.message, "arguments": shown},
             ) from exc
