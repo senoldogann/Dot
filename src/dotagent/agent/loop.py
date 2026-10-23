@@ -264,7 +264,16 @@ from dotagent.tools.groups import (
     used_groups,
 )
 from dotagent.tools.mail_calendar import account_lines
-from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, AskUserArgs, FinishArgs, UseToolsArgs
+from dotagent.tools.meta import (
+    ASK_USER_TOOL,
+    FINISH_TOOL,
+    MARK_PLAN_STEP_TOOL,
+    UPDATE_PLAN_TOOL,
+    USE_TOOLS_TOOL,
+    AskUserArgs,
+    FinishArgs,
+    UseToolsArgs,
+)
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import skill_instructions
@@ -355,6 +364,15 @@ _PLAN_NOTE: str = (
     "[system note] Your plan still shows step(s) {steps} as not closed. Mark each of them done, failed or skipped "
     "with mark_plan_step (several calls in one reply), then end the run again with your complete final answer."
 )
+# The tools whose failure says nothing of the work a finish reports: the plan's bookkeeping, a tool group turned on.
+_BOOKKEEPING_TOOLS: frozenset[str] = frozenset({UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, USE_TOOLS_TOOL})
+_FAILED_FINISH_NOTE: str = (
+    "[system note] You called finish in the same reply as {calls}, which did not work, so your answer was written "
+    "before you saw what happened. Read the result above, then end the run again with your complete final answer: say "
+    "what did not happen, or do it."
+)
+# A run that called finish in the same reply as a call that did not work was sent back once (item 552).
+FINISH_AFTER_FAILURE_EVENT: str = "finish_after_failure"
 _NO_PLAN: str = "The agent has not written a plan."
 _CAMPAIGN_TARGETS_NOTE: str = (
     "[system note] The campaign has no targets yet. Record them with campaign_targets (the outcome, measurable, and "
@@ -559,9 +577,9 @@ async def _compact(
 ) -> Compaction:
     """Fold ``head`` into a continuity note written by the fast model (``[models] fast``), the side work of a run that
     its own, slower model need not do; the run's own model writes it when the fast one gives no usable summary (a
-    provider error, a timeout, no text, a summary far too long) and, without asking the fast one, while the router has
-    paused it (item 240). The compaction event names the fast model's problem, so that a fast model that never answers
-    is seen, not hidden.
+    provider error, a timeout, no text, a summary far too long, a window that cannot be read) and, without asking the
+    fast one, while the router has paused it (item 240). The compaction event names the fast model's problem, so that a
+    fast model that never answers is seen, not hidden.
 
     The ledger and the plan are pinned into the note in about ``part_chars`` characters; the model's summary is checked
     against ``head``, and a section it still lacks after it was asked for again goes into the note as an empty heading,
@@ -583,14 +601,20 @@ async def _compact(
     fast_problem: str | None = None if paused is None else f"{unavailable_text(paused, now)} cannot answer now"
     if paused is not None:
         log.info("summary_fast_paused", run_id=agent.run.id, fast=fast.label, own=own.label, until=paused.until)
-    # The run's own model is asked with the window the run planned with (item 520), the fast one with its own.
-    text, attempts, problem = await _model_summary(
-        agent,
-        writer,
-        transcript,
-        context_tokens,
-        window if writer.label == own.label else await agent.runtime.router.window_of(writer),
-    )
+    # The run's own model is asked with the window the run planned with (item 520), the fast one with its own. A fast
+    # model whose window cannot be read (an Ollama model that is not reachable) is one that cannot answer: the run's
+    # own model writes the summary, as it does for any other problem of the fast one (item 552).
+    asked_window: int | None = window
+    if writer.label != own.label:
+        try:
+            asked_window = await agent.runtime.router.window_of(writer)
+        except (ProviderError, MissingSecretError) as error:
+            fast_problem = error.message
+            log.warning(
+                "summary_fast_failed", run_id=agent.run.id, fast=fast.label, own=own.label, problem=fast_problem
+            )
+            writer = own
+    text, attempts, problem = await _model_summary(agent, writer, transcript, context_tokens, asked_window)
     if text is None and writer.label != own.label:
         fast_problem = problem if problem is not None else "no reply"
         log.warning("summary_fast_failed", run_id=agent.run.id, fast=fast.label, own=own.label, problem=fast_problem)
@@ -956,6 +980,20 @@ def _new_teammates_note(agents: Sequence[AgentRecord]) -> str:
 
 def _plan_note(unclosed: Sequence[int]) -> str:
     return _PLAN_NOTE.format(steps=", ".join(str(number) for number in unclosed))
+
+
+def _failed_before_finish(outcomes: Sequence[ToolOutcome], finished: ToolOutcome) -> tuple[ToolOutcome, ...]:
+    """The calls of the reply that ends the run with ``finished``, ahead of it, that did not work (an error, a
+    refusal, a step kept for the owner): its answer was written before the model read their results (item 552). The
+    plan's bookkeeping is not among them."""
+    ahead: Sequence[ToolOutcome] = outcomes[: outcomes.index(finished)]
+    return tuple(
+        outcome for outcome in ahead if outcome.result.is_error and outcome.call.name not in _BOOKKEEPING_TOOLS
+    )
+
+
+def _failed_finish_note(failed: Sequence[ToolOutcome]) -> str:
+    return _FAILED_FINISH_NOTE.format(calls=", ".join(dict.fromkeys(outcome.call.name for outcome in failed)))
 
 
 def _finish_result(outcome: ToolOutcome) -> RunOutcome:
@@ -1921,6 +1959,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     sent_back: int = 0
     used_tools: bool = False
     plan_reminded: bool = False
+    failure_reminded: bool = False
     targets_reminded: bool = False
     paths_reminded: bool = False
     # The step of the newest reminder of the goal (weak tier); 0 before the first.
@@ -2215,6 +2254,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             True,
         )
         ended: RunOutcome | None = None
+        # The calls of the reply that ended the run that did not work, whose results its answer did not wait for.
+        unread: tuple[ToolOutcome, ...] = ()
         if reply.tool_calls:
             used_tools = True
             # Only text replies in a row end a task run; a step that acts starts the count again.
@@ -2225,10 +2266,15 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 outcomes: list[ToolOutcome] = await execute_calls(
                     reply.tool_calls, registry, hidden, context, agent.gate, config.parallel_tools, calls_ended.append
                 )
-            except asyncio.CancelledError:
-                # A stop of the run or of the daemon cut the step: the results of the calls that had ended stay in the
-                # thread, so that what goes on there reads what they did instead of making them again (item 159).
-                await _keep_ended(agent, reply.tool_calls, calls_ended, info.vision)
+            except BaseException:
+                # A stop of the run or of the daemon, the desktop's fail-safe, or an error outside a tool (the store
+                # could not keep a screenshot) cut the step: the results of the calls that had ended stay in the thread,
+                # so that what goes on there reads what they did instead of making them again (items 159, 552). The
+                # error that cut the step is the one that goes on, whatever keeping them comes to.
+                try:
+                    await _keep_ended(agent, reply.tool_calls, calls_ended, info.vision)
+                except Exception as keeping:  # noqa: BLE001 - logged here; the error that cut the step is raised again
+                    log.error("ended_calls_not_kept", run_id=run.id, step=steps, error=str(keeping))
                 raise
             turned_on: tuple[str, ...] = _turned_on(outcomes, hidden, on)
             if turned_on:
@@ -2272,6 +2318,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     history.append(await _stored_note(agent, arrival))
             if finished is not None:
                 ended = _finish_result(finished)
+                unread = _failed_before_finish(outcomes, finished)
             elif past_limit is not None:
                 return _run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
             else:
@@ -2338,9 +2385,18 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 else await _check_goal_at_limit(agent, checker, history, goal, ended, sent_back, facts)
             )
             return _run_end(agent, history, goal, at_limit, facts)
-        # Otherwise a plan with open steps is sent back once, so the plan the user sees matches the work; so is a
-        # session of a campaign that has no targets yet, and, with verify_answer_paths, an answer that names paths that
-        # do not exist; then goal mode lets the checker decide whether the goal is really reached.
+        # Otherwise a finish that came in the reply of a call that did not work is sent back once, to read what
+        # happened (item 552); so is a plan with open steps, so the plan the user sees matches the work, a session of a
+        # campaign that has no targets yet, and, with verify_answer_paths, an answer that names paths that do not
+        # exist; then goal mode lets the checker decide whether the goal is really reached.
+        if unread and not failure_reminded:
+            failure_reminded = True
+            nudges = 0
+            history.append(await _stored_note(agent, _failed_finish_note(unread)))
+            await runtime.bus.emit(
+                run.id, FINISH_AFTER_FAILURE_EVENT, {"calls": [outcome.call.name for outcome in unread]}, True
+            )
+            continue
         if not plan_reminded and run.mode != "chat":
             unclosed: tuple[int, ...] = open_steps((await _current_plan(agent)).steps)
             if unclosed:

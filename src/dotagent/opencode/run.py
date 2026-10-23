@@ -5,7 +5,9 @@ show theirs: the model's text and thinking as they come, each tool call and its 
 permission the agent asks for is decided as a tool of Dot's own is (:meth:`dotagent.agent.gate.RunGate.authorize`): by
 the owner's rules and preset, the review model or the owner, as the run's approval mode says; a refusal tells the agent
 why, and it goes on. The owner's messages go to the agent while it works, and a stop of the run stops it. The run ends
-done with the agent's last answer once the agent has nothing left to do, and failed when its session fails.
+done with the agent's last answer once the agent has nothing left to do, and failed when its session fails, when its
+last reply was cut short (the model's output limit) and when it goes on past the run's limits (``run_max_minutes``,
+``run_max_tokens``), which it is told of once.
 
 The agent has Dot's own tools besides its own (item 284): those of what OpenCode has no tool for (Dot's browser, the
 Mac's applications, memory, schedules, a notification, a page in the conversation, skills, a question to the owner and
@@ -33,8 +35,19 @@ from dotagent.agent.attachments import (
     steer_event,
 )
 from dotagent.agent.authorization import Authorization, StepDecision
+from dotagent.agent.continuity import new_ledger
 from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate, masked_action
+from dotagent.agent.limits import (
+    LIMIT_EVENT,
+    LimitReached,
+    RunLimits,
+    limit_event_data,
+    limit_reached,
+    limit_result,
+    limit_spent,
+    limits_of,
+)
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOutcome, browser_of
 from dotagent.agent.progress import can_ask_user, question_mode
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
@@ -80,6 +93,7 @@ from dotagent.policy.shell import ShellAssessment, assess_shell
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
+from dotagent.store.endings import PREFIX_CUT_SHORT
 from dotagent.store.models import AgentRecord, RunMode
 from dotagent.tools.base import ToolResult
 from dotagent.tools.channels import Channel
@@ -102,6 +116,22 @@ _MEANWHILE_CHARS: int = 2000
 _TITLE_CHARS: int = 80
 # How long a run that ends lets the permissions it still decides finish (:func:`_let_go`).
 _ASK_GRACE_S: float = 10.0
+# How a step of the agent ended, in OpenCode's words (the ``reason`` of its ``step-finish``): the agent goes on after a
+# step that ended with a call of a tool, and stops after any other. A reply that stopped at the model's output limit
+# sets no error in OpenCode, which goes idle with the half of an answer; Dot's own loop counts it as cut short (item
+# 552), as it does a reply that ended for a reason of the service's own.
+_GOES_ON: frozenset[str] = frozenset({"tool-calls", "unknown"})
+_CUT_SHORT: frozenset[str] = frozenset({"length", "other"})
+# The steps that end after the agent was told that the run's limit is reached before one that goes on ends the run:
+# the step that was under way when the note arrived has not read it.
+_LIMIT_GRACE_STEPS: int = 2
+# What the agent is told when the run's limit is reached (the note of Dot's own loop asks for a call of finish, which
+# the agent does not have).
+_LIMIT_NOTE: str = (
+    "[system note] The limit of this run is reached: it has used {spent}. Stop now, in this reply: write your final "
+    "answer with what was reached (the numbers), what is missing and how to go on. Call no more tools: the run ends "
+    "after this reply."
+)
 # What the agent is told when it asks for a subagent: the subagent's session would not be the run's, which Dot follows.
 NO_SUBAGENT_NOTE: str = "Subagents are not available here: do this part of the work yourself, with your own tools."
 # What the agent is told when it makes the same call a third time in a row (OpenCode asks ``doom_loop`` then): Dot's own
@@ -397,6 +427,16 @@ class _Follow:
     queue: asyncio.Queue[_Item]
     # What the names of Dot's own tools start with in the session (``dot_1a2b3c4d_``): their calls show as Dot's.
     door: str
+    # When the run began (monotonic seconds) and its limits (``[agent] run_max_minutes`` and ``run_max_tokens``, which
+    # the loop of Dot's own runs reads between its steps too, item 552), the limit the agent was told of and how many
+    # steps ended since, and the limit once the agent went on regardless: the run ends failed then.
+    started: float = field(default_factory=time.monotonic)
+    limits: RunLimits | None = None
+    told: LimitReached | None = None
+    since_told: int = 0
+    over: LimitReached | None = None
+    # How the newest step ended, in OpenCode's words.
+    finish: str = ""
     steps: int = 0
     prompts: int = 0
     users: set[str] = field(default_factory=set)
@@ -479,6 +519,7 @@ class _Follow:
                 await self.tool(event)
             case StepEnded():
                 await self.step_ended(event)
+                return self.over is not None
             case PermissionAsked():
                 self.ask(event)
             case SessionFailed():
@@ -545,6 +586,7 @@ class _Follow:
         if step is None:
             return
         self.steps += 1
+        self.finish = event.reason
         run_id: str = self.agent.run.id
         await self.runtime.store.add_run_tokens(run_id, event.input_tokens, event.output_tokens)
         await self.runtime.store.set_run_steps(run_id, self.steps)
@@ -570,6 +612,29 @@ class _Follow:
             },
             True,
         )
+        if event.reason in _GOES_ON:
+            await self.keep_to_limits()
+
+    async def keep_to_limits(self) -> None:
+        """Read the run's limits after a step that the agent goes on from, as the loop reads them between its steps
+        (item 552): the first step that ends past one tells the agent to stop and answer, and a run whose agent still
+        goes on after :data:`_LIMIT_GRACE_STEPS` more steps is over (``over``): it ends failed and the agent is
+        stopped."""
+        if self.limits is None:
+            return
+        if self.told is not None:
+            self.since_told += 1
+            if self.since_told >= _LIMIT_GRACE_STEPS:
+                self.over = self.told
+            return
+        tokens: int = await self.runtime.store.family_tokens(self.agent.run.id)
+        reached: LimitReached | None = limit_reached(self.limits, time.monotonic() - self.started, tokens)
+        if reached is None:
+            return
+        self.told = reached
+        log.info("opencode_limit_reached", run_id=self.agent.run.id, spent=limit_spent(reached))
+        await self.emit(LIMIT_EVENT, limit_event_data(reached), True)
+        await self.prompt(_LIMIT_NOTE.format(spent=limit_spent(reached)), ())
 
     def ask(self, event: PermissionAsked) -> None:
         """Decide the permission in a task of its own: the owner may take a while, and the run reads on meanwhile."""
@@ -809,8 +874,23 @@ async def _server_of(runtime: Runtime, ref: ModelRef) -> OpenCodeProvider:
     return provider
 
 
+def _outcome(follow: _Follow, answer: str, goal: str) -> RunOutcome:
+    """How the run ends. Failed when its limit was reached and the agent went on regardless, and when the agent's last
+    reply was cut short, at the model's output limit or for a reason of the service's own, as Dot's own loop ends a run
+    whose replies it cannot get whole (item 552); else done with the agent's last answer, or with a line that says it
+    gave none."""
+    if follow.over is not None:
+        result: str = limit_result(follow.over, new_ledger(goal), "", answer)
+        return RunOutcome(status="failed", result=result, needs="")
+    if follow.finish in _CUT_SHORT:
+        cut: str = f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with '{follow.finish}')."
+        return RunOutcome(status="failed", result=cut, needs="")
+    return RunOutcome(status="done", result=answer or "OpenCode's agent finished without a closing message.", needs="")
+
+
 async def run_in_opencode(agent: AgentRun) -> RunEnd:
     """Run ``agent``'s run as OpenCode's own agent (module docstring)."""
+    started: float = time.monotonic()
     runtime: Runtime = agent.runtime
     run = agent.run
     ref: ModelRef = parse_model_ref(run.model)
@@ -854,6 +934,8 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
             vision=info.vision,
             queue=queue,
             door=f"{door.name}_",
+            started=started,
+            limits=limits_of(runtime.config.agent, run.mode),
         )
         async with _dot_tools(provider.bridge, server, directory, door), server.events(directory) as stream:
             pumps: tuple[asyncio.Task[None], ...] = (
@@ -867,7 +949,8 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
                     meanwhile(goal.content, earlier[chat.seen :]), _prompt_files(agent.opening.files, info.vision)
                 )
                 answer: str = await follow.follow()
-                ended = True
+                # An agent that went on past the run's limit is stopped; the run's own ending is the failure.
+                ended = follow.over is None
             finally:
                 for task in pumps:
                     task.cancel()
@@ -875,10 +958,9 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
                 if not ended:
                     await asyncio.shield(_stop_agent(server, chat.session_id, directory))
                 await _let_go(runtime, run.id, tuple(follow.asks))
-        result: str = answer or "OpenCode's agent finished without a closing message."
         await runtime.store.append_messages(run.thread_id, [assistant_message(answer, None, ())])
         await asyncio.to_thread(
             _write_chat, run.thread_id, ChatSession(session_id=chat.session_id, seen=len(earlier) + 2 + follow.added)
         )
     log.info("opencode_run_ended", run_id=run.id, session=chat.session_id, steps=follow.steps)
-    return RunEnd(outcome=RunOutcome(status="done", result=result, needs=""), lessons=None)
+    return RunEnd(outcome=_outcome(follow, answer, run.goal), lessons=None)

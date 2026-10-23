@@ -47,7 +47,8 @@ GOAL: str = "Write the weekly report to ~/Reports/week41.md and mail it to the t
 # The home folder the check is told of: a made-up one, not this Mac's.
 HOME: str = "/Users/owner"
 SUMMARY: str = (
-    "GOAL: weekly report.\nDONE: wrote ~/Reports/week41.md.\nSTATE: draft saved.\nPROBLEMS: none.\nNEXT: send the mail."
+    "GOAL: weekly report.\nDONE: wrote ~/Reports/week41.md.\nSTATE: draft saved.\nDECISIONS: Turkish, as asked.\n"
+    "PROBLEMS: none.\nNEXT: send the mail."
 )
 
 
@@ -83,7 +84,7 @@ def test_the_check_flags_identifiers_the_history_never_mentioned() -> None:
     assert not invented.ok
     assert invented.unverified == ("https://files.example.com/report.pdf",)
     missing = check_continuity("GOAL: report. DONE: wrote it.", reference, ledger, HOME)
-    assert missing.missing_sections == ("STATE", "PROBLEMS", "NEXT")
+    assert missing.missing_sections == ("STATE", "DECISIONS", "PROBLEMS", "NEXT")
 
 
 def test_the_check_takes_an_address_cut_short_or_lengthened_as_known_and_another_one_not() -> None:
@@ -358,11 +359,13 @@ def test_history_text_holds_tool_arguments() -> None:
         (
             "The user wants the state of the report. Next I will check it, which is done, but the goal changed. "
             "No problems.",
-            ("GOAL", "DONE", "STATE", "PROBLEMS", "NEXT"),
+            ("GOAL", "DONE", "STATE", "DECISIONS", "PROBLEMS", "NEXT"),
         ),
         ("GOAL: x\nDONE: y\nSTATE: z\nDECISIONS: a\nPROBLEMS: none\nNEXT: b", ()),
-        ("## Goal\nx\n**DONE**: y\n- STATE (open): z\n1. PROBLEMS — none\n### NEXT\nb", ()),
-        ("Goal achieved.\nDone with it\nSTATE: z", ("GOAL", "DONE", "PROBLEMS", "NEXT")),
+        ("## Goal\nx\n**DONE**: y\n- STATE (open): z\n* Decisions (kept): a\n1. PROBLEMS — none\n### NEXT\nb", ()),
+        # Item 552: the prompt asks for DECISIONS, so a summary without it is asked again.
+        ("GOAL: x\nDONE: y\nSTATE: z\nPROBLEMS: none\nNEXT: b", ("DECISIONS",)),
+        ("Goal achieved.\nDone with it\nSTATE: z", ("GOAL", "DONE", "DECISIONS", "PROBLEMS", "NEXT")),
     ],
 )
 def test_a_section_counts_only_where_a_line_opens_it(summary: str, missing: tuple[str, ...]) -> None:
@@ -373,7 +376,7 @@ def test_a_summary_still_lacking_sections_gets_an_empty_heading_for_each() -> No
     """Review O9: asked for again and still without them, the summary keeps every heading the steps after it read."""
     summary: str = "GOAL: x\nDONE: y\nSTATE: z\n"
     lacking: tuple[str, ...] = missing_sections(summary)
-    assert lacking == ("PROBLEMS", "NEXT")
+    assert lacking == ("DECISIONS", "PROBLEMS", "NEXT")
     filled: str = with_empty_sections(summary, lacking)
-    assert filled == "GOAL: x\nDONE: y\nSTATE: z\nPROBLEMS:\nNEXT:"
+    assert filled == "GOAL: x\nDONE: y\nSTATE: z\nDECISIONS:\nPROBLEMS:\nNEXT:"
     assert missing_sections(filled) == ()

@@ -211,6 +211,8 @@ class ResponsesState(FrozenModel):
     stop_reason: str
     usage: Usage
     final_output: tuple[JsonObject, ...]
+    # Whether the model declined: a refusal came in the stream (item 552).
+    refused: bool = False
 
 
 def initial_responses_state(model: str) -> ResponsesState:
@@ -288,8 +290,12 @@ def fold_responses_event(
         if errored:
             raise ProviderProtocolError("error event carries no error description", context)
         return state, ()
-    if kind in ("response.output_text.delta", "response.refusal.delta"):
+    if kind == "response.output_text.delta":
         return _with_text(state, get_str(data, "delta"))
+    if kind == "response.refusal.delta":
+        # Its words reach the owner as an answer's do, and the reply says the model declined (item 552).
+        declined, deltas = _with_text(state, get_str(data, "delta"))
+        return declined.model_copy(update={"refused": state.refused or bool(deltas)}), deltas
     if kind == "response.reasoning_summary_text.delta":
         return _with_thinking(state, get_str(data, "delta"))
     if kind == "response.reasoning_summary_part.added" and state.thinking:
@@ -322,6 +328,14 @@ def _message_text(item: JsonObject) -> str:
         elif part_kind == "refusal":
             pieces.append(get_str(part, "refusal"))
     return "".join(pieces)
+
+
+def _refusal_of(item: JsonObject) -> bool:
+    """Whether a message of the output holds a refusal: the model declined, in the words of that part."""
+    return any(
+        get_str(part, "type") == "refusal" and get_str(part, "refusal").strip() != ""
+        for part in get_objects(item, "content")
+    )
 
 
 def _reasoning_text(item: JsonObject) -> str:
@@ -372,14 +386,20 @@ def responses_reply(state: ResponsesState) -> ModelReply:
     )
     texts: list[str] = [_message_text(item) for item in kept if get_str(item, "type") == "message"]
     thoughts: list[str] = [_reasoning_text(item) for item in kept if get_str(item, "type") == "reasoning"]
+    # A model that declined and made no call has not answered: its reply ends as the Messages codec ends Anthropic's
+    # refusal, so that a run does not end done with a refusal for its result and the review model's refusal is known
+    # for one (item 552).
+    declined: bool = not calls and (
+        state.refused or any(_refusal_of(item) for item in kept if get_str(item, "type") == "message")
+    )
     return ModelReply(
         model=state.model,
         text="\n\n".join(text for text in texts if text) or state.text,
         thinking="\n\n".join(text for text in thoughts if text) or state.thinking,
         tool_calls=calls,
         usage=state.usage,
-        finish=_finish_of(state, bool(calls)),
-        raw_finish=state.stop_reason or state.status,
+        finish="other" if declined else _finish_of(state, bool(calls)),
+        raw_finish="refusal" if declined else state.stop_reason or state.status,
         raw=kept,
     )
 

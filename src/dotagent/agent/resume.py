@@ -31,11 +31,14 @@ from dotagent.llm.types import ToolCall
 from dotagent.policy.types import READ_ONLY_KINDS, ActionInfo, ActionKind
 from dotagent.runtime import Runtime
 from dotagent.server import UI_SOURCE
+from dotagent.skills.types import SKILL_TOOL
 from dotagent.store.endings import classify_ending
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool
 from dotagent.tools.context import ToolContext
 from dotagent.tools.desktop import DESKTOP_ACT_TOOL
+from dotagent.tools.help import FIND_HELP_TOOL
+from dotagent.tools.meta import ASK_USER_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL, USE_TOOLS_TOOL
 
 log = get_logger(__name__)
 
@@ -44,8 +47,15 @@ RESUME_SOURCE: str = "resume"
 RESUMED_EVENT: str = "resumed"
 
 # The policy kinds of calls that change nothing when they run again. A delegated run may have done anything its mode
-# allows, so a delegation is not one of them.
-REPEATABLE_KINDS: frozenset[ActionKind] = READ_ONLY_KINDS - {"delegate"}
+# allows, so a delegation is not one of them, and neither is a ``meta`` call: that kind holds the tools that make an
+# agent, show a notification or a page, ask the owner and end the run (item 552), which a second call does again.
+REPEATABLE_KINDS: frozenset[ActionKind] = READ_ONLY_KINDS - {"delegate", "meta"}
+# The ``meta`` tools that change nothing a second call would show twice: the plan and the groups of tools are set, not
+# added to, a skill, the schedules and the help are only read, and a question that the end of the daemon closed is
+# asked again.
+REPEATABLE_META_TOOLS: frozenset[str] = frozenset(
+    {UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, USE_TOOLS_TOOL, SKILL_TOOL, "schedule_list", FIND_HELP_TOOL, ASK_USER_TOOL}
+)
 
 # Tools whose classification looks at the screen as it is now, which can bring an application to the front: their calls
 # are not classified again. None of their kinds only reads.
@@ -124,7 +134,10 @@ def can_resume(run: RunRecord, newest_run_id: str | None) -> bool:
 
 
 def repeatable(call: InterruptedCall) -> bool:
-    """Whether running ``call`` again changes nothing: its tool only reads."""
+    """Whether running ``call`` again changes nothing: its tool only reads, or is one of the ``meta`` tools that set
+    what a second call sets again (:data:`REPEATABLE_META_TOOLS`)."""
+    if call.kind == "meta":
+        return call.tool in REPEATABLE_META_TOOLS
     return call.kind is not None and call.kind in REPEATABLE_KINDS
 
 

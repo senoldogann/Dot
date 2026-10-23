@@ -1218,6 +1218,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       note(scope, record.ts, "list", `Dot wanted to finish with plan steps ${numbers} still open and was asked to close them first`, "warn");
     },
 
+    // The run called finish in the same reply as a call that did not work, so its answer was written before it saw the
+    // result: it was sent back once to read it and finish again (item 552).
+    finish_after_failure(scope, record) {
+      const calls = record.data.calls.join(", ");
+      note(scope, record.ts, "list", `Dot wanted to finish in the same reply as a call that did not work (${calls}) and was asked to read its result first`, "warn");
+    },
+
     // A session of a campaign wanted to end while the campaign had no targets: it was sent back once to record them.
     campaign_targets_reminder(scope, record) {
       note(scope, record.ts, "target", "Dot wanted to end the session before the campaign had targets and was asked to record them first", "warn");

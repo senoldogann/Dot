@@ -22,7 +22,9 @@ from dotagent.llm.types import Message, ToolCall
 
 CONTINUITY_MARK: str = "[Continuity note"
 SUMMARY_HEADING: str = "## Summary of the earlier conversation"
-SUMMARY_SECTIONS: tuple[str, ...] = ("GOAL", "DONE", "STATE", "PROBLEMS", "NEXT")
+# The sections of a summary, in the order its prompt asks for them (``agent.loop._SUMMARY_PROMPT``); one it lacks
+# is asked for again, and left as an empty heading when it is still not there (item 552).
+SUMMARY_SECTIONS: tuple[str, ...] = ("GOAL", "DONE", "STATE", "DECISIONS", "PROBLEMS", "NEXT")
 
 # Tools whose calls say nothing about the work itself.
 _BOOKKEEPING_TOOLS: frozenset[str] = frozenset({"update_plan", "mark_plan_step", "finish", "notify"})

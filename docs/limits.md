@@ -60,7 +60,8 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   model here.
 - Resuming: in goal mode, the goal check of a resumed run judges from what the resumed run did, not from the steps of
   the run it resumes. After a crash the conversation shows every call of the step that was cut off as interrupted, also
-  the ones that finished (a stop keeps the results of the ones that had ended); the first message of the resumed run
+  the ones that finished (a stop, the corner of the screen and an error outside a tool, a store that cannot write, keep
+  the results of the ones that had ended, item 552); the first message of the resumed run
   says which finished. A run of `dotx run` works in its own process: a daemon that starts while it works leaves it, and
   the approvals it waits on, to that process, and marks it as cut off only once the process has ended (the daemon never
   resumes such a run on its own).

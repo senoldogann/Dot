@@ -12,6 +12,7 @@ import httpx
 import pytest
 from PIL import Image
 
+from dotagent.agent.review import VET_TOOL, LessonVetting, _verdict_from
 from dotagent.config import GoRoute, OpenAIConfig, OpenCodeGoConfig
 from dotagent.core.errors import (
     ProviderAccessError,
@@ -20,6 +21,7 @@ from dotagent.core.errors import (
     ProviderProtocolError,
     ProviderQuotaError,
     ProviderRateLimitError,
+    ProviderRefusedError,
 )
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.types import JsonObject
@@ -232,6 +234,89 @@ def test_responses_stream_malformed_arguments_become_stand_in() -> None:
     ]
     reply, _ = replay(responses_codec(classify_openai), "m", events)
     assert reply.tool_calls[0].arguments == {"__invalid_arguments__": '{"a": '}
+
+
+def _refusal_message(words: str) -> JsonObject:
+    return {
+        "type": "message",
+        "id": "msg_1",
+        "role": "assistant",
+        "status": "completed",
+        "content": [{"type": "refusal", "refusal": words}],
+    }
+
+
+def test_a_refusal_of_the_responses_wire_is_the_models_declining_and_not_its_answer() -> None:
+    """Item 552: a run does not end done with a refusal for its result, and the review model that declines is known."""
+    refusal: JsonObject = _refusal_message("I can't help with that.")
+    events: list[SseEvent] = [
+        sse({"type": "response.refusal.delta", "delta": "I can't help "}, "response.refusal.delta"),
+        sse({"type": "response.refusal.delta", "delta": "with that."}, "response.refusal.delta"),
+        sse({"type": "response.output_item.done", "output_index": 0, "item": refusal}, "response.output_item.done"),
+        sse(
+            {"type": "response.completed", "response": {"status": "completed", "output": [refusal]}},
+            "response.completed",
+        ),
+    ]
+    reply, deltas = replay(responses_codec(classify_openai), "m", events)
+    assert (reply.finish, reply.raw_finish, reply.text) == ("other", "refusal", "I can't help with that.")
+    assert "".join(delta.text for delta in deltas) == "I can't help with that."
+    with pytest.raises(ProviderRefusedError):
+        _verdict_from(reply, VET_TOOL, LessonVetting, "m")
+
+
+def test_a_refusal_the_responses_stream_only_streams_is_a_refusal_too() -> None:
+    events: list[SseEvent] = [
+        sse({"type": "response.refusal.delta", "delta": "No."}, "response.refusal.delta"),
+        sse({"type": "response.completed", "response": {"status": "completed", "output": []}}, "response.completed"),
+    ]
+    reply, _ = replay(responses_codec(classify_openai), "m", events)
+    assert (reply.finish, reply.raw_finish, reply.text) == ("other", "refusal", "No.")
+
+
+def test_an_answer_and_a_call_of_the_responses_wire_are_not_taken_for_a_refusal() -> None:
+    answer: JsonObject = {
+        "type": "message",
+        "id": "msg_2",
+        "role": "assistant",
+        "status": "completed",
+        "content": [{"type": "output_text", "text": "Paris is 14 degrees."}],
+    }
+    call: JsonObject = {"type": "function_call", "call_id": "c", "name": "t", "arguments": "{}", "status": "completed"}
+    for output, finish, raw in (
+        ([answer], "stop", "completed"),
+        ([_refusal_message("No."), call], "tool_calls", "completed"),
+    ):
+        events: list[SseEvent] = [
+            sse(
+                {"type": "response.completed", "response": {"status": "completed", "output": output}},
+                "response.completed",
+            )
+        ]
+        reply, _ = replay(responses_codec(classify_openai), "m", events)
+        assert (reply.finish, reply.raw_finish) == (finish, raw)
+
+
+def test_a_refusal_of_the_chat_wire_is_kept_in_the_reply_and_ends_it_as_declined() -> None:
+    events: list[SseEvent] = [
+        sse(chat_chunk({"role": "assistant", "content": None, "refusal": None}, None), None),
+        sse(chat_chunk({"refusal": "I can't "}, None), None),
+        sse(chat_chunk({"refusal": "help with that."}, None), None),
+        sse(chat_chunk({}, "stop"), None),
+        SseEvent(event=None, data="[DONE]"),
+    ]
+    reply, deltas = replay(chat_codec(classify_openai, GO_CHAT), "m", events)
+    assert (reply.finish, reply.raw_finish, reply.text) == ("other", "refusal", "I can't help with that.")
+    assert [(delta.kind, delta.text) for delta in deltas] == [("text", "I can't "), ("text", "help with that.")]
+    with pytest.raises(ProviderRefusedError):
+        _verdict_from(reply, VET_TOOL, LessonVetting, "m")
+    answered: list[SseEvent] = [
+        sse(chat_chunk({"content": "Paris."}, None), None),
+        sse(chat_chunk({}, "stop"), None),
+        SseEvent(event=None, data="[DONE]"),
+    ]
+    plain, _ = replay(chat_codec(classify_openai, GO_CHAT), "m", answered)
+    assert (plain.finish, plain.raw_finish, plain.text) == ("stop", "stop", "Paris.")
 
 
 def test_responses_failed_event_raises_typed_error() -> None:
