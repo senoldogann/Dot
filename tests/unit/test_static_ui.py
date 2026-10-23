@@ -131,7 +131,10 @@ def test_the_page_has_no_inline_code_and_loads_only_files_that_exist() -> None:
     ]
     assert all(script["body"].strip() == "" for script in scripts)
     assert FORBIDDEN_IN_PAGE.search(page) is None
-    missing: list[str] = [reference for reference in REFERENCE.findall(page) if not (STATIC_DIR / reference).is_file()]
+    # A reference may be written from the root ("/favicon.svg"), as the launcher's icons are, or from the page.
+    missing: list[str] = [
+        reference for reference in REFERENCE.findall(page) if not (STATIC_DIR / reference.removeprefix("/")).is_file()
+    ]
     assert missing == []
 
 

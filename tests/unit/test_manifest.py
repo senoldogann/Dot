@@ -13,7 +13,11 @@ from dotagent.server.app import STATIC_DIR
 
 MANIFEST: Path = STATIC_DIR / "manifest.webmanifest"
 PAGE: Path = STATIC_DIR / "index.html"
+OFFLINE: Path = STATIC_DIR / "offline.html"
 SIZE: re.Pattern[str] = re.compile(r"^(?P<width>\d+)x(?P<height>\d+)$")
+TOUCH_LINK: re.Pattern[str] = re.compile(
+    r'<link rel="apple-touch-icon" sizes="(?P<sizes>\d+x\d+)" href="(?P<href>[^"]+)">'
+)
 LIGHT_THEME_COLOUR: re.Pattern[str] = re.compile(
     r'<meta name="theme-color" content="(?P<colour>#[0-9a-fA-F]{3,8})" media="\(prefers-color-scheme: light\)">'
 )
@@ -79,16 +83,34 @@ def test_every_icon_the_manifest_names_is_a_file_of_the_size_it_claims() -> None
     assert problems == [], problems
 
 
-def test_the_page_names_the_home_screen_icon_ios_asks_for() -> None:
-    """``apple-touch-icon``: iOS draws an added app with it (item 410); a 180 px file at the root of the pages, which
-    iOS also tries by that name, and its ``-precomposed`` twin, which older ones try."""
-    link: re.Match[str] | None = re.search(
-        r'<link rel="apple-touch-icon" sizes="180x180" href="([^"]+)">', PAGE.read_text()
-    )
-    assert link is not None, "index.html names no apple-touch-icon of 180x180"
-    assert link.group(1) == "apple-touch-icon.png"
-    for name in ("apple-touch-icon.png", "apple-touch-icon-precomposed.png"):
+def test_the_page_names_the_home_screen_icons_ios_asks_for() -> None:
+    """``apple-touch-icon``: iOS draws an added app with one of these (items 410 and 550), each of the sizes an iPhone
+    or an iPad asks for, at an absolute path under the icons folder. The 180 px files at the root stay for the names
+    iOS tries by itself when a page names none, and its ``-precomposed`` twin for older ones; the page kept for a Mac
+    out of reach names the 180 px icon too."""
+    links: list[tuple[str, str]] = [
+        (found["sizes"], found["href"]) for found in TOUCH_LINK.finditer(PAGE.read_text(encoding="utf-8"))
+    ]
+    assert links == [
+        ("180x180", "/icons/touch-icon-180.png"),
+        ("167x167", "/icons/touch-icon-167.png"),
+        ("152x152", "/icons/touch-icon-152.png"),
+        ("120x120", "/icons/touch-icon-120.png"),
+    ]
+    for sizes, href in links:
+        assert href.startswith("/"), href
+        width, height = sizes.split("x")
+        assert png_size(STATIC_DIR / href.removeprefix("/")) == (int(width), int(height)), href
+    for name in (
+        "apple-touch-icon.png",
+        "apple-touch-icon-precomposed.png",
+        "apple-touch-icon-180x180.png",
+        "apple-touch-icon-180x180-precomposed.png",
+    ):
         assert png_size(STATIC_DIR / name) == (180, 180), name
+    assert '<link rel="apple-touch-icon" sizes="180x180" href="/icons/touch-icon-180.png">' in OFFLINE.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_at_least_one_icon_is_maskable() -> None:

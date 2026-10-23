@@ -184,10 +184,19 @@ def test_a_name_of_reach_with_https_s_own_port_written_out_is_served_too() -> No
 
 
 @pytest.mark.parametrize(
-    "path", ["/apple-touch-icon.png", "/icons/icon-192.png", "/manifest.webmanifest", "/favicon.svg"]
+    "path",
+    [
+        "/apple-touch-icon.png",
+        "/apple-touch-icon-180x180.png",
+        "/icons/icon-192.png",
+        "/icons/touch-icon-180.png",
+        "/manifest.webmanifest",
+        "/favicon.svg",
+    ],
 )
 def test_the_files_a_launcher_draws_an_added_app_with_may_be_read_from_any_origin(path: str) -> None:
-    """A phone's launcher fetches the icon outside the page (item 410): a resource policy of ``same-origin`` kept it."""
+    """A phone's launcher fetches the icon outside the page (items 410 and 550): a resource policy of ``same-origin``
+    kept it."""
     headers: dict[str, str] = dict(response_headers(path))
     assert headers["Cross-Origin-Resource-Policy"] == "cross-origin"
     assert headers["Cache-Control"] == "no-cache"
