@@ -2202,12 +2202,13 @@ class RunManager:
         return False
 
     async def _ended_tainted(self, run_id: str) -> bool:
-        """Whether the run ``run_id`` was tainted when it ended, from its events (:func:`tainted_after`)."""
+        """Whether the run ``run_id`` was tainted when it ended, from its events (:func:`tainted_after`), or, when
+        ``dotx prune`` deleted them, from what it recorded of them first (item 556)."""
         store: Store = self._runtime.store
         found: list[EventRecord] = [
             event for kind in TAINT_EVENTS if (event := await store.last_event(run_id, kind)) is not None
         ]
-        return tainted_after(found)
+        return tainted_after(found) if found else await store.pruned_run_tainted(run_id)
 
     async def _register_run(
         self,

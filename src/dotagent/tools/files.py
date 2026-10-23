@@ -5,15 +5,25 @@ import contextlib
 import difflib
 import os
 import re
+import secrets
 import shutil
-import tempfile
+import stat
 from collections.abc import Iterator
 from itertools import islice
 from pathlib import Path
 
-from Foundation import NSURL
+from Foundation import NSURL, NSData, NSMutableData
 from pydantic import Field
-from Quartz import PDFDocument
+from Quartz import (
+    CGImageDestinationAddImage,
+    CGImageDestinationCreateWithData,
+    CGImageDestinationFinalize,
+    CGImageSourceCreateThumbnailAtIndex,
+    CGImageSourceCreateWithData,
+    PDFDocument,
+    kCGImageSourceCreateThumbnailFromImageAlways,
+    kCGImageSourceCreateThumbnailWithTransform,
+)
 
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.images import EncodedImage, encode_image
@@ -36,7 +46,20 @@ from dotagent.tools.context import ToolContext, run_sandbox
 from dotagent.tools.third_party import holds_third_party, matches_third_party
 from dotagent.undo.journal import JournalTarget, note_change, run_journal
 
-_IMAGE_SUFFIXES: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".heic"})
+_IMAGE_SUFFIXES: frozenset[str] = frozenset(
+    {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".heic", ".heif"}
+)
+# The photos of an iPhone, which Pillow does not read: macOS's ImageIO draws them as PNG first (item 556).
+_MACOS_IMAGE_SUFFIXES: frozenset[str] = frozenset({".heic", ".heif"})
+_PNG_TYPE: str = "public.png"
+# What ImageIO is asked for a photo: the image itself, not the small one stored beside it, with no limit on its size,
+# turned as its orientation says.
+_DRAWN_FULL_SIZE_TURNED: dict[str, bool] = {
+    kCGImageSourceCreateThumbnailFromImageAlways: True,
+    kCGImageSourceCreateThumbnailWithTransform: True,
+}
+# What a new file the file tools make is given before the umask is taken off (:func:`replace_in`).
+_NEW_FILE_MODE: int = 0o666
 _DEFAULT_LINE_LIMIT: int = 2000
 _MAX_LINE_CHARS: int = 2000
 _HEADROOM_CHARS: int = 200  # room next to a page for the line that says where it continues
@@ -120,6 +143,22 @@ def _pdf_text(path: Path) -> str:
     return str(document.string() or "")
 
 
+def _drawn_by_macos(data: bytes) -> bytes:
+    """A HEIC or HEIF photo as PNG, drawn by macOS's ImageIO at its full size and turned the way it is held (an
+    iPhone's portrait photos are stored on their side, with the turn kept beside them, which the PNG would lose);
+    ``data`` as it is when macOS cannot read it either, for :func:`encode_image` to say so."""
+    source = CGImageSourceCreateWithData(NSData.dataWithBytes_length_(data, len(data)), None)
+    image = CGImageSourceCreateThumbnailAtIndex(source, 0, _DRAWN_FULL_SIZE_TURNED) if source is not None else None
+    if image is None:
+        return data
+    drawn = NSMutableData.data()
+    destination = CGImageDestinationCreateWithData(drawn, _PNG_TYPE, 1, None)
+    if destination is None:
+        return data
+    CGImageDestinationAddImage(destination, image, None)
+    return bytes(drawn) if CGImageDestinationFinalize(destination) else data
+
+
 def _is_binary(path: Path) -> bool:
     with path.open("rb") as handle:
         return b"\0" in handle.read(8192)
@@ -161,7 +200,9 @@ def _read_blocking(path: Path, offset: int, limit: int, budget: int, max_edge: i
         raise ToolExecutionError("path is a directory; use list_dir", {"path": str(path)})
     suffix: str = path.suffix.lower()
     if suffix in _IMAGE_SUFFIXES:
-        encoded: EncodedImage = encode_image(path.read_bytes(), max_edge, quality)
+        raw: bytes = path.read_bytes()
+        drawn: bytes = _drawn_by_macos(raw) if suffix in _MACOS_IMAGE_SUFFIXES else raw
+        encoded: EncodedImage = encode_image(drawn, max_edge, quality)
         return ok_with_images(f"Image {path.name}: {encoded.source_width}x{encoded.source_height}px", (encoded.image,))
     if suffix == ".pdf":
         # The text of a PDF is paged by its lines like a text file's, so no part of a long one is out of reach.
@@ -236,25 +277,43 @@ def journal_for(ctx: ToolContext, tool: str) -> JournalTarget:
     )
 
 
+def replace_in(folder: int, name: str, data: bytes) -> None:
+    """Put ``data`` in the file ``name`` of the open folder ``folder`` through a temporary file beside it that takes
+    its place at once: what is at ``name`` is replaced, never followed. A file that is there keeps its permission bits;
+    a new one gets those of any program's new file, ``0o666`` less the umask, which the kernel takes off as it makes
+    the file (item 556: a private ``0o600`` was no one's choice). Blocking."""
+    try:
+        held: os.stat_result | None = os.stat(name, dir_fd=folder, follow_symlinks=False)
+    except FileNotFoundError:
+        held = None
+    temp: str = f".{name}.{secrets.token_hex(8)}"
+    handle: int = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, _NEW_FILE_MODE, dir_fd=folder)
+    try:
+        with os.fdopen(handle, "wb") as stream:
+            if held is not None and stat.S_ISREG(held.st_mode):
+                os.fchmod(stream.fileno(), held.st_mode & 0o777)
+            stream.write(data)
+        os.replace(temp, name, src_dir_fd=folder, dst_dir_fd=folder)
+    except OSError:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temp, dir_fd=folder)
+        raise
+
+
 def atomic_write(path: Path, content: str, journal: JournalTarget) -> int:
-    """Replace ``path`` with ``content`` through a temporary file, keeping its permission bits. The change is noted in
+    """Replace ``path`` with ``content`` through a temporary file (:func:`replace_in`). The change is noted in
     ``journal`` first; when that fails, the file is not changed."""
     if path.is_dir():
         raise ToolExecutionError("path is a directory", {"path": str(path)})
     data: bytes = content.encode("utf-8")
     note_change(journal, path, data)
     path.parent.mkdir(parents=True, exist_ok=True)
-    mode: int | None = path.stat().st_mode & 0o777 if path.exists() else None
-    handle, temp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    # Opened to search it alone, as making a file in it needs: a folder one may write in but not list is written too.
+    folder: int = os.open(path.parent, os.O_SEARCH | os.O_DIRECTORY)
     try:
-        with os.fdopen(handle, "wb") as stream:
-            stream.write(data)
-        if mode is not None:
-            os.chmod(temp_name, mode)
-        os.replace(temp_name, path)
-    except OSError:
-        Path(temp_name).unlink(missing_ok=True)
-        raise
+        replace_in(folder, path.name, data)
+    finally:
+        os.close(folder)
     return len(data)
 
 
@@ -289,7 +348,10 @@ def _write_file_tool() -> RegisteredTool:
 
 class EditFileArgs(ToolArgs):
     path: str = Field(description="File to edit.")
-    old: str = Field(description="Exact text to replace, including whitespace. Must be unique unless replace_all.")
+    # Never empty (item 556): an empty text is found between every two characters, and replace_all wrote new there.
+    old: str = Field(
+        min_length=1, description="Exact text to replace, including whitespace. Must be unique unless replace_all."
+    )
     new: str = Field(description="Replacement text.")
     replace_all: bool = Field(default=False, description="Replace every occurrence instead of requiring uniqueness.")
 

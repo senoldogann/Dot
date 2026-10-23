@@ -6,18 +6,27 @@ write."""
 
 import io
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 import docx
 import openpyxl
 import pptx
 import pytest
+from openpyxl.styles import Font
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.util import Inches
 
 from dotagent.core.errors import InvalidValueError, ToolExecutionError
-from dotagent.office import office_kind, office_text, unreadable_office_file
+from dotagent.office import (
+    WorkbookContent,
+    office_content,
+    office_kind,
+    office_text,
+    unreadable_office_file,
+    workbook_text,
+)
 from dotagent.tools.base import ToolResult
 from dotagent.tools.files import _read_blocking
 
@@ -168,3 +177,84 @@ def test_read_file_pages_a_workbook_by_its_lines_and_refuses_one_of_before_2007(
     with pytest.raises(ToolExecutionError) as refused:
         _read_blocking(old, 1, 10, 20_000, 1568, 80)
     assert refused.value.message == "a .xls file is of the format of before 2007; save it as .xlsx"
+
+
+def _hostile_workbook(rows: int, *, valued: bool) -> bytes:
+    """A workbook whose rows each end in a cell of the last column, XFD, which holds a value or only a style: a row is
+    read as wide as its last cell, so each costs 16,384 places however little the file weighs (item 556)."""
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    for row in range(1, rows + 1):
+        cell = sheet.cell(row=row, column=16_384, value="x" if valued else None)
+        cell.font = Font(bold=True)
+    return _saved(workbook)
+
+
+@pytest.mark.parametrize("valued", [True, False])
+def test_a_workbook_whose_rows_run_to_the_last_column_is_read_in_part_whatever_its_cells_hold(valued: bool) -> None:
+    hostile: bytes = _hostile_workbook(3, valued=valued)
+    # Ten cells may be read, and fifty places for each: the first row alone spans more.
+    content = office_content("workbook", hostile, 10)
+    assert isinstance(content, WorkbookContent)
+    assert [sheet.cut_at_row for sheet in content.sheets] == [1]
+    assert workbook_text(content) == (
+        "## Sheet 1 of 1: Sheet\n(the workbook holds more than is read: 10 cells at most, fewer when its rows run far "
+        "to the right; the rest from row 1 on is not read)"
+    )
+
+
+def test_a_workbook_of_real_data_is_read_whole_however_wide_its_rows_are_for_the_cells_they_hold() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    for row in range(1, 201):
+        sheet.append([f"row {row}", row, None, None, row * 2])
+    content = office_content("workbook", _saved(workbook), 1_000)
+    assert isinstance(content, WorkbookContent)
+    assert [(sheet.cut_at_row, len(sheet.cells)) for sheet in content.sheets] == [(None, 600)]
+
+
+def _repacked(package: bytes, part: str, change: Callable[[zipfile.ZipInfo], None]) -> bytes:
+    """``package`` with the entry of ``part`` in its central directory changed by ``change`` once its data is written
+    (the packed bytes stay as they are)."""
+    written: io.BytesIO = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(package)) as source, zipfile.ZipFile(written, "w") as target:
+        for item in source.infolist():
+            target.writestr(item, source.read(item), compress_type=item.compress_type)
+        change(next(entry for entry in target.filelist if entry.filename == part))
+    return written.getvalue()
+
+
+def _damaged(package: bytes, part: str) -> bytes:
+    """``package`` with the first bytes of the packed data of ``part`` set to 0xFF, a block type deflate has none of."""
+    with zipfile.ZipFile(io.BytesIO(package)) as source:
+        info: zipfile.ZipInfo = source.getinfo(part)
+    start: int = info.header_offset + 30 + len(info.filename.encode()) + len(info.extra)
+    return package[:start] + b"\xff" * 8 + package[start + 8 :]
+
+
+def _packed_another_way(entry: zipfile.ZipInfo) -> None:
+    entry.compress_type = 9  # Deflate64, which zipfile does not read
+
+
+def _locked(entry: zipfile.ZipInfo) -> None:
+    entry.flag_bits |= 0x1
+
+
+@pytest.mark.parametrize("damage", ["damaged", "other_packing", "locked"])
+def test_a_package_with_a_part_that_cannot_be_unpacked_is_refused_as_a_file_that_cannot_be_read(damage: str) -> None:
+    document = docx.Document()
+    document.add_paragraph("A letter.")
+    package: bytes = _saved(document)
+    part: str = "word/document.xml"
+    broken: bytes
+    match damage:
+        case "damaged":
+            broken = _damaged(package, part)
+        case "other_packing":
+            broken = _repacked(package, part, _packed_another_way)
+        case _:
+            broken = _repacked(package, part, _locked)
+    with pytest.raises(InvalidValueError, match="the Word document cannot be read"):
+        office_text("document", broken)

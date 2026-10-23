@@ -11,6 +11,7 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
+from dotagent.agent.gate import TAINT_EVENTS
 from dotagent.cli_commands import Command, PruneCommand
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import InvalidValueError
@@ -36,7 +37,9 @@ class Retention(FrozenModel):
 class PruneFindings(FrozenModel):
     """What there is to clean up, in files and bytes. ``old_runs`` and ``old_events``: the runs that ended more than
     ``retention_days`` days ago and still have events, and those events; ``journals``: the journals of file changes,
-    one per run; ``old_journals``: those whose last change is older than ``keep_days`` days."""
+    one per run; ``old_journals``: those whose last change is older than ``keep_days`` days; ``archived_messages`` and
+    ``archive_bytes``: the earlier versions of the chats' histories that compacting kept aside so that a chat can be
+    rewound, which a prune does not delete (item 556)."""
 
     old_runs: int
     old_events: int
@@ -50,6 +53,8 @@ class PruneFindings(FrozenModel):
     old_journals: int
     old_journal_bytes: int
     keep_days: int
+    archived_messages: int
+    archive_bytes: int
 
 
 def _mib(size: int) -> str:
@@ -79,6 +84,10 @@ def _events(count: int) -> str:
     return f"{count} event" if count == 1 else f"{count} events"
 
 
+def _messages(count: int) -> str:
+    return f"{count} message" if count == 1 else f"{count} messages"
+
+
 def render_findings(findings: PruneFindings) -> list[str]:
     return [
         f"Events of runs that ended over {findings.retention_days} days ago: {_runs(findings.old_runs)}, "
@@ -89,6 +98,9 @@ def render_findings(findings: PruneFindings) -> list[str]:
         f"Journals of file changes (dotx undo): {_runs(findings.journals)}, {_mib(findings.journal_bytes)}; "
         f"last change over {findings.keep_days} days ago: {_runs(findings.old_journals)}, "
         f"{_mib(findings.old_journal_bytes)}",
+        f"Earlier versions of chats' histories, kept so that a chat can be rewound (compacting adds one; deleting or "
+        f"rewinding a chat removes them, a prune does not): {_messages(findings.archived_messages)}, "
+        f"{_mib(findings.archive_bytes)}, and the screenshots they name",
     ]
 
 
@@ -120,6 +132,7 @@ async def _find(
     old_runs, old_events = await store.events_of_runs_ended_before(now - retention.retention_days * _DAY_S)
     orphans: list[Path] = await store.orphan_images(now, _YOUNG_IMAGE_S)
     journals: list[JournalFolder] = await asyncio.to_thread(list_journals, undo_dir())
+    archived_messages, archive_bytes = await store.archived_messages()
     old: list[JournalFolder] = [
         journal for journal in journals if journal.changed_at < now - retention.keep_days * _DAY_S
     ]
@@ -136,6 +149,8 @@ async def _find(
         old_journals=len(old),
         old_journal_bytes=sum(journal.size for journal in old),
         keep_days=retention.keep_days,
+        archived_messages=archived_messages,
+        archive_bytes=archive_bytes,
     )
     return orphans, old, findings
 
@@ -149,8 +164,9 @@ async def _report(store: Store, retention: Retention) -> int:
 async def _prune(store: Store, retention: Retention) -> int:
     now: float = time.time()
     old_runs, old_events = await store.events_of_runs_ended_before(now - retention.retention_days * _DAY_S)
-    # The old events go first, so that the screenshots only they named are among the orphans found next.
-    await store.delete_events_of_runs_ended_before(now - retention.retention_days * _DAY_S)
+    # The old events go first, so that the screenshots only they named are among the orphans found next. Which runs
+    # ended tainted is kept (item 556).
+    await store.delete_events_of_runs_ended_before(now - retention.retention_days * _DAY_S, TAINT_EVENTS)
     orphans, old, found = await _find(store, now, retention)
     findings: PruneFindings = found.model_copy(update={"old_runs": old_runs, "old_events": old_events})
     await store.remove_images(orphans, now - _YOUNG_IMAGE_S)

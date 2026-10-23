@@ -12,6 +12,7 @@ the zip packages of Office Open XML, and the error says how to save one that is.
 import datetime as dt
 import io
 import zipfile
+import zlib
 from collections.abc import Iterator, Sequence
 from contextlib import closing
 from itertools import groupby
@@ -70,6 +71,14 @@ _OLE_MAGIC: bytes = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 # The cells of a workbook the model reads at most; a sheet larger than that is read in part, and the text says where
 # it stops.
 MAX_CELLS: int = 100_000
+# The places of the rows walked at most for each cell that may be read (item 556): a row is read as wide as its last
+# cell, which may hold nothing, so a small file whose rows each end in an empty cell of the last column (XFD) kept a
+# worker busy for minutes. A sheet of real data reaches the cells it may read long before.
+_PLACES_PER_CELL: int = 50
+# The ways a part of an Office file is packed that every program writing one uses: one packed another way, or locked,
+# is refused as the file is (item 556), rather than left to fail inside the reader of its kind.
+_PACKED: frozenset[int] = frozenset({zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED})
+_LOCKED_PART: int = 0x1
 
 
 class OfficeTable(FrozenModel):
@@ -210,11 +219,27 @@ def names_office_file(name: str) -> bool:
     return suffix in OFFICE_SUFFIXES or suffix in _OLD_SUFFIXES
 
 
+def _package_problem(data: bytes) -> str | None:
+    """Why the parts of the zip package ``data`` cannot be read, or ``None`` when each is packed as Office packs its
+    parts and none is locked."""
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        for part in package.infolist():
+            if part.flag_bits & _LOCKED_PART:
+                return f"its part {part.filename} is locked"
+            if part.compress_type not in _PACKED:
+                return f"its part {part.filename} is packed in a way Office does not use"
+    return None
+
+
 def office_content(kind: OfficeKind, data: bytes, max_cells: int) -> OfficeContent:
     """What an Office file of ``kind`` whose bytes are ``data`` holds, a workbook read to at most ``max_cells`` cells.
-    ``InvalidValueError`` when it cannot be read: a package that is no zip or lacks a part, or a part whose XML is
-    broken (the errors of lxml and of ElementTree are ``SyntaxError``s)."""
+    ``InvalidValueError`` when it cannot be read: a package that is no zip, lacks a part or has one packed in another
+    way or locked, a part whose packed data is damaged (``zlib.error``, or ``EOFError`` when it is cut short), or a part
+    whose XML is broken (the errors of lxml and of ElementTree are ``SyntaxError``s)."""
     try:
+        problem: str | None = _package_problem(data)
+        if problem is not None:
+            raise InvalidValueError(f"the {_NAMES[kind]} cannot be read: {problem}", {"kind": kind})
         match kind:
             case "document":
                 return read_document(docx.Document(io.BytesIO(data)))
@@ -231,6 +256,8 @@ def office_content(kind: OfficeKind, data: bytes, max_cells: int) -> OfficeConte
         raise
     except (
         zipfile.BadZipFile,
+        zlib.error,
+        EOFError,
         KeyError,
         ValueError,
         SyntaxError,
@@ -387,10 +414,12 @@ def _sheet_cell(row: int, column: int, written: object, worked_out: object) -> S
 
 
 def read_workbook(formulas: Workbook, values: Workbook, max_cells: int) -> WorkbookContent:
-    """The sheets of a workbook in order and their cells, at most ``max_cells`` of them: ``formulas`` is the workbook
-    read for what its cells hold, ``values`` for what Excel last worked out."""
+    """The sheets of a workbook in order and their cells, at most ``max_cells`` of them, and at most
+    ``_PLACES_PER_CELL`` times as many places of their rows: ``formulas`` is the workbook read for what its cells hold,
+    ``values`` for what Excel last worked out."""
     sheets: list[Sheet] = []
     left: int = max_cells
+    places: int = max_cells * _PLACES_PER_CELL
     for written, worked_out in zip(formulas.worksheets, values.worksheets, strict=True):
         cells: list[SheetCell] = []
         cut_at_row: int | None = None
@@ -398,6 +427,10 @@ def read_workbook(formulas: Workbook, values: Workbook, max_cells: int) -> Workb
             written.iter_rows(values_only=True), worked_out.iter_rows(values_only=True), strict=False
         )
         for row_number, (held, shown) in enumerate(rows, 1):
+            places -= max(len(held), 1)
+            if places < 0:
+                cut_at_row = row_number
+                break
             row: list[SheetCell] = [
                 _sheet_cell(row_number, column, value, shown[column - 1] if column <= len(shown) else None)
                 for column, value in enumerate(held, 1)
@@ -437,8 +470,8 @@ def workbook_text(content: WorkbookContent) -> str:
         )
         if sheet.cut_at_row is not None:
             lines.append(
-                f"(the workbook holds more than {content.max_cells} cells; the rest from row {sheet.cut_at_row} on"
-                " is not read)"
+                f"(the workbook holds more than is read: {content.max_cells} cells at most, fewer when its rows run far"
+                f" to the right; the rest from row {sheet.cut_at_row} on is not read)"
             )
         elif len(lines) == 1:
             lines.append("(empty)")

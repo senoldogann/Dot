@@ -1,7 +1,8 @@
 """The store's one door for writes (item 66): concurrent appends and token counts all land, a unit of several
 statements is never split by another writer, and a lock held by another process is waited out, not fatal. A chat that a
 run works on, in any process, is not deleted (item 179). A note added once after a locked commit comes back as the try
-that was stored, and the database is compacted only when no write is under way on its connection (item 351)."""
+that was stored, and the database is compacted only when no write is under way on its connection (item 351). A read of
+a chat's history waits for the write under way, which the connection would show it half done (item 556)."""
 
 import asyncio
 import sqlite3
@@ -12,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.core.errors import RunConflict
-from dotagent.llm.types import user_message
+from dotagent.llm.types import Message, user_message
 from dotagent.store.db import Store, _writing
 from dotagent.store.models import MemoryRecord, RunRecord, ThreadRecord
 
@@ -25,6 +26,25 @@ class _CutShort(Store):
         await self._db.execute("UPDATE runs SET steps = 99 WHERE id = ?", (run_id,))
         changed.set()
         await asyncio.Event().wait()
+
+
+class _Replacing(Store):
+    """A store with a write that empties a chat's history and stores the new one when told to: a unit under way, as
+    ``replace_messages`` is between its delete and its insert."""
+
+    @_writing
+    async def replace_slowly(
+        self, thread_id: str, messages: list[Message], emptied: asyncio.Event, go: asyncio.Event
+    ) -> None:
+        await self._db.execute("BEGIN IMMEDIATE")
+        await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
+        emptied.set()
+        await go.wait()
+        await self._db.executemany(
+            "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
+            [(thread_id, index, body) for index, body in enumerate(self._encoded(messages))],
+        )
+        await self._db.commit()
 
 
 async def _runs_and_thread(store: Store) -> tuple[ThreadRecord, str]:
@@ -207,5 +227,28 @@ async def test_the_database_is_compacted_after_the_write_under_way(tmp_path: Pat
         release.set()
         await writing
         await compacting
+    finally:
+        await store.close()
+
+
+async def test_a_read_of_a_history_waits_for_the_replacement_under_way_and_never_finds_it_empty(
+    tmp_path: Path,
+) -> None:
+    store: _Replacing = await _Replacing.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        thread, _ = await _runs_and_thread(store)
+        await store.append_messages(thread.id, [user_message("one", ()), user_message("two", ())])
+        emptied: asyncio.Event = asyncio.Event()
+        go: asyncio.Event = asyncio.Event()
+        replacing: asyncio.Task[None] = asyncio.create_task(
+            store.replace_slowly(thread.id, [user_message("in short", ())], emptied, go)
+        )
+        await emptied.wait()
+        reading: asyncio.Task[list[Message]] = asyncio.create_task(store.load_messages(thread.id, 0))
+        await asyncio.sleep(0.1)
+        assert not reading.done()
+        go.set()
+        await replacing
+        assert [message.content for message in await reading] == ["in short"]
     finally:
         await store.close()

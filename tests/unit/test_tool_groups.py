@@ -2,6 +2,7 @@
 offers its tools, the groups a step turns on and the tools a run can call."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -369,3 +370,20 @@ def test_a_run_can_call_the_tools_it_offers_and_the_tools_of_other_modes_only() 
     assert {"read_file", "browser_open", "memory_forget"} <= set(tools.tools)
     # finish is not a chat tool: a call of it is answered as not available in chat mode, not as unknown.
     assert "finish" in tools.tools
+
+
+async def _use_tools(group: str, run_tools: frozenset[str] | None) -> ToolResult:
+    ctx: SimpleNamespace = SimpleNamespace(runtime=SimpleNamespace(registry=REGISTRY), mode="task", run_tools=run_tools)
+    prepared = await REGISTRY.tools["use_tools"].prepare({"group": group}, ctx)  # type: ignore[arg-type]
+    return await prepared.run(ctx)  # type: ignore[arg-type]
+
+
+async def test_use_tools_turns_on_only_a_group_of_the_tools_the_run_was_given() -> None:
+    """Item 556: a group the loop left out of the run (the browser off in Settings) is not said to be on, and is not
+    among the groups the run is told it has; outside a run of the loop, every group of the mode is."""
+    given: frozenset[str] = frozenset(name for name in TASK_TOOLS if group_of(name) != "browser")
+    refused: ToolResult = await _use_tools("browser", given)
+    assert refused.is_error
+    assert "browser" not in refused.text.split("Its tool groups:")[1]
+    assert not (await _use_tools("desktop", given)).is_error
+    assert not (await _use_tools("browser", None)).is_error

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from dotagent.agent.gate import TAINT_EVENTS
 from dotagent.agent.pages import THEME_VARIABLES
 from dotagent.core.errors import NotFoundError
 from dotagent.server.guard import response_headers
@@ -72,7 +73,7 @@ async def test_a_page_is_kept_under_an_id_nobody_can_guess_as_long_as_its_runs_e
 
         await store._db.execute("UPDATE runs SET finished_at = ? WHERE id = ?", (time.time() - 3600.0, old.id))
         await store._db.commit()
-        await store.delete_events_of_runs_ended_before(time.time() - 60.0)
+        await store.delete_events_of_runs_ended_before(time.time() - 60.0, TAINT_EVENTS)
         await store.delete_threads([deleted.thread_id])
         for gone in pages[:2]:
             with pytest.raises(NotFoundError):

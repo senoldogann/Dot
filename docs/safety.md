@@ -392,7 +392,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   folder option too), `dd`, a redirect, a download, a
   clone, an unpacked archive, git run in one of those folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`)
   or inline code that names the place (in a word of switches such as `-pe` too). The guard reads the line, not what a
-  program does; the sandbox below holds what it cannot read. A plugin's MCP servers, and those you added, start with the
+  program does; the sandbox below holds what it cannot read. `write_notes`, which asks nothing, writes its own file in
+  the notes folder of the workspace and nothing else: a link at the folder or at the file, which such a line can make,
+  is refused, never followed (item 556). A plugin's MCP servers, and those you added, start with the
   daemon and are given keys from the key store: put a plugin or a skill in place yourself, or install one from
   Customize › Plugins, which takes a gallery plugin's skills alone, as its commit pins them (item 542).
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by

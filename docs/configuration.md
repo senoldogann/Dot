@@ -45,8 +45,13 @@ until it finds them old. `dotx prune` lists the events of the runs that ended mo
 conversations), the screenshot files that no chat names any more (what chats deleted earlier left behind), the free
 space inside the database file and the journals of file changes (`dotx undo`) whose last change is older than
 `[agent] undo_keep_days`; `dotx prune --apply` deletes those events, and with them the screenshots only they named,
-those files and journals, and gives the space back to the disk, after which a delete returns its space by itself. The
-database is locked for a moment while it compacts, so run it when no run is active.
+those files and journals, and gives the space back to the disk, after which a delete returns its space by itself. Two
+things those events said are kept (item 556): that a run ended after reading outside content, which decides how a run
+that resumes it, or a schedule's firing that builds on it, starts; and that you saved a lesson from a run's page, which
+keeps the nightly reflection from folding or resting it. The earlier versions of a chat's history that compacting keeps
+aside, so that the chat can be rewound, stay until the chat is deleted or rewound; `dotx prune` lists how many messages
+they are and their size, and the screenshots they name stay with them. The database is locked for a moment while it
+compacts, so run it when no run is active.
 
 **Copies of the database** (item 526). While the daemon runs, it copies the database every `[store] backup_every_hours`
 hours (1), and as it starts when no copy is younger, whenever the database changed since the last copy; a database found
@@ -73,7 +78,9 @@ and start the daemon again (`dotx service install`).
 
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log` (another folder with `DOT_LOG_DIR`: `dotx service status`
 names the one in use, and the sign-in screen of a daemon that could not answer points to it); at 10 MB it is moved to
-`dotx.log.1` (the one before is dropped) and a new one is started. The output of the launchd job goes to
+`dotx.log.1` (the one before is dropped) and a new one is started (two processes that find it full together take
+turns). A line the disk will not take is dropped, never raised into the code that logs, and the next line that is
+written says how many were lost (`log_lines_dropped`). The output of the launchd job goes to
 `daemon.out.log` and `daemon.err.log` in the same directory, and the stderr of each MCP server to `mcp-<name>.log`.
 A `dotx` command that ends with an error, the daemon's start included (a configuration it refuses, a daemon already
 running, an address taken), writes a `command_failed` event to `dotx.log` too, with the command and the error;

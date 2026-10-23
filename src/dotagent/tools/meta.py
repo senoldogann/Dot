@@ -336,9 +336,12 @@ def _use_tools_tool() -> RegisteredTool:
 
     async def run(args: UseToolsArgs, ctx: ToolContext) -> ToolResult:
         # The run turns the group on when it reads this call's success; the tool only checks the name and says what
-        # the group holds.
+        # the group holds. The groups are those of the tools the run was given (item 556): one the loop left out of it
+        # (an agent's tools, the browser off in Settings, no account signed in) is not on for it.
         tools: tuple[str, ...] = tuple(
-            name for name, tool in ctx.runtime.registry.tools.items() if ctx.mode in tool.modes
+            name
+            for name, tool in ctx.runtime.registry.tools.items()
+            if ctx.mode in tool.modes and (ctx.run_tools is None or name in ctx.run_tools)
         )
         if args.group == CORE_GROUP:
             return ok("The core tools are always on.")
