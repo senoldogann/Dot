@@ -1,9 +1,12 @@
-// How often a schedule of a chat asks again, in words (items 281, 580 and 590): the rhythms "/loop" makes (every 30
-// minutes, every 2 hours) and the days and times a schedule a run made keeps (every day at 10:00, on Mondays,
-// Wednesdays and Fridays at 18:30), as the loop line over the composer and the mark of a chat in the sidebar say them.
-// Pure, so that it runs under Node without a page.
+// How often a schedule of a chat asks again, in words (items 281, 580, 590 and 592): the rhythms "/loop" makes (every
+// 30 minutes, every 2 hours) and the days and times a schedule a run made keeps (every day at 10:00, on Mon, Wed and
+// Fri at 18:30), as the loop line over the composer and the mark of a chat in the sidebar say them. Pure, so that it
+// runs under Node without a page.
 
-const DAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
+// A day alone by its name ("on Mondays at 09:00"), days together by their short names, so that the time after them
+// stays in sight on a phone's line (item 592: "on Mondays, Wednesdays and Frid…" lost it).
+const DAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOUR_MINUTE = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 const WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "short" });
 const DAY_MONTH = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
@@ -28,7 +31,7 @@ function cronTimes(minute, hour) {
   return listed(hours.map((each) => `${String(each).padStart(2, "0")}:${minute.padStart(2, "0")}`));
 }
 
-/** The days of a cron's day-of-week field ("every day", "on weekdays", "on Mondays and Fridays"), or null. */
+/** The days of a cron's day-of-week field ("every day", "on weekdays", "on Mondays", "on Mon and Fri"), or null. */
 function cronDays(day) {
   if (day === "*") {
     return "every day";
@@ -39,15 +42,17 @@ function cronDays(day) {
   if (/^[0-7](,[0-7])*$/.test(day)) {
     // In the order of a week that starts on Monday, as en-GB's does; 0 and 7 are both Sunday.
     const numbers = [...new Set(day.split(",").map((each) => Number(each) % 7))].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
-    const names = numbers.map((each) => DAYS[each]);
-    return names.length === 2 && names.includes("Saturdays") && names.includes("Sundays") ? "at weekends" : `on ${listed(names)}`;
+    if (numbers.length === 2 && numbers.includes(0) && numbers.includes(6)) {
+      return "at weekends";
+    }
+    return numbers.length === 1 ? `on ${DAYS[numbers[0]]}` : `on ${listed(numbers.map((each) => SHORT_DAYS[each]))}`;
   }
   return null;
 }
 
 /** How often a schedule of the rhythm `cron` asks again, in words: "every 30 minutes", "every hour", "every 2 hours",
- * "every day at 10:00", "on weekdays at 09:00", "on Mondays, Wednesdays and Fridays at 18:30"; null for another form
- * (a day of the month, a month, a range of minutes). */
+ * "every day at 10:00", "on weekdays at 09:00", "on Mondays at 09:00", "on Mon, Wed and Fri at 18:30"; null for another
+ * form (a day of the month, a month, a range of minutes). */
 export function loopRhythm(cron) {
   const minutes = /^\*\/(\d+) \* \* \* \*$/.exec(cron);
   if (minutes !== null) {

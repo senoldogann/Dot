@@ -14,13 +14,16 @@ test("the rhythms /loop makes read as they are written", () => {
 test("a schedule a run made reads by its days and times, as the owner's own three do", () => {
   assert.equal(loopRhythm("0 10 * * *"), "every day at 10:00");
   assert.equal(loopRhythm("0 9,19 * * *"), "every day at 09:00 and 19:00");
-  assert.equal(loopRhythm("30 18 * * 1,3,5"), "on Mondays, Wednesdays and Fridays at 18:30");
+  // Days together by their short names, so that the time stays in sight on a phone (item 592); a day alone by its name.
+  assert.equal(loopRhythm("30 18 * * 1,3,5"), "on Mon, Wed and Fri at 18:30");
+  assert.equal(loopRhythm("30 9 * * 2,4"), "on Tue and Thu at 09:30");
+  assert.equal(loopRhythm("0 9 * * 1"), "on Mondays at 09:00");
   assert.equal(loopRhythm("0 9 * * 1-5"), "on weekdays at 09:00");
   assert.equal(loopRhythm("15 8 * * 0,6"), "at weekends at 08:15");
   assert.equal(loopRhythm("5 7 * * 7"), "on Sundays at 07:05");
   // In order, whatever order the cron gives them: the hours of a day, the days of a week from Monday.
   assert.equal(loopRhythm("0 19,9 * * *"), "every day at 09:00 and 19:00");
-  assert.equal(loopRhythm("30 18 * * 0,5,1"), "on Mondays, Fridays and Sundays at 18:30");
+  assert.equal(loopRhythm("30 18 * * 0,5,1"), "on Mon, Fri and Sun at 18:30");
   assert.equal(loopRhythm("0 8 * * 0,7"), "on Sundays at 08:00");
 });
 
