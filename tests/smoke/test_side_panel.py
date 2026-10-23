@@ -192,13 +192,15 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                 # No Files card and no Details card (item 544): the facts a glance does not need fold away under
                 # More, closed the first time (item 452).
                 top: Locator = shown.locator(":scope > .panel-section:not([hidden])")
+                # The run used no skill and no MCP server, so Skills & MCP stays out of sight (item 546).
                 await expect(top.locator(":scope > .panel-section-head .panel-section-title")).to_have_text(
-                    ["Recap", "Skills & MCP", "More"]
+                    ["Recap", "More"]
                 )
+                await expect(shown.locator("#panel-run-skills")).to_be_hidden()
                 # Each section of the tab scrolls on its own once it holds more than its share of the screen.
-                skills: Locator = shown.locator("#panel-run-skills")
-                assert await skills.evaluate("(body) => getComputedStyle(body).overflowY") == "auto"
-                assert await skills.evaluate("(body) => getComputedStyle(body).maxHeight") != "none"
+                scrolling: Locator = shown.locator("#panel-run-more")
+                assert await scrolling.evaluate("(body) => getComputedStyle(body).overflowY") == "auto"
+                assert await scrolling.evaluate("(body) => getComputedStyle(body).maxHeight") != "none"
                 more: Locator = shown.get_by_role("button", name="More")
                 if index == 0:
                     await expect(more).to_have_attribute("aria-expanded", "false")
@@ -211,10 +213,8 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                 bill: Locator = shown.get_by_label("Cost of this run")
                 await expect(bill).to_be_visible()
                 await expect(bill).to_contain_text("Input tokens")
-                # Skills & MCP counts what the run may use; More says nothing over itself when no set-up warns.
-                await expect(top.locator(":scope > .panel-section-head .panel-summary")).to_have_text(
-                    ["", "3 skills", ""]
-                )
+                # More says nothing over itself when no set-up warns.
+                await expect(top.locator(":scope > .panel-section-head .panel-summary")).to_have_text(["", ""])
                 # The drawer has its own way out; beside the conversation, the header's button closes the panel.
                 close: Locator = panel.get_by_role("button", name="Close the details")
                 if width < 960:

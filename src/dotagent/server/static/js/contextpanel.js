@@ -1,18 +1,51 @@
-// What the run's context says of a tool call and of a memory change (item 539): the pages and searches it read, and the
-// notes it saved, each once and newest first. The DOM sections that show them are contextpanelview.js's; this module
-// keeps that state plain, so it is read without a page.
+// What the run's context says of a tool call and of a memory change (items 539 and 546): the skills and MCP servers it
+// used, the pages and searches it read and the notes it saved, each once. The DOM sections that show them are
+// contextpanelview.js's; this module keeps that state plain, so it is read without a page.
 
 // The most readings and notes a run's context keeps, newest first.
 const READING_LIMIT = 8;
 const MEMORY_LIMIT = 6;
 const PAGE_TOOLS = new Set(["web_fetch", "web_crawl", "browser_open", "browser_new_tab"]);
 const SEARCH_TOOLS = new Set(["web_search"]);
+const SKILL_TOOL = "skill";
+const MCP_PREFIX = "mcp__";
 
 /** The tool a call names as it is known by its own name: `mcp__server__web_fetch` reads `web_fetch`. */
 function toolName(tool) {
   const cut = tool.lastIndexOf("__");
   return cut === -1 ? tool : tool.slice(cut + 2);
 }
+
+/** What a tool call says the run used (item 546): the skill the `skill` tool named (`{ kind: "skill", name }`), the
+ * MCP server a tool of it belongs to (`{ kind: "server", name }`), or nothing for the run's own tools. */
+export function usageOf(tool, args) {
+  if (tool === SKILL_TOOL) {
+    // A skill read in parts is one use: only the call that begins it counts (tools/skill.py's `start`).
+    if (typeof args.start === "number" && args.start > 0) {
+      return null;
+    }
+    const name = typeof args.name === "string" ? args.name.trim() : "";
+    return name === "" ? null : { kind: "skill", name };
+  }
+  if (!tool.startsWith(MCP_PREFIX)) {
+    return null;
+  }
+  const rest = tool.slice(MCP_PREFIX.length);
+  const cut = rest.indexOf("__");
+  const name = cut === -1 ? rest : rest.slice(0, cut);
+  return name === "" ? null : { kind: "server", name };
+}
+
+/** `list` with `usage` counted, each skill or server once in the order it was first used; `count` says how many calls
+ * of it the run made. */
+export function addUsage(list, usage) {
+  const at = list.findIndex((item) => item.kind === usage.kind && item.name === usage.name);
+  if (at === -1) {
+    return [...list, { kind: usage.kind, name: usage.name, count: 1 }];
+  }
+  return list.map((item, index) => (index === at ? { ...item, count: item.count + 1 } : item));
+}
+
 
 const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const HOST_AND_PORT = /^[\w-]+(\.[\w-]+)*:\d+/;

@@ -324,11 +324,13 @@ after the last; a page asks for one only
 while the section is in sight, and as the run takes steps at most every 20 seconds, never two at once for one run, and
 after a write that failed it shows why and asks no more until its button is pressed or a recap arrives;
 `[recap] enabled = false` writes none and hides the section. Under the recap stand what the run is made of, each
-section only when it has a row (item 539): **Skills & MCP** (the skills and servers the palette names, each opening
-Customize), **Artifacts** (the files the chat wrote with their added and removed lines, each opening the Changes tab
-where the diff is), **Web reading** (the pages it fetched and the searches it made, a page opening in a new tab; a
-fetch that failed is not a page it read) and **Memory updated** (the notes it saved, corrected or forgot, each opening
-its note in Settings › Memory). Each row wears its mark on a tile, a file the letters of its kind. In a tab of
+section only when it has a row (item 539): **Skills & MCP** (the skills and MCP servers the run used, with how many
+times it used each, opening Customize; a skill is the `skill` tool's name, a server the one in `mcp__server__tool`;
+the section stays out of sight until the run uses one, item 546), **Artifacts** (the files the chat wrote with their
+added and removed lines, each opening the Changes tab where the diff is), **Web reading** (the pages it fetched and
+the searches it made, a page opening in a new tab; a fetch that failed is not a page it read) and **Memory updated**
+(the notes it saved, corrected or forgot, each opening its note in Settings › Memory). Each row wears its mark on a
+tile, a file the letters of its kind. In a tab of
 several sections each scrolls on its own once it holds more than two fifths of the screen, its head staying over it,
 and a tab of one section has the panel to itself (item 544). The Run tab lists no files of the conversation and no
 Details card since item 544: the files open from their chips and paths in the conversation, and the run's facts stand
