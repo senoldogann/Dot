@@ -1,7 +1,8 @@
 """The traffic lights on the line of the top bars (item 134): inside the desktop shell the window centres its traffic
 lights 26 px under the top edge (desktop/src-tauri/src/lib.rs), the centre line of the top bars' 52 px rows, and the
 page keeps 96 px of room for them at the left. The button that folds the sidebar and the top bar's buttons beside the
-lights stand on that line, with the sidebar docked, closed and a drawer; a browser's page keeps its own bars."""
+lights stand on that line, with the sidebar docked, closed and a drawer, and in the settings' nav too, whose Back to
+chats stands under the lights (item 577); a browser's page keeps its own bars."""
 
 import asyncio
 import time
@@ -28,6 +29,8 @@ TOKEN: str = "desktop-lights-token"
 # left of its bars (shell.css): the lights end 80 px from the left.
 LIGHTS_Y: float = 26.0
 LIGHTS_ROOM: float = 96.0
+# The row of the lights: the top bars' 52 px.
+LIGHTS_ROW: float = 2 * LIGHTS_Y
 # A browser's bars: the sidebar's head puts its button 12 px under the top, and the top bar's row is 48 px tall.
 _BROWSER_HEAD_Y: float = 30.0
 _BROWSER_BAR_Y: float = 24.0
@@ -165,6 +168,46 @@ async def test_in_the_desktop_shell_the_bars_stand_on_the_line_of_the_lights(
             await browser.close()
 
 
+async def test_in_the_desktop_shell_the_settings_stand_back_to_chats_under_the_lights(
+    runtime: Runtime, address: str, tmp_path: Path
+) -> None:
+    """The owner's screenshot of 2026-10-23: the settings' Back to chats stood under the traffic lights (item 577)."""
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page, errors = await _page(browser, address, True, 1280, 860)
+            head_left: float = await _left(page.get_by_role("button", name="Hide sidebar"))
+            await page.goto(f"{address}/#/settings/general")
+            nav: Locator = page.get_by_role("navigation", name="Settings")
+            # The nav's first row is the lights': its button stands where the chats' head holds its own, on their
+            # line, and Back to chats under the row, clear of the lights.
+            hide: Locator = nav.get_by_role("button", name="Hide sidebar")
+            await _on_line(hide, LIGHTS_Y)
+            assert abs(await _left(hide) - head_left) <= _TOLERANCE_PX
+            back = await nav.get_by_role("link", name="Back to chats").bounding_box()
+            assert back is not None and back["y"] >= LIGHTS_ROW - _TOLERANCE_PX, back
+            await page.screenshot(path=str(tmp_path / "lights-1280-settings.png"), animations="disabled")
+            # Hidden, the sidebar leaves the top bar's opener at the same place.
+            await hide.click()
+            show: Locator = page.get_by_role("button", name="Show sidebar")
+            await _on_line(show, LIGHTS_Y)
+            assert abs(await _left(show) - head_left) <= _TOLERANCE_PX
+            assert errors == []
+
+            # A window too narrow for the docked sidebar has the nav in the drawer, with the same head.
+            narrow, narrow_errors = await _page(browser, address, True, 800, 860)
+            await narrow.goto(f"{address}/#/settings/general")
+            await narrow.get_by_role("button", name="Show sidebar").click()
+            hide = narrow.get_by_role("navigation", name="Settings").get_by_role("button", name="Hide sidebar")
+            await _on_line(hide, LIGHTS_Y)
+            assert await _left(hide) >= LIGHTS_ROOM
+            back = await narrow.get_by_role("link", name="Back to chats").bounding_box()
+            assert back is not None and back["y"] >= LIGHTS_ROW - _TOLERANCE_PX, back
+            assert narrow_errors == []
+        finally:
+            await browser.close()
+
+
 async def test_a_browsers_page_keeps_its_own_bars(runtime: Runtime, address: str) -> None:
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
@@ -179,6 +222,14 @@ async def test_a_browsers_page_keeps_its_own_bars(runtime: Runtime, address: str
             show: Locator = page.get_by_role("button", name="Show sidebar")
             await _on_line(show, _BROWSER_BAR_Y)
             assert abs(await _left(show) - _BROWSER_LEFT) <= _TOLERANCE_PX
+            # The settings' nav keeps Back to chats and its button on one row, at the top (item 577).
+            await show.click()
+            await page.goto(f"{address}/#/settings/general")
+            nav: Locator = page.get_by_role("navigation", name="Settings")
+            back: Locator = nav.get_by_role("link", name="Back to chats")
+            await expect(back).to_be_visible()
+            assert abs(await _centre_y(back) - await _centre_y(nav.get_by_role("button", name="Hide sidebar"))) <= 1.0
+            assert await _centre_y(back) < LIGHTS_ROW
             assert errors == []
         finally:
             await browser.close()

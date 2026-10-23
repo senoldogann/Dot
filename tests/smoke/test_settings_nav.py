@@ -1,7 +1,8 @@
-"""The settings nav (item 562): in a Mac's window the sidebar holds the settings while they are open, Back to chats, the
-tabs in four groups with what each holds, and whether the daemon runs; the page is the open tab alone under its own
-head. A window too narrow for the docked sidebar has the nav in the drawer, and a phone keeps its sidebar and its list
-of tabs. Before, the sidebar kept the chats and the tabs stood in a column beside the pane, or in a row above it."""
+"""The settings nav (item 562): in a Mac's window the sidebar holds the settings while they are open, Back to chats and
+the tabs in four groups with what each holds (the daemon's state at its foot left with item 577); the page is the open
+tab alone under its own head. A window too narrow for the docked sidebar has the nav in the drawer, and a phone keeps
+its sidebar and its list of tabs. Before, the sidebar kept the chats and the tabs stood in a column beside the pane, or
+in a row above it."""
 
 import asyncio
 import time
@@ -138,9 +139,10 @@ async def test_the_sidebar_holds_the_settings_in_groups_and_follows_the_tab(
     await expect(nav.get_by_role("link", name="Models")).to_contain_text(SCRIPTED_MODEL.partition(":")[2])
     await expect(nav.get_by_role("link", name="Memory")).to_contain_text("1")
     await expect(nav.get_by_role("link", name="Providers")).to_contain_text("1")
-    # The daemon, at the foot.
-    await expect(nav.get_by_role("status")).to_contain_text("Dot is running")
-    await expect(nav.get_by_role("status")).to_contain_text("Daemon up")
+    # Nothing stands at the foot (item 577): the daemon's state is the page's, the connection and the emergency stop's
+    # banner.
+    await expect(nav.get_by_role("status")).to_have_count(0)
+    await expect(nav).not_to_contain_text("Daemon up")
     # The page is the tab alone under its own head: one h1, the tab's name, and the line that says what it is for.
     await expect(page.get_by_role("heading", level=1)).to_have_text("Models")
     await expect(page.locator(".set-lead")).not_to_be_empty()
