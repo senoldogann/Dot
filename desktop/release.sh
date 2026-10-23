@@ -114,6 +114,19 @@ signature=$(codesign --display --verbose=4 "$app" 2>&1)
 grep -qF "Authority=$identity" <<<"$signature" || fail "Dot.app is not signed by $identity"
 grep -q 'flags=0x10000(runtime)' <<<"$signature" || fail "Dot.app is not signed with the hardened runtime"
 grep -q '^Timestamp=' <<<"$signature" || fail "the signature of Dot.app has no secure timestamp"
+# What the composer's dictation needs of macOS (item 594): the reasons the app asks for the microphone and speech
+# recognition, and the microphone, the hardened runtime's one exception. A bundle without them is refused both.
+for reason in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription; do
+  plutil -extract "$reason" raw -o /dev/null "$app/Contents/Info.plist" ||
+    fail "the Info.plist of Dot.app has no $reason"
+done
+# The entitlements as a plist, read by key whatever the layout codesign gives them (PlistBuddy reads the key's dots as
+# part of its name, where plutil would read a path).
+codesign --display --entitlements - --xml "$app" >"$work/entitlements.plist" 2>"$work/codesign.err" ||
+  fail "codesign could not read the entitlements of Dot.app: $(cat "$work/codesign.err")"
+entitled=$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.device.audio-input' "$work/entitlements.plist" \
+  2>&1 || true)
+[[ $entitled == true ]] || fail "Dot.app is not entitled to the microphone (PlistBuddy: $entitled)"
 archs=$(lipo -archs "$app/Contents/MacOS/$(plutil -extract CFBundleExecutable raw -o - "$app/Contents/Info.plist")")
 [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]] ||
   fail "Dot.app is built for $archs, not for both Apple silicon and Intel"
