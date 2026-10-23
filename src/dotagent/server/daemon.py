@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from dotagent.agent.loop import warm_help_vectors
 from dotagent.agent.manager import RunManager
 from dotagent.agent.snapshots import stored_taker
+from dotagent.channels.service import Channels
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
 from dotagent.core.logs import get_logger
@@ -292,6 +293,11 @@ async def run_daemon(config: AppConfig) -> int:
             resumed: tuple[RunRecord, ...] = await manager.resume_safe() if config.agent.resume == "safe" else ()
             # A session is never resumed as a run: a campaign whose session the daemon cut off goes on with a new one.
             campaigns: int = await manager.resume_campaigns()
+            # The owner's messaging apps (item 572): a message of theirs reaches its chat only after the runs the last
+            # start cut off are resumed, and the channels stop before the manager does.
+            channels: Channels = Channels(runtime, manager, host, port)
+            await channels.start()
+            cleanup.push_async_callback(channels.stop)
             scheduler_loop: asyncio.Task[None] = await scheduler.start()
             # The watchers (item 571) look beside the scheduler, from the daemon's own clock: no inbound webhook.
             if config.watchers.enabled:
@@ -310,6 +316,7 @@ async def run_daemon(config: AppConfig) -> int:
                 started_at=time.time(),
                 stopping=stopping,
                 restart=restart,
+                channels=channels,
             )
             server: DotServer = DotServer(serving_config(create_app(context)), stopping)
             scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))

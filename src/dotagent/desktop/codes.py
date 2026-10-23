@@ -133,22 +133,28 @@ def _text_of(text: str | None, attributed: bytes | None) -> str:
     return attributed.decode("latin-1") if attributed else ""
 
 
-def read_messages(db: Path, sender: str, within_minutes: int, now: float) -> FoundMessage | None:
-    """The newest message received in Messages within the window, from a sender whose handle contains ``sender``
-    (any sender when empty). The database is opened read-only and never changed; a message still in its write-ahead
-    log is read."""
-    cutoff: float = now - within_minutes * 60.0
+def open_messages_db(db: Path) -> sqlite3.Connection:
+    """The Messages database opened read-only, never changed; a message still in its write-ahead log is read. Raises
+    :class:`DesktopPermissionError` when it cannot be opened, which is what a program without Full Disk Access meets."""
     try:
         # Read-only, not immutable: Messages keeps its database in WAL mode, and a message that has just arrived sits in
         # the -wal file for a while. ``immutable=1`` makes SQLite skip that file, so the code just sent would not be
         # there, and a read of a file that Messages is writing may come out as a malformed database (item 555).
-        connection: sqlite3.Connection = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        return sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     except sqlite3.OperationalError as exc:
         raise DesktopPermissionError(
             f"the Messages database {db} cannot be opened; macOS grants it with Full Disk Access. "
             + grant_hint("full_disk_access"),
             {"path": str(db), "error": str(exc)},
         ) from exc
+
+
+def read_messages(db: Path, sender: str, within_minutes: int, now: float) -> FoundMessage | None:
+    """The newest message received in Messages within the window, from a sender whose handle contains ``sender``
+    (any sender when empty). The database is opened read-only and never changed; a message still in its write-ahead
+    log is read."""
+    cutoff: float = now - within_minutes * 60.0
+    connection: sqlite3.Connection = open_messages_db(db)
     try:
         rows: list[tuple[float, str | None, str | None, bytes | None]] = connection.execute(
             "SELECT message.date, handle.id, message.text, message.attributedBody FROM message "

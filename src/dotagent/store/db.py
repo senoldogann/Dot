@@ -120,12 +120,14 @@ CREATE TABLE IF NOT EXISTS events (
     kind TEXT NOT NULL, data TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_run ON events(run_id, id);
+CREATE INDEX IF NOT EXISTS events_kind_ts ON events(kind, ts);
 CREATE TABLE IF NOT EXISTS approvals (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL, created_at REAL NOT NULL, decided_at REAL,
     status TEXT NOT NULL, tool TEXT NOT NULL, summary TEXT NOT NULL, severity TEXT NOT NULL,
     args TEXT NOT NULL, decided_by TEXT, note TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS approvals_run ON approvals(run_id, status);
+CREATE INDEX IF NOT EXISTS approvals_decided ON approvals(decided_at);
 CREATE TABLE IF NOT EXISTS drafts (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL, channel TEXT NOT NULL, recipients TEXT NOT NULL, cc TEXT NOT NULL,
     subject TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, decided_at REAL,
@@ -639,6 +641,12 @@ def _campaign_entry(row: aiosqlite.Row) -> CampaignEntry:
             "numbers": parse_json_object(row["numbers"], "campaign entry numbers"),
         }
     )
+
+
+def _flags_of(data: JsonObject) -> list[str]:
+    """The flags the ``flags`` list of an event or of an approval's step names; none when it has no such list."""
+    flags: object = data.get("flags")
+    return [flag for flag in flags if isinstance(flag, str)] if isinstance(flags, list) else []
 
 
 def _event(row: aiosqlite.Row) -> EventRecord:
@@ -2533,6 +2541,28 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def flagged_events(self, kind: str, flag: str, from_ts: float, to_ts: float) -> list[EventRecord]:
+        """The stored events of ``kind`` that came between two times (seconds since the epoch) and name ``flag`` among
+        their ``flags``, of any run, oldest first (item 572: which runs had a step that sends a message, and when). A
+        ``tool_result`` event records the step it ends with the flags its action raised. The ``events_kind_ts`` index
+        answers by kind and time; the flags are read from the events it finds, so that an event that only mentions the
+        flag in its text is not one."""
+        rows = await self._all(
+            "SELECT * FROM events WHERE kind = ? AND ts >= ? AND ts <= ? AND data LIKE ? ORDER BY id",
+            (kind, from_ts, to_ts, f'%"{flag}"%'),
+        )
+        return [event for event in (_event(row) for row in rows) if flag in _flags_of(event.data)]
+
+    async def event_after(self, run_id: str, kinds: Sequence[str], after_ts: float) -> EventRecord | None:
+        """The first event of one of ``kinds`` of a run stored after the time ``after_ts``, or ``None`` when it has
+        none yet."""
+        marks: str = ", ".join("?" for _ in kinds)
+        row = await self._one(
+            f"SELECT * FROM events WHERE run_id = ? AND kind IN ({marks}) AND ts > ? ORDER BY id LIMIT 1",
+            (run_id, *kinds, after_ts),
+        )
+        return None if row is None else _event(row)
+
     async def last_event(self, run_id: str, kind: str) -> EventRecord | None:
         """The newest event of ``kind`` of a run, or ``None`` when it has none."""
         row = await self._one(
@@ -2896,6 +2926,17 @@ class Store:
         if row is None:
             raise NotFoundError("approval not found", {"approval_id": approval_id})
         return _approval(row)
+
+    async def flagged_approvals(self, flag: str, from_ts: float, to_ts: float) -> list[ApprovalRecord]:
+        """The approvals answered with a yes between two times whose step raised ``flag``, of any run, oldest first. The
+        record is stored before the step goes ahead (a question the owner answered, one the review model answered, one
+        a yolo run waived), so that it is there while the step is still going on (item 572)."""
+        rows = await self._all(
+            "SELECT * FROM approvals WHERE status = 'approved' AND decided_at >= ? AND decided_at <= ? AND args LIKE ? "
+            "ORDER BY decided_at",
+            (from_ts, to_ts, f'%"{flag}"%'),
+        )
+        return [record for record in (_approval(row) for row in rows) if flag in _flags_of(record.args)]
 
     async def list_approvals(self, status: ApprovalStatus | None, limit: int) -> list[ApprovalRecord]:
         if status is None:

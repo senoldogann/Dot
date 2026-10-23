@@ -705,6 +705,13 @@ flash = true
 open_dot = true
 double_tap_ms = 400
 
+[channels]
+# The owner's own messaging apps as ways to reach Dot (item 572); off until Settings › Channels pairs and switches it.
+# imessage: Dot reads your conversation with yourself in Messages on this Mac (a message you send to your own number or
+# Apple ID address from your iPhone; Full Disk Access for the app that runs Dot) and answers in it, each answer starting
+# with ◆ (Automation for Messages). Approvals are never answered on a channel.
+imessage = false
+
 [recap]
 # The recap of a run (item 536): a few short lines on what it did, what it does now and what waits for you, at the
 # head of its page's Run tab, written by the fast model ([models] fast) from the run's record and never seen by the

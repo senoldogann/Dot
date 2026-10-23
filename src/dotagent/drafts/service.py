@@ -7,6 +7,7 @@ from collections.abc import Sequence
 
 from pydantic import Field
 
+from dotagent.channels.handles import names_a_handle, paired_handles
 from dotagent.core.errors import DesktopError, InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
@@ -70,6 +71,25 @@ def draft_problems(channel: DraftChannel, to: Sequence[str], cc: Sequence[str], 
     return problems
 
 
+async def paired_recipients(store: Store, channel: DraftChannel, to: Sequence[str]) -> list[str]:
+    """The recipients of a message draft that are a number or an address paired with the iMessage channel (item 572):
+    the owner's own conversation with themselves, which Dot reads as the owner's commands and answers in only through
+    the channel. A message of a run written there, as a draft the owner sends or as one that goes out another way,
+    would come back as the owner's untainted command. An email goes to Mail, not to that conversation."""
+    if channel != "message":
+        return []
+    handles: tuple[str, ...] = await paired_handles(store)
+    return [address.strip() for address in to if names_a_handle(address, handles)]
+
+
+def paired_problem(named: Sequence[str]) -> str:
+    """Why a draft that names ``named``, paired with the iMessage channel, is refused."""
+    return (
+        f"{', '.join(named)} is paired with Dot's iMessage channel: that is the owner's own conversation with "
+        "themselves, where what is written is read as their commands, and Dot answers there only through the channel"
+    )
+
+
 async def create_draft(
     store: Store,
     bus: EventBus,
@@ -80,7 +100,15 @@ async def create_draft(
     subject: str,
     body: str,
 ) -> DraftRecord:
-    """Keep a draft of ``run_id`` and show it in the run's conversation; it waits for the owner."""
+    """Keep a draft of ``run_id`` and show it in the run's conversation; it waits for the owner. A message draft to a
+    number or an address paired with the iMessage channel is refused."""
+    paired: list[str] = await paired_recipients(store, channel, to)
+    if paired:
+        raise InvalidValueError(
+            f"this draft cannot be made: {paired_problem(paired)}. Say what you wanted to tell the owner in your "
+            "answer instead",
+            {"channel": channel},
+        )
     record: DraftRecord = await store.add_draft(
         run_id, channel, [address.strip() for address in to], [address.strip() for address in cc], subject.strip(), body
     )
@@ -96,6 +124,11 @@ async def send_draft(store: Store, bus: EventBus, timeout_s: float, draft_id: st
     to: tuple[str, ...] = tuple(address.strip() for address in words.to)
     cc: tuple[str, ...] = tuple(address.strip() for address in words.cc)
     problems: list[str] = draft_problems(draft.channel, to, cc, words.subject, words.body)
+    # The owner may have put their own number on the card: what a run wrote is not sent into the conversation Dot reads
+    # as their commands.
+    paired: list[str] = await paired_recipients(store, draft.channel, to)
+    if paired:
+        problems.append(paired_problem(paired))
     if problems:
         raise InvalidValueError(f"the draft cannot be sent: {'; '.join(problems)}", {"draft_id": draft_id})
     claimed: DraftRecord = await store.claim_draft(draft_id, to, cc, words.subject.strip(), words.body)

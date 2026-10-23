@@ -481,6 +481,13 @@ class SnapshotsConfig(FrozenModel):
     double_tap_ms: int = Field(gt=0)
 
 
+class ChannelsConfig(FrozenModel):
+    """Which of the owner's messaging apps reach Dot (item 572): whether Dot reads the owner's conversation with
+    themselves in Messages and answers in it (``imessage``). Settings › Channels switches it, live."""
+
+    imessage: bool
+
+
 class RecapConfig(FrozenModel):
     """The recap of a run (item 536): whether one is written, after how many steps the first, and after how many more
     each new one; one more is due when the run ended after its last."""
@@ -757,6 +764,7 @@ class AppConfig(FrozenModel):
     browser: BrowserConfig
     desktop: DesktopConfig
     snapshots: SnapshotsConfig
+    channels: ChannelsConfig
     recap: RecapConfig
     assistant: AssistantConfig
     memory: MemoryConfig

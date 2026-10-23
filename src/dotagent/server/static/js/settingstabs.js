@@ -13,6 +13,7 @@ export const TABS = [
   { id: "memory", label: "Memory", icon: "database" },
   { id: "harness", label: "Self-improvement", icon: "sparkle" },
   { id: "phone", label: "Phone", icon: "smartphone" },
+  { id: "channels", label: "Channels", icon: "message" },
   { id: "snapshots", label: "SnapShots", icon: "image" },
   { id: "system", label: "System", icon: "monitor" },
 ];
@@ -21,7 +22,7 @@ export const GROUPS = [
   { title: "Interface", tabs: ["general", "appearance"] },
   { title: "Models", tabs: ["models", "keys"] },
   { title: "How Dot works", tabs: ["rules", "memory", "harness"] },
-  { title: "This Mac", tabs: ["browser", "phone", "snapshots", "system"] },
+  { title: "This Mac", tabs: ["browser", "phone", "channels", "snapshots", "system"] },
 ];
 
 /**
