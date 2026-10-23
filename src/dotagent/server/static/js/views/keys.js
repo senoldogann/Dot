@@ -65,6 +65,8 @@ const ROLES = [
   { id: "vision", label: "vision model" },
   { id: "review", label: "review model" },
 ];
+// The models a provider's page lists before Show all.
+const MODELS_SHOWN = 8;
 // A key as the daemon takes one: printable characters without spaces.
 const KEY_PATTERN = /^[!-~]+$/;
 const KEY_CHARS = 1000;
@@ -96,11 +98,17 @@ function aboutProvider(provider) {
   return { ...about, label: providerLabel(provider) };
 }
 
-/** The mark of a provider: its own logo as a mask, the generic one for a service that has none. */
+/** The mark of a provider on its tile: its own logo as a mask, the generic one for a service that has none. */
 function providerMark(provider, size) {
-  const mark = el("span", { class: size === "large" ? "provider-mark provider-mark-lg" : "provider-mark" });
+  const mark = el("span", { class: "provider-mark" });
   mark.dataset.provider = provider;
-  return mark;
+  return el("span", { class: size === "large" ? "provider-tile provider-tile-lg" : "provider-tile", "aria-hidden": "true" }, mark);
+}
+
+/** What a provider's models are, as the line under its name says it when its key is set: the words without their full stop. */
+function shortUse(use) {
+  const words = use.replace(/\.$/, "");
+  return words.charAt(0).toLowerCase() + words.slice(1);
 }
 
 /** The roles of the configured models that run on `provider`, read from the daemon status (none before it arrives). */
@@ -227,7 +235,7 @@ function keyLine(view) {
   if (view.source === null) {
     return aboutProvider(view.provider).needed ? "No key yet" : "Optional · no key";
   }
-  return view.saved ? `Authenticated · key ••••${view.tail}` : `Authenticated · ${SOURCES[view.source] ?? view.source}`;
+  return view.tail === "" ? (SOURCES[view.source] ?? view.source) : `••••${view.tail}`;
 }
 
 /**
@@ -256,7 +264,7 @@ function buildProvider(initial, isDisposed, host) {
   );
 
   // ---- the panel beside it
-  const stateLine = el("p", { class: "provider-line" });
+  const stateLine = el("p", { class: "provider-state" });
   const back = el(
     "button",
     { class: "provider-back", type: "button", "aria-label": "Back to the providers", onclick: () => host.back() },
@@ -292,11 +300,11 @@ function buildProvider(initial, isDisposed, host) {
     edit.focus();
   });
 
-  const edit = el("button", { class: "btn primary sm", type: "button" }, icon("plus"));
+  const edit = el("button", { class: "btn primary", type: "button" }, icon("plus"));
   const remove = el(
     "button",
     {
-      class: "btn ghost sm",
+      class: "btn ghost",
       type: "button",
       "aria-label": `Remove the ${about.label} key saved in Dot`,
       onclick: () => attempt(removeKey),
@@ -304,19 +312,25 @@ function buildProvider(initial, isDisposed, host) {
     icon("trash"),
     "Remove",
   );
+  remove.classList.add("provider-remove");
   const actions = el("div", { class: "provider-actions" }, edit, remove);
 
   const auth = el(
     "section",
     { class: "provider-section" },
-    el("h3", { class: "provider-section-title" }, "Authentication"),
-    el("p", { class: "provider-use" }, about.use),
     el(
-      "a",
-      { class: "provider-docs", href: about.page, target: "_blank", rel: "noopener noreferrer" },
-      `Get a key at ${about.site}`,
-      icon("external"),
+      "div",
+      { class: "provider-section-head" },
+      el("h3", { class: "provider-section-title" }, "Key"),
+      el(
+        "a",
+        { class: "provider-docs", href: about.page, target: "_blank", rel: "noopener noreferrer" },
+        `Get a key at ${about.site}`,
+        icon("external"),
+      ),
     ),
+    // What a provider whose key is needed brings is the line under its name; an optional one has more to say.
+    about.needed ? null : el("p", { class: "provider-use" }, about.use),
     facts,
     actions,
     form.element,
@@ -328,10 +342,46 @@ function buildProvider(initial, isDisposed, host) {
   // brings none.
   const modelCount = el("span", { class: "provider-count" });
   const modelBox = el("div", { class: "provider-models" });
+  const filter = el("input", {
+    class: "input sm provider-filter",
+    type: "search",
+    placeholder: "Filter models",
+    "aria-label": `Filter the models of ${about.label}`,
+    autocomplete: "off",
+    spellcheck: "false",
+    hidden: true,
+  });
+  const showAll = el("button", { class: "provider-show-all", type: "button", hidden: true });
+  let expanded = false;
   const modelsSection =
     view.provider === JUDGE_SERVICE
       ? null
-      : el("section", { class: "provider-section" }, el("h3", { class: "provider-section-title" }, "Models", modelCount), modelBox);
+      : el(
+          "section",
+          { class: "provider-section" },
+          el("div", { class: "provider-section-head" }, el("h3", { class: "provider-section-title" }, "Models", modelCount), filter),
+          modelBox,
+        );
+
+  /** The rows the filter lets through, the first few of them unless Show all was pressed or something is typed. */
+  function filterModels() {
+    const needle = filter.value.trim().toLowerCase();
+    const rows = [...modelBox.querySelectorAll(".provider-model")];
+    let shown = 0;
+    for (const row of rows) {
+      const matched = needle === "" || row.dataset.model.toLowerCase().includes(needle);
+      row.hidden = !(matched && (needle !== "" || expanded || shown < MODELS_SHOWN));
+      shown += row.hidden ? 0 : 1;
+    }
+    showAll.hidden = needle !== "" || expanded || rows.length <= MODELS_SHOWN;
+    showAll.textContent = `Show all ${rows.length}`;
+    filter.hidden = rows.length === 0;
+  }
+  showAll.addEventListener("click", () => {
+    expanded = true;
+    filterModels();
+  });
+  filter.addEventListener("input", filterModels);
 
   const judgeSwitch =
     view.provider !== JUDGE_SERVICE
@@ -387,13 +437,15 @@ function buildProvider(initial, isDisposed, host) {
           ? el("div", { class: "small muted" }, "Reading the models…")
           : el("div", { class: "note bad" }, icon("alert"), el("span", null, `The models could not be read: ${modelsProblem}`)),
       );
+      filterModels();
       return;
     }
-    modelCount.textContent = ` ${entry.models.length}`;
+    modelCount.textContent = String(entry.models.length);
     if (entry.models.length === 0) {
       modelBox.replaceChildren(
         el("div", { class: "note" }, icon("info"), el("span", null, entry.error ?? "This provider named no models.")),
       );
+      filterModels();
       return;
     }
     const main = getSnapshot().status?.models.main ?? "";
@@ -409,12 +461,14 @@ function buildProvider(initial, isDisposed, host) {
         ].filter((chip) => chip !== null);
         return el(
           "div",
-          { class: "provider-model" },
-          el("span", { class: "provider-model-name" }, modelName(model.ref)),
+          { class: "provider-model", dataset: { model: model.ref } },
+          el("span", { class: "provider-model-name mono" }, modelName(model.ref)),
           el("span", { class: "provider-model-chips" }, chips),
         );
       }),
+      showAll,
     );
+    filterModels();
   }
 
   function paint() {
@@ -422,7 +476,10 @@ function buildProvider(initial, isDisposed, host) {
     const using = about.needed ? rolesOn(view.provider) : [];
     element.dataset.state = set ? "set" : "unset";
     line.textContent = keyLine(view);
-    stateLine.textContent = set ? `Authenticated · ${SOURCES[view.source] ?? view.source}` : about.needed ? "No key yet" : "Optional";
+    stateLine.dataset.tone = set ? "ok" : "off";
+    stateLine.replaceChildren(
+      ...(set ? [icon("check"), `Connected · ${about.needed ? shortUse(about.use) : "optional"}`] : [about.needed ? "No key yet" : "Optional"]),
+    );
     dot.dataset.tone = set ? "ok" : using.length > 0 ? "bad" : "off";
     facts.replaceChildren(
       el("code", { class: "mono provider-var" }, view.name),
@@ -431,7 +488,7 @@ function buildProvider(initial, isDisposed, host) {
             el("span", { class: "key-secret mono", title: "The last characters of the key in use" }, `••••${view.tail}`),
             el("span", { class: "provider-source" }, SOURCES[view.source]),
           ]
-        : []),
+        : [el("span", { class: "provider-source" }, "not set")]),
       ...using.map((role) =>
         el("span", { class: "chip", title: `Your ${role.label} runs on ${about.label}` }, role.label),
       ),
@@ -445,8 +502,8 @@ function buildProvider(initial, isDisposed, host) {
       judgeSwitch.paint();
       judgeSwitch.toggle.disabled = !set || judge === null || !judge.key_set;
     }
-    edit.className = set ? "btn sm" : "btn sm primary";
-    edit.replaceChildren(icon(set ? "pencil" : "plus"), set ? "Replace" : "Add key");
+    edit.className = set ? "btn" : "btn primary";
+    edit.replaceChildren(icon(set ? "pencil" : "plus"), set ? "Replace key" : "Add key");
     edit.hidden = form.isOpen();
     remove.hidden = !view.saved;
     paintModels();
@@ -604,17 +661,17 @@ export function mount(root, ctx) {
     await load();
   }
 
-  ctx.head.setLead("The providers Dot signs in to its models with: the key each one takes, the models it brings and where the key is kept. The page never shows a whole key.");
+  ctx.head.setLead("The keys Dot signs in to its models with. This page never shows a whole key.");
   root.append(
     holder,
     el(
       "div",
       { class: "stack tight" },
-      el("div", { class: "note" }, icon("shield"), kept),
+      el("div", { class: "note" }, icon("lock"), kept),
       el(
         "div",
         { class: "note" },
-        icon("refresh"),
+        icon("info"),
         el(
           "span",
           null,

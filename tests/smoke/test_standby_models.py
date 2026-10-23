@@ -192,8 +192,8 @@ async def test_settings_choose_the_standby_models_in_their_order(runtime: Runtim
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{served}/#/settings/models")
-                add: Locator = page.get_by_role("combobox", name="Add a standby model")
-                card: Locator = page.locator(".setting.models-standby")
+                add: Locator = page.get_by_role("combobox", name="Add a fallback model")
+                card: Locator = page.locator(".models-standby")
                 if index == 0:
                     await expect(card.locator(".standby-none")).to_be_visible()
                     # The menu offers the models that call tools: not llava.

@@ -20,7 +20,7 @@ import { dotName, NAME_CHARS } from "../face.js";
 import { OWNER_CHARS, ownerName, shownOwner } from "../presence.js";
 import { icon } from "../icons.js";
 import { lookPicker } from "../lookpicker.js";
-import { choiceSetting, foldCard, foldGroup, inlineError, inlineLoading, segmented, switchSetting } from "../panels.js";
+import { choiceSetting, foldCard, foldGroup, inlineError, inlineLoading, segmented, setCard, setRow, setSection, switchSetting } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
@@ -828,8 +828,8 @@ function providerBlock(provider, mainModel, inUse, remember) {
       "span",
       { class: "row grow" },
       el("strong", null, providerLabel(provider.provider)),
-      provider.error === null ? el("span", { class: "hint" }, plural(provider.models.length, "model", "models")) : null,
       problemBadge(provider, inUse),
+      provider.error === null ? el("span", { class: "fold-count" }, plural(provider.models.length, "model", "models")) : null,
     ),
     body: providerBody(provider, mainModel, inUse, remember),
     openByDefault: ownsMain || isFailing(provider, inUse),
@@ -842,8 +842,7 @@ function modelsSummary(providers, inUse) {
   const failing = providers.filter((provider) => isFailing(provider, inUse.includes(provider.provider))).length;
   const keyless = providers.filter((provider) => provider.problem === "no_key" && !inUse.includes(provider.provider)).length;
   return [
-    el("span", null, plural(providers.length, "provider", "providers")),
-    el("span", null, plural(total, "model", "models")),
+    el("span", null, `${plural(providers.length, "provider", "providers")} · ${plural(total, "model", "models")}`),
     failing > 0 ? el("span", { class: "badge b-bad" }, `${failing} unavailable`) : null,
     keyless > 0 ? el("span", { class: "badge b-muted" }, `${keyless} without a key`) : null,
   ];
@@ -881,13 +880,12 @@ const ROLE_SETTINGS = [
  */
 function modelSetting({ label, hint, className, fits, choose }) {
   let shown = "";
-  const select = el("select", { class: "select sm", "aria-label": label });
-  const element = el(
-    "div",
-    { class: `setting ${className}`, hidden: true },
-    el("div", { class: "row" }, el("span", { class: "grow" }, label), select),
-    el("div", { class: "hint" }, hint),
-  );
+  const select = el("select", { class: "select sm mono", "aria-label": label });
+  // The provider of the model chosen stands in the select's box, before its chevron, as the design draws it.
+  const provider = el("span", { class: "model-pick-provider", "aria-hidden": "true" });
+  const element = setRow({ title: label, lead: hint, control: el("div", { class: "model-pick" }, select, provider) });
+  element.classList.add(className);
+  element.hidden = true;
   // Each pick is sent once the one before it was answered, so the last one made holds; the select shows the model the
   // status says after each.
   let making = Promise.resolve();
@@ -907,7 +905,7 @@ function modelSetting({ label, hint, className, fits, choose }) {
 
   function paint(providers, chosen) {
     const groups = providers
-      .map((provider) => ({ provider: provider.provider, models: provider.models.filter(fits) }))
+      .map((one) => ({ provider: one.provider, models: one.models.filter(fits) }))
       .filter((group) => group.models.length > 0);
     const listed = groups.some((group) => group.models.some((model) => model.ref === chosen));
     // The native replaceChildren writes a null as text: the option of a model not listed is left out instead.
@@ -920,6 +918,7 @@ function modelSetting({ label, hint, className, fits, choose }) {
     );
     shown = chosen;
     select.value = chosen;
+    provider.textContent = chosen === "" ? "" : providerLabel(providerOf(chosen));
     element.hidden = false;
   }
 
@@ -933,27 +932,25 @@ function modelSetting({ label, hint, className, fits, choose }) {
 // The provider of Zen's free models, which answer only as OpenCode's own agent: none can be a standby model.
 const OPENCODE_PROVIDER = "opencode";
 const STANDBY_HINT =
-  "When a run's model cannot answer (its quota, its rate limit, its key or its access, or its content filter stopped the reply), the run goes on with the first of these that can, each once at most. With none, the run ends with the error.";
+  "When a run's model cannot answer (its quota, its rate limit, its key or its access, or its content filter stopped the reply), the run goes on with the first of these that can, each once at most.";
 
 /**
- * The standby models (item 478): the models a run moves to, in their order, when its own model cannot answer, each a
- * row with its arrows and its ×, under a menu that adds one of the models that call tools. `choose(refs)` sends the
- * whole list, which the daemon keeps as `[models] standby`, and gives back the models it answered with.
- * `paint(providers, chosen)` draws it again; `hide()` hides it while the models are read.
+ * The fallback models (item 478, the standby models; drawn as the Fallbacks section, item 563): the models a run moves to,
+ * in their order, when its own model cannot answer, each a numbered row with its arrows and its ×, over a row that adds
+ * one of the models that call tools. `choose(refs)` sends the whole list, which the daemon keeps as `[models] standby`,
+ * and gives back the models it answered with. `paint(providers, chosen)` draws it again; `hide()` hides it while the
+ * models are read.
  */
 function standbySetting({ choose }) {
   let shown = [];
-  const add = el("select", { class: "select sm", "aria-label": "Add a standby model" });
-  const list = el("ol", { class: "standby-list", "aria-label": "Standby models, in their order" });
-  const none = el("div", { class: "small muted standby-none" }, "None: a run whose model cannot answer ends with the error.");
-  const element = el(
-    "div",
-    { class: "setting models-standby", hidden: true },
-    el("div", { class: "row" }, el("span", { class: "grow" }, "Standby models"), add),
-    el("div", { class: "hint" }, STANDBY_HINT),
-    list,
-    none,
-  );
+  // The select lies over the row's words, clear, so that a press anywhere on the row opens its menu.
+  const add = el("select", { class: "standby-add-select", "aria-label": "Add a fallback model" });
+  const list = el("ol", { class: "standby-list", "aria-label": "Fallback models, in their order" });
+  const none = el("div", { class: "set-row standby-none" }, "None: a run whose model cannot answer ends with the error.");
+  const adder = el("div", { class: "set-row standby-add" }, el("span", { class: "standby-add-label" }, icon("plus"), "Add a fallback model"), add);
+  const element = setSection({ title: "Fallbacks", lead: STANDBY_HINT, body: setCard(list, none, adder) });
+  element.classList.add("models-standby");
+  element.hidden = true;
   // Each change is sent once the one before it was answered, and made to the list that answer holds, so changes made
   // in a row all hold; the list is drawn again from the status after each.
   let making = Promise.resolve();
@@ -992,14 +989,14 @@ function standbySetting({ choose }) {
     return el(
       "button",
       {
-        class: `btn ghost sm icon-only standby-move ${up ? "up" : "down"}`,
+        class: "btn ghost sm icon-only standby-move",
         type: "button",
         title: up ? "Move up: a run tries it earlier" : "Move down: a run tries it later",
         "aria-label": `Move ${modelName(ref)} ${up ? "up" : "down"}`,
         disabled: up ? at === 0 : at === shown.length - 1,
         onclick: () => send((list) => moved(list, ref, by)),
       },
-      icon("chevron"),
+      icon(up ? "arrowUp" : "arrowDown"),
     );
   }
 
@@ -1009,9 +1006,9 @@ function standbySetting({ choose }) {
     const keyless = provider !== null && provider.problem === "no_key";
     return el(
       "li",
-      { class: "standby-row", dataset: { model: ref } },
-      el("span", { class: "standby-order small muted" }, `${at + 1}.`),
-      el("span", { class: "grow standby-name" }, modelName(ref), el("span", { class: "small muted" }, ` · ${providerLabel(providerOf(ref))}`)),
+      { class: "set-row standby-row", dataset: { model: ref } },
+      el("span", { class: "standby-order" }, String(at + 1)),
+      el("span", { class: "grow standby-name" }, el("span", { class: "mono" }, modelName(ref)), el("span", { class: "muted" }, providerLabel(providerOf(ref)))),
       keyless ? el("span", { class: "badge b-muted", title: "A run passes it over until its provider has a key" }, "no key") : null,
       !listed && !keyless ? el("span", { class: "badge b-muted", title: "Its provider does not list it now" }, "not listed now") : null,
       arrow(ref, at, -1),
@@ -1046,12 +1043,13 @@ function standbySetting({ choose }) {
   return { element, paint, hide };
 }
 
-/** The Models card. `asked` is the model an address asked for (`#/settings/models?model=<ref>`, the context meter's link,
- * item 396), "" for none: once listed, its provider's fold and the card open, and its row comes into sight, marked, with
- * the focus on its context size. */
-function buildModels(isDisposed, asked) {
+/** The Models page's sections: the roles, the fallbacks and every model by provider. `asked` is the model an address
+ * asked for (`#/settings/models?model=<ref>`, the context meter's link, item 396), "" for none: once listed, its provider's
+ * fold opens and its row comes into sight, marked, with the focus on its context size. `head` is the page's head: what the
+ * providers hold stands in it, and the button that asks them again. */
+function buildModels(isDisposed, asked, head) {
   let toShow = asked;
-  const list = el("div", null, inlineLoading());
+  const list = el("div", { class: "models-providers" }, inlineLoading());
   const main = modelSetting({
     label: "Default model",
     hint: "New chats start on it, and so does any run that names no model. A chat keeps the model it has; Default in its composer follows this one.",
@@ -1082,15 +1080,24 @@ function buildModels(isDisposed, asked) {
       return answered;
     },
   });
-  const body = el("div", null, main.element, ...roles.map(({ control }) => control.element), standby.element, list);
+  // Every model by provider: a search over the folds of the providers, which keep the tables of their models.
+  const search = el("input", { class: "input", type: "search", placeholder: "Search models", "aria-label": "Search models", autocomplete: "off", spellcheck: "false" });
+  const noMatch = el("div", { class: "set-row hint", hidden: true }, "No model has that in its name.");
+  const element = el(
+    "div",
+    { class: "set-sections" },
+    setSection({ title: "Roles", body: setCard(main.element, ...roles.map(({ control }) => control.element)) }),
+    standby.element,
+    setSection({ title: "Every model, by provider", body: setCard(el("div", { class: "set-row models-search" }, el("span", { class: "models-search-box" }, icon("search"), search)), list, noMatch) }),
+  );
   let providers = null;
   const reload = el(
     "button",
-    { class: "btn ghost sm", type: "button", title: "Ask the providers for their models again", "aria-label": "Ask again", onclick: () => attempt(load) },
+    { class: "btn", type: "button", title: "Ask the providers for their models again", onclick: () => attempt(load) },
     icon("refresh"),
-    el("span", { class: "label" }, "Ask again"),
+    "Ask providers again",
   );
-  const card = foldCard({ id: "system-models", title: "Models", actions: reload, body, openByDefault: true });
+  head.setActions(reload);
   let painted = null;
 
   // Called on every status update; the tables are only rebuilt when the list, the default model or the providers the
@@ -1117,7 +1124,8 @@ function buildModels(isDisposed, asked) {
       return;
     }
     painted = { providers, mainModel, chosen, standbyKey, usage };
-    card.setSummary(...modelsSummary(providers, inUse));
+    head.setMeta(...modelsSummary(providers, inUse));
+    search.placeholder = `Search ${plural(providers.reduce((count, provider) => count + provider.models.length, 0), "model", "models")}`;
     main.paint(providers, mainModel);
     for (const { role, control } of roles) {
       control.paint(providers, status === null ? "" : status.models[role]);
@@ -1126,7 +1134,40 @@ function buildModels(isDisposed, asked) {
     list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider), remember)));
     cueTables();
     showAsked();
+    findModels();
   }
+
+  /** Show the models whose names hold what is typed in the search, the providers that have none out of sight, and a fold open while it has a match (what the owner folded stays as they left it). */
+  function findModels() {
+    const needle = search.value.trim().toLowerCase();
+    let shown = 0;
+    for (const group of list.querySelectorAll(".fold-group")) {
+      const rows = [...group.querySelectorAll("tr[data-model]")];
+      let matches = 0;
+      for (const row of rows) {
+        const matched = needle === "" || row.dataset.model.toLowerCase().includes(needle);
+        const why = row.nextElementSibling?.classList.contains("context-why") ? row.nextElementSibling : null;
+        row.classList.toggle("model-filtered", !matched);
+        why?.classList.toggle("model-filtered", !matched);
+        matches += matched ? 1 : 0;
+      }
+      group.classList.toggle("model-filtered", needle !== "" && matches === 0);
+      shown += needle === "" || matches > 0 ? 1 : 0;
+      const body = group.querySelector(":scope > .fold-body");
+      if (body === null) {
+        continue;
+      }
+      if (needle !== "" && matches > 0 && body.hidden) {
+        body.dataset.searched = "";
+        body.hidden = false;
+      } else if ((needle === "" || matches === 0) && "searched" in body.dataset) {
+        delete body.dataset.searched;
+        body.hidden = true;
+      }
+    }
+    noMatch.hidden = needle === "" || shown > 0 || providers === null;
+  }
+  search.addEventListener("input", findModels);
 
   // The asked model's row, once: a later paint leaves the page where the owner took it.
   function showAsked() {
@@ -1135,10 +1176,9 @@ function buildModels(isDisposed, asked) {
       return;
     }
     toShow = "";
-    for (const fold of [row.closest(".fold-group"), card.element]) {
-      if (fold !== null && fold.dataset.open === "false") {
-        fold.querySelector(".fold-toggle").click();
-      }
+    const fold = row.closest(".fold-group");
+    if (fold !== null && fold.dataset.open === "false") {
+      fold.querySelector(".fold-toggle").click();
     }
     row.dataset.asked = "";
     // The size's menu, or its Why where the window allows no other size; on a phone the table scrolls sideways to it.
@@ -1165,7 +1205,7 @@ function buildModels(isDisposed, asked) {
     }
     standby.hide();
     list.replaceChildren(inlineLoading());
-    card.setSummary();
+    head.setMeta();
     try {
       const found = await loadModels();
       if (isDisposed()) {
@@ -1176,7 +1216,7 @@ function buildModels(isDisposed, asked) {
     } catch (error) {
       if (!isDisposed()) {
         console.error("the models could not be listed", error);
-        card.setSummary(el("span", { class: "badge b-bad" }, "could not list"));
+        head.setMeta(el("span", { class: "badge b-bad" }, "could not list"));
         list.replaceChildren(inlineError(error, () => attempt(load)));
       }
     }
@@ -1196,7 +1236,7 @@ function buildModels(isDisposed, asked) {
     cues = [...list.querySelectorAll(".table-scroll")].map(scrollCue);
   }
 
-  return { element: card.element, load, paint, dispose: stopCues };
+  return { element, load, paint, dispose: stopCues };
 }
 
 function buildTokenCard() {
@@ -1975,8 +2015,8 @@ export function mountGeneral(root, ctx) {
 export function mountModels(root, ctx) {
   let disposed = false;
   const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("model") ?? "";
-  const models = buildModels(() => disposed, asked);
-  ctx.head.setLead("The providers Dot can reach, the models each of them offers and the reasoning effort of each.");
+  const models = buildModels(() => disposed, asked, ctx.head);
+  ctx.head.setLead("Which model does each job, and what a run falls back on when its model can't answer.");
   root.append(models.element);
   const stop = onChange(() => models.paint());
   models.paint();

@@ -237,7 +237,7 @@ async def test_settings_choose_the_models_of_dots_own_work_and_the_next_call_goe
                     await expect(fast).to_have_value(_OPUS)
                     await expect(review).to_have_value(_HAIKU)
                     await expect(vision).to_have_value(_HAIKU)
-                card: Locator = page.locator(".setting.models-role").first
+                card: Locator = page.locator(".models-role").first
                 assert not (
                     await page.locator(".models-role").evaluate_all(
                         "(rows) => rows.some((row) => row.scrollWidth > row.clientWidth)"

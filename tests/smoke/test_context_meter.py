@@ -238,7 +238,7 @@ async def test_the_context_meter_shows_how_much_of_the_budget_the_last_step_fill
             await page.locator(_METER).click()
             await page.get_by_role("link", name="Change context size").click()
             await expect(page).to_have_url(f"{served}/{_SIZE_SETTING}")
-            await expect(page.locator("#fold-system-models")).to_be_attached()
+            await expect(page.get_by_role("heading", level=1)).to_have_text("Models")
             await page.close()
             # Past the budget the ring is full and says so; with room it says that.
             for run, level, label, filled in (
