@@ -6,7 +6,7 @@
 import { api, blobUrl, unreachable } from "../api.js";
 import { copyText, el } from "../dom.js";
 import { icon } from "../icons.js";
-import { errorPanel, loadingPanel, paneHead, switchSetting } from "../panels.js";
+import { errorPanel, loadingPanel, switchSetting } from "../panels.js";
 import { getSnapshot } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -55,7 +55,7 @@ function step(number, title, done, text, ...offers) {
   );
 }
 
-export function mount(root, _ctx) {
+export function mount(root, ctx) {
   let disposed = false;
   // How many actions of the guide wait for their answer: the guide is not drawn again under one.
   let busy = 0;
@@ -410,7 +410,8 @@ export function mount(root, _ctx) {
     await load();
   }
 
-  root.append(paneHead("Dot on a phone, at home or away: the steps there, a step at a time, and a code that signs in the app on its home screen.", null), holder);
+  ctx.head.setLead("Dot on a phone, at home or away: the steps there, a step at a time, and a code that signs in the app on its home screen.");
+  root.append(holder);
   attempt(load);
   return () => {
     disposed = true;

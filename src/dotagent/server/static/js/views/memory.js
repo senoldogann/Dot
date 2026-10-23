@@ -4,7 +4,7 @@
 import { api, query } from "../api.js";
 import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, paneHead } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const PAGE_SIZE = 30;
@@ -216,7 +216,7 @@ function outcomeNodes(saved, actions) {
   return nodes;
 }
 
-export function mount(root, _ctx) {
+export function mount(root, ctx) {
   let disposed = false;
   // Grows with every load, so a slow answer never overwrites a newer one.
   let ticket = 0;
@@ -552,8 +552,8 @@ export function mount(root, _ctx) {
     paintLearning(await api.get("/memories/learning"));
   }
 
+  ctx.head.setLead("Notes that Dot keeps between runs. It recalls the ones that fit the task at hand.");
   root.append(
-    paneHead("Notes that Dot keeps between runs. It recalls the ones that fit the task at hand.", null),
     asked,
     el(
       "div",

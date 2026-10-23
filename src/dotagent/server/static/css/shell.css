@@ -1051,3 +1051,182 @@
     line-height: var(--leading-sm);
   }
 }
+
+/* ---------- the settings nav (item 562) ---------- */
+
+/* While the settings are open the sidebar holds their nav and nothing of the chats and the pages (sidebar.js sets
+   data-mode; a phone's settings are a list on a page of their own and leave the sidebar as it is). */
+.sidebar[data-mode="settings"] > :not(.settings-nav) {
+  display: none;
+}
+
+.settings-nav {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px 8px;
+}
+
+.sidebar[data-mode="settings"] > .settings-nav {
+  display: flex;
+}
+
+.settings-nav-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: var(--radius-control);
+  color: var(--muted);
+}
+
+.settings-back:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.settings-nav-title {
+  margin: 4px 0 20px;
+  padding: 0 12px;
+  font-size: var(--text-xl);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.settings-nav-groups {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.settings-nav-group + .settings-nav-group {
+  margin-top: 20px;
+}
+
+.settings-nav-group-title {
+  margin: 0 0 8px;
+  padding: 0 12px;
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-label);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.settings-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: var(--space-half);
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+}
+
+.settings-nav-link:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* The open tab is a surface step up from the sidebar, as the open row of the chats is (item 74). */
+.settings-nav-link[aria-current="page"] {
+  background: var(--surface);
+  box-shadow: 0 1px 2px var(--shadow-ink);
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.settings-nav-link > .icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.settings-nav-link[aria-current="page"] > .icon {
+  color: var(--text);
+}
+
+.settings-nav-label {
+  min-width: 0;
+}
+
+/* What the tab holds, at the row's right end: a name that is too long ends in an ellipsis. */
+.settings-nav-value {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-text);
+  color: var(--muted);
+}
+
+.settings-nav-link:hover .settings-nav-value {
+  color: var(--text-2);
+}
+
+.settings-nav-dot,
+.settings-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--ok);
+}
+
+/* The daemon, at the foot: a card a hairline frames, whose dot says how it is. */
+.settings-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.settings-status-dot[data-state="wait"] {
+  background: var(--warn);
+}
+
+.settings-status-dot[data-state="bad"] {
+  background: var(--bad);
+}
+
+.settings-status-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.settings-status-title {
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-label);
+  color: var(--text);
+}
+
+.settings-status-line {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--muted);
+}
+
+.settings-status-line:empty {
+  display: none;
+}

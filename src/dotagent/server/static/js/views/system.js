@@ -20,7 +20,7 @@ import { dotName, NAME_CHARS } from "../face.js";
 import { OWNER_CHARS, ownerName, shownOwner } from "../presence.js";
 import { icon } from "../icons.js";
 import { lookPicker } from "../lookpicker.js";
-import { choiceSetting, foldCard, foldGroup, inlineError, inlineLoading, paneHead, segmented, switchSetting } from "../panels.js";
+import { choiceSetting, foldCard, foldGroup, inlineError, inlineLoading, segmented, switchSetting } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
@@ -1957,10 +1957,10 @@ function buildDotLookCard() {
   return { element, dispose: picker.dispose };
 }
 
-export function mountGeneral(root, _ctx) {
+export function mountGeneral(root, ctx) {
   const look = buildDotLookCard();
+  ctx.head.setLead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, what a chat shows of what ran without asking, and the token this browser is signed in with.");
   root.append(
-    paneHead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, what a chat shows of what ran without asking, and the token this browser is signed in with.", null),
     buildNameCard(),
     look.element,
     buildNotifications(),
@@ -1972,11 +1972,12 @@ export function mountGeneral(root, _ctx) {
 }
 
 /** The providers Dot can reach and the models each of them offers; `?model=<ref>` in the address shows that model. */
-export function mountModels(root, _ctx) {
+export function mountModels(root, ctx) {
   let disposed = false;
   const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("model") ?? "";
   const models = buildModels(() => disposed, asked);
-  root.append(paneHead("The providers Dot can reach, the models each of them offers and the reasoning effort of each.", null), models.element);
+  ctx.head.setLead("The providers Dot can reach, the models each of them offers and the reasoning effort of each.");
+  root.append(models.element);
   const stop = onChange(() => models.paint());
   models.paint();
   attempt(refresh);
@@ -1989,10 +1990,11 @@ export function mountModels(root, _ctx) {
 }
 
 /** Which Chrome the agent browses with. */
-export function mountBrowser(root, _ctx) {
+export function mountBrowser(root, ctx) {
   let disposed = false;
   const browser = buildBrowser(() => disposed);
-  root.append(paneHead("Which Chrome the agent browses with, and what Chrome has to allow first.", null), browser.element);
+  ctx.head.setLead("Which Chrome the agent browses with, and what Chrome has to allow first.");
+  root.append(browser.element);
   attempt(browser.load);
   return () => {
     disposed = true;
@@ -2000,7 +2002,7 @@ export function mountBrowser(root, _ctx) {
 }
 
 /** The daemon, its emergency stop and its health checks. */
-export function mountSystem(root, _ctx) {
+export function mountSystem(root, ctx) {
   let disposed = false;
   const daemon = buildDaemon();
   const permissions = buildPermissions();
@@ -2012,7 +2014,8 @@ export function mountSystem(root, _ctx) {
     failsafe.paint(snapshot);
   }
 
-  root.append(paneHead("The daemon, its permissions, its emergency stop and its health checks.", null), daemon.element, permissions.element, failsafe.element, doctor.element, buildAbout());
+  ctx.head.setLead("The daemon, its permissions, its emergency stop and its health checks.");
+  root.append(daemon.element, permissions.element, failsafe.element, doctor.element, buildAbout());
   const stop = onChange(paint);
   paint(getSnapshot());
   attempt(refresh);

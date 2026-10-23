@@ -10,7 +10,7 @@
 import { api } from "../api.js";
 import { ago, clip, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, paintOpener, paneHead, segmented, switchSetting } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, paintOpener, segmented, switchSetting } from "../panels.js";
 import { outcomeLabel, previewLines, usageLine } from "../rulepreview.js";
 import { onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -486,7 +486,7 @@ function buildSandbox(isDisposed) {
   return { element: el("section", { class: "card card-pad", "aria-label": "Sandbox" }, setting.element), load };
 }
 
-export function mount(root, _ctx) {
+export function mount(root, ctx) {
   let disposed = false;
   let rules = null;
   // How the rules were used on the last days (item 473), read after the rules; an answer older than the last read is
@@ -637,8 +637,8 @@ export function mount(root, _ctx) {
       words.focus();
     }
   });
+  ctx.head.setLead("Your own answers to “may Dot do this?”, applied before the safety preset.");
   root.append(
-    paneHead("Your own answers to “may Dot do this?”, applied before the safety preset.", null),
     el(
       "div",
       { class: "note" },

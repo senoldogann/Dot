@@ -291,7 +291,7 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     standing: dict[str, int] = dict(phone.viewport_size or {})
                     await phone.set_viewport_size({"width": standing["height"], "height": standing["width"]})
                     await phone.goto(f"{address}/#/settings/appearance")
-                    await expect(phone.locator(".settings-side")).to_be_visible()
+                    await expect(phone.get_by_role("heading", level=1)).to_have_text("Appearance")
                     await expect(phone.get_by_role("button", name="Back")).to_have_count(0)
                     await phone.set_viewport_size({"width": standing["width"], "height": standing["height"]})
                     await expect(phone.locator(".stagebar-left button")).to_have_attribute("aria-label", "Back")

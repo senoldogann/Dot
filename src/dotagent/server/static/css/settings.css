@@ -1,10 +1,8 @@
-/* The settings page: the tabs down the left side and the pane of the chosen tab next to them. When the two would not fit
-   side by side (the page under 1100 px: the tabs' 196 px, the gap of 36 px and the pane's 860 px; a window of 1412 px
-   with the sidebar open, of 1140 px with it closed), the tabs become a strip above the pane. */
-
-/* The settings may run wider than the other pages: the pane next to the tabs has to hold the model table whole. */
+/* The settings page (items 330 and 562): in a Mac's window the nav is the sidebar's (settingsnav.js, shell.css) and the page
+   is the open tab alone, in a column of 920 px: its head, then its sections 32 px apart, each a name over a card of rows.
+   A phone has the list of tabs for a page of its own and each tab a page of its own (item 330). */
 .page:has(> .settings-frame) {
-  max-width: 1180px;
+  max-width: 960px;
 }
 
 /* The frame measures the width the page gives the settings, whatever the window and the sidebar are doing. */
@@ -12,57 +10,188 @@
   container-type: inline-size;
 }
 
-.settings {
-  display: grid;
-  grid-template-columns: 196px minmax(0, 1fr);
-  gap: 36px;
-  align-items: start;
-}
-
-.settings-side {
-  position: sticky;
-  top: calc(var(--stagebar-h) + 16px);
-}
-
-.settings-nav {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-half);
-}
-
-.settings-tab {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 8px;
-  border-radius: var(--radius-control);
-  color: var(--text-2);
-}
-
-.settings-tab:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  color: var(--text);
-  text-decoration: none;
-}
-
-.settings-tab[aria-current="page"] {
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  color: var(--text);
-  font-weight: var(--weight-label);
-}
-
 .settings-pane {
   min-width: 0;
-  max-width: 860px;
 }
 
 .settings-pane > * + * {
-  margin-top: 16px;
+  margin-top: 32px;
 }
 
-/* The bar names the page and the open tab names the pane; the pane opens with its description line. */
-.settings-pane .page-head {
-  margin-bottom: 16px;
+/* The head: the tab's name and the line that says what it is for, and at the right what it holds and its buttons, level
+   with the bottom of the line. */
+.set-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.set-head-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.set-title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  line-height: var(--leading-2xl);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.set-lead {
+  max-width: 64ch;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+}
+
+.set-lead:empty {
+  display: none;
+}
+
+.set-head-side {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.set-meta {
+  color: var(--muted);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+}
+
+.set-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.set-meta:empty,
+.set-actions:empty,
+.set-head-side:not(:has(*)) {
+  display: none;
+}
+
+/* A section: its name over its card, and a line under the name that says what it is for. */
+.set-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.set-section-text {
+  min-width: 0;
+}
+
+.set-section-title {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-title);
+}
+
+.set-section-lead {
+  margin: var(--space-half) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+/* A card of rows: a row's title and the muted line under it on the left, its control on the right. */
+.set-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* The sections of a tab that holds them in one wrapper stand 32 px apart, as the pane's own children do. */
+.set-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.set-row {
+  padding: 16px 20px;
+}
+
+.set-row + .set-row {
+  border-top: 1px solid var(--border);
+}
+
+/* A control too wide for the room beside the text (a choice of four, a select on a phone) goes under it. */
+.set-row-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.set-row-text {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.set-row-title {
+  color: var(--text);
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  font-weight: var(--weight-label);
+}
+
+.set-row-lead {
+  margin-top: var(--space-half);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.set-row-control {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+/* A tab's cards that are not drawn as rows yet name themselves over their body, as a phone's do (app.css): a card's head
+   is the section's name and its body the card. */
+@media (min-width: 721px) {
+  .settings-pane .card:has(> .card-head) {
+    border: 0;
+    background: none;
+  }
+
+  .settings-pane .card > .card-head {
+    padding: 0 0 12px;
+    border-bottom: 0;
+    color: var(--text);
+    font-size: var(--text-ui);
+    font-weight: var(--weight-title);
+  }
+
+  .settings-pane .card > .card-head + * {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+}
+
+/* On a phone the tab's name is in the bar (views/settings.js): the page opens with its line. */
+@media (max-width: 720px) {
+  .set-title {
+    display: none;
+  }
 }
 
 /* The default model (item 199), those of Dot's own work (item 232) and the standby models (item 478), above the
@@ -495,48 +624,6 @@
   }
 }
 
-/* The strip is one row that scrolls sideways rather than rows that push the pane down, and it stays under the bar while
-   the page scrolls, over the pane, its ground reaching the window's edges (item 272). */
-@container (max-width: 1099.98px) {
-  .settings {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-  }
-
-  .settings-side {
-    top: var(--stagebar-h);
-    z-index: 10;
-    padding-block: 8px;
-    margin-block: -8px;
-    background: var(--bg);
-    box-shadow: 0 0 0 100vmax var(--bg);
-    clip-path: inset(0 -100vmax);
-  }
-
-  .settings-nav {
-    flex-direction: row;
-    gap: 4px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-  }
-
-  .settings-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* While more tabs lie to the right (scrollcue.js), the edge fades to say so. */
-  .settings-nav[data-scroll="more"] {
-    mask-image: linear-gradient(to right, var(--bg) calc(100% - 40px), transparent);
-  }
-
-  .settings-tab {
-    flex: none;
-    padding: 8px 12px;
-    white-space: nowrap;
-  }
-}
-
 /* On a phone the settings open on a list of their tabs in groups (item 330): each group's name over a
    card of rows, a row the tab's mark, its name, what it holds and an arrow. A row opens its tab as a page of its own,
    whose way back to the list is the bar's Back at the top left (item 338). */
@@ -603,13 +690,6 @@
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* A tab's page: its cards' names stand over them (app.css, items 330 and 332). */
-@media (max-width: 720px) {
-  .settings-side {
-    display: none;
-  }
 }
 
 /* Rules read as sentences: "When Dot would use shell, matching ^git push: ask me first." The four answers sit in a
@@ -1420,7 +1500,6 @@
 /* On a phone a tab of the row, the way to a provider's key page and a rule's example are a finger's height (item
    329). */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
-  .settings-tab,
   .provider-docs,
   .rule-example {
     min-height: 44px;

@@ -511,10 +511,13 @@ harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pai
 **System** (the daemon, its facts in four groups each named over its rows of a label and a value, item 378: this Dot,
 how it acts, what it works with and its models; the emergency stop and the health checks in a fold, closed, with the
 number of failures on its line, and the ways to **Diagnostics** and **Open source licences**, pages of their own). Which
-folds are open is kept in the browser. The tabs sit beside their content when the page has the room for both (1100
-px: a window of 1412 px with the sidebar open, of 1140 px with it closed) and above it otherwise, in one row that
-scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they
-are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
+folds are open is kept in the browser. In a Mac's window the sidebar is the settings' nav while they are open (item 562):
+**Back to chats** (to the chat last open), the tabs in four groups (Interface, Models, How Dot works, This Mac), each
+with what it holds at its right (the main model, how many providers have a key, how many notes Dot keeps, a green dot
+when a phone reaches Dot), and at the foot whether the daemon runs and for how long (the emergency stop, when it is
+engaged). The page is the open tab alone, in a column of 920 px under its own name and the line that says what it is
+for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On
+a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
 phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
