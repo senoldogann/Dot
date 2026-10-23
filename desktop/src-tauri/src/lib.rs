@@ -508,7 +508,9 @@ fn open_outside(url: url::Url) {
 
 /// The installer's window, made on a Mac that has no Dot (item 575). Its page is the app's own `installer.html` and
 /// nothing else: the window refuses every other address and every new window, so that no link or script can take it
-/// to a page that is not bundled. Only this label has the install commands (`capabilities/installer.json`).
+/// to a page that is not bundled. Only this label has the install commands (`capabilities/installer.json`). Its page
+/// asks the web view for nothing, and is given nothing it asks (the microphone, the camera, where the Mac is): wry
+/// grants every request no one answers (item 594).
 fn installer_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     if let Some(existing) = app.get_webview_window(installer::WINDOW) {
         return Ok(existing);
@@ -527,6 +529,7 @@ fn installer_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     .disable_drag_drop_handler()
     .on_navigation(installer::is_installer_page)
     .on_new_window(|_url, _features| NewWindowResponse::Deny)
+    .on_permission_request(|_webview, _kind| PermissionResponse::Deny)
     .build()
 }
 

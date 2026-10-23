@@ -1063,7 +1063,8 @@ and Quit. Closing the window keeps the shell in the menu bar.
   `capabilities/installer.json` grants them: to the window `installer` and to local pages, with no remote entry. The
   window `main` (the UI, the down page), the daemon's pages and any other address are refused, which a test asks of
   the app built with its real capabilities. The installer window shows its own page and nothing else: it refuses any
-  other address and any new window.
+  other address and any new window, and gives its page nothing it asks of the web view (the microphone, the camera,
+  where the Mac is), since wry grants every request no one answers (item 594).
 - **Files** drop into the composer as in the browser.
 - **The microphone** (item 594). The composer's dictation (item 574) is WebKit's speech recognition, which macOS gives
   an app only once it says why it asks (its `Info.plist`: the microphone and speech recognition) and, under the hardened
