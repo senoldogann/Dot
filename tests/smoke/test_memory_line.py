@@ -211,7 +211,7 @@ async def test_a_change_of_the_memory_is_a_quiet_line_that_leads_to_the_note(
                 await page.locator(".timeline .memory-line").nth(1).click()
                 await expect(page).to_have_url(f"{address}/#/settings/memory?note={report_id}")
                 asked: Locator = page.locator("[data-asked]")
-                await expect(asked.locator(".section-label")).to_have_text("The note from the conversation")
+                await expect(asked.locator(".set-section-title")).to_have_text("The note from the conversation")
                 await expect(asked.locator(f"[data-memory='{report_id}']")).to_contain_text(REPORT_NOW)
                 await expect(asked.get_by_role("button", name="Edit this note")).to_be_visible()
                 await page.screenshot(path=str(tmp_path / "asked-390-light.png"), animations="disabled")

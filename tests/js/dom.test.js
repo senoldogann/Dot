@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { clip, compact, duration, joined, modelName, plural, repeatsAnswer } from "../../src/dotagent/server/static/js/dom.js";
+import { clip, compact, duration, joined, modelName, nextNight, plural, repeatsAnswer } from "../../src/dotagent/server/static/js/dom.js";
 
 test("plural", () => {
   assert.equal(plural(1, "file", "files"), "1 file");
@@ -74,4 +74,14 @@ test("repeatsAnswer keeps a reply that says one thing more than the answer", () 
   assert.equal(repeatsAnswer(`3 tests failed:\n${REPORT}`, `2 tests failed:\n${REPORT}`), false);
   const long = `Report:\n${Array.from({ length: 100 }, () => REPORT).join("\n")}`;
   assert.equal(repeatsAnswer(`${long}\n${warning}`, long), false);
+});
+
+test("nextNight says tonight for an evening still to come and tomorrow once it passed", () => {
+  const at = (hours, minutes) => new Date(2026, 9, 23, hours, minutes);
+  assert.equal(nextNight("21:00", at(20, 0)), "Next: tonight, 21:00");
+  assert.equal(nextNight("21:00", at(23, 30)), "Next: tomorrow, 21:00");
+  assert.equal(nextNight("04:00", at(23, 30)), "Next: tonight, 04:00");
+  assert.equal(nextNight("04:00", at(14, 0)), "Next: tonight, 04:00");
+  assert.equal(nextNight("14:00", at(9, 0)), "Next: today, 14:00");
+  assert.equal(nextNight("14:00", at(15, 0)), "Next: tomorrow, 14:00");
 });

@@ -1,20 +1,47 @@
-// What Dot remembers: add a note, look things up by meaning or by words, correct a note and forget what is out of date.
-// The notes keep a size and scroll inside past their first rows (item 218).
+// Settings › Memory (items 218 and 566): add a note, look things up by meaning or by words, narrow the notes to the lessons, the
+// preferences or the ones saved while a run read outside content, correct a note and forget what is out of date. Under the
+// notes: what Dot knows about you and how its learning fares. The notes are read a page at a time (item 218).
 
 import { api, query } from "../api.js";
 import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel } from "../panels.js";
+import { emptyPanel, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const PAGE_SIZE = 30;
 // The most notes the route reads at once (MemoriesQuery in server/views.py).
 const MOST_READ = 200;
+// The most notes read through to narrow them to a filter, the newest first: the route has no filter of its own.
+const MOST_FILTERED = 2000;
 const SEARCH_LIMIT = 30;
+// The most hits the search route gives (SearchQuery in server/views.py): a filter on a search takes them all.
+const SEARCH_MOST = 50;
 const SEARCH_DELAY_MS = 250;
 const STRONG_MATCH = 0.75;
 const PREVIEW_CHARS = 420;
 const QUOTE_CHARS = 160;
+
+// What the notes can be narrowed to, by what each carries: its tags and whether the run that saved it had read outside
+// content. A lesson is a note tagged "lesson" (agent/lessons.py); "preference" and "preferences" are the tags the page's own
+// example uses.
+const FILTERS = [
+  { id: "all", label: "All", hint: "Every note" },
+  { id: "lessons", label: "Lessons", hint: "The notes tagged lesson: what a run learned" },
+  { id: "preferences", label: "Preferences", hint: "The notes tagged preference or preferences" },
+  { id: "outside", label: "From outside content", hint: "The notes saved while a run read content third parties can author" },
+];
+const FILTER_TESTS = {
+  all: () => true,
+  lessons: (record) => record.tags.includes("lesson"),
+  preferences: (record) => record.tags.some((tag) => tag === "preference" || tag === "preferences"),
+  outside: (record) => record.tainted,
+};
+// What an empty filter says about itself.
+const FILTER_EMPTY = {
+  lessons: "A note tagged lesson shows here: Dot writes one when a run taught it something.",
+  preferences: "Tag a note preference or preferences and it shows here.",
+  outside: "A note saved while a run read content third parties can author shows here.",
+};
 
 /** "work, Mac ,work" becomes ["work", "Mac"]: trimmed, without blanks or repeats. */
 function parseTags(text) {
@@ -28,18 +55,23 @@ function parseTags(text) {
   return tags;
 }
 
+/** `text` as text nodes, with what stands between backticks in code type: nodes to put in an element, never markup. */
+export function codeText(text) {
+  return text.split(/`([^`\n]+)`/).map((part, index) => (index % 2 === 1 ? el("code", { class: "mono" }, part) : part));
+}
+
 /** The words of a note; a long note shows its beginning, with a button to read the rest. */
 function noteText(text) {
   const preview = `${text.slice(0, PREVIEW_CHARS)}…`;
   if (text.length <= PREVIEW_CHARS) {
-    return el("div", { class: "row-text" }, text);
+    return el("div", { class: "note-text" }, codeText(text));
   }
   let expanded = false;
-  const body = el("div", { class: "row-text" }, preview);
-  const toggle = el("button", { class: "btn ghost sm", type: "button" }, "Show more");
+  const body = el("div", { class: "note-text" }, codeText(preview));
+  const toggle = el("button", { class: "note-fold", type: "button" }, "Show more");
   toggle.addEventListener("click", () => {
     expanded = !expanded;
-    body.textContent = expanded ? text : preview;
+    body.replaceChildren(...codeText(expanded ? text : preview));
     toggle.textContent = expanded ? "Show less" : "Show more";
   });
   return el("div", null, body, toggle);
@@ -60,20 +92,25 @@ export function scoreLine(score) {
 // The agents by id, from the page, so a lesson can say whose it is.
 let agentNames = {};
 
-/** Who wrote a note, whose lesson it is and how often runs used it. */
-function provenance(record) {
-  const whose = record.agent_id === null ? null : el("span", null, `${agentNames[record.agent_id] ?? "An agent"}'s`);
-  const author =
+/** When a note was saved and by whom: "Saved 2h ago by a run" (the run's name leads to it), by the nightly reflection, or by you. */
+function savedLine(record) {
+  const by =
     record.source_run === "reflection"
-      ? el("span", null, "Written by the nightly reflection")
+      ? " by the nightly reflection"
       : record.source_run
-        ? el("a", { href: `#/runs/${record.source_run}` }, "Saved by a run")
-        : el("span", null, "You wrote it");
+        ? [" by ", el("a", { href: `#/runs/${record.source_run}` }, "a run")]
+        : " by you";
+  return el("span", { title: dateTimeFull(record.created_at) }, "Saved ", ago(record.created_at), by);
+}
+
+/** Whose lesson a note is, and how often runs used it. */
+function usedLine(record) {
+  const whose = record.agent_id === null ? null : el("span", null, `${agentNames[record.agent_id] ?? "An agent"}'s lesson`);
   const used =
     record.used_count > 0
-      ? el("span", { title: dateTimeFull(record.last_used_at) }, `Used ${plural(record.used_count, "time", "times")}, last ${ago(record.last_used_at)}`)
-      : el("span", null, "Not used yet");
-  return [whose, author, used];
+      ? el("span", { title: dateTimeFull(record.last_used_at) }, `used ${plural(record.used_count, "time", "times")}, last ${ago(record.last_used_at)}`)
+      : el("span", null, "not used yet");
+  return [whose, used];
 }
 
 /**
@@ -121,7 +158,7 @@ function editForm(record, onSave, onCancel) {
  * row is a search hit; `actions` is `{ forget(record), edit(record, content, tags) }`.
  */
 function memoryRow({ record, similarity, score }, actions) {
-  const row = el("div", { class: "list-row", dataset: { memory: record.id } });
+  const row = el("div", { class: "note-row", dataset: { memory: record.id } });
   const forget = el(
     "button",
     {
@@ -139,36 +176,29 @@ function memoryRow({ record, similarity, score }, actions) {
       ? null
       : el("span", { class: `badge ${similarity >= STRONG_MATCH ? "b-ok" : "b-muted"}` }, `${Math.round(similarity * 100)}% match`);
   function showNote() {
+    const [whose, used] = usedLine(record);
     row.replaceChildren(
       el(
         "div",
-        { class: "row-main" },
+        { class: "note-main" },
         noteText(record.content),
         el(
           "div",
-          { class: "row-meta note-meta" },
+          { class: "note-meta" },
           record.tags.map((tag) => el("span", { class: "chip" }, tag)),
           match,
           record.tainted
             ? el(
                 "span",
                 { class: "badge b-warn", title: "The run that saved it had read content third parties can author." },
-                "Saved while reading outside content",
+                icon("alert"),
+                "From outside content",
               )
             : null,
-          el(
-            "span",
-            { class: "when-line" },
-            ...joined([
-              el("span", { title: dateTimeFull(record.created_at) }, `Saved ${ago(record.created_at)}`),
-              ...lifespan(record),
-              ...provenance(record),
-              scoreLine(score),
-            ]),
-          ),
+          el("span", { class: "note-when" }, ...joined([whose, savedLine(record), ...lifespan(record), used, scoreLine(score)])),
         ),
       ),
-      el("div", { class: "row-actions" }, edit, forget),
+      el("div", { class: "note-actions" }, edit, forget),
     );
   }
   edit.addEventListener("click", () => {
@@ -207,9 +237,9 @@ function outcomeNodes(saved, actions) {
     nodes.push(
       el(
         "div",
-        { class: "stack tight", dataset: { similar: "yes" } },
+        { class: "note-similar", dataset: { similar: "yes" } },
         el("div", { class: "note warn" }, icon("alert"), el("span", null, "Similar notes exist. Forget the ones that this note replaces:")),
-        el("div", { class: "card" }, saved.similar.map((hit) => memoryRow(hit, actions))),
+        setCard(...saved.similar.map((hit) => memoryRow(hit, actions))),
       ),
     );
   }
@@ -223,6 +253,13 @@ export function mount(root, ctx) {
   let hits = [];
   let total = 0;
   let shownQuery = "";
+  // What `hits` is: the notes read a page at a time ("list"), the notes read through and narrowed to a filter, of which
+  // `drawn` show ("filtered"), or what a search found ("search").
+  let mode = "list";
+  let drawn = PAGE_SIZE;
+  // How many notes were read through to narrow them, when that was fewer than the notes there are.
+  let lookedAt = 0;
+  let filter = "all";
   // The ids of the listed notes that rest: no run was handed them for [memory] rest_days, or the reflection retired
   // them. They are listed apart; a search still finds them.
   let resting = new Set();
@@ -231,51 +268,75 @@ export function mount(root, ctx) {
     class: "textarea",
     rows: "3",
     maxlength: "20000",
-    placeholder: "For example: I prefer short answers, and my invoices live in ~/Documents/Invoices.",
+    placeholder: "Remember something… e.g. I prefer short answers, and my invoices live in ~/Documents/Invoices.",
     "aria-label": "Note",
   });
-  const tags = el("input", { class: "input", type: "text", autocomplete: "off", placeholder: "work, preferences", "aria-label": "Tags" });
+  const tags = el("input", {
+    class: "input",
+    type: "text",
+    autocomplete: "off",
+    placeholder: "work, preferences",
+    title: "Optional, separated by commas",
+    "aria-label": "Tags",
+  });
   const add = el("button", { class: "btn primary", type: "button" }, icon("plus"), "Remember");
-  const outcome = el("div", { class: "stack tight", hidden: true });
+  const outcome = el("div", { class: "note-outcome", hidden: true });
   const search = el("input", {
     class: "input",
     type: "search",
     autocomplete: "off",
     spellcheck: "false",
     maxlength: "500",
-    placeholder: "Search notes…",
+    placeholder: "Search notes",
     "aria-label": "Search notes",
   });
-  const count = el("div", { class: "hint" });
-  const holder = el("div", null, loadingPanel());
-  const more = el("button", { class: "btn", type: "button", hidden: true }, "Load more");
-  const awakeCard = el("div", { class: "list-box" });
+  const count = el("span", { class: "note-count" });
+  const holder = el("div", null, inlineLoading());
+  const more = el("button", { class: "note-more", type: "button" }, "Show more notes");
+  const lookedNote = el("p", { class: "note-looked", hidden: true });
+  const foot = el("div", { class: "note-foot", hidden: true }, lookedNote, more);
+  const awakeRows = el("div", { class: "note-rows" });
   // The hint under the name, on a line of its own: beside it, a hint longer than the row left the name no room.
   const restingHead = el(
     "div",
-    { class: "section-head", dataset: { resting: "" } },
-    el("div", { class: "section-label" }, "Resting"),
+    { class: "note-rest-head", dataset: { resting: "" } },
+    el("div", { class: "note-rest-title" }, "Resting"),
     el(
       "div",
-      { class: "hint" },
+      { class: "set-row-lead" },
       "Runs no longer start with these: no run was handed them lately, they did not help, their time ran out, or another note replaced them. A search still finds the ones with no rest tag that have not run out.",
     ),
   );
-  const restingCard = el("div", { class: "list-box" });
+  const restingRows = el("div", { class: "note-rows" });
   // The note a line of a conversation leads to (item 313), named in the address after the tab's name: shown first, to be
   // read, changed or forgotten there; a note forgotten since is said to be gone.
   const askedId = new URLSearchParams(location.hash.split("?")[1] ?? "").get("note") ?? "";
-  const asked = el("div", { class: "stack tight", hidden: true, dataset: { asked: "" } });
+  const asked = el("div", { hidden: true, dataset: { asked: "" } });
   // The rows painted, by note id, with the hit each shows: a paint keeps the row of a note that did not change, so that
   // the page keeps its place and a note being corrected its form (item 204).
   let rowsShown = new Map();
 
+  function countText() {
+    if (shownQuery !== "") {
+      return `${plural(hits.length, "result", "results")} for “${clip(shownQuery, 40)}”`;
+    }
+    return mode === "filtered" ? `${hits.length} of ${total}` : String(total);
+  }
+
+  /** Whether the notes the page can show are all drawn: a search shows what it found, a list what it has read. */
+  function allDrawn() {
+    if (mode === "search") {
+      return true;
+    }
+    return mode === "filtered" ? drawn >= hits.length : hits.length >= total;
+  }
+
   function paint() {
-    count.textContent =
-      shownQuery === ""
-        ? plural(total, "note", "notes")
-        : `${plural(hits.length, "result", "results")} for “${clip(shownQuery, 40)}”`;
-    more.hidden = shownQuery !== "" || hits.length >= total;
+    count.textContent = countText();
+    lookedNote.hidden = !(mode === "filtered" && lookedAt < total);
+    lookedNote.textContent = `Looked through the newest ${lookedAt} of ${total} notes.`;
+    more.hidden = allDrawn();
+    foot.hidden = more.hidden && lookedNote.hidden;
     const rows = new Map();
     const rowOf = (hit) => {
       const shown = JSON.stringify(hit);
@@ -284,17 +345,20 @@ export function mount(root, ctx) {
       rows.set(hit.record.id, { shown, row });
       return row;
     };
-    const awake = hits.filter((hit) => !resting.has(hit.record.id)).map(rowOf);
-    const asleep = hits.filter((hit) => resting.has(hit.record.id)).map(rowOf);
+    const drawing = mode === "filtered" ? hits.slice(0, drawn) : hits;
+    const awake = drawing.filter((hit) => !resting.has(hit.record.id)).map(rowOf);
+    const asleep = drawing.filter((hit) => resting.has(hit.record.id)).map(rowOf);
     rowsShown = rows;
     if (hits.length > 0) {
-      placeChildren(awakeCard, awake);
-      placeChildren(restingCard, asleep);
-      placeChildren(holder, [...(awake.length > 0 ? [awakeCard] : []), ...(asleep.length > 0 ? [restingHead, restingCard] : [])]);
-    } else if (shownQuery === "") {
-      holder.replaceChildren(emptyPanel("brain", "Nothing remembered yet", "Add a note above, or ask Dot to remember something during a run."));
+      placeChildren(awakeRows, awake);
+      placeChildren(restingRows, asleep);
+      placeChildren(holder, [...(awake.length > 0 ? [awakeRows] : []), ...(asleep.length > 0 ? [restingHead, restingRows] : [])]);
+    } else if (shownQuery !== "") {
+      holder.replaceChildren(emptyPanel("search", "Nothing matches", filter === "all" ? "Try other words or a shorter query." : "Try other words, a shorter query or another filter."));
+    } else if (filter !== "all") {
+      holder.replaceChildren(emptyPanel("search", "No notes here", FILTER_EMPTY[filter]));
     } else {
-      holder.replaceChildren(emptyPanel("search", "Nothing matches", "Try other words or a shorter query."));
+      holder.replaceChildren(emptyPanel("brain", "Nothing remembered yet", "Add a note above, or ask Dot to remember something during a run."));
     }
   }
 
@@ -315,11 +379,33 @@ export function mount(root, ctx) {
   async function reload() {
     const mine = ++ticket;
     const text = search.value.trim();
+    const narrowed = filter !== "all";
+    const passes = FILTER_TESTS[filter];
     try {
-      if (text === "") {
+      if (text !== "") {
+        const found = await api.get(`/memories/search${query({ q: text, limit: narrowed ? SEARCH_MOST : SEARCH_LIMIT })}`);
+        if (disposed || mine !== ticket) {
+          return;
+        }
+        hits = found.filter((hit) => passes(hit.record));
+        total = hits.length;
+        resting = new Set();
+        mode = "search";
+      } else if (narrowed) {
+        const listed = await readList(MOST_FILTERED);
+        if (disposed || mine !== ticket) {
+          return;
+        }
+        agentNames = listed.agents;
+        hits = listed.items.filter(passes).map((record) => ({ record, similarity: null, score: listed.scores[record.id] }));
+        total = listed.total;
+        lookedAt = listed.items.length;
+        resting = new Set(listed.resting);
+        mode = "filtered";
+      } else {
         // After a change the list reads again as many notes as it showed, so that it keeps its length and the page its
-        // place (item 204); a first read, or one after a search, takes a page.
-        const listed = await readList(shownQuery === "" ? Math.max(PAGE_SIZE, hits.length) : PAGE_SIZE);
+        // place (item 204); a first read, or one after a search or a filter, takes a page.
+        const listed = await readList(mode === "list" ? Math.max(PAGE_SIZE, hits.length) : PAGE_SIZE);
         if (disposed || mine !== ticket) {
           return;
         }
@@ -327,14 +413,7 @@ export function mount(root, ctx) {
         hits = listed.items.map((record) => ({ record, similarity: null, score: listed.scores[record.id] }));
         total = listed.total;
         resting = new Set(listed.resting);
-      } else {
-        const found = await api.get(`/memories/search${query({ q: text, limit: SEARCH_LIMIT })}`);
-        if (disposed || mine !== ticket) {
-          return;
-        }
-        hits = found;
-        total = found.length;
-        resting = new Set();
+        mode = "list";
       }
       shownQuery = text;
       paint();
@@ -344,13 +423,13 @@ export function mount(root, ctx) {
       }
       console.error("the notes could not be loaded", error);
       count.textContent = "";
-      more.hidden = true;
-      holder.replaceChildren(errorPanel(error, () => attempt(retry)));
+      foot.hidden = true;
+      holder.replaceChildren(inlineError(error, () => attempt(retry)));
     }
   }
 
   async function retry() {
-    holder.replaceChildren(loadingPanel());
+    holder.replaceChildren(inlineLoading());
     await reload();
   }
 
@@ -361,17 +440,17 @@ export function mount(root, ctx) {
     let shown;
     try {
       const record = await api.get(`/memories/${encodeURIComponent(askedId)}`);
-      shown = el("div", { class: "card" }, memoryRow({ record, similarity: null, score: undefined }, rowActions));
+      shown = memoryRow({ record, similarity: null, score: undefined }, rowActions);
     } catch (error) {
       if (error.status !== 404) {
         throw error;
       }
-      shown = el("div", { class: "note" }, icon("info"), el("span", null, "This note is no longer in memory: it was forgotten since."));
+      shown = el("div", { class: "note note-gone" }, icon("info"), el("span", null, "This note is no longer in memory: it was forgotten since."));
     }
     if (disposed) {
       return;
     }
-    asked.replaceChildren(el("div", { class: "section-label" }, "The note from the conversation"), shown);
+    asked.replaceChildren(setSection({ title: "The note from the conversation", body: setCard(shown) }));
     asked.hidden = false;
   }
 
@@ -390,6 +469,16 @@ export function mount(root, ctx) {
     } finally {
       more.disabled = false;
     }
+  }
+
+  /** More notes: the next page of the list, or the next of the notes a filter kept, which are all read already. */
+  async function showMore() {
+    if (mode === "filtered") {
+      drawn += PAGE_SIZE;
+      paint();
+      return;
+    }
+    await loadMore();
   }
 
   async function forgetNote(record) {
@@ -469,8 +558,14 @@ export function mount(root, ctx) {
     }
   }, SEARCH_DELAY_MS);
 
+  const narrowing = segmented(FILTERS, filter, (id) => {
+    filter = id;
+    drawn = PAGE_SIZE;
+    attempt(reload);
+  });
+  narrowing.element.setAttribute("aria-label", "Show notes");
   add.addEventListener("click", () => attempt(save));
-  more.addEventListener("click", () => attempt(loadMore));
+  more.addEventListener("click", () => attempt(showMore));
   search.addEventListener("input", reloadSoon);
   content.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -485,7 +580,8 @@ export function mount(root, ctx) {
     }
   });
 
-  // What Dot knows about you (item 93): the reflection's lines, read-only, and your own lines, which you edit.
+  // What Dot knows about you (item 93): the reflection's lines, read-only, and your own lines, which you edit. Neither is
+  // drawn before it is read: a box left empty by a failed read would, saved, wipe the lines you wrote.
   const dotLines = el("ul", { class: "owner-lines" });
   const ownLines = el("textarea", {
     class: "textarea",
@@ -504,6 +600,7 @@ export function mount(root, ctx) {
     );
     ownLines.value = section.owner_lines.join("\n");
     ownerHint.textContent = section.updated_at > 0 ? `Updated ${ago(section.updated_at)}` : "";
+    ownerSection.hidden = false;
   }
   async function loadOwner() {
     paintOwner(await api.get("/memories/owner"));
@@ -518,11 +615,11 @@ export function mount(root, ctx) {
 
   // How Dot's learning fares (review O25): when the reflection, the lessons and the skills last went well, their
   // failures in a row with the last error, and why learning has stopped, if it has.
-  const learningLines = el("ul", { class: "owner-lines" });
+  const learningCard = setCard();
   const learningHint = el("span", { class: "hint" });
   // A work that was skipped, for there was nothing to learn from, leaves no mark: with neither a success nor a failure
   // recorded, it has not failed, so the line says only that there is nothing yet.
-  function learningLine(name, work) {
+  function learningRow(name, work) {
     const went =
       work.last_success !== null
         ? `last went well ${ago(work.last_success)}`
@@ -530,81 +627,64 @@ export function mount(root, ctx) {
           ? "nothing recorded yet"
           : "has not gone well yet";
     const failing = work.failures_in_row > 0 ? `; failed ${plural(work.failures_in_row, "time", "times")} in a row since: ${work.last_error}` : "";
-    return el("li", null, `${name}: ${went}${failing}`);
+    return setRow({ title: name, lead: `${went}${failing}` });
   }
   function paintLearning(view) {
-    learningLines.replaceChildren(
+    learningCard.replaceChildren(
       ...(view.health === null
-        ? [el("li", { class: "muted" }, "Nothing yet. The first reflection, or the lessons or skill of a run, start the record.")]
+        ? [setRow({ title: "Nothing yet", lead: "The first reflection, or the lessons or skill of a run, start the record." })]
         : [
-            learningLine("The nightly reflection", view.health.reflection),
-            learningLine("Lessons from runs", view.health.lessons),
-            learningLine("Skills from runs", view.health.playbooks),
+            learningRow("The nightly reflection", view.health.reflection),
+            learningRow("Lessons from runs", view.health.lessons),
+            learningRow("Skills from runs", view.health.playbooks),
             // A step that [harness] step_time keeps from running, with no record yet, is off, not failing.
             !view.harness_on && view.health.harness.last_success === null && view.health.harness.last_failure === null
-              ? el("li", null, "The nightly self-improvement: off. ", el("span", { class: "faint" }, "In the config file: [harness] step_time."))
-              : learningLine("The nightly self-improvement", view.health.harness),
+              ? setRow({
+                  title: "The nightly self-improvement",
+                  lead: el("span", null, "off. ", el("span", { class: "faint" }, "In the config file: [harness] step_time.")),
+                })
+              : learningRow("The nightly self-improvement", view.health.harness),
           ]),
     );
     learningHint.textContent = view.stalled === null ? "" : `Learning has stopped: ${view.stalled}`;
+    learningSection.hidden = false;
   }
   async function loadLearning() {
     paintLearning(await api.get("/memories/learning"));
   }
 
-  ctx.head.setLead("Notes that Dot keeps between runs. It recalls the ones that fit the task at hand.");
-  root.append(
-    asked,
-    el(
-      "div",
-      { class: "memory-layout" },
-      el(
-        "section",
-        { class: "card" },
-        el("div", { class: "card-head" }, el("span", { class: "grow" }, "Remember something")),
-        el(
-          "div",
-          { class: "card-pad stack" },
-          field("Note", content, "One fact, preference or instruction per note."),
-          field("Tags", tags, "Optional, separated by commas."),
-          el("div", { class: "row" }, el("span", { class: "hint" }, "⌘ / Ctrl + Enter"), el("span", { class: "spacer" }), add),
-          outcome,
-        ),
-      ),
-      el(
-        "section",
-        { class: "card notes-panel" },
-        el(
-          "div",
-          { class: "card-head" },
-          el("span", { class: "grow" }, "Notes"),
-          count,
-          search,
-        ),
-        holder,
-        el("div", { class: "card-pad row" }, more),
-      ),
-      el(
-        "section",
-        { class: "card" },
-        el("div", { class: "card-head" }, el("span", { class: "grow" }, "What Dot knows about you"), ownerHint),
-        el(
-          "div",
-          { class: "card-pad stack" },
-          el("div", { class: "field-label" }, "Learned by reflection"),
-          dotLines,
-          field("Your lines", ownLines, "Corrections and facts in your own words; Dot's lines above never contradict them."),
-          el("div", { class: "row" }, el("span", { class: "spacer" }), saveOwn),
-        ),
-      ),
-      el(
-        "section",
-        { class: "card learning-panel", dataset: { learning: "" } },
-        el("div", { class: "card-head" }, el("span", { class: "grow" }, "How learning fares"), learningHint),
-        el("div", { class: "card-pad" }, learningLines),
-      ),
-    ),
+  const composer = setCard(
+    content,
+    el("div", { class: "note-compose" }, el("label", { class: "note-tags" }, el("span", { class: "note-tags-label" }, "Tags"), tags), el("span", { class: "note-compose-hint", title: "⌘ or Ctrl + Enter keeps the note" }, "One fact per note · ⌘↵"), add),
+    outcome,
   );
+  composer.classList.add("note-composer");
+  const notesSection = setSection({
+    title: ["Notes", count],
+    actions: el("div", { class: "note-tools" }, narrowing.element, el("label", { class: "note-search" }, icon("search"), search)),
+    body: el("div", { class: "set-card note-card" }, holder, foot),
+  });
+  notesSection.classList.add("notes-section");
+  const ownerSection = setSection({
+    title: "What Dot knows about you",
+    actions: ownerHint,
+    body: setCard(
+      setRow({ title: "Learned by reflection", body: dotLines }),
+      setRow({
+        title: "Your lines",
+        lead: "Corrections and facts in your own words; Dot's lines above never contradict them.",
+        body: el("div", { class: "owner-edit" }, ownLines, el("div", { class: "owner-save" }, saveOwn)),
+      }),
+    ),
+  });
+  ownerSection.hidden = true;
+  const learningSection = setSection({ title: "How learning fares", actions: learningHint, body: learningCard });
+  learningSection.hidden = true;
+  learningSection.dataset.learning = "";
+  learningSection.classList.add("learning-section");
+
+  ctx.head.setLead("Notes Dot keeps between runs. It recalls the ones that fit the task at hand.");
+  root.append(asked, el("div", { class: "set-sections" }, composer, notesSection, ownerSection, learningSection));
   attempt(reload);
   attempt(loadAsked);
   attempt(loadOwner);
