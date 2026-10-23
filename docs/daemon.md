@@ -528,16 +528,17 @@ daemon's facts in four groups each named over its rows of a label and a value (i
 it works with and its models), the permissions and the ways to **Diagnostics** and **Open source licences**, pages of
 their own). Which folds are open is kept in the browser. A card that folds keeps its head on its ground, so that
 folded it is a row of the page, as a group of the health checks is (item 576).
-In a Mac's window the sidebar is the settings' nav while they are open (item 562):
-**Back to chats** (to the chat last open), the tabs in four groups (Interface, Models, How Dot works, This Mac), each
-with what it holds at its right (the main model, how many providers have a key, how many notes Dot keeps, a green dot
-when a phone reaches Dot), and at the foot whether the daemon runs and for how long (the emergency stop, when it is
-engaged). The page is the open tab alone, in a column of 920 px under its own name and the line that says what it is
-for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On
-a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
-phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
-the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
-the box by both Command keys pressed together: see below.
+In a Mac's window the sidebar is the settings' nav while they are open (item 562): **Back to chats** (to the chat last
+open; in the desktop app under the traffic lights, whose row holds the button that hides the sidebar where the chats'
+head holds it, item 577) and the tabs in four groups (Interface, Models, How Dot works, This Mac), each with what it
+holds at its right (the main model, how many providers have a key, how many notes Dot keeps, a green dot when a phone
+reaches Dot); whether the daemon answers and the emergency stop are the page's, as on every page. The page is the open
+tab alone, in a column of 920 px under its own name and the line that says what it is for, each section a name over a
+card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On a phone they are a list in
+groups whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)).
+The earlier addresses of the memory, rules and system pages lead to their tabs, and the schedules' tab
+(`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into the box by both
+Command keys pressed together: see below.
 
 **Dot's first conversation** (item 420). On a first open, while Dot has not introduced itself (`[assistant] introduced`)
 and there is no chat yet, New chat shows Dot's first conversation in the place of the greeting, over the composer, with
@@ -891,7 +892,8 @@ the agent itself.
 - **One interface.** The window is the web UI at the size the screenshot tour reviews (1280 × 860, down to a
   phone's 390 wide). The system draws only the traffic lights over the page, on the centre line of the top bars with
   room above and below them; the page keeps room for them in the sidebar's head, as tall as the top bar so that its
-  button stands on the same line, or in the top bar while the sidebar is away, and the window drags by those bars.
+  button stands on the same line (the settings' nav has the same head, with Back to chats under it, item 577), or in
+  the top bar while the sidebar is away, and the window drags by those bars.
   The themes, the colour scheme and the density are the web UI's own settings.
 - **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults without
   that file) and the token from the token file under the home directory, and opens the UI with the token in the

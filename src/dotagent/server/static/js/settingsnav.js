@@ -1,10 +1,10 @@
-// The sidebar while the settings are open (item 562): Back to chats, the tabs in their groups with what each holds (the
-// main model, how many providers are signed in, how many notes Dot keeps, whether a phone reaches Dot), and at the foot
-// whether the daemon is running. sidebar.js shows it in the place of the chats and its pages (a Mac's window; a phone has
-// the list of tabs for a page of its own, views/settings.js).
+// The sidebar while the settings are open (item 562): Back to chats and the tabs in their groups with what each holds
+// (the main model, how many providers are signed in, how many notes Dot keeps, whether a phone reaches Dot). sidebar.js
+// shows it in the place of the chats and its pages (a Mac's window; a phone has the list of tabs for a page of its own,
+// views/settings.js). The daemon's state is the page's (shell.js): the connection, and the emergency stop's banner.
 
 import { api, query } from "./api.js";
-import { duration, el, modelName, setText } from "./dom.js";
+import { el, modelName, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { readPref } from "./prefs.js";
 import { GROUPS, TABS, tabAt } from "./settingstabs.js";
@@ -12,7 +12,6 @@ import { getSnapshot, onChange } from "./state.js";
 
 // The chat the owner was on last, which main.js keeps; Back to chats leads there.
 const LAST_CHAT_KEY = "dot.lastChat";
-const UPTIME_REFRESH_MS = 30_000;
 // What the phone needs asked of Tailscale is read again no sooner than this: a tab's visit should not ask it each time.
 const PHONE_FRESH_MS = 60_000;
 
@@ -39,17 +38,17 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
       group.tabs.map((id) => links.get(id)),
     ),
   );
-  const statusDot = el("span", { class: "settings-status-dot", "aria-hidden": "true" });
-  const statusTitle = el("span", { class: "settings-status-title" });
-  const statusLine = el("span", { class: "settings-status-line" });
-  const status = el("div", { class: "settings-status", role: "status" }, statusDot, el("div", { class: "settings-status-text" }, statusTitle, statusLine));
+  // Inside the desktop shell (item 88) the window's traffic lights stand at the top left: the first row is theirs, with
+  // the button that hides the sidebar beside them where the chats' head holds it (items 113 and 134), and Back to chats
+  // stands under it (item 577). In a browser the two share the row.
+  const lights = document.documentElement.dataset.shell === "desktop";
   const element = el(
     "nav",
     { class: "settings-nav", "aria-label": "Settings" },
-    el("div", { class: "settings-nav-top" }, back, hide),
+    el("div", { class: "settings-nav-top", "data-tauri-drag-region": "" }, lights ? hide : [back, hide]),
+    lights ? back : null,
     el("h2", { class: "settings-nav-title" }, "Settings"),
     el("div", { class: "settings-nav-groups" }, groups),
-    status,
   );
 
   let disposed = false;
@@ -66,28 +65,8 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
     }
   }
 
-  function paintStatus(snapshot) {
-    const daemon = snapshot.status;
-    if (daemon === null || snapshot.stream !== "live") {
-      statusDot.dataset.state = "wait";
-      setText(statusTitle, snapshot.stream === "live" ? "Reading Dot" : "Dot is not answering");
-      setText(statusLine, snapshot.stream === "live" ? "" : "Reconnecting to the daemon");
-      return;
-    }
-    if (daemon.failsafe_engaged) {
-      statusDot.dataset.state = "bad";
-      setText(statusTitle, "Emergency stop is on");
-      setText(statusLine, "Desktop control is blocked");
-      return;
-    }
-    statusDot.dataset.state = "ok";
-    setText(statusTitle, "Dot is running");
-    setText(statusLine, `Daemon up ${duration(Math.max(0, Date.now() / 1000 - daemon.started_at))}`);
-  }
-
   function paintModel(snapshot) {
     setText(values.get("models"), snapshot.status === null ? "" : modelName(snapshot.status.models.main));
-    paintStatus(snapshot);
   }
 
   /** What the tabs hold, read from the daemon each time the nav is shown or the tab changes; one that cannot be read leaves its place empty. */
@@ -117,7 +96,6 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
   paintCurrent();
   paintModel(getSnapshot());
   const stopChange = onChange(paintModel);
-  const ticker = setInterval(() => paintStatus(getSnapshot()), UPTIME_REFRESH_MS);
 
   return {
     element,
@@ -134,7 +112,6 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
     dispose() {
       disposed = true;
       stopChange();
-      clearInterval(ticker);
     },
   };
 }

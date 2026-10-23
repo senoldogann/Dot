@@ -867,8 +867,9 @@
    window puts them (item 134, desktop/src-tauri/src/lib.rs): centred 26 px under the top edge, the centre line of the
    top bars' 52 px rows, and ending 80 px from the left. The sidebar's head keeps 96 px of room for them, and so does
    the top bar when the sidebar is away (closed, or a drawer); the head is as tall as the bar, so the button that folds
-   the sidebar stands on the lights' line, as the bar's buttons do. */
-:root[data-shell="desktop"] .side-head {
+   the sidebar stands on the lights' line, as the bar's buttons do. The settings' nav has a head of its own, the same
+   (item 577). */
+:root[data-shell="desktop"] :is(.side-head, .settings-nav-top) {
   box-sizing: border-box;
   height: 52px;
   min-height: 0;
@@ -1094,6 +1095,20 @@
   text-decoration: none;
 }
 
+/* In the desktop shell the nav's first row is its head, the lights' (item 577, above): it runs from the sidebar's top
+   to its edges, and Back to chats stands under it, as wide as its words (settingsnav.js). */
+:root[data-shell="desktop"] .settings-nav {
+  padding-top: 0;
+}
+
+:root[data-shell="desktop"] .settings-nav-top {
+  margin-inline: -8px;
+}
+
+.settings-nav > .settings-back {
+  align-self: flex-start;
+}
+
 .settings-nav-title {
   margin: 4px 0 20px;
   padding: 0 12px;
@@ -1178,55 +1193,11 @@
   color: var(--text-2);
 }
 
-.settings-nav-dot,
-.settings-status-dot {
+.settings-nav-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   flex: none;
   border-radius: var(--radius-pill);
   background: var(--ok);
-}
-
-/* The daemon, at the foot: a card a hairline frames, whose dot says how it is. */
-.settings-status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-}
-
-.settings-status-dot[data-state="wait"] {
-  background: var(--warn);
-}
-
-.settings-status-dot[data-state="bad"] {
-  background: var(--bad);
-}
-
-.settings-status-text {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.settings-status-title {
-  font-size: var(--text-ui);
-  line-height: var(--leading-ui);
-  font-weight: var(--weight-label);
-  color: var(--text);
-}
-
-.settings-status-line {
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
-  color: var(--muted);
-}
-
-.settings-status-line:empty {
-  display: none;
 }
