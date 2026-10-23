@@ -10,6 +10,7 @@ import {
   localVoice,
   problemWords,
   sentenceChunks,
+  voicePlace,
   spokenText,
   transcriptOf,
 } from "../../src/dotagent/server/static/js/voice.js";
@@ -19,8 +20,11 @@ function heard(transcript, isFinal) {
   return Object.assign([{ transcript, confidence: 0.9 }], { isFinal });
 }
 
-test("the voice follows the page's language unless one is chosen", () => {
-  assert.equal(languageTag("page", "tr", "en-US"), "tr");
+test("the voice follows the page's language unless one is chosen, a bare language given its region", () => {
+  // Item 593: Chrome's recognition can hear nothing in a tag without its region.
+  assert.equal(languageTag("page", "tr", "en-US"), "tr-TR");
+  assert.equal(languageTag("page", "en", "tr-TR"), "en-US");
+  assert.equal(languageTag("page", "pt", ""), "pt");
   assert.equal(languageTag("page", "", "fi-FI"), "fi-FI");
   assert.equal(languageTag("page", "", ""), "en-US");
   assert.equal(languageTag("tr-TR", "en", "en-US"), "tr-TR");
@@ -47,14 +51,39 @@ test("the box holds what it held, then the words heard, and says where the words
   assert.equal(dictated("kept", "one two", "").value, "kept one two");
 });
 
-test("an error of the engine says what to do, and the owner's own stop and a silence say nothing", () => {
-  assert.match(problemWords("not-allowed"), /not allowed the microphone/);
-  assert.equal(problemWords("service-not-allowed"), problemWords("not-allowed"));
-  assert.match(problemWords("audio-capture"), /No microphone/);
-  assert.match(problemWords("language-not-supported"), /choose another/);
-  assert.equal(problemWords("no-speech"), null);
-  assert.equal(problemWords("aborted"), null);
-  assert.equal(problemWords("something-new"), "Speech recognition stopped: something-new.");
+test("the place the microphone's words name: Dot.app, a Mac's browser, or a phone's and any other", () => {
+  const mac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15";
+  assert.equal(voicePlace("desktop", mac, 0), "app");
+  assert.equal(voicePlace(undefined, mac, 0), "mac");
+  // An iPad that asks for the desktop's pages says it is a Mac, with a touch screen.
+  assert.equal(voicePlace(undefined, mac, 5), "other");
+  assert.equal(voicePlace(undefined, "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari", 5), "other");
+});
+
+test("an error of the engine says what to do where the page is, and the owner's own stop says nothing", () => {
+  assert.match(problemWords("not-allowed", "mac"), /The browser has not allowed the microphone/);
+  assert.match(problemWords("not-allowed", "mac"), /System Settings › Privacy & Security › Microphone/);
+  // Item 593: in Dot.app macOS gives the microphone, not a browser; macOS Dictation types into the box meanwhile.
+  assert.match(problemWords("not-allowed", "app"), /^macOS has not given Dot the microphone/);
+  for (const place of ["app", "mac"]) {
+    assert.match(problemWords("not-allowed", place), /macOS Dictation types into the box/);
+  }
+  // A phone has no System Settings nor Fn key: its words name its own settings and its keyboard's microphone.
+  for (const code of ["not-allowed", "no-speech", "audio-capture"]) {
+    assert.doesNotMatch(problemWords(code, "other"), /System Settings|Fn|macOS/);
+  }
+  assert.match(problemWords("not-allowed", "other"), /keyboard's own microphone/);
+  for (const place of ["app", "mac", "other"]) {
+    assert.equal(problemWords("service-not-allowed", place), problemWords("not-allowed", place));
+    assert.match(problemWords("audio-capture", place), /No microphone/);
+    assert.match(problemWords("language-not-supported", place), /choose another/);
+    assert.equal(problemWords("aborted", place), null);
+  }
+  // Nothing heard says so, and what to check: a microphone kept from the app or the browser looks like a silence.
+  assert.match(problemWords("no-speech", "mac"), /^Nothing was heard\. Check that the browser may use the microphone/);
+  assert.match(problemWords("no-speech", "app"), /^Nothing was heard\. Check that Dot may use the microphone/);
+  assert.match(problemWords("no-speech", "other"), /^Nothing was heard\. Check that the browser may use the microphone/);
+  assert.equal(problemWords("something-new", "mac"), "Speech recognition stopped: something-new.");
 });
 
 test("an answer is read without its code, its marks and its addresses", () => {

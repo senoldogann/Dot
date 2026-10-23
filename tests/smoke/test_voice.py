@@ -251,7 +251,8 @@ async def test_the_microphone_fills_the_box_as_the_owner_speaks_and_nothing_is_s
         await mic.click()
         await expect(mic).to_have_attribute("aria-pressed", "true")
         await expect(mic).to_have_attribute("aria-label", "Stop dictating")
-        assert await _voice(page, "[voice.starts, voice.langs[0]]") == [1, "en"]
+        # The page's language, given its region (item 593).
+        assert await _voice(page, "[voice.starts, voice.langs[0]]") == [1, "en-US"]
         # The engine is asked for what makes a dictation: the session goes on and the words come as they are heard.
         assert await _voice(page, "[voice.recognitions[0].continuous, voice.recognitions[0].interimResults]") == [
             True,
@@ -333,22 +334,74 @@ async def test_the_microphone_stops_by_itself_after_a_silence(browser: Browser, 
     await expect(mic).to_have_attribute("aria-pressed", "false")
     assert await _voice(page, "[voice.stops, voice.aborts]") == [1, 0]
     await expect(page.locator(GOAL)).to_have_value("a few words")
+    # It heard words, so it says nothing of a silence (item 593).
+    await expect(page.locator(".toast")).to_have_count(0)
     await page.context.close()
 
 
-async def test_a_microphone_the_browser_refuses_says_so_and_a_silence_says_nothing(
+async def test_a_microphone_the_browser_refuses_says_so_and_so_does_a_dictation_that_heard_nothing(
     browser: Browser, address: str
 ) -> None:
+    """Item 593: the owner spoke in Chrome and nothing came, without a word of why: a dictation that hears nothing says
+    so and what to check; one the owner stops says nothing."""
     page: Page = await _open(browser, address, 1280)
     mic: Locator = _microphone(page)
     await mic.click()
     await page.evaluate("() => window.__voice.fail('no-speech')")
     await expect(mic).to_have_attribute("aria-pressed", "false")
+    await expect(page.locator(".toast.error")).to_contain_text("Nothing was heard. Check that the browser may use")
+    await page.locator(".toast").first.click()
+    await mic.click()
+    await mic.click()
+    await expect(mic).to_have_attribute("aria-pressed", "false")
     await expect(page.locator(".toast")).to_have_count(0)
     await mic.click()
     await page.evaluate("() => window.__voice.fail('not-allowed')")
     await expect(mic).to_have_attribute("aria-pressed", "false")
-    await expect(page.locator(".toast.error")).to_contain_text("has not allowed the microphone")
+    await expect(page.locator(".toast.error")).to_contain_text("The browser has not allowed the microphone")
+    await expect(page.locator(".toast.error")).to_contain_text("macOS Dictation types into the box")
+    await page.context.close()
+
+
+async def test_on_a_phone_a_refused_microphone_names_no_mac_setting(browser: Browser, address: str) -> None:
+    """Item 593's review: an iPhone has no System Settings nor Fn key; its words name the browser's and the device's
+    settings and the keyboard's own microphone."""
+    context: BrowserContext = await browser.new_context(
+        viewport={"width": 390, "height": 844},
+        has_touch=True,
+        is_mobile=True,
+        user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1",
+    )
+    await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    await context.add_init_script(_STAND_INS)
+    page: Page = await context.new_page()
+    await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+    mic: Locator = _microphone(page)
+    await mic.click()
+    await page.evaluate("() => window.__voice.fail('not-allowed')")
+    toast: Locator = page.locator(".toast.error")
+    await expect(toast).to_contain_text("in the device's settings")
+    await expect(toast).to_contain_text("The keyboard's own microphone types into the box")
+    await expect(toast).not_to_contain_text("System Settings")
+    await expect(toast).not_to_contain_text("Fn")
+    await context.close()
+
+
+async def test_in_dot_app_a_refused_microphone_names_macos_and_dot_not_a_browser(
+    browser: Browser, address: str
+) -> None:
+    """Item 593, from the owner's screenshot of Dot.app: its toast said "the browser" there. In the desktop shell it
+    says that macOS has not given Dot the microphone, where to allow it, and that macOS Dictation types meanwhile."""
+    page: Page = await _open(browser, address, 1280, f"window.__TAURI__ = {{}};\n{_STAND_INS}")
+    await expect(page.locator("html")).to_have_attribute("data-shell", "desktop")
+    mic: Locator = _microphone(page)
+    await mic.click()
+    await page.evaluate("() => window.__voice.fail('not-allowed')")
+    toast: Locator = page.locator(".toast.error")
+    await expect(toast).to_contain_text("macOS has not given Dot the microphone or its speech recognition")
+    await expect(toast).to_contain_text("Privacy & Security › Microphone and Speech Recognition")
+    await expect(toast).to_contain_text("macOS Dictation types into the box")
+    await expect(toast).not_to_contain_text("browser")
     await page.context.close()
 
 
@@ -420,7 +473,7 @@ async def test_the_speaker_of_an_answer_reads_it_again_or_stops_it_and_an_answer
     await expect(speaker).to_have_attribute("aria-pressed", "false")
     await speaker.click()
     spoken = await _voice(page, "voice.spoken")
-    assert spoken == [{"text": "Done. The report is in the folder.", "lang": "en"}]
+    assert spoken == [{"text": "Done. The report is in the folder.", "lang": "en-US"}]
     stop: Locator = answer.get_by_role("button", name="Stop reading")
     await expect(stop).to_have_attribute("aria-pressed", "true")
     await stop.click()

@@ -9,17 +9,24 @@ const SILENCE_MS = 6000;
 // The most characters of an answer one utterance holds: some browsers stop a long one in the middle.
 const CHUNK_CHARS = 220;
 
-/** The tag the voice speaks and listens in for `choice` (a language's id, or "page"): the page's language, else the browser's, else English. */
+// The region a language's bare tag is listened in (item 593): Chrome's recognition can hear nothing in a tag without one.
+const REGIONS = { en: "en-US", tr: "tr-TR", fi: "fi-FI", sv: "sv-SE", de: "de-DE", fr: "fr-FR", es: "es-ES" };
+
+/** The tag the voice speaks and listens in for `choice` (a language's id, or "page"): the page's language, else the
+ * browser's, else English, a bare language given its region ("tr" listens as "tr-TR"). */
 export function languageTag(choice, pageLang, browserLang) {
   if (choice !== "page") {
     return choice;
   }
-  return pageLang || browserLang || "en-US";
+  const tag = pageLang || browserLang || "en-US";
+  return REGIONS[tag.toLowerCase()] ?? tag;
 }
 
 // ----- listening ---------------------------------------------------------------------------------------------------
 
-/** The browser's speech recognition, or null where it has none (Firefox, the desktop shell). */
+/** The browser's speech recognition, or null where it has none (Firefox). Dot.app's web view has one too, WebKit's,
+ * which macOS lets hear only an app that asks for the microphone and speech recognition (item 594): an older Dot.app
+ * is refused (item 593). */
 function recognitionClass() {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 }
@@ -59,21 +66,60 @@ export function dictated(base, final, interim) {
   return { value, interimFrom: interim === "" ? null : value.length - interim.length };
 }
 
-// What an error of the recognition says to the owner; null for one that is not worth a word (nothing was said, or the
-// owner stopped it).
-const PROBLEMS = {
-  "not-allowed": "The browser has not allowed the microphone, or its speech recognition, on this page. Allow it in the browser's settings for this address.",
-  "service-not-allowed": "The browser has not allowed the microphone, or its speech recognition, on this page. Allow it in the browser's settings for this address.",
-  "audio-capture": "No microphone was found.",
-  network: "The browser's speech recognition could not be reached.",
-  "language-not-supported": "The browser does not recognize that language: choose another in Settings › General › Voice.",
-  "no-speech": null,
-  aborted: null,
+// The way to speak while the microphone cannot: macOS's own dictation types into any box, Dot's in its app too, and a
+// phone's keyboard has a microphone of its own.
+const DICTATION = {
+  app: "macOS Dictation types into the box meanwhile: the Dictation key, or Fn twice.",
+  mac: "macOS Dictation types into the box meanwhile: the Dictation key, or Fn twice.",
+  other: "The keyboard's own microphone types into the box meanwhile.",
 };
 
-/** What to tell the owner of the recognition's error `code`, or null for none. */
-export function problemWords(code) {
-  return code in PROBLEMS ? PROBLEMS[code] : `Speech recognition stopped: ${code}.`;
+/**
+ * Where the page is, for what the microphone's words name (item 593): `app`, Dot.app, where macOS gives the microphone;
+ * `mac`, a browser on a Mac; `other`, a phone's browser or any other, which has no System Settings nor Fn key. An iPad
+ * that asks for the desktop's pages says it is a Mac with a touch screen (as boot.js reads it): it is `other`.
+ */
+export function voicePlace(shell, userAgent, touchPoints) {
+  if (shell === "desktop") {
+    return "app";
+  }
+  return /Macintosh/.test(userAgent) && touchPoints <= 1 ? "mac" : "other";
+}
+
+/**
+ * What to tell the owner of the recognition's error `code`, or null for none (the owner stopped it), in the words of
+ * `place` (`voicePlace`): in Dot.app macOS, not a browser, gives the microphone (item 593), and only a Mac has System
+ * Settings. "no-speech" is also what a dictation that ended by itself without a word says: nothing was heard, which a
+ * microphone kept from the app or the browser looks like.
+ */
+export function problemWords(code, place) {
+  const app = place === "app";
+  const who = app ? "Dot" : "the browser";
+  const onMac = place !== "other";
+  switch (code) {
+    case "not-allowed":
+    case "service-not-allowed":
+      if (app) {
+        return `macOS has not given Dot the microphone or its speech recognition. Allow Dot in System Settings › Privacy & Security › Microphone and Speech Recognition; a Dot that is not listed there is an older Dot.app, which cannot ask for them. ${DICTATION.app}`;
+      }
+      return onMac
+        ? `The browser has not allowed the microphone, or its speech recognition, on this page. Allow it for this address in the browser, and the browser in System Settings › Privacy & Security › Microphone. ${DICTATION.mac}`
+        : `The browser has not allowed the microphone, or its speech recognition, on this page. Allow it for this address in the browser's settings, and the browser in the device's settings. ${DICTATION.other}`;
+    case "no-speech":
+      return onMac
+        ? `Nothing was heard. Check that ${who} may use the microphone in System Settings › Privacy & Security › Microphone, the input in System Settings › Sound, and the language in Settings › General › Voice.`
+        : "Nothing was heard. Check that the browser may use the microphone, in its settings and the device's, and the language in Settings › General › Voice.";
+    case "audio-capture":
+      return onMac ? "No microphone was found: check the input in System Settings › Sound." : "No microphone was found.";
+    case "network":
+      return `The speech recognition ${app ? "macOS" : "the browser"} uses could not be reached: it needs the network.`;
+    case "language-not-supported":
+      return `${app ? "macOS" : "The browser"} does not recognize that language: choose another in Settings › General › Voice.`;
+    case "aborted":
+      return null;
+    default:
+      return `Speech recognition stopped: ${code}.`;
+  }
 }
 
 /**
@@ -87,18 +133,27 @@ export function createDictation({ language, text, show, settled, state, problem 
   let recognition = null;
   let base = "";
   let timer = null;
+  // Whether this dictation heard a word, and whether the owner ended it: one that ends by itself having heard nothing
+  // says so (item 593), where it ended without a word before.
+  let heard = false;
+  let byOwner = false;
+  const place = () => voicePlace(document.documentElement.dataset.shell, navigator.userAgent, navigator.maxTouchPoints);
 
   function arm() {
     clearTimeout(timer);
     timer = setTimeout(() => recognition?.stop(), SILENCE_MS);
   }
 
-  function finish() {
+  /** The dictation is over; `words` say why to the owner, or null. */
+  function finish(words) {
     clearTimeout(timer);
     if (recognition !== null) {
       recognition = null;
       state(false);
       settled();
+      if (words !== null) {
+        problem(words);
+      }
     }
   }
 
@@ -113,13 +168,16 @@ export function createDictation({ language, text, show, settled, state, problem 
     engine.interimResults = true;
     engine.maxAlternatives = 1;
     base = text();
+    heard = false;
+    byOwner = false;
     /** @param {SpeechRecognitionEventLike} event */
     const heardSomething = (event) => {
       if (recognition !== engine) {
         return;
       }
-      const heard = transcriptOf(event.results);
-      const next = dictated(base, heard.final, heard.interim);
+      const said = transcriptOf(event.results);
+      heard = heard || said.final !== "" || said.interim !== "";
+      const next = dictated(base, said.final, said.interim);
       show(next.value, next.interimFrom);
       arm();
     };
@@ -128,17 +186,14 @@ export function createDictation({ language, text, show, settled, state, problem 
       if (recognition !== engine) {
         return;
       }
-      const words = problemWords(event.error);
-      if (words !== null) {
-        problem(words);
-      }
-      finish();
+      // The owner's own stop can come before the engine's word that it heard nothing: that silence says nothing.
+      finish(byOwner && event.error === "no-speech" ? null : problemWords(event.error, place()));
     };
     engine.addEventListener("result", heardSomething);
     engine.addEventListener("error", failed);
     engine.addEventListener("end", () => {
       if (recognition === engine) {
-        finish();
+        finish(heard || byOwner ? null : problemWords("no-speech", place()));
       }
     });
     recognition = engine;
@@ -155,6 +210,7 @@ export function createDictation({ language, text, show, settled, state, problem 
 
   function stop() {
     if (recognition !== null) {
+      byOwner = true;
       clearTimeout(timer);
       recognition.stop();
       state(false);
@@ -164,7 +220,7 @@ export function createDictation({ language, text, show, settled, state, problem 
   function abort() {
     const engine = recognition;
     if (engine !== null) {
-      finish();
+      finish(null);
       engine.abort();
     }
   }
