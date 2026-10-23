@@ -122,7 +122,7 @@ async def _shoot(page: Page, path: Path) -> None:
 
 
 def _card(page: Page) -> Locator:
-    return page.locator("section.card").filter(has=page.get_by_text("Sign in to sites in Dot's Chrome"))
+    return page.locator(".settings-pane")
 
 
 async def _open_card(page: Page, address: str, port: int) -> Locator:
