@@ -132,13 +132,18 @@ async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["li
     )
     await mac.goto(ui_url("127.0.0.1", port, TOKEN))
     await mac.goto(f"{address}/#/settings/phone")
-    await expect(mac.locator(".code-line")).to_have_text(f"https://{TAILNET_NAME}/")
-    await mac.get_by_role("button", name="Pair a phone").click()
+    # The address is the QR code's own once Dot answers to a name (item 565); the code is hidden until it is shown.
+    await expect(mac.locator(".phone-address-text")).to_have_text(f"https://{TAILNET_NAME}/")
+    await expect(mac.locator("output.pair-code")).to_be_hidden()
+    await mac.get_by_role("button", name="Show code").click()
     shown: Locator = mac.locator("output.pair-code")
     await expect(shown).to_have_text(CODE)
     code: str = await shown.inner_text()
     # The guide of Settings › Phone has hints of its own (item 421): the code's is the one that says when it ends.
-    await expect(mac.locator(".phone-steps .hint", has_text="Type it in Dot")).to_contain_text("It works once")
+    await expect(mac.locator(".phone-code-lead", has_text="Type it in Dot")).to_contain_text("It works once")
+    # Shown, the code is the last step's (the steps before it are ticked), and the button asks for another.
+    await expect(mac.locator(".phone-step.current")).to_contain_text("Sign in with a code")
+    await expect(mac.get_by_role("button", name="New code")).to_be_visible()
     await mac.screenshot(path=str(shots / f"settings-{width}-{scheme}.png"))
 
     # A phone with no token: a wrong code is told, the right one lets it in.
@@ -146,6 +151,8 @@ async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["li
         viewport={"width": 390, "height": 844}, color_scheme=scheme, reduced_motion="reduce"
     )
     await phone.goto(f"{address}/")
+    # It names the button Settings › Phone has (item 565), which shows the code.
+    await expect(phone.locator(".signin")).to_contain_text("go to Settings › Phone and press Show code")
     field: Locator = phone.get_by_role("textbox", name="Pairing code")
     # A token typed where the code goes is never sent: the daemon is not proven before a code goes.
     tried: list[str] = []

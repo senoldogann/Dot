@@ -228,7 +228,7 @@ function renderSignIn(message) {
   onEnter(code, () => attempt(pair));
   onEnter(input, submit);
   screen(
-    el("p", { class: "muted" }, "Type a pairing code: in Dot on your Mac, or in Safari where Dot is open, go to Settings › Phone and press Pair a phone."),
+    el("p", { class: "muted" }, "Type a pairing code: in Dot on your Mac, or in Safari where Dot is open, go to Settings › Phone and press Show code."),
     message === "" ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, message)),
     code,
     pairButton,

@@ -5,12 +5,14 @@
 // `#/settings/rules?sentence=…` (an approval card's "Make a rule of this") puts a sentence in the box. A rule's arrows
 // move it up or down the order, and a rule that another one decides in place of wherever it fits says it never decides
 // (item 449): an earlier one, or one that hands the step to you, which decides wherever it stands (item 481).
-// Above the rules, the switch of the macOS sandbox of a run's commands (item 262).
+// Above the rules, the switch of the macOS sandbox of a run's commands (item 262). The page follows the design (item
+// 565): the protections that are always on in a card of their own, the sandbox under Commands, the rules as the rows of
+// one card, and, under them, what a rule can answer; with no rule, the card offers the sentences to start from.
 
 import { api } from "../api.js";
 import { ago, clip, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, paintOpener, segmented, switchSetting } from "../panels.js";
+import { emptyPanel, field, inlineError, inlineLoading, paintOpener, segmented, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
 import { outcomeLabel, previewLines, usageLine } from "../rulepreview.js";
 import { onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -22,33 +24,29 @@ const QUOTE_CHARS = 100;
 const RULES_CHANGED = "rules_changed";
 // A pattern longer than this is cut in the sentence a rule reads as; the whole of it is its tooltip and in the form.
 const PATTERN_CHARS = 40;
-// Sentences to start from: a click puts one in the box.
+// Sentences to start from: a click puts one in the box of the words (the drafter turns each into a rule: a command or
+// two of the shell, a command that stops Dot, every step on one site).
 const EXAMPLES = [
   "Let Dot run git status and git diff without asking",
   "Ask me before Dot deletes anything with rm",
   "Hand me every step on mybank.com",
 ];
 // The four answers, in the order of the control. `label` is the answer as it reads in the sentence; `text` says what
-// Dot does then.
+// Dot does then (in the form, in a rule's tooltip and in the legend under the rules); `tone` colours its badge.
 const ANSWERS = [
   {
     id: "allow",
     label: "Do it",
     tone: "b-ok",
-    text: "Dot does it without asking. When untrusted content is in context and the action reaches outside this Mac, it still asks you.",
+    text: "Without asking. After reading untrusted content, it still asks before reaching outside this Mac.",
   },
-  {
-    id: "preapproved",
-    label: "Do it, whatever it has read",
-    tone: "b-ok",
-    text: "Dot does it without asking, even after reading untrusted content.",
-  },
-  { id: "ask", label: "Ask me first", tone: "b-warn", text: "Dot stops and asks you every time; the run waits for your answer." },
+  { id: "preapproved", label: "Do it, whatever it has read", tone: "b-ok", text: "Without asking, even after reading untrusted content." },
+  { id: "ask", label: "Ask me first", tone: "b-warn", text: "Dot stops and asks every time; the run waits for your answer." },
   {
     id: "handoff",
     label: "Hand it to me",
-    tone: "b-info",
-    text: "Dot stops, tells you what it needs done and waits. In the browser you can take over, do the step and give the browser back; when you say you did it, the run goes on from there.",
+    tone: "b-hand",
+    text: "Dot says what it needs done and waits. In the browser you take over, do the step and give it back; when you say you did it, the run goes on from there.",
   },
 ];
 
@@ -152,7 +150,71 @@ function ruleRow(record, index, total, numberOf, behaviorOf, handlers, used) {
   );
 }
 
-function buildForm(onCreated) {
+/** What no rule lifts, in a card of its own at the head of the page: four checked lines and what a yolo run does. */
+function alwaysOn() {
+  const lines = [
+    "Reading secrets and sending them out is refused.",
+    ["Research runs stay read-only. ", el("span", { class: "muted" }, "Yolo keeps this one too.")],
+    "Money and credentials are handed to you.",
+    "A message or post in your name waits for your yes.",
+  ];
+  // One child in the card: a card's children are parted by hairlines, and these are one block.
+  return el(
+    "section",
+    { class: "set-card rule-always", "aria-labelledby": "rule-always-title" },
+    el(
+      "div",
+      null,
+      el(
+        "div",
+        { class: "rule-always-head" },
+        el("span", { class: "rule-tile", "aria-hidden": "true" }, icon("lock")),
+        el("h2", { class: "rule-always-title", id: "rule-always-title" }, "Always on, whatever your rules say"),
+      ),
+      el(
+        "ul",
+        { class: "rule-always-list" },
+        lines.map((line) => el("li", null, icon("check"), el("span", null, line))),
+      ),
+      el("p", { class: "rule-always-note" }, "A yolo run asks about none of the others: it does the step and records why it would have asked."),
+    ),
+  );
+}
+
+/** What a rule can answer: each of the four answers as its badge with what Dot does then; it stands under the rules, with
+ * or without any. */
+function legend() {
+  return el(
+    "div",
+    { class: "rule-legend" },
+    el("h3", { class: "rule-legend-title" }, "What a rule can answer"),
+    el(
+      "dl",
+      { class: "rule-legend-list" },
+      ANSWERS.map((answer) => el("div", { class: "rule-legend-item" }, el("dt", null, el("span", { class: `badge ${answer.tone}` }, answer.label)), el("dd", null, answer.text))),
+    ),
+  );
+}
+
+/** The card's place while there is no rule: the shield, what the preset does meanwhile and the sentences to start from;
+ * `onPick(text)` opens the ways to write a rule with one in the box. */
+function emptyState(onPick) {
+  return el(
+    "div",
+    { class: "rule-empty" },
+    emptyPanel("shield", "No rules yet", "The safety preset decides every action. Write a rule in your own words, or start from one of these:"),
+    el(
+      "div",
+      { class: "rule-examples", role: "group", "aria-label": "Rules to start from" },
+      EXAMPLES.map((text) => el("button", { class: "rule-example", type: "button", onclick: () => onPick(text) }, text)),
+    ),
+  );
+}
+
+/** The rule as its parts: a sentence that reads as the rule will, the fields, what the rule would have done on the steps
+ * of the last days, and the buttons. Returns the row and `fill(rule)`, which puts a drafted rule in the fields.
+ * `onCreated()` runs once the rule is added, `onClose()` shuts the ways to write a rule. */
+function buildForm(onCreated, onClose) {
   const glob = el("input", {
     class: "input mono",
     type: "text",
@@ -313,33 +375,42 @@ function buildForm(onCreated) {
 
   create.addEventListener("click", () => attempt(submit));
   paintPreview();
-  const element = el(
-    "section",
-    { class: "card card-pad stack" },
-    el("div", { class: "rule-sentence rule-sentence-preview" }, icon("shield"), preview),
-    el(
+  // The row's title is the sentence the rule reads as, written as the fields are filled.
+  const element = setRow({
+    title: el("div", { class: "rule-sentence rule-sentence-preview" }, icon("shield"), preview),
+    body: el(
       "div",
-      { class: "form-grid" },
-      field("When Dot would use", glob, "A tool name or a pattern: shell, write_file, browser_*, desktop_*, mcp__*"),
-      field(
-        "matching",
-        regex,
-        "Optional regular expression, case-insensitive, searched in the action's summary (a shell command's starts with “Run:”) and its target (the command, path or address). Empty means every time.",
+      { class: "stack rule-body" },
+      el(
+        "div",
+        { class: "form-grid" },
+        field("When Dot would use", glob, "A tool name or a pattern: shell, write_file, browser_*, desktop_*, mcp__*"),
+        field(
+          "matching",
+          regex,
+          "Optional regular expression, case-insensitive, searched in the action's summary (a shell command's starts with “Run:”) and its target (the command, path or address). Empty means every time.",
+        ),
+        el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Then"), answers.element, answerHint),
+        field("Why", description, "Optional. Shown when the rule decides."),
       ),
-      el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Then"), answers.element, answerHint),
-      field("Why", description, "Optional. Shown when the rule decides."),
+      tried,
+      el(
+        "div",
+        { class: "rule-form-buttons" },
+        el("button", { class: "btn ghost", type: "button", onclick: onClose }, "Close"),
+        el("div", { class: "rule-form-main" }, tryOutButton, create),
+      ),
     ),
-    tried,
-    el("div", { class: "row" }, el("span", { class: "spacer" }), tryOutButton, create),
-  );
+  });
   return { element, fill };
 }
 
 /**
  * The rule in your own words: a sentence, the examples to start from and the Draft button. `onDrafted(rule)` gets the
  * daemon's draft (`behavior`, `tool_glob`, `match_regex`, and `description`, the sentence it reads back as). Returns
- * the element, `start(text)`, which puts a sentence in the box for a change before it is drafted, and `reset()`, which
- * empties the box and what the last draft said, once the rule is added.
+ * the row, `start(text)`, which puts a sentence in the box for a change before it is drafted, `focus()`, `reset()`, which
+ * empties the box and what the last draft said, once the rule is added, and `showExamples(shown)`: the examples are
+ * the card of the rules' own while there is no rule, and the form's own once there is one.
  */
 function buildWords(onDrafted, isDisposed) {
   const words = el("textarea", {
@@ -419,13 +490,11 @@ function buildWords(onDrafted, isDisposed) {
       attempt(run);
     }
   });
-  const element = el(
-    "section",
-    { class: "card card-pad stack" },
-    field("Say the rule in your words", words, "Dot drafts the rule from it into the form below; nothing applies until you add it."),
-    examples,
-    el("div", { class: "rule-words-foot" }, outcome, draft),
-  );
+  const element = setRow({
+    title: "Say the rule in your words",
+    lead: "Dot drafts the rule from it into the form below; nothing applies until you add it.",
+    body: el("div", { class: "stack rule-body" }, words, examples, el("div", { class: "rule-words-foot" }, outcome, draft)),
+  });
   // The box takes the focus with the caret after the words it has.
   function focus() {
     words.focus();
@@ -444,16 +513,27 @@ function buildWords(onDrafted, isDisposed) {
       outcome.hidden = true;
       outcome.replaceChildren();
     },
+    showExamples: (shown) => {
+      examples.hidden = !shown;
+    },
   };
 }
 
 /** The macOS sandbox of a run's commands (item 262), switched here while the daemon runs; the config file keeps it. */
 function buildSandbox(isDisposed) {
   let view = null;
-  const setting = switchSetting({
+  const setting = switchRowSetting({
     label: "Sandbox for a run's commands",
-    hint:
-      "On, the shell commands, terminal sessions, AppleScript and searches of a run that is not yolo start in a macOS sandbox: they can neither read nor change Dot's own files (its keys, token, settings, database and browser profiles) nor change what Dot loads and runs, and macOS starts no program that runs as root there (ps, top, sudo). Off, they run with your account's rights, and the shell guard still reads every line. A yolo run is never sandboxed. Takes effect from the next command, without a restart; kept in the config file as [shell] sandbox.",
+    hint: [
+      "On, the shell commands, terminal sessions, AppleScript and searches of a run that is not yolo start in a macOS sandbox: they can neither read nor change Dot's own files (its keys, token, settings, database and browser profiles) nor change what Dot loads and runs, and macOS starts no program that runs as root there (ps, top, sudo). A yolo run is never sandboxed.",
+      el(
+        "span",
+        { class: "rule-fine" },
+        "Off, they run with your account's rights, and the shell guard still reads every line. Takes effect from the next command, without a restart; kept in the config file as ",
+        el("code", { class: "mono" }, "[shell] sandbox"),
+        ".",
+      ),
+    ],
     read: () => view?.sandbox === true,
     write: async (on) => {
       view = await api.put("/shell/sandbox", { sandbox: on });
@@ -483,7 +563,7 @@ function buildSandbox(isDisposed) {
     }
   }
 
-  return { element: el("section", { class: "card card-pad", "aria-label": "Sandbox" }, setting.element), load };
+  return { element: el("section", { class: "set-card", "aria-label": "Sandbox" }, setting.element), load };
 }
 
 export function mount(root, ctx) {
@@ -493,15 +573,17 @@ export function mount(root, ctx) {
   // left unshown.
   let usage = null;
   let usageTicket = 0;
-  const holder = el("div", null, loadingPanel());
-  const count = el("span", { class: "hint" });
+  const holder = el("div", { class: "rule-holder" }, inlineLoading());
 
   function paint() {
     if (rules === null) {
       return;
     }
+    words.showExamples(rules.length > 0);
+    // What the page holds, at the head's right: how many rules there are.
+    ctx.head.setMeta(...(rules.length === 0 ? [] : [plural(rules.length, "rule", "rules")]));
     if (rules.length === 0) {
-      holder.replaceChildren(emptyPanel("shield", "No rules yet", "Without rules the safety preset decides every action."));
+      holder.replaceChildren(emptyState(startFrom));
       return;
     }
     const handlers = {
@@ -516,7 +598,7 @@ export function mount(root, ctx) {
       const used = usedBy.get(record.id);
       return used === undefined ? null : usageLine(used, usage, TRY_OUT_DAYS, numberOf);
     };
-    const problem = usage === null || usage.problem === null ? null : el("p", { class: "small rule-tryout-problem" }, usage.problem);
+    const problem = usage === null || usage.problem === null ? null : el("p", { class: "small rule-tryout-problem rule-problem" }, usage.problem);
     // A rule's arrow keeps the focus through every drawing of the list, whichever of the reads after a move comes last.
     const active = document.activeElement;
     const focused = active instanceof HTMLElement && holder.contains(active) ? active.dataset : null;
@@ -529,7 +611,6 @@ export function mount(root, ctx) {
     if (focused?.rule !== undefined) {
       focusArrow(focused.rule, focused.move);
     }
-    count.textContent = plural(rules.length, "rule", "rules");
   }
 
   async function loadUsage() {
@@ -559,7 +640,7 @@ export function mount(root, ctx) {
         return;
       }
       if (rules === null) {
-        holder.replaceChildren(errorPanel(error, () => attempt(retry)));
+        holder.replaceChildren(inlineError(error, () => attempt(retry)));
       } else {
         readFailed("The rules", error);
       }
@@ -567,7 +648,7 @@ export function mount(root, ctx) {
   }
 
   async function retry() {
-    holder.replaceChildren(loadingPanel());
+    holder.replaceChildren(inlineLoading());
     await reload();
   }
 
@@ -606,76 +687,66 @@ export function mount(root, ctx) {
     await reload();
   }
 
+  const addButton = el("button", { class: "btn primary", type: "button" });
+  paintOpener(addButton, "New rule", false);
+  // The two ways to write a rule stay away until New rule asks for them: the list is what this page is for (item 373).
+  // Shut by the form's own Close, they give the focus back to the button that opened them.
+  const closeForms = () => {
+    setOpen(false);
+    addButton.focus({ preventScroll: true });
+  };
   const form = buildForm(async () => {
     words.reset();
     await reload();
-  });
+  }, closeForms);
   const words = buildWords((drafted) => form.fill(drafted), () => disposed);
   const sandbox = buildSandbox(() => disposed);
-  const addButton = el("button", { class: "btn primary sm", type: "button" });
-  paintOpener(addButton, "New rule", false);
-  // The two ways to write a rule stay away until Add rule asks for them: the list is what this page is for (item 373).
-  const forms = el("div", { class: "rule-forms", hidden: true }, words.element, form.element);
-  const closeForms = () => {
-    forms.hidden = true;
-    paintOpener(addButton, "New rule", false);
-  };
-  forms.append(
-    el(
-      "div",
-      { class: "panel-foot rule-forms-foot" },
-      el("span", { class: "spacer" }),
-      el("button", { class: "btn sm", type: "button", onclick: closeForms }, "Close"),
-    ),
-  );
+  const forms = setSection({ title: "New rule", body: setCard(words.element, form.element) });
+  forms.classList.add("rule-forms");
+  forms.hidden = true;
+
+  function setOpen(open) {
+    forms.hidden = !open;
+    paintOpener(addButton, "New rule", open);
+  }
+
   addButton.addEventListener("click", () => {
-    forms.hidden = !forms.hidden;
-    paintOpener(addButton, "New rule", !forms.hidden);
+    setOpen(forms.hidden);
     if (!forms.hidden) {
       forms.scrollIntoView({ block: "nearest" });
       // What was written before Close is still there.
       words.focus();
     }
   });
-  ctx.head.setLead("Your own answers to “may Dot do this?”, applied before the safety preset.");
+
+  /** A sentence to start from, chosen in the empty card: the ways to write a rule open with it in the box. */
+  function startFrom(text) {
+    setOpen(true);
+    forms.scrollIntoView({ block: "nearest" });
+    words.start(text);
+  }
+
+  ctx.head.setLead("Your own answers to “may Dot do this?”, checked before the safety preset.");
+  ctx.head.setActions(addButton);
   root.append(
     el(
       "div",
-      { class: "note" },
-      icon("shield"),
-      el(
-        "span",
-        null,
-        "Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, money or credentials are handed to you, and a message or a post in your name waits for your yes. A yolo run keeps only the second: it asks about none of the others, does the step and records why it would have asked.",
-      ),
-    ),
-    sandbox.element,
-    forms,
-    el(
-      "section",
-      { class: "memory-panel notes-panel rule-panel" },
-      el(
-        "div",
-        { class: "panel-head" },
-        el("h2", { class: "panel-title" }, "Checked in this order"),
-        count,
-        el("span", { class: "spacer" }),
-        addButton,
-      ),
-      el(
-        "div",
-        { class: "panel-note" },
-        "The first enabled rule that fits an action decides it, except that a rule that hands the step to you decides wherever it stands; a new rule goes to the end, and a rule's arrows move it up or down.",
-      ),
-      holder,
+      { class: "set-sections" },
+      forms,
+      alwaysOn(),
+      setSection({ title: "Commands", body: sandbox.element }),
+      setSection({
+        title: "Your rules",
+        lead: "Checked top to bottom: the first enabled rule that fits decides. A rule that hands the step to you decides wherever it stands. A new rule goes to the end, and a rule's arrows move it up or down.",
+        body: el("section", { class: "set-card rule-panel", "aria-label": "Your rules" }, holder, legend()),
+      }),
     ),
   );
   // The sentence an approval card sends ("Make a rule of this"), in the address after the tab's name.
   const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("sentence");
   if (asked !== null && asked.trim() !== "") {
     // A card's "Make a rule of this" opens the ways to write one with its sentence already in the box (item 373).
-    forms.hidden = false;
-    paintOpener(addButton, "New rule", true);
+    setOpen(true);
     words.start(asked.trim());
   }
   // A rule added, switched or deleted on another page is read again here, as are the rules once the stream is back.
