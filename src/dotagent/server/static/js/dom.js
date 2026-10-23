@@ -162,6 +162,12 @@ export function clipWords(text, words, limit) {
 const REPEAT_MIN_WORDS = 20;
 // A reply's first line is the answer's reworded when at least this share of its words are in the answer's first line.
 const REWORDED_SHARE = 0.5;
+// A reply the answer stands for holds at least this share of the answer: a note that is a small part of it stays.
+const COVERED_SHARE = 0.8;
+// How many lines the answer may add before a line of the reply, as a finish puts a line before or after the reply.
+const ADDED_LINES = 3;
+// A word that is a path cut short (".../plan.md"), which a finish may write out whole.
+const SHORT_PATH = /^(?:\.\.\.|…)\/?/;
 
 /** The words of a text as they are compared: its marks of markdown left out, in lower case. */
 function wordsOf(text) {
@@ -199,11 +205,50 @@ function rewordedFrom(line, other) {
 }
 
 /**
- * Whether a run's reply says nothing its answer does not (item 567), so that the answer alone may stand for it: the
- * same words, whatever their spacing and marks, or the same lines after a first line the answer rewords, those lines
- * twenty words and more. A model told to finish after a plain reply finishes with that reply again and may reword its
- * first line on the way. A reply with a line the answer lacks, more on one of its lines, or a first line of its own is
- * shown, however much of it the answer holds: what it adds would be lost.
+ * A word without the marks of a sentence and the quotes at its ends: "estimate," and "estimate;" are one word. A sign,
+ * a unit or a currency stays part of it ("-5%" is not "5%", "$300" not "€300").
+ */
+function bare(word) {
+  return word.replace(/^[.,;:!?"'“”‘’«»]+|[.,;:!?"'“”‘’«»]+$/gu, "");
+}
+
+/**
+ * Whether the answer's line `other` says all that the reply's `line` says (item 569): the words of the reply's line are
+ * words of `other`, in their order, the marks of a sentence at their ends aside, and a path cut short (".../plan.md")
+ * stands for a word of `other` that ends as it does. A word changed, a number or a "not" lost or moved, two words that
+ * traded places, leave the line the reply's own.
+ */
+function heldIn(line, other) {
+  if (line === other) {
+    return true;
+  }
+  const theirs = other.split(" ").map(bare);
+  let at = 0;
+  for (const word of line.split(" ")) {
+    const core = bare(word);
+    if (core === "") {
+      continue;
+    }
+    const tail = SHORT_PATH.test(word) ? bare(word.replace(SHORT_PATH, "/")) : null;
+    while (at < theirs.length && theirs[at] !== core && !(tail !== null && theirs[at].endsWith(tail))) {
+      at += 1;
+    }
+    if (at === theirs.length) {
+      return false;
+    }
+    at += 1;
+  }
+  return true;
+}
+
+/**
+ * Whether a run's reply says nothing its answer does not (items 567 and 569), so that the answer alone may stand for
+ * it: the same words, whatever their spacing and marks, or every line of the reply held in a line of the answer, in
+ * order (its first line may be the answer's first reworded, and the answer may add a few lines around them), the
+ * reply twenty words and more after its first line and most of the answer. A model told to finish after a plain reply
+ * finishes with that reply again, and may reword its first line, write a path out whole or add a closing line on the
+ * way. A reply with a line the answer lacks, a word changed or moved on one of its lines, a number or a "not" the
+ * answer's line lost, is shown: what it adds would be lost.
  */
 export function repeatsAnswer(reply, answer) {
   if (wordsOf(reply).join(" ") === wordsOf(answer).join(" ")) {
@@ -211,11 +256,26 @@ export function repeatsAnswer(reply, answer) {
   }
   const said = linesOf(reply);
   const told = linesOf(answer);
-  const rest = said.slice(1);
-  if (said.length !== told.length || rest.join(" ").split(" ").length < REPEAT_MIN_WORDS) {
+  const words = said.slice(1).join(" ").split(" ").filter((word) => word !== "");
+  if (words.length < REPEAT_MIN_WORDS || said.join("\n").length < told.join("\n").length * COVERED_SHARE) {
     return false;
   }
-  return rest.join("\n") === told.slice(1).join("\n") && rewordedFrom(said[0], told[0]);
+  let next = 0;
+  for (const [index, line] of said.entries()) {
+    let found = -1;
+    for (let at = next; at < Math.min(told.length, next + ADDED_LINES + 1); at += 1) {
+      // The reply's first line may be the answer's first reworded, not a line the answer added before it.
+      if (heldIn(line, told[at]) || (index === 0 && at === 0 && rewordedFrom(line, told[at]))) {
+        found = at;
+        break;
+      }
+    }
+    if (found === -1) {
+      return false;
+    }
+    next = found + 1;
+  }
+  return true;
 }
 
 /**

@@ -292,10 +292,15 @@ never lifted to its top and dropped back. The answer of the run is the last mess
 (its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how long
 the run took shows where the pointer rests on it (on a touch screen it always shows). A message that only says the
 answer again is not shown beside it, wherever it stands in the turn (item 460): a task run that answers in a plain
-reply is told to call finish, thinks once more and finishes with the same words, or with its first line reworded
-(item 567: the lines after it the same, twenty words and more, and at least half the words of the first line in the
-answer's). A message with a line the answer lacks, or more on one of its lines, stays, and so does one whose first line
-only adds words to the answer's or has a number of its own; a first line that swaps a word for another ("No tests
+reply is told to call finish, thinks once more and finishes with the same words, or nearly: its first line reworded
+(item 567), a path cut short written out whole, a comma made a semicolon, a line added before or after (item 569). Such
+a message goes when every line of it is held in a line of the answer, in order: its words are words of that line in
+their order, the marks of a sentence at a word's ends aside (a sign, a unit or a currency is part of the word), and a
+path cut short (`.../plan.md`) stands for a word of the line that ends as it does; its first line may instead be the
+answer's first line reworded (at least half its words in it). It must hold twenty words and more after its first line
+and most of the answer, so a note that is a small part of the answer stays. A message with a line the answer lacks, a
+word changed or moved on one of its lines, a number or a "not" the answer lost, or a first line that only adds words to
+the answer's or has a number of its own, stays; a first line that swaps a word for another ("No tests
 pass:" for "All tests pass:") is taken for a rewording, and the answer, the run's last word, stands for it. A copy out
 of the conversation
 keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as the markdown
@@ -407,13 +412,12 @@ its end, where its next words come or its newest message stands, and stays there
 403 and 440). The six runs opened
 last are kept while the page lives, so that coming back to one (from a delegated run's page, say) draws it at once as it
 stood and follows its stream on from the last message read, not from the first; what the lessons, the questions and the
-cost show is read again (item 426). The stream goes on after the last stored event read: a piece of a thought or of a
-message being written has no id, and when one was the last thing read, the stream started again from the first event and
-every message of the run was drawn again, once more at each return (item 568). A run that ended while its page was open is kept as ended: coming back to it shows
-its face at rest, not the tick again. One that was still at work when its page was left has its state read again before
-it is drawn, from the side menu or any other way back: if it ended meanwhile, its chat opens at its foot with its answer
-drawn at once and its face at rest, as a run that was over when its page opened does, not on the top of its answer
-written in again (item 447).
+cost show is read again (item 426). It goes on after the last stored event read, not after a live piece of a thought
+or a message, which has no id (item 568). A run that ended while its page was open is kept as ended: coming back to it
+shows its face at rest, not the tick again. One that was still at work when its page was left has its state read again
+before it is drawn, from the side menu or any other way back: if it ended meanwhile, its chat opens at its foot with
+its answer drawn at once and its face at rest, as a run that was over when its page opened does, not on the top of its
+answer written in again (item 447).
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact under More, with no card for
