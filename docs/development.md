@@ -139,8 +139,9 @@ once: the next release raises it in the five files first.
 
 It stops at the first check that fails, and says which: files not committed, a commit that is not on GitHub's `main`,
 versions that differ, a tag that is on GitHub already, a changelog with no section for the version, the app's signature
-(the Developer ID, the hardened runtime, a secure timestamp, both architectures), and a verdict of Apple's notary
-service other than Accepted, with the log of what it found.
+(the Developer ID, the hardened runtime, a secure timestamp, both architectures), the app's reasons for the microphone
+and speech recognition and its microphone entitlement (item 594), and a verdict of Apple's notary service other than
+Accepted, with the log of what it found.
 
 Once, on the Mac that builds releases:
 

@@ -26,7 +26,7 @@ use tauri::image::Image;
 use tauri::ipc::CapabilityBuilder;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::webview::NewWindowResponse;
+use tauri::webview::{NewWindowResponse, PermissionKind, PermissionResponse};
 use tauri::{
     AppHandle, LogicalPosition, Manager, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
@@ -424,7 +424,8 @@ fn tray_icon(state: &str) -> Image<'static> {
 /// the web UI's own top bars: the system draws only the traffic lights over the page, on the bars' centre line
 /// (`TRAFFIC_LIGHTS`), the page keeps room for them (`data-shell="desktop"`, set by the UI when it runs in the shell)
 /// and drags the window by its bars. The shell's own drag-and-drop handler is off so the composer's HTML drop works.
-/// A link the page opens in a new window (every link of a model's answer) goes to the default browser.
+/// A link the page opens in a new window (every link of a model's answer) goes to the default browser. What a page asks
+/// of the web view itself, the microphone among it, is `permission_for`'s to answer.
 fn window(app: &AppHandle, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
     if let Some(existing) = app.get_webview_window(WINDOW) {
         return Ok(existing);
@@ -441,7 +442,40 @@ fn window(app: &AppHandle, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
             open_outside(url);
             NewWindowResponse::Deny
         })
+        .on_permission_request(|webview, kind| {
+            let page = webview.url().ok();
+            let granted = webview.app_handle().state::<Granted>();
+            let addresses = granted
+                .0
+                .lock()
+                .expect("nothing panics while it holds the granted addresses");
+            permission_for(page.as_ref(), kind, &addresses)
+        })
         .build()
+}
+
+/// What a page of the window is given of what it asks of the web view (item 594): the microphone, for the composer's
+/// dictation (item 574), on a page of an address the shell gave its commands (`Granted`: the daemon's own, once it
+/// proved itself); nothing else, and nothing to another page. macOS gives the microphone to the app, not to a page: the
+/// web view would hand it to any page it showed, one a link led the window to among them, and wry grants every request
+/// when no one answers it.
+fn permission_for(
+    page: Option<&url::Url>,
+    kind: PermissionKind,
+    granted: &HashSet<String>,
+) -> PermissionResponse {
+    // Both sides read as the `url` crate reads an origin: a granted address is written by hand (`read_daemon`), where a
+    // name in capitals or the port of its scheme would not match the page's own spelling of it.
+    let ours = page.is_some_and(|page| {
+        granted
+            .iter()
+            .any(|base| url::Url::parse(base).is_ok_and(|base| base.origin() == page.origin()))
+    });
+    if ours && matches!(kind, PermissionKind::Microphone) {
+        PermissionResponse::Allow
+    } else {
+        PermissionResponse::Deny
+    }
 }
 
 /// Open a web address in the default browser; the shell opens no window of its own for it. Another kind of address
@@ -1201,6 +1235,60 @@ mod tests {
         assert!(!reaches("http://127.0.0.1:8766/"));
         assert!(!reaches("http://localhost:8765/"));
         assert!(!reaches("https://127.0.0.1:8765/"));
+    }
+
+    #[test]
+    fn only_a_page_of_the_daemons_address_is_given_the_microphone_and_nothing_else_is_given() {
+        let granted: HashSet<String> = HashSet::from(["http://127.0.0.1:8765".to_string()]);
+        let page = |address: &str| url::Url::parse(address).expect("a page's address");
+        let given = |address: Option<&str>, kind: PermissionKind| {
+            let page = address.map(page);
+            matches!(
+                permission_for(page.as_ref(), kind, &granted),
+                PermissionResponse::Allow
+            )
+        };
+        // The daemon's page, the composer's dictation (item 594).
+        assert!(given(
+            Some("http://127.0.0.1:8765/#/runs"),
+            PermissionKind::Microphone
+        ));
+        // Nothing else of the web view, not even to the daemon's page.
+        assert!(!given(
+            Some("http://127.0.0.1:8765/#/runs"),
+            PermissionKind::Camera
+        ));
+        assert!(!given(
+            Some("http://127.0.0.1:8765/#/runs"),
+            PermissionKind::Geolocation
+        ));
+        // A page a link led the window to, another port of this Mac, the shell's own pages, or no page at all.
+        for address in [
+            "https://example.org/listen",
+            "http://127.0.0.1:9000/",
+            "http://localhost:8765/",
+            "tauri://localhost/down.html",
+        ] {
+            assert!(
+                !given(Some(address), PermissionKind::Microphone),
+                "{address}"
+            );
+        }
+        assert!(!given(None, PermissionKind::Microphone));
+        // An address as config.toml may spell it is the page's own: a name in capitals, the scheme's own port.
+        let spelled: HashSet<String> = HashSet::from([
+            "http://LOCALHOST:8765".to_string(),
+            "http://127.0.0.1:80".to_string(),
+        ]);
+        for address in ["http://localhost:8765/#/runs", "http://127.0.0.1/#/runs"] {
+            assert!(
+                matches!(
+                    permission_for(Some(&page(address)), PermissionKind::Microphone, &spelled),
+                    PermissionResponse::Allow
+                ),
+                "{address}"
+            );
+        }
     }
 
     #[test]

@@ -978,6 +978,17 @@ and Quit. Closing the window keeps the shell in the menu bar.
   561): not the image commands, which read a file from disk, nor the menu bar item's and the app menu's, nor events. A
   page of any other address, another port of the Mac among them, gets nothing from it.
 - **Files** drop into the composer as in the browser.
+- **The microphone** (item 594). The composer's dictation (item 574) is WebKit's speech recognition, which macOS gives
+  an app only once it says why it asks (its `Info.plist`: the microphone and speech recognition) and, under the hardened
+  runtime, is entitled to the microphone (`Dot.entitlements`, the runtime's one exception the app asks for). macOS asks
+  you the first time the microphone is pressed, and System Settings › Privacy & Security › Microphone and Speech
+  Recognition list Dot after. The shell gives the microphone to a page of the daemon's own address alone, and nothing
+  else a page asks of the web view, to any page. It is told what is asked, not by which frame, and judges the window's
+  page; the UI's frames (a page a run showed, a drawing of a file) are sandboxed, which WebKit refuses before the shell
+  is asked. The page given the microphone could record sound with it too (`getUserMedia`), as a site given a browser's
+  microphone can; Dot's takes only the words. What you say may go to Apple to be recognized, as in Safari
+  ([Safety](safety.md)). A Dot.app built before it can do neither: its composer says so and names macOS Dictation (item
+  593).
 - **Updates** (item 432). As it starts, and from **Check for Updates…**, the shell reads `latest.json` of the latest
   release on GitHub (`plugins.updater` in `desktop/src-tauri/tauri.conf.json`). A newer version is offered in a dialog:
   **Install and Restart** downloads it, checks that it is signed with the updater's key and that the signature names the

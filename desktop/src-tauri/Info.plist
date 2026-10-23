@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Merged by Tauri into the app's own Info.plist (item 594): why Dot asks macOS for the microphone and for speech
+     recognition, which the composer's microphone needs (item 574). Without these, macOS gives the app neither. -->
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Dot listens only while its microphone is on, to write what you say into the message box.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>Dot turns what you say into text in the message box. macOS may send your voice to Apple to recognize it.</string>
+</dict>
+</plist>
