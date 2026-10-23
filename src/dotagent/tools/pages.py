@@ -9,7 +9,13 @@ from typing import Annotated, Self
 
 from pydantic import Field, StringConstraints, model_validator
 
-from dotagent.agent.pages import LIBRARY_HOSTS, PAGE_EVENT, PAGE_MAX_CHARS, PAGE_TITLE_MAX_CHARS, THEME_VARIABLES
+from dotagent.agent.pages import (
+    LIBRARY_HOSTS,
+    PAGE_EVENT,
+    PAGE_MAX_CHARS,
+    PAGE_TITLE_MAX_CHARS,
+    THEME_VARIABLES,
+)
 from dotagent.core.errors import ToolInputError
 from dotagent.policy.paths import expand_path, within
 from dotagent.policy.types import ActionInfo
@@ -17,6 +23,7 @@ from dotagent.store.models import ShownPage
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, make_path_tool, ok
 from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_action
+from dotagent.tools.page_files import PageFiles, with_its_files
 from dotagent.tools.third_party import holds_third_party
 
 SHOW_PAGE_TOOL: str = "show_page"
@@ -38,8 +45,8 @@ _DESCRIPTION: str = (
     "Make it live: animate its entrance, show values on hover, let a table sort and a chart toggle its "
     "series, and keep still under prefers-reduced-motion. Libraries that fit, in a pinned version: Apache ECharts or "
     "Chart.js for charts, Mermaid for diagrams, D3 for a drawing of your own, three.js for 3D. A page you made in the "
-    f"workspace ({', '.join(sorted(PAGE_SUFFIXES))}) is shown as it is by its path instead of html; the files beside "
-    "it do not load."
+    f"workspace ({', '.join(sorted(PAGE_SUFFIXES))}) is shown by its path instead of html, with the style sheets, "
+    "scripts, pictures and fonts beside it that it names written in; what a script loads by itself does not load."
 )
 
 
@@ -101,6 +108,33 @@ def page_file(path: Path, workspace: Path) -> str:
     return text
 
 
+def whole_page_file(path: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> PageFiles:
+    """The page at the resolved ``path`` (:func:`page_file`) with the files beside it that it names written in while
+    they fit in one page (item 600), and the names of those written in and left out."""
+    return with_its_files(page_file(path, workspace), path, workspace, protected, dot_paths)
+
+
+def shown_words(page: ShownPage, files: PageFiles | None) -> str:
+    """What show_page tells the run: the page is shown, and, for a page by its path, the files written into it and
+    those left out (item 600)."""
+    words: str = f"The page “{page.title}” is shown to the user in the conversation."
+    if files is None:
+        return words
+    if files.written:
+        words += f" Written into it: {', '.join(dict.fromkeys(files.written))}."
+    if files.left_out:
+        words += (
+            f" Not written in, so not loaded: {', '.join(dict.fromkeys(files.left_out))} (outside the workspace, "
+            "protected, kept from a crawl or an MCP answer, or missing)."
+        )
+    if files.too_large:
+        words += (
+            f" Left out as the page would have been longer than {PAGE_MAX_CHARS:,} characters with them: "
+            f"{', '.join(dict.fromkeys(files.too_large))} (make them smaller to show them)."
+        )
+    return words
+
+
 def _show_page_tool() -> RegisteredTool:
     def classify(args: ShowPageArgs, ctx: ToolContext) -> ActionInfo:
         if args.path is not None:
@@ -124,17 +158,21 @@ def _show_page_tool() -> RegisteredTool:
         )
 
     async def run(args: ShowPageArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        files: PageFiles | None = None
         if args.path is not None:
             # The file that was judged (item 598's review): classified again as the call starts and refused if a link
             # moved since, then read where it was found, not by its path resolved once more.
-            html: str = await asyncio.to_thread(page_file, Path(authorized.target), ctx.workspace)
+            files = await asyncio.to_thread(
+                whole_page_file, Path(authorized.target), ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
+            )
+            html: str = files.html
         elif args.html is not None:
             html = args.html
         else:
             raise ToolInputError("give the page as html or by its path", {})
         page: ShownPage = await ctx.runtime.store.add_shown_page(ctx.run_id, args.title, html)
         await ctx.runtime.bus.emit(ctx.run_id, PAGE_EVENT, {"page_id": page.id, "title": page.title}, True)
-        return ok(f"The page “{page.title}” is shown to the user in the conversation.")
+        return ok(shown_words(page, files))
 
     return make_path_tool(
         name=SHOW_PAGE_TOOL,

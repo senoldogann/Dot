@@ -512,9 +512,15 @@ that sort and series that switch on and off, and still under `prefers-reduced-mo
 fit, in pinned versions: Apache ECharts or Chart.js for charts, Mermaid for diagrams, D3 for a drawing of the run's
 own, three.js for 3D (item 521).
 A page the run made in its workspace (an `.html`, `.htm`, `.xhtml` or `.svg` file) is shown by its path instead of its
-HTML (item 598), as it is: the file must lie in the workspace once its links are followed and not among the pages a
-crawl or an MCP answer kept there, the call is judged as a read of it, as `read_file`'s is, and the files beside it do
-not load.
+HTML (item 598): the file must lie in the workspace once its links are followed and not among the pages a crawl or an
+MCP answer kept there, and the call is judged as a read of it, as `read_file`'s is. The files beside it that it names
+are written into it, since a shown page loads nothing of this Mac (item 600): a style sheet becomes a style block, a
+script its text, and a picture, a sound, a video or a font of the page, of its styles or of a tag's `style` a `data:`
+address, each when it is one `read_file` reads without a question (in the workspace, not protected, not Dot's own, not
+a crawl's or an MCP answer's) and the page with it stays one page (500,000 characters): a file that would not fit is
+measured before it is read and left out, and the page is shown without it; a page that still comes out longer (a file
+that grew while it was read) is shown as it was written. A sheet a style imports (`@import`) is not written in. The
+answer names the files left out. What a script loads by itself (a module's imports, a fetch) does not load.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the

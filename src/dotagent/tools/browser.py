@@ -150,10 +150,9 @@ def _local_file_hint(url: str) -> str:
     if path.suffix.lower() in PAGE_SUFFIXES:
         return words + (
             f" To show the owner this page, give its path to {SHOW_PAGE_TOOL} ({USE_TOOLS_TOOL} with the group"
-            f" {group_of(SHOW_PAGE_TOOL)} turns it on): it is drawn in the conversation, and its Open shows it full"
-            f" size in the owner's browser. Scripts and styles load there from {', '.join(LIBRARY_HOSTS)} alone,"
-            " pictures only when written into the page (data: addresses), and the files beside it not at all: put in"
-            " the page what it needs of them."
+            f" {group_of(SHOW_PAGE_TOOL)} turns it on): it is drawn in the conversation with the files beside it that"
+            " it names written in (item 600), and its Open shows it full size in the owner's browser. What its scripts"
+            f" load by themselves does not load, but for libraries from {', '.join(LIBRARY_HOSTS)}."
         )
     return words + (
         f" To show the owner a file made in the workspace, write its path in code in the answer (`{path}`): the panel"
