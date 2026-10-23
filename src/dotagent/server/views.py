@@ -1317,10 +1317,10 @@ class McpServerView(FrozenModel):
     goes with its plugin, and one of the config is the owner's to take out of it. ``address`` is its URL or its command.
     ``state``: its tools are offered to runs (``ready``, with ``tools``, their names on the server), it was left out
     (``error`` says why), it is switched off in the config, or Dot tries it now, waiting for the owner to sign in on
-    ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the owner's account, and Sign in again renews
-    that. ``mark``: its service's, the one the service's tile wears (item 477), ``None`` for a server of no service
-    (the plug). ``picks_tools``: the owner may choose on the page which of its tools to offer (``allow``): of one that
-    runs, to cut its tools down, and of one left out with an allow list, to choose the list again."""
+    ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the owner's account, and Sign in again renews that.
+    ``mark``: its service's, the one the service's tile wears (item 477), ``None`` for a server of no service (Dot's own
+    icon, item 581). ``picks_tools``: the owner may choose on the page which of its tools to offer (``allow``): of one
+    that runs, to cut its tools down, and of one left out with an allow list, to choose the list again."""
 
     name: str
     origin: McpOrigin
