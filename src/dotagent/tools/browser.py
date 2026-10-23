@@ -10,7 +10,9 @@ import asyncio
 import base64
 import secrets
 from dataclasses import replace
+from pathlib import PurePosixPath
 from typing import Literal, Self
+from urllib.parse import unquote, urlsplit
 
 from pydantic import Field, SecretStr, model_validator
 
@@ -55,6 +57,7 @@ from dotagent.browser.types import (
 from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import DotError, ToolExecutionError, ToolInputError
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, combine_assessments
@@ -122,12 +125,37 @@ def _clip(text: str, limit: int) -> str:
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 
+def _local_file_hint(url: str) -> str:
+    """What to do instead of opening ``url``, a ``file:`` address (item 596): the browser opens no file of this Mac,
+    since a page opened from disk could lead it to any other (a key, a password store) past the rules on reading files.
+    A file is read with read_file, which those rules judge; a page Dot made in its workspace reaches the owner by its
+    path, written in code in the answer: the panel beside the conversation shows its text (never the page drawn), and
+    the owner opens the page in their own browser. Nothing here serves a folder on this Mac's own address: a
+    server of the Mac opens as any site, and a folder named by a page would bring the files around it within reach
+    (the first round's review). Empty for an address that is no file."""
+    parts = urlsplit(url)
+    if parts.scheme.lower() != "file":
+        return ""
+    path = PurePosixPath(unquote(parts.path))
+    words: str = " A file of this Mac is read with read_file."
+    if path.is_relative_to(PurePosixPath(workspace_dir())):
+        words += (
+            f" To show the owner a page made in the workspace, write its path in code in the answer (`{path}`): the"
+            " panel beside the conversation shows its text, and the owner opens the page in their own browser."
+        )
+    return words
+
+
 def checked_url(raw: str, config: AppConfig) -> str:
-    """The absolute URL the browser may open for ``raw``; anything else is an error the model can act on."""
+    """The absolute URL the browser may open for ``raw``; anything else is an error the model can act on, a file of this
+    Mac with what to do instead (item 596)."""
     url: str = normalize_url(raw)
     verdict = check_browser_url(url, config.browser.allowed_hosts, config.browser.blocked_hosts, config.server)
     if not verdict.allowed:
-        raise ToolInputError(f"{_clip(url, 200)!r} is not an address Dot may open: {verdict.reason}.", {"url": url})
+        raise ToolInputError(
+            f"{_clip(url, 200)!r} is not an address Dot may open: {verdict.reason}.{_local_file_hint(url)}",
+            {"url": url},
+        )
     return url
 
 

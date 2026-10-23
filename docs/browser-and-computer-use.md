@@ -234,29 +234,34 @@ Both modes share what follows.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
   matches its subdomains, and an empty `allowed_hosts` means every site. An entry is read as a host is, so that one
   spelling names a host in all of them: an international name written in Unicode or in punycode, with the dot of an
-  absolute name, or as a numeric address (item 554). The blocked list starts with the cloud-metadata hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any spelling
-  (`localhost`, `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be signed in
-  there. One page of it passes: the one a sign-in comes back to (`/oauth/callback` on this Mac at `[server] port`),
-  which macOS may open in Dot's own Chrome when you sign in from Customize; Chrome opens it as a page and nothing else
-  of the interface, and a run whose tab lands there still has the tab reset (item 448). A server of this Mac on another
-  port opens as any site. In Dot's own Chrome every request is checked as Chrome sends it, not only the address a tool
-  opens: a page (in a tab, and each hop of a redirect) must pass both lists, and anything a page loads (a script, a
-  picture, a fetch, a worker) must be neither a blocked host nor Dot's interface, so a page of an allowed site still
-  loads its parts from wherever it keeps them; what a page makes itself (`blob:` and `data:` addresses) reaches no
-  server and passes. In your Chrome (`mode = "attach"`) Dot holds none of its requests, so as not to slow or stall your
-  own tabs. What is not held is judged where it lands (item 554): a tab of Dot's on a refused address, and a frame of
-  its page on one, is reset before anything is read from it or done in it. Every view, text, picture and search of a
-  tab, every step, script, scroll, wait and upload asks first; a tab a page opens (a popup) is asked as the chat takes
-  it in, and a page of the tab that goes there on a timer, after it was read, is found by the next call, which fails
-  and says so. A frame is left for a blank page, with a note, and a frame that goes there while the page is read fails
-  that read. Whatever the browser, the daemon itself refuses a navigation to its interface that a page of another site
-  started (`Sec-Fetch-Site: cross-site`), save to the page a sign-in comes back to and to the pages runs showed. A host
-  is read the way Chrome reads it (international names, the numeric spellings of an IPv4 address, a trailing dot), and
-  an address with a backslash before its query is refused. A tab Dot opens waits until Dot checks each hop of its
+  absolute name, or as a numeric address (item 554). The blocked list starts with the cloud-metadata hosts. Dot's own
+  interface is never opened, whatever the lists say: this Mac on `[server] port` in any spelling (`localhost`,
+  `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be signed in there. One page of
+  it passes: the one a sign-in comes back to (`/oauth/callback` on this Mac at `[server] port`), which macOS may open in
+  Dot's own Chrome when you sign in from Customize; Chrome opens it as a page and nothing else of the interface, and a
+  run whose tab lands there still has the tab reset (item 448). A server of this Mac on another port opens as any site.
+  A file of this Mac (`file:`) opens in neither browser: a page opened from disk could lead the browser to any other
+  file, past the rules on reading files. The refusal tells the model what to do instead (item 596): read the file with
+  `read_file`, which those rules judge, and, for a page it made in its workspace, write its path in code in the answer:
+  the panel beside the conversation shows its text (not the page drawn, see [Runs](runs.md)), and you open the page in
+  your own browser. In Dot's own Chrome every request is checked as Chrome sends it, not only the address a tool opens:
+  a page (in a tab, and each hop of a redirect) must pass both lists, and anything a page loads (a script, a picture, a
+  fetch, a worker) must be neither a blocked host nor Dot's interface, so a page of an allowed site still loads its
+  parts from wherever it keeps them; what a page makes itself (`blob:` and `data:` addresses) reaches no server and
+  passes. In your Chrome (`mode = "attach"`) Dot holds none of its requests, so as not to slow or stall your own tabs.
+  What is not held is judged where it lands (item 554): a tab of Dot's on a refused address, and a frame of its page on
+  one, is reset before anything is read from it or done in it. Every view, text, picture and search of a tab, every
+  step, script, scroll, wait and upload asks first; a tab a page opens (a popup) is asked as the chat takes it in, and a
+  page of the tab that goes there on a timer, after it was read, is found by the next call, which fails and says so. A
+  frame is left for a blank page, with a note, and a frame that goes there while the page is read fails that read.
+  Whatever the browser, the daemon itself refuses a navigation to its interface that a page of another site started
+  (`Sec-Fetch-Site: cross-site`), save to the page a sign-in comes back to and to the pages runs showed. A host is read
+  the way Chrome reads it (international names, the numeric spellings of an IPv4 address, a trailing dot), and an
+  address with a backslash before its query is refused. A tab Dot opens waits until Dot checks each hop of its
   redirects. Chrome tells of a popup only once its page has answered, so the hops of the popup's first redirect, and of
-  a redirect that a frame of another site starts by itself, are sent before Dot can ask about them (Dot's own Chrome
-  as well): a hop to a refused address reaches its server, and nothing of the answer is read, since the popup or frame
-  is reset when it is taken in or read. A page that cancels a request while Dot is judging it makes Chrome refuse the
+  a redirect that a frame of another site starts by itself, are sent before Dot can ask about them (Dot's own Chrome as
+  well): a hop to a refused address reaches its server, and nothing of the answer is read, since the popup or frame is
+  reset when it is taken in or read. A page that cancels a request while Dot is judging it makes Chrome refuse the
   verdict ("Invalid InterceptionId"); that is logged only at debug level, and any other refusal as
   `browser_hop_unanswered`.
 - `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
