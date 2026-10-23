@@ -1,6 +1,7 @@
 """A task run that answers in a plain reply is told to finish (the loop's note on a reply without a tool), thinks once
-more and calls finish with the same words: its chat shows the answer once (item 460), as an earlier turn does. A real
-server on a scripted model, the chat read once the run is over."""
+more and calls finish with the same words: its chat shows the answer once (item 460), as an earlier turn does; so it
+does when the finish rewords a line of the reply (item 567: a run's prompt for another agent came back with its first
+line changed, and the chat showed it twice). A real server on a scripted model, the chat read once the run is over."""
 
 import asyncio
 import time
@@ -121,5 +122,80 @@ async def test_an_answer_repeated_by_finish_after_a_thought_shows_once() -> None
                 await expect(answer).to_contain_text(_ANSWER, timeout=15000)
                 await expect(page.locator(".timeline").get_by_text(_ANSWER)).to_have_count(1)
                 await expect(page.locator(".timeline").get_by_text("The note says I replied").first).to_be_attached()
+            finally:
+                await browser.close()
+
+
+# A long answer whose first line the finish rewords, as DeepSeek V4.1 Flash did on 2026-10-23 (item 567).
+_BODY_LINES: tuple[str, ...] = tuple(
+    f"{number}. Fix defect {number} in the search service and add a test that fails before the fix."
+    for number in range(1, 9)
+)
+_REPLY: str = "The prompt for the coding agent, to paste as it is:\n" + "\n".join(_BODY_LINES)
+_REWORDED: str = "Here is the prompt you can give the coding agent:\n" + "\n".join(_BODY_LINES)
+
+
+async def test_an_answer_reworded_by_finish_shows_once() -> None:
+    """The plain reply, then the finish with its first line reworded: the chat holds the words once, in the answer."""
+    script: tuple[ScriptedTurn, ...] = (
+        ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo checked"}),)),
+        ScriptedTurn(text=_REPLY, calls=()),
+        ScriptedTurn(text="", calls=(ScriptedCall(tool="finish", arguments={"answer": _REWORDED, "success": True}),)),
+    )
+    async with _served(ScriptedProvider(_PROVIDER, script)) as (runtime, manager, address):
+        run: RunRecord = await manager.start(
+            _GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(WAIT_S):
+            assert (await manager.wait(run.id)).status == "done"
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs/{run.id}")
+                answer: Locator = page.locator(".timeline .answer")
+                await expect(answer).to_contain_text("Here is the prompt you can give the coding agent", timeout=15000)
+                # The lines stand as a list in the answer, their numbers the list's own.
+                await expect(page.locator(".timeline").get_by_text("Fix defect 4 in the search service")).to_have_count(
+                    1
+                )
+                await expect(page.locator(".timeline").get_by_text("The prompt for the coding agent")).to_have_count(0)
+            finally:
+                await browser.close()
+
+
+# A reply with a line the finish leaves out: what it adds would be lost if it went (the review of item 567).
+_WARNING: str = "But the backup step failed: the disk is full."
+
+
+async def test_a_reply_that_says_more_than_the_answer_stays() -> None:
+    """The plain reply, then the finish without the reply's last line: the chat keeps the reply, that line with it."""
+    script: tuple[ScriptedTurn, ...] = (
+        ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo checked"}),)),
+        ScriptedTurn(text=f"{_REWORDED}\n{_WARNING}", calls=()),
+        ScriptedTurn(text="", calls=(ScriptedCall(tool="finish", arguments={"answer": _REWORDED, "success": True}),)),
+    )
+    async with _served(ScriptedProvider(_PROVIDER, script)) as (runtime, manager, address):
+        run: RunRecord = await manager.start(
+            _GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(WAIT_S):
+            assert (await manager.wait(run.id)).status == "done"
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs/{run.id}")
+                answer: Locator = page.locator(".timeline .answer")
+                await expect(answer).to_contain_text("Here is the prompt you can give the coding agent", timeout=15000)
+                await expect(page.locator(".timeline").get_by_text(_WARNING)).to_have_count(1)
+                # The reply stands over the answer, so its lines are there twice.
+                await expect(page.locator(".timeline").get_by_text("Fix defect 4 in the search service")).to_have_count(
+                    2
+                )
             finally:
                 await browser.close()

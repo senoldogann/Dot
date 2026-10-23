@@ -2,7 +2,7 @@
 // follow-up reads as the next turn of one chat.
 
 import { api, query } from "./api.js";
-import { el, plural } from "./dom.js";
+import { el, plural, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { answerMessage, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
@@ -177,7 +177,7 @@ function drawFlow(past, flow, asked, events) {
   for (const event of events) {
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
-      if (said !== "" && said !== answer) {
+      if (said !== "" && !repeatsAnswer(said, answer)) {
         batch = null;
         blocks.push({ say: said });
       }
