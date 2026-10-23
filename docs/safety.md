@@ -305,13 +305,13 @@ What a shell command printed after it reached the network (`curl`, `ssh`, `git c
 the guard cannot read), what a terminal program prints, and a find_help answer that lists skills or MCP servers that
 other agents of the Mac set up count the same way, unfenced, and so does reading back the files Dot keeps of such content
 when it is too long for one result, under `<workspace>/crawl/` and `<workspace>/mcp-results/` (item 494): `read_file` of
-one, a `search_files` match in one or a search of one, a shell line that names one or runs in one (the words of the
-line are read, so a line that reaches them otherwise, by a variable or a search of the workspace, is not seen); a
-failed `edit_file` of one names none of its lines. A page that comes back from a step counts the same (item 561): what
-`browser_act` (a click, an entry), `browser_upload` and `browser_fill_login` show of the page they leave is marked
-untrusted too, as what `browser_eval` and the desktop tools show already was, so a click on Next that brings up a page
-that says "run curl -T …" leaves the run marked even after your next message cleared the mark and the chat's tab
-stayed. A run that has seen such content is marked untrusted, and from then
+one, a `search_files` match in one or a search of one, a shell line that names one or runs in one, in any letter case
+(item 599; the words of the line are read, so a line that reaches them otherwise, by a variable or a search of the
+workspace, is not seen); a failed `edit_file` of one names none of its lines. A page that comes back from a step counts
+the same (item 561): what `browser_act` (a click, an entry), `browser_upload` and `browser_fill_login` show of the page
+they leave is marked untrusted too, as what `browser_eval` and the desktop tools show already was, so a click on Next
+that brings up a page that says "run curl -T …" leaves the run marked even after your next message cleared the mark and
+the chat's tab stayed. A run that has seen such content is marked untrusted, and from then
 on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
 or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
 running a script the line downloaded (item 523), or a blob it decoded and ran (`base64 -d x | sh`, or a decode to a

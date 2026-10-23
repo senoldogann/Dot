@@ -51,6 +51,24 @@ def test_a_shell_line_counts_when_it_names_such_a_path_or_runs_there(tmp_path: P
     assert not mentions_third_party("cat crawl/index.md", Path("/"), workspace)
 
 
+def test_a_folder_of_third_party_files_is_known_in_any_letter_case(tmp_path: Path) -> None:
+    """Item 599: a Mac's volume ignores letter case, so ``CRAWL/page.md`` is the crawl's page, while resolving a path
+    keeps the case it was written in: the words alone were compared, and a run read the crawl's page back unmarked."""
+    (tmp_path / "Work").mkdir()
+    workspace: Path = expand_path(str(tmp_path / "Work"), tmp_path)
+    assert holds_third_party(expand_path("CRAWL/host/001.md", workspace), workspace)
+    assert holds_third_party(workspace / "Mcp-Results" / "srv-tool.txt", workspace)
+    assert not holds_third_party(workspace / "CRAWL.md", workspace)
+    assert not holds_third_party(workspace / "Crawler" / "001.md", workspace)
+    assert matches_third_party([f"{workspace}/Crawl/host/001.md:9:y"], workspace, workspace)
+    assert mentions_third_party("cat CRAWL/host/001.md", workspace, workspace)
+    assert mentions_third_party(f"cat {str(workspace).upper()}/MCP-RESULTS/srv-tool.txt", Path("/"), workspace)
+    assert mentions_third_party("cat 001.md", workspace / "MCP-RESULTS", workspace)
+    # The folder the line runs in, written in another case than the workspace: its paths from there are read too.
+    assert mentions_third_party("cat crawl/host/001.md", tmp_path / "WORK", workspace)
+    assert not mentions_third_party("cat crawler/host/001.md", workspace, workspace)
+
+
 def test_a_failed_edit_of_a_third_party_file_names_none_of_its_lines(tmp_path: Path) -> None:
     workspace: Path = expand_path(str(tmp_path), tmp_path)
     journal: JournalTarget = JournalTarget(
