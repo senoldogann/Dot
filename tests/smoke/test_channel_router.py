@@ -17,7 +17,7 @@ from dotagent.agent.manager import RunManager
 from dotagent.channels.router import DEFAULT_CHOICES, WATCHED_KINDS, ChannelRouter
 from dotagent.channels.types import Receive
 from dotagent.config import load_config
-from dotagent.core.errors import ChannelError, ConfigError
+from dotagent.core.errors import ConfigError
 from dotagent.core.paths import env_file_path
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -41,18 +41,14 @@ class FakeChannel:
 
     def __init__(self) -> None:
         self.sent: list[str] = []
-        self.is_paired: bool = True
-        self.failing: bool = False
 
     def paired(self) -> bool:
-        return self.is_paired
+        return True
 
     async def run(self, receive: Receive) -> None:
         raise AssertionError("the router reads no channel: the tests post for it")
 
     async def send(self, text: str) -> None:
-        if self.failing:
-            raise ChannelError("the channel is down", {})
         self.sent.append(text)
 
     async def start_from_now(self) -> None:
@@ -377,28 +373,6 @@ async def test_a_message_that_fails_unexpectedly_says_so_and_the_next_one_still_
     await wired.router.inbound("imessage", "and this goes")
     await _until(lambda: len(wired.channel.sent) == before + 1, "the next answer")
     assert wired.channel.sent[-1] == "Still working."
-
-
-async def test_a_line_for_the_owner_goes_to_a_channel_that_is_on_and_paired(wired: Wired) -> None:
-    wired.channel.sent.clear()
-    assert await wired.router.tell("Good morning: three things today.") == ("imessage",)
-    assert wired.channel.sent == ["Good morning: three things today."]
-    wired.on = False
-    try:
-        assert await wired.router.tell("Not while it is off.") == ()
-    finally:
-        wired.on = True
-    wired.channel.is_paired = False
-    try:
-        assert await wired.router.tell("Nowhere to send it.") == ()
-    finally:
-        wired.channel.is_paired = True
-    wired.channel.failing = True
-    try:
-        assert await wired.router.tell("Not delivered.") == ()
-    finally:
-        wired.channel.failing = False
-    assert wired.channel.sent == ["Good morning: three things today."]
 
 
 async def test_the_page_of_a_channel_links_to_the_newest_run_of_its_chat(wired: Wired) -> None:

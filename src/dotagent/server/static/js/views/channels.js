@@ -207,7 +207,7 @@ export function mount(root, ctx) {
   function imessageSection(view) {
     const toggle = switchRowSetting({
       label: "iMessage",
-      hint: "Dot reads your conversation with yourself on this Mac and answers in it. Only what you send from now on is read.",
+      hint: "Dot reads your conversation with yourself on this Mac and answers in it, and tells you there what it has to say on its own: the morning brief and your watchers. Only what you send from now on is read.",
       read: () => view.on,
       write: async (on) => {
         await post("/channels/imessage/switch", { on }, on ? "Dot reads your conversation with yourself." : "Dot no longer reads iMessage.");

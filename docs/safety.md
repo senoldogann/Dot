@@ -43,11 +43,13 @@ shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, s
   that phone's browser and carried by its maker's push service (see [Dot on the phone](phone.md#dot-on-the-phone)). The
   first line of the morning brief goes the same way (item 570): the model wrote it from what the run read, mail of
   others among it, so it may repeat what a sender wrote.
-- **To your own devices through Apple, once you switch iMessage on: Dot's answers.** Each answer (masked of the secrets
-  Dot holds, cut to about 2,000 characters), the line that says a run waits for you and the notices a message of yours
-  earns are sent into your conversation with yourself through Messages, to Apple's iMessage servers and on to your
-  devices, as any iMessage is. What you send there is read from Messages' database on this Mac (see
-  [Channels](channels.md), item 572).
+- **To your own devices through Apple, once you switch iMessage on: Dot's answers, and what it tells you on its own.**
+  Each answer (masked of the secrets Dot holds, cut to about 2,000 characters), the line that says a run waits for you,
+  the notices a message of yours earns, and what Dot tells you on its own (item 582: the first line of the morning
+  brief and each tell of a watcher, that is a title, up to 400 characters of text and the link to the page it opens;
+  the text may hold a mail's sender and subject, or what a sender wrote) are sent into your conversation with yourself
+  through Messages, to Apple's iMessage servers and on to your devices, as any iMessage is. What you send there is read
+  from Messages' database on this Mac (see [Channels](channels.md), item 572).
 - **To the browser's makers, if you use the microphone: your voice, from your browser; and, when the Mac has no voice of
   the language, the text read aloud.** The composer's microphone and the reading of answers aloud (item 574) are the
   browser's own speech recognition and speech synthesis: Safari and Chrome may send what you say to Apple's or Google's
@@ -674,8 +676,9 @@ the mode and with the approvals its chat keeps (Auto and `[policy] approvals` un
 composer). What makes it yours is where it came from: a row of Messages' database that Messages flags as sent by you
 over iMessage, in a one-to-one conversation named for a number or an address you paired with a code typed back. A
 message from anyone else, in a group, by text message or as a reaction is never read as a command; Dot's own messages
-land in the same conversation and each starts with `◆`, which is how they are told from yours. Nobody without your Apple
-ID can write such a row from outside this Mac, but a run of Dot can from inside it: a message it sends through
+(its answers, and what it tells you on its own, item 582, whose words may be a third party's: a mail's subject) land in
+the same conversation and each starts with `◆`, which is how they are told from yours. Nobody without your Apple ID can
+write such a row from outside this Mac, but a run of Dot can from inside it: a message it sends through
 AppleScript, through keystrokes in Messages or through a tool of an MCP server lands in that conversation flagged as
 yours, and Messages' database cannot tell it from yours. The guard asks before such a send, but in `auto` the review
 model answers, not you, and in `yolo` nobody does, so a run that read untrusted content could write itself a command and

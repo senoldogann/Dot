@@ -2,8 +2,8 @@
 
 Dot does not only answer when it is asked. Each morning it writes you a brief and sends you its first line (item 570),
 and its watchers tell you when a mail, a calendar event or a GitHub notification you care about comes (item 571). Both
-are set on Schedules, and what Dot tells you on its own goes through one place, which the phone's push and the desktop's
-notifications share (see [Telling you](#telling-you)).
+are set on Schedules, and what Dot tells you on its own goes through one place, which the phone's push, the desktop's
+notifications and, when it is on, iMessage share (see [Telling you](#telling-you)).
 
 ## Morning brief
 
@@ -60,7 +60,8 @@ in one line and the brief is still written. In the presets that ask for every re
 there to answer, so the reads of mail and calendar may be refused and the brief says what it could not read.
 
 **What you get.** The answer is short, the most important first: its first line is one sentence of at most 140
-characters, which the push shows with the title "Your morning brief" and which opens the run when you tap it; then a few
+characters, which the push shows with the title "Your morning brief" and which opens the run when you tap it (with
+iMessage on, the same line goes into your conversation with yourself too, see [Telling you](#telling-you)); then a few
 lines for each part that has something. Every brief is a new run in one chat, **Morning brief**, kept for all of them:
 the run reads the conversation of the runs before it, as a schedule that goes on in its chat does, and starts untrusted
 when one of them ended so. A brief that failed is told as any schedule's failure ("A run failed", at the level its row
@@ -68,7 +69,7 @@ says: always).
 
 What goes out of the Mac is what any run's goes (see [What leaves this Mac](safety.md#what-leaves-this-mac)): the record
 above, and what the mail and calendar tools return, go to the model the run runs on, and the first line of the answer
-goes to your phone's push service. Nothing is sent anywhere else.
+goes to your phone's push service and, with iMessage on, to Apple's iMessage servers. Nothing is sent anywhere else.
 
 ## Watchers
 
@@ -122,7 +123,8 @@ reached) says so on its row, with the error, and tries again no sooner than five
 Nothing looks while the emergency stop is engaged. A watcher switches on and off on its row, and at most 20 can be made.
 
 **What a tell is.** A push to your phone (title: the watcher's name; text: the mail's sender and subject with the
-model's line, the notification, the event) and a line kept in the chat **Watchers**, which the tap opens: the chat shows
+model's line, the notification, the event), the same in your conversation with yourself when iMessage is on (see
+[Telling you](#telling-you)), and a line kept in the chat **Watchers**, which the tap opens: the chat shows
 in the sidebar, unread, with the newest tell as its last line. The line is a run that no model made (its goal says which
 watcher and what kind, its result is the tell), kept by `RunManager.keep_notice` and marked untrusted: what a third
 party wrote is in its result only, never in its goal, which a later run in that chat would take as yours. A tell that
@@ -148,8 +150,21 @@ url)` in `dotagent/notify/owner.py`: a title, a line or two of text and the rout
 (`#/runs/<id>`; an address of anything else is refused, so that nobody whose words are in a tell can send you
 elsewhere). It is an event of Dot itself, `owner_told`, live only like the other notices (see [The
 daemon](daemon.md#the-daemon-the-web-ui-and-the-service)): the web push sends it to every subscribed phone, the page
-shows it as a desktop notification where those are on, and any way to reach you added later listens for the same event.
-It is not stored: what is kept is the run it opens.
+shows it as a desktop notification where those are on, and the channel router of [Channels](channels.md) (item 582)
+sends it into your conversation with yourself while iMessage is on and a number is paired; any way to reach you added
+later listens for the same event. It is not stored: what is kept is the run it opens.
+
+**On iMessage** a tell is one message, marked `◆ `, of the title, a colon, the text and the link to the page it opens
+(`#/runs/<id>` or `#/schedules`, at the address of the links of the channel, never one that carries the access token):
+*Your morning brief: Nothing needs you today. https://…/#/runs/…*. It is masked of the secrets Dot holds and sent as
+plain text, and it is never read back as a command, since every message of Dot's in that conversation starts with `◆`
+(and the link that Messages may split off its end is Dot's own too, see
+[Channels](channels.md#what-dot-reads-and-what-it-does-not)). A channel gets at most one such message in twenty
+seconds (`ASKS_APART_S`, the pace of its other lines): a watcher that tells several things in a row is told as its
+first one, and the rest as one message when the twenty seconds are over, *Bank mail: and 3 more*, which links to the
+newest. A tell that waited alone goes as itself. With iMessage off, or no number paired, nothing is sent there, and a
+tell that was held when it was switched off is let go; the phone's push and the page's notification are not changed by
+it.
 
 ## The API
 

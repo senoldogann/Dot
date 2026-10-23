@@ -709,7 +709,8 @@ double_tap_ms = 400
 # The owner's own messaging apps as ways to reach Dot (item 572); off until Settings › Channels pairs and switches it.
 # imessage: Dot reads your conversation with yourself in Messages on this Mac (a message you send to your own number or
 # Apple ID address from your iPhone; Full Disk Access for the app that runs Dot) and answers in it, each answer starting
-# with ◆ (Automation for Messages). Approvals are never answered on a channel.
+# with ◆ (Automation for Messages). What Dot tells you on its own (the morning brief's first line, a watcher's tell,
+# item 582) goes there too, at most one line in twenty seconds. Approvals are never answered on a channel.
 imessage = false
 
 [recap]
