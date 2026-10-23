@@ -19,6 +19,7 @@ from dotagent.server.guard import (
     require_loopback,
     response_headers,
 )
+from dotagent.server.links import base_url
 
 PORT: int = 8765
 TOKEN: str = "MARKER-0123456789abcdef"
@@ -30,9 +31,17 @@ NONCE: str = "0123456789abcdef" * 4
 PROOF: str = "4aea8baff569980b8b9dceb16e4d02f89d6563a252c47dcf94912b82ae440020"
 
 
-@pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1", "127.0.0.2"])
-def test_loopback_addresses_are_accepted(host: str) -> None:
+@pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1"])
+def test_loopback_addresses_are_accepted_and_every_request_they_make_is_served(host: str) -> None:
+    """A host the daemon starts on is one its Host check knows, in the address the clients build from it (item 561):
+    ``links.base_url`` writes it as it stands, an IPv6 one in brackets."""
     require_loopback(host)
+    address: str = base_url(host, PORT).removeprefix("http://")
+    assert check_request("/api/health", address, None, None, None, None, TOKEN, PORT, frozenset()) is None
+    assert (
+        check_request("/api/status", address, f"http://{address}", None, None, GOOD_AUTH, TOKEN, PORT, frozenset())
+        is None
+    )
 
 
 @pytest.mark.parametrize("host", ["0.0.0.0", "192.168.1.20", "::", "example.org", ""])
@@ -40,6 +49,21 @@ def test_addresses_other_machines_can_reach_are_refused(host: str) -> None:
     with pytest.raises(ConfigError) as refused:
         require_loopback(host)
     assert refused.value.context["host"] == host
+    assert "127.0.0.1, localhost, ::1" in refused.value.message
+
+
+@pytest.mark.parametrize(
+    "host", ["127.0.0.2", "127.1.2.3", "0:0:0:0:0:0:0:1", "0000:0000:0000:0000:0000:0000:0000:0001"]
+)
+def test_a_spelling_of_a_loopback_address_the_host_check_does_not_know_is_refused_at_the_start(host: str) -> None:
+    """The daemon bound there and then refused every request with 421 (item 561), its own client's among them."""
+    with pytest.raises(ConfigError) as refused:
+        require_loopback(host)
+    assert refused.value.context["host"] == host
+    assert "no other spelling of a loopback address" in refused.value.message
+    address: str = base_url(host, PORT).removeprefix("http://")
+    refusal: Refusal | None = check_request("/api/health", address, None, None, None, None, TOKEN, PORT, frozenset())
+    assert refusal is not None and refusal.status == 421
 
 
 @pytest.mark.parametrize(

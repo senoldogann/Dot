@@ -11,8 +11,11 @@ emergency stop, and renaming or removing a folder above any of them, which would
 profile names. The search tools may not read the user's protected locations either: a search has no reason to, while
 the programs a shell runs (ssh, git, a cloud CLI) read their own credentials there, so those stay open to a command and
 are the guard's to keep. macOS refuses such a call with "Operation not permitted",
-whatever path, link or letter case names the file. ``[shell] sandbox = false`` starts them without it, and Settings ›
-Rules switches it while the daemon runs (:class:`SwitchedSandbox`).
+whatever path, symbolic link or letter case names the file. A hard link is the exception: the profile matches the path
+a file has, so a hard link that a process outside the sandbox (a yolo run, a run while ``[shell] sandbox = false``)
+made to one of them earlier is another path to it, which the profile does not name; the daemon says so in its log when
+it starts (:func:`hard_linked`, item 561). ``[shell] sandbox = false`` starts them without it, and Settings › Rules
+switches it while the daemon runs (:class:`SwitchedSandbox`).
 
 A process that has another program act for it would act outside the sandbox, so the profile refuses that too:
 opening an application, a document or an address through Launch Services (``open``, a program's own call), starting the
@@ -50,6 +53,8 @@ user's account may; Dot's own code is among what it loads and runs.
 """
 
 import asyncio
+import os
+import stat
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -151,6 +156,21 @@ def build_sandbox(
         commands=(SANDBOX_EXEC, "-p", sandbox_profile(sealed, unwritable, launch_agents)),
         search=(SANDBOX_EXEC, "-p", sandbox_profile(protected, unwritable, launch_agents)),
     )
+
+
+def hard_linked(paths: Sequence[Path]) -> dict[Path, int]:
+    """The regular files among ``paths`` that have more than one name on this Mac, each with how many (item 561). A
+    profile of paths cannot close a hard link made outside the sandbox: it is another path to the same file, and a run's
+    command that reads it reads what the profile seals. A folder among ``paths`` is not searched. Blocking."""
+    linked: dict[Path, int] = {}
+    for path in paths:
+        try:
+            status: os.stat_result = os.lstat(path)
+        except OSError:
+            continue
+        if stat.S_ISREG(status.st_mode) and status.st_nlink > 1:
+            linked[path] = status.st_nlink
+    return linked
 
 
 async def check_sandbox(sandbox: Sandbox) -> None:

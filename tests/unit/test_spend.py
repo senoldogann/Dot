@@ -4,7 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from dotagent.browser.safety import dialog_is_financial
+from dotagent.browser.safety import assess_step, dialog_is_financial, payment_steps
+from dotagent.browser.types import Step
 from dotagent.config import SpendCap
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, naming_reasons
 from dotagent.policy.engine import decide
@@ -261,3 +262,48 @@ async def test_a_payment_steps_amount_is_the_largest_its_labels_and_its_page_nam
     page.text = "Nothing to pay here"
     assert await _payment_amount(ctx, labels) == Amount(value=480.0, currency="€")  # type: ignore[arg-type]
     assert await _payment_amount(ctx, [None]) is None  # type: ignore[arg-type]
+
+
+def test_the_payment_steps_of_a_batch_are_the_clicks_that_pay_not_the_typing_into_a_card_field() -> None:
+    """One amount stands for one payment (item 561): a batch with two payment steps would have passed for the larger
+    of its amounts, so ``browser_act`` counts them and refuses a batch with more than one."""
+    paying: StepAssessment = assessment_for(["payment"])
+    plain: StepAssessment = assessment_for([])
+    card: Element = Element(role="textbox", name="Card number")
+    donate: Element = Element(role="button", name="Donate $10")
+    support: Element = Element(role="button", name="Support the shelter")
+    steps: list[tuple[Step, Element | None, StepAssessment]] = [
+        # Typing into a card field is flagged as money, and moves none by itself.
+        (Step(action="fill", ref="e8", text="4242 4242 4242 4242"), card, paying),
+        (Step(action="click", ref="e5"), donate, paying),
+        (Step(action="click", ref="e6"), support, plain),
+        (Step(action="click_at", x=10, y=10), None, plain),
+        (Step(action="click", ref="e1"), Element(role="button", name="Next"), plain),
+    ]
+    assert payment_steps(steps, frozenset()) == 1
+    # A control no pattern knows that the typed judge found a payment is one too, each time it is clicked.
+    assert payment_steps(steps, frozenset({support})) == 2
+    assert payment_steps([steps[1], steps[1]], frozenset()) == 2
+    assert payment_steps([], frozenset()) == 0
+
+
+def test_enter_or_space_on_a_button_that_pays_is_a_payment_as_a_click_on_it_is() -> None:
+    """Enter or Space on the control that has the focus presses it (the review of item 561): on a button that pays,
+    the step is judged by the button's name as a click is, so it is money for the owner, and a batch counts it among
+    its payments. Enter in a search box presses nothing that pays."""
+    pay: Element = Element(role="button", name="Pay $45.00")
+    search: Element = Element(role="textbox", name="Search")
+    for key in ("Enter", "Space", " ", "Control+Enter"):
+        judged: StepAssessment = assess_step(Step(action="press", ref="e5", key=key), pay, None)
+        assert "financial" in judged.flags, (key, judged)
+    assert "financial" not in assess_step(Step(action="press", ref="e2", key="Enter"), search, None).flags
+    assert "financial" not in assess_step(Step(action="press", ref="e5", key="Tab"), pay, None).flags
+    pressed: StepAssessment = assess_step(Step(action="press", ref="e5", key="Enter"), pay, None)
+    clicked: StepAssessment = assess_step(
+        Step(action="click", ref="e9"), Element(role="button", name="Place order"), None
+    )
+    steps: list[tuple[Step, Element | None, StepAssessment]] = [
+        (Step(action="click", ref="e9"), Element(role="button", name="Place order"), clicked),
+        (Step(action="press", ref="e5", key="Enter"), pay, pressed),
+    ]
+    assert payment_steps(steps, frozenset()) == 2

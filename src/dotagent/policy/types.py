@@ -79,10 +79,12 @@ DecisionSource = Literal[
 
 # Who answers a question the policy raised, strictest first: ``supervised`` the user, who is also asked before every
 # change the policy lets through (item 398); ``ask`` the user (the web UI calls it Auto-accept edits: edits and routine
-# work run); ``auto`` a reviewer model (which can hand the question on to the user); ``yolo`` nobody (the action is
-# allowed and only recorded), but for the guard (item 429): money, credentials, messages and posts in the user's name
-# are the user's in every mode. Secret stores and data sent out, which the other modes refuse (item 433), and a change
-# of Dot's own files, which is the user's in every other mode (item 398), yolo lets through.
+# work run); ``auto`` a reviewer model (which can hand the question on to the user); ``yolo`` nobody: it asks nothing
+# (item 443), the action is allowed and recorded with the reason it would have asked for. Money and credentials, a
+# message or a post in the user's name (the guard, item 429), a pre-approved spend, a change of Dot's own files (item
+# 398), and the secret stores and data sent out that the other modes refuse (item 433) are all waived there. A refusal
+# that is no question stands: a research run's limit, and the secret that a run which read outside content would send
+# out (item 525).
 ApprovalMode = Literal["supervised", "ask", "auto", "yolo"]
 # What the agent's own question (``ask_user``) does in a run nobody can answer during it (``[agent] questions``,
 # ``agent.progress.can_ask_user``): ``wait`` for the answer, or ``leave`` it for the user and go on. A run the user can

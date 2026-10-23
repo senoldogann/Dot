@@ -1,7 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The shell's own pages may show notifications through the shell and drag the window by its bars. The pages of the daemon's address get the same when the shell starts (grant in src/lib.rs); no other remote page does.",
+  "description": "The shell's own pages may show notifications through the shell, drag the window by its bars and zoom it with a double click there, and nothing else of Tauri's core. The pages of the daemon's address get the same when the shell starts (grant in src/lib.rs); no other remote page does.",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-start-dragging", "notification:default"]
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize",
+    "notification:default"
+  ]
 }

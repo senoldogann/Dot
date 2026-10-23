@@ -1,11 +1,11 @@
 """The keys of web_search's hosted rungs are read again when their provider is retired, as Settings › Providers does
-on a saved or removed key, and a Keychain that refuses does not stop the daemon (item 558)."""
+on a saved or removed key (item 558). A Keychain that refuses is no key for them, as it is for every key a service can
+be opened without (``tests/unit/test_keychain_refusal.py``)."""
 
 import pytest
 
-from dotagent import runtime
+from dotagent import runtime, secrets
 from dotagent.config import AppConfig, load_default_config
-from dotagent.core.errors import ConfigError
 from dotagent.llm.calls import ModelCall
 from dotagent.llm.router import ModelRouter
 
@@ -14,20 +14,10 @@ async def _recorded(call: ModelCall) -> None:
     del call
 
 
-def test_a_keychain_that_refuses_is_no_key_for_a_service_the_daemon_starts_without(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def refused(name: str) -> str | None:
-        raise ConfigError("the macOS Keychain refused the lookup", {"name": name, "returncode": 36})
-
-    monkeypatch.setattr(runtime, "resolve_secret", refused)
-    assert runtime._optional_secret("OLLAMA_API_KEY") is None
-
-
 async def test_a_retired_provider_has_its_search_key_read_again(monkeypatch: pytest.MonkeyPatch) -> None:
     config: AppConfig = load_default_config()
     held: dict[str, str] = {}
-    monkeypatch.setattr(runtime, "resolve_secret", held.get)
+    monkeypatch.setattr(secrets, "resolve_secret", held.get)
     keys: runtime.SearchKeys = runtime.SearchKeys(ollama=False, anthropic=False)
     router: ModelRouter = ModelRouter(config, _recorded, {})
     told: list[str] = []

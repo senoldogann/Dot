@@ -79,6 +79,22 @@ the review model is never asked about them, and a payment under its pre-approved
 `auto`), and a message sent for you or a post in your name still waits for your yes (the review model answers it in
 `auto`; a rule that allows it does not), and a login filled from your 1Password waits for yours alone, in `auto` too.
 
+**What an upload asks** (item 561). A file sent to a server carries the flag `upload`: one chosen in a page's upload
+control with `browser_upload` (many pages send it as soon as it is chosen), a `curl -T`, a form sent with a file, a
+push. No preset lists it, so what it does follows from the mode and the preset (see [Safety](safety.md#safety) for the
+presets):
+
+| Where                                       | An upload                                                          |
+| ------------------------------------------- | ------------------------------------------------------------------ |
+| `ask` or `auto`, `aggressive` or `balanced` | goes ahead until the run has read untrusted content, then asks (you in `ask`, the review model in `auto`) |
+| `ask` or `auto`, `cautious`                 | asks, as everything that is not read-only does                     |
+| `supervised`, any preset                    | asks, as every change does                                         |
+| `yolo`, any preset                          | asks nothing; once the run has read outside content, the review model checks it first (item 525) |
+
+A file of your home folder, of the system or of Dot's own carries `exfiltration` as well, and a protected one
+`secret_access`: every mode but `yolo` refuses those. A rule of yours that allows an upload still asks once the run has
+read untrusted content; only a `preapproved` rule skips that question.
+
 **If the review model fails** (the provider is down, or the model does not answer in the form asked for after two
 attempts) there is no fallback. That one tool call fails with the error as its result, the run goes on, and the
 question is not put to you in its place.

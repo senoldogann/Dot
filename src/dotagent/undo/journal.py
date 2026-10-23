@@ -11,6 +11,7 @@ import os
 import shutil
 import stat
 import time
+import unicodedata
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -120,8 +121,9 @@ def note_change(target: JournalTarget, path: Path, data: bytes) -> JournalEntry:
 def _note(target: JournalTarget, path: Path, data: bytes) -> JournalEntry:
     entries: list[JournalEntry] = read_journal(target.directory)
     seq: int = len(entries)
-    first: bool = all(entry.path != str(path) for entry in entries)
     status: os.stat_result | None = _lstat(path)
+    path = _as_held(path, status)
+    first: bool = all(entry.path != str(path) for entry in entries)
     skipped: str | None = None
     copy: bytes | None = None
     if first and status is not None:
@@ -149,6 +151,35 @@ def _note(target: JournalTarget, path: Path, data: bytes) -> JournalEntry:
     )
     _append(target.directory / JOURNAL_FILE, entry)
     return entry
+
+
+def _folded(name: str) -> str:
+    """``name`` as this Mac's file system compares names: its letter case and its normalization do not tell two names
+    apart."""
+    return unicodedata.normalize("NFD", name).casefold()
+
+
+def _as_held(path: Path, status: os.stat_result | None) -> Path:
+    """``path`` with its last part spelt as its folder holds it, when a file is there (``status``): the file system
+    keeps the case of a name but does not tell ``DOC.TXT`` from ``doc.txt``, so a file that two changes name two ways
+    would have two histories in the journal and be taken back only to the first one's last change, not to what it was
+    (item 561). The folders above are as the kernel names them already (:func:`dotagent.policy.paths.kernel_path`). The
+    name found must be the same file, not another whose name folds the same (a volume may tell case); ``path`` as it is
+    when none is, when it is spelt as held, or when the folder cannot be read. Blocking."""
+    if status is None:
+        return path
+    folded: str = _folded(path.name)
+    other: Path | None = None
+    try:
+        with os.scandir(path.parent) as held:
+            for entry in held:
+                if entry.name == path.name:
+                    return path
+                if _folded(entry.name) == folded and os.path.samestat(status, entry.stat(follow_symlinks=False)):
+                    other = path.parent / entry.name
+    except OSError:
+        return path
+    return path if other is None else other
 
 
 def _lstat(path: Path) -> os.stat_result | None:

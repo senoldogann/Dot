@@ -23,6 +23,7 @@ APP_NAME: str = "Dot"
 # The app's bundle identifier, the launchd job's label.
 BUNDLE_ID: str = "dev.dotagent.dot"
 SOURCE: Path = Path(__file__).parent / "dot_app.c"
+BUILD_FOLDER: str = ".dot-app-build"
 
 _XCRUN: str = "/usr/bin/xcrun"
 _CODESIGN: str = "/usr/bin/codesign"
@@ -54,6 +55,11 @@ class InfoPlist(TypedDict):
 def app_path(home: Path) -> Path:
     """Where Dot.app is: in Dot's home."""
     return home / f"{APP_NAME}.app"
+
+
+def build_path(home: Path) -> Path:
+    """Where Dot.app is built and signed before it takes the old one's place: beside it, in Dot's home."""
+    return home / BUILD_FOLDER
 
 
 def app_program(app: Path) -> Path:
@@ -125,7 +131,7 @@ def ensure_app(home: Path) -> Path:
     info: bytes = render_info_plist()
     if _current(app, source, info):
         return app_program(app)
-    aside: Path = home / ".dot-app-build"
+    aside: Path = build_path(home)
     if aside.exists():
         shutil.rmtree(aside)
     built: Path = aside / app.name

@@ -80,7 +80,10 @@ you.
 **Pre-approved spending.** `[policy.spend]` lists sites with caps, for example `"namecheap.com" = { per_purchase = 20,
 per_day = 50 }`. Dot reads the amount of a payment step from the labels of its controls ("Pay €19.90") and from the
 total on the page, and takes the largest (item 385: a coupon or a basket line in the same step cannot stand for the
-payment), so that a misread errs towards the hand-off; under both caps the step is a
+payment), so that a misread errs towards the hand-off. A batch of browser steps carries one payment step at most (item
+561): a click that pays, by its control's words or by the typed judge's reading; filling in a card field is not one.
+Two payments in one call would pass for the larger of their amounts, so the call is refused and the model sends them
+one call at a time, each decided on its own amount; this holds in every mode, `yolo` too. Under both caps the step is a
 question instead of a hand-off (`auto` lets the review model answer, `ask` asks you once, and a `yolo` run asks
 nothing), it
 is recorded with its amount, shown in the timeline, and counts against the site's day.
@@ -110,7 +113,9 @@ currency, so list sites that bill in one currency. Empty by default.
    shows its number without "#" hands the click off. A dialog that asks to confirm is judged by the same words,
    without that exception: there, an order's number is the order about to be paid. The way to the
    payment page ("Checkout", "Continue to payment") is an ordinary click, so the run fills the order and the button
-   that pays is the one handed to you (item 522).
+   that pays is the one handed to you (item 522). Enter or Space pressed on a button, which presses it, is judged by
+   the button's label as a click on it is (item 561), and so is Return on a focused or default button of an
+   application of the Mac (item 555).
 5. *The guard* (item 429): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for a yes in every mode that asks, whatever
@@ -121,6 +126,47 @@ currency, so list sites that bill in one currency. Empty by default.
    asked for (item 443).
    What the policy cannot tell for a message is not guarded: a key that sends in a web page's chat box, a page's own script
    (`browser_eval`), a program of the shell that talks to a mail server or a chat's API itself (`curl`, a script).
+   For an AppleScript or JXA script (the tool `apple_script`, and `osascript` in a command line) the guard reads the
+   script's words (item 561): `send` and `make new outgoing message`, also when JavaScript writes a letter of the verb
+   with an escape (`"s\x65nd"`), and the properties of a Mail rule that send later (`forward message`, `redirect
+   message`, `reply text`), ask as a send. A script that may send in words the guard cannot read asks as a send too.
+   Some say nothing it can read whatever application they drive, and ask whichever they name: a raw Apple event
+   (`«event ichtsend»` is Messages' own `send` by its code, `«event emsgsend»` Mail's); text the script runs as a
+   script (`run script`, `load script`), or builds and runs through the Objective-C bridge (`NSAppleScript`,
+   `NSClassFromString`, `NSAppleEventDescriptor`, `performSelector`, AppleScriptObjC's `current application's NSTask`
+   and `NSProcessInfo`); a script file (`osascript send.scpt`); and a script the command line puts together as it runs
+   (`osascript -e "$S"`, `-e "…$(…)…"`, a here-document or here-string that holds a variable, `xargs osascript -e`,
+   `find -exec osascript -e {}`): the line shows words, not the script that runs, even when the variable is the line's
+   own. So do keystrokes (`keystroke`, `key code`, `keyCode`) and a button pressed through System Events' UI scripting
+   (`click`, `perform`, `actions`: `click button 1 of toolbar 1`, `perform action "AXPress"`, a JavaScript `.click()`
+   or `.actions[0].perform()`), whatever application they are pressed in: a key goes to the application in front, and
+   a process is found by a filter, a built or a localized name as well as by its own, so the script cannot say whose
+   Send it presses (the structural option after the third review of item 561; a script that only copies or pastes
+   through keys asks too). A shell line a script puts together as it runs (`do shell script` or `doShellScript` with
+   anything but literal text, and the line Terminal's `do script` types) is code the guard cannot read, like such a
+   command line: every preset asks about it, and as a send too, since the line may be `osascript` with a script that
+   sends. Others are how
+   scripts of every application are written, and ask when the script names Mail or Messages (by name, bundle id or
+   path) or builds the name of the application or the process it drives: names it by anything but one string (a
+   concatenation, a variable, a number or a filter: `application ("Mess" & "ages")`, `application a`, `application
+   id (…)`, `process 1`, `process whose …`; JavaScript's `Application(…)`, `byName(…)`, `processes[…]` with anything but
+   one string, or `whose(…)`; `current application` is none). They are read by what they are called, not by how they are
+   called: JavaScript that builds code or a name as it runs (`eval`, `Function`, `constructor`, `Reflect` and `Proxy`
+   wherever they stand; a method called through `.call`, `.apply` or `.bind`; a bracket that is neither an array
+   literal nor a number: `m["se" + "nd"]`, `m?.[verb]`, `{[verb]: go}`, `m /**/ [verb]`. An array literal is one after
+   `=`, `(`, `,`, `:`, `[` or `>`, or at the start; the comments and what the strings say are left out first, and
+   where a slash or an HTML-like comment keeps the guard from telling them apart, every bracket that is not a number
+   asks); the Objective-C bridge (`ObjC`, `$.NS…`, and AppleScriptObjC's `use framework` and `current
+   application's`, which also make a script high risk). A plain read of Mail or Messages (`get subject of messages
+   of inbox`, `messages[0].subject()`) asks nothing; JavaScript that indexes by a variable (`messages[i]`) does. What
+   the guard does not read: JavaScript that builds a name with `with`; an application other than Mail and Messages
+   that sends through its own dictionary (Outlook, another mailer: there the verb is the only word it reads); what a
+   script can reach, which it tells by the names in the script, so that a localized name of Messages (Mesajlar) or an
+   application reached through a symlink passes; a shell line that JavaScript runs through a name it builds as it runs
+   (`a["doShell" + "Script"](line)`, `a.doShellScript.call(a, line)`) in a script that names neither Mail nor Messages,
+   which is not read as a shell line at all, so that what it runs is held by the sandbox alone; and what an
+   application does once a script has handed it the work. macOS does not hold a sandbox to Apple Events (see below),
+   so what stands in the way of such a script is the Automation permission you gave Mail and Messages.
 6. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
    decides, with one of four answers: *do it* (`allow`), *do it, whatever it has read* (`preapproved`: the question
    untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what
@@ -169,7 +215,13 @@ currency, so list sites that bill in one currency. Empty by default.
    action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it
    run alone with plain arguments (after a `cd` at most; nothing chained to it, substituted into it or sent on with
    `|` or `>`), and a rule that stops Dot fits the command or the word wherever the action mentions it, as a whole
-   word (`x.com` does not fit `netflix.com`). The draft fills the form, its description the sentence the rule reads
+   word (`x.com` does not fit `netflix.com`). A rule that lets Dot act in the shell is made from commands only: a draft
+   that gives words for it (for the shell, or for `*`, which covers it) is refused and the review model asked once
+   more, since a word fits `git push; anything` as well as `git push` (item 561). The same goes for the AppleScript
+   tool (`apple_script`, or a pattern that covers it), which runs shell lines with `do shell script`: a word fits a
+   script that runs a command outside the workspace as well, and the tool has no form for commands, so a rule that lets
+   Dot act in it is for every use of the tool. The draft fills the form, its
+   description the sentence the rule reads
    back as ("For “git status” run alone in the shell, …: Dot does it without asking."), and applies once you add it.
    Words that cover every action ("Dot can run everything without asking me") draft a rule for every tool ("For every
    use of any tool: Dot does it without asking."), which the protections that are always on still bound; words that
@@ -185,6 +237,16 @@ currency, so list sites that bill in one currency. Empty by default.
 | `aggressive` (default) | privilege, system settings, public posts, messages sent for you, destructive actions outside the workspace, and a read that may reach a protected location or the clipboard |
 | `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace                                            |
 | `cautious`             | everything that is not read-only                                                                                                                                            |
+
+An upload (the flag `upload`: a file chosen in a page's upload control with `browser_upload`, which many pages send as
+soon as it is chosen; a `curl -T` or a form sent with a file; a push; a copy to another machine) is in no preset's
+list, so what each does is this (item 561): `aggressive` and `balanced` let one go until the run has read untrusted
+content and ask from then on (the question untrusted content raises, below), `cautious` asks for every one, and a
+`yolo` run asks nothing, but has the review model check it once the run has read outside content (*Outside content in
+yolo*, below). An upload stays medium risk unless a file of it is in the home folder, the system folders or Dot's own
+(`exfiltration`) or protected (`secret_access`), which every mode but `yolo` refuses; that is why `balanced`, which
+asks for high risk, does not ask for every upload. The page an upload leaves is a stranger's to write, so what the tool
+shows of it marks the run untrusted, as any page does.
 
 A shell line is destructive outside the workspace when it removes, cuts or moves away a file there (item 385: `mv` takes
 its sources from where they were), and when it replaces one that is there: a redirect that empties it (`>`, `>|`, `&>`),
@@ -213,7 +275,11 @@ other agents of the Mac set up count the same way, unfenced, and so does reading
 when it is too long for one result, under `<workspace>/crawl/` and `<workspace>/mcp-results/` (item 494): `read_file` of
 one, a `search_files` match in one or a search of one, a shell line that names one or runs in one (the words of the
 line are read, so a line that reaches them otherwise, by a variable or a search of the workspace, is not seen); a
-failed `edit_file` of one names none of its lines. A run that has seen such content is marked untrusted, and from then
+failed `edit_file` of one names none of its lines. A page that comes back from a step counts the same (item 561): what
+`browser_act` (a click, an entry), `browser_upload` and `browser_fill_login` show of the page they leave is marked
+untrusted too, as what `browser_eval` and the desktop tools show already was, so a click on Next that brings up a page
+that says "run curl -T …" leaves the run marked even after your next message cleared the mark and the chat's tab
+stayed. A run that has seen such content is marked untrusted, and from then
 on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
 or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
 running a script the line downloaded (item 523), or a blob it decoded and ran (`base64 -d x | sh`, or a decode to a
@@ -250,8 +316,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   a step refused whose words would send a secret Dot holds out of the Mac: a key read in this process (saved with `dotx
   auth set` or in Settings), a value of `<home>/.env`, or text in the form of a key or a private key. A request, a
   page's address or field, a message, the arguments of an MCP tool, a step that uploads, posts or sends, and what runs
-  code or types into an application (a command line, an AppleScript, keystrokes), which may reach the network without
-  saying so, are what it looks at (`policy/egress.py`), in the step's target, its summary and every string of its
+  code or types into an application (a command line, an AppleScript, keystrokes, a script run in a page with
+  `browser_eval`, item 561), which may reach the network without saying so, are what it looks at (`policy/egress.py`),
+  in the step's target, its summary and every string of its
   arguments, on every way a run acts (Dot's own loop, OpenCode, a batch of the browser or the desktop). The step is
   refused before it runs, and its `policy` event says why, with the secret masked. A command that reads a secret from a
   file or a variable as it runs (`curl -d @file`) carries none in its words, and is not seen here: the shell guard's
@@ -367,7 +434,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   `desktop_clipboard_write` hands nothing over and asks nothing more than before. A `yolo` run asks nothing and has no
   sandbox (item 443), and neither has a run with `[shell] sandbox = false`: there the guard's names are all there is,
   and what it does not read gets through (a name the line builds as it runs, a quote the shell takes out twice, `sh -c
-  "pb''paste"`, a script in a file, `osascript r.applescript`, a script typed into a session, `osascript -i`).
+  "pb''paste"`, a script in a file, `osascript r.applescript`, which asks as a script that may send (item 561) but not
+  as a read of the clipboard, a script typed into a session, `osascript -i`).
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts and from the `osascript` of the AppleScript
   tool, whose `do shell script` starts a shell with the same environment (item 555), `SSH_AUTH_SOCK` among them, so a
@@ -401,7 +469,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   as a protected one.
 - Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but changes them only once you
   agree: its own code (the folder its package is imported from, the Python environment it runs in and the Python under
-  that, and the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the
+  that, the file of the launchd job that starts the daemon, and the program that job starts it with: `Dot.app` in
+  Dot's home and the folder it is built in, item 561), its plugins and their own files, its skills (with the
   `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's records
   of the MCP servers you added from other agents and on Customize › Connectors, the home of the OpenCode server it starts,
   the playbooks it learned and the file of its emergency stop. The file tools ask you before they write there
@@ -421,8 +490,12 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals)
   and the stores no program has any use for (`[policy] sealed_paths`: the data and caches of your browsers, their
   cookies, Messages and Mail, item 531), nor change what Dot loads and runs, nor rename a folder above any of them,
-  whatever program does it: a script the run wrote, code that builds the path, a link, another letter case. macOS
-  answers `Operation not permitted`. The search tools may not read your protected locations either; a command still may
+  whatever program does it: a script the run wrote, code that builds the path, a symbolic link, another letter case.
+  macOS answers `Operation not permitted`. A hard link is not closed, because the profile names paths: a hard link to
+  one of those files that a process outside the sandbox made earlier (a `yolo` run, a run while
+  `[shell] sandbox = false`) is another path to the same file, and a command reads it. The daemon
+  says in its log, when it starts, which of the files above have another name on the Mac (`sealed_file_has_other_names`,
+  item 561). The search tools may not read your protected locations either; a command still may
   (ssh and git read their keys there), and for those the guard reads its line. A search that meets a place it may not
   read shows
   what it found elsewhere and names the places it did not read, as a search of any run does with a folder whose reading
@@ -445,15 +518,20 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
 - What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
   startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
   so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`
-  again after an update to rewrite the job).
+  again after an update to rewrite the job). The program the job runs is among what a command may not change: `Dot.app`
+  in Dot's home, the app that starts the daemon, and the folder it is built in, are closed to a command's writes, new
+  files and renames, so a command cannot put a program there and then end the daemon (launchd keeps its job and starts
+  it again) to have it run outside the sandbox with your rights (item 561). Dot builds the app itself, from outside the
+  sandbox, when `dotx service install` runs.
 - What the sandbox does not cover: Apple Events, which macOS does not hold a `sandbox-exec` profile to (measured on
   macOS 26: with a rule over the Finder, the terminal apps, System Events and the rest, a script still drove the Finder
   and started an application that was not running), so an AppleScript can have another application act for it, with that
   application's powers: Mail sends a message the policy asked about, a terminal app runs a line outside the sandbox. The
-  Automation permission you grant is what stands in its way. The desktop tools reach a terminal app through its keys,
-  buttons and menus as well, which the guard judges as far as it reads them ([Browser and computer
-  use](browser-and-computer-use.md#computer-use) says how far). Nor a program that speaks to launchd or another service
-  through its own interface rather than the programs above, and the programs Dot starts itself (its browser, the MCP
+  Automation permission you grant is what stands in its way, and the guard's reading of the script (what it reads of a
+  script that drives Mail or Messages, and what it does not, is under *The guard* above, item 561). The desktop tools
+  reach a terminal app through its keys, buttons and menus as well, which the guard judges as far as it reads them
+  ([Browser and computer use](browser-and-computer-use.md#computer-use) says how far). Nor a program that speaks to
+  launchd or another service through its own interface rather than the programs above, and the programs Dot starts itself (its browser, the MCP
   servers) run from where they are installed: a command can change the programs installed under your account
   (Homebrew's,
   the caches of npm and uv) and your shell's startup files, which those programs and your own Terminal then run. And it

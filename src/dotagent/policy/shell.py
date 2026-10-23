@@ -604,7 +604,13 @@ _CURL_VALUES: str = "AbcCdDeEFHKmoPQrtTuUwxXyYz"
 # and Name:value a header).
 _HTTPIE_DATA: re.Pattern[str] = re.compile(r"^[^=:@\s]+(?:=@|:=@|:=|=(?!=)|@)")
 _AS_ADMIN: re.Pattern[str] = re.compile(r"administrator privileges", re.IGNORECASE)
-_AS_SEND: re.Pattern[str] = re.compile(r"\bsend\b|\bmake new outgoing message\b", re.IGNORECASE)
+# The verbs of a send: Mail's and Messages' ``send``, a draft made to be sent, and the properties of a Mail rule that
+# send later, when a message arrives (``forward message``, ``redirect message``, ``reply text``; JXA spells them
+# ``forwardMessage``, ``redirectMessage``, ``replyText``).
+_AS_SEND: re.Pattern[str] = re.compile(
+    r"\bsend\b|\bmake new outgoing message\b|\bforward\s*message\b|\bredirect\s*message\b|\breply\s*text\b",
+    re.IGNORECASE,
+)
 _AS_POWER: re.Pattern[str] = re.compile(r"\b(shut down|restart|log out|sleep)\b", re.IGNORECASE)
 _AS_DELETE: re.Pattern[str] = re.compile(r"\bdelete\b|\bmove to trash\b|\bempty trash\b", re.IGNORECASE)
 # The calls of a script that run a shell line or type one into a terminal, in AppleScript and in JXA (item 116 added
@@ -636,8 +642,100 @@ _CLIPBOARD_WORD: re.Pattern[str] = re.compile(r"clipboard", re.IGNORECASE)
 # Any pasteboard of the system's, named on the line: inline code in another language (``python3 -c`` with
 # ``NSPasteboard``, ``swift -e``) reads it by the class's name.
 _PASTEBOARD: re.Pattern[str] = re.compile(r"pasteboard", re.IGNORECASE)
-_AS_KEYSTROKES: re.Pattern[str] = re.compile(r"\bkeystroke\b|\bkey\s+code\b|\bkeyCode\s*\(", re.IGNORECASE)
-_AS_NATIVE: re.Pattern[str] = re.compile(r"\bObjC\.import\b|\$\.NS[A-Z]|\bNSTask\b|\bNSAppleScript\b")
+_AS_KEYSTROKES: re.Pattern[str] = re.compile(r"\bkeystroke\b|\bkey\s+code\b|\bkeyCode\b", re.IGNORECASE)
+# The Objective-C bridge: JavaScript's (the ``ObjC`` object: ``ObjC.import``, ``ObjC.classes``; ``$.NSString``) and
+# AppleScriptObjC's (``use framework``, ``current application's``), through which a script may call any method of the
+# system by a name it builds.
+_AS_NATIVE: re.Pattern[str] = re.compile(
+    r"\bObjC\b|\$\.NS[A-Z]|\bNSTask\b|\bNSAppleScript\b|"
+    r"(?i:\buse\s+framework\b|\bcurrent\s+application['\u2019]s\b)"
+)
+# What runs text as a script, builds a class or a method by its name, sends a raw event or starts a process through the
+# bridge: scripts that say nothing the guard can read of what they do, whatever application they drive (item 561).
+# ``NSProcessInfo`` is read in AppleScriptObjC's spelling only: JavaScript reads the environment through it as often.
+_AS_BRIDGE_RUNS_TEXT: re.Pattern[str] = re.compile(
+    r"\bNSClassFromString\b|\bNSAppleScript\b|\bNSAppleEventDescriptor\b|\bperformSelector|\bNSTask\b|"
+    r"\bcurrent\s+application['\u2019]s\s+NSProcessInfo\b",
+    re.IGNORECASE,
+)
+# A control pressed through System Events' UI scripting, AppleScript's and JavaScript's: by the verb (``click``,
+# ``perform``) or by the list of a control's actions (``actions``), however the script reaches them (item 561).
+_AS_UI_PRESS: re.Pattern[str] = re.compile(
+    r"\bclick\b|\bperform\b|\bactions\b|\bAXPress\b|\bAXConfirm\b", re.IGNORECASE
+)
+# What a script that sends a message says in words the guard cannot read (item 561). The guard reads a script's words:
+# ``send`` is the verb of Mail and Messages, so it tells a send by it, and has no word to read when a script names the
+# command another way, so it asks about a script that does, if the script can reach the two. Said another way each time
+# it is the same few things, read by what they are called (an identifier) rather than by how they are written:
+# - a raw Apple event (``«event ichtsend»``, a command named by its codes, whose clipboard forms the guard reads for
+#   what they are: :data:`_AS_CLIPBOARD`), text run as a script (``run script``, ``load script``) and what builds or
+#   runs one through the bridge (``NSAppleScript``, ``NSClassFromString``, ``performSelector``): these ask whatever
+#   application the script drives;
+# - text run as JavaScript (``eval``, ``Function``, ``constructor``, ``Reflect``, ``Proxy``, however called or
+#   passed on), a method called through ``.call``, ``.apply`` or ``.bind``, and a name JavaScript builds as it runs
+#   (a bracket that is neither an array literal nor a number: ``m["se" + "nd"]``, ``m?.[verb]``, ``{[verb]: go}``);
+# - the bridge (:data:`_AS_NATIVE`), keystrokes, which press a Send button's key, and a press of a button through
+#   System Events (:data:`_AS_UI_PRESS`), which names the button by its place, not by its word.
+# A script reaches Mail or Messages when it names one (by name, bundle id ``com.apple.mail`` or ``com.apple.MobileSMS``,
+# or path to the application), or calls ``Application(…)`` with a name that is not one string.
+_AS_MESSAGING: re.Pattern[str] = re.compile(r"\b(?:messages|mail|mobilesms)\b", re.IGNORECASE)
+_AS_RAW_EVENT: re.Pattern[str] = re.compile(r"(?:«|<<)\s*event\s+(?!Jons\wClp)", re.IGNORECASE)
+_AS_RUNS_TEXT: re.Pattern[str] = re.compile(r"\b(?:run|load)\s+script\b", re.IGNORECASE)
+_JS_RUNS_CODE: re.Pattern[str] = re.compile(r"\b(?:eval|Function|constructor|Reflect|Proxy)\b")
+_JS_INDIRECT_CALL: re.Pattern[str] = re.compile(r"\.\s*(?:call|apply|bind)\b")
+# A bracket that does not hold a number, and the characters after which one opens an array literal: ``=``, ``(``,
+# ``,``, ``:``, ``[`` and ``>`` (an arrow function's); after any other it indexes what stands before it.
+_JS_BRACKET: re.Pattern[str] = re.compile(r"\[(?!\s*-?\d+\s*\])")
+_ARRAY_LITERAL_AFTER: str = "=(,:[>"
+# What :func:`_without_comments_and_strings` tells apart, in the order JavaScript reads them: a line comment (ended by
+# any of JavaScript's line terminators: a line feed, a carriage return, U+2028 and U+2029), a block comment, a string
+# literal ending on its line (a line feed or a carriage return ends one, U+2028 and U+2029 do not; a backslash before a
+# line break, ``\r\n`` too, goes on to the next line), a template literal; and what it cannot tell from them: a slash
+# that starts none of these (a division, or a regular expression, which may hold a quote that starts no string) and an
+# HTML-like comment (``<!--``, ``-->``).
+_JS_LEXED: re.Pattern[str] = re.compile(
+    r"""//[^\n\r\u2028\u2029]*|/\*.*?\*/|"(?:[^"\\\n\r]|\\(?:\r\n|.))*"|'(?:[^'\\\n\r]|\\(?:\r\n|.))*'"""
+    r"""|`(?:[^`\\]|\\.)*`|/|<!--|-->""",
+    re.DOTALL,
+)
+# What the shell fills in as a line runs, in a word or in the body of a here-document: a variable (``$S``, ``${S}``,
+# ``$1``), the output of a command (``$(...)``, backticks; the line's own substitutions stand in a word as
+# ``$__dot_substituted__``). JavaScript's own ``$.`` is none of them.
+_SHELL_FILLS_IN: re.Pattern[str] = re.compile(r"\$[({A-Za-z_0-9$!?#@*-]|`")
+_JS_APPLICATION: re.Pattern[str] = re.compile(r"\bApplication\s*\(")
+# An application or a process an AppleScript names by anything but one string (the review of item 561's second push):
+# a concatenation, a variable, a number, a filter. Read once its comments are gone and its strings emptied.
+_AS_REFERENCE: re.Pattern[str] = re.compile(r"\b(application|process)\s+(?:id\s+)?", re.IGNORECASE)
+# Words after ``application`` or ``process`` that are no name of one: a kind (``application process``) or a word of
+# the sentence (``the application of``).
+_AS_NOT_A_NAME: frozenset[str] = frozenset(
+    {
+        "process",
+        "processes",
+        "file",
+        "files",
+        "of",
+        "is",
+        "to",
+        "then",
+        "and",
+        "or",
+        "in",
+        "that",
+        "with",
+        "by",
+    }
+)
+_AS_COMMENT: re.Pattern[str] = re.compile(r"\(\*[\s\S]*?\*\)|--[^\n]*|^[ \t]*#[^\n]*", re.MULTILINE)
+_AS_STRING: re.Pattern[str] = re.compile(r'"(?:[^"\\]|\\.)*"')
+# JavaScript's process of System Events by anything but one string: ``byName("Mess" + "ages")``, ``processes[i]``,
+# read in the script with its strings emptied.
+_JS_PROCESS_BUILT: re.Pattern[str] = re.compile(
+    r"""\.byName\s*\(\s*(?!(?:\"\"|'')\s*\))|\bprocesses\s*\[\s*(?!(?:\"\"|'')\s*\])|\.whose\s*\("""
+)
+_JS_APPLICATION_NAMED: re.Pattern[str] = re.compile(
+    r"""\bApplication\s*\(\s*(?:"[^"\\\n]*"|'[^'\\\n]*'|`[^`\\$\n]*`)\s*\)"""
+)
 _AS_LITERAL: re.Pattern[str] = re.compile(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'")
 _AS_GLUE: re.Pattern[str] = re.compile(r"with\s+administrator\s+privileges|[\s&()+,;¬{}:]|\btext\b", re.IGNORECASE)
 _AS_ESCAPE: re.Pattern[str] = re.compile(r"\\(.)")
@@ -2563,6 +2661,7 @@ def _assess_xargs(args: list[str], scope: ShellScope, given: _Input) -> list[Fin
         else [[*command, *given.paths]]
     )
     findings: list[Finding] = [found for run in runs for found in _assess_simple(run, scope, _NO_INPUT)]
+    findings.extend(_handed_unseen_words(command, scope, re.compile(re.escape(placeholder)) if placeholder else None))
     if _program(command[0]) not in _NAMES_ONLY and _holds_protected(given.walked, scope):
         # The piped twin of ``find ~ -exec cat {} +`` (item 531): every file the listing walked may be one it reads.
         findings.append(
@@ -2573,6 +2672,20 @@ def _assess_xargs(args: list[str], scope: ShellScope, given: _Input) -> list[Fin
     return findings
 
 
+def _handed_unseen_words(command: list[str], scope: ShellScope, placeholder: re.Pattern[str] | None) -> list[Finding]:
+    """What a runner (``xargs``, ``find -exec``, ``fd -x``) hands its command are words the line does not show: what a
+    pipe carries, the files found. An ``osascript`` it runs may be handed its script that way (``xargs -0 osascript
+    -e``, ``find . -exec osascript -e {} \\;``): judged once more with a word only the running line knows put in for
+    the placeholder, or after the command, which is a script the guard cannot read (item 561)."""
+    if not any(_program(word) == "osascript" for word in command):
+        return []
+    if placeholder is not None and any(placeholder.search(word) for word in command):
+        unseen: list[str] = [placeholder.sub(lambda _: _SUBSTITUTED, word) for word in command]
+    else:
+        unseen = [*command, _SUBSTITUTED]
+    return _assess_simple(unseen, scope, _NO_INPUT)
+
+
 def _runs_with(command: list[str], roots: list[str], scope: ShellScope, placeholder: re.Pattern[str]) -> list[Finding]:
     """A command that ``find`` or ``fd`` runs on what it finds, judged on the roots it searches: put in for its
     placeholder, or after it."""
@@ -2580,7 +2693,8 @@ def _runs_with(command: list[str], roots: list[str], scope: ShellScope, placehol
         runs: list[list[str]] = [[placeholder.sub(root, word) for word in command] for root in roots]
     else:
         runs = [[*command, *roots]]
-    return [found for run in runs for found in _assess_simple(run, scope, _NO_INPUT)]
+    findings: list[Finding] = [found for run in runs for found in _assess_simple(run, scope, _NO_INPUT)]
+    return [*findings, *_handed_unseen_words(command, scope, placeholder)]
 
 
 def _find_parts(args: list[str]) -> tuple[list[str], list[str]]:
@@ -3001,7 +3115,10 @@ def _shell_statement_findings(statement: str, scope: ShellScope) -> list[Finding
     if command:
         findings.extend(_assess_all(command, scope))
     if not command or not _literal_only(statement):
-        findings.append(_finding("high", (), "runs a shell command that is put together while the script runs"))
+        # A line the script puts together as it runs is code the guard cannot read: judged as the worst it could be
+        # (:func:`_unknown`), which can also send a message through ``osascript`` (item 561).
+        unread: Finding = _unknown("runs a shell command that is put together while the script runs")
+        findings.append(unread.model_copy(update={"flags": (*unread.flags, "external_send", "message_send")}))
     return findings
 
 
@@ -3016,6 +3133,123 @@ def _without_js_escapes(script: str) -> str:
     return _JS_ESCAPE.sub(letter, script)
 
 
+def _without_comments_and_strings(script: str) -> str | None:
+    """``script`` as JavaScript reads it between its comments and its strings (item 561): the comments gone, each string
+    literal empty (its quotes kept) and the template literals as written, because code stands in them. None when it
+    holds what this reading cannot tell from a comment or a string, so that a quote or a character it takes for code may
+    be no quote or no code: a slash that starts neither a comment nor sits in a string (a division, or a regular
+    expression, which may hold a quote) and an HTML-like comment (``<!--``, ``-->``)."""
+    parts: list[str] = []
+    end: int = 0
+    for found in _JS_LEXED.finditer(script):
+        token: str = found.group(0)
+        if token in ("/", "<!--", "-->"):
+            return None
+        parts.append(script[end : found.start()])
+        end = found.end()
+        if token.startswith(("//", "/*")):
+            parts.append(" ")
+        elif token[0] in "\"'":
+            parts.append(token[0] * 2)
+        else:
+            parts.append(token)
+    parts.append(script[end:])
+    return "".join(parts)
+
+
+def _indexes_by_a_built_name(script: str) -> bool:
+    """Whether ``script`` has a bracket that is neither an array literal nor holds a number (item 561): it indexes what
+    stands before it by a name JavaScript may build as it runs (``m["se" + "nd"]``, ``m?.[verb]``, ``{[verb]: go}``,
+    ``m /**/ [verb]``). An array literal is a bracket that starts the script or comes after ``=``, ``(``, ``,``, ``:``,
+    ``[`` or ``>`` (blanks and comments between), so ``[M.name(), 1]`` and ``messages[0]`` ask nothing. Where the
+    comments and strings cannot be told apart (:func:`_without_comments_and_strings`), every bracket that holds no
+    number asks."""
+    bare: str | None = _without_comments_and_strings(script)
+    if bare is None:
+        return _JS_BRACKET.search(script) is not None
+    for found in _JS_BRACKET.finditer(bare):
+        at: int = found.start()
+        while at > 0 and bare[at - 1].isspace():
+            at -= 1
+        if at > 0 and bare[at - 1] not in _ARRAY_LITERAL_AFTER:
+            return True
+    return False
+
+
+def _names_by_a_built_name(script: str) -> bool:
+    """Whether ``script`` names the application or the process it drives by anything but one string (the review of item
+    561's second push), so that it may drive Mail or Messages without a word of theirs: in AppleScript an application or
+    a process named by a concatenation, a variable, a number or a filter (``application ("Mess" & "ages")``,
+    ``application a``, ``application id (…)``, ``process 1``; ``current application`` is none), in JavaScript an
+    ``Application(…)``, a ``byName(…)`` or a ``processes[…]`` that holds anything but one string."""
+    if len(_JS_APPLICATION.findall(script)) > len(_JS_APPLICATION_NAMED.findall(script)):
+        return True
+    bare_js: str | None = _without_comments_and_strings(script)
+    if _JS_PROCESS_BUILT.search(bare_js if bare_js is not None else script):
+        return True
+    bare: str = _AS_STRING.sub('""', _AS_COMMENT.sub(" ", script))
+    for found in _AS_REFERENCE.finditer(bare):
+        if bare[max(0, found.start() - 8) : found.start()].lower() == "current ":
+            continue
+        at: int = found.end()
+        if at >= len(bare):
+            continue
+        first: str = bare[at]
+        if first == '"':
+            after: int = at + 2
+            while after < len(bare) and bare[after] in " \t":
+                after += 1
+            if after < len(bare) and bare[after] == "&":
+                return True
+        elif first in "(&" or first.isdigit():
+            return True
+        elif first.isalpha() or first == "_":
+            word: str = re.match(r"\w+", bare[at:]).group(0).lower()  # type: ignore[union-attr]
+            if word not in _AS_NOT_A_NAME:
+                return True
+    return False
+
+
+def _hides_a_send(script: str, text: str) -> str | None:
+    """Why ``script`` (``text``: with the escapes of its JavaScript read) may send a message by words the guard cannot
+    read (item 561): the reason for the question, or None when it hides none. A raw Apple event, text run as a script
+    and what builds or runs one through the Objective-C bridge say nothing of what they do, whatever application they
+    drive, and are rare enough to ask about whichever it is. So do keystrokes and a button pressed through System
+    Events, whatever application they are pressed in (the structural option after the hook's third review): a key goes
+    to the application in front, and a process can be found by a filter, a built name or a localized one, so which
+    application's Send they press cannot be read from the script at all. The rest (a name JavaScript builds as it runs,
+    code it builds, a call it makes indirectly, the bridge) is how scripts of every application are written, and needs
+    the application's own command to send, so it asks only when the script can reach Mail or Messages
+    (:data:`_AS_MESSAGING`, or a name built as it runs: :func:`_names_by_a_built_name`). The brackets are read in the
+    script as written: a bracket cannot be written with an escape, and a quote can, which would put the reading of
+    strings out of step with JavaScript's."""
+    if _AS_RAW_EVENT.search(text):
+        return "may send a message: it names a command by a raw Apple event, which the guard cannot read"
+    if _AS_RUNS_TEXT.search(text):
+        return "may send a message: it runs text as a script, which the guard cannot read"
+    if _AS_BRIDGE_RUNS_TEXT.search(text):
+        return (
+            "may send a message: it builds a class, a method or an event as it runs, or runs text as a script, through "
+            "the Objective-C bridge, which the guard cannot read"
+        )
+    if _AS_KEYSTROKES.search(text) or _AS_UI_PRESS.search(text):
+        return (
+            "may send a message: it types keystrokes or presses a button through System Events, in an application the "
+            "guard cannot tell from the script, which may be Mail's or Messages' Send"
+        )
+    builds: bool = _names_by_a_built_name(text)
+    if _AS_MESSAGING.search(text) is None and not builds:
+        return None
+    if _indexes_by_a_built_name(script) or any(
+        pattern.search(text) is not None for pattern in (_JS_RUNS_CODE, _JS_INDIRECT_CALL, _AS_NATIVE)
+    ):
+        return (
+            "may send a message: it can reach Mail or Messages and builds a name or code as it runs, calls a method "
+            "through a name it holds or uses the Objective-C bridge, which the guard cannot read"
+        )
+    return None
+
+
 def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     flags: list[Flag] = []
     reasons: list[str] = []
@@ -3028,10 +3262,16 @@ def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
         flags.append("system_settings")
         risk = "high"
         reasons.append("changes power or session state")
-    if _AS_SEND.search(script):
+    unescaped: str = _without_js_escapes(script)
+    hides: str | None = _hides_a_send(script, unescaped)
+    if _AS_SEND.search(script) or _AS_SEND.search(unescaped):
         flags.extend(("external_send", "message_send"))
         risk = "high" if risk != "high" else risk
         reasons.append("sends a message")
+    elif hides is not None:
+        flags.extend(("external_send", "message_send"))
+        risk = "high"
+        reasons.append(hides)
     if _AS_DELETE.search(script):
         flags.append("destructive")
         risk = "high" if risk != "high" else risk
@@ -3040,7 +3280,7 @@ def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
     findings: list[Finding] = [_finding(risk, tuple(dict.fromkeys(flags)), reason)]
     for statement in _shell_statements(script):
         findings.extend(_shell_statement_findings(statement, scope))
-    if _AS_CLIPBOARD.search(script) or _AS_CLIPBOARD.search(_without_js_escapes(script)):
+    if _AS_CLIPBOARD.search(script) or _AS_CLIPBOARD.search(unescaped):
         findings.append(_names_the_clipboard())
     if _AS_KEYSTROKES.search(script):
         findings.append(_finding("high", (), "types into whatever application has the keyboard focus"))
@@ -3055,13 +3295,26 @@ def _osascript_source(args: list[str]) -> str | None:
     return "\n".join(parts) if parts else None
 
 
+def _unreadable_script(why: str) -> list[Finding]:
+    """A script the guard cannot read says nothing of what it sends, so it may send a message: judged as a script that
+    does (item 561)."""
+    return [_finding("high", ("external_send", "message_send"), f"{why}, so it may send a message")]
+
+
 def _assess_osascript(args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
+    """``osascript`` judged by the script it is given: its ``-e`` arguments, or the text on its standard input (a
+    here-document, a here-string, an ``echo`` piped in) when it names no script. A script in a file, or that the shell
+    puts together as the line runs (``-e "$S"``, ``-e "...$(printf se)nd..."``, a here-document that holds ``$V``,
+    ``xargs osascript -e``), is a script the guard cannot read, however little of it the line shows (item 561)."""
     source: str | None = _osascript_source(args)
     if source is None and not _positional(args) and given.text is not None:
-        return _applescript_findings(given.text, scope)
+        source = given.text
     if source is None:
-        return [_finding("high", (), "runs a script file that cannot be inspected")]
-    return _applescript_findings(source, scope)
+        return _unreadable_script("runs a script file that cannot be inspected")
+    findings: list[Finding] = _applescript_findings(source, scope)
+    if _SHELL_FILLS_IN.search(source):
+        return [*_unreadable_script("runs a script the shell puts together as the line runs"), *findings]
+    return findings
 
 
 def _assess_command(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:

@@ -164,7 +164,11 @@ Both modes share what follows.
   the last snapshot still valid; a page that did not change comes back as one line that says so. A tab that closes under
   a batch (a sign-in callback that did its job, a tab the user closed) stops the batch without a failed step: the result
   says the page closed it and shows the tab that is now current. A popup that opens and closes itself before the model
-  could see it is a note on the page that opened it.
+  could see it is a note on the page that opened it. The page a batch leaves is a stranger's to write, so the run that
+  reads it is marked untrusted, as `browser_upload` and `browser_fill_login` mark it by the page they leave (item 561;
+  see [Safety](safety.md#safety)). A batch carries one payment step at most (a click on a control that asks to pay, by
+  its words or by the typed judge's reading): two payments in one call would pass for the larger of their amounts under
+  the caps of `[policy.spend]`, so the call is refused and the steps are sent one call at a time, in every mode.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a
@@ -186,8 +190,11 @@ Both modes share what follows.
   fenced as the page's text and makes the run untrusted. As an action it is a click of medium risk on the tab's page:
   the aggressive and balanced presets allow it, the cautious preset asks, a research run does not have it and a `yolo`
   run does it without asking. What the script does inside the page is not checked or paced action by action, as
-  `browser_act`'s steps are. Outside `yolo` it is refused on a page that holds a password, one-time-code or card field,
-  in any frame (a script reads a field's value whole, one Chrome filled in too), and from then on no text a browser tool
+  `browser_act`'s steps are; its words are read for a secret, as a command line's are: in a run that read outside
+  content, a script that carries a key or a secret Dot holds is refused in every mode, `yolo` too (item 561, *No secret
+  out* in [Safety](safety.md#safety)). Outside `yolo` it is refused on a page that holds a password, one-time-code or
+  card field, in any frame (a script reads a field's value whole, one Chrome filled in too), and from then on no text a
+  browser tool
   of that chat gives back shows the values of the site's cookies, the ones long enough to be a session (a plain word
   such as `dismissed` is no session): they read `[hidden]` in the script's value, in its error, in where it led the tab
   and in what a later tool reads, and the judges and the log lines that name a refused address do not have them
