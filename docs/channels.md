@@ -2,14 +2,16 @@
 
 Dot can be reached without Tailscale and without the web UI: from the messaging app of your phone. A *channel* receives
 your messages and sends Dot's, and what Dot tells you on its own. There is one, **iMessage**, through the conversation
-you have with yourself (item 572). Settings › Channels shows where it stands (what macOS has granted, which numbers and
-addresses are paired) and has its switch. [Dot on the phone](phone.md) is the other way, the web UI itself on your phone
-through your own tailnet.
+you have with yourself (item 572) or, when your iPhone uses another Apple ID than this Mac, the one between the two
+(item 595). Settings › Channels shows where it stands (what macOS has granted, which numbers and addresses are paired,
+what Dot sees of Messages' database) and has its switch. [Dot on the phone](phone.md) is the other way, the web UI
+itself on your phone through your own tailnet.
 
 ## How it works
 
-A message you send to yourself is posted into a chat of its own, **iMessage**, which is in the sidebar like any chat,
-as if you had typed it in the box of the web UI (the same code that sends the box's message):
+A message you send to yourself (or from your iPhone's Apple ID to this Mac's) is posted into a chat of its own,
+**iMessage**, which is in the sidebar like any chat, as if you had typed it in the box of the web UI (the same code that
+sends the box's message):
 
 - With no run at work in that chat it starts one. With one at work the message waits in the chat's queue and starts the
   chat's next run when that one ends, as a message typed while a run works does.
@@ -53,14 +55,21 @@ Settings › Channels › iMessage, from the top:
 3. **Your number or Apple ID email**: type your own number with its country code (`+358 40 123 4567`) or the address of
    your Apple ID, and **Send a code**. Dot sends a six-digit code there through Messages: type back what you read on
    your iPhone (good for ten minutes and five tries), and it is paired. Up to three can be paired; the cross on one
-   forgets it. **Pair only your own number or Apple ID address, the conversation with yourself.** The code shows only
-   that it reached whoever holds that number or address, not that it is yours: with the number of someone else, paired
-   with their help, every message you send them would be read as your command.
+   forgets it. **Which one:** with one Apple ID on the Mac and the iPhone, the one you write to yourself at. With two,
+   the Mac's own and your personal one on the iPhone (item 595), the number or address your iPhone writes **from**: in
+   Messages on this Mac the conversation with your iPhone is named for it. Pair that one, not the Mac's own; if your
+   iPhone writes from your number at times and from your address at others, pair both. **Pair only your own number or
+   Apple ID address: pairing someone else's gives them Dot.** Every message from a paired number or address runs as your
+   command, and the tab says so beside each one (*Messages from this address run as you*); every message you send to it
+   does too. The code shows only that it reached whoever holds that number or address, not that it is yours: with the
+   number of someone else, paired with their help, every message they send you would run as your command.
 4. Switch **iMessage** on (`[channels] imessage`). Only what you send from then on is read: what was sent while it was
    off is never run.
 
 Then, on the iPhone, open Messages and your conversation with yourself (write a message to your own number), and send
-Dot a message. The conversation is the same on this Mac.
+Dot a message. The conversation is the same on this Mac. With two Apple IDs, write from the iPhone to the Apple ID of
+this Mac (the address or number its Messages is signed in with): the conversation on this Mac is named for your iPhone's
+handle, and Dot answers in it, from the Mac's account to yours.
 
 ## What Dot reads, and what it does not
 
@@ -68,19 +77,27 @@ Dot reads Messages' database (`~/Library/Messages/chat.db`) read-only, every thr
 row is a command only when all of these hold:
 
 - it is in a conversation with one person (never a group) named for one of the numbers or addresses you paired;
-- Messages flags it as sent by you (`is_from_me`) over iMessage (a text message is never read), and it is not a
-  reaction;
+- it is over iMessage (a text message is never read) and is not a reaction, and either Messages flags it as sent by
+  you (`is_from_me = 1`: your conversation with yourself, and what this Mac sends in the chat) or it was **received from
+  the handle the chat is named for** (`is_from_me = 0`, and the sender of the message is that handle, compared in lower
+  case and as a number or address is written): your iPhone's Apple ID writing to this Mac's (item 595);
 - it does not start with `◆`: Dot's own messages land in the same conversation as yours, and each starts so;
 - it is words: a sticker, an app's message, a payment, or any rich content Messages gives a bundle of its own, is never
   a command (a link preview is read as the link it holds);
 - it is not only a link that Dot wrote: Messages may split the link at the end of one of Dot's messages into a row of
   its own, which has no `◆` (see Links, below);
-- a run of Dot may not have written it, and Messages does not send it later than it was written (see below);
+- a run of Dot may not have written it, and Messages does not send it later than it was written (see below), whether
+  it is flagged as sent or as received;
+- it is not the second row of one message that Messages keeps as two (item 595): a sent row and a received row in the
+  same chat with the same words, dated at most ten seconds apart, are one command, and the second is let go (see *One
+  message, two rows*, below);
 - it is newer than the cursor, the row Dot last read, which the store keeps: the first poll sets it and answers nothing,
   and a restart repeats nothing and loses nothing.
 
-A message from anyone else, in any other conversation, is never read. Nobody without your Apple ID can write a message
-into your conversation with yourself.
+A message from anyone else, in any other conversation, is never read; nor is one in a paired chat that did not come from
+the handle the chat is named for. Nobody without your Apple ID can write a message into your conversation with yourself,
+and nobody without the Apple ID of your paired number or address can write one *from* it: Apple authenticates the
+sender.
 
 **Links.** Messages may keep a link as a row of its own after the words of a message, a link preview, flagged as sent by
 you like any row. A row that is only a link that Dot wrote, one into its own pages (the address its messages link to) or
@@ -97,6 +114,34 @@ be read is let go and never answered, as it may be one of Dot's own.
 
 A run that a channel started is not resumed on its own when Dot starts again after it cut the run off (`[agent] resume`
 resumes the runs of the web UI): the chat shows it and **Resume** is yours.
+
+## What Dot sees
+
+When a message you wrote gets no answer, the tab says why. **What Dot sees in Messages** (and `seen` in `GET
+/api/channels`) shows, from the last look Dot took (every three seconds while the channel is on):
+
+- **Newest message**: the newest row of Messages' database, in any conversation: its number, the date it carries and
+  when Dot first saw it. The number moves up when a message arrives. A number that stays put after you wrote means
+  Dot's read-only connection saw no new row at all, whatever the rules above say.
+- **Read up to**: the cursor, the row Dot has read up to. **Last looked**: when it looked.
+- **chat.db** and **chat.db-wal**: the size and the time of the last change of Messages' database and of its
+  write-ahead log, where Messages keeps what it has just written until it folds it into the database (`os.stat`; the
+  program that runs Dot needs Full Disk Access for them, as for the database).
+- **Last command**: the last row Dot took as a command, and when; it survives a restart. **Last error**: the last thing
+  that went wrong, with its time and the secrets Dot holds masked; it stays after the problem is gone.
+
+**The warning.** When the log has changed and nothing Dot can read has changed with it, for more than two minutes, the
+tab says: *Messages has written since Dot last saw a new message; Dot may not be seeing the newest. Quit and reopen
+Messages.* A change that Dot's own read shows is not one: a new row, or a message Dot sent being marked delivered or
+read in one of the newest rows. Messages folds its log into the database when it quits, and Dot reads it from then. The
+log has `imessage_wal_unseen` once for it, with the sizes and times. The warning says Dot *may* not see the newest:
+Messages writes its log for other reasons too.
+
+**Check now** looks at once. With the channel on and a number paired it is a poll like the loop's: it reads and runs
+what is new, once (the loop's poll and this one never read the same row twice). With the channel off, or nothing
+paired, it only looks and reads no message, so that the switch keeps its meaning. A line says what was seen. The log has
+`imessage_newest_row` when the newest row changes, at most once a minute, with its number and date and nothing of what
+it says or who sent it.
 
 ## Who may command Dot through this channel
 
@@ -125,6 +170,25 @@ So the channel does not run a message a run may have written, in any mode:
   recipient you changed to one ([Drafts](runs.md#drafts)): what a run writes is not sent into the conversation Dot reads
   as yours.
 
+**Two Apple IDs (item 595).** When your iPhone uses another Apple ID than this Mac, your messages are not flagged as
+sent by you but are received, from your handle, in the chat named for it. Only the holder of that Apple ID can make such
+a row: Apple authenticates the sender. A run of Dot sends through this Mac's Messages as the Mac's own account, so it
+writes rows flagged as sent, and a command of a run cannot write `chat.db` itself (the sandbox closes
+`~/Library/Messages`, `[policy] sealed_paths`). Even so a received row is judged like a sent one, by the window above
+and by Send Later: that Messages writes no received copy of what this Mac sends to your own address cannot be shown, and
+if it did, a run's message would pass for yours. It costs a message now and then: one you write from the iPhone while a
+run is sending something is told, and you send it again. The pairing shows that the code reached the holder of the
+handle, not that the handle is yours: **pairing someone else's number or address gives them Dot**, since a message from
+a paired handle is a command.
+
+**One message, two rows.** With one Apple ID Messages may keep a message you send to yourself as two rows, one flagged
+as sent and one as received. In the same chat, a sent row and a received row with the same words, dated at most ten
+seconds from each other, are one command: the one Dot reads second is let go, and the log says so
+(`imessage_message_let_go`, with `copy_of` the row it copies), in the same poll or a later one. Each row is the copy of
+one row only, so words you say again run again, and two rows of one kind are never copies of each other (you repeating
+yourself). Words typed on the Mac and the same words sent from the iPhone within ten seconds are one command too: that
+is the price of the rule.
+
 The window holds in `yolo` and in `auto` as in the modes that ask: it does not depend on who answered the question, or
 on whether anyone was asked. What it does not catch is a send the guard cannot see, which raises no flag: a script of a
 web page, a program the run wrote and then runs (the guard reads the command, not the program's file), a macOS Shortcut,
@@ -149,6 +213,9 @@ Mac](safety.md#what-leaves-this-mac).
 | *Messages is not open* | macOS tells about an application only while it runs: **Ask macOS** starts it hidden |
 | *the Messages database is laid out differently* | a macOS update changed `chat.db`: the channel reads nothing until Dot is updated |
 | a number that gets no code | Messages could not send to it: check that it is a number or address of your Apple ID |
+| *Newest message* does not move after you wrote | Dot sees no new row: see *chat.db-wal*; quit and reopen Messages |
+| the message is on the Mac, nothing runs | pair the number your iPhone writes from: the chat is named for it |
+| *Last error* names a message that did not go | Messages did not take Dot's answer: Automation, or the address |
 
 Left for later: other messaging apps (the router posts what a channel receives and sends what a run ends with; a
 channel is the part that reads and sends), attachments, and answers to approvals on a channel (deliberately not).

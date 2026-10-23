@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import Field, StrictBool
 
 from dotagent.channels.imessage import Access, Needs, Verifying
+from dotagent.channels.seen import Seen
 from dotagent.connections.mac import AutomationState
 from dotagent.core.types import FrozenModel
 
@@ -18,8 +19,9 @@ class ImessageView(FrozenModel):
     """The iMessage channel: whether it is ``on``, the ``handles`` paired, a code that waits to be typed back
     (``verifying``), whether the program that runs Dot may read Messages' database (``database``) and control Messages
     (``automation``), what keeps the channel from working now (``problem``, and ``needs``, the permission it is for),
-    the newest run of its chat (``chat_run_id``, which the page links to) and the name of the program macOS holds
-    responsible for Dot (``program``), which is what to switch on in Privacy & Security."""
+    the newest run of its chat (``chat_run_id``, which the page links to), the name of the program macOS holds
+    responsible for Dot (``program``), which is what to switch on in Privacy & Security, and what the channel sees of
+    Messages' database (``seen``, item 595): the newest row, the cursor, the two files, the last command and error."""
 
     on: bool
     handles: tuple[str, ...]
@@ -30,6 +32,7 @@ class ImessageView(FrozenModel):
     needs: Needs | None
     chat_run_id: str | None
     program: str | None
+    seen: Seen
 
 
 class ChannelsView(FrozenModel):

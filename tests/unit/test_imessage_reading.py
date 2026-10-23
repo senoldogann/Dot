@@ -79,6 +79,72 @@ def test_only_the_owners_own_one_to_one_conversation_is_read(db: MessagesDb) -> 
     assert upto == newest_rowid(db.path)
 
 
+def test_a_message_the_paired_handle_sends_to_this_mac_is_read_as_received(db: MessagesDb) -> None:
+    """Two Apple IDs (item 595): the iPhone's account writes to the Mac's, and the row is not flagged as sent by this
+    Mac but names the handle it came from, in the one-to-one chat named for it."""
+    owner: int = db.handle(ADDRESS)
+    own: int = db.chat(ADDRESS)
+    received: int = db.message(own, "from the iPhone", from_me=False, sender=owner)
+    sent: int = db.message(own, "typed on this Mac")
+    rows, upto = read_new(db.path, 0, [ADDRESS])
+    assert [(row.rowid, row.chat, row.text, row.received) for row in rows] == [
+        (received, ADDRESS, "from the iPhone", True),
+        (sent, ADDRESS, "typed on this Mac", False),
+    ]
+    assert upto == sent
+
+
+def test_a_received_message_is_read_only_from_the_handle_its_chat_is_named_for(db: MessagesDb) -> None:
+    owner: int = db.handle(ADDRESS)
+    stranger: int = db.handle("+358409999999")
+    own: int = db.chat(ADDRESS)
+    other_chat: int = db.chat("+358409999999")
+    group: int = db.chat("chat123456789", style=43)
+    same_name_group: int = db.chat(ADDRESS, style=43)
+    wanted: int = db.message(own, "run the report", from_me=False, sender=owner)
+    # Impossible in a real one-to-one chat, but a row of another handle there is nobody's command.
+    db.message(own, "from another handle", from_me=False, sender=stranger)
+    db.message(own, "from no handle", from_me=False)
+    db.message(group, "from the paired handle, in a group", from_me=False, sender=owner)
+    db.message(same_name_group, "in a group named like the handle", from_me=False, sender=owner)
+    db.message(other_chat, "the paired handle in the chat of another", from_me=False, sender=owner)
+    db.message(own, "by text message", from_me=False, sender=owner, service="SMS")
+    db.message(own, "Liked “run the report”", from_me=False, sender=owner, reaction=2001)
+    db.message(own, "a change of the chat", from_me=False, sender=owner, item_type=1)
+    rows, upto = read_new(db.path, 0, [ADDRESS])
+    assert [(row.rowid, row.text) for row in rows] == [(wanted, "run the report")]
+    assert upto == newest_rowid(db.path)
+
+
+def test_a_received_message_is_not_read_from_the_other_paired_handle(db: MessagesDb) -> None:
+    by_address: int = db.handle(ADDRESS)
+    own: int = db.chat(PHONE)
+    db.message(own, "the address writes in the chat of the number", from_me=False, sender=by_address)
+    assert read_new(db.path, 0, [PHONE, ADDRESS])[0] == []
+
+
+@pytest.mark.parametrize(
+    ("sender", "chat"),
+    [
+        ("ME@Example.COM", "me@example.com"),
+        (ADDRESS, "Me@Example.com"),
+        ("+358 40 123 4567", PHONE),
+        ("+358-40-123-4567", PHONE),
+    ],
+)
+def test_the_sender_is_compared_in_lower_case_and_as_a_handle_is_written(
+    db: MessagesDb, sender: str, chat: str
+) -> None:
+    made: int = db.message(db.chat(chat), "hello", from_me=False, sender=db.handle(sender))
+    assert [row.rowid for row in read_new(db.path, 0, [PHONE, ADDRESS])[0]] == [made]
+
+
+@pytest.mark.parametrize("sender", ["358401234567", "0401234567", "me", "12345", "not an address@", ""])
+def test_a_sender_that_is_no_number_or_address_is_nobodys_command(db: MessagesDb, sender: str) -> None:
+    db.message(db.chat(PHONE), "hello", from_me=False, sender=db.handle(sender))
+    assert read_new(db.path, 0, [PHONE])[0] == []
+
+
 def test_each_paired_handle_reads_its_own_chat_and_a_handle_not_paired_reads_none(db: MessagesDb) -> None:
     by_phone: int = db.message(db.chat(PHONE), "via the number")
     by_address: int = db.message(db.chat(ADDRESS), "via the address")

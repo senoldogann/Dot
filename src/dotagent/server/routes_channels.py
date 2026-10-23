@@ -73,6 +73,17 @@ def channels_router(ctx: ServerContext) -> APIRouter:
             await service.imessage.remove(request.handle)
         return await service.view()
 
+    @router.post("/channels/imessage/poll")
+    async def poll_imessage() -> ChannelsView:
+        """Look at Messages' database now, which is **Check now**. With the channel on and a number paired it is a poll
+        as the loop makes one (it reads what is new and starts what it must, once: never twice with the loop's own);
+        with it off, or nothing paired, a look that reads no message. It waits for a switch or a pairing step under way,
+        so that no message is run after the switch said off. The answer shows what the channel saw."""
+        service: Channels = channels()
+        async with service.changing:
+            await service.poll_now()
+        return await service.view()
+
     @router.post("/channels/imessage/check")
     async def check_imessage() -> ChannelsView:
         """Show macOS's question whether Dot may control Messages, Messages started hidden first when it does not run,

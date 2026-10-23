@@ -1,12 +1,21 @@
-"""The iMessage channel (item 572): the owner's own conversation with themselves.
+"""The iMessage channel (item 572): the owner's own conversation with themselves, or with their iPhone's Apple ID.
 
-Messages on this Mac is signed in to the owner's Apple ID. A message the owner sends to their own number or address from
-their iPhone arrives on the Mac in that chat of ``~/Library/Messages/chat.db`` with ``is_from_me = 1``, and no one
-without the owner's Apple ID can write one there, so the channel needs no token or secret of its own. Only that
-conversation is read: a one-to-one chat (never a group) whose identifier is one of the handles the owner paired, rows
-that Messages marks as sent by the owner over iMessage (never SMS, which is not tied to the Apple ID), and not the
-reactions to a message. The database is opened read-only (Full Disk Access for the program that runs Dot), and Dot's own
-replies, which land in the same chat as the owner's, each start with :data:`MARKER` and are skipped.
+Messages on this Mac is signed in to an Apple ID. Under the owner's own, a message the owner sends to their own number
+or address from their iPhone arrives on the Mac in that chat of ``~/Library/Messages/chat.db`` with ``is_from_me = 1``,
+and no one without the owner's Apple ID can write one there. When the iPhone uses another Apple ID (item 595), its
+messages arrive as rows received, ``is_from_me = 0``, from the handle it writes from, in the one-to-one chat named for
+that handle, and no one without that Apple ID can write one either: Apple authenticates the sender. So the channel
+needs no token or secret of its own. Only the conversations with the handles the owner paired are read: one-to-one
+chats (never a group), rows that Messages marks as sent by the owner over iMessage (never SMS, which is not tied to an
+Apple ID) or received from the handle the chat is named for, and not the reactions to a message. The database is opened
+read-only (Full Disk Access for the program that runs Dot), and Dot's own replies, which land in the same chat as the
+owner's, each start with :data:`MARKER` and are skipped.
+
+A row received is judged as a row sent is. A run of Dot sends through this Mac's Messages as the Mac's account, which
+writes rows ``is_from_me = 1``; but that Messages never keeps a received copy of what a run sends to the owner's own
+address cannot be shown, and a run must not come back as the owner's command, so the window of a step that sends and
+Send Later hold a received row too. With one Apple ID Messages may keep a message to oneself as two rows, one sent and
+one received: the second, with the same words and dated at most :data:`COPY_S` from the first, is let go.
 
 Messages may show part of a message as a row of its own: a link at its end becomes a link preview, a row that is the
 link and nothing else, with the bundle of one in ``balloon_bundle_id`` (no such column in an older macOS), flagged as
@@ -33,6 +42,7 @@ from typing import Literal
 from dotagent.channels.handles import STATE_KEY, ImessageState, normalize_handle
 from dotagent.channels.intake import Accept, Intake, Skip, Tell, Verdict
 from dotagent.channels.onetime import OneTimeCode, Redeemed, new_code, redeem, shown_code
+from dotagent.channels.seen import COMMAND_KEY, Look, Seen, SeenCommand, Watch, stat_file, wal_path
 from dotagent.channels.sends import runs_sending_at
 from dotagent.channels.types import STOP_COMMAND, ChannelId, Receive
 from dotagent.core.errors import ChannelError, DesktopError, DesktopPermissionError
@@ -72,6 +82,18 @@ _APPLE_EPOCH: float = 978_307_200.0
 _NANOSECOND_DATES_FROM: float = 1e11
 # ``chat.style`` of a conversation with one person; a group is 43.
 _ONE_TO_ONE: int = 45
+# The newest rows of the message table whose state is compared from one look to the next, and the columns of it that a
+# database has (what Messages writes to a message after it is there).
+_WATCHED_ROWS: int = 30
+_STATE_COLUMNS: tuple[str, ...] = (
+    "date_delivered",
+    "date_read",
+    "is_delivered",
+    "is_read",
+    "is_sent",
+    "is_finished",
+    "error",
+)
 # The mark of an attachment in the text of a message, and what Messages writes where a mention or an attachment was.
 _OBJECT: str = "￼"
 _STREAM_CLASS: bytes = b"NSString"
@@ -89,6 +111,11 @@ JOIN_S: float = 3.0
 OWN_LINK_S: float = 60.0
 _OWN_LINK_BEFORE_S: float = 5.0
 _SENT_KEPT: int = 20
+# A message that Messages keeps as two rows, one sent and one received (item 595), is one command: the second, with the
+# same words in the same chat, dated at most this long from the first, is let go. The rows that may be a command are
+# kept in mind, this many, for the copy that may follow one.
+COPY_S: float = 10.0
+_HEARD_KEPT: int = 20
 _LINK: re.Pattern[str] = re.compile(r"https?://\S+", re.IGNORECASE)
 
 type Script = Callable[[ScriptLanguage, str, tuple[str, ...], tuple[str, ...], float], Awaitable[str]]
@@ -101,7 +128,9 @@ class Row(FrozenModel):
     could not be read), when it was sent, whether it carries a file and whether Messages sends it later than it was
     written (macOS 15's Send Later, where the database has the column). ``balloon`` is the bundle of the rich content it
     holds (a link preview's, a sticker's, an app's), ``None`` for plain words and where the database has no such column.
-    ``link_at`` is when the last link joined to its words was sent (see :meth:`IMessageChannel._joined`)."""
+    ``link_at`` is when the last link joined to its words was sent (see :meth:`IMessageChannel._joined`). ``received``
+    is a row Messages flags as received, not sent by this Mac's account: it came from the handle its chat is named for
+    (item 595: the iPhone's Apple ID writing to this Mac's)."""
 
     rowid: int
     chat: str
@@ -111,6 +140,7 @@ class Row(FrozenModel):
     scheduled: bool = False
     balloon: str | None = None
     link_at: float | None = None
+    received: bool = False
 
 
 class Verifying(FrozenModel):
@@ -124,6 +154,19 @@ class Verifying(FrozenModel):
 class _Pending:
     handle: str
     code: OneTimeCode
+
+
+@dataclass
+class _Heard:
+    """A row that may be a command, kept in mind for the copy of it that Messages may write as a row of the other kind
+    (:meth:`IMessageChannel._copy_of`); ``copied`` once its copy came, so that a row is the copy of one row only."""
+
+    rowid: int
+    chat: str
+    text: str
+    sent_at: float
+    received: bool
+    copied: bool = False
 
 
 def message_seconds(raw: float) -> float:
@@ -235,6 +278,31 @@ def newest_rowid(db: Path) -> int:
         connection.close()
 
 
+def look_at(db: Path) -> Look:
+    """What one look at the database shows (item 595): the newest row and its date, the state of the newest
+    :data:`_WATCHED_ROWS` rows (what Messages writes to a message after it is there: delivered, read), and the size and
+    time of the last change of the database and of its write-ahead log, which are read after the rows, so that a log
+    that changes between the two reads as newer than the rows and is told from one the rows show."""
+    connection: sqlite3.Connection = open_messages_db(db)
+    try:
+        names: set[str] = {name.casefold() for name in _columns(connection)}
+        fields: str = ", ".join(("ROWID", "date", *(name for name in _STATE_COLUMNS if name in names)))
+        rows: list[tuple[int, float | None, *tuple[object, ...]]] = connection.execute(
+            f"SELECT {fields} FROM message ORDER BY ROWID DESC LIMIT ?", (_WATCHED_ROWS,)
+        ).fetchall()
+    except sqlite3.DatabaseError as error:
+        raise _unreadable(db, error) from error
+    finally:
+        connection.close()
+    return Look(
+        newest=rows[0][0] if rows else 0,
+        dated=message_seconds(rows[0][1]) if rows and rows[0][1] is not None else None,
+        state=tuple(tuple(row) for row in rows),
+        chat_db=stat_file(db),
+        chat_db_wal=stat_file(wal_path(db)),
+    )
+
+
 def _columns(connection: sqlite3.Connection) -> list[str]:
     """The names of the columns of the message table, as this macOS lays it out: the columns a later macOS added (the
     ones of Send Later, the bundle of rich content) are found by their names, so that an older database is read as
@@ -264,11 +332,24 @@ def _quoted(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
+def sender_is(sender: str | None, chat: str) -> bool:
+    """Whether ``sender``, the handle Messages names for a message received, is the handle the chat ``chat`` is named
+    for, both as :func:`normalize_handle` writes a handle: an address in lower case, a number with its country code and
+    no marks. A message that names no sender, or one that is no number or address, is nobody's."""
+    if sender is None:
+        return False
+    try:
+        return normalize_handle(sender) == chat
+    except ChannelError:
+        return False
+
+
 def read_new(db: Path, after: int, handles: Sequence[str]) -> tuple[list[Row], int]:
     """The owner's messages in the conversations with ``handles`` after the row ``after``, oldest first, and the row to
     go on from: the newest in the database, or the last of a full batch. A conversation is a one-to-one chat named for a
-    handle; a message is the owner's when Messages flags it as sent by them over iMessage, and a reaction to a message
-    is not one."""
+    handle; a message is the owner's when Messages flags it as sent by them over iMessage, or (item 595, when the
+    iPhone has another Apple ID than this Mac) when it was received over iMessage from the handle its chat is named for,
+    and a reaction to a message is not one."""
     connection: sqlite3.Connection = open_messages_db(db)
     try:
         newest: int = int(connection.execute("SELECT COALESCE(MAX(ROWID), 0) FROM message").fetchone()[0])
@@ -276,27 +357,33 @@ def read_new(db: Path, after: int, handles: Sequence[str]) -> tuple[list[Row], i
             return [], max(newest, after)
         marks: str = ", ".join("?" for _ in handles)
         columns: list[str] = _columns(connection)
-        found: list[tuple[int, str, str | None, bytes | None, float | None, int | None, int, str | None]] = (
-            connection.execute(
-                "SELECT message.ROWID, lower(chat.chat_identifier), message.text, message.attributedBody, "
-                f"message.date, message.cache_has_attachments, {_scheduled_sql(columns)}, {_balloon_sql(columns)} "
-                "FROM message "
-                "JOIN chat_message_join ON chat_message_join.message_id = message.ROWID "
-                "JOIN chat ON chat.ROWID = chat_message_join.chat_id "
-                "WHERE message.ROWID > ? AND message.ROWID <= ? AND message.is_from_me = 1 "
-                "AND message.service = 'iMessage' AND chat.style = ? "
-                f"AND lower(chat.chat_identifier) IN ({marks}) "
-                "AND COALESCE(message.associated_message_type, 0) = 0 AND COALESCE(message.item_type, 0) = 0 "
-                "ORDER BY message.ROWID LIMIT ?",
-                (after, newest, _ONE_TO_ONE, *handles, BATCH),
-            ).fetchall()
-        )
+        found: list[
+            tuple[int, str, str | None, bytes | None, float | None, int | None, int, str | None, int, str | None]
+        ]
+        found = connection.execute(
+            "SELECT message.ROWID, lower(chat.chat_identifier), message.text, message.attributedBody, "
+            f"message.date, message.cache_has_attachments, {_scheduled_sql(columns)}, {_balloon_sql(columns)}, "
+            "COALESCE(message.is_from_me, 0), handle.id "
+            "FROM message "
+            "JOIN chat_message_join ON chat_message_join.message_id = message.ROWID "
+            "JOIN chat ON chat.ROWID = chat_message_join.chat_id "
+            "LEFT JOIN handle ON handle.ROWID = message.handle_id "
+            "WHERE message.ROWID > ? AND message.ROWID <= ? "
+            "AND message.service = 'iMessage' AND chat.style = ? "
+            f"AND lower(chat.chat_identifier) IN ({marks}) "
+            "AND COALESCE(message.associated_message_type, 0) = 0 AND COALESCE(message.item_type, 0) = 0 "
+            "ORDER BY message.ROWID LIMIT ?",
+            (after, newest, _ONE_TO_ONE, *handles, BATCH),
+        ).fetchall()
     except sqlite3.DatabaseError as error:
         raise _unreadable(db, error) from error
     finally:
         connection.close()
     rows: dict[int, Row] = {}
-    for rowid, chat, text, attributed, date, attachments, scheduled, balloon in found:
+    for rowid, chat, text, attributed, date, attachments, scheduled, balloon, from_me, sender in found:
+        if not from_me and not sender_is(sender, chat):
+            # Received, and not from the handle its chat is named for: nobody's command.
+            continue
         if date is None:
             # A message with no date cannot be told old from new: it is not run, and the ones after it still are.
             log.warning("imessage_row_without_a_date", rowid=rowid)
@@ -309,17 +396,18 @@ def read_new(db: Path, after: int, handles: Sequence[str]) -> tuple[list[Row], i
             attachment=bool(attachments),
             scheduled=scheduled != 0,
             balloon=balloon or None,
+            received=not from_me,
         )
     ordered: list[Row] = [rows[rowid] for rowid in sorted(rows)]
     return ordered, (found[-1][0] if len(found) >= BATCH else newest)
 
 
 class IMessageChannel:
-    """The channel of the owner's conversation with themselves. ``script`` runs AppleScript (``run_osascript``; a test
-    gives its own), ``db`` is the Messages database, ``timeout_s`` how long Messages gets to take a message and
-    ``own_base`` the address the links of Dot's messages open at (the router's, with its trailing slash): a row that is
-    only a link into it is Dot's own. ``problem`` is what keeps the channel from working now, in words, and ``needs``
-    the permission it is for, when it is one."""
+    """The channel of the owner's conversation with themselves, or with their iPhone's Apple ID (item 595). ``script``
+    runs AppleScript (``run_osascript``; a test gives its own), ``db`` is the Messages database, ``timeout_s`` how long
+    Messages gets to take a message and ``own_base`` the address the links of Dot's messages open at (the router's, with
+    its trailing slash): a row that is only a link into it is Dot's own. ``problem`` is what keeps the channel from
+    working now, in words, and ``needs`` the permission it is for, when it is one."""
 
     id: ChannelId = "imessage"
     limit: int = OUT_CHARS - len(MARKER)
@@ -339,14 +427,19 @@ class IMessageChannel:
         self._db: Path = db
         self._timeout_s: float = timeout_s
         self._own_base: str = own_base
-        # What Dot sent lately and when, for the links in it (:meth:`_dots_own_link`).
+        # What Dot sent lately and when, for the links in it (:meth:`_dots_own_link`), and the rows that may have been
+        # commands, for their copies (:meth:`_copy_of`).
         self._sent: deque[tuple[float, str]] = deque(maxlen=_SENT_KEPT)
+        self._heard: deque[_Heard] = deque(maxlen=_HEARD_KEPT)
         self._poll_s: float = poll_s
         self._clock: Callable[[], float] = clock
         self._state: ImessageState = ImessageState()
         self._intake: Intake = Intake()
         self._pending: _Pending | None = None
         self._code_sent_at: float = -CODE_APART_S
+        # What the channel sees of the database (item 595), and the one look or poll at a time that adds to it.
+        self._watch: Watch = Watch()
+        self._polling: asyncio.Lock = asyncio.Lock()
         self.problem: str | None = None
         self.needs: Needs | None = None
 
@@ -354,6 +447,12 @@ class IMessageChannel:
         """Read what the channel kept in the store."""
         kept: str | None = await self._store.kv_get(STATE_KEY)
         self._state = ImessageState() if kept is None else ImessageState.model_validate_json(kept)
+        command: str | None = await self._store.kv_get(COMMAND_KEY)
+        self._watch.command = None if command is None else SeenCommand.model_validate_json(command)
+
+    def seen(self) -> Seen:
+        """What the channel sees of Messages' database, for Settings › Channels."""
+        return self._watch.seen(self._state.cursor, self._clock())
 
     @property
     def handles(self) -> tuple[str, ...]:
@@ -386,22 +485,52 @@ class IMessageChannel:
             await asyncio.sleep(self._poll_s)
 
     async def poll(self, receive: Receive) -> None:
-        """Read what came in since the last poll; the first poll of a channel sets the cursor and reads nothing."""
+        """Read what came in since the last poll; the first poll of a channel sets the cursor and reads nothing. One
+        poll at a time, the loop's and the owner's **Check now**: two at once would read the same rows twice."""
         if not self._state.handles:
             return
-        try:
-            if self._state.cursor is None:
-                await self._keep(cursor=await asyncio.to_thread(newest_rowid, self._db))
-                self._clear("full_disk_access")
+        async with self._polling:
+            await self._poll(receive)
+
+    async def look(self) -> None:
+        """Look at the database and read no message: what **Check now** does while the channel is off or has nothing
+        paired, so that the tab shows what Dot sees before anything is read."""
+        async with self._polling:
+            now: float = self._clock()
+            self._watch.looking(now)
+            try:
+                looked: Look = await asyncio.to_thread(look_at, self._db)
+            except DesktopPermissionError as error:
+                self._read_failed(error.message, "full_disk_access", now)
                 return
-            rows, upto = await asyncio.to_thread(read_new, self._db, self._state.cursor, self._state.handles)
+            except DesktopError as error:
+                self._read_failed(error.message, None, now)
+                return
+            self._watch.saw(looked, now)
+            self._clear("full_disk_access")
+
+    async def _poll(self, receive: Receive) -> None:
+        cursor: int | None = self._state.cursor
+        rows: list[Row] = []
+        now: float = self._clock()
+        self._watch.looking(now)
+        try:
+            if cursor is None:
+                upto: int = await asyncio.to_thread(newest_rowid, self._db)
+            else:
+                rows, upto = await asyncio.to_thread(read_new, self._db, cursor, self._state.handles)
+            looked: Look = await asyncio.to_thread(look_at, self._db)
         except DesktopPermissionError as error:
-            self._fail(error.message, "full_disk_access")
+            self._read_failed(error.message, "full_disk_access", now)
             return
         except DesktopError as error:
-            self._fail(error.message, None)
+            self._read_failed(error.message, None, now)
             return
+        self._watch.saw(looked, now)
         self._clear("full_disk_access")
+        if cursor is None:
+            await self._keep(cursor=upto)
+            return
         for row in self._joined(rows):
             # The cursor moves before the message is handled: one that fails is not read again.
             await self._keep(cursor=row.rowid)
@@ -435,13 +564,15 @@ class IMessageChannel:
         return joined
 
     def _takes_a_link(self, words: Row, link: Row) -> bool:
-        """Whether the row ``link``, a link preview, goes with the row ``words`` before it (see :meth:`_joined`)."""
+        """Whether the row ``link``, a link preview, goes with the row ``words`` before it (see :meth:`_joined`): in the
+        same chat, by the same author (words this Mac sent and a link that came from the iPhone are two messages), and
+        soon after."""
         said: str | None = words.text
         if said is None or said == "" or said.lstrip().startswith(MARKER.strip()):
             return False
         if words.balloon is not None or only_a_link(said) is not None or said.strip().casefold() == STOP_COMMAND:
             return False
-        if words.chat != link.chat or self._dots_own_link(link):
+        if words.chat != link.chat or words.received != link.received or self._dots_own_link(link):
             return False
         return 0.0 <= link.sent_at - (words.sent_at if words.link_at is None else words.link_at) <= JOIN_S
 
@@ -475,6 +606,15 @@ class IMessageChannel:
         if self._dots_own_link(row):
             log.info("imessage_message_let_go", rowid=row.rowid, reason="a link of Dot's own")
             return
+        original: int | None = self._copy_of(row)
+        if original is not None:
+            log.info(
+                "imessage_message_let_go",
+                rowid=row.rowid,
+                reason="the copy of a message read a moment before",
+                copy_of=original,
+            )
+            return
         verdict: Verdict = self._intake.judge(row.text, row.sent_at, row.attachment, self._clock())
         # What would be run is first checked against what Dot's own runs may have written (item 572), but for the one
         # message that only stops a run: Dot stops when told to, whoever may have told it.
@@ -486,19 +626,45 @@ class IMessageChannel:
             case Accept(text):
                 if row.chat != self._state.reply_to:
                     await self._keep(reply_to=row.chat)
-                log.info("imessage_message_read", rowid=row.rowid, chars=len(text))
+                log.info("imessage_message_read", rowid=row.rowid, chars=len(text), received=row.received)
+                command: SeenCommand = self._watch.took(row.rowid, self._clock())
                 await receive(text)
+                await self._store.kv_set(COMMAND_KEY, command.model_dump_json())
             case Tell(notice):
                 await self._reply(row.chat, notice)
             case Skip(reason):
                 log.info("imessage_message_let_go", rowid=row.rowid, reason=reason)
+
+    def _copy_of(self, row: Row) -> int | None:
+        """The row ``row`` is the copy of, or ``None``. With one Apple ID Messages may keep a message to oneself as two
+        rows (item 595), one sent and one received: in the same chat, with the same words, dated at most :data:`COPY_S`
+        from each other, they are one command, in either order and in the same poll or a later one, and the second is
+        let go. A row is the copy of one row only, so that words said again are run again, and two rows of one kind are
+        never copies of each other (the owner repeating themselves). A row that is not a copy and may be a command is
+        kept in mind for the copy that may follow it, whatever becomes of it (run, or told why not)."""
+        if not row.text:
+            return None
+        for heard in self._heard:
+            if (
+                not heard.copied
+                and heard.chat == row.chat
+                and heard.received != row.received
+                and heard.text == row.text
+                and abs(heard.sent_at - row.sent_at) <= COPY_S
+            ):
+                heard.copied = True
+                return heard.rowid
+        self._heard.append(_Heard(row.rowid, row.chat, row.text, row.sent_at, row.received))
+        return None
 
     async def _not_the_owners(self, row: Row) -> str | None:
         """The words that tell the owner why ``row`` is not run as theirs, or ``None`` when it may be. A run can write a
         row flagged as the owner's (see :mod:`dotagent.channels.sends`), and a message a run wrote must not come back
         as the owner's command. A row Messages sends later than it was written has a date that hides the step that
         scheduled it; a row dated in the window of a step of any run that raised ``message_send`` may be that step's. A
-        row that joins words and a link is judged by the date of each."""
+        row that joins words and a link is judged by the date of each. A row received from the iPhone's Apple ID (item
+        595) is judged the same way: that Messages keeps no received copy of what a run sends to the owner's own
+        address cannot be shown, so nothing waives the window for it."""
         if row.scheduled:
             log.warning("imessage_message_scheduled", rowid=row.rowid)
             return SCHEDULED
@@ -515,6 +681,11 @@ class IMessageChannel:
         if message != self.problem:
             log.warning("imessage_not_read", problem=message)
         self.problem, self.needs = message, needs
+
+    def _read_failed(self, message: str, needs: Needs | None, now: float) -> None:
+        """A look at the database failed at ``now``: the channel's problem, and the last error the tab shows."""
+        self._fail(message, needs)
+        self._watch.failed(message, now)
 
     def _clear(self, needs: Needs) -> None:
         """A problem that was about ``needs`` is over."""
@@ -549,7 +720,9 @@ class IMessageChannel:
             detail: str = said if isinstance(said, str) and said else error.message
             if "-1743" in detail or "not authorized" in detail.casefold():
                 self._fail("macOS has not let the app that runs Dot control Messages", "automation")
-            raise ChannelError(f"Messages did not take the message: {detail}", {}) from error
+            failure: str = f"Messages did not take the message: {detail}"
+            self._watch.failed(failure, self._clock())
+            raise ChannelError(failure, {}) from error
         self._clear("automation")
 
     # ----- pairing ---------------------------------------------------------------------------

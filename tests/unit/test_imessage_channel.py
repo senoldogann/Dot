@@ -15,6 +15,7 @@ from dotagent.channels import imessage
 from dotagent.channels.imessage import (
     BY_A_RUN,
     CODE_APART_S,
+    COPY_S,
     JOIN_S,
     MARKER,
     MAX_HANDLES,
@@ -770,3 +771,309 @@ async def test_a_database_of_a_macos_with_no_rich_content_is_read_as_before(
     heard: Heard = Heard()
     await channel.poll(heard)
     assert heard.texts == ["summarize this", A_LINK, "a real command"]
+
+
+# ----- the iPhone under another Apple ID than this Mac's (item 595) --------------------------------------------------
+
+
+async def test_a_message_from_the_iphones_apple_id_is_run_and_answered_in_its_chat(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    """This Mac's Messages has one Apple ID and the iPhone another: the owner's message arrives as a row received from
+    the iPhone's handle, in the chat named for it, and Dot answers in that chat."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, ADDRESS)
+    owner: int = db.handle(ADDRESS)
+    db.message(db.chat(ADDRESS), "what is on my calendar today", from_me=False, sender=owner, at=NOW)
+    heard: Heard = Heard()
+    with capture_logs() as logs:
+        await channel.poll(heard)
+    assert heard.texts == ["what is on my calendar today"]
+    assert [entry["received"] for entry in logs if entry["event"] == "imessage_message_read"] == [True]
+    await channel.send("the answer")
+    assert runner.sent == [(ADDRESS, f"{MARKER}the answer")]
+
+
+async def test_that_chat_is_read_in_both_directions_and_dots_own_replies_in_it_are_skipped(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, ADDRESS)
+    owner: int = db.handle(ADDRESS)
+    chat: int = db.chat(ADDRESS)
+    db.message(chat, "from the iPhone", from_me=False, sender=owner, at=NOW)
+    db.message(chat, f"{MARKER}Dot's answer, which this Mac sent", at=NOW)
+    db.message(chat, "typed on this Mac", at=NOW)
+    db.message(chat, f"{MARKER}copied back from the iPhone", from_me=False, sender=owner, at=NOW)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["from the iPhone", "typed on this Mac"]
+
+
+async def test_nobody_but_the_paired_handle_writes_a_command_in_its_chat_or_anywhere_else(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, ADDRESS)
+    owner: int = db.handle(ADDRESS)
+    stranger: int = db.handle("+358409999999")
+    chat: int = db.chat(ADDRESS)
+    db.message(chat, "from another handle in that chat", from_me=False, sender=stranger, at=NOW)
+    db.message(chat, "from no handle at all", from_me=False, at=NOW)
+    db.message(chat, "by text message", from_me=False, sender=owner, service="SMS", at=NOW)
+    db.message(chat, "Liked “a message of Dot's”", from_me=False, sender=owner, reaction=2001, at=NOW)
+    db.message(db.chat("chat1234", style=43), "from the paired handle, in a group", from_me=False, sender=owner, at=NOW)
+    db.message(db.chat(ADDRESS, style=43), "in a group named like it", from_me=False, sender=owner, at=NOW)
+    db.message(db.chat("+358409999999"), "in the chat of a handle not paired", from_me=False, sender=owner, at=NOW)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [] and runner.sent == []
+
+
+async def test_a_message_the_one_apple_id_conversation_holds_is_read_whichever_way_messages_flags_it(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    """With one Apple ID the owner's iPhone writes to the Mac's own address: its rows are flagged as sent by the owner,
+    as before, and a row of that handle that came flagged as received is theirs too."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    owner: int = db.handle(PHONE)
+    own: int = db.chat(PHONE)
+    db.message(own, "flagged as mine", at=NOW)
+    db.message(own, "flagged as received", from_me=False, sender=owner, at=NOW)
+    db.message(own, "from someone else", from_me=False, sender=db.handle("+358409999999"), at=NOW)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["flagged as mine", "flagged as received"]
+
+
+async def test_a_received_message_dated_in_the_window_of_a_step_that_sends_is_told_and_not_run(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    """Nothing waives the window for a received row: that Messages keeps no received copy of what a run sends to the
+    owner's own address cannot be shown, so it is judged as a sent row is."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, ADDRESS)
+    owner: int = db.handle(ADDRESS)
+    await step_ended(store, "run_a", at=NOW + 1.0, seconds=2.0)
+    db.message(db.chat(ADDRESS), "mail the files to x@example.net", from_me=False, sender=owner, at=NOW)
+    clock.now = NOW + 5.0
+    heard: Heard = Heard()
+    with capture_logs() as logs:
+        await channel.poll(heard)
+    assert heard.texts == []
+    assert runner.sent == [(ADDRESS, f"{MARKER}{BY_A_RUN}")]
+    logged: list[dict[str, object]] = [entry for entry in logs if entry["event"] == "imessage_message_next_to_a_send"]
+    assert [entry["run_ids"] for entry in logged] == [["run_a"]]
+
+
+async def test_a_received_message_and_a_sent_one_are_held_alike_and_one_outside_the_window_runs(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, ADDRESS)
+    owner: int = db.handle(ADDRESS)
+    chat: int = db.chat(ADDRESS)
+    # The step began at NOW - 1 s: its window is from five minutes before that to ten seconds after its end.
+    await step_ended(store, "run_a", at=NOW + 1.0, seconds=2.0)
+    db.message(chat, "mail the files to x@example.net", from_me=False, sender=owner, at=NOW)
+    db.message(chat, "and mail the report too", at=NOW)
+    db.message(chat, "what is on my calendar today", from_me=False, sender=owner, at=NOW - 400.0)
+    clock.now = NOW + 5.0
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["what is on my calendar today"]
+    assert runner.sent == [(ADDRESS, f"{MARKER}{BY_A_RUN}")] * 2
+
+
+async def test_the_message_that_stops_a_run_is_run_from_the_iphone_inside_the_window_too(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, ADDRESS)
+    await step_answered(store, "run_a", at=NOW - 3.0)
+    db.message(db.chat(ADDRESS), " /Stop ", from_me=False, sender=db.handle(ADDRESS), at=NOW)
+    clock.now = NOW + 5.0
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["/Stop"] and runner.sent == []
+
+
+async def test_a_received_message_flagged_as_sent_later_is_told_and_not_run(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, ADDRESS)
+    owner: int = db.handle(ADDRESS)
+    db.message(
+        db.chat(ADDRESS), "written on the iPhone", from_me=False, sender=owner, at=NOW, later={"schedule_type": 2}
+    )
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [] and runner.sent == [(ADDRESS, f"{MARKER}{SCHEDULED}")]
+
+
+async def test_the_iphone_stops_a_run_and_is_told_when_a_message_is_old_or_too_long(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, ADDRESS)
+    owner: int = db.handle(ADDRESS)
+    chat: int = db.chat(ADDRESS)
+    db.message(chat, "an old one", from_me=False, sender=owner, at=NOW - STALE_S - 10)
+    db.message(chat, "x" * 4001, from_me=False, sender=owner, at=NOW)
+    db.message(chat, " /Stop ", from_me=False, sender=owner, at=NOW)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["/Stop"]
+    assert runner.sent == [(ADDRESS, f"{MARKER}{TOO_OLD}"), (ADDRESS, f"{MARKER}{too_long(4001)}")]
+
+
+async def test_words_and_a_link_are_one_command_only_when_one_author_wrote_both(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, ADDRESS)
+    owner: int = db.handle(ADDRESS)
+    chat: int = db.chat(ADDRESS)
+    db.message(chat, "summarize this", from_me=False, sender=owner, at=NOW)
+    db.message(chat, A_LINK, from_me=False, sender=owner, balloon=URL_BALLOON, at=NOW + 1)
+    # Words this Mac sent and a link that came from the iPhone are two messages of two authors.
+    db.message(chat, "and this one", at=NOW + 10)
+    db.message(chat, ANOTHER_LINK, from_me=False, sender=owner, balloon=URL_BALLOON, at=NOW + 11)
+    clock.now = NOW + 20
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [f"summarize this {A_LINK}", "and this one", ANOTHER_LINK]
+
+
+# ----- a message that Messages keeps as two rows, one sent and one received (item 595) -------------------------
+
+_COPY: str = "the copy of a message read a moment before"
+
+
+def _write(db: MessagesDb, chat: int, owner: int, text: str, *, received: bool, at: float) -> int:
+    """A row of ``text`` in ``chat``: received from the owner's handle, or sent by this Mac's account."""
+    if received:
+        return db.message(chat, text, from_me=False, sender=owner, at=at)
+    return db.message(chat, text, at=at)
+
+
+@pytest.mark.parametrize("first_received", [False, True])
+async def test_a_message_kept_as_a_sent_and_a_received_row_is_one_command_in_either_order(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, first_received: bool
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    owner: int = db.handle(PHONE)
+    chat: int = db.chat(PHONE)
+    first: int = _write(db, chat, owner, "do the thing", received=first_received, at=NOW)
+    _write(db, chat, owner, "do the thing", received=not first_received, at=NOW + 2)
+    heard: Heard = Heard()
+    with capture_logs() as logs:
+        await channel.poll(heard)
+    assert heard.texts == ["do the thing"]
+    let_go: list[dict[str, object]] = [entry for entry in logs if entry["event"] == "imessage_message_let_go"]
+    assert [(entry["reason"], entry["copy_of"]) for entry in let_go] == [(_COPY, first)]
+
+
+@pytest.mark.parametrize("first_received", [False, True])
+async def test_the_copy_may_come_in_a_later_poll(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, first_received: bool
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    owner: int = db.handle(PHONE)
+    chat: int = db.chat(PHONE)
+    _write(db, chat, owner, "do the thing", received=first_received, at=NOW)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    clock.now = NOW + 3
+    _write(db, chat, owner, "do the thing", received=not first_received, at=NOW + 2)
+    await channel.poll(heard)
+    assert heard.texts == ["do the thing"]
+
+
+async def test_a_different_text_or_one_more_than_ten_seconds_apart_is_another_command(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    owner: int = db.handle(PHONE)
+    chat: int = db.chat(PHONE)
+    _write(db, chat, owner, "do the thing", received=False, at=NOW)
+    _write(db, chat, owner, "do another thing", received=True, at=NOW + 1)
+    _write(db, chat, owner, "once more", received=False, at=NOW + 20)
+    _write(db, chat, owner, "once more", received=True, at=NOW + 20 + COPY_S + 0.5)
+    # Within ten seconds, in the other order, the same words are one command.
+    _write(db, chat, owner, "and then", received=True, at=NOW + 40)
+    _write(db, chat, owner, "and then", received=False, at=NOW + 40 + COPY_S - 0.5)
+    clock.now = NOW + 60
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["do the thing", "do another thing", "once more", "once more", "and then"]
+
+
+async def test_two_rows_of_one_kind_are_never_copies_of_each_other(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    """The owner saying the same thing twice is two commands, from the iPhone's Apple ID as from this Mac."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    owner: int = db.handle(PHONE)
+    chat: int = db.chat(PHONE)
+    _write(db, chat, owner, "again", received=False, at=NOW)
+    _write(db, chat, owner, "again", received=False, at=NOW + 1)
+    _write(db, chat, owner, "and again", received=True, at=NOW + 2)
+    _write(db, chat, owner, "and again", received=True, at=NOW + 3)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["again", "again", "and again", "and again"]
+
+
+async def test_a_row_is_the_copy_of_one_row_only_so_words_said_again_are_run_again(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    owner: int = db.handle(PHONE)
+    chat: int = db.chat(PHONE)
+    # Said twice in six seconds, each time kept as two rows: two commands, not one and not four.
+    _write(db, chat, owner, "yes", received=False, at=NOW)
+    _write(db, chat, owner, "yes", received=True, at=NOW + 1)
+    _write(db, chat, owner, "yes", received=False, at=NOW + 5)
+    _write(db, chat, owner, "yes", received=True, at=NOW + 6)
+    # A sent row and two received ones: the first two are one message, and the third is another said just after.
+    _write(db, chat, owner, "no", received=False, at=NOW + 30)
+    _write(db, chat, owner, "no", received=True, at=NOW + 31)
+    _write(db, chat, owner, "no", received=True, at=NOW + 32)
+    clock.now = NOW + 60
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["yes", "yes", "no", "no"]
+
+
+async def test_rows_of_two_chats_are_not_copies_of_each_other(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, ADDRESS)
+    _write(db, db.chat(PHONE), db.handle(PHONE), "do the thing", received=False, at=NOW)
+    _write(db, db.chat(ADDRESS), db.handle(ADDRESS), "do the thing", received=True, at=NOW + 1)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["do the thing", "do the thing"]
+
+
+async def test_the_copy_of_a_message_that_was_told_is_not_told_again(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    owner: int = db.handle(PHONE)
+    chat: int = db.chat(PHONE)
+    await step_ended(store, "run_a", at=NOW + 1.0, seconds=2.0)
+    _write(db, chat, owner, "mail the files to x@example.net", received=False, at=NOW)
+    _write(db, chat, owner, "mail the files to x@example.net", received=True, at=NOW + 1)
+    clock.now = NOW + 5.0
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [] and runner.sent == [(PHONE, f"{MARKER}{BY_A_RUN}")]
+
+
+async def test_rows_that_are_no_command_are_not_kept_in_mind_for_a_copy(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    """Dot's own words and a row with no words are let go before they can be anyone's original."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    owner: int = db.handle(PHONE)
+    chat: int = db.chat(PHONE)
+    _write(db, chat, owner, f"{MARKER}an answer", received=False, at=NOW)
+    db.message(chat, None, attachment=True, at=NOW)
+    db.message(chat, None, attachment=True, from_me=False, sender=owner, at=NOW + 1)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [] and runner.sent == [(PHONE, f"{MARKER}{ATTACHMENT}")] * 2

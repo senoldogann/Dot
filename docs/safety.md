@@ -682,30 +682,40 @@ and any other answer skips it (item 558).
 send to yourself starts a run as one typed in the web UI does: it is yours and trusted, so the run starts untainted, in
 the mode and with the approvals its chat keeps (Auto and `[policy] approvals` until you choose others in the chat's
 composer). What makes it yours is where it came from: a row of Messages' database that Messages flags as sent by you
-over iMessage, in a one-to-one conversation named for a number or an address you paired with a code typed back. A
-message from anyone else, in a group, by text message or as a reaction is never read as a command; Dot's own messages
-(its answers, and what it tells you on its own, item 582, whose words may be a third party's: a mail's subject) land in
-the same conversation and each starts with `◆`, which is how they are told from yours. Nobody without your Apple ID can
-write such a row from outside this Mac, but a run of Dot can from inside it: a message it sends through
-AppleScript, through keystrokes in Messages or through a tool of an MCP server lands in that conversation flagged as
-yours, and Messages' database cannot tell it from yours. The guard asks before such a send, but in `auto` the review
-model answers, not you, and in `yolo` nobody does, so a run that read untrusted content could write itself a command and
-have it read as yours, untainted. The channel does not run it, in any mode: a row dated in the window of a step of any
-run that raised `message_send` (from five minutes before the step began, its wait for an answer included, to ten seconds
-after its end; a step that sends and goes on stays in its window until it ends, about 33 minutes at the most) is told
-and not run, and so is a message Messages sends later than it was written (Send Later of macOS 15), and a draft to a
-number or address you paired is refused. What this does not catch is a send the guard cannot see, which raises no flag:
-a script of a page, a program the run wrote and then runs, a Shortcut, a job a step left behind. `/stop` is run in any
-case. Pair only your own number or Apple ID address: the code you type back shows only that it reached whoever holds the
-number, so with someone else's every message you send them would be read as your command. Approvals and questions are
-never answered on a channel: a line says one waits and where to answer, in Dot's UI or the phone app, so that a
-channel's account, if taken, could not approve anything. A message is read up to 4,000 characters and 30 a minute, and
-one that came more than 15 minutes before Dot read it is not run: Dot says so. A row that is not words (a sticker, an
-app's message, a payment: rich content, which Messages marks with a bundle of its own) is never run, and neither is a
-row that is only a link that Dot wrote, one into its own pages or one in a message it sent a minute before: Messages may
-split the link at the end of a message of Dot's into a row of its own, which has no `◆` and is flagged as yours, and it
-would else start a run whose answer might end with a link as well. A link of yours that Messages splits off your words,
-less than 3 seconds after them, is joined to them as one command.
+over iMessage, in a one-to-one conversation named for a number or an address you paired with a code typed back; or, when
+your iPhone has another Apple ID than this Mac (item 595), a row received over iMessage from that very number or
+address, in the conversation named for it. A message from anyone else, in a group, by text message or as a reaction is
+never read as a command; Dot's own messages (its answers, and what it tells you on its own, item 582, whose words may be
+a third party's: a mail's subject) land in the same conversation and each starts with `◆`, which is how they are told
+from yours. Nobody without your Apple ID can write such a row from outside this Mac (nor one received from your paired
+number, which needs the Apple ID of that number: Apple authenticates the sender), but a run of Dot can write one flagged
+as sent from inside it: a message it sends through AppleScript, through keystrokes in Messages or through a tool of an
+MCP server lands in that conversation flagged as yours, and Messages' database cannot tell it from yours. The guard asks
+before such a send, but in `auto` the review model answers, not you, and in `yolo` nobody does, so a run that read
+untrusted content could write itself a command and have it read as yours, untainted. The channel does not run it, in any
+mode: a row dated in the window of a step of any run that raised `message_send` (from five minutes before the step
+began, its wait for an answer included, to ten seconds after its end; a step that sends and goes on stays in its window
+until it ends, about 33 minutes at the most) is told and not run, and so is a message Messages sends later than it was
+written (Send Later of macOS 15), and a draft to a number or address you paired is refused. What this does not catch is
+a send the guard cannot see, which raises no flag: a script of a page, a program the run wrote and then runs, a
+Shortcut, a job a step left behind. `/stop` is run in any case. A row received from your paired number or address is
+judged like a sent one, by the window and by Send Later: a run sends as this Mac's account, and `[policy] sealed_paths`
+closes `chat.db` to its commands, but that Messages writes no received copy of what this Mac sends to your own address
+cannot be shown, and if it did, a run's message would pass for yours; it costs a message now and then, which is told and
+sent again. With one Apple ID Messages may keep a message to yourself as a sent row and a received row: in one chat,
+with the same words and dated at most ten seconds apart, they are one command, and the second is let go. Pairing someone
+else's number or address gives them Dot: the code you type back shows only that it reached whoever holds the number, so
+with someone else's every message they send you, and every message you send them, would be read as your command.
+Settings › Channels shows what the channel sees of Messages' database (the newest row, the cursor, the two files, the
+last command and error) and warns when its log changed and nothing Dot reads did; it informs and decides nothing.
+Approvals and questions are never answered on a channel: a line says one waits and where to answer, in Dot's UI or the
+phone app, so that a channel's account, if taken, could not approve anything. A message is read up to 4,000 characters
+and 30 a minute, and one that came more than 15 minutes before Dot read it is not run: Dot says so. A row that is not
+words (a sticker, an app's message, a payment: rich content, which Messages marks with a bundle of its own) is never
+run, and neither is a row that is only a link that Dot wrote, one into its own pages or one in a message it sent a
+minute before: Messages may split the link at the end of a message of Dot's into a row of its own, which has no `◆` and
+is flagged as yours, and it would else start a run whose answer might end with a link as well. A link of yours that
+Messages splits off your words, less than 3 seconds after them, is joined to them as one command.
 
 **The record of each step.** Every step that the policy let through keeps, with its result, what decided it (item 468):
 the verdict, where it came from (one of your rules, named, the preset, the guard, the taint, supervised...), the reason,

@@ -19,17 +19,20 @@ from dotagent.channels.imessage import (
     database_access,
 )
 from dotagent.channels.router import ASKS_APART_S, WATCHED_KINDS, ChannelRouter
+from dotagent.channels.seen import Seen, SeenError
 from dotagent.channels.types import Channel, ChannelId
 from dotagent.channels.views import AutomationAnswer, ChannelsView, ImessageView
 from dotagent.connections import mac
 from dotagent.connections.mac import AutomationState
 from dotagent.core.errors import DesktopError
 from dotagent.core.logs import get_logger
+from dotagent.core.text import redact_known
 from dotagent.desktop import perms
 from dotagent.desktop.codes import chat_db_path
 from dotagent.desktop.script import run_osascript
 from dotagent.events import Subscription
 from dotagent.runtime import Runtime
+from dotagent.secrets import known_secrets
 from dotagent.server.links import base_url
 
 log = get_logger(__name__)
@@ -208,7 +211,27 @@ class Channels:
             needs=self._imessage.needs,
             chat_run_id=await self._router.chat_run_id("imessage"),
             program=await asyncio.to_thread(self._macos.program),
+            seen=await self._seen(),
         )
+
+    async def _seen(self) -> Seen:
+        """What the channel sees of Messages' database (item 595), the last error masked of the secrets Dot holds: what
+        osascript says of a message that did not go may quote it."""
+        seen: Seen = self._imessage.seen()
+        if seen.error is None:
+            return seen
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        masked: SeenError = seen.error.model_copy(update={"message": redact_known(seen.error.message, known)})
+        return seen.model_copy(update={"error": masked})
+
+    async def poll_now(self) -> None:
+        """Look at Messages' database at once (Settings › Channels, **Check now**). With the channel on and a handle
+        paired it is a poll as the loop's own, and reads and runs what is new; otherwise it only looks, and reads no
+        message, so that the switch keeps its meaning."""
+        if self._on["imessage"] and self._imessage.paired():
+            await self._imessage.poll(partial(self._router.inbound, "imessage"))
+        else:
+            await self._imessage.look()
 
     async def ask_macos_about_messages(self) -> None:
         """Show macOS's question whether Dot may control Messages, one at a time, and wait a while for the owner's
