@@ -8,6 +8,7 @@ steps is classified once, from the elements it targets in the latest snapshot.
 
 import asyncio
 import base64
+import posixpath
 import secrets
 from dataclasses import replace
 from pathlib import PurePosixPath
@@ -17,6 +18,7 @@ from urllib.parse import unquote, urlsplit
 from pydantic import Field, SecretStr, model_validator
 
 from dotagent.agent.judge import ClickFacts, ClickJudgment, PageCheck, PageFacts, render_page_check
+from dotagent.agent.pages import LIBRARY_HOSTS
 from dotagent.browser.render import (
     describe_step,
     render_act_outcome,
@@ -83,6 +85,9 @@ from dotagent.tools.base import (
 )
 from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
+from dotagent.tools.groups import group_of
+from dotagent.tools.meta import USE_TOOLS_TOOL
+from dotagent.tools.pages import PAGE_SUFFIXES, SHOW_PAGE_TOOL
 from dotagent.vault.hosts import fills_on, website_hosts
 from dotagent.vault.onepassword import Login, LoginSecret, kept_token
 
@@ -128,22 +133,32 @@ def _clip(text: str, limit: int) -> str:
 def _local_file_hint(url: str) -> str:
     """What to do instead of opening ``url``, a ``file:`` address (item 596): the browser opens no file of this Mac,
     since a page opened from disk could lead it to any other (a key, a password store) past the rules on reading files.
-    A file is read with read_file, which those rules judge; a page Dot made in its workspace reaches the owner by its
-    path, written in code in the answer: the panel beside the conversation shows its text (never the page drawn), and
-    the owner opens the page in their own browser. Nothing here serves a folder on this Mac's own address: a
-    server of the Mac opens as any site, and a folder named by a page would bring the files around it within reach
-    (the first round's review). Empty for an address that is no file."""
+    A file is read with read_file, which those rules judge. A page Dot made in its workspace is shown by its path with
+    show_page (item 598), sandboxed in the conversation, whose Open shows it full size in the owner's browser; any other
+    file of the workspace reaches the owner by its path, written in code in the answer, which the panel beside the
+    conversation shows. Nothing here serves a folder on this Mac's own address: a server of the Mac opens as any site,
+    and a folder named by a page would bring the files around it within reach (item 596's review). Empty for an address
+    that is no file."""
     parts = urlsplit(url)
     if parts.scheme.lower() != "file":
         return ""
-    path = PurePosixPath(unquote(parts.path))
+    # Read as written, ".." taken away (item 596's review): a path that climbs out of the workspace is none of its.
+    path = PurePosixPath(posixpath.normpath(unquote(parts.path)))
     words: str = " A file of this Mac is read with read_file."
-    if path.is_relative_to(PurePosixPath(workspace_dir())):
-        words += (
-            f" To show the owner a page made in the workspace, write its path in code in the answer (`{path}`): the"
-            " panel beside the conversation shows its text, and the owner opens the page in their own browser."
+    if not path.is_relative_to(PurePosixPath(workspace_dir())):
+        return words
+    if path.suffix.lower() in PAGE_SUFFIXES:
+        return words + (
+            f" To show the owner this page, give its path to {SHOW_PAGE_TOOL} ({USE_TOOLS_TOOL} with the group"
+            f" {group_of(SHOW_PAGE_TOOL)} turns it on): it is drawn in the conversation, and its Open shows it full"
+            f" size in the owner's browser. Scripts and styles load there from {', '.join(LIBRARY_HOSTS)} alone,"
+            " pictures only when written into the page (data: addresses), and the files beside it not at all: put in"
+            " the page what it needs of them."
         )
-    return words
+    return words + (
+        f" To show the owner a file made in the workspace, write its path in code in the answer (`{path}`): the panel"
+        " beside the conversation shows it."
+    )
 
 
 def checked_url(raw: str, config: AppConfig) -> str:

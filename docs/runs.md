@@ -492,7 +492,7 @@ of holding it all in its context, and names the file in its answer. The file is 
 It is the only file a `research` run may write, and the write lands on that file or nowhere: a link at the notes folder
 or at the file, which a command of a `task` run can make, is refused, never followed (item 556).
 
-**Pages in the conversation.** `show_page(title, html)` shows you a page the run writes in HTML, in the conversation: a
+**Pages in the conversation.** `show_page(title, html | path)` shows you a page the run writes in HTML, in the chat: a
 chart, a table, a diagram, a 3D view, a mockup. It sits under its title in a frame as wide as the conversation and as
 tall as the page (80 to 2,000 pixels), and Open shows it full size in your browser. It is drawn in the colours of the
 theme on screen, given to it as CSS variables (`--background`, `--foreground`, `--accent`, `--chart-1` to `--chart-6`
@@ -511,6 +511,10 @@ list or figures in text, one page a question and none for a single number. It as
 that sort and series that switch on and off, and still under `prefers-reduced-motion`. It names the libraries that
 fit, in pinned versions: Apache ECharts or Chart.js for charts, Mermaid for diagrams, D3 for a drawing of the run's
 own, three.js for 3D (item 521).
+A page the run made in its workspace (an `.html`, `.htm`, `.xhtml` or `.svg` file) is shown by its path instead of its
+HTML (item 598), as it is: the file must lie in the workspace once its links are followed and not among the pages a
+crawl or an MCP answer kept there, the call is judged as a read of it, as `read_file`'s is, and the files beside it do
+not load.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the

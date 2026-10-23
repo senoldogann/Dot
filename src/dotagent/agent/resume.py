@@ -39,6 +39,7 @@ from dotagent.tools.context import ToolContext
 from dotagent.tools.desktop import DESKTOP_ACT_TOOL
 from dotagent.tools.help import FIND_HELP_TOOL
 from dotagent.tools.meta import ASK_USER_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL, USE_TOOLS_TOOL
+from dotagent.tools.pages import SHOW_PAGE_TOOL
 
 log = get_logger(__name__)
 
@@ -56,6 +57,10 @@ REPEATABLE_KINDS: frozenset[ActionKind] = READ_ONLY_KINDS - {"delegate", "meta"}
 REPEATABLE_META_TOOLS: frozenset[str] = frozenset(
     {UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, USE_TOOLS_TOOL, SKILL_TOOL, "schedule_list", FIND_HELP_TOOL, ASK_USER_TOOL}
 )
+
+# Tools a second call adds to again whatever the kind of the call: a page shown by its path is a read of its file (item
+# 598), and a second call shows the page twice.
+_ADDING_TOOLS: frozenset[str] = frozenset({SHOW_PAGE_TOOL})
 
 # Tools whose classification looks at the screen as it is now, which can bring an application to the front: their calls
 # are not classified again. None of their kinds only reads.
@@ -135,7 +140,10 @@ def can_resume(run: RunRecord, newest_run_id: str | None) -> bool:
 
 def repeatable(call: InterruptedCall) -> bool:
     """Whether running ``call`` again changes nothing: its tool only reads, or is one of the ``meta`` tools that set
-    what a second call sets again (:data:`REPEATABLE_META_TOOLS`)."""
+    what a second call sets again (:data:`REPEATABLE_META_TOOLS`); never a tool that adds again
+    (:data:`_ADDING_TOOLS`)."""
+    if call.tool in _ADDING_TOOLS:
+        return False
     if call.kind == "meta":
         return call.tool in REPEATABLE_META_TOOLS
     return call.kind is not None and call.kind in REPEATABLE_KINDS
