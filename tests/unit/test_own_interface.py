@@ -172,7 +172,9 @@ def test_a_file_of_this_mac_is_refused_with_what_to_do_instead(tmp_path: Path, m
     # The page itself, drawn, rather than its text in the panel (item 598).
     assert "give its path to show_page (use_tools with the group pages turns it on)" in made
     assert "its Open shows it full size in the owner's browser" in made
-    assert "from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, esm.sh alone" in made
+    # The files beside it are written in (item 600); a script's own loads are not, but for the libraries.
+    assert "with the files beside it that it names written in" in made
+    assert "but for libraries from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, esm.sh" in made
     assert "write its path" not in made
     for other in ("site/About.HTM", "site/feed.xhtml", "chart.svg"):
         assert "give its path to show_page" in _refusal((workspace / other).as_uri(), config)
