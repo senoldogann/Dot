@@ -115,7 +115,7 @@ async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
             assert marks == 0, "every provider keeps its own mark"
             assert await wide.locator(".provider-panel").count() == 1
             assert (await wide.locator(".provider-title").text_content()) == "OpenAI"
-            assert await wide.locator(".provider-section-title", has_text="Authentication").count() == 1
+            assert await wide.locator(".provider-section-title", has_text="Key").count() == 1
             assert await wide.locator(".provider-section-title", has_text="Models").count() == 1
             sideways = await wide.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
             assert sideways <= 0

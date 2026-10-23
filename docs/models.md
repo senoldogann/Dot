@@ -27,9 +27,10 @@ next call of that work on, with no restart (a run under way keeps the review mod
 its second opinion and its approvals), and the config file keeps it with the rest of the file as it was; a model that
 cannot do the work is refused, and nothing changes (`POST /api/models/roles`).
 
-Under them, **Standby models** (item 478) lists the models a run moves to when its own model cannot answer (below), in
-their order: **Add a model…** puts one of the models that call tools at the end, the arrows move one up or down, and ×
-takes it off; a model whose provider has no key says so, since a run passes it over. The list holds from the next move
+Under them, **Fallbacks** (item 478, the standby models; drawn as a numbered list since item 563) lists the models a run
+moves to when its own model cannot answer (below), in their order: **Add a fallback model** puts one of the models that
+call tools at the end, the arrows move one up or down, and × takes it off; a model whose provider has no key says so,
+since a run passes it over. The list holds from the next move
 on, with no restart (a run that moved already keeps its model), and the config file keeps it as `standby` with the rest
 of the file as it was; a model named twice, one that cannot call tools and one of Zen's free models are refused, and
 nothing changes (`PUT /api/models/standby`, eight at most). An empty list moves no run: the error ends it.
@@ -266,7 +267,7 @@ the key in use comes from (the daemon's environment, Dot's `.env` file or the Ke
 or more, its last four characters; a key never comes back from the daemon whole. **Check** asks the provider whether it
 takes the key in use: the model listing of OpenAI and Anthropic, the subscription of OpenCode Go and the key's own page
 at OpenRouter (what it has spent and may spend) cost nothing, the Ollama key is tried with one search of its hosted web
-search. **Add key** or **Replace** saves a key in `<home>/.env` and then runs **Check**; the trash button removes the
+search. **Add key** or **Replace key** saves a key in `<home>/.env` and then runs **Check**; **Remove** takes away the
 key saved there (a key from the environment or the Keychain is left alone). The page warns when the daemon was started
 with the variable in its environment, which comes before a key saved in Dot. A saved or removed key is used from the
 next request of a run on, even in a run under way. The memory search (an OpenAI or ollama.com key) and the MCP servers

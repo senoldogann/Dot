@@ -498,11 +498,15 @@ draws no line either way (items 346, 362 and 500, kept in this browser), and the
 **Appearance** (the look
 of this browser, below), **Models** (the **Default model** first, a menu of the models that can call tools: the runs
 that name no model, a new chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models]
-main`, as when it is changed from the composer's model menu; then one fold per provider, with the reasoning levels of
-each model and a menu to choose one; a provider without a key, or whose key was refused (HTTP 401), says so and links to
-Providers, and one that refused access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in
-with, each with its key and the models it brings; see [Models and providers](models.md#models-and-providers)),
-**Browser** (which Chrome Dot browses with and what Chrome has to allow first; see [Browser
+main`, as when it is changed from the composer's model menu; the **Roles** card holds the fast, review and vision
+models too, each with its provider in its box, and **Fallbacks** the models a run moves to; then **Every model, by
+provider**, a search over one fold per provider, with the reasoning levels of each model and a menu to choose one, and
+what the providers hold in the page's head with a button that asks them again; a provider without a key, or whose key
+was refused (HTTP 401), says so and links to Providers, and one that refused access (HTTP 403) says that, with its
+words), **Providers** (the providers Dot signs in with, one card: each on its tile with the tail of its key and a dot
+that says whether it is signed in, and the one chosen with its key, the page where it is made and the models it brings
+behind a filter; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses with
+and what Chrome has to allow first; see [Browser
 use](browser-and-computer-use.md#browser-use)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
 what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, every
 version with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
