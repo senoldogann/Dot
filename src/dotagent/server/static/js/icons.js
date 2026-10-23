@@ -385,6 +385,15 @@ const SHAPES = {
     ["path", { d: "M15.54 8.46a5 5 0 0 1 0 7.07" }],
     ["path", { d: "M19.07 4.93a10 10 0 0 1 0 14.14" }],
   ],
+  // The button that opens the palette of reactions under a message of Dot's (item 586).
+  smilePlus: [
+    ["path", { d: "M22 11v1a10 10 0 1 1-9-10" }],
+    ["path", { d: "M8 14s1.5 2 4 2 4-2 4-2" }],
+    ["line", { x1: 9, x2: 9.01, y1: 9, y2: 9 }],
+    ["line", { x1: 15, x2: 15.01, y1: 9, y2: 9 }],
+    ["path", { d: "M16 5h6" }],
+    ["path", { d: "M19 2v6" }],
+  ],
   // A draft of an email and the press that sends it (item 314).
   mail: [["rect", { width: 20, height: 16, x: 2, y: 4, rx: 2 }], ["path", { d: "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" }]],
   send: [

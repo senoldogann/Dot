@@ -5,6 +5,9 @@ see [Channels](channels.md). By voice, where the phone's browser offers it (Safa
 screen may not, and the page says when the browser refuses): the composer's microphone dictates a message, and the
 speaker under an answer reads it aloud, with the browser's own speech recognition and voice, in the language chosen in
 Settings › General › Voice (item 574; see [the daemon page](daemon.md#the-daemon-the-web-ui-and-the-service)).
+Under each message of Dot's a smiley opens the palette of reactions, a thumb's size, and what each does is the same on
+the phone: a 👎 on a run at work reaches it, a ✋ holds it until you write, a 📌 keeps the message as a note (item 586; see
+[Reactions](runs.md#reactions-on-dots-messages)).
 
 The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on the chat you
 were in last (New chat the first time; item 286), with the sidebar's sections, the chats and the run pages at a phone

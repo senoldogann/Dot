@@ -17,6 +17,7 @@ from fastapi import FastAPI
 
 from dotagent.agent.loop import warm_help_vectors
 from dotagent.agent.manager import RunManager
+from dotagent.agent.reactions import Reactions
 from dotagent.agent.snapshots import stored_taker
 from dotagent.channels.service import Channels
 from dotagent.config import AppConfig
@@ -306,6 +307,10 @@ async def run_daemon(config: AppConfig) -> int:
                 )
                 watching.add_done_callback(_log_watchers_end)
                 cleanup.push_async_callback(_cancelled, watching)
+            # The reactions on Dot's messages (item 586) wait to be told to their runs for a moment; they stop with
+            # the daemon.
+            reactions: Reactions = Reactions(runtime, manager)
+            cleanup.push_async_callback(reactions.close)
             context: ServerContext = ServerContext(
                 runtime=runtime,
                 manager=manager,
@@ -317,6 +322,7 @@ async def run_daemon(config: AppConfig) -> int:
                 stopping=stopping,
                 restart=restart,
                 channels=channels,
+                reactions=reactions,
             )
             server: DotServer = DotServer(serving_config(create_app(context)), stopping)
             scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))

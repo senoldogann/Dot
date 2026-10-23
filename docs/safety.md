@@ -320,7 +320,13 @@ only a `preapproved` rule skips the question. A
 project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. The error of a call that reached outside marks
 it too when it may hold such words (item 551): what an MCP server answered a call with, which the model reads inside
 the fence as data, and the error of a search whose engines answered with an error page; a failure in transit does not.
-A message you send to the run clears the mark; your answer to a question of a run you watch does not,
+A reaction on a message of Dot's (item 586) never clears the mark: while the run works it reaches it as a note
+from Dot, not as your words, which vouches for nothing and is no instruction to the review model, and it approves no
+step (the note says so); after the run ended it starts a follow-up run that starts as untrusted as the run of the
+message, or the chat's last, ended, whose goal holds none of Dot's words and whose quote of the message is no
+instruction (see [Reactions](runs.md#reactions-on-dots-messages)). A 📌 makes a note marked as read from outside
+content when the run read some. A message you send to the run clears the mark; your answer to a question of a run you
+watch does not,
 whether the run waited for it or went on (item 508), as it
 answers what the run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts
 once that run has ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a

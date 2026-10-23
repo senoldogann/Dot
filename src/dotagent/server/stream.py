@@ -16,6 +16,7 @@ from dotagent.agent.learning_health import LEARNING_STALLED_EVENT
 from dotagent.agent.lessons import LESSON_EVENTS
 from dotagent.agent.loop import browser_of
 from dotagent.agent.manager import QUEUE_CHANGED_EVENT, TERMINALS_CHANGED_EVENT
+from dotagent.agent.reaction_words import REACTION_ADDED_EVENT, REACTION_REMOVED_EVENT
 from dotagent.agent.rewind import CHAT_REWOUND_EVENT
 from dotagent.browser.types import Frame
 from dotagent.drafts.service import DRAFT_CREATED_EVENT, DRAFT_DECIDED_EVENT
@@ -41,8 +42,9 @@ FRAME_EVENT: str = "frame"
 # the phone hears it (``notify/push.py``): a question a run left, a draft written for the owner to send (item 314), a
 # campaign that ended by itself, a firing a schedule missed, learning that has stopped, what Dot tells the owner on its
 # own (the morning brief and the watchers, items 570 and 571); a chat rewound (item 282); and a draft sent or discarded,
-# which may come after its run's stream has ended (item 314). A restart after an unexpected stop is pushed only: it
-# happens before any page is back on the stream.
+# which may come after its run's stream has ended (item 314); and a reaction put on a message of Dot's or taken back
+# (item 586), which may come after the run's stream has ended too. A restart after an unexpected stop is pushed only:
+# it happens before any page is back on the stream.
 LIFECYCLE_KINDS: frozenset[str] = frozenset(
     {
         "run_queued",
@@ -66,6 +68,8 @@ LIFECYCLE_KINDS: frozenset[str] = frozenset(
         OWNER_TOLD_EVENT,
         RULES_CHANGED_EVENT,
         CHAT_REWOUND_EVENT,
+        REACTION_ADDED_EVENT,
+        REACTION_REMOVED_EVENT,
         SNAPSHOT_EVENT,
         SNAPSHOT_FAILED_EVENT,
     }

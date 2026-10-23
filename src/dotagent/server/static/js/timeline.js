@@ -20,6 +20,7 @@ import { answerMessage, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
+import { sayFoot, stepMessage } from "./reactions.js";
 import { callKind, describeArguments, flowIcon, flowWords, toolRow } from "./tools.js";
 
 const GOAL_CHARS = 160;
@@ -369,9 +370,12 @@ function buildFlock() {
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
  * browser tool call (Dot's computer starts its view on it). `onGoalFiles(files)` takes the files that came
  * with the run's goal, to show them under it, and `onGoalPicks(picks)` what the owner picked for it in the composer
- * (item 318); null where the page shows no goal, and they stand in the timeline.
+ * (item 318); null where the page shows no goal, and they stand in the timeline. `reactions` are the page's reactions of
+ * the chat (reactions.js), whose button and chips stand in the foot of each message of the run's own, its answer and what
+ * it said in its steps (item 586); null where the timeline shows none. `onReactionHold(held)` says that the owner holds
+ * the run with a ✋, which waits for what they write next, or that the hold is over.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere }) {
+export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere, reactions = null, onReactionHold = (/** @type {boolean} */ _held) => undefined }) {
   const element = el("div", { class: "timeline" });
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
@@ -898,6 +902,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         href: isRoot ? null : `#/runs/${scope.runId}`,
         // The answer of a run that ends under the reader's eyes is read aloud when Settings › General says so (item 574).
         readNow: isRoot && revealing(),
+        // The reactions on the page's own run (item 586); a delegated run's answer is read in the row that holds it.
+        reactions: isRoot ? reactions : null,
+        runId: scope.runId,
       });
       place(scope, answer, record.ts);
       if (isRoot && needs !== "") {
@@ -955,6 +962,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       scope.replies.push({ node: target.node, text: data.text });
       if (!ORDINARY_ENDS.has(data.finish)) {
         target.node.append(el("div", { class: "small muted" }, `This message ended early: ${data.finish}`));
+      }
+      // The reactions on what the page's own run said in a step (item 586): the words are in the thread, the key is the step.
+      if (reactions !== null && scope.runId === rootRunId) {
+        target.node.append(sayFoot(reactions, scope.runId, stepMessage(data.step)));
       }
       if (scope.runId === rootRunId) {
         onStats({ step: data.step, input: data.input_tokens, output: data.output_tokens });
@@ -1167,6 +1178,17 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     steer(scope, record) {
       const files = record.data.files ?? [];
       const text = record.data.text;
+      // Dot's note about a reaction of yours (item 586) is no message of yours, nor a line of the conversation: the chips
+      // under the message say what you put on it, and a hold has its own line.
+      if (record.data.reaction !== undefined) {
+        return;
+      }
+      // The queued follow-up of a reaction that you sent on with Steer is yours to send (item 586): the note the run read
+      // holds your words, and they stand as your message, though the reaction vouches for nothing.
+      if (record.data.owner_text !== undefined) {
+        place(scope, userMessage({ text: record.data.owner_text, sentAt: record.ts, files, editFromHere: null }), record.ts);
+        return;
+      }
       // Dot's words that you did a step kept for you (item 482) are no message of yours.
       if (record.data.vouches === false) {
         note(scope, record.ts, "hand", clip(text, 400), "");
@@ -1464,6 +1486,26 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     handback(scope, record) {
       note(scope, record.ts, "hand", `You returned control after ${Math.round(record.data.held_s)} s; the run goes on.`, "");
       onHeld(false);
+    },
+
+    // The owner held the run with a ✋ (item 586): it waits at its next step for what they write next, or for the ✋ to be
+    // taken back, and stops when nobody writes for as long as a hold may last (`[reactions] hold_minutes`).
+    reaction_hold(scope, record) {
+      note(scope, record.ts, "hand", "You held the run (✋): it waits for your next message.", "");
+      if (scope.runId === rootRunId) {
+        onReactionHold(true);
+      }
+    },
+    reaction_hold_ended(scope, record) {
+      const words = {
+        message: "You wrote to the run, and it goes on.",
+        released: "You took the ✋ back, and the run goes on.",
+        lapsed: `Nobody wrote for ${duration(record.data.held_s)}, so the run stopped.`,
+      };
+      note(scope, record.ts, "hand", words[record.data.reason] ?? "The hold is over.", "");
+      if (scope.runId === rootRunId) {
+        onReactionHold(false);
+      }
     },
 
     // A typed judgment sent a step to another model of the run (`model`, `option`, `probabilities`); or that model

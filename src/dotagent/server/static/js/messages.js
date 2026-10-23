@@ -88,11 +88,12 @@ export function showMessagePicks(message, picks) {
 /**
  * How a run ended, as the actor's answer: the face of `actorId` (an agent id, a run id, or "dot") on the left, the answer
  * itself or why there is none, then one line with a copy of it, a speaker that reads it aloud (item 574; where the browser
- * can speak), when it ended, the outcome and how long the run took. `startedAt` is null when the start of the run is not
- * known; `href` leads to the run itself (null when the reader is there). `readNow` says the answer has just come in, to be
- * read aloud as it appears when Settings › General says so.
+ * can speak), the button of the reactions with the chips of those that stand (item 586; where `reactions` is given and
+ * `runId` is the run the answer is of), when it ended, the outcome and how long the run took. `startedAt` is null when
+ * the start of the run is not known; `href` leads to the run itself (null when the reader is there). `readNow` says the
+ * answer has just come in, to be read aloud as it appears when Settings › General says so.
  */
-export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false }) {
+export function answerMessage({ actorId, status, text, endedAt, startedAt, href, readNow = false, reactions = null, runId = null }) {
   const outcome = OUTCOMES[status] ?? { label: status, empty: "" };
   const written = text.trim() !== "";
   const facts = [stamp(endedAt, dateTimeFull(endedAt)), el("span", null, outcome.label)];
@@ -110,6 +111,7 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href,
       { class: "answer-foot" },
       written ? copyButton(text, "Copy the answer") : null,
       written ? readAloudButton(text, readNow && status === "done") : null,
+      written && reactions !== null && runId !== null ? reactions.controls(runId, "answer") : null,
       el("span", { class: "answer-facts meta-facts" }, ...facts),
       href === null ? null : el("a", { class: "small", href }, "Open run"),
     ),

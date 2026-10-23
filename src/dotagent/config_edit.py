@@ -5,8 +5,8 @@ context size of a model, a key of ``[models.context]`` (item 250), whether the t
 (item 255), whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), or the names the
 daemon answers to and whether it keeps the Mac awake, ``[server] reach`` and ``keep_awake`` (item 271), or whether the
 notes are found by meaning, ``[memory] embed_enabled`` (item 558), or whether a messaging app of the owner reaches Dot,
-``[channels] imessage`` (item 572), so the comments and the other settings stay as
-written."""
+``[channels] imessage`` (item 572), or what a reaction on Dot's message does once its run has ended, ``[reactions]``
+(item 586), so the comments and the other settings stay as written."""
 
 import os
 import re
@@ -35,7 +35,17 @@ _EDITING: threading.Lock = threading.Lock()
 
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
 type ConfigTable = Literal[
-    "agent", "assistant", "browser", "channels", "judge", "memory", "models", "server", "shell", "snapshots"
+    "agent",
+    "assistant",
+    "browser",
+    "channels",
+    "judge",
+    "memory",
+    "models",
+    "reactions",
+    "server",
+    "shell",
+    "snapshots",
 ]
 type AgentSetting = Literal["resume"]
 type AssistantSetting = Literal["name", "owner", "introduced"]
@@ -56,6 +66,7 @@ type BrowserSetting = Literal[
 type JudgeSetting = Literal["provider"]
 type MemorySetting = Literal["embed_enabled"]
 type ModelsSetting = Literal["main", "fast", "review", "vision", "standby"]
+type ReactionsSetting = Literal["follow_ups", "good", "love", "wrong", "again", "explain", "hold"]
 type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
 type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
@@ -67,6 +78,7 @@ type SettingKey = (
     | JudgeSetting
     | MemorySetting
     | ModelsSetting
+    | ReactionsSetting
     | ServerSetting
     | ShellSetting
     | SnapshotsSetting

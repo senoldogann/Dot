@@ -28,6 +28,7 @@ import { recapSection } from "../recap.js";
 import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
+import { createReactions, REACTION_EVENTS } from "../reactions.js";
 import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { changesSection } from "../changes.js";
@@ -165,6 +166,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // command to stop it, but it takes no steer, and its browser is not shown or taken over from here.
   const elsewhere = detail.elsewhere;
   let active = detail.active || elsewhere;
+  // The owner holds the run with a ✋ (item 586): it waits for what they write next, which is then sent to it at once, not
+  // queued behind a run that waits for it.
+  let holding = detail.holding === true;
   // The run was cut off (by the daemon, or by the end of its dotx command) and a new run can go on from where it
   // stopped; `cutOff` is how.
   let resumable = detail.resumable;
@@ -847,6 +851,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     if (elsewhere) {
       return false;
     }
+    if (holding) {
+      return true;
+    }
     return !queueing || (settingValue(BUSY_SEND) === "steer") !== other;
   }
 
@@ -959,9 +966,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     choices.setWords(!editing && !(active && steers(false)));
     footStop.hidden = !active;
     // Short enough for one line of a phone's composer, which holds about thirty characters (items 111 and 437).
-    const working = steers(false)
-      ? narrowOr("Steer this run (or /btw)", "Steer this run, or /btw to ask on the side")
-      : narrowOr("Queue a message (or /btw)", "Queue a message, or /btw to ask on the side");
+    const working = holding
+      ? narrowOr("Write to let it go on", "The run is on hold: write to let it go on")
+      : steers(false)
+        ? narrowOr("Steer this run (or /btw)", "Steer this run, or /btw to ask on the side")
+        : narrowOr("Queue a message (or /btw)", "Queue a message, or /btw to ask on the side");
     input.placeholder = active ? working : narrowOr("Follow up (@ or /)", "Follow up (@ for apps, / for skills and commands, or /btw to ask on the side)");
     keepLook();
     const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
@@ -1354,6 +1363,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     event.stopPropagation();
     inspector.showFile(event.detail, event.target);
   });
+  // The reactions of the chat on Dot's messages (item 586): read once the page stands, and again when the daemon tells that
+  // one was put or taken back, here or on another screen.
+  const reactions = createReactions({ threadId: run.thread_id, signal });
   const timeline = createTimeline({
     rootRunId: runId,
     actorId: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,
@@ -1418,6 +1430,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     },
     onGoalFiles: goalMessage === null ? null : (files) => showMessageFiles(goalMessage, files),
     onGoalPicks: goalMessage === null ? null : (picks) => showMessagePicks(goalMessage, picks),
+    reactions,
+    onReactionHold: (held) => {
+      holding = held;
+      syncControls();
+    },
   });
   const problem =
     historyProblem === null
@@ -1452,7 +1469,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
 
   // The conversation grows into the room a short one leaves, so the dock under it stands at the window's foot from the
   // first message (item 129).
-  const earlier = earlierTurns(history, (past) => (past.rewindable ? () => editFromHere(past) : null), signal);
+  const earlier = earlierTurns(history, (past) => (past.rewindable ? () => editFromHere(past) : null), signal, reactions);
   const thread = el(
     "div",
     { class: "run-thread" },
@@ -1512,6 +1529,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   }
   const settled = setTimeout(() => settling.disconnect(), SETTLE_OPEN_MS);
   paintLessons(detail.lessons);
+  reactions.load().catch((error) => readFailed("The reactions", error));
   attempt(changes.refresh);
   paintQuestions(detail.questions);
   paintAgents();
@@ -1530,6 +1548,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       reconcile();
     } else if (HELPER_MOMENTS.has(event.kind) && event.run_id !== runId && (event.data.parent_run_id === runId || timeline.knows(event.run_id))) {
       helpersChanged();
+    } else if (REACTION_EVENTS.has(event.kind) && event.data.thread_id === run.thread_id) {
+      reactions.refresh();
     } else if (event.kind === "run_queued" && event.data.parent_run_id === null && event.run_id !== runId) {
       catchUp();
     }
@@ -1539,12 +1559,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const stopBack = onStreamBack(() => {
     reconcile();
     catchUp();
+    reactions.refresh();
   });
   catchUp();
 
   const take = (message) => {
     if (message.data.kind === "steer" && message.data.run_id === runId) {
-      messageRead(message.data.data.text);
+      // A queued follow-up of a reaction sent on with Steer (item 586) was read when the note around its words was.
+      messageRead(message.data.data.owner_text ?? message.data.data.text);
     }
     timeline.push(message.data);
     recap.onEvent(message.data);
@@ -1628,6 +1650,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     stopLifecycle();
     stopBack();
     computer.dispose();
+    reactions.dispose();
     inspector.dispose();
     stage.dispose();
     stopStatus();

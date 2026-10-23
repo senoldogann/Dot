@@ -8,6 +8,7 @@ import { foldSteps } from "./layout.js";
 import { answerMessage, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
+import { sayFoot, stepMessage } from "./reactions.js";
 import { countKinds, flowIcon, flowWords, toolRow } from "./tools.js";
 
 const THREAD_LIMIT = 200;
@@ -113,7 +114,7 @@ async function allEvents(runId, signal) {
 }
 
 /** What a run said and ran, read and drawn into the turn's `flow`; nothing is drawn once `signal` aborted. */
-async function fillFlow(past, flow, asked, signal) {
+async function fillFlow(past, flow, asked, signal, reactions) {
   let events;
   try {
     events = await allEvents(past.id, signal);
@@ -122,15 +123,15 @@ async function fillFlow(past, flow, asked, signal) {
     return;
   }
   if (events !== null && !signal.aborted) {
-    drawRead(past, flow, asked, events);
+    drawRead(past, flow, asked, events, reactions);
   }
 }
 
 /** Draws what was read of a run into the turn's `flow`. A failure to read or to draw it says why, with the way to the
  * run: the turn keeps its question and its answer. */
-function drawRead(past, flow, asked, events) {
+function drawRead(past, flow, asked, events, reactions) {
   try {
-    drawFlow(past, flow, asked, events);
+    drawFlow(past, flow, asked, events, reactions);
   } catch (error) {
     flowNotShown(past, flow, error);
   }
@@ -154,8 +155,8 @@ function flowNotShown(past, flow, error) {
  * its words again — the answer itself is the turn's message, so a line that only repeats it is left out. `events`
  * are all its events, so a call without a result was cut off. The files and picks its message came with go under
  * `asked`, the turn's message, and a message that steered the run stands where it came (item 403), as on the run's
- * own page. */
-function drawFlow(past, flow, asked, events) {
+ * own page. What the run said stands with the button and the chips of the reactions (item 586) when `reactions` is given. */
+function drawFlow(past, flow, asked, events, reactions) {
   const answer = (past.result ?? "").trim();
   const blocks = [];
   let batch = null;
@@ -183,19 +184,27 @@ function drawFlow(past, flow, asked, events) {
       const said = (event.data.text ?? "").trim();
       if (said !== "" && !repeatsAnswer(said, answer)) {
         batch = null;
-        blocks.push({ say: said });
+        blocks.push({ say: said, step: event.data.step });
       }
     } else if (event.kind === "attachments" && message !== null) {
       files = event.data.files;
     } else if (event.kind === "picks" && message !== null) {
       picks = event.data;
     } else if (event.kind === "steer") {
+      // Dot's note about a reaction of yours (item 586) is no line of the conversation, as on the run's own page: the
+      // chips under the message say what you put on it.
+      if (event.data.reaction !== undefined) {
+        continue;
+      }
       batch = null;
-      // Dot's words that you did a step kept for you (item 482) are no message of yours.
+      // Dot's words that you did a step kept for you (item 482) are no message of yours; the queued follow-up of a
+      // reaction that you sent on with Steer is (item 586): its note holds your words, and they stand as your message.
       blocks.push(
-        event.data.vouches === false
-          ? { kept: event.data.text }
-          : { steer: { text: event.data.text, files: event.data.files ?? [], sentAt: event.ts } },
+        event.data.owner_text !== undefined
+          ? { steer: { text: event.data.owner_text, files: event.data.files ?? [], sentAt: event.ts } }
+          : event.data.vouches === false
+            ? { kept: event.data.text }
+            : { steer: { text: event.data.text, files: event.data.files ?? [], sentAt: event.ts } },
       );
     } else if (event.kind === "page_shown") {
       // A page the run showed (`show_page`, item 193) stands where it came, in its frame, as on the run's own page.
@@ -238,7 +247,7 @@ function drawFlow(past, flow, asked, events) {
       ? el("div", { class: "note" }, icon("hand"), el("span", null, block.kept))
       : block.say === undefined
         ? stepsBlock(block)
-        : el("div", { class: "turn-say" }, prose(block.say)),
+        : el("div", { class: "turn-say" }, prose(block.say), reactions === null ? null : sayFoot(reactions, past.id, stepMessage(block.step))),
   );
   keepPlace(flow, () => {
     if (files !== null) {
@@ -286,7 +295,7 @@ function keepPlace(flow, change) {
 
 /** Fills a turn's operations once it comes near what is seen, once: near the window, or on a phone near the box the
  * conversation scrolls in, which the turn is in once the page stands. The watch ends with the page (`signal`). */
-function whenNear(element, ops, asked, run, signal) {
+function whenNear(element, ops, asked, run, signal, reactions) {
   requestAnimationFrame(() => {
     if (signal.aborted) {
       return;
@@ -295,7 +304,7 @@ function whenNear(element, ops, asked, run, signal) {
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           watch.disconnect();
-          void fillFlow(run, ops, asked, signal);
+          void fillFlow(run, ops, asked, signal, reactions);
         }
       },
       { root: scrollBox(element), rootMargin: OPS_MARGIN },
@@ -307,13 +316,14 @@ function whenNear(element, ops, asked, run, signal) {
 
 /** One earlier run as what was asked, what it did and how it ended; a run still going keeps the foot of its message back.
  * What the run did is drawn at once when `known` holds it (`loadHistory`'s `read`: `{ events }`, or `{ error }`), else
- * read now for an `eager` turn and once the turn comes near what is seen for the others. */
-function turn(past, editFromHereOf, eager, known, signal) {
+ * read now for an `eager` turn and once the turn comes near what is seen for the others. The answer and what the run
+ * said have the reactions' button and chips (item 586) when `reactions` is given. */
+function turn(past, editFromHereOf, eager, known, signal, reactions) {
   const href = `#/runs/${past.id}`;
   const ended = FINISHED.has(past.status);
   const ops = el("div", { class: "turn-ops", hidden: true });
   const answer = ended
-    ? answerMessage({ actorId: past.agent_id ?? "dot", status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href: null })
+    ? answerMessage({ actorId: past.agent_id ?? "dot", status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href: null, reactions, runId: past.id })
     : el("div", { class: "note" }, icon("clock"), el("span", null, "This run is still going."), el("a", { class: "small", href }, "Open run"));
   const asked =
     past.source === RESUME_SOURCE
@@ -327,12 +337,12 @@ function turn(past, editFromHereOf, eager, known, signal) {
       if ("error" in known) {
         flowNotShown(past, ops, known.error);
       } else {
-        drawRead(past, ops, asked, known.events);
+        drawRead(past, ops, asked, known.events, reactions);
       }
     } else if (eager) {
-      void fillFlow(past, ops, asked, signal);
+      void fillFlow(past, ops, asked, signal, reactions);
     } else {
-      whenNear(element, ops, asked, past, signal);
+      whenNear(element, ops, asked, past, signal, reactions);
     }
   }
   return element;
@@ -342,9 +352,10 @@ function turn(past, editFromHereOf, eager, known, signal) {
  * The earlier turns of the conversation (`loadHistory`'s `{ earlier, read, cut }`) as one block, or null when there
  * are none. `editFromHereOf(run)` gives what
  * rewinds the chat to before the message of an earlier run (item 282), or null where it cannot be; `signal` ends with
- * the page, and what the turns read with it.
+ * the page, and what the turns read with it. `reactions` are the page's reactions of the chat (reactions.js), whose
+ * button and chips stand under the messages of the turns (item 586); null for none.
  */
-export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal) {
+export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal, reactions = null) {
   if (earlier.length === 0 && !cut) {
     return null;
   }
@@ -366,7 +377,7 @@ export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal) {
     "div",
     { class: "history", role: "region", "aria-label": "Earlier in this conversation" },
     note,
-    shown.map((past, index) => turn(past, editFromHereOf, index >= shown.length - EAGER_TURNS, read.get(past.id), signal)),
+    shown.map((past, index) => turn(past, editFromHereOf, index >= shown.length - EAGER_TURNS, read.get(past.id), signal, reactions)),
   );
 }
 
