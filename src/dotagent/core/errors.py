@@ -196,6 +196,11 @@ class McpError(DotError):
     """An MCP server failed to start, list tools or run a tool."""
 
 
+class McpRejected(McpError):
+    """An MCP server answered a call with an error of its own, a JSON-RPC error: its words are in the context, as
+    ``error``, and the model reads them as it reads an answer of the server (item 551)."""
+
+
 class OpenCodeError(DotError):
     """OpenCode's own agent (item 283) could not be started, reached or used, or its session failed."""
 

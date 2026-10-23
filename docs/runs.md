@@ -219,7 +219,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - `/btw <question>` in the box of a run (the slash menu offers it) asks on the side: the run's model answers from what
   the run has done so far,
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and
-  the answer are `aside_question` and `aside_answer` events, never messages of the conversation.
+  the answer are `aside_question` and `aside_answer` events, never messages of the conversation; the answer has the
+  secrets Dot holds masked, as a run's own replies do (item 551).
 - `/loop <rhythm> <message>` in the box of a run (item 281) or of a new chat (item 400; the slash menu offers it in
   both, `/loop 30m check the build`) makes the message a loop of the chat: the message goes at once (in a new chat, as
   the message that starts it), and a schedule of the chat (item 291) asks it again every 5, 10, 15, 20 or 30 minutes or

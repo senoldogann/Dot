@@ -7,22 +7,25 @@ from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
 from dotagent.agent.authorization import Authorization, StepDecision
-from dotagent.agent.gate import RunGate, hold_note
+from dotagent.agent.gate import RunGate, hold_note, masked_action
 from dotagent.core.errors import (
     ApprovalParked,
     ApprovalRejected,
     DotError,
     FailSafeTriggered,
     HandedOff,
+    McpError,
     PolicyDenied,
     RunCancelled,
     ToolInputError,
+    WebError,
+    WebTransportError,
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_json, redact_known, strip_blobs_keep_text, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolCall, invalid_arguments_text
-from dotagent.policy.types import ActionInfo
+from dotagent.policy.types import TAINTING_KINDS, ActionInfo
 from dotagent.secrets import known_secrets
 from dotagent.tools.apple import APPLE_SCRIPT_TOOL, script_apps
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult, fail, ok
@@ -96,6 +99,13 @@ def _describe_failure(exc: Exception, tool: RegisteredTool) -> str:
     if isinstance(exc, OSError):
         return f"Operating system error: {exc}"
     return f"{tool.spec.name} failed with an unexpected error ({type(exc).__name__}): {exc}"
+
+
+def _may_hold_outside_words(exc: Exception) -> bool:
+    """Whether the error of a call that reached outside may hold words that third parties write: what an MCP server
+    answered a call with, and what the engines of a search answered with (item 551). A failure in transit holds none,
+    nor does a refusal of the gate."""
+    return isinstance(exc, McpError | WebError) and not isinstance(exc, WebTransportError)
 
 
 class _GateTime:
@@ -193,6 +203,10 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         if not isinstance(exc, DotError | TimeoutError | OSError):
             log.exception("tool_crashed", run_id=ctx.run_id, tool=tool.spec.name)
         text: str = _describe_failure(exc, tool)
+        # The model reads the error of a call that reached outside as it reads an answer: the run is untrusted from then
+        # on when the error may hold words that third parties write (item 551).
+        if action is not None and action.kind in TAINTING_KINDS and _may_hold_outside_words(exc):
+            gate.taint()
         handed_off: bool = isinstance(exc, HandedOff)
         failed: ToolResult = _with_approval_note(ok(text) if handed_off else fail(text), note)
         return _Checked(result=failed, action=action, waited_s=at_gate.seconds, decision=decision)
@@ -254,6 +268,9 @@ async def _execute_one(
     clipped: ToolResult = result.model_copy(update={"text": truncate_middle(result.text, ctx.output_chars)})
     seconds: float = time.monotonic() - started
     files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
+    # The step as its record shows it: a command or an address carries the secrets Dot holds as the call's arguments do,
+    # masked there and so here (item 551). What the loop and the peers read of the call stays as it is.
+    shown: ActionInfo | None = None if action is None else masked_action(action, known)
     await ctx.runtime.bus.emit(
         ctx.run_id,
         "tool_result",
@@ -265,11 +282,11 @@ async def _execute_one(
             "images": list(files),
             "seconds": round(seconds, 2),
             "waited_s": round(waited_s, 2),
-            "summary": action.summary if action is not None else "",
+            "summary": shown.summary if shown is not None else "",
             "kind": action.kind if action is not None else "",
             "risk": action.risk if action is not None else "",
-            "target": action.target if action is not None else "",
-            "site": _site(call, action),
+            "target": shown.target if shown is not None else "",
+            "site": redact_known(_site(call, action), known),
             "steps": batch_steps(call.arguments),
             "channel": channel_of(call.name),
             # Whether the run is tainted after this result: a run that goes on from it takes it over (item 243).
