@@ -160,39 +160,46 @@ its marks (a heading's hashes, a list's mark, the stars of bold, the backticks o
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
 links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
 sent is the text as typed. A **microphone** by the send (item 574; where the browser has speech recognition,
-`SpeechRecognition` or Safari's `webkitSpeechRecognition`: Safari and Chrome, not Firefox or the desktop app, which show
-none) fills the box as you speak, after what it holds, the words the engine may still change drawn quieter until it
-settles them. It listens in the page's language or the one chosen in Settings › General › Voice (English, Türkçe, Suomi,
-Svenska, Deutsch, Français or Español), and stops at a second press, after six seconds of silence, when you type, when you
-send and when the page goes out of sight; a browser that refuses the microphone is said so. Nothing is sent by voice
-alone: you read the box and send as usual. A message whose answer was lost on its way back (the page says the sending failed and keeps
-the message) is done once when it is sent again, here and in the box of a run: the page sends each new message with a
-key of its own, and the daemon answers the same message sent again with what its first sending made. `/` at the start of
-a word opens the slash menu over the box: the commands of the composer (`/auto`, `/task`, `/chat`, `/research` and
-`/loop` here; `/btw`, the modes and `/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools,
-read from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and
-Escape closes. The menu stands in sections with a hairline between them and no title on the page (a screen reader
-hears each by name: Commands, Skills, MCP tools): a row is a line icon, the name and under it its words, cut by an
-ellipsis rather than wrapped (item 537, after Qoder's menu: a terminal in a box for a command, the arrows of a loop for
-`/loop`, a puzzle piece for a skill), and under the list stands what the keys do (a touch screen has none, so it has
-no such line). An MCP tool is named in words, its server's first, as the row of a call to it is ("Web Research · Web
-crawl results", not `web-research / mcp__web-research__web_crawl_results`; item 581), and the letters find it by those
-words or by the names the model calls it by. A skill picked is a chip under the box, a tool the chip of its server, as
-from the **+** (below), and the slash word goes; a command does its work. `@` at the start of a word opens the menu of
-the servers and plugins alone (item 367, and the owner's word of 2026-10-21, item 447) — the group the menu titles **MCP
-servers**, the plugins: each one by its name and the number of its tools, filtered by the letters after it — the skills
-and the servers' tools, which the slash menu carries, are not there; a pick is a chip and the at word goes. In both
-menus a server, and each of its tools, wears the mark its service's Customize tile wears, on that tile's light ground:
-the service's logo, else its icon or its letters (DeepWiki's magnifier, Context7's C7), the plug for a service with no
-mark of its own, and Dot's own icon, its own tile as an application's is, for a server of no service (web-research, a
-server added by hand; item 581, on its Customize tile and its chip too); and a skill wears the puzzle piece, here and as
-a chip and as the row of a call to the `skill` tool, plain in the ink of the text (item 537; the Customize cards keep
-the marks of item 477: the download arrow of an imported skill, the brain of a learned one; the daemon's palette says
-which server is of which service). An `@` inside a word, as in an address, opens nothing. On a phone either menu takes
-the room the keyboard leaves above the composer and scrolls inside it. A run that waits for your approval is listed
-under Waits for you, below the composer, and leads to its chat: the card stands there alone (item 434). Once you allow
-it, the card leaves the chat with the line that asked for it, as the page opens again too; refused, it stays and says
-so, and a question keeps its answer.
+`SpeechRecognition` or Safari's `webkitSpeechRecognition`: Safari, Chrome and the desktop app's web view, not Firefox,
+which shows none) fills the box as you speak, after what it holds, the words the engine may still change drawn quieter
+until it settles them. It listens in the page's language, given its region ("en" listens as "en-US", item 593), or the
+one chosen in Settings › General › Voice (English, Türkçe, Suomi, Svenska, Deutsch, Français or Español), and stops at a
+second press, after six seconds of silence, when you type, when you send and when the page goes out of sight. A
+microphone that is refused says so and where to allow it: in a Mac's browser, the browser for the address and in System
+Settings › Privacy & Security › Microphone; in the desktop app, which macOS gives the microphone and speech recognition
+only once the app asks for them (a Dot.app built before item 594 cannot), Dot in System Settings, the toast naming macOS
+and Dot, not a browser (item 593); and on a phone, the browser's and the device's settings, with no word of a Mac's. On
+a Mac they name macOS Dictation (the Dictation key, or Fn twice), on a phone the keyboard's own microphone, which type
+into the box meanwhile. A dictation that ends by itself having heard nothing says so and what to check (the microphone's
+permission, on a Mac the input in System Settings › Sound, the language), where it ended without a word before; one you
+stop says nothing. Nothing is sent by voice alone: you read the box and send as usual. A message whose answer was lost
+on its way back (the page says the sending failed and keeps the message) is done once when it is sent again, here and in
+the box of a run: the page sends each new message with a key of its own, and the daemon answers the same message sent
+again with what its first sending made. `/` at the start of a word opens the slash menu over the box: the commands of
+the composer (`/auto`, `/task`, `/chat`, `/research` and `/loop` here; `/btw`, the modes and `/loop` in the box of a
+run), the skills by name with their description, and each MCP server with its tools, read from the daemon as a run reads
+them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape closes. The menu stands in
+sections with a hairline between them and no title on the page (a screen reader hears each by name: Commands, Skills,
+MCP tools): a row is a line icon, the name and under it its words, cut by an ellipsis rather than wrapped (item 537,
+after Qoder's menu: a terminal in a box for a command, the arrows of a loop for `/loop`, a puzzle piece for a skill),
+and under the list stands what the keys do (a touch screen has none, so it has no such line). An MCP tool is named in
+words, its server's first, as the row of a call to it is ("Web Research · Web crawl results", not `web-research /
+mcp__web-research__web_crawl_results`; item 581), and the letters find it by those words or by the names the model calls
+it by. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the slash
+word goes; a command does its work. `@` at the start of a word opens the menu of the servers and plugins alone (item
+367, and the owner's word of 2026-10-21, item 447) — the group the menu titles **MCP servers**, the plugins: each one by
+its name and the number of its tools, filtered by the letters after it — the skills and the servers' tools, which the
+slash menu carries, are not there; a pick is a chip and the at word goes. In both menus a server, and each of its tools,
+wears the mark its service's Customize tile wears, on that tile's light ground: the service's logo, else its icon or its
+letters (DeepWiki's magnifier, Context7's C7), the plug for a service with no mark of its own, and Dot's own icon, its
+own tile as an application's is, for a server of no service (web-research, a server added by hand; item 581, on its
+Customize tile and its chip too); and a skill wears the puzzle piece, here and as a chip and as the row of a call to the
+`skill` tool, plain in the ink of the text (item 537; the Customize cards keep the marks of item 477: the download arrow
+of an imported skill, the brain of a learned one; the daemon's palette says which server is of which service). An `@`
+inside a word, as in an address, opens nothing. On a phone either menu takes the room the keyboard leaves above the
+composer and scrolls inside it. A run that waits for your approval is listed under Waits for you, below the composer,
+and leads to its chat: the card stands there alone (item 434). Once you allow it, the card leaves the chat with the line
+that asked for it, as the page opens again too; refused, it stays and says so, and a question keeps its answer.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens the file picker at once (documents, photos and
 screenshots alike; a phone opens its own sheet). The slash menu picks **Plugins** (the MCP servers with tools) and
