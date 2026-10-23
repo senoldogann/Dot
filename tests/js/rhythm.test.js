@@ -40,4 +40,7 @@ test("the next firing is its time today, else its day's name and time", () => {
   assert.equal(nextFiring(new Date(2026, 9, 23, 8, 0).getTime() / 1000, now), "23 Oct 08:00");
   // A firing a minute past its time is the one happening now, before the scheduler moves the next one on.
   assert.equal(nextFiring(new Date(2026, 9, 23, 8, 59).getTime() / 1000, now), "08:59");
+  // Also when it fell a moment before midnight: not "Fri 23:58", which reads as next Friday.
+  const pastMidnight = new Date(2026, 9, 24, 0, 1).getTime() / 1000;
+  assert.equal(nextFiring(new Date(2026, 9, 23, 23, 58).getTime() / 1000, pastMidnight), "23:58");
 });

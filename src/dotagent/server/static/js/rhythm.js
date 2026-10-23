@@ -79,5 +79,9 @@ export function nextFiring(at, now) {
   if (at < now - DUE_GRACE_S || at - now >= WEEK_S) {
     return `${DAY_MONTH.format(when)} ${time}`;
   }
+  // One happening now is said by its time alone, also when it fell a moment before midnight.
+  if (at <= now) {
+    return time;
+  }
   return DAY_KEY.format(when) === DAY_KEY.format(new Date(now * 1000)) ? time : `${WEEKDAY.format(when)} ${time}`;
 }
