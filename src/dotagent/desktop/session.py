@@ -7,10 +7,11 @@ shows only what changed.
 """
 
 import asyncio
+import contextlib
 import subprocess
 import time
 from collections import OrderedDict
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from functools import partial
@@ -71,6 +72,10 @@ _IDLE_HOLD_S: int = 5
 _REAP_TIMEOUT_S: float = 2.0
 _CAFFEINATE: str = "/usr/bin/caffeinate"
 _FRONT_ACTIONS: frozenset[str] = frozenset({"click", "double_click", "right_click", "type", "paste", "key", "drag"})
+# How often a run that waits for its turn at the desktop looks whether the run that holds it waits for the owner, and
+# how long that wait has lasted before it counts as one (a policy check answers in milliseconds), item 555.
+_TURN_POLL_S: float = 0.5
+_ASKING_GRACE_S: float = 2.0
 
 
 class StepReview(FrozenModel):
@@ -320,6 +325,9 @@ class DesktopSession:
         self._listed: tuple[float, tuple[AppInfo, ...]] | None = None
         self._pool: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dot-desktop")
         self._lock: asyncio.Lock = asyncio.Lock()
+        # When the batch that holds the desktop began to wait for the owner's answer about a step (monotonic seconds),
+        # else None (item 555).
+        self._asking_since: float | None = None
         self._threads: OrderedDict[str, ThreadDesktop] = OrderedDict()
         self._woken: dict[int, AXElement] = {}
         self._wake_tried: set[int] = set()
@@ -330,6 +338,43 @@ class DesktopSession:
 
     async def _call[T](self, work: Callable[[], T]) -> T:
         return await asyncio.get_running_loop().run_in_executor(self._pool, work)
+
+    def _refuse_while_asking(self) -> None:
+        since: float | None = self._asking_since
+        if since is not None and time.monotonic() - since >= _ASKING_GRACE_S:
+            raise DesktopError(
+                "another run is waiting for the owner's answer about a step on the desktop, and no other run uses the "
+                "desktop while it waits, since the owner may be doing that step by hand on this screen; try again "
+                "later, or go on with what does not need the desktop",
+                {},
+            )
+
+    @contextlib.asynccontextmanager
+    async def _turn(self) -> AsyncIterator[None]:
+        """One operation's turn at the desktop, which one run uses at a time. A run that finds the desktop held by a
+        batch that waits for the owner's answer, which takes minutes, is told so at once instead of queueing behind it
+        until its own tool times out (a batch's preview has no timeout at all): the lock is polled, so a run that was
+        already queued when the wait began is told too (item 555)."""
+        while True:
+            self._refuse_while_asking()
+            try:
+                await asyncio.wait_for(self._lock.acquire(), _TURN_POLL_S)
+            except TimeoutError:
+                continue
+            break
+        try:
+            yield
+        finally:
+            self._lock.release()
+
+    async def _ask(self, reviewer: StepReviewer, review: StepReview) -> None:
+        """Put a step to the reviewer, who may wait minutes for the owner's answer: the desktop stays held meanwhile
+        (:meth:`_turn` says why to the runs that ask for it)."""
+        self._asking_since = time.monotonic()
+        try:
+            await reviewer(review)
+        finally:
+            self._asking_since = None
 
     def _running(self) -> tuple[tuple[AppInfo, ...], frozenset[int]]:
         """The applications running now and the Chromes Dot's browser works in (worker thread)."""
@@ -515,12 +560,12 @@ class DesktopSession:
 
     async def list_apps(self) -> tuple[AppView, ...]:
         """The applications that are open, the one with the keyboard focus first."""
-        async with self._lock:
+        async with self._turn():
             await self._prepare(self._prepare_listing)
             return await self._call(partial(_list_job, self._config))
 
     async def snapshot(self, thread_id: str, app: str | None, request: ViewRequest) -> SnapshotView:
-        async with self._lock:
+        async with self._turn():
             await self._prepare(self._prepare_looking)
             state: ThreadDesktop = self._thread(thread_id)
             running, preferred = await self._call(self._running)
@@ -530,19 +575,19 @@ class DesktopSession:
             return view
 
     async def screenshot(self) -> ScreenshotView:
-        async with self._lock:
+        async with self._turn():
             await self._prepare(self._prepare_screenshot)
             return await self._call(partial(shots.take_screen, self._config))
 
     async def zoom(self, region: Rect) -> ScreenshotView:
         """A screenshot of ``region`` (model units) at the display's own sharpness."""
-        async with self._lock:
+        async with self._turn():
             await self._prepare(self._prepare_screenshot)
             return await self._call(partial(shots.take_region, self._config, region))
 
     async def read(self, thread_id: str, app: str | None, ref: int, offset: int, max_chars: int) -> TextRead:
         """The text of one element, ``max_chars`` of it from ``offset``."""
-        async with self._lock:
+        async with self._turn():
             await self._prepare(self._prepare_looking)
             state: ThreadDesktop = self._thread(thread_id)
             running, preferred = await self._call(self._running)
@@ -560,11 +605,11 @@ class DesktopSession:
             return TextRead(label=label, text=text[offset : offset + max_chars], total_chars=total, offset=offset)
 
     async def read_clipboard(self) -> str | None:
-        async with self._lock:
+        async with self._turn():
             return await self._call(hid.read_clipboard)
 
     async def write_clipboard(self, text: str) -> None:
-        async with self._lock:
+        async with self._turn():
             await self._call(partial(hid.write_clipboard, text))
 
     # -- opening ---------------------------------------------------------------------------------------------------
@@ -583,7 +628,7 @@ class DesktopSession:
         """Open (or bring forward) an application, make it the thread's target and show its window, at most
         ``max_chars`` of its text. ``bundle`` is the path a check of ``query`` came to, and is what starts
         (item 418)."""
-        async with self._lock:
+        async with self._turn():
             await self._prepare(self._prepare_acting)
             opened, fresh = await self._call(lambda: _open_job(self._config, query, self._browser_chrome(), bundle))
             _refuse_secrets(opened)
@@ -645,16 +690,18 @@ class DesktopSession:
         # No terminal line is known while the step is reviewed and runs: one that is refused, taken over or fails
         # halfway may leave any text behind.
         self._lines = {}
-        await reviewer(
+        await self._ask(
+            reviewer,
             StepReview(
                 index=index,
                 step=step,
                 description=describe_step(step),
                 context=inspection.context,
                 target=inspection.target,
-            )
+            ),
         )
-        effect: Effect = await self._call(partial(actions.execute_step, env, step))
+        # The step goes to what it was reviewed for, not to whatever is there after the wait (item 555).
+        effect: Effect = await self._call(partial(actions.execute_step, env, step, inspection))
         self._lines = safety.lines_after(typed, step, inspection.context)
         return effect
 
@@ -718,7 +765,7 @@ class DesktopSession:
         """Perform a batch of steps in one application, each reviewed first, and show the window afterwards, at most
         ``max_chars`` of its text. ``secure_field`` decides what a step does at a secure text field: a step it refuses
         fails and stops the batch."""
-        async with self._lock:
+        async with self._turn():
             await self._prepare(self._prepare_acting)
             state: ThreadDesktop = self._thread(thread_id)
             env: StepEnv = await self._call(partial(self._open_env, state, app, steps, secure_field))
@@ -735,7 +782,7 @@ class DesktopSession:
 
     async def preview(self, thread_id: str, app: str | None, steps: Sequence[Step]) -> tuple[StepContext, ...]:
         """The context of each step as far as it is known before anything runs: used to judge a batch up front."""
-        async with self._lock:
+        async with self._turn():
             await self._prepare(self._prepare_listing)
             return await self._call(partial(self._preview_in_worker, self._thread(thread_id), app, steps, self._lines))
 

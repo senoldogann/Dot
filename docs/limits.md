@@ -1,8 +1,9 @@
 # Status and known limits
 
-- `code_fetch` reads Messages through its database, so it needs Full Disk Access for the program that runs Dot; Mail is
-  read through AppleScript and the first use may show an Automation prompt. A code Dot does not recognise (no cue word,
-  more than one six-digit number) is reported as such, not guessed.
+- `code_fetch` reads Messages through its database, so it needs Full Disk Access for the program that runs Dot; the
+  database is read as Messages keeps it, with its write-ahead log, so a message that has just arrived is there (item
+  555). Mail is read through AppleScript and the first use may show an Automation prompt. A code Dot does not recognise
+  (no cue word, more than one six-digit number) is reported as such, not guessed.
 - **Verified live, through the whole stack:** Ollama with cloud models through the local server; OpenAI on both wires
   (Responses and Chat Completions), with screenshots and with the embeddings; OpenCode Go on its three routes (chat,
   responses, messages), with screenshots that a tool returns; the hosted Ollama web search. The smoke tests of the wire

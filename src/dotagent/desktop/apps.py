@@ -119,6 +119,12 @@ def list_apps() -> tuple[AppInfo, ...]:
     return tuple(replace(app, frontmost=app.pid == front) for app in parse_lsappinfo(_stdout([_LSAPPINFO, "list"])))
 
 
+def bundle_ids() -> dict[int, str | None]:
+    """The bundle id of every registered application by its pid (one ``lsappinfo`` call), for what must know an
+    application by what it is and not by the name it shows, which is the Mac's language (item 555)."""
+    return {app.pid: app.bundle_id for app in parse_lsappinfo(_stdout([_LSAPPINFO, "list"]))}
+
+
 def _names_of(app: AppInfo) -> tuple[str, ...]:
     stem: str = Path(app.bundle_path).stem if app.bundle_path else ""
     return tuple(fold_search(name) for name in (app.name, stem, app.bundle_id or "") if name)

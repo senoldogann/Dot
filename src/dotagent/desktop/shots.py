@@ -41,7 +41,7 @@ def _picture_of(config: DesktopConfig, area: Rect, windows: Sequence[WindowInfo]
     """The pixels of ``area`` (points) with password manager windows blacked out, and how many were."""
     perms.require_screen_recording()
     picture: Image.Image = capture.capture_native(area, config.capture_timeout_s)
-    return capture.black_out(picture, area, safety.hidden_regions(windows))
+    return capture.black_out(picture, area, safety.hidden_regions(windows, apps.bundle_ids()))
 
 
 def take_screen(config: DesktopConfig) -> ScreenshotView:

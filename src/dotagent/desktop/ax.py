@@ -501,6 +501,17 @@ def focused_window(app: AXElement, pid: int) -> AXElement | None:
     return windows[0] if windows else None
 
 
+def default_button_of(element: AXElement | None, app: AXElement, pid: int) -> ElementState | None:
+    """The default button of the window or sheet the keyboard is in, which Return presses (live): the top-level window
+    or sheet of ``element``, the control that has the keyboard, else the focused window of ``app``. ``None`` when it has
+    none."""
+    top: AXElement | None = None if element is None else read_optional(element, "AXTopLevelUIElement", pid)
+    if top is None:
+        top = focused_window(app, pid)
+    button: object | None = None if top is None else read_optional(top, "AXDefaultButton", pid)
+    return None if button is None else read_state(button, pid)
+
+
 def _open_menus(app: AXElement, pid: int) -> tuple[Root, ...]:
     """Context menus and pop-up menus that are open belong to the application, not to any window."""
     menus: list[Root] = []

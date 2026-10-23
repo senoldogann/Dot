@@ -3,6 +3,7 @@ killed."""
 
 import asyncio
 import contextlib
+from collections.abc import Mapping
 from typing import Literal
 
 from dotagent.core.errors import DesktopError
@@ -16,14 +17,21 @@ _REAP_TIMEOUT_S: float = 5.0
 
 
 async def run_osascript(
-    language: ScriptLanguage, script: str, argv: tuple[str, ...], confinement: tuple[str, ...], timeout_s: float
+    language: ScriptLanguage,
+    script: str,
+    argv: tuple[str, ...],
+    confinement: tuple[str, ...],
+    timeout_s: float,
+    env: Mapping[str, str] | None = None,
 ) -> str:
     """The script's result as text, ``osascript`` started by ``confinement`` (the words of a run's sandbox, or
-    none). ``argv`` reaches the script's ``run`` handler as its arguments, so that values go in as they are, never as
-    words of the script: after ``--``, since ``osascript`` reads a first argument that starts with a dash as one of its
-    options, ``-e`` and a line of script among them. A script that waits for an Automation approval the user never
-    sees times out; one whose wait is cancelled (a stopped run, the tool's own timeout) is killed, so it never goes on
-    acting on the Mac without its run."""
+    none) with the environment ``env`` (``None``: Dot's own). ``argv`` reaches the script's ``run`` handler as its
+    arguments, so that values go in as they are, never as words of the script: after ``--``, since ``osascript`` reads a
+    first argument that starts with a dash as one of its options, ``-e`` and a line of script among them. A script that
+    waits for an Automation approval the user never sees times out; one whose wait is cancelled (a stopped run, the
+    tool's own timeout) is killed, so it never goes on acting on the Mac without its run. What a run's script starts
+    (``do shell script``) has ``env`` too, so a run's script is given the environment its commands are: without the
+    variables that look like secrets, ``SSH_AUTH_SOCK`` among them (item 555)."""
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
         *confinement,
         _OSASCRIPT,
@@ -35,6 +43,7 @@ async def run_osascript(
         *argv,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=env,
     )
     try:
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout_s)

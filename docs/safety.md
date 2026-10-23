@@ -269,7 +269,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   password manager or Keychain Access, in any mode, nor a window of Dot's outside `yolo`: the desktop app's, or one of
   another application (a browser, an installed web app) that shows the web UI, known at each step by the title the UI
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
-  title is refused as well). Desktop screenshots black out the password managers' windows; their secure fields are not
+  title is refused as well). Desktop screenshots black out the password managers' windows, each known by its
+  application's bundle id as well as its name, so on a Mac in any language (item 555); their secure fields are not
   masked.
 - A login of your 1Password is filled by Dot, never by the run's model (item 493). Once you connect 1Password
   (Customize › Connectors › 1Password: a vault "Shared with Dot" and a service account that only reads it, or a service
@@ -355,8 +356,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   and what it does not read gets through (a name the line builds as it runs, a quote the shell takes out twice, `sh -c
   "pb''paste"`, a script in a file, `osascript r.applescript`, a script typed into a session, `osascript -i`).
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
-  `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
-  not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
+  `AUTH` in the name) are removed from the processes the shell tool starts and from the `osascript` of the AppleScript
+  tool, whose `do shell script` starts a shell with the same environment (item 555), `SSH_AUTH_SOCK` among them, so
+  commands do not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
 - Outside a `yolo` run (which may, without asking, item 433) the agent can neither read nor change `~/.ssh`,
   `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
   `~/.config/gcloud`, the tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`,
@@ -427,7 +429,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   macOS 26: with a rule over the Finder, the terminal apps, System Events and the rest, a script still drove the Finder
   and started an application that was not running), so an AppleScript can have another application act for it, with that
   application's powers: Mail sends a message the policy asked about, a terminal app runs a line outside the sandbox. The
-  Automation permission you grant is what stands in its way. Nor a program that speaks to launchd or another service
+  Automation permission you grant is what stands in its way. The desktop tools reach a terminal app through its keys,
+  buttons and menus as well, which the guard judges as far as it reads them ([Browser and computer
+  use](browser-and-computer-use.md#computer-use) says how far). Nor a program that speaks to launchd or another service
   through its own interface rather than the programs above, and the programs Dot starts itself (its browser, the MCP
   servers) run from where they are installed: a command can change the programs installed under your account
   (Homebrew's,
