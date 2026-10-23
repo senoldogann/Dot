@@ -203,8 +203,12 @@ class HarnessSetCommand(FrozenModel):
 
 
 class HarnessAdoptCommand(FrozenModel):
+    """Adopt a version. One written from a run that read content third parties can author is adopted only after a yes
+    (item 588): asked on the terminal, or ``yes`` given beforehand."""
+
     name: Literal["harness-adopt"]
     version_id: str
+    yes: bool = False
 
 
 class HarnessRetireCommand(FrozenModel):

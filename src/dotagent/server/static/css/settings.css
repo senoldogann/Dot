@@ -3527,6 +3527,12 @@
   padding: var(--space-4) var(--space-5);
 }
 
+/* Why a version in use is refused (item 587): under its head, where the lists of its texts begin. */
+.follow-refused {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-3);
+}
+
 .follow-summary {
   flex: 1;
   min-width: 0;
@@ -3677,6 +3683,14 @@
 
 .version-row.retired .version-summary {
   color: var(--muted);
+}
+
+/* The pill of a version Dot wrote after a run read content others can write (item 588): after the summary, on its own
+   line when the summary fills the row, never in the column of the states. */
+.version-origin {
+  display: inline-block;
+  margin-left: var(--space-2);
+  white-space: nowrap;
 }
 
 .version-tools {

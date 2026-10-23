@@ -350,6 +350,11 @@ def build_parser() -> argparse.ArgumentParser:
     harness_set.add_argument("--adopt", action="store_true", help="adopt the version at once")
     harness_adopt = harness_commands.add_parser("adopt", help="make a version the one every run takes")
     harness_adopt.add_argument("version_id", help="a version id from 'dotx harness list'")
+    harness_adopt.add_argument(
+        "--yes",
+        action="store_true",
+        help="adopt a version written from content others can author without asking first",
+    )
     harness_retire = harness_commands.add_parser(
         "retire", help="put a version aside; an adopted one leaves the prompt as Dot's own"
     )

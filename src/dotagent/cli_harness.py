@@ -28,6 +28,7 @@ from dotagent.cli_commands import (
     HarnessStepCommand,
     HarnessStepsCommand,
 )
+from dotagent.cli_ui import read_line
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path, screenshots_dir
@@ -44,6 +45,7 @@ from dotagent.harness.service import (
     OWNER,
     adopt,
     adopted,
+    check_adoptable,
     create_version,
     diff_text,
     notes_with,
@@ -51,6 +53,7 @@ from dotagent.harness.service import (
     refusals,
     retire,
     step_facts,
+    taint_of,
     text_of,
 )
 from dotagent.harness.step import run_step, scripted_role_turns
@@ -196,9 +199,33 @@ async def cmd_harness_set(command: HarnessSetCommand) -> int:
     return 0
 
 
+# What is said of a version that may come from content others can author, before it is adopted (item 588): what
+# tainted it is said, for the owner to weigh.
+_TAINTED_WARNING: str = (
+    "Warning: a line in this version may come from content others can author: {why}. "
+    "Read it first with 'dotx harness show {version}'.\n"
+)
+
+
 async def cmd_harness_adopt(command: HarnessAdoptCommand) -> int:
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
     async with _store() as store:
-        version: HarnessVersion = await adopt(store, command.version_id, time.time())
+        wanted: HarnessVersion = await store.get_harness_version(command.version_id)
+        why: tuple[str, ...] = await taint_of(store, wanted)
+    # A text the gate refuses is never adopted, whether the owner would be asked about it or not (item 587).
+    check_adoptable(wanted, secrets)
+    if why:
+        sys.stdout.write(_TAINTED_WARNING.format(why="; ".join(why), version=wanted.id))
+        if not command.yes:
+            if not sys.stdin.isatty():
+                sys.stdout.write("Not adopted: there is no terminal to ask on. Pass --yes to adopt it unasked.\n")
+                return 1
+            answer: str | None = await read_line("Adopt it anyway? [y/N] ", fresh=True)
+            if answer is None or answer.strip().lower() not in ("y", "yes"):
+                sys.stdout.write("Not adopted.\n")
+                return 1
+    async with _store() as store:
+        version: HarnessVersion = await adopt(store, command.version_id, time.time(), secrets)
     sys.stdout.write(f"Adopted: {version_line(version)}\nThe runs that start from now on take it.\n")
     return 0
 

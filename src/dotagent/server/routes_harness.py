@@ -3,12 +3,23 @@ by the owner, adopted and retired."""
 
 import asyncio
 import time
+from collections.abc import Sequence
 
 from fastapi import APIRouter
 
 from dotagent.harness.components import NO_HARNESS, HarnessText
 from dotagent.harness.graph import HarnessGraph, Lineage, graph_of, lineage_of
-from dotagent.harness.service import OWNER, adopt, adopted, create_version, retire, text_of
+from dotagent.harness.service import (
+    OWNER,
+    adopt,
+    adopted,
+    create_version,
+    refusal_words,
+    refusals,
+    retire,
+    taint_of,
+    text_of,
+)
 from dotagent.secrets import known_secrets
 from dotagent.server.context import ServerContext
 from dotagent.server.views import HarnessRequest, HarnessView
@@ -20,15 +31,37 @@ _STEPS_SHOWN: int = 50
 _EXPERIENCES_SHOWN: int = 200
 
 
+def _refused_of(versions: Sequence[HarnessVersion], held: Sequence[str]) -> dict[str, str]:
+    """The versions of ``versions`` whose texts the gate for learned texts refuses now, by id, with why in words
+    (:func:`refusal_words`). Seven questions over up to six readings of each text of each version: work for a thread,
+    not for the daemon's loop."""
+    return {version.id: refusal_words(found) for version in versions if (found := refusals(text_of(version), held))}
+
+
 def harness_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     store: Store = ctx.runtime.store
 
     async def view() -> HarnessView:
         limits = ctx.runtime.config.harness
+        # The values Dot holds are asked for in a stored text as when it was written (item 587).
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        current: HarnessVersion | None = await adopted(store)
+        versions: list[HarnessVersion] = await store.list_harness_versions()
+        shown: list[HarnessVersion] = [*([] if current is None else [current]), *versions]
+        from_outside: dict[str, tuple[str, ...]] = {}
+        for version in shown:
+            reasons: tuple[str, ...] = await taint_of(store, version)
+            if reasons:
+                from_outside[version.id] = reasons
+        # The gate is asked of every version listed: CPU work that grows with the history, kept off the loop that the
+        # daemon's runs, its page and its phone share (item 588, pre-push review round 4).
+        refused: dict[str, str] = await asyncio.to_thread(_refused_of, shown, held)
         return HarnessView(
-            adopted=await adopted(store),
-            versions=tuple(await store.list_harness_versions()),
+            adopted=current,
+            versions=tuple(versions),
+            from_outside=from_outside,
+            refused=refused,
             habits_chars=limits.habits_chars,
             tool_guidance_chars=limits.tool_guidance_chars,
             component_lines=limits.component_lines,

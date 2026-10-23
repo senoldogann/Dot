@@ -31,10 +31,35 @@ const NOTE_WORDS = {
   from_run: "learned from run",
   composed_of: "combined from",
   tainted: "read content others wrote",
+  tainted_by: "what it read",
 };
 
 function capital(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Why a version may come from content others can write (a page, a message), in the daemon's words, none when nothing says
+ * so. The daemon reads the version's notes and those of the versions it was combined from, and counts notes that cannot be
+ * read as a reason too: this page never reads them as clean. */
+function outsideReasons(view, version) {
+  return view.from_outside?.[version.id] ?? [];
+}
+
+/** The pill of a version that may come from content others can write, beside its state, with the reasons on a hover. */
+function outsidePill(reasons) {
+  return el(
+    "span",
+    {
+      class: "badge b-warn",
+      title: `A line in this version may come from content others can write: ${reasons.join("; ")}.`,
+    },
+    "From outside content",
+  );
+}
+
+/** The pill of a version whose text the daemon's checks refuse now: it is not put in use, and a run never takes it. */
+function refusedPill(refusal) {
+  return el("span", { class: "badge b-bad", title: `${capital(refusal)}. A version like this is not put in use.` }, "Refused");
 }
 
 /** A pill with the name of a state or an outcome: green for what is in use or done, red for a failure, grey for the rest. */
@@ -95,7 +120,10 @@ function noteLines(notes) {
  * and both texts as they stand, in a place under the row) and the buttons that fit its state. */
 function versionRow(version, handlers) {
   const buttons = [];
-  if (version.state !== "adopted") {
+  const reasons = handlers.reasons(version);
+  const refusal = handlers.refusal(version);
+  // A version the checks refuse is not offered for use: set it aside and write another.
+  if (version.state !== "adopted" && refusal === "") {
     buttons.push(el("button", { class: "btn sm", type: "button", onclick: () => handlers.onAdopt(version) }, "Use"));
   }
   // The version in use is set aside from What Dot follows now, above; a set-aside one has nothing left to set aside.
@@ -114,6 +142,7 @@ function versionRow(version, handlers) {
         dateTime(version.created_at),
       ]),
     ),
+    refusal === "" ? null : el("div", { class: "row-text" }, el("span", { class: "muted" }, "Refused: "), `${refusal}. Set it aside and write another.`),
     el("div", { class: "version-label" }, "Habits"),
     textBlock(version.habits),
     el("div", { class: "version-label" }, "Tool guidance"),
@@ -132,7 +161,13 @@ function versionRow(version, handlers) {
       "div",
       { class: "harness-line" },
       el("span", { class: "harness-mark" }, pill(STATE_TONE, STATE_WORDS, version.state)),
-      el("span", { class: "version-summary", title: version.summary }, clip(version.summary, SUMMARY_CHARS)),
+      el(
+        "span",
+        { class: "version-summary", title: version.summary },
+        clip(version.summary, SUMMARY_CHARS),
+        reasons.length > 0 ? el("span", { class: "version-origin" }, outsidePill(reasons)) : null,
+        refusal === "" ? null : el("span", { class: "version-origin" }, refusedPill(refusal)),
+      ),
       el("span", { class: "version-tools" }, toggle, ...buttons),
     ),
     details,
@@ -288,14 +323,25 @@ function followBody(view, handlers) {
     );
   }
   const column = (label, text) => el("div", { class: "follow-column" }, el("div", { class: "follow-label" }, label), bulletList(text));
+  const reasons = handlers.reasons(adopted);
+  const refusal = handlers.refusal(adopted);
   return setCard(
     el(
       "div",
       { class: "follow-head" },
       pill(STATE_TONE, STATE_WORDS, "adopted"),
+      reasons.length > 0 ? outsidePill(reasons) : null,
+      refusal === "" ? null : refusedPill(refusal),
       el("span", { class: "follow-summary" }, adopted.summary),
       el("button", { class: "btn sm", type: "button", onclick: () => handlers.onRetire(adopted) }, "Set aside"),
     ),
+    refusal === ""
+      ? null
+      : el(
+          "p",
+          { class: "hint follow-refused" },
+          `${capital(refusal)}: the part that fails is left out of every run's instructions. Set this version aside and write another.`,
+        ),
     el(
       "div",
       { class: "follow-columns" },
@@ -497,6 +543,8 @@ export function mount(root, ctx) {
     const handlers = {
       onAdopt: (version) => attempt(() => adoptVersion(version)),
       onRetire: (version) => attempt(() => retireVersion(version)),
+      reasons: (version) => outsideReasons(view, version),
+      refusal: (version) => view.refused?.[version.id] ?? "",
     };
     holder.replaceChildren(
       el(
@@ -555,6 +603,20 @@ export function mount(root, ctx) {
   }
 
   async function adoptVersion(version) {
+    // A version that may come from content others can write is the owner's to weigh, and a click is not a read.
+    const reasons = outsideReasons(view, version);
+    if (reasons.length > 0) {
+      const confirmed = await confirmDialog({
+        title: "Use a version written from outside content?",
+        message: `A line in this version may come from content others can write: ${reasons.join("; ")}. Read its texts under Texts and notes first: the runs that start from now on follow it.`,
+        confirmLabel: "Use it",
+        danger: false,
+        focusCancel: true,
+      });
+      if (!confirmed) {
+        return;
+      }
+    }
     await api.post(`/harness/${version.id}/adopt`, null);
     toast("ok", "In use: the runs that start from now on follow it.");
     await reload();

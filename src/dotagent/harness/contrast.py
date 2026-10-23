@@ -115,7 +115,21 @@ def contrast(base: ProbeReport, candidate: ProbeReport) -> Contrast:
 
 
 def contrast_text(found: Contrast) -> str:
-    """One paragraph of a contrast, as the composer and the experience writer read it."""
+    """A contrast as the models read it (item 588): the verdict in all, on how many of the tasks the candidate did
+    better, worse and could not be judged, and how its tokens compare. Never a task's id nor its verdict: what a
+    candidate is judged on is never shown to the model that writes it (the composer, the experience writer)."""
+    unclear: int = sum(1 for task in found.tasks if task.verdict == "unclear")
+    sign: str = "+" if found.tokens_delta >= 0 else ""
+    return (
+        f"In all {found.verdict}: better on {found.better} of {len(found.tasks)} tasks, worse on {found.worse}"
+        + (f", not played enough to judge on {unclear}" if unclear else "")
+        + f", tokens {sign}{found.tokens_delta}."
+    )
+
+
+def contrast_detail(found: Contrast) -> str:
+    """A contrast for the owner, task by task with its id: what is kept in the notes of a version and in the record of a
+    step, to be read on the page and with ``dotx harness show``, and never shown to a model (:func:`contrast_text`)."""
     parts: list[str] = []
     for task in found.tasks:
         if task.base is None or task.candidate is None:
@@ -125,12 +139,7 @@ def contrast_text(found: Contrast) -> str:
             f"{task.task_id}: {task.verdict} ({task.candidate.passes}/{task.candidate.attempts} passed against "
             f"{task.base.passes}/{task.base.attempts}; {task.candidate.steps:.1f} steps against {task.base.steps:.1f})"
         )
-    sign: str = "+" if found.tokens_delta >= 0 else ""
-    return (
-        f"In all {found.verdict}: better on {found.better}, worse on {found.worse}, tokens {sign}{found.tokens_delta}. "
-        + "; ".join(parts)
-        + "."
-    )
+    return f"{contrast_text(found)} " + "; ".join(parts) + "."
 
 
 def choose(contrasts: Sequence[Contrast]) -> Contrast | None:

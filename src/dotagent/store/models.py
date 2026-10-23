@@ -132,7 +132,9 @@ class RunRecord(FrozenModel):
     is the campaign the run is a session of, ``None`` for any other run. ``agent_id`` is the agent the run belongs to
     (item 86), ``None`` for Dot. ``rewindable`` says whether its chat can be rewound to before its first message (item
     282): Dot kept where that message went in the chat's history, which it does not for a delegated run, nor did for
-    runs from before."""
+    runs from before. ``harness_version`` is the version of the harness the run took as it started (item 389), ``None``
+    when Dot's own text alone was in use and for a run that has not started or is from before; it is how the runs that
+    had a version are told from the others (item 588)."""
 
     id: str
     thread_id: str
@@ -156,6 +158,7 @@ class RunRecord(FrozenModel):
     campaign_id: str | None
     agent_id: str | None
     rewindable: bool
+    harness_version: str | None = None
 
 
 class RewindCut(FrozenModel):

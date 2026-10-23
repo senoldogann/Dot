@@ -36,6 +36,7 @@ from dotagent.store.stats import (
     ChannelStats,
     CompactionStats,
     DayOutcomes,
+    HarnessUse,
     LearningStats,
     ModelStats,
     RunCosts,
@@ -55,6 +56,8 @@ from dotagent.store.stats import (
 )
 
 _DAY_S: float = 86400.0
+# What a run that took no version of the harness took: Dot's own text alone.
+OWN_TEXT: str = "Dot's own text"
 # The tools listed: the ones whose calls took the most seconds in all.
 _TOOLS_SHOWN: int = 15
 
@@ -177,7 +180,7 @@ def render_time(stats: Sequence[ModelStats]) -> list[str]:
 def render_tools(tools: Sequence[ToolStats]) -> list[str]:
     """The tools table: the tools whose calls took the most seconds, with the part spent waiting at the gate."""
     shown: Sequence[ToolStats] = tools[:_TOOLS_SHOWN]
-    width: int = max(len("tool"), *(len(entry.tool) for entry in shown))
+    width: int = max((len("tool"), *(len(entry.tool) for entry in shown)))
     header: str = (
         f"  {'tool':<{width}}  {'calls':>6}  {'failed':>6}  {'seconds':>9}  {'median s':>8}  {'at the gate s':>13}"
     )
@@ -269,6 +272,23 @@ def render_learning(learning: LearningStats) -> list[str]:
     return lines
 
 
+def render_harness(uses: Sequence[HarnessUse]) -> list[str]:
+    """The finished runs by the version of the harness they took (item 588), the busiest first, with the share that
+    ended done: what a version did for the runs that had it, against the runs on Dot's own text."""
+    if not uses or all(use.version is None for use in uses):
+        return ["Harness: no finished run took a version of the harness (Dot's own text alone)."]
+    width: int = max((len("version"), *(len(use.version or OWN_TEXT) for use in uses)))
+    header: str = f"  {'version':<{width}}  {'runs':>5}  {'done':>5}"
+    rows: list[str] = [
+        f"  {use.version or OWN_TEXT:<{width}}  {use.runs:>5}  {_percent(use.done, use.runs):>5}" for use in uses
+    ]
+    return [
+        "Harness, the finished runs by the version of the harness they took (done: the share that ended done):",
+        header,
+        *rows,
+    ]
+
+
 def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "all"]) -> list[str]:
     if not stats.models:
         return [f"No runs in the last {days} days."]
@@ -286,6 +306,7 @@ def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "
         lines.extend(["", *render_days(stats.days)])
     if by != "site":
         lines.extend(["", *render_learning(stats.learning)])
+        lines.extend(["", *render_harness(stats.harness)])
     return lines
 
 
@@ -297,6 +318,7 @@ def render_run_costs(costs: RunCosts) -> list[str]:
         f"input tokens {_count(stats.input_tokens)} ({_per(stats.input_tokens, stats.steps)} a step), "
         f"output tokens {_count(stats.output_tokens)}",
         f"  tool calls took {_seconds(costs.tool_seconds)} s, of which {_seconds(costs.waited_s)} s at the gate",
+        f"  harness: {costs.harness_version or OWN_TEXT}",
     ]
     return [*head, *render_model(stats)[3:], "", *render_time([stats]), "", *render_tools(costs.tools)]
 
