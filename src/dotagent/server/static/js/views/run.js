@@ -1576,9 +1576,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   }
   const finished = (message) => message.data.kind === "run_finished" && message.data.run_id === runId;
   const ended = kept.messages.some(finished);
+  // The stream goes on after the last stored event read (item 568). A live piece, of a thought or of a message being
+  // written, has no id (0): taken for the last event, it made the stream start again from the first, and a chat left
+  // and come back to while its run worked drew every message again, once more at each return.
+  const lastStored = kept.messages.reduce((highest, message) => Math.max(highest, message.id), 0);
   (ended ? Promise.resolve() : follow({
     path: `/runs/${runId}/stream`,
-    after: kept.messages.length === 0 ? 0 : kept.messages[kept.messages.length - 1].id,
+    after: lastStored,
     signal,
     isFinished: finished,
     onState: (state) => {
