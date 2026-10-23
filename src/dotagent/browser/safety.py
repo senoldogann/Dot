@@ -7,7 +7,7 @@ then decides whether the user must be asked, whether the step is refused, or whe
 import ipaddress
 import re
 import socket
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import get_args
 from urllib.parse import unquote, urlsplit
 
@@ -41,6 +41,9 @@ _HOST_LIKE: re.Pattern[str] = re.compile(r"^(localhost|[\w-]+(\.[\w-]+)+|\d{1,3}
 _UNSAFE_FILE_CHARS: re.Pattern[str] = re.compile(r"[^\w.\- ()]+")
 _MAX_FILE_NAME_CHARS: int = 120
 _TYPING_ACTIONS: frozenset[StepAction] = frozenset({"fill", "type", "press", "select", "insert"})
+# The keys that press the control that has the focus, as a click on it does (the review of item 561): Enter submits a
+# form or presses a button, Space presses a button or ticks a box.
+_ACTIVATING_KEYS: frozenset[str] = frozenset({"enter", "numpadenter", "space", " "})
 _CLICKING_ACTIONS: frozenset[StepAction] = frozenset({"click", "double_click", "right_click", "click_at"})
 _QUIET_ACTIONS: frozenset[StepAction] = frozenset({"hover", "scroll_into_view"})
 _CLICKABLE_ROLES: frozenset[str] = frozenset({"button", "link", "menuitem", "tab", "option", "checkbox", "switch"})
@@ -279,6 +282,15 @@ def parse_element(line: str) -> Element | None:
     return Element(role=parsed[0].role, name=parsed[0].name)
 
 
+def _activates(step: Step) -> bool:
+    """Whether ``step`` is a key that presses the control it is given (:data:`_ACTIVATING_KEYS`), with or without a
+    modifier, as a click on it does."""
+    if step.action != "press" or not step.key:
+        return False
+    key: str = step.key if step.key == " " else step.key.rsplit("+", 1)[-1]
+    return key.lower() in _ACTIVATING_KEYS
+
+
 def assess_step(step: Step, element: Element | None, target: Element | None) -> StepAssessment:
     """Risk and flags of one step, judged from the action and the element it targets. A drag's element is judged as a
     click on it would be; the element it drops onto is more often a list or a region than a button, and its name says
@@ -286,6 +298,9 @@ def assess_step(step: Step, element: Element | None, target: Element | None) -> 
     reasons: list[str] = []
     if step.action in _TYPING_ACTIONS:
         reasons = typing_reasons(element, step.text)
+        # Enter or Space on a button presses it: judged by its name, as a click on it is (the review of item 561).
+        if _activates(step):
+            reasons = list(dict.fromkeys(reasons + clicking_reasons(element, _CLICKABLE_ROLES)))
     elif step.action in _CLICKING_ACTIONS or step.action in ("check", "uncheck"):
         reasons = clicking_reasons(element, _CLICKABLE_ROLES)
     elif step.action == "drag":
@@ -311,6 +326,19 @@ def unexplained_clicks(steps: Sequence[tuple[Step, Element | None]]) -> tuple[El
             and element.role in _CLICKABLE_ROLES
             and not clicking_reasons(element, _CLICKABLE_ROLES)
         )
+    )
+
+
+def payment_steps(steps: Sequence[tuple[Step, Element | None, StepAssessment]], judged: Collection[Element]) -> int:
+    """How many steps of a batch pay (item 561): a click, a check, a drag or a key that presses its control
+    (:func:`_activates`) whose control's name asks to pay (``financial``), or that the typed judge found a payment
+    (``judged``: the controls it found so). Typing into a card field is flagged as money too, but moves none by
+    itself."""
+    return sum(
+        1
+        for step, element, part in steps
+        if (step.action not in _TYPING_ACTIONS or _activates(step))
+        and ("financial" in part.flags or (element is not None and element in judged))
     )
 
 

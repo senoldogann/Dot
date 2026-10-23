@@ -52,11 +52,13 @@ const EMPTY_TOKEN: &str = "it is empty; delete it and the daemon makes a new one
 /// What the daemon's proof puts before the nonce (`daemon_proof` in `dotagent.server.guard`).
 const PROOF_LABEL: &[u8] = b"dot daemon proof\n";
 const NONCE_BYTES: usize = 32;
-/// What a page of the window may do through the shell: the core commands, dragging the window by its bars, and
-/// notifications. `capabilities/default.json` gives the same to the shell's own pages.
+/// What a page of the window may do through the shell: drag the window by its bars and zoom it with a double click
+/// there (the drag script Tauri adds to a page asks for both), and notifications. Nothing else of Tauri's core is
+/// granted (item 561): `core:default` would let a page read any PNG from disk (`image`), change the menu bar item and
+/// the app menu (`tray`, `menu`) and emit events. `capabilities/default.json` gives the same to the shell's own pages.
 const PAGE_PERMISSIONS: [&str; 3] = [
-    "core:default",
     "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize",
     "notification:default",
 ];
 const ICON_IDLE: &[u8] = include_bytes!("../icons/tray-idle.png");
@@ -1208,5 +1210,17 @@ mod tests {
                 .expect("the capability file is JSON");
         assert!(file.get("remote").is_none());
         assert_eq!(file["permissions"], serde_json::json!(PAGE_PERMISSIONS));
+    }
+
+    #[test]
+    fn a_page_is_given_no_more_of_tauris_core_than_the_window_commands_its_bars_use() {
+        // `core:default` takes in the image commands (a page could read any PNG from disk), the tray and menu commands
+        // (it could remove the menu bar item) and the event commands (item 561).
+        for permission in PAGE_PERMISSIONS {
+            assert!(
+                !permission.starts_with("core:") || permission.starts_with("core:window:allow-"),
+                "{permission} grants more of Tauri's core than the window's bars use"
+            );
+        }
     }
 }

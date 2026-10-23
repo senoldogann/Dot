@@ -256,7 +256,15 @@ level, says the choice waits for a message that starts a run.
 
 **Keys** are read from the environment of the process, then from `<home>/.env`, then from the macOS Keychain (service
 `dot-agent`, account = the variable name); a Keychain that does not answer within 15 seconds (locked, or waiting for a
-prompt nobody answers) is an error that says so. `dotx auth set OPENAI_API_KEY` reads the value from the terminal
+prompt nobody answers) or that refuses the lookup (a prompt you denied, a locked one with nobody to ask) is an error
+that says so, with what `security` said, and not a key that is missing; one that holds no such item is a key that is
+missing. The page of keys shows such a key as unset and the log says why (`keychain_unreadable`, item 561). A key the
+daemon can start without is taken as no key, at its start and where a connector or the memory's embedder is made
+(Ollama's, which a local Ollama needs none of; the Anthropic key of web search's relay; the judge's; the organization
+and project of an OpenAI account), so that a Keychain that is locked does not stop Dot from starting. What needs the key
+later fails for want of it (web search's hosted rungs with the Keychain's own error); a key a connector cannot be built
+without (OpenAI's, Anthropic's, OpenRouter's, OpenCode Go's) keeps the error wherever it is read.
+`dotx auth set OPENAI_API_KEY` reads the value from the terminal
 without echoing it and writes the file with mode 0600 (a value with a line break in it is refused, and two processes
 changing the file take turns); `dotx auth status` shows which keys are present. `.env.example`
 is a template for the file. An OpenAI key is created on platform.openai.com under API keys (`OPENAI_API_KEY`); the

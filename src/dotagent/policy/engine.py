@@ -26,11 +26,6 @@ _DENY_FLAGS: frozenset[Flag] = frozenset({"secret_access", "exfiltration"})
 RULE_MATCH_TIMEOUT_S: float = 0.25
 # Why an allowed action asks once untrusted content is in context; a yolo run reads it in the line of what it did.
 _TAINT_REASON: str = "untrusted content is in context and this action reaches outside the Mac"
-# What a yolo run asks nothing about (the owner's word of 2026-10-20, item 443): every layer that asks, hands off or
-# refuses below it — the always-on review, Dot's own files, money and credentials, a message or a post in the owner's
-# name, a pre-approved spend — is waived with the reason it would have asked for, and the step's record keeps it. A
-# refusal is not a question and stays one: a research run's (``mode``). A rule of the owner's cannot refuse — its
-# behaviours are allow, preapproved, ask and hand off — and the hand-off one asks for is waived with the rest.
 # Why a change of Dot's own files waits for the user (item 398).
 _OWN_FILES_REASON: str = "only the user lets a run change Dot's own files"
 # What Supervised lets through without a question: what only observes, and the run's own notes and memory notes, as a
@@ -84,7 +79,13 @@ def waived_in_yolo(info: ActionInfo) -> Decision:
     """What a yolo run makes of an action the always-on review refuses (:func:`auto_review`): the question it waives,
     which the record of the step keeps as its reason. Its verdict is a question, not a refusal — a yolo run's gate
     waives questions and raises refusals (item 443) — and only that gate ever sees it. The layers after the review
-    still judge the step (:func:`decide_past_review`): a refusal among them stands, and the rest is theirs to do."""
+    still judge the step (:func:`decide_past_review`): a refusal among them stands, and the rest is theirs to do.
+
+    What a yolo run asks nothing about is every layer that asks, hands off or refuses below the review (item 443, the
+    owner's word of 2026-10-20): Dot's own files, money and credentials, a message or a post in the owner's name, a
+    pre-approved spend. Each is waived with the reason it would have asked for, and the step's record keeps it. A
+    refusal that is no question stays one: a research run's (``mode``). A rule of the owner's cannot refuse — its
+    behaviours are allow, preapproved, ask and hand off — and the hand-off one asks for is waived with the rest."""
     return Decision(
         verdict="ask",
         source="auto_review",

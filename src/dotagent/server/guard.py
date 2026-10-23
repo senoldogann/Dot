@@ -41,6 +41,8 @@ _PERMISSION_BITS: int = 0o777
 _OTHERS_BITS: int = 0o077
 _TOKEN_BYTES: int = 32
 _LOOPBACK_NAME: str = "localhost"
+# The hosts ``[server] host`` may name, spelt as the Host check knows them (:func:`local_hosts`).
+_LOCAL_HOSTS: tuple[str, ...] = ("127.0.0.1", _LOOPBACK_NAME, "::1")
 _HTTP_BAD_REQUEST: int = 400
 _HTTP_MISDIRECTED: int = 421
 _HTTP_FORBIDDEN: int = 403
@@ -129,26 +131,36 @@ class Refusal(FrozenModel):
 
 
 def require_loopback(host: str) -> None:
-    """Refuse a bind address that other machines can reach."""
-    if host == _LOOPBACK_NAME:
+    """Refuse a bind address that other machines can reach, and a loopback one that the Host check does not know
+    (:data:`_LOCAL_HOSTS`): the clients write the host as it stands into the address they send their requests to, so
+    another spelling (127.0.0.2, ::1 written out in full) would start a daemon that refuses every request (item 561)."""
+    if host in _LOCAL_HOSTS:
         return
     try:
         address: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(host)
     except ValueError as exc:
         raise ConfigError(
-            "the server host must be localhost or a loopback address", {"host": host, "setting": "[server] host"}
+            f"the server host must be one of {', '.join(_LOCAL_HOSTS)}", {"host": host, "setting": "[server] host"}
         ) from exc
-    if not address.is_loopback:
-        raise ConfigError(
-            "the server host must be localhost or a loopback address; Dot controls this Mac and is not served to "
-            "the network",
-            {"host": host, "setting": "[server] host"},
-        )
+    reason: str = (
+        "the server answers to no other spelling of a loopback address"
+        if address.is_loopback
+        else "Dot controls this Mac and is not served to the network"
+    )
+    raise ConfigError(
+        f"the server host must be one of {', '.join(_LOCAL_HOSTS)}; {reason}",
+        {"host": host, "setting": "[server] host"},
+    )
+
+
+def _host_header(host: str, port: int) -> str:
+    """``host`` and ``port`` as a ``Host`` header carries them: an IPv6 address in brackets."""
+    return f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
 
 
 def local_hosts(port: int) -> frozenset[str]:
     """The ``Host`` header values with which a browser on this Mac reaches the server."""
-    return frozenset({f"127.0.0.1:{port}", f"{_LOOPBACK_NAME}:{port}", f"[::1]:{port}"})
+    return frozenset(_host_header(host, port) for host in _LOCAL_HOSTS)
 
 
 def host_is_local(host_header: str | None, port: int, reach: frozenset[str]) -> bool:

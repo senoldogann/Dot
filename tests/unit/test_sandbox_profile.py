@@ -10,7 +10,10 @@ from pathlib import Path
 
 import pytest
 
+from dotagent.config import load_default_config
 from dotagent.core.errors import ConfigError
+from dotagent.dot_app import app_path, app_program, build_path
+from dotagent.policy.paths import expand_protected
 from dotagent.policy.sandbox import (
     CLIPBOARD_SERVICES,
     HANDING_PROGRAMS,
@@ -20,8 +23,10 @@ from dotagent.policy.sandbox import (
     Sandbox,
     SwitchedSandbox,
     build_sandbox,
+    hard_linked,
     sandbox_profile,
 )
+from dotagent.runtime import _dot_paths, _own_code
 
 
 def test_the_profile_seals_guards_and_keeps_in_place_each_folder_above_once_and_quoted() -> None:
@@ -192,3 +197,93 @@ def test_macos_refuses_a_command_of_a_run_the_clipboards_service(tmp_path: Path)
         [*words, sys.executable, str(LOOK_UP_THE_CLIPBOARD)], capture_output=True, text=True, check=False
     )
     assert (inside.returncode, inside.stdout.strip()) == (0, "1100"), inside
+
+
+def test_dots_own_code_names_the_app_the_daemon_starts_with_and_the_folder_it_is_built_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 561: launchd runs the program of Dot.app, outside the sandbox, at every start of the daemon."""
+    home: Path = tmp_path / "home"
+    monkeypatch.setenv("DOT_HOME", str(home))
+    app: set[Path] = {app_path(home), build_path(home)}
+    assert app <= set(_own_code())
+    assert app <= set(_dot_paths(load_default_config()))
+    assert build_path(home) == home / ".dot-app-build"
+
+
+def test_macos_keeps_a_command_from_changing_the_program_launchd_starts_the_daemon_with(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 561: a command that wrote a program into Dot.app and then ended the daemon (launchd keeps its job) would
+    have it run outside the sandbox with the owner's rights. The profile of a run's commands, built from the paths of
+    Dot's own code as the runtime builds it, refuses the program whether it is there or not yet, and the folder Dot
+    builds it in."""
+    home: Path = Path(os.path.realpath(tmp_path)) / "home"
+    home.mkdir()
+    monkeypatch.setenv("DOT_HOME", str(home))
+    words: tuple[str, ...] = build_sandbox((), (), expand_protected([], _own_code()), home / "agents").commands
+    program: Path = app_program(app_path(home))
+
+    def run(line: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([*words, "/bin/zsh", "-c", line], capture_output=True, text=True, check=False)
+
+    # Not there yet: a command can make neither the app nor the folder it is built in.
+    refused: list[subprocess.CompletedProcess[str]] = [
+        run(f"mkdir -p {program.parent} && echo planted > {program}"),
+        run(f"mkdir -p {build_path(home)}/Dot.app && echo planted > {build_path(home)}/Dot.app/Dot"),
+    ]
+    assert [(done.returncode != 0, "not permitted" in done.stderr) for done in refused] == [(True, True)] * 2
+    assert not app_path(home).exists() and not build_path(home).exists()
+    # Made as `dotx service install` makes it, outside the sandbox: it is read, and neither changed nor moved.
+    program.parent.mkdir(parents=True)
+    program.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    refused = [
+        run(f"printf planted >> {program}"),
+        run(f"echo planted > {program}"),
+        run(f"mv {program} {program}.moved"),
+        run(f"mv {app_path(home)} {app_path(home)}.moved"),
+    ]
+    assert [(done.returncode != 0, "not permitted" in done.stderr) for done in refused] == [(True, True)] * 4
+    assert program.read_text(encoding="utf-8") == "#!/bin/sh\nexit 0\n"
+    read: subprocess.CompletedProcess[str] = run(f"cat {program}; echo note > {home}/note.txt")
+    assert (read.returncode, read.stdout) == (0, "#!/bin/sh\nexit 0\n")
+    assert (home / "note.txt").read_text(encoding="utf-8") == "note\n"
+
+
+def test_a_sealed_file_that_has_another_name_is_found(tmp_path: Path) -> None:
+    """Item 561: the profile matches paths, so a hard link to a sealed file made where it did not hold is a name it does
+    not know; the daemon says so in its log at its start."""
+    token: Path = tmp_path / "api-token"
+    token.write_text("secret", encoding="utf-8")
+    alone: Path = tmp_path / ".env"
+    alone.write_text("x", encoding="utf-8")
+    (tmp_path / "workspace").mkdir()
+    os.link(token, tmp_path / "workspace" / "link")
+    assert hard_linked([token, alone, tmp_path / "workspace", tmp_path / "missing"]) == {token: 2}
+    assert hard_linked([]) == {}
+
+
+def test_a_hard_link_made_outside_the_sandbox_is_the_one_name_of_a_sealed_file_the_profile_does_not_close(
+    tmp_path: Path,
+) -> None:
+    """What ``docs/safety.md`` says it does not cover (item 561): a symbolic link, another letter case or a link made in
+    the sandbox are refused, and a hard link that a process outside it made earlier reads the file."""
+    home: Path = Path(os.path.realpath(tmp_path)) / "home"
+    (home / "sealed").mkdir(parents=True)
+    (home / "workspace").mkdir()
+    secret: Path = home / "sealed" / "token"
+    secret.write_text("secret", encoding="utf-8")
+    os.link(secret, home / "workspace" / "hard")
+    words: tuple[str, ...] = build_sandbox((home / "sealed",), (), (), home / "agents").commands
+
+    def run(line: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([*words, "/bin/zsh", "-c", line], capture_output=True, text=True, check=False)
+
+    assert run(f"cat {secret}").returncode != 0
+    assert run(f"ln {secret} {home}/workspace/made-inside").returncode != 0
+    symbolic: subprocess.CompletedProcess[str] = run(
+        f"ln -s {secret} {home}/workspace/soft && cat {home}/workspace/soft"
+    )
+    assert symbolic.returncode != 0 and "secret" not in symbolic.stdout
+    read: subprocess.CompletedProcess[str] = run(f"cat {home}/workspace/hard")
+    assert (read.returncode, read.stdout) == (0, "secret")

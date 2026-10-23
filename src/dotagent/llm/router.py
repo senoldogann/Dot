@@ -37,7 +37,7 @@ from dotagent.llm.types import (
 )
 from dotagent.opencode.bridge import ToolBridge
 from dotagent.opencode.server import OpenCodeServer
-from dotagent.secrets import require_secret, resolve_secret
+from dotagent.secrets import optional_secret, require_secret
 
 log = get_logger(__name__)
 
@@ -199,13 +199,13 @@ class ModelRouter:
     async def _create(self, name: str) -> ChatProvider:
         match name:
             case "ollama":
-                key: str | None = await asyncio.to_thread(resolve_secret, self._config.providers.ollama.api_key_env)
+                key: str | None = await asyncio.to_thread(optional_secret, self._config.providers.ollama.api_key_env)
                 return OllamaProvider(self._config.providers.ollama, key)
             case "openai":
                 openai = self._config.providers.openai
                 api_key: str = await asyncio.to_thread(require_secret, openai.api_key_env, "the openai provider")
-                organization: str | None = await asyncio.to_thread(resolve_secret, openai.organization_env)
-                project: str | None = await asyncio.to_thread(resolve_secret, openai.project_env)
+                organization: str | None = await asyncio.to_thread(optional_secret, openai.organization_env)
+                project: str | None = await asyncio.to_thread(optional_secret, openai.project_env)
                 return OpenAIProvider(openai, api_key, organization, project)
             case "opencode_go":
                 go = self._config.providers.opencode_go

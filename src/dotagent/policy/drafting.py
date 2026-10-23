@@ -22,6 +22,8 @@ from dotagent.core.types import FrozenModel
 from dotagent.store.models import Behavior
 
 SHELL_TOOL: str = "shell"
+# The AppleScript tool runs shell lines too (``do shell script``): for a rule that lets Dot act it is the shell's twin.
+APPLE_SCRIPT_TOOL: str = "apple_script"
 # The answers that let Dot act; a rule with any other answer stops it.
 _LETTING: frozenset[Behavior] = frozenset({"allow", "preapproved"})
 # What chains a command to another in zsh (which runs the shell tool's commands), substitutes one into it, sends its
@@ -72,7 +74,9 @@ class RuleDraft(FrozenModel):
     ] = Field(
         description=(
             "The words, names or addresses an action must mention for the rule to apply (mybank.com, invoice). Empty "
-            "when the rule is about every use of the tool and when commands are given."
+            "when the rule is about every use of the tool and when commands are given. A rule that lets Dot act and "
+            "covers the shell tool (shell, or a pattern such as *) gives commands, never mentions; one that covers the "
+            "AppleScript tool (apple_script, or a pattern such as *) gives no mentions either."
         )
     )
     problem: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] = Field(
@@ -133,8 +137,9 @@ def _tools_text(tool_glob: str, fitting: Sequence[str]) -> str:
 def rule_from_draft(draft: RuleDraft, tools: frozenset[str]) -> DraftedRule:
     """The rule ``draft`` makes for a Dot that has ``tools``. A draft whose tool fits none of them, that gives commands
     for another tool than the shell or together with mentions, that lets Dot run a command that is not one plain
-    command, or whose command or mention holds no word to match on, is refused with what is wrong with it. What the
-    draft says in ``problem`` is the caller's to read first."""
+    command, that lets Dot act on words in a tool that is or includes the shell or the AppleScript tool, or whose
+    command or mention holds no word to match on, is refused with what is wrong with it. What the draft says in
+    ``problem`` is the caller's to read first."""
     fitting: list[str] = sorted(name for name in tools if fnmatch.fnmatchcase(name, draft.tool))
     if not fitting:
         raise InvalidValueError("the tool fits none of Dot's tools", {"tool": draft.tool})
@@ -149,6 +154,23 @@ def rule_from_draft(draft: RuleDraft, tools: frozenset[str]) -> DraftedRule:
         if _WORD.search(part) is None:
             raise InvalidValueError("a command or a mention needs a word to match on", {"part": part})
     letting: bool = draft.answer in _LETTING
+    if letting and draft.mentions and fnmatch.fnmatchcase(SHELL_TOOL, draft.tool):
+        # A word fits anywhere in a command line, so a rule that lets Dot act on a word would let the command with
+        # anything chained to it through as well; for the shell it is the command that is named, and it fits alone
+        # (item 561).
+        raise InvalidValueError(
+            f"a rule that lets Dot act and covers the {SHELL_TOOL} tool names commands, not words: a word fits "
+            "anywhere in a command line, one with more chained to it too",
+            {"tool": draft.tool, "mentions": ", ".join(draft.mentions)},
+        )
+    if letting and draft.mentions and fnmatch.fnmatchcase(APPLE_SCRIPT_TOOL, draft.tool):
+        # The same for the AppleScript tool, which runs shell lines through ``do shell script``: a word fits anywhere
+        # in a script, one that runs a command outside the workspace too. It has no form for commands (review of 561).
+        raise InvalidValueError(
+            f"a rule that lets Dot act and covers the {APPLE_SCRIPT_TOOL} tool names no words: a word fits anywhere in "
+            "a script, one that runs a shell line with do shell script too",
+            {"tool": draft.tool, "mentions": ", ".join(draft.mentions)},
+        )
     if letting:
         for command in draft.commands:
             if not _UNPLAIN.isdisjoint(command):

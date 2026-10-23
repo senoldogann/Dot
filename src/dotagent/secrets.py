@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotagent.core.errors import ConfigError, MissingSecretError
+from dotagent.core.logs import get_logger
 from dotagent.core.paths import env_file_path
 from dotagent.core.text import KNOWN_SECRET_MIN_CHARS
 from dotagent.core.types import FrozenModel
@@ -23,6 +24,12 @@ KEYCHAIN_SERVICE: str = "dot-agent"
 # The end of a key that may be shown so the owner can tell two keys apart; a shorter key shows nothing of itself.
 _SECURITY: str = "/usr/bin/security"
 _KEYCHAIN_TIMEOUT_S: float = 15.0
+# What ``security find-generic-password`` exits with when there is nothing to find: the low byte of the status it got,
+# errSecItemNotFound (-25300), errSecNoDefaultKeychain (-25307) and errSecNoSuchKeychain (-25294). Any other exit is a
+# Keychain that would not answer: errSecInteractionNotAllowed (36, locked, with nobody to ask), a prompt the owner
+# denied (128), a failed authorization (51) (item 561).
+_KEYCHAIN_HOLDS_NONE: frozenset[int] = frozenset({44, 37, 50})
+_KEYCHAIN_ERROR_CHARS: int = 300
 _TAIL_CHARS: int = 4
 _TAIL_MIN_CHARS: int = 16
 # The name of an entry of the env file, as a shell names a variable.
@@ -30,6 +37,8 @@ _ENTRY_NAME: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _LOCK_FILE_MODE: int = 0o600
 
 type SecretSource = Literal["environment", "env_file", "keychain"]
+
+log = get_logger(__name__)
 
 # The values :func:`resolve_secret` returned in this process, for :func:`known_secrets`.
 _resolved: set[str] = set()
@@ -140,8 +149,9 @@ def _from_env_file(path: Path, name: str) -> str | None:
 
 
 def _from_keychain(name: str) -> str | None:
-    """The secret called ``name`` in the login Keychain, or ``None``. A Keychain that does not answer (locked, or
-    waiting for a prompt nobody answers) is a ``ConfigError`` that says so."""
+    """The secret called ``name`` in the login Keychain, or ``None`` when it holds none (:data:`_KEYCHAIN_HOLDS_NONE`).
+    A Keychain that does not answer (locked, or waiting for a prompt nobody answers) or that refuses (a prompt the
+    owner denied, a locked one with nobody to ask) is a ``ConfigError`` that says so, not a key that is missing."""
     try:
         completed: subprocess.CompletedProcess[str] = subprocess.run(
             [_SECURITY, "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", name, "-w"],
@@ -161,8 +171,22 @@ def _from_keychain(name: str) -> str | None:
                 ),
             },
         ) from exc
-    if completed.returncode != 0:
+    if completed.returncode in _KEYCHAIN_HOLDS_NONE:
         return None
+    if completed.returncode != 0:
+        # Not "no key": the owner would be told to enter a key that is there. What ``security`` says holds no secret.
+        raise ConfigError(
+            "the macOS Keychain refused the lookup",
+            {
+                "name": name,
+                "returncode": completed.returncode,
+                "stderr": " ".join(completed.stderr.split())[:_KEYCHAIN_ERROR_CHARS],
+                "hint": (
+                    "unlock the login keychain, or allow Dot's access when macOS asks, or keep the key in the env "
+                    "file (dotx auth set)"
+                ),
+            },
+        )
     value: str = completed.stdout.strip()
     return value or None
 
@@ -174,6 +198,28 @@ def resolve_secret(name: str) -> str | None:
     if found:
         _resolved.add(found)
     return found or None
+
+
+def _say_unreadable(error: ConfigError) -> None:
+    """The log's line for a Keychain that did not answer or refused: what ``error`` says of it, without the hint."""
+    log.warning(
+        "keychain_unreadable",
+        error=error.message,
+        **{key: value for key, value in error.context.items() if key != "hint"},
+    )
+
+
+def optional_secret(name: str) -> str | None:
+    """The secret called ``name`` for a service Dot can start without (the key of a hosted rung of a ladder, the
+    organization of an OpenAI account): a Keychain that does not answer or that refuses (locked, a prompt denied) is
+    logged (``keychain_unreadable``) and taken as no key, so that the daemon still starts and the page of the service
+    still opens, and a run that needs the key meets the Keychain's error itself (:func:`require_secret`). A key the
+    service cannot be built without keeps :func:`require_secret` and its error (item 561). Blocking."""
+    try:
+        return resolve_secret(name)
+    except ConfigError as error:
+        _say_unreadable(error)
+        return None
 
 
 def known_secrets() -> tuple[str, ...]:
@@ -200,7 +246,13 @@ def secret_state(name: str) -> SecretState:
         return SecretState(source="environment", saved=bool(saved), tail=_tail(from_env))
     if saved:
         return SecretState(source="env_file", saved=True, tail=_tail(saved))
-    from_keychain: str | None = _from_keychain(name)
+    try:
+        from_keychain: str | None = _from_keychain(name)
+    except ConfigError as error:
+        # A view of where keys are kept must not fail with a Keychain that does not answer: the key shows as unset, and
+        # the log says why; a run that needs the key meets the error itself (:func:`resolve_secret`, item 561).
+        _say_unreadable(error)
+        from_keychain = None
     if from_keychain:
         return SecretState(source="keychain", saved=False, tail=_tail(from_keychain))
     return SecretState(source=None, saved=False, tail="")

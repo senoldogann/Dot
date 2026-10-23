@@ -19,7 +19,7 @@ from dotagent.awake import KeepAwake
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import RECONNECT_NOTICE, BrowserSession
 from dotagent.config import AppConfig, McpServerConfig
-from dotagent.core.errors import ConfigError, ElsewhereError, McpError, StoreError
+from dotagent.core.errors import ElsewhereError, McpError, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.notify import Notifier, show_notification
 from dotagent.core.paths import (
@@ -31,6 +31,7 @@ from dotagent.core.paths import (
     config_path,
     connected_servers_path,
     db_path,
+    dot_home,
     downloads_dir,
     ensure_layout,
     env_file_path,
@@ -49,6 +50,7 @@ from dotagent.core.paths import (
 )
 from dotagent.desktop.session import DesktopSession
 from dotagent.desktop.snapshots import SnapshotService
+from dotagent.dot_app import app_path, build_path
 from dotagent.events import EventBus
 from dotagent.help.added import AddedServers, added_server_configs, read_added_servers
 from dotagent.help.meaning import HelpVectors
@@ -65,9 +67,9 @@ from dotagent.oauth.keychain import Keychain, keychain_file
 from dotagent.plugins.catalog import PluginShelf, load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
-from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox
+from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox, hard_linked
 from dotagent.scheduler.timing import resolve_zone
-from dotagent.secrets import env_lock_path, resolve_secret
+from dotagent.secrets import env_lock_path, optional_secret
 from dotagent.store.backup import backup_folder, partial_folder
 from dotagent.store.db import Store
 from dotagent.terminal.session import Terminals
@@ -114,24 +116,13 @@ class SearchKeys:
         self.anthropic: bool = anthropic
 
 
-def _optional_secret(name: str) -> str | None:
-    """The key ``name`` when it is set, for a service the daemon can start without: a Keychain that does not answer or
-    refuses (locked, a prompt denied) is logged and taken as no key, so the daemon still starts, and a run that needs
-    the key meets the Keychain's error itself (:func:`dotagent.secrets.resolve_secret`). Blocking."""
-    try:
-        return resolve_secret(name)
-    except ConfigError as error:
-        log.warning("keychain_unreadable", name=name, error=error.message)
-        return None
-
-
 async def _refresh_search_key(config: AppConfig, keys: SearchKeys, provider: str) -> None:
     """Read again whether the key of ``provider`` is set when its connector is retired (a key saved or removed in
     Settings › Providers), if it is one of web_search's hosted rungs (:class:`SearchKeys`)."""
     if provider == "ollama":
-        keys.ollama = await asyncio.to_thread(_optional_secret, config.providers.ollama.api_key_env) is not None
+        keys.ollama = await asyncio.to_thread(optional_secret, config.providers.ollama.api_key_env) is not None
     elif provider == "anthropic":
-        keys.anthropic = await asyncio.to_thread(_optional_secret, config.providers.anthropic.api_key_env) is not None
+        keys.anthropic = await asyncio.to_thread(optional_secret, config.providers.anthropic.api_key_env) is not None
 
 
 @dataclass(frozen=True)
@@ -262,12 +253,17 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
 
 def _own_code() -> tuple[Path, ...]:
     """The code Dot itself runs: the folder its package is imported from, the Python environment it runs in and the
-    Python under that, and the file of the launchd job that starts the daemon."""
+    Python under that, the file of the launchd job that starts the daemon, and the program the job starts it with
+    (Dot.app in Dot's home, and the folder it is built in; item 561). A program a command put there would run outside
+    the sandbox at the daemon's next start, which a command can bring about itself by ending the daemon: launchd keeps
+    its job."""
     return (
         Path(__file__).resolve().parent.parent,
         Path(sys.prefix),
         Path(sys.base_prefix),
         launch_agent_path(Path.home()),
+        app_path(dot_home()),
+        build_path(dot_home()),
     )
 
 
@@ -313,6 +309,9 @@ async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths
     )
     launch_agents: Path = Path(await asyncio.to_thread(os.path.realpath, Path.home() / "Library" / "LaunchAgents"))
     built: Sandbox = build_sandbox(sealed, protected, dot_paths, launch_agents)
+    # The profile matches paths: a hard link to a sealed file made outside the sandbox is a path it does not name.
+    for linked, names in (await asyncio.to_thread(hard_linked, sealed)).items():
+        log.warning("sealed_file_has_other_names", path=str(linked), names=names)
     if config.shell.sandbox:
         await check_sandbox(built)
     return SwitchedSandbox(built, config.shell.sandbox)
@@ -420,9 +419,9 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     # Keys of services the daemon starts without: a Keychain that does not answer does not stop it (item 558).
-    ollama_key: str | None = await asyncio.to_thread(_optional_secret, config.providers.ollama.api_key_env)
-    anthropic_key: str | None = await asyncio.to_thread(_optional_secret, config.providers.anthropic.api_key_env)
-    typesafe_key: str | None = await asyncio.to_thread(_optional_secret, config.judge.api_key_env)
+    ollama_key: str | None = await asyncio.to_thread(optional_secret, config.providers.ollama.api_key_env)
+    anthropic_key: str | None = await asyncio.to_thread(optional_secret, config.providers.anthropic.api_key_env)
+    typesafe_key: str | None = await asyncio.to_thread(optional_secret, config.judge.api_key_env)
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
     push_keys: PushKeys = await asyncio.to_thread(read_or_create_keys, vapid_path())
     for problem in plugins.problems:

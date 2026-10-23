@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.agent.review import RULE_TOOL, RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
+from dotagent.agent.review import _RULE_SYSTEM, RULE_TOOL, RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
 from dotagent.config import load_default_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import JsonObject
@@ -116,12 +116,88 @@ def test_a_mention_fits_as_a_whole_word(url: str, fits: bool) -> None:
         (_draft("shell", "allow", ["git status"], ["status"]), "a rule names commands or mentions, not both"),
         (_draft("shell", "allow", ["git status && git push"], []), "a command that a rule lets Dot run is one plain"),
         (_draft("browser_*", "ask", [], ["..."]), "a command or a mention needs a word to match on"),
+        # A word fits anywhere in a command line: a rule that lets Dot act on one would let the command with anything
+        # chained to it through, which the plain-command guarantee is there to keep from it (item 561).
+        (
+            _draft("shell", "allow", [], ["git push"]),
+            "a rule that lets Dot act and covers the shell tool names commands",
+        ),
+        (_draft("shell", "preapproved", [], ["git push"]), "a rule that lets Dot act and covers the shell tool"),
+        (_draft("*", "allow", [], ["git push"]), "a rule that lets Dot act and covers the shell tool"),
+        (_draft("s*", "preapproved", [], ["git push"]), "a rule that lets Dot act and covers the shell tool"),
     ],
 )
 def test_a_draft_that_breaks_a_check_is_refused(draft: RuleDraft, problem: str) -> None:
     with pytest.raises(InvalidValueError) as caught:
         rule_from_draft(draft, TOOLS)
     assert caught.value.message.startswith(problem)
+
+
+@pytest.mark.parametrize(
+    ("tool", "answer", "mentions"),
+    [
+        # A rule that stops Dot fits a word wherever the command mentions it, which is what it is for.
+        ("shell", "ask", ["git push"]),
+        ("shell", "handoff", ["git push"]),
+        ("*", "handoff", ["mybank.com"]),
+        # A rule that lets Dot act on a word of a page, a file or an address of another tool stays what it was.
+        ("browser_*", "allow", ["mybank.com"]),
+        ("write_file", "allow", ["notes.md"]),
+        # Every use of every tool names no word: the broad rule the owner may ask for stays.
+        ("*", "allow", []),
+    ],
+)
+def test_words_still_make_the_rules_that_are_safe_for_them(tool: str, answer: Behavior, mentions: list[str]) -> None:
+    rule: DraftedRule = rule_from_draft(_draft(tool, answer, [], mentions), TOOLS)
+    assert (rule.tool_glob, rule.behavior) == (tool, answer)
+
+
+# The AppleScript tool runs shell lines through ``do shell script``: a rule that lets Dot act on a word of a script fits
+# a script that runs a command outside the workspace as well (the review of item 561), and it has no form for commands.
+SCRIPTING: frozenset[str] = frozenset({*TOOLS, "apple_script"})
+
+
+@pytest.mark.parametrize(
+    ("tool", "answer"),
+    [("apple_script", "allow"), ("apple_script", "preapproved"), ("apple_*", "allow"), ("*script", "preapproved")],
+)
+def test_a_rule_that_lets_dot_act_on_words_of_an_applescript_is_refused_as_it_is_for_the_shell(
+    tool: str, answer: Behavior
+) -> None:
+    with pytest.raises(InvalidValueError) as caught:
+        rule_from_draft(_draft(tool, answer, [], ["Notes"]), SCRIPTING)
+    assert caught.value.message.startswith("a rule that lets Dot act and covers the apple_script tool names no words")
+
+
+def test_a_rule_that_covers_the_shell_and_the_applescript_tool_says_what_it_says_of_the_shell() -> None:
+    with pytest.raises(InvalidValueError) as caught:
+        rule_from_draft(_draft("*", "allow", [], ["Notes"]), SCRIPTING)
+    assert caught.value.message.startswith("a rule that lets Dot act and covers the shell tool names commands")
+
+
+@pytest.mark.parametrize(
+    ("answer", "mentions"),
+    [("ask", ["Notes"]), ("handoff", ["Mail"]), ("allow", []), ("preapproved", [])],
+)
+def test_a_rule_for_the_applescript_tool_that_stops_dot_or_names_no_word_stays(
+    answer: Behavior, mentions: list[str]
+) -> None:
+    rule: DraftedRule = rule_from_draft(_draft("apple_script", answer, [], mentions), SCRIPTING)
+    assert (rule.tool_glob, rule.behavior) == ("apple_script", answer)
+
+
+def test_the_drafters_prompt_and_the_field_say_what_the_refusal_says_of_the_applescript_tool() -> None:
+    assert "covers the AppleScript tool (apple_script" in _RULE_SYSTEM
+    assert "covers the AppleScript tool (apple_script" in str(RuleDraft.model_fields["mentions"].description)
+
+
+def test_a_rule_drafted_from_a_command_fits_it_alone_where_the_same_words_would_fit_a_chain(tmp_path: Path) -> None:
+    """The owner's "let Dot run git push" is drafted as ``commands``: the pattern fits the command alone, where the
+    same words as ``mentions`` (refused above) would have fitted ``git push; <anything>`` too."""
+    rule: DraftedRule = rule_from_draft(_draft("shell", "allow", ["git push"], []), TOOLS)
+    assert _fits(rule, _shell("git push", tmp_path))
+    assert not _fits(rule, _shell("git push; echo chained", tmp_path))
+    assert not _fits(rule, _shell("git push && echo chained", tmp_path))
 
 
 def test_the_rule_reads_back_as_a_sentence_in_its_description() -> None:

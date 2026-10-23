@@ -23,7 +23,7 @@ from dotagent.llm.openai import request_headers
 from dotagent.llm.provider_errors import classify_ollama, classify_openai
 from dotagent.llm.wire import get_str
 from dotagent.memory.ranking import Vector, unit_vector
-from dotagent.secrets import require_secret, resolve_secret
+from dotagent.secrets import optional_secret, require_secret
 
 _OLLAMA_EMBED_PATH: str = "/api/embed"
 _OPENAI_EMBED_PATH: str = "/embeddings"
@@ -186,7 +186,8 @@ class OpenAIEmbedder:
 
 async def build_ollama_embedder(config: AppConfig) -> OllamaEmbedder:
     ollama: OllamaConfig = config.providers.ollama
-    key: str | None = await asyncio.to_thread(resolve_secret, ollama.api_key_env)
+    # Optional: a Keychain that refuses is no key here, so that the daemon starts (item 561).
+    key: str | None = await asyncio.to_thread(optional_secret, ollama.api_key_env)
     return OllamaEmbedder(ollama, key, config.memory.embed_model)
 
 
@@ -195,8 +196,8 @@ async def build_openai_embedder(config: AppConfig) -> OpenAIEmbedder:
     openai: OpenAIConfig = config.providers.openai
     purpose: str = 'the OpenAI embeddings ([memory] embed_provider = "openai")'
     api_key: str = await asyncio.to_thread(require_secret, openai.api_key_env, purpose)
-    organization: str | None = await asyncio.to_thread(resolve_secret, openai.organization_env)
-    project: str | None = await asyncio.to_thread(resolve_secret, openai.project_env)
+    organization: str | None = await asyncio.to_thread(optional_secret, openai.organization_env)
+    project: str | None = await asyncio.to_thread(optional_secret, openai.project_env)
     return OpenAIEmbedder(openai, api_key, organization, project, config.memory.embed_model)
 
 

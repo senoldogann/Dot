@@ -16,8 +16,8 @@ from dotagent.policy.types import ActionInfo, ActionKind, Flag
 
 # The kinds of step that hand their words to someone beyond the Mac: a request, a page's address or field, a message,
 # an MCP server's tool, whose server may be anywhere, and what runs code or types into an application (a command line,
-# an AppleScript, keystrokes), which may reach the network whatever flags its words raised: a plain `curl` of an
-# address that holds a secret raises none.
+# an AppleScript, keystrokes, a script in a page: :data:`_SENDING_TOOLS`), which may reach the network whatever flags
+# its words raised: a plain `curl` of an address that holds a secret raises none.
 _SENDING_KINDS: frozenset[ActionKind] = frozenset(
     {
         "network",
@@ -34,11 +34,18 @@ _SENDING_KINDS: frozenset[ActionKind] = frozenset(
 _SENDING_FLAGS: frozenset[Flag] = frozenset(
     {"external_send", "message_send", "upload", "public_post", "social", "exfiltration"}
 )
+# A tool whose words are code that runs in a page: a script may fetch any address as a command line may, yet it is
+# classified as a click of medium risk, since no pattern tells what its text does (item 263). Its kind is not added to
+# the list above: a plain click's summary and target (a label, the page's address) would raise false refusals (item
+# 561).
+_SENDING_TOOLS: frozenset[str] = frozenset({"browser_eval"})
 
 
 def sends_out(info: ActionInfo) -> bool:
     """Whether the step hands what its arguments say to someone beyond the Mac."""
-    return info.kind in _SENDING_KINDS or any(flag in _SENDING_FLAGS for flag in info.flags)
+    return (
+        info.kind in _SENDING_KINDS or info.tool in _SENDING_TOOLS or any(flag in _SENDING_FLAGS for flag in info.flags)
+    )
 
 
 def _texts(value: JsonValue) -> Iterator[str]:

@@ -31,6 +31,7 @@ from dotagent.browser.safety import (
     hides_secrets,
     normalize_url,
     parse_element,
+    payment_steps,
     refuse_secret_field,
     secret_field_flag,
     secret_field_label,
@@ -408,6 +409,7 @@ def _act_tool() -> RegisteredTool:
         # flags it adds are recorded with the step.
         # The judge is a model of its own: it reads no login filled from the password manager either (item 493), nor
         # a cookie a script ran with (item 533).
+        unexplained: tuple[Element, ...] = unexplained_clicks([(step, element) for step, element, _ in judged])
         judgments: list[ClickJudgment] = await asyncio.gather(
             *(
                 ctx.runtime.judge.judge_click(
@@ -418,12 +420,29 @@ def _act_tool() -> RegisteredTool:
                     ),
                     ctx.run_id,
                 )
-                for element in unexplained_clicks([(step, element) for step, element, _ in judged])
+                for element in unexplained
             )
         )
         found: list[StepAssessment] = [assessment_for(judgment.reasons) for judgment in judgments if judgment.reasons]
         if found:
             assessment = combine_assessments([assessment, *found])
+        # One payment is decided on its own amount and counts against the caps of its site once: a batch that pays more
+        # than once would pass for the largest of its amounts (item 561), so the steps are sent one call at a time.
+        paying: frozenset[Element] = frozenset(
+            element
+            for element, judgment in zip(unexplained, judgments, strict=True)
+            if "financial" in assessment_for(judgment.reasons).flags
+        )
+        payments: int = payment_steps(
+            [(step, element, part) for (step, element, _), part in zip(judged, assessed, strict=True)], paying
+        )
+        if payments > 1:
+            raise ToolInputError(
+                "A batch takes one payment step at most (a purchase, a donation, a booking, a transfer): each payment "
+                "is decided on its own amount and counts against the owner's caps on its own. Send them one call at "
+                "a time, each once the page shows the one before it done.",
+                {"payment_steps": payments},
+            )
         # The pace of a site counts a call as one action, so while a pace is set for a class of the batch's public or
         # social actions the batch carries one of them at most; with none set it carries as many (item 266).
         paced: list[PaceClass] = [
@@ -462,10 +481,12 @@ def _act_tool() -> RegisteredTool:
         note: str = batch_cut_note(len(args.steps), limit)
         if note:
             rendered = f"{note}\n{rendered}"
+        # The page that comes back from a click is a stranger's to write, as one that was opened is: the run reads it as
+        # untrusted from here on (item 561), though the step's own kind (a click, an entry) is not one that taints.
         if args.expect is None:
-            return ok(rendered)
+            return mark_untrusted(ok(rendered))
         check: PageCheck | None = await _page_check(args.expect, outcome, ctx)
-        return ok(rendered if check is None else f"{render_page_check(check)}\n{rendered}")
+        return mark_untrusted(ok(rendered if check is None else f"{render_page_check(check)}\n{rendered}"))
 
     return make_reviewed_tool(
         name="browser_act",
@@ -735,12 +756,15 @@ class UploadArgs(ToolArgs):
 
 
 def _upload_flags(path_classes: list[PathClass]) -> tuple[Flag, ...]:
+    """What an upload carries: always ``upload``, since many upload controls send the file as soon as it is chosen, and
+    a run that read outside content is asked before it does one (item 561); and what its files are (``secret_access``
+    for a protected one, ``exfiltration`` for one of the home folder, the system or Dot's own)."""
     flags: list[Flag] = []
     if "protected" in path_classes:
         flags.append("secret_access")
     if any(path_class in ("home", "system", "dot") for path_class in path_classes):
         flags.append("exfiltration")
-    return tuple(flags)
+    return (*flags, "upload")
 
 
 def _upload_tool() -> RegisteredTool:
@@ -750,14 +774,17 @@ def _upload_tool() -> RegisteredTool:
             classify_path(path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths) for path in resolved
         ]
         flags: tuple[Flag, ...] = _upload_flags(classes)
-        risk: Risk = "high" if flags else "medium"
+        # An upload alone is medium, as a shell line that uploads is, so that balanced does not ask for every one.
+        risk: Risk = "high" if any(flag != "upload" for flag in flags) else "medium"
         names: str = ", ".join(path.name for path in resolved)
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
         return _action("browser_upload", "browser_input", risk, f"Upload {names} to {target}", target, flags)
 
     async def run(args: UploadArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         paths: list[str] = [str(expand_path(raw, ctx.workspace)) for raw in args.paths]
-        return _page_result(await ctx.browser.upload(ctx.thread_id, args.ref, paths, hides_secrets(ctx.approvals)), ctx)
+        view: PageView = await ctx.browser.upload(ctx.thread_id, args.ref, paths, hides_secrets(ctx.approvals))
+        # The page the upload brings up is the site's to write (item 561).
+        return mark_untrusted(_page_result(view, ctx))
 
     return make_path_tool(
         name="browser_upload",
@@ -915,7 +942,8 @@ def _fill_login_tool() -> RegisteredTool:
             f"Filled the {', '.join(kind for kind, _ in parts)} of the login {login.title} from 1Password. The values "
             "were not shown to you and never are; scripts stay off in this chat's tabs while this tab is open."
         )
-        return ok(f"{said}\n{render_page_view(view, _nonce(), _body_budget(ctx))}")
+        # The page the fill leaves is the site's to write (item 561).
+        return mark_untrusted(ok(f"{said}\n{render_page_view(view, _nonce(), _body_budget(ctx))}"))
 
     return make_reviewed_tool(
         name="browser_fill_login",

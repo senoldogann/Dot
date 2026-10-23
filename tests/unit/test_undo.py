@@ -229,3 +229,55 @@ def test_a_folder_the_run_made_below_a_link_that_came_since_is_not_removed(tmp_p
     (work / "a").symlink_to(elsewhere, target_is_directory=True)
     assert remove_empty_dirs(created_dirs(changes)) == []
     assert (elsewhere / "b").is_dir()
+
+
+def _volume_ignores_case(folder: Path) -> bool:
+    """Whether the file system of ``folder`` keeps the case of a name but does not tell two cases apart (a Mac's
+    default)."""
+    probe: Path = folder / "case-probe"
+    probe.write_text(".", encoding="utf-8")
+    try:
+        return (folder / "CASE-PROBE").exists()
+    finally:
+        probe.unlink()
+
+
+def test_a_file_named_in_another_letter_case_has_one_history_and_goes_back_to_what_it_was(tmp_path: Path) -> None:
+    """Item 561: ``doc.txt`` and ``DOC.TXT`` are one file where the volume does not tell case apart, and the journal
+    knew it by the spelling it was given: the second spelling had a history of its own, whose "before" was the first
+    change's result, so taking the run back put back v1 and called the other spelling a conflict."""
+    if not _volume_ignores_case(tmp_path):
+        pytest.skip("this volume tells letter case apart: doc.txt and DOC.TXT are two files here")
+    root: Path = tmp_path / "undo"
+    work: Path = tmp_path / "work"
+    work.mkdir()
+    doc: Path = work / "doc.txt"
+    doc.write_text("original\n", encoding="utf-8")
+    target: JournalTarget = _target(root, RUN_ID, MIB, MIB)
+    atomic_write(doc, "v1\n", target)
+    atomic_write(work / "DOC.TXT", "v2\n", target)
+    atomic_write(work / "Doc.Txt", "v3\n", target)
+    entries = read_journal(run_journal(root, RUN_ID))
+    # One spelling, the one the folder holds, and only the first change keeps a copy.
+    assert [(entry.path, entry.backup) for entry in entries] == [(str(doc), True), (str(doc), False), (str(doc), False)]
+    plan: list[UndoStep] = _plan(_changes(root, (RUN_ID,)))
+    assert [(Path(step.path).name, step.state, step.changes) for step in plan] == [("doc.txt", "ready", 3)]
+    apply_undo(due_steps(plan), root)
+    assert doc.read_text(encoding="utf-8") == "original\n"
+
+
+def test_a_file_made_in_one_letter_case_and_changed_in_another_is_known_by_the_case_it_was_made_in(
+    tmp_path: Path,
+) -> None:
+    if not _volume_ignores_case(tmp_path):
+        pytest.skip("this volume tells letter case apart: doc.txt and DOC.TXT are two files here")
+    root: Path = tmp_path / "undo"
+    work: Path = tmp_path / "work"
+    work.mkdir()
+    target: JournalTarget = _target(root, RUN_ID, MIB, MIB)
+    atomic_write(work / "Report.txt", "made\n", target)
+    atomic_write(work / "report.txt", "changed\n", target)
+    paths: list[str] = [entry.path for entry in read_journal(run_journal(root, RUN_ID))]
+    assert paths == [str(work / "Report.txt")] * 2
+    plan: list[UndoStep] = _plan(_changes(root, (RUN_ID,)))
+    assert [(step.state, step.action, step.changes) for step in plan] == [("ready", "delete", 2)]

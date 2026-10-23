@@ -679,7 +679,9 @@ is active, still otherwise), and a notification carries the face in the state it
 
 Ctrl-C stops the daemon: the runs that are going on are cancelled, and the browser and the other services are closed.
 
-The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any other address. Every request must carry
+The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any other address: `[server] host` is
+`127.0.0.1`, `localhost` or `::1`, written so (another spelling of a loopback address, such as `127.0.0.2` or `::1` in
+full, would start a server that refuses every request, its own client's too: item 561). Every request must carry
 a path without a `.` or `..` segment (`..%2F`, as a browser sends it, reads as one; item 419), a `Host` of the loopback
 address and, when it has one, an `Origin` of the server itself; every call under `/api` except
 `/api/health`, `/api/proof` and `/api/phone/pair` needs the bearer token in `<home>/api-token` (mode 0600). A page a run showed
@@ -747,7 +749,9 @@ dotx service uninstall   # stop the daemon and remove the job
   `python3.13`, and a grant went to that Python binary alone, so the next one (a uv update, another version) had none.
   `service install` builds the app with clang (Xcode's Command Line Tools; `xcode-select --install` when it says they
   are missing) and signs it ad hoc. macOS knows such an app by the hash of its code, so the app is built again only when
-  its source or its Info.plist change; otherwise it stays as it is, with what you granted it. It is not the desktop
+  its source or its Info.plist change; otherwise it stays as it is, with what you granted it. A run's commands cannot
+  change it: the sandbox closes `Dot.app` and the folder it is built in to their writes (item 561, see
+  [Safety](safety.md#safety)). It is not the desktop
   shell's window app (`desktop/`, `dev.dot.desktop`), which also bears the name. Moving from the Python job, grant the
   permissions to Dot once; the `python3.13` rows in System Settings can go. Settings › System in the
   web UI reports what the daemon itself has, and `dotx desktop check` what your terminal has.
@@ -913,8 +917,10 @@ and Quit. Closing the window keeps the shell in the menu bar.
 - **Notifications** are the system's: the web UI sends them through the shell (Settings › General › Notifications,
   the same switch). A click brings Dot to the front, where Waiting for you leads to the run.
 - **Only Dot's pages call the shell.** The shell's own pages and the pages of the daemon's address may call the shell,
-  to send a notification or drag the window: the address it reads from `config.toml`, and any it read there before
-  since it started. A page of any other address, another port of the Mac among them, gets nothing from it.
+  to send a notification or drag the window (by its bars, and zoom it with a double click there): the address it reads
+  from `config.toml`, and any it read there before since it started. They get no other command of Tauri's core (item
+  561): not the image commands, which read a file from disk, nor the menu bar item's and the app menu's, nor events. A
+  page of any other address, another port of the Mac among them, gets nothing from it.
 - **Files** drop into the composer as in the browser.
 - **Updates** (item 432). As it starts, and from **Check for Updates…**, the shell reads `latest.json` of the latest
   release on GitHub (`plugins.updater` in `desktop/src-tauri/tauri.conf.json`). A newer version is offered in a dialog:
