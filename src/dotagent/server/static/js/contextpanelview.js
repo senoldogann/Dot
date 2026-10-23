@@ -4,7 +4,7 @@
 // (contextpanel.js); nothing is shown of what the run did not do. Each row wears the theme's own colours (run.css), so
 // the panel reads in every theme.
 
-import { addMemory, addReadings, addUsage, readingsOf, usageOf } from "./contextpanel.js";
+import { addMemory, addReadings, addUsage, languageOf, readingsOf, usageOf } from "./contextpanel.js";
 import { clip, el, plural } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
@@ -15,9 +15,11 @@ const MEMORY_WORDS_CHARS = 80;
 // What the conversation says of a memory change (timeline.js), in the same words.
 const MEMORY_CHANGES = { Saved: "Saved to memory", Updated: "Updated memory", Forgot: "Removed from memory" };
 
-/** The mark of a row on its own tile: an icon, or the letters of a file's kind. */
+/** The mark of a row on its own tile: an icon, a language's logo, or the letters of a file's kind. A logo keeps the
+ * light tile of a service's mark, so that a dark logo (Rust, JSON) reads in the dark scheme too. */
 function tile(mark) {
-  return el("span", { class: "context-tile" }, typeof mark === "string" ? icon(mark) : mark);
+  const logo = typeof mark !== "string" && mark.classList.contains("context-logo");
+  return el("span", { class: logo ? "context-tile context-tile-logo" : "context-tile" }, typeof mark === "string" ? icon(mark) : mark);
 }
 
 /** A row of a section: its mark and its line, and beside them what says how it stands. */
@@ -25,9 +27,13 @@ function row(mark, name, note) {
   return [tile(mark), el("span", { class: "context-name" }, name), note === "" ? null : el("span", { class: "context-note" }, note)];
 }
 
-/** A file's mark: the letters of its kind ("MD", "TS") on an accent tile, or a folded page when its kind has no short
- * name. */
+/** A file's mark: its language's own logo (item 547), the letters of its kind ("MD", "TS") on an accent tile when its
+ * language has no mark, or a folded page when its kind has no short name. */
 function fileMark(path) {
+  const language = languageOf(path);
+  if (language !== null) {
+    return el("img", { class: "context-logo", src: `/icons/languages/${language}.svg`, alt: "" });
+  }
   const name = path.slice(path.lastIndexOf("/") + 1);
   const dot = name.lastIndexOf(".");
   const kind = dot > 0 ? name.slice(dot + 1).toUpperCase() : "";
