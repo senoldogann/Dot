@@ -6,6 +6,7 @@ folder written whole (D11)."""
 import json
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from structlog.testing import capture_logs
@@ -48,11 +49,14 @@ from dotagent.agent.playbooks import (
 from dotagent.agent.review import PlaybookDraft
 from dotagent.cli_playbooks import render_entry, render_list
 from dotagent.core.errors import NotFoundError
+from dotagent.core.paths import playbooks_dir
 from dotagent.core.types import JsonObject
+from dotagent.events import EventBus
 from dotagent.skills.catalog import SkillRoot, load_catalog
 from dotagent.skills.parse import parse_skill
 from dotagent.skills.types import SKILL_FILE, Skill, SkillCatalog
-from dotagent.store.models import EventRecord
+from dotagent.store.db import Store
+from dotagent.store.models import EventRecord, RunRecord
 
 HOST: str = "shop.example.com"
 # Runs that end at once and count their use of one playbook, and how many uses each counts.
@@ -295,6 +299,41 @@ def test_a_retired_skill_keeps_its_name_and_its_folder(tmp_path: Path) -> None:
         record_use(tmp_path, name, False)
     assert (tmp_path / RETIRED_DIR / name / SKILL_FILE).is_file()
     assert (tmp_path / RETIRED_DIR / f"{name}-2" / SKILL_FILE).is_file()
+
+
+def test_a_skill_moved_aside_as_the_second_retired_copy_is_still_read_listed_and_dropped_by_its_new_name(
+    tmp_path: Path,
+) -> None:
+    """Item 557: the copy moved aside to ``<name>-2`` took its folder's name only; its SKILL.md still said ``<name>``,
+    which the loader refuses, so it was no longer listed or read, and only a name the page never showed dropped it."""
+    name: str = _playbook().name
+    write_playbook(tmp_path, _playbook())
+    for _ in range(MAX_FAILURES):
+        record_use(tmp_path, name, False)
+    write_playbook(tmp_path, _playbook())
+    for _ in range(MAX_FAILURES):
+        record_use(tmp_path, name, False)
+    aside: Path = tmp_path / RETIRED_DIR / f"{name}-2"
+    entries = list_playbooks(tmp_path)
+    assert sorted((entry.skill.name, entry.meta.name, entry.retired) for entry in entries) == [
+        (name, name, True),
+        (f"{name}-2", f"{name}-2", True),
+    ]
+    assert f"# {name}-2\n" in (aside / SKILL_FILE).read_text(encoding="utf-8")
+    assert drop_playbook(tmp_path, f"{name}-2") == aside
+    assert [entry.meta.name for entry in list_playbooks(tmp_path)] == [name]
+
+
+def test_a_skill_rewritten_by_a_run_that_ended_done_starts_its_failures_in_a_row_again(tmp_path: Path) -> None:
+    """Item 557: a failure of a run that read the old steps does not count against the steps a later run verified."""
+    name: str = _playbook().name
+    write_playbook(tmp_path, _playbook())
+    assert _counted(record_use(tmp_path, name, False)).failing == 1
+    update_playbook(tmp_path, name, _playbook().model_copy(update={"run_id": "run-2", "written_at": 1_700_100_000.0}))
+    assert read_meta(tmp_path / name).failing == 0
+    # The next run that reads the fresh steps fails for a reason of its own, and the skill is not retired for it.
+    meta: PlaybookMeta = _counted(record_use(tmp_path, name, False))
+    assert (meta.failing, retires(meta), (tmp_path / name / SKILL_FILE).is_file()) == (1, False, True)
 
 
 def test_a_use_counted_after_another_run_retired_the_playbook_is_not_counted(tmp_path: Path) -> None:
@@ -552,3 +591,36 @@ def test_a_skill_folder_is_written_whole_or_not_at_all(tmp_path: Path, monkeypat
     with pytest.raises(OSError, match="disk is full"):
         write_playbook(tmp_path, broken)
     assert sorted(child.name for child in tmp_path.iterdir() if not child.name.startswith(".lock")) == [name]
+
+
+async def test_the_skill_work_of_a_long_run_reads_its_newest_steps_and_counts_every_skill_it_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 557: the steps a run is distilled from are the newest of its calls and results, not the first part of it,
+    and a skill it read at its start is counted however many events came after."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    monkeypatch.setattr(playbooks_module, "_EVENTS_READ", 10)
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        runtime = SimpleNamespace(store=store, bus=EventBus(store))
+        thread = await store.create_thread("t", "test")
+        run: RunRecord = await store.create_run(
+            thread.id, "goal", "task", "ollama:x", None, "test", None, "standard", None, "ask", False, None, None, None
+        )
+        name: str = _playbook().name
+        root: Path = playbooks_dir()
+        write_playbook(root, _playbook())
+        # Another run read it and failed; this run read it before anything else, and fails too.
+        record_use(root, name, False)
+        await store.add_event(run.id, "tool_call", {"call_id": "s", "tool": "skill", "args": {"name": name}})
+        for number in range(30):
+            call: JsonObject = {"call_id": f"c{number}", "tool": "shell"}
+            await store.add_event(run.id, "tool_call", {**call, "args": {"command": f"step {number}"}})
+            await store.add_event(run.id, "tool_result", {**call, "site": "", "ok": True, "text": "done"})
+        steps = acting_steps(await playbooks_module._acting_events(runtime, run))  # type: ignore[arg-type]
+        assert [step.arguments for step in steps] == [f'{{"command":"step {number}"}}' for number in range(25, 30)]
+        await playbooks_module._record_uses(runtime, run, "failed")  # type: ignore[arg-type]
+        assert not (root / name).exists()
+        assert (root / RETIRED_DIR / name / SKILL_FILE).is_file()
+    finally:
+        await store.close()

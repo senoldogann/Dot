@@ -12,7 +12,8 @@ unless the older is one the owner saved, off the event loop, and the other rests
 lists them; it puts aside the notes newer ones made outdated (item 306, :func:`outdated_pairs`: the review model
 judges each older note against a newer one close to it, and one it calls outdated rests and names the note that
 replaced it, so the Memory page still lists it and the owner can wake it); and it writes one journal note of the days
-it read (:func:`journal_span`), tagged ``journal``, when anything happened. A lesson the owner saved from a run's page
+it read (:func:`journal_span`), tagged ``journal``, when anything happened, which names the lessons that were saved,
+not the ones left out or waiting for the owner. A lesson the owner saved from a run's page
 is never folded away, retired nor put aside, and neither is a note the owner wrote. Whether a run read
 content third parties can author is read from all its results, not only the ones its digest shows. The last reflection
 is kept in the store's key/value table, so the next one knows where to start and the Activity list can show it.
@@ -35,8 +36,10 @@ from dotagent.agent.lessons import (
     LESSONS_NONE,
     LESSONS_PROPOSED,
     LessonCase,
+    RunLessons,
     learn_from,
     repeats,
+    run_lessons,
     same_way_round,
     stored_signals,
 )
@@ -255,7 +258,9 @@ def duplicate_pairs(
     older is one the owner saved (``owner_saved``) and the newer is not; two the owner saved make no pair, as nothing
     the owner chose is folded away. A resting note is in no pair, and two notes pair only when they are the same
     agent's: a lesson learnt again would take the resting one's rest along, and an agent would lose its lesson to
-    another's. The newer note of a pair is one of the newest :data:`_MERGE_RECENT`."""
+    another's. A note saved while reading outside content (``tainted``) never folds away a clean older one (item 557):
+    page content does not put a trusted lesson aside. The newer note of a pair is one of the newest
+    :data:`_MERGE_RECENT`."""
     by_age: list[MemoryRecord] = sorted(
         (note for note in notes if REST_TAG not in note.tags), key=lambda note: note.created_at
     )
@@ -272,6 +277,7 @@ def duplicate_pairs(
                 if note.id not in taken
                 and note.agent_id == older.agent_id
                 and not (older.id in owner_saved and note.id in owner_saved)
+                and not (note.tainted and not older.tainted)
                 and _close(older, note, vectors)
             ),
             None,
@@ -343,8 +349,9 @@ def outdated_pairs(
     changed since the last reflection (``since``), by a run or by the owner; the older one Dot's own, written before it,
     the same agent's, close to it (:func:`_closeness`), its closest such newer note, and in one pair at most. Neither
     rests nor ran out of time, and none is a journal note; a standing note (``core``), a note the owner wrote and a
-    lesson the owner saved (``owner_saved``) are never the older one. The newest pairs first, at most
-    :data:`MOST_OUTDATED_PAIRS`."""
+    lesson the owner saved (``owner_saved``) are never the older one, and a note saved while reading outside content
+    (``tainted``) is never the newer one of a clean older note (item 557): page content does not put a trusted fact
+    aside. The newest pairs first, at most :data:`MOST_OUTDATED_PAIRS`."""
     awake: list[MemoryRecord] = [
         note for note in notes if REST_TAG not in note.tags and JOURNAL_TAG not in note.tags and not expired(note, now)
     ]
@@ -362,6 +369,7 @@ def outdated_pairs(
             if older.id != newer.id
             and older.id not in taken
             and older.agent_id == newer.agent_id
+            and not (newer.tainted and not older.tainted)
             and _written(older) < _written(newer)
             and (closeness := _closeness(older, newer, vectors, threshold)) is not None
         ]
@@ -402,7 +410,8 @@ def journal_text(
     outdated: int,
     max_chars: int,
 ) -> str:
-    """The journal note: what Dot did and learned in ``span`` (:func:`journal_span`), within ``max_chars``."""
+    """The journal note: what Dot did and learned in ``span`` (:func:`journal_span`), within ``max_chars``; ``lessons``
+    are the ones that were saved."""
     counts: dict[str, int] = {
         status: sum(1 for run in runs if run.status == status) for status in ("done", "failed", "cancelled")
     }
@@ -461,11 +470,23 @@ async def _asked_already(store: Store, run_id: str) -> bool:
     return False
 
 
-async def _learn(runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRecord]) -> tuple[list[str], bool]:
-    """The lessons the reflection drew from ``runs``: the ones the loop did not ask about, with their ending as one
-    more signal when they did not reach their goal; and whether one of them came from a run that had read content
-    third parties can author, which the journal that names them then carries too (item 384)."""
+async def _saved_lessons(store: Store, run_id: str) -> list[str]:
+    """The lessons of the run ``run_id`` that are saved as notes now, from its lesson events."""
+    held: RunLessons | None = await run_lessons(store, run_id)
+    return [] if held is None else [view.text for view in held.lessons if view.state == "saved"]
+
+
+async def _learn(
+    runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRecord]
+) -> tuple[list[str], list[str], bool]:
+    """``(the lessons the reflection drew, the ones among them that were saved, whether the saved ones are tainted)``,
+    from ``runs``: the ones the loop did not ask about, with their ending as one more signal when they did not reach
+    their goal. Only the saved lessons are the journal's to name (item 557): one the second look left out, or one that
+    waits for the owner (``propose``), is not handed to later runs through a note of Dot's. They are tainted when one
+    came from a run that had read content third parties can author, which the journal that names them then carries too
+    (item 384)."""
     written: list[str] = []
+    saved: list[str] = []
     tainted: bool = False
     for run in runs:
         if await _asked_already(runtime.store, run.id):
@@ -479,10 +500,11 @@ async def _learn(runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRec
         signals: tuple[str, ...] = (*await stored_signals(runtime.store, case), *(() if ending is None else (ending,)))
         if not signals:
             continue
-        drawn: tuple[str, ...] = tuple((await learn_from(runtime, deciding, case, signals)).lessons)
-        written.extend(drawn)
-        tainted = tainted or (case.tainted and bool(drawn))
-    return written, tainted
+        written.extend((await learn_from(runtime, deciding, case, signals)).lessons)
+        kept: list[str] = await _saved_lessons(runtime.store, run.id)
+        saved.extend(kept)
+        tainted = tainted or (case.tainted and bool(kept))
+    return written, saved, tainted
 
 
 async def merge_duplicates(
@@ -628,8 +650,8 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         for run in await store.runs_finished_since(since)
         if wants_reflection(run) and run.finished_at is not None and run.finished_at < now
     ]
-    lessons, lessons_tainted = (
-        await _learn(runtime, deciding, runs) if runtime.config.agent.lessons != "off" and runs else ([], False)
+    lessons, named, lessons_tainted = (
+        await _learn(runtime, deciding, runs) if runtime.config.agent.lessons != "off" and runs else ([], [], False)
     )
     own: list[MemoryRecord] = _own(await store.memories_with_tag(LESSON_TAG, _LESSON_NOTES))
     owner_saved: set[str] = await store.owner_saved_memory_ids()
@@ -642,7 +664,7 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
     journal: str | None = None
     if runs or merged or retired or outdated:
         span: str = journal_span(since, now, runtime.schedule_zone)
-        text: str = journal_text(span, runs, lessons, merged, retired, outdated, runtime.config.memory.max_chars)
+        text: str = journal_text(span, runs, named, merged, retired, outdated, runtime.config.memory.max_chars)
         saved: SavedMemory = await save_memory(
             runtime.memory, text, (JOURNAL_TAG,), REFLECTION_SOURCE, None, None, lessons_tainted
         )

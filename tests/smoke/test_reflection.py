@@ -20,6 +20,12 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.learning_health import (
+    LEARNED,
+    LEARNING_STALLED_EVENT,
+    REFLECTION_SILENCE_S,
+    record_learning,
+)
 from dotagent.agent.lessons import LESSON_TAG, LESSONS_PROPOSED
 from dotagent.agent.manager import RunManager
 from dotagent.agent.reflection import last_reflection, reflection_cron
@@ -392,3 +398,25 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         kept: OwnerSection = await owner_section(store)
         assert kept.owner_lines == (OWNER_OWN_LINE,) and kept.dot_lines == section.dot_lines
         assert EVAL_SOURCE not in {run.source for run in (clean, failed, stopped, stumbled)}
+
+
+async def test_the_tick_that_starts_the_reflection_after_a_long_quiet_does_not_tell_that_learning_stopped(
+    login_env: dict[str, str],
+) -> None:
+    """Item 557: the Mac slept through two nights; the first tick after starts the catch-up reflection, and the check of
+    the clock in the same tick saw no reflection that went well for more than two days."""
+    async with _home(login_env, []) as home:
+        store: Store = home.runtime.store
+        fire_at: float | None = next_firing(reflection_cron("03:30"), time.time(), home.runtime.schedule_zone)
+        assert fire_at is not None
+        quiet_since: float = fire_at - 3 * 86400.0
+        await record_learning(store, home.runtime.bus, "reflection", quiet_since, LEARNED, REFLECTION_SILENCE_S)
+        scheduler: Scheduler = Scheduler(home.runtime, home.manager)
+        async with home.runtime.bus.subscribe_kinds(frozenset({LEARNING_STALLED_EVENT})) as notices:
+            await scheduler.tick(fire_at + 1)
+            assert scheduler.reflecting()
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                await scheduler.drain()
+            assert notices.queue.empty()
+        reflection: Reflection | None = await last_reflection(store)
+        assert reflection is not None and reflection.at == fire_at + 1

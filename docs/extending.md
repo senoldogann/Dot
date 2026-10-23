@@ -473,7 +473,8 @@ it says what to try next. It changes nothing.
 answer checked, or its goal check found the outcome achieved) after at least `skill_min_steps` (4) acting steps (every
 tool call but the ones that plan, ask, remember, consult, read a skill, find help or finish) is followed, once it has
 ended, by one call of the review model that distils how it got there: from the acting steps (each tool call with its
-arguments and the start of its result; failed calls marked) the model names the kind of work in a few words, writes the
+arguments and the start of its result; failed calls marked, the newest of them when a run took many) the model names
+the kind of work in a few words, writes the
 steps that worked, one sentence each, with the values that change from goal to goal as parameters in angle brackets, and
 a one-sentence description. A model that gives the steps or the parameters as one text instead of a list is read as the
 list it means (a JSON array in a string, or a line to each step), but all the steps run together in one line are no list
@@ -489,7 +490,8 @@ the agent's); another owner's skill of the same name keeps its folder, and the n
 (`learned-<kind>-2`). Later runs see it under Skills like any skill (its source is `learned`) with a note that it is
 advice from Dot's own work, to follow with their own parameters and judgement, and read it with the `skill` tool. Every
 run that ended done or failed counts the learned skills it read; one read by two runs in a row that then failed (none
-ended done between them) is retired, moved under `<home>/playbooks/.retired`, and no longer offered.
+ended done between them, and a run that ended done and rewrote its steps starts the count again) is retired, moved
+under `<home>/playbooks/.retired`, and no longer offered.
 
 A skill whose name starts with `taught-` is one the owner showed Dot once (item 423, Teach a task in the composer):
 they did the task in a tab, the review model wrote its steps from what they did and from their words, and they read
@@ -502,16 +504,22 @@ and no secret field's name, which the recorder leaves out before the draft is wr
 fails, or a folder that cannot be written, leaves a `playbook_failed` event on the run; a written or updated one a
 `playbook_written` event and a retired one a `playbook_retired` event. A run that read content third parties can author
 (a web page, a message, a result of an MCP server) is distilled from its own steps alone: the model sees each call and
-whether it worked, never what it returned nor the run's answer; a skill that names a web address, an account or an
-e-mail address the run's own goal and calls never did is not kept (`playbook_failed` says why), and the skill says
-where it comes from (`read_outside` in its record). The skill never takes an instruction from a page as a step, and
-never holds a secret, a one-time code, an e-mail address or a home path. Customize › Skills lists the learned skills
+whether it worked, never what it returned nor the run's answer, so nothing a page says reaches the skill as a step. The
+skill's record says where it comes from (`tainted`, and the runs in `tainted_runs`, which `dotx playbooks show` and
+the API show), and it is offered with some of its lines withheld, as below. The model is told never to put a secret, a
+one-time code, an e-mail address or a home path in a skill, but only secrets are checked for: the values Dot holds, the
+value of a key that names a secret and the keys and tokens of known forms are masked before the skill is written, and
+an e-mail address or a home path the model writes anyway is kept as written (a skill from a clean run is offered whole;
+one from a run that read outside content has such lines withheld). Customize › Skills lists the learned skills
 under Learned (kind, where, the runs, how they fared, Retired on a retired one, an agent's with its name and Share)
 with Drop; `dotx playbooks list` shows them with
 their use, `dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired. A run is
 offered a skill learned from third-party content, or of unknown origin, with its lines that name an address, run a
 command or reach a path in the home folder or the Mac's own folders withheld; `dotx playbooks trust NAME` offers one
-with all its steps, until a run that reads third-party content rewrites them.
+with all its steps, until a run that reads third-party content rewrites them. The names that start with `learned-`,
+`taught-` or `playbook-` are Dot's alone: a skill of any other folder (yours, a plugin's, one of `[skills] dirs`) with
+such a name is left out and reported, since a run is told that a `taught-` skill is the owner's own instruction (item
+557).
 Delegated runs, chats and evals (which always run without learned skills) write none. `dotx stats` counts the skills
 written, retired and read, and compares, per host, the runs that read a skill with the runs on that host that did not
 (act calls and seconds a run).

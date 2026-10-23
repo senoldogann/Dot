@@ -26,7 +26,7 @@ from dotagent.memory.embedder import Embedder, build_embedder
 from dotagent.memory.ranking import Similar, Vector, fused_scores, most_similar, ranked_by_use
 from dotagent.memory.words import lowercase, search_terms
 from dotagent.store.db import Store
-from dotagent.store.models import MemoryRecord, MemoryScore
+from dotagent.store.models import AwakeNotes, MemoryRecord, MemoryScore
 
 CORE_TAG: str = "core"
 # The tags the nightly reflection (:mod:`dotagent.agent.reflection`) writes: the day's journal note, and a lesson
@@ -292,18 +292,21 @@ async def _recall(index: MemoryIndex, query: str, limit: int, agent_id: str | No
         return []
     config: MemoryConfig = index.config
     terms: tuple[str, ...] = await _distinctive_terms(index.store, search_terms(text), total)
-    rankings: list[list[str]] = [await index.store.search_memories_terms(terms, config.candidate_pool)]
+    now: float = time.time()
+    # The cut to the best ``candidate_pool`` notes is made among the notes that may be found (item 557): resting and
+    # expired notes, and an agent's lessons in a search that is not its own, do not use up the places of the others.
+    among: AwakeNotes = AwakeNotes(now=now, rest_tag=REST_TAG, scoped=scoped, agent_id=agent_id)
+    rankings: list[list[str]] = [await index.store.search_memories_terms(terms, config.candidate_pool, among)]
     similarities: dict[str, float] = {}
     if index.embedder is not None:
         await backfill(index)
         query_vector: Vector = (await index.embedder.embed([text]))[0]
         close: list[Similar] = most_similar(
-            query_vector, await index.store.all_memory_vectors(), config.min_similarity, config.candidate_pool
+            query_vector, await index.store.all_memory_vectors(among), config.min_similarity, config.candidate_pool
         )
         rankings.append([item.id for item in close])
         similarities = {item.id: item.similarity for item in close}
     scores: dict[str, float] = fused_scores(rankings)
-    now: float = time.time()
     candidates: list[MemoryRecord] = [
         record
         for record in await index.store.get_memories(list(scores))

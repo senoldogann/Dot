@@ -376,6 +376,17 @@ class MemoryRecord(FrozenModel):
     tainted: bool
 
 
+class AwakeNotes(FrozenModel):
+    """Which notes a search may find, asked of the store so that the cut to the best ones is made among them (item 557):
+    the notes not tagged ``rest_tag``, whose time has not run out at ``now``, and, with ``scoped``, the ones a run of
+    ``agent_id`` may be handed (Dot's, and that agent's own)."""
+
+    now: float
+    rest_tag: str
+    scoped: bool
+    agent_id: str | None
+
+
 class MemoryScore(FrozenModel):
     """How the runs a note was handed to ended: ``handed`` runs in all, of which ``done`` ended done and ``failed``
     failed (the rest were cancelled, or still work)."""

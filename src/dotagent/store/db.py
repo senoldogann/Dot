@@ -41,6 +41,7 @@ from dotagent.store.models import (
     ApprovalRecord,
     ApprovalStatus,
     AutoDecisionCount,
+    AwakeNotes,
     Behavior,
     BrowserMode,
     CampaignEntry,
@@ -237,6 +238,17 @@ _EXTENSIONS: dict[str, str] = {
 # The events that say a lesson is the owner's (item 556): ``owner_saved_memory_ids`` reads them, so a prune leaves them.
 # An event stored before ``by`` was written is the owner's (``_SavedData``).
 _OWNER_SAVED_LESSON: str = "kind = 'lesson_saved' AND coalesce(json_extract(data, '$.by'), 'owner') = 'owner'"
+
+
+def _awake(among: AwakeNotes) -> tuple[str, tuple[object, ...]]:
+    """`` AND id IN (the notes ``among`` allows)`` and what it binds: not tagged ``rest_tag`` (the tags are kept as one
+    comma-separated text), not run out of time, and, when scoped, Dot's or the agent's own."""
+    return (
+        " AND id IN (SELECT id FROM memories WHERE (',' || tags || ',') NOT LIKE ?"
+        " AND (expires_at IS NULL OR expires_at > ?) AND (? = 0 OR agent_id IS NULL OR agent_id = ?))",
+        (f"%,{among.rest_tag},%", among.now, int(among.scoped), among.agent_id),
+    )
+
 
 # A screenshot saved this recently may belong to a message or event that is not stored yet, so deleting a chat leaves it
 # for ``orphan_images`` to find later.
@@ -2540,6 +2552,25 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def events_of_kinds(self, run_id: str, kinds: Sequence[str], limit: int) -> list[EventRecord]:
+        """The newest ``limit`` events of a run that are of any of ``kinds``, oldest first."""
+        marks: str = ",".join("?" * len(kinds))
+        rows = await self._all(
+            "SELECT * FROM (SELECT * FROM events WHERE run_id = ? AND kind IN"
+            f" ({marks}) ORDER BY id DESC LIMIT ?) ORDER BY id",
+            (run_id, *kinds, limit),
+        )
+        return [_event(row) for row in rows]
+
+    async def tool_calls_named(self, run_id: str, tool: str) -> list[EventRecord]:
+        """The ``tool_call`` events of a run that call the tool ``tool``, oldest first."""
+        rows = await self._all(
+            "SELECT * FROM events WHERE run_id = ? AND kind = 'tool_call' AND json_extract(data, '$.tool') = ?"
+            " ORDER BY id",
+            (run_id, tool),
+        )
+        return [_event(row) for row in rows]
+
     async def run_sites(self, run_id: str) -> list[str]:
         """The sites a run's calls reached (the ``site`` of its ``tool_result`` events: page hosts and applications),
         the one it reached most often first (item 308)."""
@@ -3567,14 +3598,18 @@ class Store:
         row = await self._one("SELECT COUNT(*) AS n FROM memories", ())
         return 0 if row is None else int(row["n"])
 
-    async def search_memories_terms(self, terms: Sequence[str], limit: int) -> list[str]:
+    async def search_memories_terms(
+        self, terms: Sequence[str], limit: int, among: AwakeNotes | None = None
+    ) -> list[str]:
         """Ids of the memories that contain any of ``terms`` (folded words, see ``fts_query``), ranked by BM25, best
-        first."""
+        first, at most ``limit``: of every note, or of the ones ``among`` allows, which the cut is made among (item
+        557), so that notes that rest, ran out of time or are another agent's do not use up the places."""
         if not terms:
             return []
+        allowed, bound = ("", ()) if among is None else _awake(among)
         rows = await self._all(
-            "SELECT id FROM memories_fts WHERE memories_fts MATCH ? ORDER BY bm25(memories_fts) LIMIT ?",
-            (fts_query(terms), limit),
+            f"SELECT id FROM memories_fts WHERE memories_fts MATCH ?{allowed} ORDER BY bm25(memories_fts) LIMIT ?",
+            (fts_query(terms), *bound, limit),
         )
         return [str(row["id"]) for row in rows]
 
@@ -3588,8 +3623,11 @@ class Store:
             counts[term] = 0 if row is None else int(row["notes"])
         return counts
 
-    async def all_memory_vectors(self) -> list[tuple[str, tuple[float, ...]]]:
-        rows = await self._all("SELECT id, vec FROM memory_vectors", ())
+    async def all_memory_vectors(self, among: AwakeNotes | None = None) -> list[tuple[str, tuple[float, ...]]]:
+        """The embeddings of every note, or of the ones ``among`` allows (as :meth:`search_memories_terms`), and of no
+        vector that has no note (item 557)."""
+        allowed, bound = ("", ()) if among is None else _awake(among)
+        rows = await self._all(f"SELECT id, vec FROM memory_vectors WHERE 1 = 1{allowed}", bound)
         return [(str(row["id"]), unpack_vector(bytes(row["vec"]))) for row in rows]
 
     async def help_vectors(self, model: str) -> dict[str, tuple[float, ...]]:
