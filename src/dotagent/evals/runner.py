@@ -31,8 +31,8 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.site import serve_site, with_site
 from dotagent.evals.types import EvalTask, FileSeed, SkillSeed
 from dotagent.events import Subscription
-from dotagent.harness.components import NO_HARNESS, HarnessText
-from dotagent.harness.service import adopt, create_version
+from dotagent.harness.components import NO_HARNESS, GivenText
+from dotagent.harness.service import install
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatProvider
@@ -300,15 +300,15 @@ async def _supervise(
 
 
 async def _run_in(
-    runtime: Runtime, task: EvalTask, model: str, stand_in: ChatProvider | None, attempt: int, harness: HarnessText
+    runtime: Runtime, task: EvalTask, model: str, stand_in: ChatProvider | None, attempt: int, harness: GivenText
 ) -> TaskOutcome:
-    """One attempt in an open runtime: seed the workspace, adopt ``harness`` in the attempt's own store when it is
-    not Dot's own text alone (item 391: a probe of the harness), run the goal, judge what is left."""
+    """One attempt in an open runtime: seed the workspace, adopt ``harness`` in the attempt's own store as it stands
+    when it is not Dot's own text alone (item 391: a probe of the harness; the owner's limits of now apply to new text
+    only, item 589), run the goal, judge what is left."""
     if stand_in is not None:
         await runtime.router.register(parse_model_ref(model).provider, stand_in)
     if harness != NO_HARNESS:
-        probed = await create_version(runtime.store, runtime.config.harness, harness, "probed text", "probe", "", ())
-        await adopt(runtime.store, probed.id, time.time())
+        await install(runtime.store, harness, "probed text", "probe", time.time())
     await asyncio.to_thread(seed_workspace, runtime.workspace, task.files)
     manager: RunManager = RunManager(runtime)
     started: float = time.monotonic()
@@ -340,6 +340,7 @@ async def _run_in(
     injection_checks: tuple[CheckOutcome, ...] = await evaluate_checks(
         task.injection_checks, runtime.workspace, record.result, runtime.shell_env
     )
+    delegated_input, delegated_output = await runtime.store.delegated_usage(record.id)
     return judge(
         task,
         attempt,
@@ -347,7 +348,7 @@ async def _run_in(
         cut,
         checks,
         injection_checks,
-        run_metrics(record, events),
+        run_metrics(record, events, delegated_input, delegated_output),
         took_easy_way(task.easy_way, events),
         seconds,
     )
@@ -361,7 +362,7 @@ async def _attempt(
     model: str,
     scripted: bool,
     attempt: int,
-    harness: HarnessText,
+    harness: GivenText,
 ) -> TaskOutcome:
     """One attempt in a throw-away home that is removed afterwards, holding the skills the task brings, its run given
     the MCP servers the task brings, with the task's site (if it has one) served for its length and its address put
@@ -398,7 +399,7 @@ async def play(
     model: str,
     tasks: Sequence[EvalTask],
     repeats: int,
-    harness: HarnessText,
+    harness: GivenText,
     scripted: bool,
 ) -> AsyncGenerator[TaskOutcome]:
     """Every task ``repeats`` times against ``model``, one attempt at a time, each outcome as soon as it is known, each

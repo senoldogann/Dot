@@ -94,8 +94,13 @@ def _unproven_steps(events: Sequence[EventRecord]) -> int:
     return total
 
 
-def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
-    """The numbers of one run: its record gives steps and tokens, its events give the rest."""
+def run_metrics(
+    run: RunRecord, events: Sequence[EventRecord], delegated_input: int = 0, delegated_output: int = 0
+) -> RunMetrics:
+    """The numbers of one run: its record gives steps and tokens, its events give the rest. The tokens are the run's and
+    those of the runs it delegated to (``delegated_input`` and ``delegated_output``, :meth:`Store.delegated_usage`), the
+    ones the run's token ceiling counts and the probe's budget is spent in (item 589): a text that has the model
+    delegate more spends more, and the scorecard says so."""
     results: list[EventRecord] = [event for event in events if event.kind == "tool_result"]
     acts: list[EventRecord] = [event for event in results if event.data.get("tool") in ACT_TOOLS]
     failures: list[tuple[str, str]] = [
@@ -103,8 +108,8 @@ def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
     ]
     return RunMetrics(
         steps=run.steps,
-        input_tokens=run.input_tokens,
-        output_tokens=run.output_tokens,
+        input_tokens=run.input_tokens + delegated_input,
+        output_tokens=run.output_tokens + delegated_output,
         tool_calls=sum(1 for event in events if event.kind == "tool_call"),
         tool_errors=sum(1 for event in results if event.data.get("ok") is False),
         invalid_arguments=sum(1 for event in events if event.kind == "tool_call" and _has_broken_arguments(event)),
@@ -123,6 +128,7 @@ def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
         rejected_arguments=sum(1 for tool, text in failures if failure_cause(tool, text) == "rejected_arguments"),
         help_calls=sum(1 for event in events if event.kind == "tool_call" and event.data.get("tool") == FIND_HELP_TOOL),
         plan_changes=sum(1 for event in events if event.kind == PLAN_EVENT),
+        approvals_asked=sum(1 for event in events if event.kind == "approval_requested"),
     )
 
 

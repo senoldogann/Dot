@@ -694,7 +694,10 @@ class HarnessStep(FrozenModel):
 
 class HarnessProbe(FrozenModel):
     """One attempt of a probe (item 391): the step it was part of, the version played (``None`` for Dot's own text
-    alone) and its ``label``, the task and the attempt, and what the attempt came to."""
+    alone) and its ``label``, the task and the attempt, and what the attempt came to: whether it passed, how the run
+    ended, its steps, tokens (the run's and those of the runs it delegated to), tool errors and seconds, the approvals
+    its run asked (every one declined: nobody is there), and how many of the task's checks held of how many (item 589;
+    none of the three is counted for an attempt recorded before)."""
 
     id: int
     step_id: str
@@ -711,6 +714,19 @@ class HarnessProbe(FrozenModel):
     tool_errors: int
     seconds: float
     created_at: float
+    approvals_asked: int = 0
+    checks_passed: int = 0
+    checks_total: int = 0
+
+
+class HarnessPruned(FrozenModel):
+    """What :meth:`dotagent.store.db.Store.prune_harness` deleted of the loop's own records (item 589): versions put
+    aside, steps, the attempts of their probes and experiences."""
+
+    versions: int
+    steps: int
+    probes: int
+    experiences: int
 
 
 class HarnessExperience(FrozenModel):

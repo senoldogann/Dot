@@ -575,8 +575,8 @@ that says whether it is signed in, and the one chosen with its key, the page whe
 behind a filter; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses with
 and what Chrome has to allow first; see [Browser
 use](browser-and-computer-use.md#browser-use)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
-what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, every
-version with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
+what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, the
+versions, fifty at a time, with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
 harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pairing code for its home-screen app; see
 [Dot on the phone](phone.md#dot-on-the-phone)) and
 **System** (item 564: three tiles say how the daemon, the permissions and the health checks stand; the **Emergency

@@ -42,6 +42,7 @@ from dotagent.agent.reflection_record import REFLECTION_KEY, Reflection, Reflect
 from dotagent.agent.verify import CallFact
 from dotagent.cli_stats import render_reflection
 from dotagent.config import AppConfig, load_default_config
+from dotagent.harness.step import learns_from
 from dotagent.memory.service import OwnerSection, owner_lines_within, owner_prompt_lines
 from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord, MemoryScore, RunRecord, RunStatus
@@ -128,6 +129,24 @@ def test_only_a_task_or_research_run_of_its_own_that_ended_is_read() -> None:
     assert not wants_reflection(_run("done", "task", "run_parent", "ui"))
     assert not wants_reflection(_run("done", "task", None, "eval"))
     assert not wants_reflection(_run("running", "task", None, "ui"))
+
+
+def test_a_run_on_one_of_zens_free_models_is_read_by_the_reflection_and_not_learned_from_by_a_step() -> None:
+    """Item 589 (L6): such a run goes whole to OpenCode's own agent, which takes no habits, tool guidance, notes or
+    skills of Dot's, so a step of the improvement loop does not learn from it. The reflection reads it as any run of the
+    owner's day (the pre-push review of 589): its journal, what Dot knows about the owner and its lessons."""
+    zen: RunRecord = _run("done", "task", None, "ui").model_copy(update={"model": "opencode:big-pickle"})
+    assert wants_reflection(zen)
+    assert wants_reflection(zen.model_copy(update={"status": "failed"}))
+    assert not learns_from(zen)
+    assert not learns_from(zen.model_copy(update={"status": "failed"}))
+    assert learns_from(zen.model_copy(update={"model": "ollama:qwen3:8b"}))
+    assert learns_from(zen.model_copy(update={"model": "anthropic:claude-haiku-5-5"}))
+    # A reference no provider of Dot's answers to is read as before, not refused: an old run still has its place.
+    assert learns_from(zen.model_copy(update={"model": "scripted:any"}))
+    assert learns_from(zen.model_copy(update={"model": "not a reference"}))
+    # What the reflection would not read, a step does not learn from either.
+    assert not learns_from(zen.model_copy(update={"model": "ollama:qwen3:8b", "mode": "chat"}))
 
 
 def test_the_ending_of_a_run_that_did_not_reach_its_goal_is_a_signal() -> None:

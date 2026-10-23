@@ -38,7 +38,17 @@ from dotagent.evals.types import ScriptedTurn
 from dotagent.harness.components import COMPONENTS, NO_HARNESS, HarnessText
 from dotagent.harness.contrast import scores_of
 from dotagent.harness.graph import Lineage, graph_of, lineage_of, mermaid
-from dotagent.harness.probe import ProbeAsk, ProbeReport, ask_from_file, probe_apart, probe_here, report_json
+from dotagent.harness.probe import (
+    BASE,
+    CONFIRM_BASE,
+    ProbeAsk,
+    ProbeReport,
+    ask_from_file,
+    confirm_label,
+    probe_apart,
+    probe_here,
+    report_json,
+)
 from dotagent.harness.propose import propose_from_run
 from dotagent.harness.roles import ROLE_NAMES
 from dotagent.harness.service import (
@@ -48,20 +58,21 @@ from dotagent.harness.service import (
     check_adoptable,
     create_version,
     diff_text,
+    given_text,
     notes_with,
+    raw_text_of,
     refusal_words,
     refusals,
     retire,
     step_facts,
     taint_of,
-    text_of,
 )
 from dotagent.harness.step import run_step, scripted_role_turns
 from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import HarnessExperience, HarnessStep, HarnessVersion
+from dotagent.store.models import HarnessExperience, HarnessProbe, HarnessStep, HarnessVersion
 
 # What a version's line names in place of a text: Dot's own text, which a run takes while none is adopted.
 OWN_TEXT: str = "Dot's own text"
@@ -90,11 +101,11 @@ def render_version(version: HarnessVersion, secrets: Sequence[str] = ()) -> list
     """The version's line, its parent, what the gate for learned texts refuses of it now (``secrets`` are the values Dot
     holds), then each component under its name, ``(nothing)`` for an empty one."""
     lines: list[str] = [version_line(version), f"made from: {version.parent_id or OWN_TEXT}"]
-    refused: dict[str, str] = refusals(text_of(version), secrets)
+    refused: dict[str, str] = refusals(raw_text_of(version), secrets)
     if refused:
         lines.append(f"refused: {refusal_words(refused)}; it is not adopted, and no run takes the component")
     for name in COMPONENTS:
-        text: str = text_of(version).component(name)
+        text: str = raw_text_of(version).component(name)
         lines.extend(["", f"## {name}", text if text != "" else "(nothing)"])
     if version.notes != "":
         lines.extend(["", "## notes", version.notes])
@@ -136,15 +147,45 @@ async def cmd_harness_show(command: HarnessShowCommand) -> int:
     return 0
 
 
+def _played_as(version_id: str, probes: Sequence[HarnessProbe]) -> list[tuple[str, list[HarnessProbe]]]:
+    """The attempts of the probes that played the version ``version_id``, grouped by what it was played as, a line each
+    (item 589, pre-push review round 2): in the step that tried it, in the confirmation on new attempts (twice as many),
+    and as the base the candidates and the survivor were compared with, in the step and in the confirmation. The counts
+    answer different questions, so a sum of them is read as none. An attempt under another label (none is written
+    today) has its own group: none is left out."""
+    names: dict[str, str] = {
+        version_id: "in the step that tried it",
+        confirm_label(version_id): "in the confirmation, on new attempts",
+        BASE: "as the base",
+        CONFIRM_BASE: "as the base in a confirmation",
+    }
+    groups: dict[str, list[HarnessProbe]] = {}
+    for attempt in probes:
+        groups.setdefault(attempt.label, []).append(attempt)
+    order: list[str] = [label for label in names if label in groups]
+    order.extend(sorted(label for label in groups if label not in names))
+    return [(names.get(label, f"labelled {label}"), groups[label]) for label in order]
+
+
+def _attempts_line(attempts: Sequence[HarnessProbe]) -> str:
+    """``3 of 6 attempts passed, 5 of 6 checks held, 0 approvals asked`` of ``attempts``."""
+    passed: int = sum(1 for attempt in attempts if attempt.passed)
+    held: int = sum(attempt.checks_passed for attempt in attempts)
+    checks: int = sum(attempt.checks_total for attempt in attempts)
+    approvals: int = sum(attempt.approvals_asked for attempt in attempts)
+    # The checks and the approvals are counted from item 589 on: an attempt recorded before has neither.
+    detail: str = f", {held} of {checks} checks held, {approvals} approvals asked" if checks else ""
+    return f"{passed} of {len(attempts)} attempts passed{detail}"
+
+
 def render_lineage(lineage: Lineage) -> list[str]:
     """What the store knows of a version's past: its ancestors, how its probes went, the steps that touched it and the
     experiences about it."""
     lines: list[str] = []
     if lineage.ancestors:
         lines.extend(["", "## made from", *(version_line(older) for older in lineage.ancestors)])
-    if lineage.probes:
-        passed: int = sum(1 for probe in lineage.probes if probe.passed)
-        lines.extend(["", f"## probes: {passed} of {len(lineage.probes)} attempts passed"])
+    for played_as, attempts in _played_as(lineage.version.id, lineage.probes):
+        lines.extend(["", f"## probes {played_as}: {_attempts_line(attempts)}"])
     if lineage.steps:
         lines.extend(
             ["", "## steps", *(f"{step.id}  {step.state}  {_when(step.started_at)}" for step in lineage.steps)]
@@ -168,8 +209,8 @@ async def cmd_harness_diff(command: HarnessDiffCommand) -> int:
         else:
             current: HarnessVersion | None = await adopted(store)
             against = None if current is None or current.id == version.id else current
-    before: HarnessText = NO_HARNESS if against is None else text_of(against)
-    diff: str = diff_text(before, text_of(version), OWN_TEXT if against is None else against.id, version.id)
+    before: HarnessText = NO_HARNESS if against is None else raw_text_of(against)
+    diff: str = diff_text(before, raw_text_of(version), OWN_TEXT if against is None else against.id, version.id)
     sys.stdout.write(f"{diff}\n" if diff != "" else "The texts are the same.\n")
     return 0
 
@@ -185,7 +226,7 @@ async def cmd_harness_set(command: HarnessSetCommand) -> int:
     secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
     async with _store() as store:
         current: HarnessVersion | None = await adopted(store)
-        kept: HarnessText = NO_HARNESS if current is None else text_of(current)
+        kept: HarnessText = NO_HARNESS if current is None else raw_text_of(current)
         text: HarnessText = HarnessText(
             habits=kept.habits if habits is None else habits,
             tool_guidance=kept.tool_guidance if tool_guidance is None else tool_guidance,
@@ -260,7 +301,7 @@ def render_step(step: HarnessStep) -> list[str]:
     """How a step ended, and what it did."""
     facts: dict[str, object] = json.loads(step.outcome) if step.outcome else {}
     lines: list[str] = [f"Step {step.id}: {step.state}" + (f" ({step.error})" if step.error else "")]
-    for key in ("from_run", "candidates", "decision", "probed", "adopted", "reason", "tokens"):
+    for key in ("from_run", "candidates", "decision", "probed", "confirmation", "adopted", "reason", "tokens"):
         if key in facts:
             lines.append(f"  {key}: {facts[key]}")
     contrasts: object = facts.get("contrasts")
@@ -341,10 +382,12 @@ async def cmd_harness_final(command: HarnessFinalCommand) -> int:
         )
         if version is None:
             raise InvalidValueError("no version is adopted; name one to play the final set under", {})
-        text: HarnessText = text_of(version)
+    # What the final set plays is the text as a run would take it: a component the gate refuses now left out, the values
+    # Dot holds asked for here, since the probe's own home cannot know them (item 587).
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
     ask: ProbeAsk = ProbeAsk(
         label=version.id,
-        text=text,
+        text=given_text(version, secrets),
         tasks=tuple(config.harness.final_tasks),
         repeats=1,
         model=config.models.main,

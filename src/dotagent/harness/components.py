@@ -30,13 +30,24 @@ class HarnessText(FrozenModel):
         return self.habits if name == "habits" else self.tool_guidance
 
 
+class GivenText(HarnessText):
+    """A text as a model may be given it (item 587, pre-push review round 2): what
+    :func:`dotagent.harness.service.given_text` made of a stored version, after the gate for learned texts was asked of
+    it again (a component it refuses is left out), or Dot's own text alone. A probe's ask, the installation of a probed
+    text, the prompt's inputs, the evals' runner and the comparison of a lesson with the rules in use take this type
+    and no other, so that a text taken as it is stored (:func:`dotagent.harness.service.raw_text_of`) does not pass the
+    type checker there, and a probe's ask made of one is refused when it is made. It is built in two places, which a
+    test reads the source for: ``NO_HARNESS`` below and ``given_text``; a probe's ask read back from the file the step
+    wrote holds one too."""
+
+
 # Dot's own text alone: what a run takes while no version is adopted.
-NO_HARNESS: HarnessText = HarnessText(habits="", tool_guidance="")
+NO_HARNESS: GivenText = GivenText(habits="", tool_guidance="")
 # The mark before a rule of a component that is a list: a bullet or a number.
 _LIST_MARK: re.Pattern[str] = re.compile(r"^\s*(?:[-*•]|\d{1,2}[.)])\s+")
 
 
-def rules_of(text: HarnessText) -> tuple[str, ...]:
+def rules_of(text: GivenText) -> tuple[str, ...]:
     """The rules the adopted ``text`` gives a run, one line each, the habits first and then the tool guidance, a
     bullet or a number before a rule taken off and the blank lines left out: what a lesson is compared with, so that
     the memory does not learn again what the prompt already says (item 584)."""

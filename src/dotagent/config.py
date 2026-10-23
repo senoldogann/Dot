@@ -575,17 +575,21 @@ class HarnessConfig(FrozenModel):
     selector: str
     experience: str
     # The nightly step (item 391): when it runs (HH:MM in [scheduler] timezone, or "off"), the scoring set and the
-    # final set (eval task ids), how many times each task is played, which scopes are proposed, and its budget of
-    # minutes and tokens; who adopts a version the probe showed better: the owner, or the step itself. Each set names
-    # at least one task: an empty list would select the whole catalogue, the final set with it.
+    # final set (eval task ids, no task in both: item 589), how many times each task is played, how many passes more
+    # than the base a candidate needs over the whole scoring set to count as better (item 589: one lucky attempt is no
+    # evidence), which scopes are proposed (each once), and its budget of minutes and tokens; who adopts a version the
+    # probe showed better: the owner, or the step itself; and how many days the loop's own records are kept (0: for
+    # ever). Each set names at least one task: an empty list would select the whole catalogue, the final set with it.
     step_time: str
     scoring_tasks: list[str] = Field(min_length=1)
     final_tasks: list[str] = Field(min_length=1)
     step_repeats: int = Field(ge=1)
+    step_margin: int = Field(ge=1)
     step_candidates: list[Literal["invariant", "domain"]] = Field(min_length=1, max_length=2)
     step_minutes: float = Field(gt=0, allow_inf_nan=False)
     step_tokens: int = Field(gt=0)
     adopt: Literal["owner", "auto"]
+    keep_days: int = Field(ge=0)
 
     @field_validator("proposer", "composer", "selector", "experience")
     @classmethod
@@ -598,6 +602,24 @@ class HarnessConfig(FrozenModel):
         if value != "off" and _TIME_OF_DAY.fullmatch(value) is None:
             raise ValueError('step_time is a time of day as "04:10" (24-hour) or "off"')
         return value
+
+    @field_validator("step_candidates")
+    @classmethod
+    def _each_scope_once(cls, value: list[Literal["invariant", "domain"]]) -> list[Literal["invariant", "domain"]]:
+        if len(set(value)) != len(value):
+            raise ValueError("step_candidates names a scope once: a scope proposed twice is probed twice for nothing")
+        return value
+
+    @model_validator(mode="after")
+    def _sets_share_no_task(self) -> Self:
+        shared: list[str] = sorted(set(self.scoring_tasks) & set(self.final_tasks))
+        if shared:
+            raise ValueError(
+                f"scoring_tasks and final_tasks share {', '.join(shared)}: the final set is never used to choose "
+                "between candidates, so no task of it may be in the scoring set. Name both lists in [harness]: a "
+                "task you name in one is taken out of the other's default, but not out of one you wrote too"
+            )
+        return self
 
 
 class ShellConfig(FrozenModel):
@@ -898,11 +920,47 @@ def _validated(merged: JsonObject, source: str) -> AppConfig:
         ) from exc
 
 
+def _settled_task_sets(merged: JsonObject, user: JsonObject, source: str) -> JsonObject:
+    """``merged`` with the two task sets of the harness made disjoint where the owner wrote only one of them (item 589):
+    a task they name in ``final_tasks`` is no longer in the default ``scoring_tasks`` (and the other way round), as
+    their word wins over a default that grew a task since they wrote their file. Two lists they both wrote are left as
+    they are: whether they share a task is for the validation to say. A list that names every task of the other's
+    default leaves it none, which is said here, in words that name the list to write too (``source`` is the file), and
+    not by the validation's "List should have at least 1 item"."""
+    written: JsonValue = user.get("harness")
+    table: JsonValue = merged.get("harness")
+    if not isinstance(written, dict) or not isinstance(table, dict):
+        return merged
+    named: str | None = (
+        "final_tasks"
+        if "final_tasks" in written and "scoring_tasks" not in written
+        else "scoring_tasks"
+        if "scoring_tasks" in written and "final_tasks" not in written
+        else None
+    )
+    given: JsonValue = None if named is None else table.get(named)
+    if named is None or not isinstance(given, list):
+        return merged
+    default: str = "scoring_tasks" if named == "final_tasks" else "final_tasks"
+    others: JsonValue = table.get(default)
+    if not isinstance(others, list):
+        return merged
+    left: list[JsonValue] = [task for task in others if task not in given]
+    if not left:
+        raise ConfigError(
+            f"configuration failed validation: harness.{named} names every task of the default {default}, which leaves "
+            f"it none: name {default} too",
+            {"path": source, "fix": f"name {default} as well as {named} under [harness] in {source}"},
+        )
+    return {**merged, "harness": {**table, default: left}}
+
+
 def load_config(user_path: Path) -> AppConfig:
     """Load defaults, overlay ``user_path`` if it exists, and validate the result."""
     merged: JsonObject = load_defaults()
     if user_path.exists():
-        merged = deep_merge(merged, _read_toml(user_path))
+        user: JsonObject = _read_toml(user_path)
+        merged = _settled_task_sets(deep_merge(merged, user), user, str(user_path))
     return _validated(merged, str(user_path))
 
 

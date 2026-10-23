@@ -23,7 +23,7 @@ from dotagent.evals.catalog import select_tasks
 from dotagent.evals.results import Cut, TaskOutcome
 from dotagent.evals.runner import eval_config, lookup_secrets, play, reached_models, secret_names
 from dotagent.evals.types import EvalTask
-from dotagent.harness.components import HarnessText
+from dotagent.harness.components import GivenText
 from dotagent.store.models import RunStatus
 from dotagent.tools.shell import read_login_env
 
@@ -31,6 +31,16 @@ log = get_logger(__name__)
 
 # The label of the probe of the adopted texts, which the candidates are compared with.
 BASE: str = "base"
+# The label of the probe of the adopted texts played again, and of the survivor played again (``confirm-<its id>``), on
+# new attempts, before a step adopts the survivor on its own (item 589, review round 1).
+CONFIRM_BASE: str = "confirm-base"
+
+
+def confirm_label(version_id: str) -> str:
+    """The label of the confirmation probe of the version ``version_id``."""
+    return f"confirm-{version_id}"
+
+
 # How long the step waits for a probe past its budget of minutes before it ends the process.
 _GRACE_S: float = 120.0
 # How long a probe told to end (SIGTERM) may take to end its play and the runs it started before it is killed.
@@ -39,7 +49,9 @@ _OUTPUT_CHARS: int = 2000
 
 
 class Scorecard(FrozenModel):
-    """What one attempt of a probe came to: whether it passed, how the run ended, whether it was cut, and its cost."""
+    """What one attempt of a probe came to: whether it passed, how the run ended, whether it was cut, and its cost: the
+    steps, the tokens (the run's and those of the runs it delegated to), the tool errors, the seconds, the approvals its
+    run asked (each declined: nobody is there) and how many of the task's checks held of how many (item 589)."""
 
     task_id: str
     attempt: int
@@ -51,6 +63,9 @@ class Scorecard(FrozenModel):
     output_tokens: int
     tool_errors: int
     seconds: float
+    approvals_asked: int = 0
+    checks_passed: int = 0
+    checks_total: int = 0
 
 
 class ProbeAsk(FrozenModel):
@@ -59,7 +74,7 @@ class ProbeAsk(FrozenModel):
     of the model under test."""
 
     label: str
-    text: HarnessText
+    text: GivenText
     tasks: tuple[str, ...]
     repeats: int
     model: str
@@ -96,6 +111,9 @@ def card_of(outcome: TaskOutcome) -> Scorecard:
         output_tokens=outcome.metrics.output_tokens,
         tool_errors=outcome.metrics.tool_errors,
         seconds=outcome.seconds,
+        approvals_asked=outcome.metrics.approvals_asked or 0,
+        checks_passed=sum(1 for check in outcome.checks if check.passed),
+        checks_total=len(outcome.checks),
     )
 
 

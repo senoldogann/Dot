@@ -26,29 +26,49 @@ from dotagent.agent.review import (
     ProposalScope,
 )
 from dotagent.config import HarnessConfig
-from dotagent.core.errors import DotError
+from dotagent.core.errors import DotError, InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
-from dotagent.harness.components import COMPONENTS, NO_HARNESS, HarnessText
-from dotagent.harness.contrast import Contrast, choose, contrast, contrast_detail, contrast_text
-from dotagent.harness.probe import BASE, ProbeAsk, Prober, ProbeReport, nothing_played, over_budget
+from dotagent.harness.components import COMPONENTS, NO_HARNESS, GivenText, HarnessText
+from dotagent.harness.contrast import (
+    CONFIRM_FACTOR,
+    Contrast,
+    choose,
+    confirm_contrast,
+    contrast,
+    contrast_detail,
+    contrast_text,
+)
+from dotagent.harness.probe import (
+    BASE,
+    CONFIRM_BASE,
+    ProbeAsk,
+    Prober,
+    ProbeReport,
+    confirm_label,
+    nothing_played,
+    over_budget,
+)
 from dotagent.harness.propose import bounds_of, case_of, propose_from_run, withheld_tasks
 from dotagent.harness.roles import composer_of, experience_writer_of
 from dotagent.harness.service import (
     adopt_replacing,
     adopted,
+    check_adoptable,
     create_version,
+    given_text,
     notes_of,
     notes_with,
     step_facts,
-    text_of,
 )
+from dotagent.llm.opencode import OPENCODE_PROVIDER
+from dotagent.llm.types import split_model_ref
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import HarnessStep, HarnessStepState, HarnessVersion, RunRecord
+from dotagent.store.models import HarnessPruned, HarnessStep, HarnessStepState, HarnessVersion, RunRecord
 
 log = get_logger(__name__)
 
@@ -58,6 +78,7 @@ COMPOSER: str = "composer"
 _OWNER_WORDS: dict[str, str] = {"adopted": "in use", "retired": "set aside"}
 # How far back the step looks for a run to learn from when no step came before.
 _LOOKBACK_S: float = 24 * 3600.0
+_DAY_S: float = 86400.0
 _SESSION: str = "harness:step"
 # What the roles answer under `dotx harness step --scripted` (:func:`scripted_role_turns`): the proposer proposes this
 # habit in the first scope and keeps in the others, the experience writer saw no effect, and the composer is never
@@ -91,10 +112,35 @@ def plan_of(config: HarnessConfig, model: str, scripted: bool) -> StepPlan:
     )
 
 
+def learns_from(run: RunRecord) -> bool:
+    """Whether a step may learn from ``run``: one the reflection reads (a task or research run of its own that ended)
+    that Dot's own agent worked. A run on one of Zen's free models goes whole to OpenCode's own agent, which takes no
+    habits, no tool guidance, no notes and no skills of Dot's (item 589), so what it did says nothing of them and its
+    tools are not Dot's; the reflection still reads it, since its journal, what Dot knows about the owner and its
+    lessons are of the owner's day. A model reference no provider of Dot's answers to (a run of a time before a provider
+    was renamed) is no OpenCode run: it is read as it was."""
+    ref: tuple[str, str] | None = split_model_ref(run.model)
+    return wants_reflection(run) and (ref is None or ref[0] != OPENCODE_PROVIDER)
+
+
+async def _why_not_adopted(store: Store, version_id: str, held: Sequence[str]) -> str:
+    """Why the step's own adoption of ``version_id``, after its confirmation, did not happen, in the words of the
+    step's decision: the owner adopted or set the version aside during the confirmation, the gate for learned texts
+    refuses its text now, or the version in use is no longer the one the step compared it with."""
+    version: HarnessVersion = await store.get_harness_version(version_id)
+    if version.state in _OWNER_WORDS:
+        return f"{version.id} is {_OWNER_WORDS[version.state]}, as you left it while the step ran"
+    try:
+        check_adoptable(version, held)
+    except InvalidValueError:
+        return "left to you: the gate for learned texts refuses its text now"
+    return "left to you: what is in use changed while the step ran"
+
+
 async def pick_run(store: Store, since: float) -> RunRecord | None:
-    """The newest run of the owner's that ended after ``since`` and that a reflection would read (a task or research
-    run of its own that ended), or ``None``."""
-    runs: list[RunRecord] = [run for run in await store.runs_finished_since(since) if wants_reflection(run)]
+    """The newest run of the owner's that ended after ``since`` and that a step may learn from (:func:`learns_from`),
+    or ``None``."""
+    runs: list[RunRecord] = [run for run in await store.runs_finished_since(since) if learns_from(run)]
     return max(runs, key=lambda run: run.finished_at or 0.0, default=None)
 
 
@@ -111,6 +157,9 @@ def _cards(report: ProbeReport) -> list[tuple[object, ...]]:
             card.output_tokens,
             card.tool_errors,
             card.seconds,
+            card.approvals_asked,
+            card.checks_passed,
+            card.checks_total,
         )
         for card in report.cards
     ]
@@ -152,8 +201,11 @@ async def _retire(store: Store, versions: Sequence[HarnessVersion], now: float, 
 async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober: Prober, now: float) -> _Outcome:
     store: Store = runtime.store
     config: HarnessConfig = runtime.config.harness
+    # The values Dot holds, which a probe's own home cannot know: a stored text is played, or shown to a role, only as
+    # :func:`given_text` leaves it (the gate with them), so that what is scored is what a run would take (item 587).
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
     base: HarnessVersion | None = await adopted(store)
-    base_text: HarnessText = NO_HARNESS if base is None else text_of(base)
+    base_text: GivenText = NO_HARNESS if base is None else given_text(base, held)
     from_run: str | None = step.from_run
     if from_run is None:
         return _Outcome(
@@ -174,7 +226,7 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
 
     async def write_experience(probed: HarnessVersion | None) -> None:
         try:
-            await _write_experience(runtime, step, from_run, base_text, candidates, contrasts, probed)
+            await _write_experience(runtime, step, from_run, base_text, candidates, contrasts, probed, held)
         except DotError as exc:
             log.warning("harness_experience_failed", step=step.id, error=exc.message)
             errors.append(f"the experience writer failed: {exc.message}")
@@ -184,13 +236,16 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
     started: float = time.monotonic()
     spent: int = 0
 
-    async def played(label: str, text: HarnessText, version_id: str | None) -> ProbeReport:
+    async def played(label: str, version: HarnessVersion | None, repeats: int = plan.repeats) -> ProbeReport:
+        """``version`` (``None``: Dot's own text alone) played as ``label`` ``repeats`` times on each task, within what
+        is left of the budget. What is played is its text as :func:`given_text` leaves it, never the text as stored:
+        this is the only way a version reaches a probe in a step."""
         nonlocal spent
         ask: ProbeAsk = ProbeAsk(
             label=label,
-            text=text,
+            text=NO_HARNESS if version is None else given_text(version, held),
             tasks=plan.tasks,
-            repeats=plan.repeats,
+            repeats=repeats,
             model=plan.model,
             scripted=plan.scripted,
             max_minutes=max(0.0, plan.minutes - (time.monotonic() - started) / 60.0),
@@ -198,15 +253,18 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
         )
         report: ProbeReport = nothing_played(ask) if over_budget(ask, 0, 0.0, 0) is not None else await prober(ask)
         spent += report.tokens
-        await store.add_harness_probes(step.id, version_id, label, _cards(report), time.time())
+        await store.add_harness_probes(
+            step.id, None if version is None else version.id, label, _cards(report), time.time()
+        )
         return report
 
-    base_report: ProbeReport = await played(BASE, base_text, None if base is None else base.id)
+    base_report: ProbeReport = await played(BASE, base)
     contrasts: list[Contrast] = []
     by_label: dict[str, HarnessVersion] = {}
 
     async def contrasted(candidate: HarnessVersion) -> Contrast:
-        found: Contrast = contrast(base_report, await played(candidate.id, text_of(candidate), candidate.id))
+        found: Contrast = contrast(base_report, await played(candidate.id, candidate), config.step_margin)
+
         contrasts.append(found)
         by_label[candidate.id] = candidate
         await store.set_harness_notes(
@@ -232,9 +290,14 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
     if chosen is None:
         await _retire(store, candidates, time.time(), "no better than the base on the scoring set")
         await write_experience(None)
+        # A candidate that could not be told from a lucky attempt, or whose probe was cut short, says why (item 589).
+        unclear: str = "; ".join(f"{found.label} is unclear: {found.why}" for found in contrasts if found.why)
         return _Outcome(
             state="keep",
-            facts={**facts_now(), "decision": "the base is kept: no candidate did better"},
+            facts={
+                **facts_now(),
+                "decision": f"the base is kept: no candidate did better{f' ({unclear})' if unclear else ''}",
+            },
             error="; ".join(errors) or None,
         )
     winners: list[Contrast] = [found for found in contrasts if found.verdict == "better"]
@@ -244,7 +307,7 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
         composed: HarnessVersion | None
         try:
             composed = await _compose(
-                runtime, step, from_run, base_text, [by_label[found.label] for found in winners], winners
+                runtime, step, from_run, base_text, [by_label[found.label] for found in winners], winners, held
             )
         except DotError as exc:
             log.warning("harness_composer_failed", step=step.id, error=exc.message)
@@ -280,20 +343,52 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
     )
     await write_experience(probed)
     adopted_now: bool = False
+    confirmation: str | None = None
+
+    async def confirm() -> Contrast:
+        """The base and the survivor played again on new attempts, :data:`CONFIRM_FACTOR` times as many as the step's
+        own: luck gave a text that changes nothing a better score in a step in six to twenty-seven, and gives it twice
+        in a row in one in fifty. Recorded in the survivor's notes (the owner reads the tasks there) and in the step."""
+        again: int = plan.repeats * CONFIRM_FACTOR
+        base_again: ProbeReport = await played(CONFIRM_BASE, base, again)
+        survivor_again: ProbeReport = await played(confirm_label(probed.id), probed, again)
+        found: Contrast = confirm_contrast(base_again, survivor_again, config.step_margin)
+        current: HarnessVersion = await store.get_harness_version(probed.id)
+        await store.set_harness_notes(probed.id, notes_with(current.notes, {"confirmation": contrast_detail(found)}))
+        return found
+
     # The owner already decided about the survivor while the step ran: nothing is left to adopt or to leave to them.
     if not decided and adopts_on_its_own(config.adopt, survivor, plan.repeats, case.tainted, failed=bool(errors)):
-        replaced: HarnessVersion | None = await adopt_replacing(
-            store, probed.id, None if base is None else base.id, time.time(), await asyncio.to_thread(known_secrets)
-        )
-        adopted_now = replaced is not None
-        if not adopted_now:
-            decision = f"{decision}; left to you: what is in use changed while the step ran"
+        sure: Contrast | None = None
+        try:
+            sure = await confirm()
+        except DotError as exc:
+            log.warning("harness_confirmation_failed", step=step.id, error=exc.message)
+            errors.append(f"the confirmation failed: {exc.message}")
+            decision = f"{decision}; left to you: the confirmation on new attempts failed"
+        if sure is not None:
+            confirmation = contrast_detail(sure)
+            if sure.verdict == "better":
+                decision = f"{decision}; confirmed on new attempts ({contrast_text(sure)})"
+                replaced: HarnessVersion | None = await adopt_replacing(
+                    store, probed.id, None if base is None else base.id, time.time(), held
+                )
+                adopted_now = replaced is not None
+                if not adopted_now:
+                    decision = f"{decision}; {await _why_not_adopted(store, probed.id, held)}"
+            else:
+                decision = (
+                    f"{decision}; left to you: it was not better again on new attempts, which a better text is "
+                    f"({contrast_text(sure)})"
+                )
     elif not decided and config.adopt == "auto":
         if case.tainted:
             decision = f"{decision}; left to you: the run had read content others can author"
         elif errors:
             decision = f"{decision}; left to you: the step failed after the probes"
     facts: dict[str, JsonValue] = {**facts_now(), "decision": decision, "probed": probed.id}
+    if confirmation is not None:
+        facts["confirmation"] = confirmation
     if adopted_now:
         facts["adopted"] = True
     return _Outcome(state="done", facts=facts, error="; ".join(errors) or None)
@@ -303,25 +398,28 @@ async def _compose(
     runtime: Runtime,
     step: HarnessStep,
     from_run: str,
-    base_text: HarnessText,
+    base_text: GivenText,
     winners: Sequence[HarnessVersion],
     found: Sequence[Contrast],
+    held: Sequence[str],
 ) -> HarnessVersion | None:
     """One version of the winning candidates by the composer, written as a candidate for the step to probe in its turn;
     ``None`` when the composer keeps the base, which leaves the best candidate as the survivor. A composer that fails
-    raises its error, which the step records."""
+    raises its error, which the step records. The composer is shown the texts of the candidates as :func:`given_text`
+    leaves them (``held`` are the values Dot holds), and the composed text is written with the same values asked."""
     run: RunRecord = await runtime.store.get_run(from_run)
+    shown: list[GivenText] = [given_text(candidate, held) for candidate in winners]
     briefs: tuple[CandidateBrief, ...] = tuple(
         CandidateBrief(
             number=number,
             scope=_scope_of(candidate),
             summary=candidate.summary,
-            habits=candidate.habits,
-            tool_guidance=candidate.tool_guidance,
+            habits=text.habits,
+            tool_guidance=text.tool_guidance,
             moments=_moments_of(candidate),
             contrast=contrast_text(each),
         )
-        for number, (candidate, each) in enumerate(zip(winners, found, strict=True), start=1)
+        for number, (candidate, text, each) in enumerate(zip(winners, shown, found, strict=True), start=1)
     )
     request: CompositionRequest = CompositionRequest(
         goal=run.goal,
@@ -352,7 +450,7 @@ async def _compose(
             },
             ensure_ascii=False,
         ),
-        known_secrets(),
+        held,
     )
     return composed
 
@@ -411,17 +509,19 @@ async def _write_experience(
     runtime: Runtime,
     step: HarnessStep,
     from_run: str,
-    base_text: HarnessText,
+    base_text: GivenText,
     candidates: Sequence[HarnessVersion],
     contrasts: Sequence[Contrast],
     probed: HarnessVersion | None,
+    held: Sequence[str],
 ) -> None:
     """What each candidate's edit did, by the experience writer, and the experience it kept, if any; a writer that
-    fails raises its error, which the step records."""
+    fails raises its error, which the step records. The components a candidate changed are told by the texts as
+    :func:`given_text` leaves them, as the base is."""
     by_label: dict[str, Contrast] = {found.label: found for found in contrasts}
     edits: tuple[EditOutcome, ...] = tuple(
         EditOutcome(
-            component=", ".join(_changed(base_text, text_of(candidate))) or "nothing",
+            component=", ".join(_changed(base_text, given_text(candidate, held))) or "nothing",
             change=candidate.summary,
             observed=contrast_text(by_label[candidate.id]) if candidate.id in by_label else "not probed",
         )
@@ -466,6 +566,21 @@ async def _since_last_step(store: Store, now: float) -> float:
     return now - _LOOKBACK_S
 
 
+async def _prune(store: Store, config: HarnessConfig, now: float) -> None:
+    """Delete the loop's own records older than ``[harness] keep_days`` days before ``now``, but for the adopted version
+    and its lineage (:meth:`Store.prune_harness`, item 589): what a step writes every night is bounded here, where it
+    grows. A store that refuses the deletion is logged and tried again by the next step, as nothing else waits on it."""
+    if config.keep_days == 0:
+        return
+    try:
+        gone: HarnessPruned = await store.prune_harness(now - config.keep_days * _DAY_S)
+    except DotError as exc:
+        log.warning("harness_prune_failed", error=exc.message, context=exc.context)
+        return
+    if gone.versions or gone.steps or gone.probes or gone.experiences:
+        log.info("harness_pruned", keep_days=config.keep_days, **gone.model_dump())
+
+
 async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: Prober, scripted: bool) -> HarnessStep:
     """One step at ``now``, learning from ``from_run`` or from the newest run of the owner's that ended since the last
     step, its probes played by ``prober`` (apart from the daemon, or in this process for a process that runs nothing
@@ -489,10 +604,12 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
         await store.finish_harness_step(step.id, time.time(), "failed", "{}", f"{type(exc).__name__}: {exc}")
         raise
     facts: dict[str, JsonValue] = {**outcome.facts, **({"scripted": True} if plan.scripted else {})}
-    return await store.finish_harness_step(
+    finished: HarnessStep = await store.finish_harness_step(
         step.id,
         time.time(),
         "failed" if outcome.error is not None else outcome.state,
         json.dumps(facts, ensure_ascii=False),
         outcome.error,
     )
+    await _prune(store, runtime.config.harness, now)
+    return finished

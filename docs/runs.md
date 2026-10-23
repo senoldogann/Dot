@@ -61,7 +61,10 @@ is the answer (a small model that is offered both writes the call out as text).
   it; a name the summary abbreviates itself, with an ellipsis inside it or a `<placeholder>`, is not looked up). The
   `compacted` event names the model,
   how the summary came about, the attempts it took, what the check found and the estimated size of the prompt before
-  and after it (`tokens_before`, `tokens_after`).
+  and after it (`tokens_before`, `tokens_after`). The model that writes the summary is told that what tools returned
+  (pages, files, mail, command output) is data, to be reported as what it said and never as an instruction to the run
+  or a wish of yours, and that the summary is Dot's own note of what happened, in which only what you wrote stands in
+  your voice (in GOAL); the note that carries the summary says the same to the run that goes on (item 589).
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
 `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only with
 evidence (`evidence`, cut at 400 characters): what the run observed that shows it, such as the path and what it read

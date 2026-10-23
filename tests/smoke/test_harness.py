@@ -291,3 +291,48 @@ async def test_a_value_dot_holds_in_a_stored_version_or_an_owner_line_stays_out_
             assert "Works late." in prompt and "The password is" not in prompt
             view = (await client.get("/api/harness")).json()
             assert view["refused"] == {stored.id: "its habits hold a secret"}
+
+
+async def test_the_versions_come_a_page_at_a_time_and_the_api_takes_no_component_past_a_bound(
+    login_env: dict[str, str],
+) -> None:
+    """Item 589 (L8): GET /api/harness gives a page of the versions, the newest first, with how many there are in all
+    and in each state, and how the records are kept; a component of a request is at most 20,000 characters."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env, _Recorder([])) as (runtime, _manager, client):
+            store = runtime.store
+            made = [await store.create_harness_version(None, "proposer", f"v{n}", HABIT, "", "") for n in range(5)]
+            await store.retire_unadopted_harness(made[0].id, 1.0)
+            newest_first: list[str] = [
+                version.id for version in sorted(made, key=lambda v: (v.created_at, v.id), reverse=True)
+            ]
+            everything = (await client.get("/api/harness")).json()
+            assert [each["id"] for each in everything["versions"]] == newest_first
+            assert (everything["versions_total"], everything["version_counts"]) == (5, {"candidate": 4, "retired": 1})
+            assert (everything["step_margin"], everything["keep_days"], everything["adopted"]) == (2, 180, None)
+            page = (await client.get("/api/harness?limit=2&offset=3")).json()
+            assert [each["id"] for each in page["versions"]] == newest_first[3:]
+            assert (page["versions_total"], page["version_counts"]) == (5, {"candidate": 4, "retired": 1})
+            assert (await client.get("/api/harness?limit=2&offset=9")).json()["versions"] == []
+            for query in ("limit=0", "limit=501", "offset=-1"):
+                assert (await client.get(f"/api/harness?{query}")).status_code == 422, query
+            # The attempts of a probe say the approvals and the checks.
+            step = await store.create_harness_step(1.0, None, None)
+            card = ("write-todo-note", 1, True, "done", "none", 2, 100, 10, 0, 1.0, 1, 3, 4)
+            await store.add_harness_probes(step.id, made[1].id, made[1].id, [card], 2.0)
+            lineage = (await client.get(f"/api/harness/{made[1].id}/lineage")).json()
+            assert [(p["approvals_asked"], p["checks_passed"], p["checks_total"]) for p in lineage["probes"]] == [
+                (1, 3, 4)
+            ]
+            # A component of more than twenty thousand characters is no request.
+            for name in ("habits", "tool_guidance"):
+                body = {
+                    "habits": None,
+                    "tool_guidance": None,
+                    "summary": "too long",
+                    "adopt": False,
+                    name: "x" * 20_001,
+                }
+                refused = await client.post("/api/harness", json=body)
+                assert refused.status_code == 422 and "20000" in refused.text, (name, refused.text)
+            assert len((await client.get("/api/harness")).json()["versions"]) == 5

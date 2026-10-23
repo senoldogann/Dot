@@ -22,9 +22,9 @@ from pathlib import Path
 from typing import Concatenate, Literal
 
 import aiosqlite
-from pydantic import TypeAdapter
+from pydantic import JsonValue, TypeAdapter
 
-from dotagent.core.errors import InvalidValueError, NotFoundError, RunConflict, StoreError
+from dotagent.core.errors import InvalidValueError, JsonParseError, NotFoundError, RunConflict, StoreError
 from dotagent.core.ids import new_id
 from dotagent.core.jsonutil import dumps_compact, parse_json_object, parse_json_value
 from dotagent.core.logs import get_logger
@@ -56,6 +56,7 @@ from dotagent.store.models import (
     FollowUpOf,
     HarnessExperience,
     HarnessProbe,
+    HarnessPruned,
     HarnessState,
     HarnessStep,
     HarnessStepState,
@@ -543,6 +544,36 @@ def _harness_version(row: aiosqlite.Row) -> HarnessVersion:
     )
 
 
+def _composed_of(notes: str) -> list[str]:
+    """The ids of the versions a version's notes say it was composed of; none for notes that say nothing of it or that
+    are not JSON (a version is kept by its lineage, and a lineage that cannot be read is no reason to keep more)."""
+    try:
+        parsed: JsonValue = parse_json_value(notes, "a version's notes") if notes else {}
+    except JsonParseError:
+        return []
+    parts: JsonValue = parsed.get("composed_of") if isinstance(parsed, dict) else None
+    return [part for part in parts if isinstance(part, str)] if isinstance(parts, list) else []
+
+
+def _versions_of_step(base_version: object, outcome: str) -> set[str]:
+    """The versions a step touched, as :meth:`Store.harness_steps_of_version` reads them: the one its probes were
+    compared with, its candidates and the one it probed."""
+    named: set[str] = set() if base_version is None else {str(base_version)}
+    try:
+        facts: JsonValue = parse_json_value(outcome, "a step's outcome") if outcome else {}
+    except JsonParseError:
+        return named
+    if not isinstance(facts, dict):
+        return named
+    candidates: JsonValue = facts.get("candidates")
+    if isinstance(candidates, list):
+        named.update(candidate for candidate in candidates if isinstance(candidate, str))
+    probed: JsonValue = facts.get("probed")
+    if isinstance(probed, str):
+        named.add(probed)
+    return named
+
+
 def _harness_step(row: aiosqlite.Row) -> HarnessStep:
     return HarnessStep(
         id=row["id"],
@@ -573,6 +604,9 @@ def _harness_probe(row: aiosqlite.Row) -> HarnessProbe:
         tool_errors=row["tool_errors"],
         seconds=row["seconds"],
         created_at=row["created_at"],
+        approvals_asked=row["approvals_asked"],
+        checks_passed=row["checks_passed"],
+        checks_total=row["checks_total"],
     )
 
 
@@ -1004,6 +1038,13 @@ _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
     # What a reaction's follow-up is a follow-up of (item 586; a ``FollowUpOf`` as JSON, NULL for any other message).
     ("follow_up", "TEXT"),
 )
+# Columns of ``harness_probes`` added later (item 589): the approvals the attempt's run asked, and how many of the
+# task's checks held of how many; an attempt recorded before holds none of the three.
+_ADDED_HARNESS_PROBE_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("approvals_asked", "INTEGER NOT NULL DEFAULT 0"),
+    ("checks_passed", "INTEGER NOT NULL DEFAULT 0"),
+    ("checks_total", "INTEGER NOT NULL DEFAULT 0"),
+)
 # Columns of ``harness_experiences`` added later: whether the run the experience was written from had read content
 # third parties can author (item 392), which keeps it from the proposer.
 _ADDED_HARNESS_EXPERIENCE_COLUMNS: tuple[tuple[str, str], ...] = (("tainted", "INTEGER NOT NULL DEFAULT 0"),)
@@ -1067,6 +1108,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
     await _add_columns(connection, "queued_messages", _ADDED_QUEUE_COLUMNS)
     await _add_columns(connection, "harness_experiences", _ADDED_HARNESS_EXPERIENCE_COLUMNS)
+    await _add_columns(connection, "harness_probes", _ADDED_HARNESS_PROBE_COLUMNS)
     await _add_columns(connection, "agents", _ADDED_AGENT_COLUMNS)
     if "scope_thread_id" in await _add_columns(connection, "approvals", _ADDED_APPROVAL_COLUMNS):
         # A step kept before item 484 belongs to the chat of the run that kept it.
@@ -1307,10 +1349,18 @@ class Store:
             raise NotFoundError("harness version not found", {"version_id": version_id})
         return _harness_version(row)
 
-    async def list_harness_versions(self) -> list[HarnessVersion]:
-        """Every version of the harness, the newest first."""
-        rows = await self._all("SELECT * FROM harness_versions ORDER BY created_at DESC, id DESC", ())
+    async def list_harness_versions(self, limit: int = -1, offset: int = 0) -> list[HarnessVersion]:
+        """The versions of the harness, the newest first: every one, or ``limit`` of them after the first ``offset``
+        (item 589: a page of them; a negative ``limit`` is no limit)."""
+        rows = await self._all(
+            "SELECT * FROM harness_versions ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?", (limit, offset)
+        )
         return [_harness_version(row) for row in rows]
+
+    async def count_harness_versions(self) -> dict[str, int]:
+        """How many versions there are in each state (those with none are left out), past the page a list shows."""
+        rows = await self._all("SELECT state, COUNT(*) AS n FROM harness_versions GROUP BY state", ())
+        return {str(row["state"]): int(row["n"]) for row in rows}
 
     async def adopted_harness_id(self) -> str | None:
         """The id of the adopted version, or ``None`` while a run's prompt is Dot's own text alone."""
@@ -1503,11 +1553,11 @@ class Store:
         self, step_id: str, version_id: str | None, label: str, cards: Sequence[tuple[object, ...]], created_at: float
     ) -> None:
         """Keep the attempts of a probe: each of ``cards`` is ``(task_id, attempt, passed, status, cut, steps,
-        input_tokens, output_tokens, tool_errors, seconds)``."""
+        input_tokens, output_tokens, tool_errors, seconds, approvals_asked, checks_passed, checks_total)``."""
         await self._db.executemany(
             "INSERT INTO harness_probes(step_id, version_id, label, task_id, attempt, passed, status, cut, steps,"
-            " input_tokens, output_tokens, tool_errors, seconds, created_at)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " input_tokens, output_tokens, tool_errors, seconds, approvals_asked, checks_passed, checks_total,"
+            " created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [(step_id, version_id, label, *card, created_at) for card in cards],
         )
         await self._db.commit()
@@ -1591,6 +1641,84 @@ class Store:
             (limit, offset),
         )
         return [_harness_experience(row) for row in rows]
+
+    async def prune_harness(self, before: float) -> HarnessPruned:
+        """Delete the records of the improvement loop older than ``before`` (item 589), in one unit: the versions put
+        aside, the steps that began and the experiences written, and with them the attempts of the probes of a step or a
+        version deleted. Never the adopted version and its lineage: its ancestors (``parent_id``), the versions it was
+        composed of (``composed_of`` in its notes and in theirs), the steps that touched any of them (as the base of
+        their probes, a candidate or the probed version) and the experiences about them, so that what is in use can
+        always be read back to where it came from. A version that is a candidate or a probed one waits for the owner and
+        is never deleted here, and nor is its own lineage, the same: a composed survivor that waits past the days keeps
+        the candidates it was composed of, or it would read as written from content it was not (``taint_of`` finds a
+        part gone, which it counts as a taint). A version set aside since ``before``, which its age keeps, keeps its
+        lineage as long, for the same reason."""
+
+        async def statements() -> HarnessPruned:
+            adopted: aiosqlite.Row | None = await self._one(
+                "SELECT value FROM kv WHERE key = ?", (HARNESS_ADOPTED_KEY,)
+            )
+            versions: dict[str, aiosqlite.Row] = {
+                str(row["id"]): row
+                for row in await self._all(
+                    "SELECT id, parent_id, state, created_at, retired_at, notes FROM harness_versions", ()
+                )
+            }
+            lineage: set[str] = set()
+            # The roots of what is kept: the version in use, every one that waits for the owner, and every one set
+            # aside since ``before``, which its age keeps: each keeps its lineage for as long as it is kept.
+            pending: list[str] = [
+                *([] if adopted is None else [str(adopted["value"])]),
+                *(
+                    version_id
+                    for version_id, row in versions.items()
+                    if row["state"] != "retired"
+                    or (row["created_at"] if row["retired_at"] is None else row["retired_at"]) >= before
+                ),
+            ]
+            while pending:
+                found: str = pending.pop()
+                if found in lineage or found not in versions:
+                    continue
+                lineage.add(found)
+                parent: object = versions[found]["parent_id"]
+                if parent is not None:
+                    pending.append(str(parent))
+                pending.extend(_composed_of(str(versions[found]["notes"])))
+            old_versions: list[str] = [
+                version_id
+                for version_id, row in versions.items()
+                if row["state"] == "retired"
+                and (row["created_at"] if row["retired_at"] is None else row["retired_at"]) < before
+                and version_id not in lineage
+            ]
+            old_steps: list[str] = [
+                str(row["id"])
+                for row in await self._all(
+                    "SELECT id, base_version, outcome FROM harness_steps WHERE started_at < ?", (before,)
+                )
+                if not lineage.intersection(_versions_of_step(row["base_version"], str(row["outcome"])))
+            ]
+            probes: int = 0
+            for step_id in old_steps:
+                probes += (await self._db.execute("DELETE FROM harness_probes WHERE step_id = ?", (step_id,))).rowcount
+                await self._db.execute("DELETE FROM harness_steps WHERE id = ?", (step_id,))
+            for version_id in old_versions:
+                probes += (
+                    await self._db.execute("DELETE FROM harness_probes WHERE version_id = ?", (version_id,))
+                ).rowcount
+                await self._db.execute("DELETE FROM harness_versions WHERE id = ?", (version_id,))
+            kept: str = ",".join("?" * len(lineage))
+            experiences: aiosqlite.Cursor = await self._db.execute(
+                "DELETE FROM harness_experiences WHERE created_at < ?"
+                + (f" AND (version_id IS NULL OR version_id NOT IN ({kept}))" if lineage else ""),
+                (before, *sorted(lineage)),
+            )
+            return HarnessPruned(
+                versions=len(old_versions), steps=len(old_steps), probes=probes, experiences=experiences.rowcount
+            )
+
+        return await self._unit(statements)
 
     async def count_harness_experiences(self) -> int:
         """How many experiences the library keeps in all (item 527), past the newest a list shows."""
@@ -2404,6 +2532,16 @@ class Store:
             (run_id, run_id),
         )
         return 0 if row is None else int(row["n"])
+
+    async def delegated_usage(self, run_id: str) -> tuple[int, int]:
+        """The input and the output tokens of the runs started on behalf of ``run_id`` (the runs it delegated to), as
+        their totals stand now: what :meth:`family_tokens` adds to the run's own."""
+        row = await self._one(
+            "SELECT COALESCE(SUM(input_tokens), 0) AS spent_in, COALESCE(SUM(output_tokens), 0) AS spent_out"
+            " FROM runs WHERE parent_run_id = ?",
+            (run_id,),
+        )
+        return (0, 0) if row is None else (int(row["spent_in"]), int(row["spent_out"]))
 
     async def active_run_owners(self) -> list[str | None]:
         """The owners of the runs that are active (queued, running, or blocked on a question), each once; ``None`` for

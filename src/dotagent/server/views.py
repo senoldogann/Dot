@@ -199,6 +199,13 @@ class RunsQuery(FrozenModel):
     thread_id: str | None = None
 
 
+class HarnessQuery(FrozenModel):
+    """``GET /api/harness``: the versions of the harness a page at a time, the newest first (item 589)."""
+
+    limit: int = Field(default=100, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
+
+
 class AwayQuery(FrozenModel):
     """The moment "while you were away" reads from (item 466), in seconds since the epoch; the server keeps it within
     the last :data:`~dotagent.server.away.AWAY_WINDOW_S`."""
@@ -779,18 +786,22 @@ class LearningHealthView(FrozenModel):
 
 class HarnessView(FrozenModel):
     """``GET /api/harness`` (item 389, docs/harness.md): the adopted version, ``None`` while a run's prompt is Dot's
-    own text alone, every version the newest first, which of these (the adopted one included) come from content
-    others can author and why (``from_outside``, by version id: the notes of a version and of the ones it was
-    composed of, item 588) and which hold a text the gate for learned texts refuses now (``refused``, by version
-    id, in words: such a version is not adopted and a prompt leaves the component out, item 587), the bounds a
-    component keeps to, and how the nightly step is set (item 393): when it runs ("off" never), the scoring and
-    final sets, the repeats, and who adopts a version the probe showed better; and how many steps and experiences
-    there are in all (item 527), as their lists stop at the newest."""
+    own text alone, a page of the versions, the newest first (``limit`` and ``offset``, item 589; ``versions_total`` of
+    them in all, ``version_counts`` of each state), which of these (the adopted one included) come from content others
+    can author and why (``from_outside``, by version id: the notes of a version and of the ones it was composed of,
+    item 588) and which hold a text the gate for learned texts refuses now (``refused``, by version id, in words: such a
+    version is not adopted and a prompt leaves the component out, item 587), the bounds a component keeps to, and how
+    the nightly step is set (item 393): when it runs ("off" never), the scoring and final sets, the repeats, the margin
+    of passes a candidate needs to count as better, who adopts a version the probe showed better and how many days the
+    loop's records are kept (item 589); and how many steps and experiences there are in all (item 527), as their lists
+    stop at the newest."""
 
     adopted: HarnessVersion | None
     versions: tuple[HarnessVersion, ...]
     from_outside: dict[str, tuple[str, ...]]
     refused: dict[str, str]
+    versions_total: int
+    version_counts: dict[str, int]
     habits_chars: int
     tool_guidance_chars: int
     component_lines: int
@@ -798,17 +809,21 @@ class HarnessView(FrozenModel):
     scoring_tasks: tuple[str, ...]
     final_tasks: tuple[str, ...]
     step_repeats: int
+    step_margin: int
     adopt: Literal["owner", "auto"]
+    keep_days: int
     steps_total: int
     experiences_total: int
 
 
 class HarnessRequest(FrozenModel):
     """``POST /api/harness``: a version of the owner's. A component given replaces the adopted version's text, one left
-    out (``None``) keeps it; ``summary`` says in a line what the version is; ``adopt`` adopts it at once."""
+    out (``None``) keeps it; ``summary`` says in a line what the version is; ``adopt`` adopts it at once. A component is
+    at most :data:`_TEXT_CHARS` characters here (item 589), far past what ``[harness]`` lets one be: the bound keeps a
+    request that is no text from being read, and ``habits_chars`` and ``tool_guidance_chars`` say the rest."""
 
-    habits: str | None
-    tool_guidance: str | None
+    habits: Annotated[str, StringConstraints(max_length=_TEXT_CHARS)] | None
+    tool_guidance: Annotated[str, StringConstraints(max_length=_TEXT_CHARS)] | None
     summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
     adopt: bool
 
