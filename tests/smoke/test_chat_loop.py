@@ -333,3 +333,62 @@ async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_
                 await page.close()
         finally:
             await browser.close()
+
+
+@pytest.mark.browser
+async def test_the_loops_of_a_chat_fold_under_their_head_and_keep_their_stops_in_one_column(tmp_path: Path) -> None:
+    """Item 591, from the owner's phone: the Stops of a chat's loops stood at different places, each row's words pushing
+    its own, and four loops took the room over the composer. The Stops stand in one column; the rows fold under a head
+    that says how many loops there are and, folded, when the next one asks; the fold is kept across a reload."""
+    turns: tuple[ScriptedTurn, ...] = tuple(_finish(f"Answer {number}.") for number in range(1, 8))
+    async with _daemon(turns) as (manager, address), async_playwright() as playwright:
+        run: RunRecord = await _first_run(manager)
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            for index, (width, scheme) in enumerate(_SHOTS):
+                page: Page = await _page(browser, address, width, scheme)
+                await page.goto(f"{address}/#/runs/{run.id}")
+                loops: Locator = page.get_by_role("region", name="Loops of this chat")
+                box: Locator = page.locator(".dock textarea")
+                if index == 0:
+                    # Each loop's message goes at once as the chat's next run; the next loop waits for its answer.
+                    lines: tuple[str, ...] = (
+                        "/loop 30m check the build",
+                        "/loop 2h water the plants in the greenhouse",
+                    )
+                    for answer, line in enumerate(lines, 2):
+                        await box.fill(line)
+                        await box.press("Enter")
+                        await expect(loops).to_contain_text(line.split(" ", 2)[2][:12])
+                        await expect(page.locator(".run-thread")).to_contain_text(f"Answer {answer}.")
+                rows: Locator = loops.locator(".loop-row")
+                await expect(rows).to_have_count(2)
+                head: Locator = loops.get_by_role("button", name=re.compile(r"^Loops 2"))
+                await expect(head).to_have_attribute("aria-expanded", "true")
+                # Every Stop ends where the others do, whatever the words beside it.
+                stops: list[float] = []
+                for at in range(2):
+                    found = await rows.nth(at).get_by_role("button", name=re.compile(r"^Stop the loop")).bounding_box()
+                    assert found is not None
+                    stops.append(found["x"] + found["width"])
+                assert abs(stops[0] - stops[1]) <= 1, stops
+                await page.screenshot(path=tmp_path / f"loops-open-{width}-{scheme}.png")
+                # Folded, the head alone stands, saying when the next one asks; the fold outlives a reload.
+                await head.click()
+                await expect(head).to_have_attribute("aria-expanded", "false")
+                await expect(rows.first).to_be_hidden()
+                await expect(head).to_contain_text(re.compile(r"next (\w{3} )?\d"))
+                await page.screenshot(path=tmp_path / f"loops-folded-{width}-{scheme}.png")
+                await page.reload()
+                head = page.get_by_role("region", name="Loops of this chat").get_by_role(
+                    "button", name=re.compile(r"^Loops 2")
+                )
+                await expect(head).to_have_attribute("aria-expanded", "false")
+                await head.click()
+                await expect(page.get_by_role("region", name="Loops of this chat").locator(".loop-row")).to_have_count(
+                    2
+                )
+                await expect(head).to_have_attribute("aria-expanded", "true")
+                await page.close()
+        finally:
+            await browser.close()

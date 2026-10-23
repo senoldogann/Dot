@@ -6338,8 +6338,54 @@ a.memory-line:hover .memory-change {
   font-variant-numeric: tabular-nums;
 }
 
-/* A loop's row (item 281): its message keeps room beside how often it asks again and when next, which give way
-   first on a phone. */
+/* The head of the loops (item 591): a button that folds their rows away, with how many there are and, folded, when
+   the next one asks, in the rows' own line. */
+.chat-loops > .chat-loops-toggle {
+  width: 100%;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 var(--space-2);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+/* The sheet is the toggle's own hover ground, so a hovered head takes a tint of the text over it, as a sidebar row does. */
+.chat-loops > .chat-loops-toggle:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+}
+
+.chat-loops-count,
+.chat-loops-next {
+  color: var(--muted);
+  font-weight: var(--weight-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-loops-next {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+}
+
+/* A loop's row (item 281): its dot, its words and its Stop in three columns, so that the Stops of the rows stand in
+   one line whatever the words beside them (item 591); its message keeps room beside how often it asks again and when
+   next, which give way first. */
+.loop-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.loop-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 .chat-loops .background-label {
   min-width: 6em;
 }
@@ -6349,6 +6395,21 @@ a.memory-line:hover .memory-change {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* On a phone the message stands over how often it asks again, each on a line of its own, where both were cut short on
+   one (item 591). */
+@media (max-width: 720px) {
+  .loop-text {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding-block: var(--space-1);
+  }
+
+  .chat-loops .background-label {
+    min-width: 0;
+  }
 }
 
 /* A list that could not be read says why, with a way to read it again. */
