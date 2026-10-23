@@ -220,9 +220,11 @@ async def test_a_subscription_gets_the_question_and_the_end_and_goes_when_its_se
         "/api/push/subscriptions", json={"endpoint": push_service.plain_endpoint, "keys": _browser_keys()}
     )
     assert refused.status_code == 422, "a push service is reached over HTTPS only"
-    # The test's push service speaks plain HTTP: the watcher is pointed at it through the endpoint it posts to.
+    # The test's push service speaks plain HTTP: the watcher is pointed at it through the endpoint it posts to. iOS
+    # sends ``expirationTime`` with its subscription (item 548): it is accepted and kept by nothing.
     added: httpx.Response = await client.post(
-        "/api/push/subscriptions", json={"endpoint": push_service.endpoint, "keys": _browser_keys()}
+        "/api/push/subscriptions",
+        json={"endpoint": push_service.endpoint, "expirationTime": None, "keys": _browser_keys()},
     )
     assert added.status_code == 201, added.text
     subscriptions = await runtime.store.list_push_subscriptions()
