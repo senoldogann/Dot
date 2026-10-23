@@ -330,7 +330,8 @@ the section stays out of sight until the run uses one, item 546), **Artifacts** 
 added and removed lines, each opening the Changes tab where the diff is), **Web reading** (the pages it fetched and
 the searches it made, a page opening in a new tab; a fetch that failed is not a page it read) and **Memory updated**
 (the notes it saved, corrected or forgot, each opening its note in Settings › Memory). Each row wears its mark on a
-tile, a file the letters of its kind. In a tab of
+tile: a skill or a server its icon, a file its language's own logo (Simple Icons, version 16.35.0, CC0, under
+`icons/languages/`, item 547), or the letters of its kind where the language has no mark. In a tab of
 several sections each scrolls on its own once it holds more than two fifths of the screen, its head staying over it,
 and a tab of one section has the panel to itself (item 544). The Run tab lists no files of the conversation and no
 Details card since item 544: the files open from their chips and paths in the conversation, and the run's facts stand

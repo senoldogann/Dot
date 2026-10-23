@@ -116,7 +116,8 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                 assert [folder["name"] for folder in disk["folders"]][-1] == "Dot's home in all"
                 licences = (await client.get("/api/licences")).json()
                 assert any(item["name"].lower() == "fastapi" and item["licence"] for item in licences["packages"])
-                assert {"Inter", "GeistMono", "Lucide", "js/appearance", "js/character"} <= {
+                # The languages' logos carry Simple Icons' notice (item 547).
+                assert {"Inter", "GeistMono", "Lucide", "js/appearance", "js/character", "icons/languages"} <= {
                     notice["name"] for notice in licences["bundled"]
                 }
                 assert [tool["name"] for tool in licences["tools"]] == [

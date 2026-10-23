@@ -46,6 +46,92 @@ export function addUsage(list, usage) {
   return list.map((item, index) => (index === at ? { ...item, count: item.count + 1 } : item));
 }
 
+// The mark a file's kind wears (item 547), named as the file under `static/icons/languages` is: Simple Icons' slug.
+const LANGUAGE_MARKS = new Map([
+  ["py", "python"],
+  ["pyi", "python"],
+  ["pyw", "python"],
+  ["js", "javascript"],
+  ["mjs", "javascript"],
+  ["cjs", "javascript"],
+  ["jsx", "javascript"],
+  ["ts", "typescript"],
+  ["mts", "typescript"],
+  ["cts", "typescript"],
+  ["tsx", "typescript"],
+  ["json", "json"],
+  ["jsonc", "json"],
+  ["css", "css"],
+  ["scss", "sass"],
+  ["sass", "sass"],
+  ["html", "html5"],
+  ["htm", "html5"],
+  ["xml", "xml"],
+  ["svg", "svg"],
+  ["sh", "gnubash"],
+  ["bash", "gnubash"],
+  ["zsh", "gnubash"],
+  ["fish", "gnubash"],
+  ["rs", "rust"],
+  ["go", "go"],
+  ["java", "openjdk"],
+  ["kt", "kotlin"],
+  ["kts", "kotlin"],
+  ["c", "c"],
+  ["h", "c"],
+  ["cc", "cplusplus"],
+  ["cpp", "cplusplus"],
+  ["cxx", "cplusplus"],
+  ["hpp", "cplusplus"],
+  ["hh", "cplusplus"],
+  ["cs", "dotnet"],
+  ["php", "php"],
+  ["rb", "ruby"],
+  ["sql", "sqlite"],
+  ["toml", "toml"],
+  ["yaml", "yaml"],
+  ["yml", "yaml"],
+  ["md", "markdown"],
+  ["markdown", "markdown"],
+  ["mdx", "markdown"],
+  ["swift", "swift"],
+  ["dart", "dart"],
+  ["vue", "vuedotjs"],
+  ["svelte", "svelte"],
+  ["lua", "lua"],
+  ["r", "r"],
+  ["scala", "scala"],
+  ["ex", "elixir"],
+  ["exs", "elixir"],
+  ["hs", "haskell"],
+  ["pl", "perl"],
+  ["pm", "perl"],
+  ["clj", "clojure"],
+  ["cljs", "clojure"],
+  ["cljc", "clojure"],
+  ["ipynb", "jupyter"],
+  ["dockerfile", "docker"],
+  ["gradle", "gradle"],
+  ["cmake", "cmake"],
+]);
+
+// The files whose own name is their language's: they have no extension to read.
+const WHOLE_NAME_MARKS = new Map([
+  ["dockerfile", "docker"],
+  ["cmakelists.txt", "cmake"],
+]);
+
+/** The mark of a file's language (item 547), by its own name or extension: a slug of `static/icons/languages`, or null
+ * for a kind with no mark of its own, which wears its letters instead. */
+export function languageOf(path) {
+  const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+  const whole = WHOLE_NAME_MARKS.get(name);
+  if (whole !== undefined) {
+    return whole;
+  }
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? null : (LANGUAGE_MARKS.get(name.slice(dot + 1)) ?? null);
+}
 
 const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const HOST_AND_PORT = /^[\w-]+(\.[\w-]+)*:\d+/;

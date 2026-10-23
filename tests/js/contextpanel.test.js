@@ -4,7 +4,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { addMemory, addReadings, addUsage, readingsOf, usageOf } from "../../src/dotagent/server/static/js/contextpanel.js";
+import {
+  addMemory,
+  addReadings,
+  addUsage,
+  languageOf,
+  readingsOf,
+  usageOf,
+} from "../../src/dotagent/server/static/js/contextpanel.js";
 
 test("a page a tool opened or read, as a line and the address it points at", () => {
   assert.deepEqual(readingsOf("web_fetch", { url: "https://docs.python.org/3/library/asyncio.html?x=1#top" }), [
@@ -96,6 +103,22 @@ test("the used skills and servers are listed once, in the order they were first 
   ]);
   // A skill and a server of the same name are two rows.
   assert.equal(addUsage(list, { kind: "server", name: "review" }).length, 3);
+});
+
+test("a file's own name or extension names its language's mark, and only a kind with no mark falls back", () => {
+  assert.equal(languageOf("/tmp/probe_office2.py"), "python");
+  assert.equal(languageOf("src/app.TSX"), "typescript");
+  assert.equal(languageOf("notes/README.md"), "markdown");
+  assert.equal(languageOf("Cargo.toml"), "toml");
+  assert.equal(languageOf("src/lib.rs"), "rust");
+  assert.equal(languageOf("index.html"), "html5");
+  assert.equal(languageOf("settings.yml"), "yaml");
+  // Dockerfile and CMakeLists.txt are named by their whole name, with no extension to read.
+  assert.equal(languageOf("deploy/Dockerfile"), "docker");
+  assert.equal(languageOf("build/CMakeLists.txt"), "cmake");
+  assert.equal(languageOf("Makefile"), null);
+  assert.equal(languageOf("notes.unknown"), null);
+  assert.equal(languageOf(".gitignore"), null);
 });
 
 test("a note changed again is told once, as it stands now, newest first", () => {

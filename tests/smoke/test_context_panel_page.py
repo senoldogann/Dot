@@ -1,9 +1,9 @@
 """The context under the recap of a run's Run tab (item 539), in a real browser: an ended run shows the files its chat
 wrote under Artifacts, the page it fetched under Web reading (and not the one it did not get) and the note it saved
 under Memory updated, with the recap first and the time it was written; a row of Artifacts opens the Changes tab where
-the diff is. Each row wears its mark on a tile, and a file the letters of its kind. A run that used no skill and no MCP
-server shows no Skills & MCP section (item 546). At 1280 beside the conversation and at 390 in the phone's sheet, the
-panel no wider than the screen."""
+the diff is. Each row wears its mark on a tile, and a file its language's own logo (item 547). A run that used no skill
+and no MCP server shows no Skills & MCP section (item 546). At 1280 beside the conversation and at 390 in the phone's
+sheet, the panel no wider than the screen."""
 
 import asyncio
 import time
@@ -44,8 +44,9 @@ _SIZES: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (39
 
 
 def _turns(workspace: Path, tags: list[str], site: str) -> list[ScriptedTurn]:
-    """For each size: a run of four writes, a note saved, a page fetched and its answer, then the recap. Each size
-    writes its own files and saves its own note, so that neither run finds the other's already there."""
+    """For each size: a run of four writes, one in each of four languages, a note saved, a page fetched and its answer,
+    then the recap. Each size writes its own files and saves its own note, so that neither run finds the other's
+    already there."""
     turns: list[ScriptedTurn] = []
     for tag in tags:
         turns.extend(
@@ -54,11 +55,14 @@ def _turns(workspace: Path, tags: list[str], site: str) -> list[ScriptedTurn]:
                 calls=(
                     ScriptedCall(
                         tool="write_file",
-                        arguments={"path": str(workspace / f"note-{tag}-{n}.md"), "content": f"Note {tag} {n}\n"},
+                        arguments={
+                            "path": str(workspace / f"note-{tag}-{ext}"),
+                            "content": f"Note {tag} {ext.rpartition('.')[2]}\n",
+                        },
                     ),
                 ),
             )
-            for n in range(4)
+            for ext in ("0.py", "1.ts", "2.md", "3.rs")
         )
         turns.append(
             ScriptedTurn(
@@ -192,13 +196,23 @@ async def _one_size(
         recap: Locator = details.locator("#panel-run-recap")
         await expect(recap.locator(".recap-text p")).to_have_text(RECAP.split("\n"))
         await expect(recap.locator(".recap-meta")).to_contain_text("Updated")
-        # The files the chat wrote, each once, its kind on a tile, a row opening the Changes tab. A run that used no
-        # skill and no MCP server has no Skills & MCP section.
+        # The files the chat wrote, each once, its language's own logo on a light tile, a row opening the Changes tab.
+        # A run that used no skill and no MCP server has no Skills & MCP section.
         await expect(details.locator("#panel-run-skills")).to_be_hidden()
         artifacts: Locator = details.locator("#panel-run-artifacts")
         await expect(artifacts).to_be_visible()
         await expect(artifacts.locator(".context-row")).to_have_count(4)
-        await expect(artifacts.locator(".context-kind")).to_have_text(["MD", "MD", "MD", "MD"])
+        await expect(artifacts.locator(".context-tile-logo")).to_have_count(4)
+        await expect(artifacts.locator(".context-kind")).to_have_count(0)
+        logos: list[str] = await artifacts.locator(".context-logo").evaluate_all(
+            "(logos) => logos.map((logo) => logo.getAttribute('src'))"
+        )
+        assert sorted(logos) == [
+            "/icons/languages/markdown.svg",
+            "/icons/languages/python.svg",
+            "/icons/languages/rust.svg",
+            "/icons/languages/typescript.svg",
+        ], logos
         await expect(
             details.locator(".panel-section", has=page.locator("#panel-run-artifacts")).locator(".panel-summary")
         ).to_have_text("4 files")

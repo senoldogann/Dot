@@ -1356,6 +1356,20 @@ button.context-row {
   line-height: var(--leading-xs);
 }
 
+/* A language's logo (item 547) stands on a light tile, as a service's mark does (app.css), so that a dark logo reads in
+   the dark scheme too; the tile stays light under the pointer, as that mark's does. */
+.context-tile-logo,
+.context-row:hover .context-tile-logo {
+  background: var(--mark-ground);
+  box-shadow: inset 0 0 0 1px var(--mark-ring);
+}
+
+.context-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
 .context-name {
   flex: 1;
   min-width: 0;
