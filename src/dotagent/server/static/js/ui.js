@@ -5,6 +5,8 @@ import { icon } from "./icons.js";
 
 const TOAST_MS = 3500;
 const ERROR_TOAST_MS = 9000;
+// A toast with something to do stays long enough to do it.
+const ACTION_TOAST_MS = 15000;
 
 let region = null;
 let viewer = null;
@@ -17,12 +19,16 @@ function toastRegion() {
   return region;
 }
 
-/** Show a short message; `kind` is "ok" or "error". */
-export function toast(kind, text) {
+/** Show a short message; `kind` is "ok" or "error". `action` (`{ label, run }`), when given, is a button in it that runs
+ * `run()` (item 616: Reload, for a microphone that Safari stopped hearing). */
+export function toast(kind, text, action = null) {
   const node = el("div", { class: `toast ${kind}` }, icon(kind === "error" ? "alert" : "check"), el("span", null, text));
+  if (action !== null) {
+    node.append(el("button", { class: "btn sm toast-action", type: "button", onclick: action.run }, action.label));
+  }
   node.addEventListener("click", () => node.remove());
   toastRegion().append(node);
-  setTimeout(() => node.remove(), kind === "error" ? ERROR_TOAST_MS : TOAST_MS);
+  setTimeout(() => node.remove(), action !== null ? ACTION_TOAST_MS : kind === "error" ? ERROR_TOAST_MS : TOAST_MS);
 }
 
 /** Run `action`; when it fails, tell the user why instead of leaving the click without any effect. */

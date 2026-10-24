@@ -89,6 +89,21 @@ export function voicePlace(shell, userAgent, touchPoints) {
   return /Macintosh/.test(userAgent) && touchPoints <= 1 ? "mac" : "other";
 }
 
+/** Whether the page is on an iPhone, an iPod or an iPad (one that asks for a computer's pages says it is a Mac with a
+ * touch screen), where every browser is Safari's engine (item 616). */
+function appleTouch(userAgent, touchPoints) {
+  return /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && touchPoints > 1);
+}
+
+// What a dictation that heard nothing says on an iPhone or an iPad when an earlier one of the page began (item 616).
+// Safari there hears the first dictation after the page loads, and at times a later one opens the microphone and hears
+// nothing at all, whatever is said (WebKit bugs 317741 and 321436); a new page hears again.
+const DEAF_AGAIN =
+  "Safari heard nothing this time. On an iPhone or an iPad it at times hears only the first dictation after the page loads: reload the page and press the microphone again, or use the keyboard's microphone.";
+
+// How many dictations of a page began to listen, by its document: a page loaded anew starts at none.
+const pageDictations = new WeakMap();
+
 /**
  * What to tell the owner of the recognition's error `code`, or null for none (the owner stopped it), in the words of
  * `place` (`voicePlace`): in Dot.app macOS, not a browser, gives the microphone (item 593), and only a Mac has System
@@ -133,6 +148,9 @@ export function problemWords(code, place) {
  * not touched stops by itself after `SILENCE_MS` from the moment the engine began to listen with no word heard, after
  * `PAUSE_MS` of silence once one was, and with the page put out of sight. `began()` says the engine began to listen, and
  * `sound(loud)` whether it hears a sound now, for the recorder's clock and wave (item 605); both may be left out.
+ * `end()` ends a dictation the owner stopped that the engine has not closed, with what it heard, saying Safari's
+ * deafness on an iPhone's later dictation (item 616). A
+ * `problem(words, offer)` may come with `{ reload: true }`: reloading the page is what brings the microphone back.
  */
 export function createDictation({ language, text, show, settled, state, problem, began = () => {}, sound = (/** @type {boolean} */ _loud) => {} }) {
   let recognition = null;
@@ -148,6 +166,8 @@ export function createDictation({ language, text, show, settled, state, problem,
   // Safari asked ended at once, saying it heard nothing, and Safari, once allowed, started it all the same, for nobody,
   // with the microphone on.
   let started = false;
+  // Whether this dictation began after an earlier one of the page, on an iPhone or an iPad (item 616).
+  let again = false;
   const place = () => voicePlace(document.documentElement.dataset.shell, navigator.userAgent, navigator.maxTouchPoints);
 
   function arm() {
@@ -155,17 +175,28 @@ export function createDictation({ language, text, show, settled, state, problem,
     timer = setTimeout(() => recognition?.stop(), heard ? PAUSE_MS : SILENCE_MS);
   }
 
-  /** The dictation is over; `words` say why to the owner, or null. */
-  function finish(words) {
+  /** The dictation is over; `words` say why to the owner, or null, and `offer` what may help. */
+  function finish(words, offer = undefined) {
     clearTimeout(timer);
     if (recognition !== null) {
       recognition = null;
       state(false);
       settled();
       if (words !== null) {
-        problem(words);
+        problem(words, offer);
       }
     }
+  }
+
+  /** The end of a dictation that began and heard no word (item 616). On an iPhone or an iPad, after an earlier one of
+   * the page, it is most likely Safari's deafness, whoever stopped it: the owner spoke to a flat wave. Otherwise only an
+   * end the owner did not ask for says that nothing was heard, with what to check. */
+  function endSilent() {
+    if (again) {
+      finish(DEAF_AGAIN, { reload: true });
+      return;
+    }
+    finish(byOwner ? null : problemWords("no-speech", place()));
   }
 
   function start() {
@@ -182,6 +213,7 @@ export function createDictation({ language, text, show, settled, state, problem,
     heard = false;
     byOwner = false;
     started = false;
+    again = false;
     // An engine this dictation no longer holds that begins or hears anyway (Safari starts one once the owner allows it,
     // whatever was asked of it meanwhile) is dropped, so that the microphone is not left on for nobody.
     const left = () => recognition !== engine;
@@ -191,10 +223,7 @@ export function createDictation({ language, text, show, settled, state, problem,
         engine.abort();
         return;
       }
-      if (!started) {
-        started = true;
-        began();
-      }
+      opened();
       arm();
     };
     engine.addEventListener("start", begin);
@@ -213,10 +242,7 @@ export function createDictation({ language, text, show, settled, state, problem,
         engine.abort();
         return;
       }
-      if (!started) {
-        started = true;
-        began();
-      }
+      opened();
       sound(true);
       const said = transcriptOf(event.results);
       heard = heard || said.final !== "" || said.interim !== "";
@@ -229,18 +255,35 @@ export function createDictation({ language, text, show, settled, state, problem,
       if (recognition !== engine) {
         return;
       }
-      // The owner's own stop can come before the engine's word that it heard nothing: that silence says nothing.
-      finish(byOwner && event.error === "no-speech" ? null : problemWords(event.error, place()));
+      // A silence: "no-speech", or "aborted", which is the engine's own here, as the dictation's own abort lets the engine
+      // go first; Safari answers so the stop of a dictation that heard nothing (item 616). The owner's own stop can come
+      // before the engine's word that it heard nothing: that silence says nothing but on an iPhone's later dictation.
+      if (event.error === "no-speech" || event.error === "aborted") {
+        if (heard) {
+          finish(null);
+        } else {
+          endSilent();
+        }
+        return;
+      }
+      finish(problemWords(event.error, place()));
     };
     engine.addEventListener("result", heardSomething);
     engine.addEventListener("error", failed);
     engine.addEventListener("end", () => {
       if (recognition === engine) {
         // One that never began heard nothing because it never listened: its error, if any, said why.
-        finish(heard || byOwner || !started ? null : problemWords("no-speech", place()));
+        if (heard || !started) {
+          finish(null);
+        } else {
+          endSilent();
+        }
       }
     });
     recognition = engine;
+    // Safari on an iPhone does not hear while it speaks, and a microphone that heard the reading would write the answer
+    // into the box (item 616).
+    stopReading();
     try {
       engine.start();
     } catch (error) {
@@ -275,6 +318,34 @@ export function createDictation({ language, text, show, settled, state, problem,
     }
   }
 
+  /** The engine began: the recorder's clock starts, and the page counts one more dictation that listened (item 616). */
+  function opened() {
+    if (started) {
+      return;
+    }
+    started = true;
+    const before = pageDictations.get(document) ?? 0;
+    pageDictations.set(document, before + 1);
+    again = before > 0 && appleTouch(navigator.userAgent, navigator.maxTouchPoints);
+    began();
+  }
+
+  /** The owner stopped a dictation that the engine has not closed since (item 616: a deaf Safari may answer no stop):
+   * it ends with what it heard, as an abort would, and an iPhone's later dictation that heard nothing says it is
+   * Safari's (`endSilent`); the owner's own stop of any other says nothing. */
+  function end() {
+    const engine = recognition;
+    if (engine === null) {
+      return;
+    }
+    if (heard || !started) {
+      finish(null);
+    } else {
+      endSilent();
+    }
+    engine.abort();
+  }
+
   function hidden() {
     if (document.visibilityState === "hidden") {
       abort();
@@ -287,6 +358,7 @@ export function createDictation({ language, text, show, settled, state, problem,
     start,
     stop,
     abort,
+    end,
     toggle: () => (recognition === null ? start() : stop()),
     dispose() {
       abort();

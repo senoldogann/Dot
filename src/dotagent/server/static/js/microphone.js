@@ -17,7 +17,8 @@ const STOP = "Stop dictating";
 // How many bars the wave holds, and how often a new one comes in: the oldest go out at the left, past the recorder's width.
 const BARS = 96;
 const WAVE_MS = 90;
-// How long the tick waits for the engine to settle what it heard before the words it has go into the box all the same.
+// How long the tick waits for the engine to settle what it heard before the words it has go into the box all the same
+// (an iPhone's later dictation that heard none then says it is Safari's: item 616).
 const SETTLE_MS = 3000;
 
 /**
@@ -156,7 +157,10 @@ export function createMicrophone({ textarea, setInterim }) {
     },
     settled: () => setInterim(null),
     state,
-    problem: (words) => toast("error", words),
+    // Safari's deafness on an iPhone (item 616) is undone by a new page: the toast offers to reload it. The box's words
+    // are its draft, which the reload keeps.
+    problem: (words, offer) =>
+      toast("error", words, offer?.reload ? { label: "Reload", run: () => window.location.reload() } : null),
     began() {
       beganAt = performance.now();
     },
@@ -175,7 +179,7 @@ export function createMicrophone({ textarea, setInterim }) {
   cancel.addEventListener("click", drop);
   done.addEventListener("click", () => {
     // The engine settles what it heard and ends; the words go into the box then. One that does not end soon is ended
-    // with the words it has.
+    // with the words it has, and an iPhone's later one that heard none says it is Safari's (item 616).
     tickHadFocus = done.matches(":focus-visible");
     done.disabled = true;
     cancel.disabled = true;
@@ -188,7 +192,7 @@ export function createMicrophone({ textarea, setInterim }) {
       const pressedIn = dictations;
       settling = setTimeout(() => {
         if (pressedIn === dictations) {
-          dictation.abort();
+          dictation.end();
         }
       }, SETTLE_MS);
     }

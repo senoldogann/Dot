@@ -7226,6 +7226,16 @@ a.memory-line:hover .memory-change {
   color: var(--on-bad);
 }
 
+/* What a toast offers to do (item 616), in the toast's own colours. */
+.toast .toast-action {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+  border-color: currentColor;
+  background: transparent;
+  color: inherit;
+}
+
 dialog.modal {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);

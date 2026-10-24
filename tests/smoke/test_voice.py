@@ -512,6 +512,50 @@ async def test_on_a_phone_a_refused_microphone_names_no_mac_setting(browser: Bro
     await context.close()
 
 
+async def test_on_an_iphone_a_later_dictation_that_hears_nothing_says_so_and_reload_brings_the_microphone_back(
+    browser: Browser, address: str
+) -> None:
+    """Item 616, from the owner's iPhone: the first dictation after the page loads hears, and a later one opens the
+    microphone and hears nothing (WebKit bugs 317741 and 321436); Safari answers its stop with "aborted", which said
+    nothing: the recorder closed on the box as it was. It says so now, and its Reload gives a page that hears again, the
+    box's words kept as its draft."""
+    context: BrowserContext = await browser.new_context(
+        viewport={"width": 390, "height": 844},
+        has_touch=True,
+        is_mobile=True,
+        user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1",
+    )
+    await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    await context.add_init_script(_STAND_INS)
+    page: Page = await context.new_page()
+    await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+    mic: Locator = _microphone(page)
+    await mic.click()
+    await page.evaluate("() => window.__voice.hear([['first words', true]])")
+    await _recorder(page).locator(".mic-done").click()
+    await expect(page.locator(GOAL)).to_have_value("first words")
+    # The next one opens the microphone and hears nothing; the owner's tick is answered with "aborted".
+    await page.evaluate("() => { window.__voice.endAfter = 60000; }")
+    await mic.click()
+    await page.evaluate("() => window.__voice.recognitions.at(-1).dispatchEvent(new Event('audiostart'))")
+    await _recorder(page).locator(".mic-done").click()
+    await page.evaluate("() => window.__voice.fail('aborted')")
+    toast: Locator = page.locator(".toast.error")
+    await expect(toast).to_contain_text("Safari heard nothing this time.")
+    await expect(toast).to_contain_text("use the keyboard's microphone")
+    await expect(_recorder(page)).to_be_hidden()
+    await expect(page.locator(GOAL)).to_have_value("first words")
+    reload: Locator = toast.get_by_role("button", name="Reload")
+    await expect(reload).to_be_visible()
+    starts: int = await _voice(page, "voice.starts")
+    assert starts == 2
+    await reload.click()
+    await expect(page.locator(GOAL)).to_have_value("first words")
+    # A page anew: its first dictation is the first again.
+    assert await _voice(page, "voice.starts") == 0
+    await context.close()
+
+
 async def test_in_dot_app_a_refused_microphone_names_macos_and_dot_not_a_browser(
     browser: Browser, address: str
 ) -> None:

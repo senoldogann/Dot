@@ -189,7 +189,12 @@ and Dot, not a browser (item 593); and on a phone, the browser's and the device'
 a Mac they name macOS Dictation (the Dictation key, or Fn twice), on a phone the keyboard's own microphone, which type
 into the box meanwhile. A dictation that ends by itself having heard nothing says so and what to check (the microphone's
 permission, on a Mac the input in System Settings › Sound, the language), where it ended without a word before; one you
-stop says nothing. Nothing is sent by voice alone: you read the box and send as usual. A message whose answer was lost
+stop says nothing. Safari's way of saying it, "aborted" where Chrome says "no-speech", counts the same (item 616). On an
+iPhone or an iPad, Safari hears the first dictation after the page loads, and at times a later one opens the microphone
+and hears nothing (WebKit bugs 317741 and 321436): the wave stays flat. Such a dictation says that Safari heard nothing,
+whoever ended it, and its toast's **Reload** brings the microphone back, the box's words kept as its draft; the
+keyboard's own microphone types meanwhile. A dictation stops a reading aloud first, as Safari does not hear while it
+speaks. Nothing is sent by voice alone: you read the box and send as usual. A message whose answer was lost
 on its way back (the page says the sending failed and keeps the message) is done once when it is sent again, here and in
 the box of a run: the page sends each new message with a key of its own, and the daemon answers the same message sent
 again with what its first sending made. `/` at the start of a word opens the slash menu over the box: the commands of
