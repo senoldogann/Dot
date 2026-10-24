@@ -311,7 +311,8 @@ currency, so list sites that bill in one currency. Empty by default.
    action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it
    run alone with plain arguments (after a `cd` at most; nothing chained to it, substituted into it or sent on with
    `|` or `>`), and a rule that stops Dot fits the command or the word wherever the action mentions it, as a whole
-   word (`x.com` does not fit `netflix.com`). A rule that lets Dot act in the shell is made from commands only: a draft
+   word (`x.com` does not fit `netflix.com`), its edges told as the engine that matches it tells a word character
+   (`x²` fits "run x² now", item 629). A rule that lets Dot act in the shell is made from commands only: a draft
    that gives words for it (for the shell, or for `*`, which covers it) is refused and the review model asked once
    more, since a word fits `git push; anything` as well as `git push` (item 561). The same goes for the AppleScript
    tool (`apple_script`, or a pattern that covers it), which runs shell lines with `do shell script`: a word fits a

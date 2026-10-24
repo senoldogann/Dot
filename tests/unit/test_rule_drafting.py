@@ -108,6 +108,33 @@ def test_a_mention_fits_as_a_whole_word(url: str, fits: bool) -> None:
     assert _fits(rule, _page(url)) is fits
 
 
+def _note(summary: str) -> ActionInfo:
+    return ActionInfo(tool="write_file", kind="write", risk="low", summary=summary, target="notes.md", flags=())
+
+
+@pytest.mark.parametrize(
+    ("mention", "summary", "fits"),
+    [
+        # ``²`` and ``½`` are no word characters to the engine (``re`` took them for some): a boundary after them never
+        # fit, and a rule that stops Dot at x² stopped it at nothing.
+        ("x²", "Write the sum of x² and y", True),
+        ("½ cup", "Write a recipe with ½ cup of milk", True),
+        # A circled letter and a vowel sign are word characters to the engine (``re`` took them for none): the mention
+        # is a whole word, not letters that fit inside another one.
+        ("ⓐbc", "Write ⓐbc down", True),
+        ("ⓐbc", "Write xⓐbc down", False),
+        ("का", "Write का now", True),
+        ("का", "Write काम now", False),
+    ],
+)
+def test_a_mention_is_bounded_where_the_engine_that_matches_rules_sees_a_word(
+    mention: str, summary: str, fits: bool
+) -> None:
+    """Item 629: the drafter puts a word boundary where the engine of ``policy.engine`` (``regex``) sees a word."""
+    rule: DraftedRule = rule_from_draft(_draft("write_file", "ask", [], [mention]), TOOLS)
+    assert _fits(rule, _note(summary)) is fits
+
+
 @pytest.mark.parametrize(
     ("draft", "problem"),
     [

@@ -15,6 +15,7 @@ import re
 from collections.abc import Sequence
 from typing import Annotated
 
+import regex
 from pydantic import Field, StringConstraints
 
 from dotagent.core.errors import InvalidValueError
@@ -32,7 +33,10 @@ _UNPLAIN: frozenset[str] = frozenset("\n\r;&|`$<>()")
 _PLAIN_CHAR: str = r"[^\n\r;&|`$<>()]"
 # The one command that may come first: the shell tool's commands often change into a folder and chain the step with &&.
 _CD_FIRST: str = rf"(?:cd[ \t]+{_PLAIN_CHAR}+&&[ \t]*)?"
-_WORD: re.Pattern[str] = re.compile(r"\w")
+# A word character as the engine that matches a rule takes it (``regex``, in ``policy.engine``): Python's ``re`` takes
+# ``²`` and ``½`` for word characters and a circled letter or a vowel sign for none, and a boundary put where the engine
+# sees none never fits, so that a rule that stops Dot at ``x²`` stopped it at nothing (item 629).
+_WORD: regex.Pattern[str] = regex.compile(r"\w")
 # What a rule's description may hold (``RuleRequest``).
 _DESCRIPTION_CHARS: int = 300
 _ANSWER_TEXT: dict[Behavior, str] = {
