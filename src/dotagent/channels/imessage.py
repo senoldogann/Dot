@@ -22,6 +22,8 @@ link and nothing else, with the bundle of one in ``balloon_bundle_id`` (no such 
 the owner's like any row and with no marker. So a row is a command only when it is words. A row with the bundle of any
 other rich content (a sticker, an app, a payment) is let go. A row that is only a link Dot wrote, one into its own pages
 or one in a message it sent a moment before, is Dot's own and let go, whether it is a link preview or plain words. A
+link preview that is only a host, or a name that looks like one (``example.com`` ends a message of progress), is Dot's
+own in the few seconds after the message that holds it; the same words as plain words are the owner's, a command. A
 link the owner sent is a row of its own after their words in the same way: it is one command with them. A picture Dot
 sends with an answer (item 617) is a row too: a message of its own with a file, no words and no marker. Dot tells it
 from a picture of the owner's by when it was written and what it is (a file and no words, dated within a minute of a
@@ -117,6 +119,10 @@ JOIN_S: float = 3.0
 # send to this long after it, is Dot's own. Messages may split the link at the end of a message into a row of its own.
 OWN_LINK_S: float = 60.0
 _OWN_LINK_BEFORE_S: float = 5.0
+# A link preview of a host or of a name that looks like one (``example.com``, ``notes.md``) is Dot's own only in the few
+# seconds after the message that holds it: Messages writes the row of a preview as it sends the message, and the owner
+# may send the same word a little later (item 618).
+OWN_PREVIEW_S: float = 10.0
 _SENT_KEPT: int = 20
 # A message that Messages keeps as two rows, one sent and one received (item 595), is one command: the second, with the
 # same words in the same chat, dated at most this long from the first, is let go. The rows that may be a command are
@@ -124,6 +130,8 @@ _SENT_KEPT: int = 20
 COPY_S: float = 10.0
 _HEARD_KEPT: int = 20
 _LINK: re.Pattern[str] = re.compile(r"https?://\S+", re.IGNORECASE)
+_SCHEME: re.Pattern[str] = re.compile(r"https?://(?:www\.)?", re.IGNORECASE)
+_BARE_HOST: re.Pattern[str] = re.compile(r"[\w-]+(?:\.[\w-]+)+(?::\d+)?(?:/\S*)?")
 
 # What a picture is sent with (item 617): the arguments of its ``run`` handler are the path of the file and the
 # recipient, and it is sent over iMessage as the text of a message is (drafts/scripts.py). The path reaches the script
@@ -238,6 +246,23 @@ def only_a_link(words: str | None) -> str | None:
     ``None``. Such a row is a link preview Messages made of a link, or a link sent as it is."""
     found: str | None = None if words is None else words.strip()
     return found if found is not None and _LINK.fullmatch(found) is not None else None
+
+
+def link_form(words: str | None) -> str | None:
+    """``words`` as a link written with no scheme, no ``www.`` and no closing slash, in lower case, when they are one
+    link or one bare host (a name with a dot in it and no space: Messages may make a link of ``example.com``, or of a
+    file name such as ``notes.md``, as it does of an address with its scheme); else ``None``. A link has the same form
+    however it is written."""
+    found: str | None = None if words is None else words.strip()
+    if not found:
+        return None
+    bare: str = _SCHEME.sub("", found, count=1).rstrip("/").casefold()
+    return bare if _BARE_HOST.fullmatch(bare) is not None else None
+
+
+def _dated_near(row: Row, at: float, after_s: float) -> bool:
+    """Whether ``row`` is dated from just before ``at`` (when Dot handed a message to Messages) to ``after_s`` after."""
+    return at - _OWN_LINK_BEFORE_S <= row.sent_at <= at + after_s
 
 
 def database_access(db: Path) -> Access:
@@ -623,19 +648,28 @@ class IMessageChannel:
         return 0.0 <= link.sent_at - (words.sent_at if words.link_at is None else words.link_at) <= JOIN_S
 
     def _dots_own_link(self, row: Row) -> bool:
-        """Whether ``row`` is only a link that Dot wrote: one into its own pages (the address its messages link to), or
-        one that stands in a message Dot sent a moment before the row's date. Messages may split a link at the end of a
-        message of Dot's into a row of its own, a link preview, which has no marker and is flagged as the owner's like
-        any row: it is Dot's own, and never a command."""
+        """Whether ``row`` is a link that Dot wrote, and so never a command of the owner's. Messages may split a link at
+        the end of a message of Dot's into a row of its own, a link preview, which has no marker and is flagged as the
+        owner's like any row. Two kinds of row are Dot's own:
+
+        - a row that is only a link with its scheme (``https://…``), a link preview or plain words: one into Dot's own
+          pages (the address its messages link to), or one that stands whole in a message Dot sent from just before the
+          row's date to :data:`OWN_LINK_S` after;
+        - a link preview, and only that, that is a host or a name that looks like one (``example.com`` ending a message
+          of progress, ``notes.md`` in an answer, item 618), however it writes its scheme, its ``www.`` and its closing
+          slash (:func:`link_form`), when a message Dot sent from just before the row's date to :data:`OWN_PREVIEW_S`
+          after holds it. The same words as plain words are the owner's: a reply of ``notes.md`` is a command, whatever
+          Dot said a moment ago."""
         link: str | None = only_a_link(row.text)
-        if link is None:
-            return False
-        wanted: str = link.casefold()
-        if self._own_base and wanted.startswith(self._own_base.casefold()):
-            return True
-        return any(
-            wanted in said.casefold() and at - _OWN_LINK_BEFORE_S <= row.sent_at <= at + OWN_LINK_S
-            for at, said in self._sent
+        if link is not None:
+            wanted: str = link.casefold()
+            if self._own_base and wanted.startswith(self._own_base.casefold()):
+                return True
+            if any(wanted in said.casefold() and _dated_near(row, at, OWN_LINK_S) for at, said in self._sent):
+                return True
+        form: str | None = link_form(row.text) if row.balloon == URL_BALLOON else None
+        return form is not None and any(
+            form in _SCHEME.sub("", said.casefold()) and _dated_near(row, at, OWN_PREVIEW_S) for at, said in self._sent
         )
 
     def _dots_own_picture(self, row: Row) -> bool:

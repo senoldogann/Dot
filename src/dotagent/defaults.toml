@@ -738,6 +738,13 @@ double_tap_ms = 400
 # with ◆ (Automation for Messages). What Dot tells you on its own (the morning brief's first line, a watcher's tell,
 # item 582) goes there too, at most one line in twenty seconds. Approvals are never answered on a channel.
 imessage = false
+# progress: what a run you started from there tells while it works (item 618). iMessage cannot edit a message it sent,
+# so "live" is a few messages: a run that works longer than 15 seconds sends one, then at most one every 30 seconds and
+# six in all (a run that ends sooner sends only its answer), each of what happened since the one before: the commands it
+# ran (their first 60 characters), the tools it used by their names on the page, and the first sentence of its newest
+# thought when the model thinks. Never a tool's output, and masked of the secrets Dot holds like an answer. "steps" (the
+# default) or "off": only the answer.
+progress = "steps"
 
 [reactions]
 # Reactions on Dot's messages (item 586, docs/runs.md): a button under each message of Dot's opens a palette: 👍 good,

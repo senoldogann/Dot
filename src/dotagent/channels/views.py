@@ -39,9 +39,10 @@ class ImessageView(FrozenModel):
 
 
 class ChannelsView(FrozenModel):
-    """Every channel."""
+    """Every channel, and whether a run started from one tells what it does while it works (``progress``, item 618)."""
 
     imessage: ImessageView
+    progress: bool
 
 
 class SwitchRequest(FrozenModel):

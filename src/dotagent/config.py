@@ -487,12 +487,19 @@ class SnapshotsConfig(FrozenModel):
     double_tap_ms: int = Field(gt=0)
 
 
+# Whether a run started from a channel tells what it does while it works (item 618): ``steps`` sends a few messages of
+# its commands, tools and newest thought, ``off`` only its answer.
+type ProgressMode = Literal["steps", "off"]
+
+
 class ChannelsConfig(FrozenModel):
     """Which of the owner's messaging apps reach Dot (item 572): whether Dot reads the owner's conversation with
-    themselves in Messages and answers in it, and tells them there what it says on its own (item 582) (``imessage``).
-    Settings › Channels switches it, live."""
+    themselves in Messages and answers in it, and tells them there what it says on its own (item 582) (``imessage``),
+    and whether a run started from there tells what it does while it works (``progress``, item 618). Settings ›
+    Channels switches both, live."""
 
     imessage: bool
+    progress: ProgressMode
 
 
 # What a reaction does once the run it is about has ended (item 586): ``follow_up`` starts a run in the same chat, as

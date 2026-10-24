@@ -22,9 +22,11 @@ from dotagent.channels.imessage import (
     MARKER,
     MAX_HANDLES,
     OWN_LINK_S,
+    OWN_PREVIEW_S,
     PICTURE_SCRIPT,
     SCHEDULED,
     IMessageChannel,
+    link_form,
 )
 from dotagent.channels.intake import ATTACHMENT, FLOOD, MAX_PER_MINUTE, STALE_S, TOO_OLD, UNREAD_NOTE, too_long
 from dotagent.channels.pictures import Picture
@@ -606,6 +608,133 @@ async def test_a_row_that_is_only_a_link_into_dots_own_pages_is_dots_own_and_nev
         await channel.poll(heard)
     assert heard.texts == ["a real command"] and runner.sent == []
     assert [entry["reason"] for entry in logs if entry["event"] == "imessage_message_let_go"] == ["a link of Dot's own"]
+
+
+@pytest.mark.parametrize(
+    ("words", "form"),
+    [
+        ("https://example.com/a/b?c=1#d", "example.com/a/b?c=1#d"),
+        ("HTTP://WWW.Example.COM/", "example.com"),
+        ("example.com", "example.com"),
+        ("example.com:8443/x", "example.com:8443/x"),
+        ("notes.md", "notes.md"),
+        ("  main.py \n", "main.py"),
+        ("a host-name.example.org", None),
+        ("read example.com", None),
+        ("example", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_a_link_has_one_form_however_it_is_written(words: str | None, form: str | None) -> None:
+    assert link_form(words) == form
+
+
+PROGRESS_WITH_A_HOST: str = "Working for 20 s:\n$ ls\nread a page: example.com\nwrote notes.md"
+
+
+@pytest.mark.parametrize(
+    "written",
+    ["https://example.com/", "https://www.example.com", "http://example.com", "example.com", "EXAMPLE.com", "notes.md"],
+)
+async def test_a_host_in_a_message_of_progress_is_dots_own_when_messages_splits_it_off_whatever_it_writes(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, written: str
+) -> None:
+    """A message that ends with a bare host may get a row of its own for the link Messages made of it (a link preview),
+    written with its scheme or without; it must start no run (item 618: *read a page: example.com* is a line of a
+    message of progress)."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    own: int = db.chat(PHONE)
+    clock.now = NOW
+    await channel.send(PROGRESS_WITH_A_HOST)
+    db.message(own, written, balloon=URL_BALLOON, at=NOW + 1)
+    db.message(own, "a real command", at=NOW + 2)
+    clock.now = NOW + 5
+    heard: Heard = Heard()
+    with capture_logs() as logs:
+        await channel.poll(heard)
+    assert heard.texts == ["a real command"] and runner.sent == [(PHONE, f"{MARKER}{PROGRESS_WITH_A_HOST}")]
+    let_go: list[object] = [entry["reason"] for entry in logs if entry["event"] == "imessage_message_let_go"]
+    assert let_go == ["a link of Dot's own"]
+
+
+@pytest.mark.parametrize(
+    "words",
+    ["example.com", "EXAMPLE.com", "notes.md", "https://example.com/", "https://www.example.com", "Example.com\n"],
+)
+async def test_a_host_or_a_file_name_the_owner_types_is_a_command_whatever_dot_said_a_moment_before(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, words: str
+) -> None:
+    """The owner may answer with one word Dot has just said. Only a link preview, the row Messages splits off a message,
+    is Dot's own: the same words as words are theirs (the review of item 618)."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    own: int = db.chat(PHONE)
+    clock.now = NOW
+    await channel.send(PROGRESS_WITH_A_HOST)
+    db.message(own, words, at=NOW + 1)
+    clock.now = NOW + 5
+    heard: Heard = Heard()
+    with capture_logs() as logs:
+        await channel.poll(heard)
+    assert heard.texts == [words.strip()]
+    assert [entry for entry in logs if entry["event"] == "imessage_message_let_go"] == []
+
+
+async def test_a_link_preview_of_a_host_is_dots_own_for_a_few_seconds_after_the_message_and_then_the_owners(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    own: int = db.chat(PHONE)
+    clock.now = NOW
+    await channel.send(PROGRESS_WITH_A_HOST)
+    # From just before the send to the end of the window; and a second after it.
+    db.message(own, "example.com", balloon=URL_BALLOON, at=NOW - 5)
+    db.message(own, "example.com", balloon=URL_BALLOON, at=NOW + OWN_PREVIEW_S)
+    db.message(own, "notes.md", balloon=URL_BALLOON, at=NOW + OWN_PREVIEW_S + 1)
+    db.message(own, "example.com", balloon=URL_BALLOON, at=NOW + OWN_LINK_S - 1)
+    clock.now = NOW + OWN_LINK_S + 40
+    heard: Heard = Heard()
+    with capture_logs() as logs:
+        await channel.poll(heard)
+    assert heard.texts == ["notes.md", "example.com"]
+    let_go: list[object] = [entry["reason"] for entry in logs if entry["event"] == "imessage_message_let_go"]
+    assert let_go == ["a link of Dot's own"] * 2
+
+
+async def test_a_link_with_its_scheme_is_still_dots_own_for_a_minute_as_a_preview_or_as_words(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    """The window of a link written whole (item 611) is not the preview's: a page Dot named stays its own link."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    own: int = db.chat(PHONE)
+    clock.now = NOW
+    await channel.send(f"The source: {A_LINK}")
+    db.message(own, A_LINK, balloon=URL_BALLOON, at=NOW + OWN_PREVIEW_S + 20)
+    db.message(own, A_LINK, at=NOW + OWN_LINK_S)
+    db.message(own, A_LINK, at=NOW + OWN_LINK_S + 1)
+    clock.now = NOW + OWN_LINK_S + 40
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [A_LINK]
+
+
+async def test_a_file_name_that_looks_like_a_host_is_dots_own_as_a_preview_of_a_message_dot_sent_and_nothing_else(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    own: int = db.chat(PHONE)
+    clock.now = NOW
+    await channel.send("I wrote notes.md and main.py for you.")
+    db.message(own, "notes.md", balloon=URL_BALLOON, at=NOW + 1)
+    # Plain words, what Dot did not say, words with it, and a preview after the window are the owner's.
+    db.message(own, "main.py", at=NOW + 2)
+    db.message(own, "other.example", balloon=URL_BALLOON, at=NOW + 3)
+    db.message(own, "read notes.md and tell me", at=NOW + 4)
+    db.message(own, "notes.md", balloon=URL_BALLOON, at=NOW + OWN_PREVIEW_S + 2)
+    clock.now = NOW + OWN_LINK_S + 40
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["main.py", "other.example", "read notes.md and tell me", "notes.md"]
 
 
 async def test_a_link_inside_the_owners_words_is_theirs_even_when_it_is_a_page_of_dots(

@@ -64,9 +64,10 @@ class FakeChannel:
         self.refuses: set[str] = set()
         self.explodes: set[str] = set()
         self.order: list[tuple[str, str]] = []
+        self.is_paired: bool = True
 
     def paired(self) -> bool:
-        return True
+        return self.is_paired
 
     async def run(self, receive: Receive) -> None:
         raise AssertionError("the router reads no channel: the tests post for it")
@@ -132,11 +133,20 @@ async def manager(runtime: Runtime) -> AsyncIterator[RunManager]:
 class Wired:
     """A router over a fake channel, and the task that follows the runs of its chat."""
 
-    def __init__(self, runtime: Runtime, manager: RunManager, base: str | None = BASE) -> None:
+    def __init__(
+        self,
+        runtime: Runtime,
+        manager: RunManager,
+        base: str | None = BASE,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self.runtime: Runtime = runtime
         self.manager: RunManager = manager
         self.channel: FakeChannel = FakeChannel()
         self.on: bool = True
+        # Whether a run started from the channel tells what it does while it works (item 618): off, as in a daemon
+        # that was told so, until a test switches it on.
+        self.progress_on: bool = False
         # The pictures an answer names (item 617) go from the runtime's workspace or the owner's home, which is a
         # folder of the test's own here.
         self.home: Path = runtime.workspace.parent / "owner"
@@ -148,6 +158,8 @@ class Wired:
             lambda _: self.on,
             _ASKS_APART_S,
             Pictures(runtime.workspace, self.home, runtime.protected),
+            lambda: self.progress_on,
+            clock,
         )
 
     async def thread(self) -> ThreadRecord:
@@ -161,9 +173,11 @@ class Wired:
 
 
 @contextlib.asynccontextmanager
-async def _following(runtime: Runtime, manager: RunManager, base: str | None) -> AsyncIterator[Wired]:
+async def _following(
+    runtime: Runtime, manager: RunManager, base: str | None, clock: Callable[[], float] = time.monotonic
+) -> AsyncIterator[Wired]:
     """A router over a fake channel, with the task that follows the runs of its chat."""
-    wiring: Wired = Wired(runtime, manager, base)
+    wiring: Wired = Wired(runtime, manager, base, clock)
     # As the service starts it: the router reads which chat is whose.
     await wiring.router.load()
     async with runtime.bus.subscribe_kinds(WATCHED_KINDS) as feed:
@@ -179,6 +193,25 @@ async def _following(runtime: Runtime, manager: RunManager, base: str | None) ->
 async def wired(runtime: Runtime, manager: RunManager) -> AsyncIterator[Wired]:
     async with _following(runtime, manager, BASE) as wiring:
         yield wiring
+
+
+class Clock:
+    """The time of the router in a test (item 618): it moves when the test says."""
+
+    def __init__(self) -> None:
+        self.now: float = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+@pytest_asyncio.fixture(loop_scope="module")
+async def working(runtime: Runtime, manager: RunManager) -> AsyncIterator[tuple[Wired, Clock]]:
+    """A router that tells what a run does as it works, on a clock the test moves."""
+    clock: Clock = Clock()
+    async with _following(runtime, manager, BASE, clock) as wiring:
+        wiring.progress_on = True
+        yield wiring, clock
 
 
 @pytest_asyncio.fixture(loop_scope="module")
@@ -1072,3 +1105,285 @@ async def test_a_router_with_no_finder_sends_an_answer_as_text_and_names_no_pict
             watching.cancel()
             await asyncio.gather(watching, return_exceptions=True)
     assert channel.sent == [f"It is at {named}"] and channel.pictures == []
+
+
+# ----- what a run does as it works, told on the channel (item 618) ----------------------------------------
+
+
+async def _quiet_for_a_moment() -> None:
+    """The router had time to follow what was just emitted."""
+    await asyncio.sleep(0.25)
+
+
+async def _began(
+    wiring: Wired, clock: Clock, replies: Replies, at: float, goal: str = "do the long thing"
+) -> RunRecord:
+    """A run started from the channel at ``at`` (on the test's clock) that is held before its first reply, so that it
+    works until the test lets it go; the router has seen it begin."""
+    clock.now = at
+    replies.push(finish("All done."))
+    replies.gate = asyncio.Event()
+    await wiring.router.inbound("imessage", goal)
+    await _until(lambda: bool(wiring.manager.active_run_ids()), "the run is at work")
+    await _quiet_for_a_moment()
+    return (await wiring.runs())[-1]
+
+
+async def _let_go(wiring: Wired, replies: Replies) -> None:
+    """The run held by ``_began`` goes on and ends."""
+    assert replies.gate is not None
+    replies.gate.set()
+    replies.gate = None
+    await _settled(wiring.manager)
+    await _quiet_for_a_moment()
+
+
+async def _does(runtime: Runtime, run: RunRecord, tool: str, **arguments: object) -> None:
+    """The run calls ``tool``: the event the loop emits for the call."""
+    await runtime.bus.emit(run.id, "tool_call", {"call_id": f"call_{tool}", "tool": tool, "args": arguments}, False)
+
+
+async def _thinks(runtime: Runtime, run: RunRecord, thought: str) -> None:
+    """The model's reply of a step, with its thought."""
+    await runtime.bus.emit(run.id, "assistant", {"step": 1, "text": "", "thinking": thought, "tool_calls": []}, False)
+
+
+async def test_a_run_that_works_longer_than_fifteen_seconds_tells_what_it_did_and_then_gives_its_answer(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
+) -> None:
+    wired, clock = working
+    before: int = len(wired.channel.sent)
+    run: RunRecord = await _began(wired, clock, replies, 1000.0)
+    clock.now = 1003.0
+    await _does(runtime, run, "shell", command="ls -la ~/Desktop")
+    await _thinks(runtime, run, "There are three files. I should open the first one. Then I will summarise it.")
+    clock.now = 1014.0
+    await _does(runtime, run, "web_fetch", url="https://example.com/a/very/long/path?token=abc123")
+    await runtime.bus.emit(run.id, "tool_result", {"tool": "shell", "ok": True, "text": "TOP SECRET OUTPUT"}, False)
+    await _quiet_for_a_moment()
+    # Fourteen seconds in: nothing yet.
+    assert wired.channel.sent[before:] == []
+    clock.now = 1016.0
+    await _does(runtime, run, "desktop_screenshot")
+    await _until(lambda: len(wired.channel.sent) == before + 1, "the first message of progress")
+    assert wired.channel.sent[before] == (
+        "Working for 16 s:\n$ ls -la ~/Desktop\nread a page: example.com\nused the desktop\n💭 There are three files."
+    )
+    # Never what a tool answered, and a page only by its host.
+    assert "TOP SECRET" not in wired.channel.sent[before] and "token" not in wired.channel.sent[before]
+    clock.now = 1020.0
+    await _does(runtime, run, "shell", command="echo hello")
+    await _quiet_for_a_moment()
+    assert len(wired.channel.sent) == before + 1
+    clock.now = 1047.0
+    await _does(runtime, run, "write_file", path="/Users/me/notes/summary.md", content="a body that is not told")
+    await _until(lambda: len(wired.channel.sent) == before + 2, "the second message of progress")
+    assert wired.channel.sent[before + 1] == "Working for 47 s:\n$ echo hello\nwrote summary.md"
+    await _let_go(wired, replies)
+    # The answer is the last, with the progress before it and none after it.
+    assert wired.channel.sent[before + 2 :] == ["All done."]
+
+
+async def test_a_run_that_ends_before_fifteen_seconds_sends_only_its_answer(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
+) -> None:
+    wired, clock = working
+    before: int = len(wired.channel.sent)
+    run: RunRecord = await _began(wired, clock, replies, 2000.0, "a quick one")
+    clock.now = 2004.0
+    await _does(runtime, run, "shell", command="date")
+    await _thinks(runtime, run, "A quick one.")
+    clock.now = 2014.9
+    await _does(runtime, run, "read_file", path="/etc/hosts")
+    await _let_go(wired, replies)
+    assert wired.channel.sent[before:] == ["All done."]
+    # What it did is not told after its end, however long after: its steps went with it.
+    clock.now = 2200.0
+    await _does(runtime, run, "shell", command="a step that comes late")
+    await _quiet_for_a_moment()
+    assert wired.channel.sent[before:] == ["All done."]
+
+
+async def test_a_message_every_thirty_seconds_at_most_and_six_in_all(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
+) -> None:
+    wired, clock = working
+    before: int = len(wired.channel.sent)
+    run: RunRecord = await _began(wired, clock, replies, 3000.0, "a very long one")
+    told: list[str] = []
+    for number in range(10):
+        clock.now = 3016.0 + 31.0 * number
+        await _does(runtime, run, "shell", command=f"step {number}")
+        if number < 6:
+            await _until(lambda: len(wired.channel.sent) == before + len(told) + 1, f"message {number + 1}")
+            told.append(wired.channel.sent[-1])
+        else:
+            await _quiet_for_a_moment()
+    assert len(wired.channel.sent) == before + 6
+    assert [message.splitlines()[1:] for message in told] == [[f"$ step {number}"] for number in range(6)]
+    # Another step inside the thirty seconds of a message waits for the time to pass and is told with the next.
+    await _let_go(wired, replies)
+    assert wired.channel.sent[before + 6 :] == ["All done."]
+
+
+async def test_a_step_inside_the_thirty_seconds_waits_and_goes_with_the_next_message(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
+) -> None:
+    wired, clock = working
+    before: int = len(wired.channel.sent)
+    run: RunRecord = await _began(wired, clock, replies, 4000.0, "steps that wait")
+    clock.now = 4016.0
+    await _does(runtime, run, "shell", command="first")
+    await _until(lambda: len(wired.channel.sent) == before + 1, "the first message")
+    for moment, command in ((4020.0, "second"), (4030.0, "third"), (4040.0, "third")):
+        clock.now = moment
+        await _does(runtime, run, "shell", command=command)
+    await _quiet_for_a_moment()
+    assert len(wired.channel.sent) == before + 1
+    clock.now = 4046.0
+    await _does(runtime, run, "shell", command="fourth")
+    await _until(lambda: len(wired.channel.sent) == before + 2, "the second message")
+    assert wired.channel.sent[-1] == "Working for 46 s:\n$ second\n$ third ×2\n$ fourth"
+    await _let_go(wired, replies)
+
+
+async def test_a_message_of_progress_is_masked_of_the_secrets_dot_holds(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
+) -> None:
+    secret: str = "hunter2-horse-battery-staple-7"
+    write_env_value(env_file_path(), "SOME_THIRD_SERVICE_PASSWORD_FILE", secret)
+    wired, clock = working
+    before: int = len(wired.channel.sent)
+    run: RunRecord = await _began(wired, clock, replies, 5000.0, "a run with a secret in it")
+    clock.now = 5016.0
+    await _does(runtime, run, "shell", command=f"curl -H 'X-Pass: {secret}' https://x.example")
+    await _thinks(runtime, run, f"The password {secret} is in the header.")
+    await _until(lambda: len(wired.channel.sent) == before + 1, "the message of progress")
+    told: str = wired.channel.sent[-1]
+    assert secret not in told and told.splitlines()[1] == "$ curl -H 'X-Pass: ***' https://x.example"
+    await _let_go(wired, replies)
+
+
+async def test_a_secret_the_cut_of_a_command_would_split_is_masked_before_it_is_cut(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
+) -> None:
+    """The first 60 characters of a command are told: a secret that stands across the 60th would be cut into a half no
+    mask knows, if the cut came first."""
+    secret: str = "correct-horse-battery-staple-4"
+    write_env_value(env_file_path(), "SOME_FOURTH_SERVICE_PASSWORD_FILE", secret)
+    wired, clock = working
+    before: int = len(wired.channel.sent)
+    run: RunRecord = await _began(wired, clock, replies, 5500.0, "a run with a secret across the cut")
+    clock.now = 5516.0
+    await _does(runtime, run, "shell", command=f"{'x' * 45} {secret} and more words after it")
+    await _thinks(runtime, run, f"{'y' * 120} {secret[:12]}")
+    await _until(lambda: len(wired.channel.sent) == before + 1, "the message of progress")
+    told: str = wired.channel.sent[-1]
+    assert secret not in told and "correct-horse" not in told and "staple" not in told
+    assert told.splitlines()[1].startswith("$ " + "x" * 45 + " *** and ")
+    await _let_go(wired, replies)
+
+
+async def test_with_progress_off_a_long_run_sends_only_its_answer(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
+) -> None:
+    wired, clock = working
+    wired.progress_on = False
+    try:
+        before: int = len(wired.channel.sent)
+        run: RunRecord = await _began(wired, clock, replies, 6000.0, "a run told to be quiet")
+        clock.now = 6016.0
+        await _does(runtime, run, "shell", command="ls")
+        await _thinks(runtime, run, "Quiet.")
+        clock.now = 6100.0
+        await _does(runtime, run, "shell", command="pwd")
+        await _quiet_for_a_moment()
+        assert wired.channel.sent[before:] == []
+        await _let_go(wired, replies)
+        assert wired.channel.sent[before:] == ["All done."]
+    finally:
+        wired.progress_on = True
+
+
+async def test_a_run_typed_in_the_page_or_in_another_chat_tells_no_progress(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime, manager: RunManager
+) -> None:
+    wired, clock = working
+    before: int = len(wired.channel.sent)
+    thread: ThreadRecord = await wired.thread()
+    clock.now = 7000.0
+    replies.push(finish("Typed in the page."), finish("In another chat."))
+    replies.gate = asyncio.Event()
+    typed: RunRecord = await manager.start(
+        "typed in the chat of the channel", "task", None, thread.id, "ui", None, None, "standard", None, None, None, ()
+    )
+    other: RunRecord = await manager.start(
+        "typed in another chat", "task", None, None, "ui", None, None, "standard", None, None, None, ()
+    )
+    await _quiet_for_a_moment()
+    clock.now = 7016.0
+    for run in (typed, other):
+        await _does(runtime, run, "shell", command="ls")
+        await _thinks(runtime, run, "Not for the phone.")
+    clock.now = 7100.0
+    await _does(runtime, typed, "shell", command="pwd")
+    await _quiet_for_a_moment()
+    assert wired.channel.sent[before:] == []
+    await _let_go(wired, replies)
+    # The answer of a run in the channel's chat goes back, as it always did; the other chat's does not.
+    assert wired.channel.sent[before:] == ["Typed in the page."]
+
+
+async def test_the_steps_of_a_run_it_delegated_are_not_told_but_the_delegating_is(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
+) -> None:
+    wired, clock = working
+    before: int = len(wired.channel.sent)
+    run: RunRecord = await _began(wired, clock, replies, 8000.0, "a run with a helper")
+    # A delegated run lives in a thread of its own, which is no chat.
+    helpers: ThreadRecord = await runtime.store.create_thread("helper", "delegate")
+    helper: RunRecord = await runtime.store.create_run(
+        helpers.id,
+        "a helper's job",
+        "task",
+        run.model,
+        run.id,
+        "delegate",
+        "medium",
+        "standard",
+        None,
+        "yolo",
+        False,
+        None,
+        None,
+        None,
+    )
+    clock.now = 8016.0
+    await _does(runtime, helper, "shell", command="a helper's command")
+    await _thinks(runtime, helper, "A helper's thought.")
+    await _does(runtime, run, "delegate", goal="Count the boxes on the first shelf")
+    await _until(lambda: len(wired.channel.sent) == before + 1, "the message of progress")
+    assert wired.channel.sent[-1] == "Working for 16 s:\nhanded work to a helper: Count the boxes on the first shelf"
+    await runtime.store.finish_run(helper.id, "done", "")
+    await _let_go(wired, replies)
+
+
+async def test_nothing_is_told_to_a_channel_nobody_is_paired_on_and_nothing_is_kept_for_it(
+    working: tuple[Wired, Clock], replies: Replies, runtime: Runtime
+) -> None:
+    wired, clock = working
+    before: int = len(wired.channel.sent)
+    run: RunRecord = await _began(wired, clock, replies, 9000.0, "a run on a channel nobody listens on")
+    wired.channel.is_paired = False
+    try:
+        clock.now = 9016.0
+        await _does(runtime, run, "shell", command="while nobody listens")
+        await _quiet_for_a_moment()
+    finally:
+        wired.channel.is_paired = True
+    clock.now = 9050.0
+    await _does(runtime, run, "shell", command="when somebody does")
+    await _until(lambda: len(wired.channel.sent) == before + 1, "the message of progress")
+    # What the run did while nobody could be told is not told afterwards.
+    assert wired.channel.sent[-1] == "Working for 50 s:\n$ when somebody does"
+    await _let_go(wired, replies)

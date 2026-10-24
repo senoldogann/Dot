@@ -16,6 +16,10 @@ link. Approvals and questions are never answered on a channel: the account of a 
 approve. The links are made from ``[server] reach``, the name a phone reaches Dot by; with none there is no address a
 phone can open, and no link is sent (item 611).
 
+A run that a message on a channel started and that works longer than 15 seconds sends a few messages of progress too
+(item 618, ``[channels] progress``): what it did since the last one, from the calls of its tools and its newest thought,
+at most one every 30 seconds and six in all, never what a tool answered.
+
 What Dot tells the owner on its own (the morning brief and the watchers, ``owner_told`` of ``notify/owner.py``, item
 582) goes out on each channel that is on and paired as one line: the title, the text and the link to the page it opens.
 A channel gets one such line in a window of :data:`ASKS_APART_S`; the tells that come inside it are held and told after
@@ -27,17 +31,20 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
+from pydantic import JsonValue
+
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.channels.intake import UNREAD_ANSWER, UNREAD_NOTE
 from dotagent.channels.pictures import Found, Pictures
+from dotagent.channels.progress import APART_S, FIRST_AFTER_S, Progress, first_sentence, step_words
 from dotagent.channels.text import as_plain_text, cut_with_link, one_line
 from dotagent.channels.types import TITLES, Channel, ChannelId, is_stop
 from dotagent.core.errors import DotError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
-from dotagent.core.text import redact_known
+from dotagent.core.text import redact_json, redact_known
 from dotagent.events import Subscription
 from dotagent.notify.owner import OWNER_TOLD_EVENT, OwnerTold
 from dotagent.runtime import Runtime
@@ -57,9 +64,17 @@ from dotagent.store.models import (
 
 log = get_logger(__name__)
 
+# The events of a run's work that the router follows to tell the owner what it does while it works (item 618): its
+# start, the model's reply of each step (its thought) and each call of a tool.
+_PROGRESS_KINDS: frozenset[str] = frozenset({"run_started", "assistant", "tool_call"})
 # The events the router tells the owner of: the end of a run, an approval or a question that waits for them, and what
-# Dot tells them on its own (item 582).
-WATCHED_KINDS: frozenset[str] = frozenset({"run_finished", "approval_requested", QUESTION_LEFT_EVENT, OWNER_TOLD_EVENT})
+# Dot tells them on its own (item 582); and those it follows to tell them what a run does as it works (item 618).
+WATCHED_KINDS: frozenset[str] = frozenset(
+    {"run_finished", "approval_requested", QUESTION_LEFT_EVENT, OWNER_TOLD_EVENT, *_PROGRESS_KINDS}
+)
+# The runs the router has looked at for their progress, at most, before those that are none of a channel's are
+# forgotten.
+_FOLLOWED_MAX: int = 512
 # The kv key of the chat of each channel (``channels.thread.imessage``).
 _THREAD_KEY: str = "channels.thread."
 # A run waits for the owner a few times in a row now and then: the owner is told of the first at once, and of the waits
@@ -115,6 +130,15 @@ class _HeldAsk:
     run_id: str
 
 
+@dataclass
+class _Followed:
+    """A run started from a channel that the router follows for its progress (item 618): the channel it answers on and
+    what it has done since the last message about it."""
+
+    channel_id: ChannelId
+    progress: Progress
+
+
 class ChannelRouter:
     """Posts the owner's messages of the channels into their chats and tells the owner what comes of them. ``base`` is
     the address the links open at (with its trailing slash), never one that carries the access token, and ``None`` when
@@ -130,6 +154,10 @@ class ChannelRouter:
         is_on: Callable[[ChannelId], bool],
         asks_apart_s: float = ASKS_APART_S,
         pictures: Pictures | None = None,
+        progress: Callable[[], bool] | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        progress_first_s: float = FIRST_AFTER_S,
+        progress_apart_s: float = APART_S,
     ) -> None:
         self._store: Store = runtime.store
         self._manager: RunManager = manager
@@ -138,6 +166,14 @@ class ChannelRouter:
         self._is_on: Callable[[ChannelId], bool] = is_on
         # Which files an answer names as pictures and which of them go with it (item 617); with none an answer is text.
         self._pictures: Pictures | None = pictures
+        # Whether a run started from a channel tells what it does while it works (item 618; with none it does not),
+        # the clock the windows of the router go by (a test gives its own), the runs followed by their id (a delegated
+        # run's, and a run that is none of a channel's, are ``None``) and the limits of the messages.
+        self._progress: Callable[[], bool] | None = progress
+        self._clock: Callable[[], float] = clock
+        self._progress_first_s: float = progress_first_s
+        self._progress_apart_s: float = progress_apart_s
+        self._following: dict[str, _Followed | None] = {}
         # The chat of each channel by its thread's id, read from the store as the service starts and made on a first
         # message; one chat is made at a time.
         self._chats: dict[str, ChannelId] = {}
@@ -302,6 +338,7 @@ class ChannelRouter:
                 event: EventRecord = await asyncio.wait_for(feed.queue.get(), self._held_for())
             except TimeoutError:
                 await self._tell_held()
+                await self._tell_progress()
                 continue
             try:
                 await self._tell_of(event)
@@ -313,6 +350,12 @@ class ChannelRouter:
             # An event of Dot itself: it has no run, and no chat of a channel is its own.
             await self._told_on_its_own(OwnerTold.model_validate(event.data))
             return
+        if event.kind in _PROGRESS_KINDS:
+            await self._follow(event)
+            return
+        if event.kind == "run_finished":
+            # What the run did is not told after its end: its answer is.
+            self._following.pop(event.run_id, None)
         run: RunRecord = await self._store.get_run(event.run_id)
         root: RunRecord = await self._root(run)
         channel_id: ChannelId | None = self._chats.get(root.thread_id)
@@ -398,15 +441,15 @@ class ChannelRouter:
         wait of a run for the owner held for it (item 611), or how many. A channel that was switched off, or lost its
         pairing, while its lines were held is not told, and no window starts."""
         for channel_id in tuple(self._held):
-            if time.monotonic() < self._may_tell_at(channel_id):
+            if self._clock() < self._may_tell_at(channel_id):
                 continue
             held: _Held = self._held.pop(channel_id)
             if self._reachable(channel_id):
                 await self._say(channel_id, self._told_line(held), None)
-                self._told_at[channel_id] = time.monotonic()
+                self._told_at[channel_id] = self._clock()
                 log.info("channel_owner_told", channel=channel_id, tells=held.count)
         for channel_id in tuple(self._held_asks):
-            if time.monotonic() < self._may_ask_at(channel_id):
+            if self._clock() < self._may_ask_at(channel_id):
                 continue
             asks: list[_HeldAsk] = self._held_asks.pop(channel_id)
             if self._reachable(channel_id):
@@ -424,7 +467,7 @@ class ChannelRouter:
         await self._say(
             channel_id, self._asking(newest.event, self.link(newest.run_id), len(waiting) - 1), newest.run_id
         )
-        self._asked_at[channel_id] = time.monotonic()
+        self._asked_at[channel_id] = self._clock()
         log.info("channel_wait_told", channel=channel_id, waits=len(waiting))
 
     async def _still_waits(self, ask: _HeldAsk) -> bool:
@@ -440,20 +483,103 @@ class ChannelRouter:
         return record.status in _OPEN
 
     def _held_for(self) -> float | None:
-        """The seconds until the first window ends that has lines held for it; ``None`` when none is held."""
+        """The seconds until the first window ends that has lines held for it, or a message of progress may go; ``None``
+        when nothing waits for a window."""
         ends: list[float] = [self._may_tell_at(channel_id) for channel_id in self._held]
         ends += [self._may_ask_at(channel_id) for channel_id in self._held_asks]
+        if self._tells_progress():
+            ends += [
+                due
+                for followed in self._following.values()
+                if followed is not None and (due := followed.progress.due_at()) is not None
+            ]
         if not ends:
             return None
-        return max(0.0, min(ends) - time.monotonic())
+        return max(0.0, min(ends) - self._clock())
 
     def _may_tell_at(self, channel_id: ChannelId) -> float:
-        """When (``time.monotonic``) the window of ``channel_id`` since its last line of tells ends."""
+        """When (on the router's clock) the window of ``channel_id`` since its last line of tells ends."""
         return self._told_at.get(channel_id, -self._asks_apart_s) + self._asks_apart_s
 
     def _may_ask_at(self, channel_id: ChannelId) -> float:
-        """When (``time.monotonic``) the window of ``channel_id`` since its last line about a wait ends."""
+        """When (on the router's clock) the window of ``channel_id`` since its last line about a wait ends."""
         return self._asked_at.get(channel_id, -self._asks_apart_s) + self._asks_apart_s
+
+    # ----- progress (item 618) ---------------------------------------------------------------
+
+    def _tells_progress(self) -> bool:
+        return self._progress is not None and self._progress()
+
+    async def _follow(self, event: EventRecord) -> None:
+        """A step of a run (its start, the reply of the model, a call of a tool), told to the owner as progress when
+        the run was started from a channel, as a message when one may go. What a tool answered is not read here."""
+        if not self._tells_progress():
+            return
+        followed: _Followed | None = await self._followed(event)
+        if followed is None:
+            return
+        if event.kind in ("assistant", "tool_call"):
+            # Masked before it is cut: a secret cut in two is no secret a pattern knows (the loop masked it already, as
+            # the event was made; this does not rely on that).
+            known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+            if event.kind == "assistant":
+                thinking: object = event.data.get("thinking")
+                if isinstance(thinking, str):
+                    followed.progress.thought(first_sentence(redact_known(thinking, known)))
+            else:
+                tool: object = event.data.get("tool")
+                args: JsonValue = redact_json(event.data.get("args"), known)
+                words: str | None = (
+                    step_words(tool, args if isinstance(args, dict) else {}) if isinstance(tool, str) else None
+                )
+                if words is not None:
+                    followed.progress.step(words)
+        await self._tell_progress()
+
+    async def _followed(self, event: EventRecord) -> _Followed | None:
+        """The run ``event`` belongs to, followed for its progress, or ``None``: only the steps of a run that a message
+        on a channel started count, not those of a run it delegated to, nor of any run of another kind. The store is
+        asked once for a run; the answer is kept until the run ends."""
+        if event.run_id in self._following:
+            return self._following[event.run_id]
+        run: RunRecord = await self._store.get_run(event.run_id)
+        channel_id: ChannelId | None = self._chats.get(run.thread_id)
+        followed: _Followed | None = None
+        if run.parent_run_id is None and channel_id is not None and run.source == channel_id:
+            started: float = self._clock()
+            followed = _Followed(channel_id, Progress(started, self._progress_first_s, self._progress_apart_s))
+        if len(self._following) >= _FOLLOWED_MAX:
+            self._following = {run_id: kept for run_id, kept in self._following.items() if kept is not None}
+        self._following[event.run_id] = followed
+        return followed
+
+    async def _tell_progress(self) -> None:
+        """Send the message of progress of each run followed whose time has come (see
+        :mod:`~dotagent.channels.progress`). A channel that was switched off, or has nobody paired, is told nothing,
+        and what the run did meanwhile is not kept for it."""
+        if not self._tells_progress():
+            return
+        now: float = self._clock()
+        for run_id, followed in tuple(self._following.items()):
+            if followed is None:
+                continue
+            due: float | None = followed.progress.due_at()
+            if due is None or now < due:
+                continue
+            if not self._reachable(followed.channel_id):
+                followed.progress.forget()
+                continue
+            text: str | None = followed.progress.message(now)
+            if text is not None:
+                await self._say_progress(followed.channel_id, text, run_id)
+
+    async def _say_progress(self, channel_id: ChannelId, text: str, run_id: str) -> None:
+        """Send a message of progress: masked of the secrets Dot holds as an answer is, and within the channel's
+        size. It is no Markdown, so it is not read as such; a failure is logged."""
+        channel: Channel = self._channels[channel_id]
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        await self._deliver(channel_id, redact_known(text, known)[: channel.limit], known)
+        log.info("channel_progress_told", channel=channel_id, run_id=run_id, lines=text.count("\n") + 1)
 
     def _told_line(self, held: _Held) -> str:
         """The one line of the tells held for a channel: the tell itself when it is the only one, else how many there

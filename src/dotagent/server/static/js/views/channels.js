@@ -3,7 +3,8 @@
 // iMessage reads the owner's conversation with themselves in Messages, or with their iPhone's Apple ID when it is not the
 // Mac's own (item 595): its card has the switch, the numbers and addresses paired (each with a code sent to it that the
 // owner types back from their iPhone), what macOS has granted (Full Disk Access to read Messages' database and Automation
-// to send in it) and what the channel sees of that database, with Check now, which looks at once.
+// to send in it) and what the channel sees of that database, with Check now, which looks at once. A run started from
+// there tells what it does while it works, a few messages (item 618): the card has a switch for that too.
 
 import { api } from "../api.js";
 import { linkFact, lookWords, seenFacts } from "../channelfacts.js";
@@ -242,7 +243,7 @@ export function mount(root, ctx) {
     return row;
   }
 
-  function imessageSection(view) {
+  function imessageSection(view, progressOn) {
     const toggle = switchRowSetting({
       label: "iMessage",
       hint: "Dot reads your conversation with yourself on this Mac, or the one your iPhone's Apple ID has with this Mac's, and answers in it, and tells you there what it has to say on its own: the morning brief and your watchers. Only what you send from now on is read.",
@@ -253,6 +254,17 @@ export function mount(root, ctx) {
       onToggled: () => toggle.paint(),
     });
     toggle.paint();
+    // What a run started from the channel tells while it works (item 618): `[channels] progress`, live.
+    const progress = switchRowSetting({
+      label: "Progress messages",
+      hint: "While a run you started from iMessage works, Dot sends a few lines of what it is doing: the commands it runs, the tools it uses and its newest thought. The first after 15 seconds, then at most one every 30 seconds and six in all. Off, or for a run that ends sooner, only the answer comes.",
+      read: () => progressOn,
+      write: async (on) => {
+        await post("/channels/progress", { on }, on ? "Dot tells you what a run is doing as it works." : "Dot sends only the answers.");
+      },
+      onToggled: () => progress.paint(),
+    });
+    progress.paint();
     const warning =
       view.seen.warning === null
         ? null
@@ -265,7 +277,7 @@ export function mount(root, ctx) {
       view.chat_run_id === null
         ? null
         : el("a", { class: "btn sm", href: `#/runs/${view.chat_run_id}` }, icon("message"), el("span", null, "Open the chat"));
-    const card = setCard(toggle.element, handlesRow(view), ...permissionRows(view), seenRow(view), warning, problem);
+    const card = setCard(toggle.element, progress.element, handlesRow(view), ...permissionRows(view), seenRow(view), warning, problem);
     card.setAttribute("role", "group");
     card.setAttribute("aria-label", "iMessage");
     return setSection({
@@ -285,7 +297,7 @@ export function mount(root, ctx) {
       return;
     }
     shown = drawn;
-    holder.replaceChildren(el("div", { class: "set-sections" }, imessageSection(current.imessage)));
+    holder.replaceChildren(el("div", { class: "set-sections" }, imessageSection(current.imessage, current.progress)));
   }
 
   async function load() {

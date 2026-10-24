@@ -31,6 +31,7 @@ from dotagent.core.errors import ChannelError, DesktopError
 from dotagent.core.paths import config_path, env_file_path
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import write_env_value
 from dotagent.server.app import create_app
@@ -568,7 +569,7 @@ async def test_a_daemon_that_starts_with_the_channel_on_reads_it_from_the_start(
 ) -> None:
     replies.clear()
     configured: Runtime = dataclasses.replace(
-        runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True)})
+        runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True, progress="steps")})
     )
     osascript: Osascript = Osascript()
     channels: Channels = Channels(
@@ -609,7 +610,7 @@ async def test_a_message_from_the_iphones_other_apple_id_starts_a_run_and_its_an
     command."""
     replies.clear()
     configured: Runtime = dataclasses.replace(
-        runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True)})
+        runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True, progress="steps")})
     )
     osascript: Osascript = Osascript()
     channels: Channels = Channels(
@@ -667,7 +668,7 @@ async def test_the_link_at_the_end_of_an_answer_is_not_read_back_as_a_command_wh
     another."""
     replies.clear()
     configured: Runtime = dataclasses.replace(
-        runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True)})
+        runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True, progress="steps")})
     )
     osascript: Osascript = Osascript()
     channels: Channels = Channels(
@@ -722,7 +723,7 @@ async def _reading(
         runtime,
         config=runtime.config.model_copy(
             update={
-                "channels": ChannelsConfig(imessage=True),
+                "channels": ChannelsConfig(imessage=True, progress="steps"),
                 "server": runtime.config.server.model_copy(update={"reach": [] if reach is None else reach}),
             }
         ),
@@ -944,3 +945,130 @@ async def test_a_server_without_channels_says_so(runtime: Runtime, manager: RunM
     async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8765") as http:
         answered: httpx.Response = await http.get("/api/channels", headers={"Authorization": f"Bearer {TOKEN}"})
     assert answered.status_code == 422 and "without channels" in answered.json()["message"]
+
+
+async def test_a_run_that_works_longer_than_a_moment_tells_what_it_does_while_it_works_and_then_answers(
+    runtime: Runtime, manager: RunManager, messages: MessagesDb, replies: Replies
+) -> None:
+    """Item 618 on a real run, with the limits made short (half a second to the first message and between two): the
+    model thinks, runs a command and looks into a folder, then waits for the gate; the message of progress comes from
+    the timer, with no event after the half second; the answer follows when the model goes on, and nothing after it."""
+    replies.clear()
+    configured: Runtime = dataclasses.replace(
+        runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True, progress="steps")})
+    )
+    osascript: Osascript = Osascript()
+    channels: Channels = Channels(
+        configured,
+        manager,
+        "127.0.0.1",
+        8765,
+        script=osascript,
+        messages_db=messages.path,
+        macos=FakeMacos(),
+        poll_s=0.05,
+        progress_first_s=0.5,
+        progress_apart_s=0.5,
+        **own_places(),
+    )
+    await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
+    await channels.start()
+    try:
+        own: int = messages.chat(PHONE)
+        await asyncio.sleep(0.4)
+        replies.think("I should greet first. Then I will look around.")
+        replies.push(
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo hello from the run"}),)
+            ),
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="list_dir", arguments={"path": "."}),)),
+            finish("Greeted."),
+        )
+        replies.gate = asyncio.Event()
+        replies.hold_from = 2
+        started: float = time.monotonic()
+        messages.message(own, "greet me and look around", at=time.time())
+        await _until(lambda: len(osascript.sent) == 1, "the message of progress")
+        waited: float = time.monotonic() - started
+        handle, told = osascript.sent[0]
+        lines: list[str] = told.removeprefix(MARKER).splitlines()
+        assert handle == PHONE and told.startswith(MARKER)
+        assert lines[0].startswith("Working for ") and lines[0].endswith(" s:")
+        assert lines[1:] == ["$ echo hello from the run", "looked in a folder", "💭 I should greet first."]
+        assert waited >= 0.4
+        await asyncio.sleep(0.8)
+        assert len(osascript.sent) == 1
+        assert replies.gate is not None
+        replies.gate.set()
+        await _until(lambda: len(osascript.sent) == 2, "the answer")
+        assert osascript.sent[1] == (PHONE, f"{MARKER}Greeted.")
+        await asyncio.sleep(0.8)
+        assert len(osascript.sent) == 2
+    finally:
+        replies.clear()
+        await channels.stop()
+
+
+async def test_a_run_that_ends_in_a_moment_tells_only_its_answer_whatever_it_did(
+    runtime: Runtime, manager: RunManager, messages: MessagesDb, replies: Replies
+) -> None:
+    replies.clear()
+    configured: Runtime = dataclasses.replace(
+        runtime, config=runtime.config.model_copy(update={"channels": ChannelsConfig(imessage=True, progress="steps")})
+    )
+    osascript: Osascript = Osascript()
+    channels: Channels = Channels(
+        configured,
+        manager,
+        "127.0.0.1",
+        8765,
+        script=osascript,
+        messages_db=messages.path,
+        macos=FakeMacos(),
+        poll_s=0.05,
+        progress_first_s=60.0,
+        **own_places(),
+    )
+    await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
+    await channels.start()
+    try:
+        own: int = messages.chat(PHONE)
+        await asyncio.sleep(0.4)
+        replies.think("A quick one.")
+        replies.push(
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="list_dir", arguments={"path": "."}),)),
+            finish("Quickly done."),
+        )
+        messages.message(own, "a quick one", at=time.time())
+        await _until(lambda: len(osascript.sent) == 1, "the answer")
+        await asyncio.sleep(0.6)
+        assert osascript.sent == [(PHONE, f"{MARKER}Quickly done.")]
+    finally:
+        await channels.stop()
+
+
+async def test_the_messages_of_progress_are_switched_with_a_setting_kept_in_the_config(world: World) -> None:
+    refused: httpx.Response = await world.http.post("/api/channels/progress", json={"on": False})
+    assert refused.status_code == 401
+    assert (await world.get("/api/channels"))["progress"] is True
+    assert world.channels.progress is True
+    off: JsonObject = await world.post("/api/channels/progress", {"on": False})
+    assert off["progress"] is False and world.channels.progress is False
+    assert tomllib.loads(config_path().read_text(encoding="utf-8"))["channels"]["progress"] == "off"
+    assert (await world.get("/api/channels"))["progress"] is False
+    on: JsonObject = await world.post("/api/channels/progress", {"on": True})
+    assert on["progress"] is True and world.channels.progress is True
+    assert tomllib.loads(config_path().read_text(encoding="utf-8"))["channels"]["progress"] == "steps"
+    # The setting is the owner's alone to write: only a boolean is taken.
+    await world.post("/api/channels/progress", {"on": "steps"}, 422)
+
+
+async def test_a_config_file_that_cannot_be_changed_leaves_the_progress_switch_as_it_was(world: World) -> None:
+    saved: str = config_path().read_text(encoding="utf-8")
+    config_path().write_text("this is [not valid toml", encoding="utf-8")
+    try:
+        refused: JsonObject = await world.post("/api/channels/progress", {"on": False}, 422)
+        assert "not valid TOML" in str(refused["message"])
+        assert (await world.get("/api/channels"))["progress"] is True and world.channels.progress is True
+    finally:
+        config_path().write_text(saved, encoding="utf-8")
