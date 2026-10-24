@@ -58,9 +58,13 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 TOKEN: str = "file-panel-test-token"
 WAIT_S: float = 30.0
 ANSWER: str = (
-    "The rows are in `~/Documents/rows.csv`, the plan in `~/Documents/todo.md` and the chart in"
-    " `~/Documents/chart.png`; the notes in `~/.private/notes.txt` stay where they are."
+    "The rows are in `~/Documents/rows.csv`, the plan in `~/Documents/todo.md`, the chart in"
+    " `~/Documents/chart.png` and the script in `~/Documents/total.py`; the notes in `~/.private/notes.txt` stay where"
+    " they are."
 )
+# A source file, which the panel shows as code: its lines numbered and its words coloured by kind (item 624).
+SCRIPT: str = 'def total(rows):\n    # The sum of the amounts.\n    return sum(row["amount"] for row in rows) // 1\n'
+
 # Markup in a text file, which the panel shows as it is written.
 TODO: str = "# To do\n\nPay the <b>rent</b> first.\n"
 # What each run writes in the workspace before it answers.
@@ -166,6 +170,7 @@ def _user_home(root: Path) -> Path:
     (home / "Documents" / "rows.csv").write_text("Item;Amount\nRent;1200,50\nFood;300\n", encoding="utf-8")
     (home / "Documents" / "todo.md").write_text(TODO, encoding="utf-8")
     (home / "Documents" / "chart.png").write_bytes(_picture())
+    (home / "Documents" / "total.py").write_text(SCRIPT, encoding="utf-8")
     (home / ".private" / "notes.txt").write_text("Private notes.\n", encoding="utf-8")
     (home / "Documents" / "tidy.sh").write_text("#!/bin/sh\necho tidy\n", encoding="utf-8")
     return home
@@ -332,7 +337,7 @@ async def _one_size(
 
     # A path the answer names: a CSV table as a grid, split at its semicolons, which opens on the Mac.
     paths: Locator = page.locator("button.code-path")
-    await expect(paths).to_have_count(4)
+    await expect(paths).to_have_count(5)
     rows: Locator = paths.filter(has_text="rows.csv")
     await rows.click()
     await expect(view).to_have_attribute("data-kind", "table")
@@ -357,7 +362,8 @@ async def _one_size(
     await expect(view.get_by_role("button", name="Copy the text")).to_be_visible()
     await _close(page, view, todo)
 
-    # An image, as it is.
+    # An image, as it is: in a dialog it is a frame around the picture rather than a tall sheet with the picture at its
+    # top, and a press shows it at full size over the page.
     chart: Locator = paths.filter(has_text="chart.png")
     await chart.click()
     await expect(view).to_have_attribute("data-kind", "image")
@@ -365,7 +371,36 @@ async def _one_size(
     await expect(picture).to_have_attribute("src", re.compile(r"^blob:"))
     assert await picture.evaluate("(image) => image.decode().then(() => image.naturalWidth)") == 320
     await expect(view.get_by_role("button", name="Copy the text")).to_be_hidden()
+    if width < 960 or panel != "on":
+        frame: dict[str, float] | None = await view.locator(".file-body").bounding_box()
+        drawn: dict[str, float] | None = await view.locator(".file-picture").bounding_box()
+        assert frame is not None and drawn is not None
+        assert frame["height"] - drawn["height"] <= 32, (frame, drawn)
+    await view.get_by_role("button", name="chart.png, show at full size").click()
+    lightbox: Locator = page.locator("dialog.lightbox")
+    await expect(lightbox).to_be_visible()
+    await expect(lightbox.locator("img")).to_have_attribute("src", re.compile(r"^blob:"))
+    await page.keyboard.press("Escape")
+    await expect(lightbox).not_to_be_visible()
     await _close(page, view, chart)
+
+    # A source file as code (item 624): its language and path over it, its lines numbered, its words coloured by kind,
+    # and the text whole a press away.
+    script: Locator = paths.filter(has_text="total.py")
+    await script.click()
+    await expect(view).to_have_attribute("data-kind", "text")
+    editor: Locator = view.locator("pre.file-code-editor")
+    await expect(editor).to_be_visible()
+    await expect(view.locator(".file-code-language")).to_have_text("python")
+    await expect(view.locator(".file-code-breadcrumb")).to_contain_text("total.py")
+    await expect(editor.locator(".file-code-gutter")).to_have_text(["1", "2", "3", "4"])
+    await expect(editor.locator(".file-code-keyword").first).to_have_text("def")
+    # Python's "//" is division, not a comment (the review of item 624).
+    await expect(editor.locator(".file-code-comment")).to_have_count(1)
+    await expect(editor.locator(".file-code-comment")).to_have_text("# The sum of the amounts.")
+    await expect(editor.locator(".file-code-string")).to_have_text('"amount"')
+    await expect(view.get_by_role("button", name="Copy the text")).to_be_visible()
+    await _close(page, view, script)
 
     # A path the panel does not show says why; Escape closes it and the panel is back as it was.
     await paths.filter(has_text="notes.txt").click()

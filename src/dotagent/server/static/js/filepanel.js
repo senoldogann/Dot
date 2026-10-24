@@ -13,7 +13,7 @@ import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { segmented } from "./panels.js";
 import { prose } from "./prose.js";
-import { toast } from "./ui.js";
+import { showImage, toast } from "./ui.js";
 
 const KINDS = {
   pdf: "PDF",
@@ -371,9 +371,84 @@ function officeView(file, lookAddress, views, toolbar, body) {
 }
 
 // ------------------------------------------------------------------------------------------------ text
-/** A text as text; a Markdown file formatted as an answer is, its HTML never drawn, with its source a click away. */
+// A source file, by its extension, reads as code (item 624): its lines numbered and its words coloured by their kind.
+const CODE_FILE = /\.(?:py|pyi|js|mjs|cjs|jsx|ts|tsx|json|css|scss|html|xml|sh|bash|zsh|rs|go|java|kt|kts|c|h|cc|cpp|hpp|cs|php|rb|sql|toml|yaml|yml|ini|swift|dart|vue|svelte)$/i;
+const CODE_LANGUAGES = {
+  py: "python", pyi: "python", js: "javascript", mjs: "javascript", cjs: "javascript", jsx: "javascript",
+  ts: "typescript", tsx: "typescript", json: "json", css: "css", scss: "scss", html: "html", xml: "xml",
+  sh: "shell", bash: "shell", zsh: "shell", rs: "rust", go: "go", java: "java", kt: "kotlin", kts: "kotlin",
+  c: "c", h: "c", cc: "cpp", cpp: "cpp", hpp: "cpp", cs: "csharp", php: "php", rb: "ruby", sql: "sql",
+  toml: "toml", yaml: "yaml", yml: "yaml", ini: "ini", swift: "swift", dart: "dart", vue: "vue", svelte: "svelte",
+};
+const CODE_KEYWORDS = new Set(
+  "and as assert async await break case catch class const continue def del elif else except export extends finally for from function global if import in interface is let match new nonlocal not or pass raise return static struct switch throw try type var while with yield pub fn impl use mod where enum trait self this True False None null undefined true false".split(" "),
+);
+const CODE_COMMENT_LANGUAGES = new Set(["python", "ruby", "shell", "yaml", "toml", "ini"]);
+
+function codeTokenClass(token, language) {
+  if (/^[\"'`]/.test(token)) {
+    return "file-code-string";
+  }
+  if (token.startsWith("//") || token.startsWith("/*") || (token.startsWith("#") && CODE_COMMENT_LANGUAGES.has(language))) {
+    return "file-code-comment";
+  }
+  if (/^\d/.test(token)) {
+    return "file-code-number";
+  }
+  if (/^(?:true|false|null|undefined|None|True|False)$/.test(token)) {
+    return "file-code-literal";
+  }
+  return CODE_KEYWORDS.has(token) ? "file-code-keyword" : null;
+}
+
+// The words of a line: strings, comments as the language writes them (a "#" in Python, the shells and the files of
+// settings, "//" and "/* */" in the others, so that Python's "//" is division and Rust's "#[" no comment), names,
+// numbers, spaces and the single marks between them.
+const HASH_TOKENS = /(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|#[^\n]*|\b[A-Za-z_$][\w$]*\b|\b\d+(?:\.\d+)?\b|\s+|.)/g;
+const SLASH_TOKENS = /(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/.*|\/\*.*?\*\/|\b[A-Za-z_$][\w$]*\b|\b\d+(?:\.\d+)?\b|\s+|.)/g;
+
+function codeLine(line, language) {
+  const tokens = line.match(CODE_COMMENT_LANGUAGES.has(language) ? HASH_TOKENS : SLASH_TOKENS) ?? [];
+  const children = tokens.map((token) => {
+    const className = codeTokenClass(token, language);
+    return className === null ? document.createTextNode(token) : el("span", { class: className }, token);
+  });
+  return children.length === 0 ? [document.createTextNode(" ")] : children;
+}
+
+function codeView(file, toolbar, body, cut) {
+  const extension = file.name.match(/\.([^.]+)$/)?.[1]?.toLowerCase() ?? "";
+  const language = CODE_LANGUAGES[extension] ?? "code";
+  const path = file.path ?? file.name;
+  const breadcrumb = path.split(/[\\/]/).filter(Boolean).join(" / ");
+  fill(
+    toolbar,
+    el("div", { class: "file-code-path", title: path },
+      el("span", { class: "file-code-language" }, language),
+      el("span", { class: "file-code-breadcrumb" }, breadcrumb),
+    ),
+  );
+  const code = el("code");
+  const lines = file.preview.text.replace(/\r\n?/g, "\n").split("\n");
+  for (const [index, line] of lines.entries()) {
+    code.append(
+      el("span", { class: "file-code-row" },
+        el("span", { class: "file-code-gutter", "aria-hidden": "true" }, String(index + 1)),
+        el("span", { class: "file-code-content" }, ...codeLine(line, language)),
+      ),
+    );
+  }
+  fill(body, el("pre", { class: "file-text file-code-editor", "aria-label": `${language} source code` }, code), cut);
+}
+
+/** A text as text; a Markdown file formatted as an answer is, its HTML never drawn, with its source a click away; a
+ * source file as code. */
 function textView(file, toolbar, body) {
   const cut = file.preview.cut ? hint("The file is longer than this; open it on the Mac to read it all.") : null;
+  if (CODE_FILE.test(file.name)) {
+    codeView(file, toolbar, body, cut);
+    return;
+  }
   const source = () => el("pre", { class: "file-text" }, file.preview.text);
   if (!MARKDOWN_NAME.test(file.name)) {
     fill(body, source(), cut);
@@ -443,16 +518,33 @@ function pdfView(file, preview, scroller, keep, cleanups) {
   return el("div", { class: "file-pages" }, pages);
 }
 
+/** A picture, drawn whole in the panel, which shows it at full size over the page when it is pressed, as the
+ * screenshots of a run do. */
 function imageView(file, keep) {
-  const image = el("img", { class: "file-image", alt: file.name });
-  const holder = el("div", { class: "file-picture" }, image);
+  const image = el("img", { class: "file-image", alt: "", decoding: "async" });
+  const holder = el(
+    "button",
+    {
+      class: "file-picture",
+      type: "button",
+      title: "Show the picture at full size",
+      "aria-label": `${file.name}, show at full size`,
+    },
+    image,
+  );
   blobUrl(`/files/image${query({ path: file.path })}`).then(
     (url) => {
       if (keep(url) !== null) {
         image.src = url;
+        holder.addEventListener("click", () => showImage(url, file.name));
       }
     },
-    (error) => holder.replaceChildren(note("warn", `The image could not be loaded: ${error.message}`)),
+    (error) => {
+      holder.disabled = true;
+      holder.removeAttribute("aria-label");
+      holder.removeAttribute("title");
+      holder.replaceChildren(note("warn", `The image could not be loaded: ${error.message}`));
+    },
   );
   return holder;
 }

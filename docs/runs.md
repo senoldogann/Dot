@@ -286,9 +286,13 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   TSV table (split at its commas, or at its semicolons where a comma marks decimals), a grid with a tab for each sheet,
   a click on a cell saying what it holds (its formula and the value last worked out); a Word document its headings,
   paragraphs, lists and tables; a presentation its slides with their text, tables, charts' series and notes; an image
-  itself; a Markdown file (`.md`, `.markdown`) formatted as an answer is, with its headings, lists, tables and code, and
-  as it is written a click away (item 269), its HTML never drawn; any other text as text, never as a page. On a page
-  without the panel (the new chat's, an agent's) the file opens in a dialog. **Copy the text** in the panel's head takes
+  itself, whole in a frame that fits it, and at full size over the page when it is pressed (Escape closes the picture
+  first; item 624); a Markdown file (`.md`, `.markdown`) formatted as an answer is, with its headings, lists, tables and
+  code, and as it is written a click away (item 269), its HTML never drawn; a source file (Python, JavaScript,
+  TypeScript, shell, Rust, Go, Swift, SQL, YAML and the like, by its extension) as code, its lines numbered and its
+  words coloured by their kind (keywords, strings, numbers, comments), its language and its path over it (item 624); any
+  other text as text, never as a page. On a page without the panel (the new chat's, an agent's) the file opens in a
+  dialog. **Copy the text** in the panel's head takes
   what the panel reads of a text or Markdown file, a PDF (its text, page by page, up to 512 KB), a Word document or a
   presentation (item 403). **Open on the Mac** opens a document in its application (`open`), never a script or a
   program. Close or Escape gives the panel back as it was. The file stays as the chat goes on at its next run (a message
