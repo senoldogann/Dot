@@ -357,7 +357,8 @@ async def _one_size(
     await expect(view.get_by_role("button", name="Copy the text")).to_be_visible()
     await _close(page, view, todo)
 
-    # An image, as it is.
+    # An image, as it is: in a dialog it is a frame around the picture rather than a tall sheet with the picture at its
+    # top, and a press shows it larger over the page.
     chart: Locator = paths.filter(has_text="chart.png")
     await chart.click()
     await expect(view).to_have_attribute("data-kind", "image")
@@ -365,6 +366,17 @@ async def _one_size(
     await expect(picture).to_have_attribute("src", re.compile(r"^blob:"))
     assert await picture.evaluate("(image) => image.decode().then(() => image.naturalWidth)") == 320
     await expect(view.get_by_role("button", name="Copy the text")).to_be_hidden()
+    if width < 960 or panel != "on":
+        frame: dict[str, float] | None = await view.locator(".file-body").bounding_box()
+        drawn: dict[str, float] | None = await view.locator(".file-picture").bounding_box()
+        assert frame is not None and drawn is not None
+        assert frame["height"] - drawn["height"] <= 32, (frame, drawn)
+    await view.get_by_role("button", name="chart.png, show larger").click()
+    lightbox: Locator = page.locator("dialog.lightbox")
+    await expect(lightbox).to_be_visible()
+    await expect(lightbox.locator("img")).to_have_attribute("src", re.compile(r"^blob:"))
+    await page.keyboard.press("Escape")
+    await expect(lightbox).not_to_be_visible()
     await _close(page, view, chart)
 
     # A path the panel does not show says why; Escape closes it and the panel is back as it was.

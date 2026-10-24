@@ -13,7 +13,7 @@ import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { segmented } from "./panels.js";
 import { prose } from "./prose.js";
-import { toast } from "./ui.js";
+import { showImage, toast } from "./ui.js";
 
 const KINDS = {
   pdf: "PDF",
@@ -443,16 +443,33 @@ function pdfView(file, preview, scroller, keep, cleanups) {
   return el("div", { class: "file-pages" }, pages);
 }
 
+/** A picture, drawn whole in the panel, which shows it larger over the page when it is pressed, as the
+ * screenshots of a run do. */
 function imageView(file, keep) {
-  const image = el("img", { class: "file-image", alt: file.name });
-  const holder = el("div", { class: "file-picture" }, image);
+  const image = el("img", { class: "file-image", alt: "", decoding: "async" });
+  const holder = el(
+    "button",
+    {
+      class: "file-picture",
+      type: "button",
+      title: "Show the picture larger",
+      "aria-label": `${file.name}, show larger`,
+    },
+    image,
+  );
   blobUrl(`/files/image${query({ path: file.path })}`).then(
     (url) => {
       if (keep(url) !== null) {
         image.src = url;
+        holder.addEventListener("click", () => showImage(url, file.name));
       }
     },
-    (error) => holder.replaceChildren(note("warn", `The image could not be loaded: ${error.message}`)),
+    (error) => {
+      holder.disabled = true;
+      holder.removeAttribute("aria-label");
+      holder.removeAttribute("title");
+      holder.replaceChildren(note("warn", `The image could not be loaded: ${error.message}`));
+    },
   );
   return holder;
 }

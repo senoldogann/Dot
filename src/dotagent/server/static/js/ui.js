@@ -106,6 +106,19 @@ export function showImage(url, description) {
     const image = el("img", { alt: "" });
     viewer = el("dialog", { class: "lightbox" }, image);
     viewer.addEventListener("click", () => viewer.close());
+    // Escape closes the picture before the page behind it: the panel a picture was opened from answers Escape too, and
+    // would take the key first, leaving the picture over what it showed.
+    window.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Escape" && viewer.open) {
+          event.preventDefault();
+          event.stopPropagation();
+          viewer.close();
+        }
+      },
+      true,
+    );
     document.body.append(viewer);
   }
   const image = viewer.querySelector("img");
