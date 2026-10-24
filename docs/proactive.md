@@ -7,7 +7,9 @@ notifications and, when it is on, iMessage share (see [Telling you](#telling-you
 
 ## Morning brief
 
-The **Morning brief** card is at the head of Schedules. It has a switch, the time of day (08:00, read in `[scheduler]
+The **Morning brief** card stands under your schedules on the Schedules page, as one line: its name, when it writes
+("Every day at 08:00", or Off) and its switch; the arrow at its right opens its settings, and the page keeps them open
+or folded as you left them (item 609). Its settings are the time of day (08:00, read in `[scheduler]
 timezone`, which is the zone of this Mac unless the configuration says another), every day or the weekdays, and a box,
 **Also tell me about…**, for your own lines, one thing each (at most 20 lines of 300 characters). Switched on, Dot
 writes the brief at that time, and your phone gets the push of its first line, which opens the brief in its chat.
@@ -73,7 +75,8 @@ goes to your phone's push service and, with iMessage on, to Apple's iMessage ser
 
 ## Watchers
 
-**Watchers** is the panel under the brief on Schedules; **New watcher** makes one. A watcher has:
+**Watchers** is the panel under the brief on Schedules (with none, its head says *None yet* and a line says what a
+watcher does, item 609); **New watcher** makes one. A watcher has:
 
 - a **kind**: **New mail** in a Google or Microsoft account you signed in (see [Mail and
   calendars](runs.md#mail-and-calendars)); **Calendar**, an event about to start in one of those accounts; or

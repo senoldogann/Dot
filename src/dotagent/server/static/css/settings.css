@@ -2981,23 +2981,31 @@
   overflow-wrap: anywhere;
 }
 
-/* ---------- The Morning brief card (item 570) at the head of Schedules: its name and switch, the time, the days and the
-   owner's own lines, then when it fires next and when it last did. ---------- */
+/* ---------- The Morning brief card (item 570) under the owner's schedules: a line with its name, when it writes and
+   its switch, and folded under it (item 609) the time, the days and the owner's own lines, then when it fires next
+   and when it last did. ---------- */
 
 .brief-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
 }
 
-.brief-head .switch {
-  margin-top: var(--space-half);
+.brief-opener .icon {
+  transition: transform var(--motion-quick) var(--ease);
+}
+
+.brief-card.open .brief-opener .icon {
+  transform: rotate(90deg);
+}
+
+.brief-card:not(.open) {
+  gap: 0;
 }
 
 .brief-mark {
   display: inline-flex;
   flex: none;
-  margin-top: var(--space-half);
   color: var(--muted);
 }
 
@@ -3024,8 +3032,9 @@
   justify-content: flex-end;
 }
 
-/* ---------- The Watchers panel (item 571) under the brief: a row for each watcher, the form that makes one when it is
-   asked for, and the failure of a look written on the row it belongs to. ---------- */
+/* ---------- The Watchers panel (item 571) under the brief: a row for each watcher (none: its head and its line, item
+   609), the form that makes one when it is asked for, and the failure of a look written on the row it belongs to.
+   ---------- */
 
 .watcher-lead {
   margin: 0;

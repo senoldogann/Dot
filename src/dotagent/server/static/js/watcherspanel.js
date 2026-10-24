@@ -8,7 +8,7 @@
 import { ago, clip, el, joined, plural } from "./dom.js";
 import { api } from "./api.js";
 import { icon } from "./icons.js";
-import { emptyPanel, field, inlineError, loadingPanel, paintOpener, segmented } from "./panels.js";
+import { field, inlineError, loadingPanel, paintOpener, segmented } from "./panels.js";
 import { onLifecycle } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
 
@@ -298,9 +298,10 @@ export function mountWatchers() {
   const holder = el("div", null, loadingPanel());
   const count = el("span", { class: "hint" });
   const formSlot = el("div", { class: "watcher-form-slot", hidden: true });
-  const addButton = el("button", { class: "btn primary sm", type: "button" });
+  // The page's one primary button is New schedule: a watcher is made from a quieter one (item 609).
+  const addButton = el("button", { class: "btn sm", type: "button" });
   paintOpener(addButton, "New watcher", false);
-  const lead = el("p", { class: "hint watcher-lead" }, "Dot looks for you and tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and as a line in the chat Watchers.");
+  const lead = el("p", { class: "hint watcher-lead" }, "Dot tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and in the chat Watchers.");
   const element = el(
     "section",
     { class: "memory-panel notes-panel watcher-panel", dataset: { watchers: "" } },
@@ -314,9 +315,10 @@ export function mountWatchers() {
     if (views === null || editing !== null) {
       return;
     }
-    count.textContent = views.length === 0 ? "" : plural(views.length, "watcher", "watchers");
+    // With none, the head says so and the panel is its head and its line (item 609): no picture of an empty list.
+    count.textContent = views.length === 0 ? "None yet" : plural(views.length, "watcher", "watchers");
     if (views.length === 0) {
-      holder.replaceChildren(emptyPanel("bell", "No watchers yet", "Add one with New watcher and Dot will tell you when something you care about comes."));
+      holder.replaceChildren();
       return;
     }
     const handlers = {
@@ -338,7 +340,7 @@ export function mountWatchers() {
       views = fresh;
       options = offered;
       lead.textContent = offered.looking
-        ? `Dot looks for you and tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and as a line in the chat Watchers. At most ${plural(offered.tells_per_hour, "tell", "tells")} an hour for one watcher.`
+        ? "Dot tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and in the chat Watchers."
         : "The watchers are off in the configuration ([watchers] enabled): none of them looks.";
       paint();
     } catch (error) {

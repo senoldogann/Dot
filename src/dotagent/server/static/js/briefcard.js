@@ -1,12 +1,14 @@
-// The Morning brief card at the head of Schedules (item 570): a switch, the time of day, every day or the weekdays, and the
-// owner's own lines ("Also tell me about…"). On, Dot writes the brief at that time as a schedule of its own (`GET` and
-// `PUT /api/brief`), a run that only reads, whose first line goes to the phone and which opens in the chat "Morning
-// brief". The schedule shows in the list below with its label and switches off there too, which the card follows.
+// The Morning brief card of Schedules (item 570): a switch, the time of day, every day or the weekdays, and the owner's
+// own lines ("Also tell me about…"). On, Dot writes the brief at that time as a schedule of its own (`GET` and `PUT
+// /api/brief`), a run that only reads, whose first line goes to the phone and which opens in the chat "Morning brief".
+// The schedule shows in the list above with its label and switches off there too, which the card follows. The card is a
+// line of its own (item 609): its name, when it writes, and its switch, its settings folded under it until opened.
 
 import { api } from "./api.js";
 import { clip, el, joined } from "./dom.js";
 import { icon } from "./icons.js";
 import { field, inlineError, segmented } from "./panels.js";
+import { readPref, writePref } from "./prefs.js";
 import { attempt, toast } from "./ui.js";
 
 const DAYS = [
@@ -15,6 +17,22 @@ const DAYS = [
 ];
 const LINES_PLACEHOLDER = "One thing a line: the roof repair, anything from the visa office";
 const LAST_STATUS_CHARS = 60;
+// Whether the owner left the card's settings open, kept between visits (item 609).
+const OPEN_KEY = "dot.brief.open";
+const OPEN_LABEL = "Show the brief's settings";
+const CLOSE_LABEL = "Hide the brief's settings";
+
+/** The card's line under its name (item 609): when the brief is written, or that it is off. A schedule set elsewhere at
+ * times the card cannot show (`custom`) is said so, not given the card's time, which is not its own. */
+function briefSummary(view) {
+  if (!view.enabled) {
+    return "Off";
+  }
+  if (view.custom) {
+    return "On, at times this card cannot show: open it to see";
+  }
+  return `${view.days === "weekdays" ? "Weekdays" : "Every day"} at ${view.time}`;
+}
 
 /** The words that say what a saved brief does: "on, 08:00 every day". */
 function saidAbout(view) {
@@ -49,22 +67,13 @@ export function mountBrief(ctx, onSaved) {
   const customNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span"));
   const status = el("div", { class: "hint brief-status", role: "status" }, "Reading the brief…");
   const save = el("button", { class: "btn primary", type: "button", disabled: true }, icon("check"), "Save");
+  const summary = el("div", { class: "hint brief-summary" }, "Reading the brief…");
+  const opener = el("button", { class: "btn ghost sm icon-only brief-opener", type: "button", "aria-expanded": "false", "aria-controls": "brief-settings" }, icon("chevron"));
   const now = el("button", { class: "btn", type: "button", disabled: true, title: "Write a brief now: it reads, as at its time" }, icon("play"), "Write one now");
-  const element = el(
-    "section",
-    { class: "card card-pad stack brief-card", dataset: { brief: "" } },
-    el(
-      "div",
-      { class: "brief-head" },
-      el("span", { class: "brief-mark", "aria-hidden": "true" }, icon("sun")),
-      el(
-        "div",
-        { class: "grow" },
-        el("h2", { class: "panel-title" }, "Morning brief"),
-        el("div", { class: "hint" }, "Dot writes it at the time you set and sends the first line to your phone. It only reads: it never acts."),
-      ),
-      toggle,
-    ),
+  const settings = el(
+    "div",
+    { class: "stack brief-settings", id: "brief-settings" },
+    el("div", { class: "hint" }, "Dot writes it at the time you set and sends the first line to your phone. It only reads: it never acts."),
     el(
       "div",
       { class: "form-grid brief-form" },
@@ -80,6 +89,31 @@ export function mountBrief(ctx, onSaved) {
     status,
     el("div", { class: "row brief-actions" }, el("span", { class: "spacer" }), now, save),
   );
+  const element = el(
+    "section",
+    { class: "card card-pad stack brief-card", dataset: { brief: "" } },
+    el(
+      "div",
+      { class: "brief-head" },
+      el("span", { class: "brief-mark", "aria-hidden": "true" }, icon("sun")),
+      el("div", { class: "grow" }, el("h2", { class: "panel-title" }, "Morning brief"), summary),
+      toggle,
+      opener,
+    ),
+    settings,
+  );
+
+  /** Open or fold the card's settings, as the owner left them next time. */
+  function setOpen(open) {
+    settings.hidden = !open;
+    element.classList.toggle("open", open);
+    opener.setAttribute("aria-expanded", String(open));
+    opener.setAttribute("aria-label", open ? CLOSE_LABEL : OPEN_LABEL);
+    opener.title = open ? CLOSE_LABEL : OPEN_LABEL;
+    writePref(OPEN_KEY, open ? "1" : "0");
+  }
+  setOpen(readPref(OPEN_KEY) === "1");
+  opener.addEventListener("click", () => setOpen(settings.hidden));
 
   function wanted(enabled) {
     return {
@@ -118,6 +152,7 @@ export function mountBrief(ctx, onSaved) {
   function paint(fresh, force) {
     view = fresh;
     toggle.setAttribute("aria-checked", String(view.enabled));
+    summary.textContent = briefSummary(view);
     zone.textContent = `Read in ${view.zone}, the time zone of your schedules.`;
     if (force || !dirty) {
       time.value = view.time;
@@ -143,7 +178,10 @@ export function mountBrief(ctx, onSaved) {
         return;
       }
       if (view === null) {
-        status.replaceChildren(inlineError(error, () => attempt(retry)));
+        // On the card's own line, not in its folded settings: a brief that could not be read says so where it is seen,
+        // and the settings say no more that it is being read.
+        summary.replaceChildren(inlineError(error, () => attempt(retry)));
+        status.replaceChildren();
       } else {
         console.warn("the brief could not be read again", error);
       }
@@ -151,6 +189,7 @@ export function mountBrief(ctx, onSaved) {
   }
 
   async function retry() {
+    summary.replaceChildren("Reading the brief…");
     status.replaceChildren("Reading the brief…");
     await reload();
   }
@@ -203,8 +242,9 @@ export function mountBrief(ctx, onSaved) {
   return {
     element,
     reload,
-    /** Bring the card into view and put the cursor in its time, for the Edit of the brief's row in the list. */
+    /** Open the card, bring it into view and put the cursor in its time, for the Edit of the brief's row in the list. */
     focus() {
+      setOpen(true);
       element.scrollIntoView({ block: "start" });
       time.focus();
     },

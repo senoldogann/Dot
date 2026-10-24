@@ -1138,7 +1138,8 @@ async def test_the_panel_makes_a_watcher_checks_it_now_shows_a_failure_and_chang
                 await page.goto(f"http://127.0.0.1:{port}/#/schedules")
                 panel: Locator = page.locator("[data-watchers]")
                 await expect(panel.get_by_role("heading", name="Watchers")).to_be_visible()
-                await expect(panel.get_by_text("No watchers yet")).to_be_visible()
+                # With none, the head says so and nothing stands for an empty list (item 609).
+                await expect(panel.get_by_text("None yet")).to_be_visible()
                 # Make a mail watcher with the owner's words.
                 await panel.get_by_role("button", name="New watcher").click()
                 form: Locator = panel.locator("[data-watcher-form='new']")
