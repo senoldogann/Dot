@@ -560,7 +560,12 @@ the kind of work in a few words, writes the
 steps that worked, one sentence each, with the values that change from goal to goal as parameters in angle brackets, and
 a one-sentence description. A model that gives the steps or the parameters as one text instead of a list is read as the
 list it means (a JSON array in a string, or a line to each step), but all the steps run together in one line are no list
-of them: it is asked once more, and no skill is saved as one step for that (item 543). The skill is a folder
+of them: it is asked once more, and no skill is saved as one step for that (item 543). A description left out stands as
+the first sentence of "When" (at most 200 characters, cut between words), and an answer the model wrote as its whole
+text, one JSON object (in a code fence or not), is read as its call: the roles that write or judge what Dot learns (the
+lessons, the skills, the owner section, the merges, the harness's proposer, composer and experience writer) are read so,
+while a role that lets an action happen (the review of a step, the goal's verdict, a rule drafted from your words)
+answers by its call alone (item 614). The skill is a folder
 `learned-<kind>/SKILL.md` under `<home>/playbooks` with "Kind of
 work", "When", "Steps", "Parameters" and "Evidence" (the goal, every run it was learned from with its acting steps, the
 date), plus a `playbook.json` that keeps the kind and counts its use; the folder is written whole under a hidden name

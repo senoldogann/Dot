@@ -278,13 +278,16 @@ it; drawing it on the page is left for later).
 
 Four roles are built for the step, and three of them play it today: the step chooses between candidates by their
 passes, so it does not call the selector yet, and `[harness] selector` has no effect until it does. Each role is a model
-asked one question that it answers with one tool call (as the review model answers Dot's other questions), each shown digests and texts inside fences it reads as data and never follows, with
-the secrets Dot holds masked: the **proposer** (`propose_harness`: a candidate's whole texts within the bounds, the
-moments of the run behind each change, or keep), the **composer** (`compose_harness`: one version of the candidates,
-a decision with its evidence for each change, or the base kept), the **selector** (`select_answer`: the best of
-anonymous answers to one goal, judged on delivery, conformance, fidelity, consistency, fitness and finish, never on
-length) and the **experience writer** (`write_experience`: what each edit did, and an experience only when an edit
-helped or hurt with evidence). An answer that breaks its rules (a text past the bounds, a change with no moment, an
+asked one question that it answers with one tool call, as the review model answers Dot's other questions; the proposer,
+the composer and the experience writer may write that call's JSON as their whole answer instead, in a code fence or not,
+and it is read as the call (item 614), while the selector answers by its call alone. Each is shown digests and texts
+inside fences it reads as data and never follows, with the secrets Dot holds masked: the **proposer**
+(`propose_harness`: a candidate's whole texts within the bounds, the moments of the run behind each change, or keep),
+the **composer** (`compose_harness`: one version of the candidates, a decision with its evidence for each change, or the
+base kept), the **selector** (`select_answer`: the best of anonymous answers to one goal, judged on delivery,
+conformance, fidelity, consistency, fitness and finish, never on length) and the **experience writer**
+(`write_experience`: what each edit did, and an experience only when an edit helped or hurt with evidence). An answer
+that breaks its rules (a text past the bounds, a change with no moment, an
 experience with no effect behind it) is asked once more with what was wrong (the fields and their problems, never a
 key the model made up, as the step says them when it fails), then the step fails and says so.
 `[harness] proposer`, `composer`, `selector` and `experience` name a model for each; "" is `[models] review`.
