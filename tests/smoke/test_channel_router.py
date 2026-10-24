@@ -269,8 +269,10 @@ async def test_a_message_starts_a_run_in_the_channels_own_chat_as_the_owners_and
     # The owner's default: the approvals the configuration names, the chat's choices those of a new chat's composer.
     assert run.approvals == runtime.config.policy.approvals
     assert await runtime.store.chat_choices(thread.id) == DEFAULT_CHOICES
-    # The chat is in the sidebar like any other, and it is the one the next message of the channel goes to.
-    assert thread.id in {summary.id for summary in await runtime.store.list_thread_summaries(50)}
+    # The chat is in the sidebar's list, and it is the one the next message of the channel goes to. Its summary says
+    # which channel made it (item 619): that is what the sidebar puts it in a section of its own by.
+    summaries = {summary.id: summary for summary in await runtime.store.list_thread_summaries(50)}
+    assert thread.id in summaries and summaries[thread.id].source == "imessage"
 
 
 async def test_the_next_message_goes_to_the_same_chat(wired: Wired, replies: Replies) -> None:

@@ -427,6 +427,45 @@
   font-weight: var(--weight-text);
 }
 
+/* The chats a channel's messages made stand in a section of their own at the foot of the list (item 619), outside the
+   list so that folding Chats does not fold them: its label is the button that folds it, with the channel's mark before
+   its name (in the green of an iMessage) and, while it is folded over a chat nobody has read, the accent's dot after its
+   count. */
+.side-channels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+}
+
+.side-channels:not(:empty) {
+  margin-top: 8px;
+}
+
+.side-channel-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--ok);
+}
+
+.side-fold .side-channel-mark .icon {
+  width: 14px;
+  height: 14px;
+  transform: none;
+  transition: none;
+}
+
+.side-label-dot:not([hidden]) {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-left: var(--space-half);
+  border-radius: 50%;
+  background: var(--accent);
+}
+
 /* A section's label is the button that folds it (item 95): the chevron points down while open, right while folded. */
 .side-fold {
   display: flex;

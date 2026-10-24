@@ -7,6 +7,9 @@
 // A chat whose latest run ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark
 // read. Each chat stands once (item 202): a chat at work stands under Working, wearing the faces of the runs it delegated
 // (item 507), and goes back among the days once it rests; a pinned one stays under Pinned, with the same faces.
+// The chats a channel's messages made (item 619: the "iMessage" chat) leave the days for a section of their own at the foot
+// of the list, with the channel's mark and a count; it folds like the Chats group does and keeps its fold, and a search
+// finds its chats as it finds the others.
 
 import { ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
@@ -46,8 +49,13 @@ const CONNECTED_MARKS = 3;
 // Where Connect apps leads (item 545): the services' tab of Customize.
 const CONNECTORS_PATH = "#/customize/connectors";
 const MARKS_TURN_MS = 6000;
-// Which sections the owner folded (`waiting`, `working`, `chats`), kept between visits.
+// Which sections the owner folded (`waiting`, `working`, `chats`, and a channel's by its id: `imessage`), kept between
+// visits.
 const FOLDS_KEY = "dot.sideFolds";
+// The channels whose chats stand in a section of their own (item 619), by the `source` their threads have (the channel's
+// id, as the router makes the thread): the name of the section and its mark. A thread of any other source is a chat among
+// the days.
+const CHANNEL_SECTIONS = { imessage: { label: "iMessage", icon: "message" } };
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
 // The states of a run that is over: only such a chat can be marked unread (item 131).
@@ -90,6 +98,12 @@ function groupChats(chats, now) {
     now,
   );
   return pinned.length === 0 ? days : [{ label: "Pinned", chats: pinned }, ...days];
+}
+
+/** The channel whose messages made `chat` (item 619), or null: a thread whose source is a channel's id. A chat the
+ * owner pinned stays under Pinned, where they put it. */
+function channelOf(chat) {
+  return chat.pinned_at === null && typeof chat.source === "string" && Object.hasOwn(CHANNEL_SECTIONS, chat.source) ? chat.source : null;
 }
 
 function matchesQuery(chat, needle) {
@@ -391,6 +405,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const keptRows = new Map();
   const keptGroups = new Map();
   const list = el("div", { class: "side-runs" });
+  // The sections of the channels' chats (item 619), at the foot of the list, outside it so that folding Chats does not
+  // fold them; each section and its label are kept from one painting to the next, so that the focus stays on a label
+  // that was pressed.
+  const channelsNav = el("div", { class: "side-channels" });
+  const keptSections = new Map();
+  const keptLabels = new Map();
   const ageTicker = setInterval(() => {
     for (const node of list.querySelectorAll(".side-age")) {
       setText(node, age(Number(node.dataset.ts)));
@@ -449,12 +469,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   const schedulesLink = el("a", { class: "side-link", href: "#/schedules", onclick: onNavigate }, icon("calendar"), el("span", null, "Schedules"));
 
-  // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's; while chats are being
-  // chosen, their boxes. A row folded away is left out.
+  // The rows the arrow keys walk and the search's Enter opens, in order: Working's, the list's and the channels'; while
+  // chats are being chosen, their boxes. A row folded away is left out.
   function rows() {
     const nodes = selecting
-      ? list.querySelectorAll("input.side-check")
-      : [...activityNav.querySelectorAll("[data-section=working] a.side-run"), ...list.querySelectorAll("a.side-run")];
+      ? [...list.querySelectorAll("input.side-check"), ...channelsNav.querySelectorAll("input.side-check")]
+      : [
+          ...activityNav.querySelectorAll("[data-section=working] a.side-run"),
+          ...list.querySelectorAll("a.side-run"),
+          ...channelsNav.querySelectorAll("a.side-run"),
+        ];
     return [...nodes].filter((node) => node.getClientRects().length > 0);
   }
 
@@ -546,10 +570,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
 
   // What the list says when it shows no chat: that there is none yet, or none that matches the search; nothing while
-  // every chat stands under Working, or while one there matches.
-  function emptyNote() {
+  // every chat stands under Working or in a channel's section, or while one there matches.
+  function emptyNote(inChannels) {
     if (needle !== "") {
-      const found = work.working.some((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
+      const found = inChannels || work.working.some((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
       return found ? [] : [el("div", { class: "side-note" }, `No chat matches “${search.value.trim()}”.`)];
     }
     return chats.length === 0 ? [el("div", { class: "side-note" }, "No chats yet. Start one with New chat.")] : [];
@@ -609,6 +633,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     chatsLabel.firstChild.setAttribute("aria-expanded", foldedChats ? "false" : "true");
     list.hidden = foldedChats;
     if (failure !== null) {
+      channelsNav.replaceChildren();
       list.replaceChildren(
         el(
           "div",
@@ -633,15 +658,21 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return;
     }
     if (chats === null) {
+      channelsNav.replaceChildren();
       list.replaceChildren(el("div", { class: "side-note" }, el("div", { class: "spinner" }), el("span", null, "Loading chats…")));
       return;
     }
     const shown = shownChats();
-    if (shown.length === 0) {
-      list.replaceChildren(...emptyNote(), ...olderNote());
+    // The chats of the channels stand at the foot, in a section of their own each (item 619); the others among the days.
+    const channelChats = shown.filter((chat) => channelOf(chat) !== null);
+    const own = shown.filter((chat) => channelOf(chat) === null);
+    paintChannels(channelChats);
+    if (own.length === 0) {
+      list.replaceChildren(...emptyNote(channelChats.length > 0), ...olderNote());
+      pruneKept(shown);
       return;
     }
-    const groups = groupChats(shown, new Date());
+    const groups = groupChats(own, new Date());
     keepChildren(list, [
       ...groups.map((group) => {
         const section = keptGroups.get(group.label) ?? el("section", { class: "side-group" }, el("h3", { class: "side-label" }, group.label));
@@ -667,10 +698,71 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         keptGroups.delete(label);
       }
     }
+    pruneKept(shown);
+  }
+
+  // What is kept of the rows of chats that are no longer listed goes (item 328).
+  function pruneKept(shown) {
     const listed = new Set(shown.map((chat) => chat.id));
     for (const id of keptRows.keys()) {
       if (!listed.has(id)) {
         keptRows.delete(id);
+      }
+    }
+  }
+
+  // A channel's label (item 619): the button that folds its section, as the Chats label is, with the channel's mark, its
+  // name, how many chats it holds and, folded over a chat nobody has read, a dot. Made once, so that it keeps the focus.
+  function channelLabel(id) {
+    let kept = keptLabels.get(id);
+    if (kept === undefined) {
+      const count = el("span", { class: "side-label-count" });
+      const unread = el("span", { class: "side-label-dot", role: "img", "aria-label": "unread", hidden: true });
+      const mark = el("span", { class: "side-channel-mark", "aria-hidden": "true" }, icon(CHANNEL_SECTIONS[id].icon));
+      kept = { count, unread, label: foldLabel("h3", false, () => toggleFold(id), mark, `${CHANNEL_SECTIONS[id].label} `, count, unread) };
+      keptLabels.set(id, kept);
+    }
+    return kept;
+  }
+
+  // The sections of the channels' chats, at the foot of the list (item 619). Each has its label and its chats' rows as any
+  // chat's row is (a chat at work stands under Working, as every chat does). It folds like the Chats group, and a search
+  // shows what it finds in a section folded, as Working does; choosing chats to delete needs them in sight.
+  function paintChannels(channelChats) {
+    const sections = [];
+    for (const id of Object.keys(CHANNEL_SECTIONS)) {
+      const members = channelChats.filter((chat) => channelOf(chat) === id);
+      if (members.length === 0) {
+        continue;
+      }
+      const folded = folds[id] === true && !selecting && needle === "";
+      const { count, unread, label } = channelLabel(id);
+      label.firstChild.setAttribute("aria-expanded", folded ? "false" : "true");
+      setText(count, String(members.length));
+      unread.hidden = !(folded && members.some((chat) => chat.unread === true));
+      const section = keptSections.get(id) ?? el("section", { class: "side-group side-channel", "data-channel": id });
+      keptSections.set(id, section);
+      section.toggleAttribute("data-folded", folded);
+      keepChildren(section, [
+        label,
+        ...(folded
+          ? []
+          : members.map((chat) => {
+              if (selecting) {
+                const pick = chatPick(chat, selected.has(chat.id), toggle, pickFaceOf(chat));
+                rowNodes.set(chat.id, pick);
+                return pick;
+              }
+              return keptEntry(chat);
+            })),
+      ]);
+      sections.push(section);
+    }
+    keepChildren(channelsNav, sections);
+    for (const id of keptSections.keys()) {
+      if (!sections.some((section) => section.dataset.channel === id)) {
+        keptSections.delete(id);
+        keptLabels.delete(id);
       }
     }
   }
@@ -1162,6 +1254,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
   activityNav.addEventListener("keydown", walkRows);
   list.addEventListener("keydown", walkRows);
+  channelsNav.addEventListener("keydown", walkRows);
 
   paintLists();
   load();
@@ -1204,7 +1297,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     ),
     el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, schedulesLink),
     activityNav,
-    el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
+    el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav),
   );
   // Connect apps (items 492 and 545): at the foot, right of the cog of Settings, the way to Customize › Connectors, the
   // page of the services Dot works with, with the marks of the MCP servers it is connected to; the list of pages no

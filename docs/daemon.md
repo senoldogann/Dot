@@ -34,7 +34,16 @@ rest counted, and its name for a screen reader says how many there are. Nothing 
 whose conversation and Agents tab hold those runs. Working lists too what is no chat's: the session of a campaign
 (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and
 its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working hides its rows,
-the open chat's too, and keeps its count (item 513), and the search finds the chats at work, folded or not. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
+the open chat's too, and keeps its count (item 513), and the search finds the chats at work, folded or not.
+**The chats a channel's messages made** (item 619, [Channels](channels.md): today the **iMessage** chat, a thread whose
+`source` is the channel's id) leave the days for a section of their own at the foot of the list, under the days, with
+the channel's mark (a green speech bubble), its name and how many chats it holds: **iMessage 1**. Its label folds it,
+as Chats' does, and the fold is kept between visits; folding Chats does not fold it, nor does it fold Chats.
+Folded over a chat you have not read, the label shows the accent's dot after its count. Its chat is a row like any
+chat's, with its menu; Select and the arrow keys reach it, and a search shows what it finds in it, folded or not. A
+chat of it at work stands under Working like every chat (item 202) and comes back once the run ends, and one you
+pinned stays under Pinned.
+Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
 and **Schedules** (a page of its own since item 401); in the foot, the cog of **Settings**, **Connect apps** beside it
 ([Connect apps](extending.md#connect-apps), items 492 and 545), which opens
 [Customize › Connectors](extending.md#customize--connectors), and
@@ -42,9 +51,9 @@ the red square of the **Emergency stop**, which stays there while the sidebar is
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
 longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
-while it is being made or lost; what works stands under Working. The sections (Waiting for you, Working, Chats) fold on
-a click of their label, and the folds are kept between visits. The sidebar's head holds only the button that folds it
-away. **Select** turns the list into
+while it is being made or lost; what works stands under Working. The sections (Waiting for you, Working, Chats, and
+a channel's) fold on a click of their label, and the folds are kept between visits. The sidebar's head holds only
+the button that folds it away. **Select** turns the list into
 checkboxes: tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event and
 approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to end, or
 cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a drawer. The
