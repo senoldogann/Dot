@@ -112,6 +112,19 @@ def _note(summary: str) -> ActionInfo:
     return ActionInfo(tool="write_file", kind="write", risk="low", summary=summary, target="notes.md", flags=())
 
 
+@pytest.mark.parametrize("mention", ["\u200d", "\ufe0f", "\u0301", "\u203f"])
+def test_a_mention_of_nothing_a_person_reads_as_a_word_is_refused(mention: str) -> None:
+    """Item 629: a joiner, a variation selector, a combining mark or a connector alone is a word character to the
+    engine, and still no word to match on."""
+    with pytest.raises(InvalidValueError, match="needs a word to match on"):
+        rule_from_draft(_draft("write_file", "ask", [], [mention]), TOOLS)
+
+
+def test_a_mention_of_a_number_that_is_no_digit_to_the_engine_makes_a_rule() -> None:
+    rule: DraftedRule = rule_from_draft(_draft("write_file", "ask", [], ["½"]), TOOLS)
+    assert _fits(rule, _note("Write ½ now")) is True
+
+
 @pytest.mark.parametrize(
     ("mention", "summary", "fits"),
     [

@@ -37,6 +37,10 @@ _CD_FIRST: str = rf"(?:cd[ \t]+{_PLAIN_CHAR}+&&[ \t]*)?"
 # ``²`` and ``½`` for word characters and a circled letter or a vowel sign for none, and a boundary put where the engine
 # sees none never fits, so that a rule that stops Dot at ``x²`` stopped it at nothing (item 629).
 _WORD: regex.Pattern[str] = regex.compile(r"\w")
+# What a command or a mention must hold for a rule to match on: a letter, a number or ``_``. The engine's ``\w`` takes
+# a joiner, a variation selector and a combining mark as well, which nobody reads as a word: a mention of them alone
+# stays refused (item 629).
+_HAS_WORD: regex.Pattern[str] = regex.compile(r"[\p{L}\p{N}_]")
 # What a rule's description may hold (``RuleRequest``).
 _DESCRIPTION_CHARS: int = 300
 _ANSWER_TEXT: dict[Behavior, str] = {
@@ -110,7 +114,8 @@ def command_pattern(commands: Sequence[str]) -> str:
 
 def mention_pattern(mentions: Sequence[str]) -> str:
     """A pattern that fits an action that mentions one of ``mentions`` in its summary or its target, as a whole word
-    where a mention starts or ends with a letter or a digit: x.com does not fit netflix.com."""
+    where a mention starts or ends with a word character as the engine that matches rules tells one (a letter, a mark,
+    a decimal digit, ``_``; not ``²`` or ``½``): x.com does not fit netflix.com (item 629)."""
     return "(?:" + "|".join(_bounded(mention) for mention in mentions) + ")"
 
 
@@ -155,7 +160,7 @@ def rule_from_draft(draft: RuleDraft, tools: frozenset[str]) -> DraftedRule:
     if draft.commands and draft.tool != SHELL_TOOL:
         raise InvalidValueError(f"only a rule for the {SHELL_TOOL} tool names commands", {"tool": draft.tool})
     for part in (*draft.commands, *draft.mentions):
-        if _WORD.search(part) is None:
+        if _HAS_WORD.search(part) is None:
             raise InvalidValueError("a command or a mention needs a word to match on", {"part": part})
     letting: bool = draft.answer in _LETTING
     if letting and draft.mentions and fnmatch.fnmatchcase(SHELL_TOOL, draft.tool):
