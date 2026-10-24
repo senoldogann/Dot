@@ -165,7 +165,10 @@ sent is the text as typed. A **microphone** by the send (item 574; where the bro
 which shows none) fills the box as you speak, after what it holds, the words the engine may still change drawn quieter
 until it settles them. It listens in the page's language, given its region ("en" listens as "en-US", item 593), or the
 one chosen in Settings › General › Voice (English, Türkçe, Suomi, Svenska, Deutsch, Français or Español), and stops at a
-second press, after six seconds of silence, when you type, when you send and when the page goes out of sight. A
+second press, after six seconds of silence, when you type, when you send and when the page goes out of sight. The
+silence is counted from the moment the browser begins to listen, not while it asks for the microphone and its speech
+recognition the first time (an iPhone asks twice), and a second press while it still asks drops the dictation; one that
+the browser starts anyway once you allow it is stopped at once, so the microphone is not left on (item 603). A
 microphone that is refused says so and where to allow it: in a Mac's browser, the browser for the address and in System
 Settings › Privacy & Security › Microphone; in the desktop app, which macOS gives the microphone and speech recognition
 only once the app asks for them (a Dot.app built before item 594 cannot), Dot in System Settings, the toast naming macOS

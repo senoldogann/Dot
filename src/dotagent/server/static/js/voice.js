@@ -127,7 +127,8 @@ export function problemWords(code, place) {
  * interimFrom)` puts what was heard on top of them in the box, and `settled()` says that the quieter words are no longer
  * the engine's to change; `state(listening)` says whether the microphone is on, and `problem(words)` why it could not be.
  * `start()`, `stop()` (the engine settles what it has) and `abort()` (it drops what it has) are the owner's; one that is
- * not touched stops by itself after `SILENCE_MS`, and with the page put out of sight.
+ * not touched stops by itself after `SILENCE_MS` from the moment the engine began to listen, and with the page put out of
+ * sight.
  */
 export function createDictation({ language, text, show, settled, state, problem }) {
   let recognition = null;
@@ -137,6 +138,12 @@ export function createDictation({ language, text, show, settled, state, problem 
   // says so (item 593), where it ended without a word before.
   let heard = false;
   let byOwner = false;
+  // Whether the engine began to listen (its `start`). The first time, a browser asks for the microphone and its speech
+  // recognition before it does, and an iPhone asks twice, for as long as the owner reads: the silence is counted from
+  // then, never through the questions, and an engine is not stopped before it began (item 603). One stopped while
+  // Safari asked ended at once, saying it heard nothing, and Safari, once allowed, started it all the same, for nobody,
+  // with the microphone on.
+  let started = false;
   const place = () => voicePlace(document.documentElement.dataset.shell, navigator.userAgent, navigator.maxTouchPoints);
 
   function arm() {
@@ -170,11 +177,28 @@ export function createDictation({ language, text, show, settled, state, problem 
     base = text();
     heard = false;
     byOwner = false;
-    /** @param {SpeechRecognitionEventLike} event */
-    const heardSomething = (event) => {
-      if (recognition !== engine) {
+    started = false;
+    // An engine this dictation no longer holds that begins or hears anyway (Safari starts one once the owner allows it,
+    // whatever was asked of it meanwhile) is dropped, so that the microphone is not left on for nobody.
+    const left = () => recognition !== engine;
+    // The engine says it began with `start`, and with `audiostart` as the microphone opens; a word heard says it too.
+    const began = () => {
+      if (left()) {
+        engine.abort();
         return;
       }
+      started = true;
+      arm();
+    };
+    engine.addEventListener("start", began);
+    engine.addEventListener("audiostart", began);
+    /** @param {SpeechRecognitionEventLike} event */
+    const heardSomething = (event) => {
+      if (left()) {
+        engine.abort();
+        return;
+      }
+      started = true;
       const said = transcriptOf(event.results);
       heard = heard || said.final !== "" || said.interim !== "";
       const next = dictated(base, said.final, said.interim);
@@ -193,7 +217,8 @@ export function createDictation({ language, text, show, settled, state, problem 
     engine.addEventListener("error", failed);
     engine.addEventListener("end", () => {
       if (recognition === engine) {
-        finish(heard || byOwner ? null : problemWords("no-speech", place()));
+        // One that never began heard nothing because it never listened: its error, if any, said why.
+        finish(heard || byOwner || !started ? null : problemWords("no-speech", place()));
       }
     });
     recognition = engine;
@@ -204,17 +229,23 @@ export function createDictation({ language, text, show, settled, state, problem 
       problem(`The microphone could not start: ${error.message}`);
       return;
     }
+    // The button shows it on at once; the silence is counted from the engine's `start`.
     state(true);
-    arm();
   }
 
   function stop() {
-    if (recognition !== null) {
-      byOwner = true;
-      clearTimeout(timer);
-      recognition.stop();
-      state(false);
+    if (recognition === null) {
+      return;
     }
+    if (!started) {
+      // Before the engine began (the browser still asks), there is nothing to settle: it is dropped.
+      abort();
+      return;
+    }
+    byOwner = true;
+    clearTimeout(timer);
+    recognition.stop();
+    state(false);
   }
 
   function abort() {
