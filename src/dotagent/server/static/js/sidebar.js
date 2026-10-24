@@ -259,8 +259,7 @@ function chatLink(chat, onNavigate, face, children) {
 }
 
 /** One row of the activity sections: the state dot, the title and what it needs or where it works, and the faces of the
- * runs it delegated (item 507). A run of the Working section says Working and for how long at its right (item 122); a
- * schedule due there does not work yet. */
+ * runs it delegated (item 507). A run of the Working section says Working and for how long at its right (item 122). */
 function activityRow(row, onNavigate, children) {
   const ended = ENDED.has(row.status);
   const detail = [row.channel, row.detail].filter((part) => part !== "");
@@ -299,8 +298,8 @@ function activityRows(rows, onNavigate) {
  * Where the runs at work stand (item 202). `rows` are the rows of Working with the delegated runs that ended under
  * them, `chats` the chats listed. A chat whose latest run is one of them stands once, as that chat, with the runs it
  * delegated: under Working (`working`, `{ chat, row, children }`), unless it is pinned, which keeps it under Pinned
- * (`pinned`, its family by chat id). A row that is no listed chat's (a schedule about to fire, a run whose chat is not
- * listed, a delegated run whose parent is not) stands under Working as it is, its `chat` null.
+ * (`pinned`, its family by chat id). A row that is no listed chat's (a run whose chat is not listed, a delegated run
+ * whose parent is not) stands under Working as it is, its `chat` null.
  */
 function placeWork(rows, chats) {
   const byRun = new Map(chats.map((chat) => [chat.latest_run_id, chat]));

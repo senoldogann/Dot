@@ -29,8 +29,8 @@ ends; a pinned chat stays under Pinned. At the right of a chat at work the time 
 Under its name, in the line its last words would take, stand the faces of the runs it delegated (item 507), those at
 work and those that ended: three at most, laid over one another as the marks of the connected apps stand in the foot, the
 rest counted, and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
-whose conversation and Agents tab hold those runs. Working lists too what is no chat's: a schedule about to fire, the
-session of a campaign (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and
+whose conversation and Agents tab hold those runs. Working lists too what is no chat's: the session of a campaign
+(which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and
 its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working hides its rows,
 the open chat's too, and keeps its count (item 513), and the search finds the chats at work, folded or not. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
 and **Schedules** (a page of its own since item 401); in the foot, the cog of **Settings**, **Connect apps** beside it
@@ -78,8 +78,9 @@ first visit marks it and shows nothing, so the card never pours out the past, an
 A run started with **Run now** is one of them.
 
 Above the chats, two sections appear while they have rows: **Waiting for you** (the approvals and questions runs wait
-for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run delegated
-by another, and a schedule that fires within the hour), each row with its state dot, the first words of its title on one
+for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, and a run
+delegated by another; a schedule about to fire is no work yet, and stands under the home's **Due today**, item 608),
+each row with its state dot, the first words of its title on one
 line, and under it the channel it last worked in (browser, files, shell, desktop, mail) and what it needs; a row opens
 the run. They are `GET /api/activity`, which carries the runs that ended today too, for the home's **Today** strip; the
 Activity page that showed it all is gone (item 364), and its address leads to the home. A run that ended shows how long
