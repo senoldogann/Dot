@@ -124,6 +124,56 @@ test("a snake_case name keeps its underscores and a lone star stays", () => {
   assert.equal(spokenText("Use read_file on 2 * 3."), "Use read_file on 2 * 3.");
 });
 
+test("the links, the rule and the pipes of a table, and the spaces around them, are read as they were", () => {
+  // Item 612 made their patterns read in linear time; what they say did not change.
+  assert.equal(spokenText("see [the docs](https://example.com/docs) and ![a chart](chart.png)"), "see the docs and a chart.");
+  assert.equal(spokenText("Text with [one](https://a.b/c)[two](https://a.b/d)."), "Text with onetwo.");
+  assert.equal(spokenText("[[1](https://example.com/a)]"), "[1].");
+  assert.equal(spokenText("[docs](https://example.com/?q[]=1)"), "docs.");
+  assert.equal(spokenText("[wiki](https://en.wikipedia.org/wiki/Python_(programming_language)) end"), "wiki) end.");
+  // What is not a link stays as written: an open bracket, an address with no end, a bracket inside the words.
+  assert.equal(spokenText("[open [x] bracket and a [real](https://x.y/z) link"), "[open [x] bracket and a real link.");
+  assert.equal(spokenText("[a](https://x.y/z and [b](https://x.y/y)"), "[a](link and b.");
+  assert.equal(spokenText("[a [b](https://x.y/z)"), "a [b.");
+  assert.equal(spokenText("![a [b] c](img.png) and [d]"), "![a [b] c](img.png) and [d].");
+  // A table: its rule is not read, its cells are, with or without the spaces and tabs around the pipes.
+  assert.equal(spokenText("| a | | c |"), "a, , c.");
+  assert.equal(spokenText("a \t|  b"), "a, b.");
+  assert.equal(spokenText("a   |   b   |   c"), "a, b, c.");
+  assert.equal(spokenText("  | a |  \n  :--- |  ---: |  \n| b | c |"), "a. b, c.");
+  assert.equal(spokenText("|---|---|\n|a|b|"), "a, b.");
+  // A row with an empty cell between its dashes is no rule.
+  assert.equal(spokenText("-- | | --"), "--, , --.");
+  assert.equal(spokenText("   \n  \t  \n"), "");
+});
+
+test("an answer of eighty thousand characters of one kind is turned into words in a moment, whichever kind", () => {
+  // Item 612: the pattern of the links read to the end of the line from each "[" of a run of them, the rule of a table and
+  // the pipes from each space of a run of spaces: 80,000 of them took seconds, on the page's thread, as the answer came.
+  const size = 80_000;
+  const kinds = {
+    "a run of [": "[".repeat(size),
+    "a run of [ and then ](": `${"[".repeat(size)}](`,
+    "a run of ![": "![".repeat(size / 2),
+    "a run of [a": "[a".repeat(size / 2),
+    "a run of [a](": "[a](".repeat(size / 4),
+    "a run of [a](b": "[a](b".repeat(size / 5),
+    "a run of spaces": " ".repeat(size),
+    "spaces, then a word": `${" ".repeat(size)}word`,
+    "tabs, then a word": `${"\t".repeat(size)}word`,
+    "a rule of dashes, then spaces and a word": `--${" ".repeat(size)}word`,
+    "pipes and spaces": "| ".repeat(size / 2),
+    "a pipe, spaces, a pipe": `|${" ".repeat(size)}|`,
+    "lines of spaces": " \n".repeat(size / 2),
+  };
+  for (const [kind, text] of Object.entries(kinds)) {
+    const started = performance.now();
+    spokenText(text);
+    const took = performance.now() - started;
+    assert.ok(took < 100, `${kind}: ${took.toFixed(0)} ms for ${text.length} characters`);
+  }
+});
+
 test("an answer is said in pieces that end where a sentence does", () => {
   assert.deepEqual(sentenceChunks("One. Two. Three.", 8), ["One.", "Two.", "Three."]);
   assert.deepEqual(sentenceChunks("One. Two. Three.", 100), ["One. Two. Three."]);

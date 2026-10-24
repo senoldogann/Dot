@@ -157,6 +157,63 @@ def test_a_kind_of_work_becomes_a_skill_name(host: str, expected: str) -> None:
     assert slug(host) == expected
 
 
+@pytest.mark.parametrize(
+    ("kind", "expected"),
+    [
+        ("Şirket yıllık raporu", "sirket-yillik-raporu"),
+        ("Fatura düzenleme çıktı alma", "fatura-duzenleme-cikti-alma"),
+        ("Ödeme hatırlatma e-postası", "odeme-hatirlatma-e-postasi"),
+        ("İş görüşmesi notları", "is-gorusmesi-notlari"),
+        ("Müşteri şikayet yanıtı", "musteri-sikayet-yaniti"),
+        ("ÇIĞ DIŞI", "cig-disi"),
+        ("Straße in Århus, Ærø", "strasse-in-arhus-aero"),
+        ("Łódź Đurđevac Þing", "lodz-durdevac-thing"),
+        ("Crème brûlée ﬁnal ２", "creme-brulee-final-2"),
+        ("日本語", ""),
+    ],
+)
+def test_a_kind_of_work_in_turkish_or_another_language_is_named_by_its_letters(kind: str, expected: str) -> None:
+    """Item 612 (the final review): every letter outside a-z was deleted, so "Şirket yıllık raporu" was
+    ``irket-y-ll-k-raporu`` on the skill card, in the proposals, in the versions and in the list the model is given."""
+    assert slug(kind) == expected
+
+
+def test_a_skill_of_a_kind_in_turkish_has_a_name_that_can_be_read_and_kinds_that_differ_by_a_letter_have_two() -> None:
+    assert playbook_name("Şirket yıllık raporu") == "learned-sirket-yillik-raporu"
+    assert taught_name("Müşteri şikayet yanıtı") == "taught-musteri-sikayet-yaniti"
+    # "Ödeme" and "Deme" were one name, and one kind to a run that looked for the skill of its kind, while the
+    # letters outside a-z were dropped.
+    assert slug("Ödeme") == "odeme" and slug("Deme") == "deme"
+    assert slug("İ") == "i" and slug("ı") == "i"
+
+
+def test_a_skill_stored_under_the_name_it_had_before_is_still_found_and_is_updated_in_its_own_folder(
+    tmp_path: Path,
+) -> None:
+    """Item 612: a name is kept with its skill, so the skills written before the transliteration keep their folders;
+    a run of their kind finds them by the kind it wrote, which is slugged on both sides, and updates them there."""
+    kind: str = "Şirket yıllık raporu"
+    before: str = "learned-irket-y-ll-k-raporu"
+    stored: Playbook = _playbook().model_copy(
+        update={"name": before, "kind": kind, "draft": _draft().model_copy(update={"kind": kind})}
+    )
+    write_playbook(tmp_path, stored)
+    entries = list_playbooks(tmp_path)
+    found = same_kind(kind, entries, None)
+    assert found is not None and found.meta.name == before and found.meta.kind == kind
+    # The same words in capitals and with the letters the owner types without their marks are the same kind.
+    assert same_kind("ŞİRKET YILLIK RAPORU", entries, None) is found
+    assert same_kind("Sirket yillik raporu", entries, None) is found
+    assert same_kind("Şirket aylık raporu", entries, None) is None
+    # The name a new skill of the kind would take is another folder, which the run does not write: it updates the old.
+    assert playbook_name(kind) == "learned-sirket-yillik-raporu" and free_name(tmp_path, playbook_name(kind)) == (
+        "learned-sirket-yillik-raporu"
+    )
+    update_playbook(tmp_path, found.meta.name, stored.model_copy(update={"run_id": "run-2", "written_at": 2e9}))
+    assert [entry.meta.name for entry in list_playbooks(tmp_path)] == [before]
+    assert read_meta(tmp_path / before).runs == ("run-1", "run-2")
+
+
 def test_a_playbook_is_a_skill_the_catalog_loads(tmp_path: Path) -> None:
     file: Path = write_playbook(tmp_path, _playbook())
     skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), "learned")

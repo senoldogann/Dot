@@ -3075,11 +3075,55 @@
   overflow-wrap: anywhere;
 }
 
+/* A watcher's name keeps the room its row has (item 612): its kind chip goes under a long name, where it squeezed the name
+   to a sliver beside the switch and the buttons, and an address longer than the row ends in an ellipsis (the chip's title
+   has it whole), where it ran out of the card. */
+.watcher-list .row-main > .row {
+  flex-wrap: wrap;
+}
+
+.watcher-list .row-meta .chip {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.watcher-list .chip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* On a phone a watcher's row gives its mark back to the words, as a schedule's gives its face: the switch says whether it
    looks. */
 @media (max-width: 720px) {
   .watcher-list .list-row > .watcher-mark {
     display: none;
+  }
+}
+
+/* On a phone the name has the width between the switch and the edge (item 612). The three buttons, which took 116 px of
+   the first line and left a long name a sliver of 80 px, stand at the end of the row's last line, beside what the last
+   look said; the switch stays at the name's first line, where it was centred against a name of many. The rules say the
+   page's phone grid again with the buttons placed after the row's text (specificity above it, so that their order in
+   the file does not matter). */
+@media (max-width: 720px) {
+  .page[data-layout="page"] .watcher-list > .list-row:has(> .row-main):has(> .row-actions) > .row-actions {
+    grid-column: 3;
+    grid-row: auto;
+    align-self: end;
+  }
+
+  .page[data-layout="page"] .watcher-list > .list-row:has(> .row-main):has(> .row-actions) > .row-main > .when-line {
+    grid-column: 1 / 3;
+  }
+
+  .page[data-layout="page"] .watcher-list > .list-row:has(> .row-main):has(> .row-actions) > .row-main > :first-child {
+    grid-column: 2 / -1;
+  }
+
+  .page[data-layout="page"] .watcher-list > .list-row:has(> .row-main):has(> .row-actions) > .switch {
+    align-self: start;
   }
 }
 
@@ -3421,7 +3465,8 @@
    thumb's 36 px made a row of five a wall of boxes. */
 @media (pointer: coarse) and (max-width: 720px) {
   .row-meta .chip,
-  .schedule-list .chip {
+  .schedule-list .chip,
+  .watcher-list .chip {
     min-height: 0;
     padding-block: 0;
   }

@@ -4,16 +4,20 @@ tells the owner what is new and is theirs, and keeps its place so that a restart
 A look is :func:`look_at`. It reads the new items of its kind (:mod:`dotagent.proactive.looks`), judges the mail and the
 notifications the owner gave words for against those words, one question of the fast model for each
 (:mod:`dotagent.proactive.judge`), and tells what fits through :func:`dotagent.notify.owner.tell_owner`, keeping a line
-of it in the chat "Watchers". A watcher set to start a run does that for each item it told, within its limit. The first
-look of a watcher only takes what is there as handled, so no old mail is told. A watcher's failure is on its row and the
-others look on."""
+of it in the chat "Watchers". A watcher set to start a run does that for each item it told, within its limit. Each item
+is dealt with in turn, the oldest first: judged, told and written down as handled before the next is asked about (item
+612), so a look that is cut has kept what it finished and the next look takes the rest. The first look of a watcher
+only takes what is there as handled, so no old mail is told. A watcher's failure is on its row and the others look
+on."""
 
 import asyncio
 import contextlib
 import secrets
 import time
 import weakref
-from collections.abc import Sequence
+from collections.abc import Coroutine, Sequence
+from dataclasses import dataclass
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.manager import RunManager, thread_title
@@ -42,8 +46,16 @@ from dotagent.tools.mail_calendar import fence_account
 
 log = get_logger(__name__)
 
-# One look, with the questions it asks a model, ends at this; the other watchers do not wait for longer.
+# One look, with the questions it asks a model, ends at this; the other watchers do not wait for longer. What it cuts is
+# the reading of the provider and each question to the model: an item being told is told and written down first, and
+# what a cut look had finished stays (the next look takes the rest).
 LOOK_TIMEOUT_S: float = 180.0
+# One question of a watcher to the fast model, a verdict on one item. It has a limit of its own, under the look's, and
+# not the run's ``[agent] model_call_timeout_s`` (420 s), which is for a step that may think for minutes: with that one
+# a single stalled answer outlasted the look and ended it, and an item the model does not answer for could never be
+# told as one it could not judge. The question is a few lines in and one tool call out, which a fast model answers in
+# seconds; a call that takes half a minute is a stalled one, and six of them fill a look.
+JUDGE_TIMEOUT_S: float = 30.0
 # A look that failed is tried again no sooner than this.
 RETRY_FLOOR_S: float = 300.0
 _HOUR_S: float = 3600.0
@@ -87,6 +99,22 @@ class Chosen(FrozenModel):
     note: str
 
 
+@dataclass
+class _Progress:
+    """How far the look in hand has come, for a look that is cut or fails to say what it had done: the new items it
+    found, how many it told, and how many it judged not to be the owner's. What it told and what it judged not to be
+    theirs is written down as handled; the rest is for the next look."""
+
+    found: int = 0
+    told: int = 0
+    not_theirs: int = 0
+
+    @property
+    def handled(self) -> int:
+        """The items dealt with and written down: those told and those judged not to be the owner's."""
+        return self.told + self.not_theirs
+
+
 def _recent(times: Sequence[float], now: float) -> tuple[float, ...]:
     """The times of ``times`` within the last hour."""
     return tuple(moment for moment in times if now - moment < _HOUR_S)
@@ -112,14 +140,14 @@ async def _gather(runtime: Runtime, watcher: WatcherRecord, now: float) -> Gathe
 
 async def _verdict(runtime: Runtime, watcher: WatcherRecord, item: Item) -> Chosen | None:
     """The item as the owner is to be told of it, or ``None`` when it is not theirs by their words. A model that cannot
-    judge (no key, a pause, a failure, a reply with no verdict) makes the item one to tell, saying so: it is told, not
-    dropped."""
+    judge (no key, a pause, a failure, a reply that does not come within :data:`JUDGE_TIMEOUT_S` or holds no verdict)
+    makes the item one to tell, saying so: it is told, not dropped."""
     fast: str = runtime.roles.fast()
     try:
         verdict: Verdict = await judge(
             runtime.router,
             fast,
-            runtime.config.agent.model_call_timeout_s,
+            JUDGE_TIMEOUT_S,
             f"watch:{watcher.id}",
             _WHAT[watcher.kind],
             watcher.words,
@@ -131,21 +159,26 @@ async def _verdict(runtime: Runtime, watcher: WatcherRecord, item: Item) -> Chos
     return Chosen(item=item, note=verdict.why) if verdict.tell else None
 
 
-async def _choose(runtime: Runtime, watcher: WatcherRecord, items: Sequence[Item]) -> tuple[list[Chosen], int, int]:
-    """The items to tell, oldest first, how many were judged not to be the owner's, and how many were left unjudged for
-    there being too many in one look (the oldest of them: the newest are judged first). The calendar and a GitHub
+def _judged(watcher: WatcherRecord) -> bool:
+    """Whether the fast model judges the items of ``watcher`` against the owner's words. The calendar and a GitHub
     watcher without words judge nothing: what its look found is what it tells."""
-    if watcher.kind == "calendar" or (watcher.kind == "github" and watcher.words == ""):
-        return [Chosen(item=item, note="") for item in items], 0, 0
+    return not (watcher.kind == "calendar" or (watcher.kind == "github" and watcher.words == ""))
+
+
+def _to_decide(runtime: Runtime, watcher: WatcherRecord, items: Sequence[Item]) -> tuple[list[Item], int]:
+    """The items to deal with, oldest first, and how many were left unjudged for there being too many in one look: the
+    oldest of them, since the newest are judged."""
+    ordered: list[Item] = sorted(items, key=lambda item: item.order)
+    if not _judged(watcher):
+        return ordered, 0
     cap: int = runtime.config.watchers.judged_per_look
-    newest_first: list[Item] = sorted(items, key=lambda item: item.order, reverse=True)
-    chosen: list[Chosen] = []
-    for item in newest_first[:cap]:
-        decision: Chosen | None = await _verdict(runtime, watcher, item)
-        if decision is not None:
-            chosen.append(decision)
-    judged: int = min(len(newest_first), cap)
-    return sorted(chosen, key=lambda one: one.item.order), judged - len(chosen), len(newest_first) - judged
+    return ordered[-cap:], max(0, len(ordered) - cap)
+
+
+async def _decide(runtime: Runtime, watcher: WatcherRecord, item: Item) -> Chosen | None:
+    """``item`` as the owner is to be told of it, or ``None`` when it is not theirs: the model's verdict where it
+    judges, else what the look found."""
+    return await _verdict(runtime, watcher, item) if _judged(watcher) else Chosen(item=item, note="")
 
 
 async def _chat_of_tells(runtime: Runtime) -> str:
@@ -237,15 +270,19 @@ async def _tell(
     return started is not None
 
 
+async def _keep(runtime: Runtime, watcher: WatcherRecord, keys: Sequence[str]) -> None:
+    """Write down that the items with ``keys`` are handled, so that no later look asks about them or tells them."""
+    await update_state(
+        runtime.store, watcher.id, lambda state: state.model_copy(update={"seen": _kept_keys(state.seen, keys)})
+    )
+
+
 async def _tell_the_rest(runtime: Runtime, manager: RunManager, watcher: WatcherRecord, rest: list[Chosen]) -> None:
     """The items past the hour's limit, said in one line, and written down as handled."""
     text: str = f"and {len(rest)} more"
     route: str | None = await _keep_line(runtime, manager, watcher, text)
     await tell_owner(runtime.bus, watcher.name, text, "#/schedules" if route is None else route)
-    keys: list[str] = [one.item.key for one in rest]
-    await update_state(
-        runtime.store, watcher.id, lambda state: state.model_copy(update={"seen": _kept_keys(state.seen, keys)})
-    )
+    await _keep(runtime, watcher, [one.item.key for one in rest])
 
 
 def _summary(found: int, told: int, not_theirs: int, unjudged: int, over: int, left_out: int, cut: str) -> str:
@@ -268,9 +305,20 @@ def _summary(found: int, told: int, not_theirs: int, unjudged: int, over: int, l
     return ", ".join(parts) + "."
 
 
-async def _look(runtime: Runtime, manager: RunManager, watcher: WatcherRecord, now: float) -> LookOutcome:
+async def _until[T](deadline: float, work: Coroutine[Any, Any, T]) -> T:
+    """The result of ``work``, or a :class:`TimeoutError` when it is not done by ``deadline``, a moment of the event
+    loop's clock: at once when that moment has passed."""
+    return await asyncio.wait_for(work, deadline - asyncio.get_running_loop().time())
+
+
+async def _look(
+    runtime: Runtime, manager: RunManager, watcher: WatcherRecord, now: float, progress: _Progress
+) -> LookOutcome:
     config: WatchersConfig = runtime.config.watchers
-    gathered: Gathered = await _gather(runtime, watcher, now)
+    # The look's time is up at this moment for what can stall, the reading of the provider and each question to the
+    # model; an item in hand is told and written down first, so a look is cut between items and never in one.
+    deadline: float = asyncio.get_running_loop().time() + LOOK_TIMEOUT_S
+    gathered: Gathered = await _until(deadline, _gather(runtime, watcher, now))
     first: bool = not watcher.state.primed
     store = runtime.store
     if first:
@@ -294,20 +342,27 @@ async def _look(runtime: Runtime, manager: RunManager, watcher: WatcherRecord, n
             ),
         )
         return LookOutcome(first=True, found=len(gathered.items), told=0, summary=text, error=None)
-    chosen, not_theirs, unjudged = await _choose(runtime, watcher, gathered.items)
-    recent_told: tuple[float, ...] = _recent(watcher.state.told, now)
-    recent_ran: tuple[float, ...] = _recent(watcher.state.ran, now)
-    room: int = max(0, config.tells_per_hour - len(recent_told))
-    runs_left: int = max(0, config.runs_per_hour - len(recent_ran))
-    spoken: int = 0
-    for one in chosen[:room]:
-        if await _tell(runtime, manager, watcher, one, now, runs_left > 0):
-            runs_left -= 1
-        spoken += 1
-    if chosen[room:]:
-        await _tell_the_rest(runtime, manager, watcher, chosen[room:])
+    progress.found = len(gathered.items)
+    room: int = max(0, config.tells_per_hour - len(_recent(watcher.state.told, now)))
+    runs_left: int = max(0, config.runs_per_hour - len(_recent(watcher.state.ran, now)))
+    deciding, unjudged = _to_decide(runtime, watcher, gathered.items)
+    over: list[Chosen] = []
+    for item in deciding:
+        decision: Chosen | None = await _until(deadline, _decide(runtime, watcher, item))
+        if decision is None:
+            # Not the owner's: written down, so that the next look does not ask the model about it again.
+            await _keep(runtime, watcher, [item.key])
+            progress.not_theirs += 1
+        elif progress.told < room:
+            if await _tell(runtime, manager, watcher, decision, now, runs_left > 0):
+                runs_left -= 1
+            progress.told += 1
+        else:
+            over.append(decision)
+    if over:
+        await _tell_the_rest(runtime, manager, watcher, over)
     text = _summary(
-        len(gathered.items), spoken, not_theirs, unjudged, len(chosen[room:]), gathered.left_out, gathered.cut
+        progress.found, progress.told, progress.not_theirs, unjudged, len(over), gathered.left_out, gathered.cut
     )
     await update_state(
         store,
@@ -325,12 +380,26 @@ async def _look(runtime: Runtime, manager: RunManager, watcher: WatcherRecord, n
             }
         ),
     )
-    return LookOutcome(first=False, found=len(gathered.items), told=spoken, summary=text, error=None)
+    return LookOutcome(first=False, found=progress.found, told=progress.told, summary=text, error=None)
 
 
-async def _failed(runtime: Runtime, watcher: WatcherRecord, now: float, message: str) -> LookOutcome:
+def _cut_words(progress: _Progress) -> str:
+    """What the row says of a look that ran out of time: how long it had and, when it had dealt with some, how far it
+    came."""
+    said: str = f"the look took more than {LOOK_TIMEOUT_S:.0f} seconds"
+    if progress.handled == 0:
+        return said
+    return (
+        f"{said}; it had dealt with {progress.handled} of the {progress.found} new ones ({progress.told} told) "
+        "and the next look takes the rest"
+    )
+
+
+async def _failed(
+    runtime: Runtime, watcher: WatcherRecord, now: float, message: str, progress: _Progress
+) -> LookOutcome:
     """Say on the watcher's row that its look failed, and when it tries again: no sooner than its interval or
-    :data:`RETRY_FLOOR_S`."""
+    :data:`RETRY_FLOOR_S`. What the look had told before it failed is written down already and is in the outcome."""
     said: str = one_line(message, 300)
     retry_s: float = RETRY_FLOOR_S if watcher.kind == "calendar" else max(watcher.minutes * 60.0, RETRY_FLOOR_S)
     await update_state(
@@ -338,28 +407,36 @@ async def _failed(runtime: Runtime, watcher: WatcherRecord, now: float, message:
         watcher.id,
         lambda state: state.model_copy(update={"error": said, "error_at": now, "next_look_at": now + retry_s}),
     )
-    return LookOutcome(first=not watcher.state.primed, found=0, told=0, summary="", error=said)
+    return LookOutcome(first=not watcher.state.primed, found=progress.found, told=progress.told, summary="", error=said)
 
 
 async def look_at(runtime: Runtime, manager: RunManager, watcher_id: str, now: float) -> LookOutcome:
     """One look of the watcher ``watcher_id`` at ``now``, alone (the loop's and the owner's Check now do not overlap). A
     failure is written on the watcher's row and returned, never raised; a watcher deleted meanwhile is a
-    :class:`NotFoundError`."""
+    :class:`NotFoundError`. A look that is out of time ends at its next question to the model, with what it told and
+    judged written down, and the next look takes the rest."""
     lock: asyncio.Lock = _LOCKS.setdefault(watcher_id, asyncio.Lock())
     async with lock:
         watcher: WatcherRecord = await get_watcher(runtime.store, watcher_id)
+        progress: _Progress = _Progress()
         try:
-            async with asyncio.timeout(LOOK_TIMEOUT_S):
-                return await _look(runtime, manager, watcher, now)
+            return await _look(runtime, manager, watcher, now, progress)
         except DotError as error:
             log.warning("watcher_look_failed", watcher_id=watcher_id, kind=watcher.kind, error=error.message)
-            return await _failed(runtime, watcher, now, error.message)
+            return await _failed(runtime, watcher, now, error.message, progress)
         except TimeoutError:
-            log.warning("watcher_look_timed_out", watcher_id=watcher_id, kind=watcher.kind)
-            return await _failed(runtime, watcher, now, f"the look took more than {LOOK_TIMEOUT_S:.0f} seconds")
+            log.warning(
+                "watcher_look_timed_out",
+                watcher_id=watcher_id,
+                kind=watcher.kind,
+                found=progress.found,
+                handled=progress.handled,
+                told=progress.told,
+            )
+            return await _failed(runtime, watcher, now, _cut_words(progress), progress)
         except Exception as error:
             log.exception("watcher_look_crashed", watcher_id=watcher_id, kind=watcher.kind)
-            return await _failed(runtime, watcher, now, f"{type(error).__name__}: {error}")
+            return await _failed(runtime, watcher, now, f"{type(error).__name__}: {error}", progress)
 
 
 async def emergency_stop_engaged() -> bool:

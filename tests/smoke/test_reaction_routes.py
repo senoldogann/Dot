@@ -154,6 +154,30 @@ async def test_what_cannot_be_reacted_to_is_refused_with_the_reason(login_env: d
         assert await session.runtime.store.thread_reactions(run.thread_id) == []
 
 
+async def test_a_step_has_one_key_so_one_reaction_on_it_starts_one_follow_up(login_env: dict[str, str]) -> None:
+    """Item 612 (the final review): ``step-1``, ``step-01`` and ``step-0001`` were three messages, each with a claim of
+    its own, and one 👎 on one sentence of a run started a follow-up run for each (as many as the hour allowed)."""
+    turns: list[ScriptedTurn] = [says(SAID), finish("Forty shelves."), finish("Reconsidered: the beds face east.")]
+    async with open_session(login_env, turns) as session, _served(session) as client:
+        run: RunRecord = await session.start()
+        await session.ended(run.id)
+        first: httpx.Response = await client.post(_message(run, "step-1"), json={"reaction": "wrong"})
+        assert (first.status_code, first.json()["effect"]) == (201, "follow_up")
+        for key in ("step-01", "step-0001", "step-001", "step-0", "step-00"):
+            refused: httpx.Response = await client.post(_message(run, key), json={"reaction": "wrong"})
+            assert refused.status_code == 422, key
+            assert (await client.get(_message(run, key))).status_code == 422, key
+            assert (await client.delete(f"{_message(run, key)}/wrong")).status_code == 422, key
+        follow: str = first.json()["run_id"]
+        await session.ended(follow)
+        # One follow-up in the chat, and one key on the chat's reactions: the one the page writes.
+        assert [one.id for one in await session.runtime.store.list_runs(10, run.thread_id)] == [follow, run.id]
+        listed: httpx.Response = await client.get(f"/api/threads/{run.thread_id}/reactions")
+        assert [(row["message"], row["reaction"], row["follow_up_run_id"]) for row in listed.json()] == [
+            ("step-1", "wrong", follow)
+        ]
+
+
 async def test_the_routes_answer_only_with_the_token(login_env: dict[str, str]) -> None:
     async with open_session(login_env, [finish(ANSWER)]) as session, _served(session) as client:
         run: RunRecord = await session.start()

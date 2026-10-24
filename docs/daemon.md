@@ -349,7 +349,9 @@ General › Voice (with a voice kept on this Mac when the browser has one for th
 has not: [what leaves this Mac](safety.md#what-leaves-this-mac)), leaving out its code, its addresses and the marks of
 its Markdown, and stops the reading at a second press. With **Read answers aloud** on in Settings › General › Voice
 (off until you turn it on, in this browser alone), the answer of a run that ends while its page is open is read as it
-appears, and one shown again by a chat opened later is not; one answer is read at a time. Beside the speaker a
+appears, and one shown again by a chat opened later is not; one answer is read at a time, and the reading ends when you
+leave the chat or send a message in it (item 612: it went on over the page you opened next, with no button on the screen
+to stop it). Beside the speaker a
 smiley with a plus (item 586) opens the palette of reactions (👍 ❤️ 👎 🔁 📌 ❓ ✋), and what Dot said in the middle of a
 run has a quiet foot of its own with it; the chips of the reactions that stand follow the button, a press of one takes
 it back, and they are there after a reload, in the turns before the run and on every other screen of the chat. What
@@ -885,7 +887,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
-| `GET\|POST /runs/{id}/messages/{message}/reactions`, `DELETE /runs/{id}/messages/{message}/reactions/{reaction}` | the reactions on a message of Dot's (item 586; `message` is `answer` or `step-<n>`): list them; put one on (`{"reaction": "good"}`, one of `good`, `love`, `wrong`, `again`, `remember`, `explain`, `hold`) and do what it says, 201, or 200 when it was there (the reply has `reactions`, `effect`, `said` and `run_id`; 404 for no run or a step it did not say, 422 for a message with no words, for the answer of a run that works, or for a 📌 on a message that holds a secret); take one back |
+| `GET\|POST /runs/{id}/messages/{message}/reactions`, `DELETE /runs/{id}/messages/{message}/reactions/{reaction}` | the reactions on a message of Dot's (item 586; `message` is `answer` or `step-<n>`, `n` written as the number it is, from 1: `step-01` and `step-0` are 422, so that a message has one key; item 612): list them; put one on (`{"reaction": "good"}`, one of `good`, `love`, `wrong`, `again`, `remember`, `explain`, `hold`) and do what it says, 201, or 200 when it was there (the reply has `reactions`, `effect`, `said` and `run_id`; 404 for no run or a step it did not say, 422 for a message with no words, for the answer of a run that works, or for a 📌 on a message that holds a secret); take one back |
 | `GET /threads/{id}/reactions`                                                   | the reactions that stand on the messages of a chat's runs (404 for no chat) |
 | `GET\|POST /reactions/settings` (`{"key": "wrong", "value": "feedback"}`)        | the switch of the follow-ups and what each reaction does after a run, as they stand; change one, live and kept in `config.toml` under `[reactions]` (`follow_ups` takes true or false, the others `follow_up` or `feedback`: 422 for a pair that does not fit) |
 | `GET /runs/{id}/recap`, `POST /runs/{id}/recap` (`{"force": …}`)                | the run's recap and whether one is due; one written when it is due, or whether or not with `force` (item 536) |

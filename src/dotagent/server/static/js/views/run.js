@@ -40,6 +40,7 @@ import { RUN_BACK_EVENT } from "../shell.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
+import { stopReading } from "../voice.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
 import { narrowOr, PHONE } from "../layout.js";
 
@@ -1665,6 +1666,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     loops.dispose();
     meter.dispose();
     frame.dispose();
+    // An answer being read aloud is not read on over the page the reader went to: the speaker that stops it is on this
+    // page, and goes with it (item 612).
+    stopReading();
     if (ticker !== null) {
       clearInterval(ticker);
       clearInterval(costTicker);

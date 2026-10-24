@@ -438,23 +438,33 @@ function utteranceFor(words, lang) {
   return utterance;
 }
 
+// A link or an image, `[text](address)`, then the two stretches that look like one and are not: a "[" with no "](" after it,
+// and a "[text](" whose address does not end in ")". Each is taken whole, so that no "[" inside it starts a scan of the same
+// stretch again: the pattern of the link alone read to the end of the line from each "[" of a long run of them (item 612).
+const LINK = /(!?\[([^\]\n]*)\]\([^)\s]*\))|!?\[[^\]\n]*\]\([^)\s]*|!?\[[^\]\n]*/g;
+
 /**
  * An answer's Markdown as the words to say: its code left out (it is not read out), its links and images as their words,
  * an address as "link", its marks gone, a table's cells one after the other, and a full stop where a line ends without one,
  * so that a heading and the line under it are not run together.
+ *
+ * It runs on the page's thread as an answer arrives, so every pattern reads in time linear in the answer (item 612): none
+ * scans ahead from each of a long run of its characters, to find the same end of the line each time. Besides the links
+ * (above), the table's rule has no two runs of spaces that could share a line's spaces, and a pipe takes the spaces
+ * before it from where their run begins.
  */
 export function spokenText(markdown) {
   const plain = markdown
     .replace(/(```|~~~)[\s\S]*?(?:\1|$)/g, "\n")
-    .replace(/!?\[([^\]\n]*)\]\([^)\s]*\)/g, "$1")
+    .replace(LINK, (stretch, link, text) => (link === undefined ? stretch : text))
     .replace(/https?:\/\/[^\s)]+/g, "link")
-    .replace(/^[ \t]*\|?[ \t]*:?-{2,}:?[ \t]*(?:\|[ \t]*:?-{2,}:?[ \t]*)*\|?[ \t]*$/gm, "")
+    .replace(/^[ \t]*(?:\|[ \t]*)?:?-{2,}:?[ \t]*(?:\|[ \t]*:?-{2,}:?[ \t]*)*(?:\|[ \t]*)?$/gm, "")
     .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, "")
     .replace(/^[ \t]*(?:[-*+]|\d{1,3}[.)])[ \t]+/gm, "")
     .replace(/^[ \t]*>[ \t]?/gm, "")
     .replace(/(\*\*|__|~~|`)/g, "")
     .replace(/(^|[\s(])([*_])(?=\S)([^*_\n]+?)(?<=\S)\2(?=[\s).,!?:;]|$)/gm, "$1$3")
-    .replace(/[ \t]*\|[ \t]*/g, ", ");
+    .replace(/(?:(?<![ \t])[ \t]+)?\|[ \t]*/g, ", ");
   return plain
     .split("\n")
     .map((line) => line.trim().replace(/^,\s*|,\s*$/g, ""))
