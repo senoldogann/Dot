@@ -7,6 +7,7 @@ import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { forgetSentPictures } from "./attachments.js";
 import { setPageTitle, watchAttention } from "./attention.js";
+import { loadMacVoice } from "./macvoice.js";
 import { wireConversationCopy } from "./clipboard.js";
 import { el, OPEN_FILE_EVENT } from "./dom.js";
 import { fileDialog } from "./filepanel.js";
@@ -627,7 +628,7 @@ function handleAuthLost() {
 async function connect() {
   renderWaiting();
   try {
-    await Promise.all([refresh(), loadLooks(), loadOwnThemes(), loadAssistant()]);
+    await Promise.all([refresh(), loadLooks(), loadOwnThemes(), loadAssistant(), loadMacVoice()]);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       const before = untried === null ? null : keptBefore;

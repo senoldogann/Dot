@@ -69,6 +69,7 @@ from dotagent.store.models import (
 )
 from dotagent.tailnet import TailnetState
 from dotagent.undo.restore import UndoAction, UndoState
+from dotagent.voice.wav import MAX_RECORDING_BYTES
 
 _GOAL_CHARS: int = 50_000
 _TEXT_CHARS: int = 20_000
@@ -82,6 +83,8 @@ PickedName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=
 _KEY_CHARS: int = 1000
 # Base64 takes four characters for every three bytes.
 _UPLOAD_B64_CHARS: int = (MAX_ATTACHMENT_BYTES + 2) // 3 * 4
+# A recording of the composer's microphone has a limit of its own (item 626): five minutes of 16 kHz mono sound.
+_RECORDING_B64_CHARS: int = (MAX_RECORDING_BYTES + 2) // 3 * 4
 
 
 class ErrorView(FrozenModel):
@@ -450,6 +453,20 @@ class AttachmentUpload(FrozenModel):
     name: str = Field(min_length=1, max_length=255)
     media_type: str = Field(max_length=200)
     data_b64: str = Field(min_length=1, max_length=_UPLOAD_B64_CHARS)
+
+
+class RecordingUpload(FrozenModel):
+    """A recording of the composer's microphone for this Mac to write down (item 626): a WAV, base64-encoded, and the
+    language it is in (``tr-TR``)."""
+
+    language: str = Field(min_length=2, max_length=16)
+    data_b64: str = Field(min_length=1, max_length=_RECORDING_B64_CHARS)
+
+
+class TranscriptView(FrozenModel):
+    """The words a recording was written down as; empty when nothing was heard in it."""
+
+    text: str
 
 
 class LoopRequest(FrozenModel):

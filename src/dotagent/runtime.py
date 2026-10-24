@@ -46,6 +46,7 @@ from dotagent.core.paths import (
     token_path,
     undo_dir,
     vapid_path,
+    voice_dir,
     web_research_dir,
     workspace_dir,
 )
@@ -280,7 +281,8 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     its own code, which the daemon runs at its next start, its plugins and their own files, whose MCP servers start
     with the daemon and are given keys from the key store, and so does each server of its record of those added from
     other agents (item 165) and of its record of those added on Customize › Connectors, the data of the web-research
-    server that comes with Dot, which starts with the daemon and reads it back (item 583), the home of the OpenCode
+    server that comes with Dot, which starts with the daemon and reads it back (item 583), the folder the daemon builds
+    the program that writes recordings down in and runs it from (item 626), the home of the OpenCode
     server it starts (its config says what OpenCode's agent may do), its skills (the copies of those added from other
     agents too) and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
     return (
@@ -288,6 +290,7 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
         *plugin_roots(config.plugins),
         plugins_data_dir(),
         web_research_dir(),
+        voice_dir(),
         added_servers_path(),
         connected_servers_path(),
         opencode_dir(),

@@ -12,7 +12,7 @@ import pytest
 
 from dotagent.config import load_default_config
 from dotagent.core.errors import ConfigError
-from dotagent.core.paths import web_research_dir
+from dotagent.core.paths import voice_dir, web_research_dir
 from dotagent.dot_app import app_path, app_program, build_path, runtime_path
 from dotagent.policy.paths import expand_protected
 from dotagent.policy.sandbox import (
@@ -295,6 +295,58 @@ def test_macos_keeps_a_command_from_changing_what_the_web_research_server_reads_
     assert sorted(path.name for path in folder.iterdir()) == ["crawl-jobs.sqlite3"]
     read: subprocess.CompletedProcess[str] = run(f"cat {jobs}; echo note > {home}/note.txt")
     assert (read.returncode, read.stdout) == (0, "jobs")
+    assert (home / "note.txt").read_text(encoding="utf-8") == "note\n"
+
+
+def test_macos_keeps_a_command_from_changing_the_program_the_daemon_builds_to_write_recordings_down(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 626: the daemon builds the program that writes recordings down in a folder of its own under Dot's home and
+    runs it, outside the sandbox, with the owner's rights: a command that could replace it, or put a program of its own
+    in a folder the daemon builds in, would have it run at the next recording. The profile of a run's commands, built
+    from what Dot loads and runs as the runtime builds it, refuses each, whether the folder is there or not yet, and
+    lets the command read what is there."""
+    home: Path = Path(os.path.realpath(tmp_path)) / "home"
+    home.mkdir()
+    monkeypatch.setenv("DOT_HOME", str(home))
+    words: tuple[str, ...] = build_sandbox(
+        (), (), expand_protected([], _dot_paths(load_default_config())), home / "agents"
+    ).commands
+    folder: Path = voice_dir()
+    assert folder == home / "voice"
+
+    def run(line: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([*words, "/bin/zsh", "-c", line], capture_output=True, text=True, check=False)
+
+    def refusals(done: list[subprocess.CompletedProcess[str]]) -> list[tuple[bool, bool]]:
+        return [(one.returncode != 0, "not permitted" in one.stderr) for one in done]
+
+    # Not there yet: a command can make neither the folder nor a build folder, nor a program in one.
+    refused: list[subprocess.CompletedProcess[str]] = [
+        run(f"mkdir {folder}"),
+        run(f"mkdir -p {folder}/build-abcd1234 && echo planted > {folder}/build-abcd1234/transcribe"),
+    ]
+    assert refusals(refused) == [(True, True)] * 2
+    assert not folder.exists()
+    # Built as the daemon builds it, outside the sandbox: nothing in it is changed, made or moved.
+    built: Path = folder / "build-abcd1234"
+    built.mkdir(parents=True)
+    program: Path = built / "transcribe"
+    program.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    refused = [
+        run(f"echo planted > {program}"),
+        run(f"printf planted >> {program}"),
+        run(f"mv {program} {program}.moved"),
+        run(f"mv {built} {built}.moved"),
+        run(f"mkdir {folder}/build-wxyz5678"),
+        run(f"ln -s /tmp {folder}/link"),
+        run(f"echo planted > {folder}/recordings"),
+    ]
+    assert refusals(refused) == [(True, True)] * 7
+    assert program.read_text(encoding="utf-8") == "#!/bin/sh\nexit 0\n"
+    assert sorted(entry.name for entry in folder.iterdir()) == ["build-abcd1234"]
+    read: subprocess.CompletedProcess[str] = run(f"cat {program}; echo note > {home}/note.txt")
+    assert (read.returncode, read.stdout) == (0, "#!/bin/sh\nexit 0\n")
     assert (home / "note.txt").read_text(encoding="utf-8") == "note\n"
 
 

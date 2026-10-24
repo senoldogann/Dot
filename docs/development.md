@@ -31,7 +31,7 @@ service are marked:
 
 | Marker     | Needs                                                                                                                |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- |
-| `live`     | a running Ollama server with a signed-in cloud model                                                                 |
+| `live`     | a running Ollama server with a signed-in cloud model; the voice test (item 626): macOS 26 and Apple's developer tools |
 | `browser`  | Chrome; it runs headless against a local fixture server                                                              |
 | `internet` | the public internet; read-only requests: a few, two or three to each connector, a download of each gallery plugin    |
 | `desktop`  | a logged-in screen and `DOT_DESKTOP_TESTS=1`; it moves the real pointer and keyboard against a local AppKit window |
@@ -42,6 +42,17 @@ your keys. A few smoke tests that use the local Ollama server's embedding model 
 `pytest` collects every test, as each test module is imported by its path (`tests/unit` and `tests/smoke` have modules
 of the same name), and a mark that is not in the table fails, so a mistyped one cannot pick a test that needs a service
 (item 213).
+
+No test opens a microphone (item 626). Chrome's own fake microphone (`--use-fake-device-for-media-stream`) still makes
+macOS ask for the microphone for the app that runs the tests, a permission dialog on the screen, and `getUserMedia`
+waits for its answer. So the browser tests of the composer's recording (`tests/smoke/test_voice_recording.py`) replace
+`getUserMedia` with a function that gives a stream made by Web Audio, a tone the test turns on and off; the page's
+capture, its audio worklet, its downsampling, its WAV file and its request run as they do for a real microphone, in
+Chrome and in WebKit, Safari's engine. The program that writes a recording down is a stand-in of the test's own
+(`tests/smoke/voice_stand_ins.py`): `DOT_SWIFTC` names a compiler that copies it, and every smoke test starts with
+`DOT_SWIFTC` naming one that does not exist, so that no test builds Swift or asks the owner's developer tools. The one
+test that builds the real program, `tests/smoke/test_voice_live.py` (`-m live`, which may download a language's model
+from Apple the first time), records with `say`.
 
 A test never finds your keys unless it is marked `hosted`, `internet` or `live` (item 558, `tests/conftest.py`): in a
 run where none of those is selected the variables of the providers' keys are out of the environment and the login

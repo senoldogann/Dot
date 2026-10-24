@@ -1,7 +1,7 @@
 // What the interface reads off the window that TypeScript's own DOM library does not know: the desktop shell's bridge,
-// the hook the shell calls, Safari's word for a page opened from the home screen, and the browser's speech recognition
-// (item 574). Checked by `npm run check`
-// (tsconfig.json); never loaded by a browser.
+// the hook the shell calls, Safari's word for a page opened from the home screen, the browser's speech recognition
+// (item 574), Safari's prefixed Web Audio, and what the audio worklet of the recording sees (item 626). Checked by
+// `npm run check` (tsconfig.json); never loaded by a browser.
 
 interface TauriNotificationBridge {
   isPermissionGranted(): Promise<boolean>;
@@ -36,7 +36,16 @@ interface SpeechRecognitionLike extends EventTarget {
   abort(): void;
 }
 
+/** What the global scope of an audio worklet has (voicecapture.js, item 626), which TypeScript's DOM library does not know. */
+declare class AudioWorkletProcessor {
+  readonly port: MessagePort;
+  process(inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array>): boolean;
+}
+declare function registerProcessor(name: string, processor: new () => AudioWorkletProcessor): void;
+
 interface Window {
+  /** Safari's Web Audio before it dropped the prefix (14.1). */
+  webkitAudioContext?: typeof AudioContext;
   /** Tauri's bridge, present only inside the desktop shell (`withGlobalTauri`); its notification part is what the page uses. */
   __TAURI__?: { notification?: TauriNotificationBridge } & Record<string, unknown>;
   /** Set by main.js: the desktop shell's New chat calls it once it moved the page to the home. */

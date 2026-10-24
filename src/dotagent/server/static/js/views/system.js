@@ -52,7 +52,9 @@ import { approvalLabel } from "../runmodes.js";
 import { scrollCue } from "../scrollcue.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
-import { canListen, canSpeak, sayOnce, stopReading } from "../voice.js";
+import { canRecord } from "../capture.js";
+import { macVoice } from "../macvoice.js";
+import { appleTouch, canListen, canSpeak, listeningWay, macOffer, sayOnce, stopReading } from "../voice.js";
 
 const NOT_SET = "—";
 // The roles a model is configured for, and the tab where a missing or refused key is put right.
@@ -258,12 +260,29 @@ function buildVoiceCard() {
     aloud.toggle.disabled = true;
     facts.push("This browser cannot speak, so no answer is read aloud.");
   }
-  if (canListen()) {
+  const mac = macVoice();
+  const way = listeningWay({
+    recognition: canListen(),
+    recording: canRecord(),
+    mac: mac.transcribe,
+    userAgent: navigator.userAgent,
+    touchPoints: navigator.maxTouchPoints,
+  });
+  // What the Mac still needs before it can write down what is said (item 626), as the daemon says it.
+  const macNeeds = macOffer(mac) === "" ? [] : [macOffer(mac)];
+  if (way === "recording") {
+    facts.push(
+      "The microphone records your voice and sends it to your Mac, which writes it down on the device with macOS's own dictation: it goes to no one else, and the Mac keeps nothing. The first time a language is used the Mac downloads its model from Apple. Nothing is sent by voice alone: the words fill the box, and you send them.",
+    );
+  } else if (way === "recognition") {
     facts.push(
       "The browser does the listening: Safari and Chrome may send your voice to Apple's or Google's servers to recognize it. Dot sends nothing itself, and nothing is sent by voice alone: the words fill the box, and you send them.",
     );
+    if (appleTouch(navigator.userAgent, navigator.maxTouchPoints)) {
+      facts.push("Safari on an iPhone or an iPad at times hears only the first dictation after the page loads.", ...macNeeds);
+    }
   } else {
-    facts.push("This browser has no speech recognition, so the composer shows no microphone.");
+    facts.push("This browser has no speech recognition, so the composer shows no microphone.", ...macNeeds);
   }
   return section(
     "Voice",

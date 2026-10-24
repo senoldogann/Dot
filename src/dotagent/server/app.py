@@ -30,6 +30,7 @@ from dotagent.core.errors import (
     ToolExecutionError,
     ToolInputError,
     UndoError,
+    VoiceError,
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import looks_dir
@@ -67,6 +68,7 @@ from dotagent.server.routes_teams import teams_router
 from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
 from dotagent.server.routes_vault import vault_router
+from dotagent.server.routes_voice import voice_router
 from dotagent.server.views import ErrorView
 
 log = get_logger(__name__)
@@ -96,6 +98,7 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (PhoneSetupError, 422),
     (ChannelError, 422),
     (SignInError, 422),
+    (VoiceError, 422),
     (ProviderError, 502),
 )
 
@@ -191,6 +194,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(assistant_router(ctx))
     app.include_router(accounts_router(ctx))
     app.include_router(vault_router(ctx))
+    app.include_router(voice_router())
 
     @app.exception_handler(DotError)
     async def dot_error(request: Request, exc: DotError) -> JSONResponse:
