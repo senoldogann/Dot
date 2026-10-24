@@ -7,6 +7,7 @@ import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { forgetSentPictures } from "./attachments.js";
 import { setPageTitle, watchAttention } from "./attention.js";
+import { loadMacVoice } from "./macvoice.js";
 import { wireConversationCopy } from "./clipboard.js";
 import { el, OPEN_FILE_EVENT } from "./dom.js";
 import { fileDialog } from "./filepanel.js";
@@ -626,6 +627,9 @@ function handleAuthLost() {
 
 async function connect() {
   renderWaiting();
+  // The Mac's answer on writing down what is said is read in the background (item 626): a slow Mac takes a while to
+  // answer, and nothing of the page's start needs it. A composer made before it listens the browser's way.
+  loadMacVoice();
   try {
     await Promise.all([refresh(), loadLooks(), loadOwnThemes(), loadAssistant()]);
   } catch (error) {

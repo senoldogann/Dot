@@ -6,12 +6,18 @@ import { test } from "node:test";
 
 import {
   QUIET_BAR,
+  appleTouch,
+  captureProblem,
   clockText,
+  deafWords,
   dictated,
   languageTag,
+  listeningWay,
   localVoice,
+  macOffer,
   nextWave,
   problemWords,
+  sendProblem,
   sentenceChunks,
   voicePlace,
   spokenText,
@@ -237,4 +243,125 @@ test("the recorder's wave moves one bar to the left, a tall one coming in while 
   assert.equal(nextWave(quiet, true, () => 0)[2], 0.3);
   assert.equal(nextWave(quiet, true, () => 1)[2], 1);
   assert.deepEqual(nextWave([0.9, 0.5, 0.2], false, () => 0.5), [0.5, 0.2, QUIET_BAR]);
+});
+
+// ----- how the page listens (item 626) ------------------------------------------------------------------------------------
+
+const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1";
+const MAC_SAFARI = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15";
+const MAC_CHROME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0 Safari/537.36";
+const FIREFOX = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:140.0) Gecko/20100101 Firefox/140.0";
+
+/** The way the page listens in a browser that `recognition` and `recording` describe, with the Mac able or not. */
+function wayOf(userAgent, touchPoints, { recognition = true, recording = true, mac = true } = {}) {
+  return listeningWay({ recognition, recording, mac, userAgent, touchPoints });
+}
+
+test("an iPhone or an iPad records for the Mac when the Mac can write down, and keeps Safari's recognition when it cannot", () => {
+  assert.equal(wayOf(IPHONE, 5), "recording");
+  assert.equal(wayOf("Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1", 5), "recording");
+  // An iPad that asks for the computer's pages says it is a Mac with a touch screen.
+  assert.equal(wayOf(MAC_SAFARI, 5), "recording");
+  // Where the Mac cannot, the recognition stays, with the toast of item 616: better than no microphone.
+  assert.equal(wayOf(IPHONE, 5, { mac: false }), "recognition");
+  // A page that cannot record (an address that is not secure has no microphone to open) keeps the recognition too.
+  assert.equal(wayOf(IPHONE, 5, { recording: false }), "recognition");
+  // And an iPhone with neither has no microphone at all.
+  assert.equal(wayOf(IPHONE, 5, { recognition: false, mac: false }), null);
+  assert.equal(wayOf(IPHONE, 5, { recognition: false, recording: false }), null);
+});
+
+test("a browser with no speech recognition records when the Mac can write down, and has no microphone when it cannot", () => {
+  assert.equal(wayOf(FIREFOX, 0, { recognition: false }), "recording");
+  assert.equal(wayOf(FIREFOX, 0, { recognition: false, mac: false }), null);
+  assert.equal(wayOf(FIREFOX, 0, { recognition: false, recording: false }), null);
+});
+
+test("everywhere else, a Mac's Safari or Chrome and Dot.app, the browser's recognition stays whatever the Mac can", () => {
+  for (const mac of [true, false]) {
+    assert.equal(wayOf(MAC_SAFARI, 0, { mac }), "recognition");
+    assert.equal(wayOf(MAC_CHROME, 0, { mac }), "recognition");
+    assert.equal(wayOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140.0", 0, { mac }), "recognition");
+    // A phone that is not Apple's: Chrome on Android hears every time.
+    assert.equal(wayOf("Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140.0 Mobile Safari/537.36", 5, { mac }), "recognition");
+  }
+});
+
+test("an iPhone, an iPod and an iPad are Apple's touch screens, and a Mac with one touch point is not", () => {
+  assert.equal(appleTouch(IPHONE, 5), true);
+  assert.equal(appleTouch("Mozilla/5.0 (iPod touch; CPU iPhone OS 17_0 like Mac OS X)", 5), true);
+  assert.equal(appleTouch(MAC_SAFARI, 5), true);
+  assert.equal(appleTouch(MAC_SAFARI, 1), false);
+  assert.equal(appleTouch(MAC_SAFARI, 0), false);
+  assert.equal(appleTouch(MAC_CHROME, 0), false);
+});
+
+test("what the Mac lacks to write down what is said is offered as one sentence, and as none where it lacks nothing", () => {
+  assert.equal(macOffer(null), "");
+  assert.equal(macOffer({ transcribe: true, why: null }), "");
+  assert.equal(macOffer({ transcribe: false, why: null }), "");
+  assert.equal(
+    macOffer({ transcribe: false, why: "This Mac needs macOS 26 or later" }),
+    "A Mac that writes down what you say hears every time. This Mac needs macOS 26 or later.",
+  );
+  assert.equal(
+    macOffer({ transcribe: false, why: "Install Apple's developer tools on the Mac: xcode-select --install" }),
+    "A Mac that writes down what you say hears every time. Install Apple's developer tools on the Mac: xcode-select --install.",
+  );
+});
+
+test("the toast of a dictation Safari did not hear says what the Mac lacks to write down instead, when it says anything", () => {
+  const words = "Safari heard nothing this time.";
+  assert.equal(deafWords(words, null), words);
+  assert.equal(deafWords(words, { transcribe: false, why: null }), words);
+  assert.equal(
+    deafWords(words, { transcribe: false, why: "Install Apple's developer tools on the Mac: xcode-select --install" }),
+    "Safari heard nothing this time. A Mac that writes down what you say hears every time. Install Apple's developer tools on the Mac: xcode-select --install.",
+  );
+});
+
+test("a refused or missing microphone is told where to allow it in the words of the place, and with no word of speech recognition", () => {
+  const refused = (name, place) => captureProblem({ name, message: "x" }, place);
+  for (const name of ["NotAllowedError", "PermissionDeniedError", "SecurityError"]) {
+    assert.equal(
+      refused(name, "other"),
+      "The browser has not allowed the microphone on this page. Allow it for this address in the browser's settings, and the browser in the device's settings. The keyboard's own microphone types into the box meanwhile.",
+    );
+  }
+  assert.match(refused("NotAllowedError", "mac"), /System Settings › Privacy & Security › Microphone\. macOS Dictation types into the box/);
+  assert.match(refused("NotAllowedError", "app"), /^macOS has not given Dot the microphone\. Allow Dot in System Settings/);
+  for (const place of ["app", "mac", "other"]) {
+    assert.doesNotMatch(refused("NotAllowedError", place), /speech recognition/i);
+  }
+  assert.equal(refused("NotFoundError", "other"), "No microphone was found.");
+  assert.equal(refused("NotFoundError", "mac"), "No microphone was found: check the input in System Settings › Sound.");
+  assert.match(refused("NotReadableError", "other"), /another app may be using it/);
+  // The audio the page's own capture could not start (capture.js): press again, or reload.
+  assert.equal(
+    refused("InvalidStateError", "other"),
+    "The browser would not start the sound for the microphone. Press the microphone again; if that does not help, reload the page.",
+  );
+  assert.equal(captureProblem(new Error("boom"), "other"), "The microphone could not start: boom");
+  assert.equal(captureProblem(undefined, "other"), "The microphone could not start: the browser gave no reason");
+});
+
+test("what a recording met on its way to the Mac is said in plain words: unreachable, a language it cannot, or its own words", () => {
+  assert.match(sendProblem({ status: 0, message: "Cannot reach the Dot daemon. Is it running?" }), /^The Mac could not be reached, so what you said was not written down\./);
+  assert.equal(
+    sendProblem({ status: 422, message: "This Mac cannot write down xx-YY", context: { code: "unsupported-language" } }),
+    "The Mac cannot write down this language. Choose another in Settings › General › Voice.",
+  );
+  assert.equal(sendProblem({ status: 422, message: "The Mac took longer than 60 seconds", context: { code: "timeout" } }), "The Mac took longer than 60 seconds");
+  for (const code of ["unavailable", "no-audio", "failed"]) {
+    assert.equal(sendProblem({ status: 422, message: `words for the owner of ${code}`, context: { code } }), `words for the owner of ${code}`);
+  }
+  // What is not the Mac's own to say is no words for the owner: a request it could not read, a daemon that failed.
+  assert.equal(sendProblem({ status: 422, message: "the recording is not a WAV file", context: {} }), "The Mac could not write down what you said.");
+  assert.equal(sendProblem({ status: 500, message: "Dot failed on an error it did not expect", context: { error: "x" } }), "The Mac could not write down what you said.");
+  assert.equal(sendProblem({ status: 422, message: "", context: { code: "failed" } }), "The Mac could not write down what you said.");
+  assert.equal(sendProblem(undefined), "The Mac could not write down what you said.");
+  // None of it says what the page does: no file format, no program, no model.
+  for (const words of [sendProblem({ status: 0 }), sendProblem({ context: { code: "unsupported-language" } })]) {
+    assert.doesNotMatch(words, /WAV|Swift|transcrib|locale/i);
+  }
 });

@@ -288,3 +288,9 @@ class PhoneSetupError(DotError):
 class ChannelError(DotError):
     """A channel of the owner's messaging apps (iMessage; item 572) could not be set up or used: a handle that is not
     one, a code that is wrong, Messages refusing or not answering."""
+
+
+class VoiceError(DotError):
+    """This Mac could not write a recording down (item 626). The message is for the owner, in plain words, and says what
+    to do; ``context["code"]`` is what a page tells it by: ``unavailable`` (this Mac cannot write recordings down),
+    ``unsupported-language``, ``no-audio``, ``timeout`` or ``failed``."""

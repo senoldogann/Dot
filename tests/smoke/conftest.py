@@ -6,7 +6,10 @@ Settings › Phone opens the App Store or Tailscale with (item 421); the tests o
 stand-ins. The tests of the accounts signed in (items 422 and 424) keep their tokens in a keychain of their own
 (``keychain_file``). A test that opens the Connectors page for its layout alone has macOS answer at once
 (``mac_at_rest``): the page waits for ``GET /api/connections``, which asks macOS's permission service about each
-application that runs, and that service takes seconds when the Mac is busy."""
+application that runs, and that service takes seconds when the Mac is busy. The Swift compiler that builds the program
+which writes a recording down (item 626) is one that does not exist too, so that no test builds Swift, opens Apple's
+frameworks or asks the owner's developer tools whether this Mac can write down: every page a browser test opens asks
+``GET /api/voice``, and answers that the Mac cannot. The tests of the microphone's recording point it at a stand-in."""
 
 import fcntl
 import os
@@ -25,6 +28,7 @@ MISSING_OPENCODE: str = "/nonexistent/dot-tests/opencode"
 MISSING_TAILSCALE: str = "/nonexistent/dot-tests/tailscale"
 MISSING_CAFFEINATE: str = "/nonexistent/dot-tests/caffeinate"
 MISSING_OPEN: str = "/nonexistent/dot-tests/open"
+MISSING_SWIFTC: str = "/nonexistent/dot-tests/swiftc"
 # The keychain the accounts of the official sign-ins keep their tokens in (item 422): one that does not exist, which the
 # Keychain refuses before ``security`` runs (item 628: ``security`` itself would use the login keychain in its place),
 # so that no test reads or writes the owner's login keychain through them; the tests of the sign-ins make their own.
@@ -36,6 +40,7 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ["DOT_TAILSCALE"] = MISSING_TAILSCALE
     os.environ["DOT_CAFFEINATE"] = MISSING_CAFFEINATE
     os.environ["DOT_OPEN"] = MISSING_OPEN
+    os.environ["DOT_SWIFTC"] = MISSING_SWIFTC
     os.environ["DOT_KEYCHAIN"] = MISSING_KEYCHAIN
 
 

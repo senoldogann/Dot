@@ -64,18 +64,37 @@ run needs, sent where the configuration points:
   of files it read or wrote, the host of pages it read, a tool's name and the first sentence of its newest thought,
   masked of the secrets Dot holds, never what a tool answered. What you send there is read from Messages' database on
   this Mac (see [Channels](channels.md), item 572).
-- **To the browser's makers, if you use the microphone: your voice, from your browser or Dot.app (Apple's); and, when
-  the Mac has no voice of the language, the text read aloud.** The composer's microphone and the reading of answers
-  aloud (item 574) are the browser's own speech recognition and speech synthesis: Safari and Chrome may send what you
-  say to Apple's or Google's servers to recognize it (the browser's own settings say whether they do). In the desktop
+- **To the browser's makers, if you use the microphone in a browser that recognizes speech itself: your voice, from
+  your browser or Dot.app (Apple's); and, when the Mac has no voice of the language, the text read aloud.** The
+  composer's microphone and the reading of answers aloud (item 574) are the browser's own speech recognition and speech
+  synthesis: Safari and Chrome may send what you say to Apple's or Google's servers to recognize it (the browser's own
+  settings say whether they do). On an iPhone or an iPad, where the Mac can write down, and in a browser with no speech
+  recognition, the microphone records instead and your voice does not go to the browser's makers (item 626, the next
+  entry). In the desktop
   app the recognition is WebKit's, macOS's own, which may send what you say to Apple as Safari's does, once macOS lets
   the app hear (item 594: the app asks macOS for the microphone and speech recognition). An answer is read aloud with a
   voice the browser keeps on this Mac when it has one for the language (`localService`: Dot picks it, and macOS's own
   voices send nothing). A network voice, such as Chrome's "Google …" voices, sends the text it reads to its servers; the
   browser speaks with one only when the Mac has no voice of that language, and Settings › General › Voice says so. Dot
   sends nothing itself: it only gets the words the browser hands back, into the box, and sends nothing until you press
-  send. In the desktop app the daemon's page, given the microphone, could record sound with it too (`getUserMedia`), as
-  a site given a browser's microphone can; Dot's page takes only the words (item 594).
+  send. In the desktop app Dot's page takes only the words (item 594): it could record sound with the microphone it is
+  given (`getUserMedia`), as a site given a browser's microphone can, and does so only for the recording of the next
+  entry, which is for a phone's browser and one with no speech recognition.
+- **To your own Mac, from your phone's browser, if you use the microphone there: a recording of your voice, which stays
+  on your devices.** On an iPhone or an iPad, where Safari's own speech recognition goes deaf after the first dictation
+  of a page, and in a browser with no speech recognition (item 626), the page records the microphone itself and sends
+  the recording to the daemon on this Mac, at the address the page reaches Dot at (over your tailnet, as the rest of the
+  page), behind the access token like every request. The Mac writes it down with macOS 26's own dictation, on the
+  device, with a small program the daemon builds with Apple's developer tools, and answers with the words, which go into
+  the box and are sent nowhere until you press send. The recording is held in a file of mode 0600 in a private folder
+  of Dot's home for as long as that takes, and deleted whether it worked or not; it and the words are never logged and
+  never kept, and no one else gets them: not Apple, not Google, not Dot's makers. What does leave this Mac is macOS's
+  own request, once for each language you use: it downloads the language's dictation model from Apple (the model that
+  System Settings › Keyboard › Dictation offers) and keeps it; the request has none of your voice or words in it. A Mac
+  that cannot write down (older than macOS 26, or without Apple's developer tools) leaves the iPhone with Safari's own
+  recognition, as before, and Settings › General › Voice says which way the page listens and what the Mac lacks. On a
+  Mac's own Safari or Chrome and in the desktop app nothing of this changes: the browser recognizes the voice, as the
+  entry before says.
 - **To the model, for the morning brief: Dot's record of itself.** The brief's run (item 570, see
   [Dot comes to you](proactive.md)) is given what waits for you, the runs that failed since the last brief, the
   campaigns at work and the schedules of the day, as lines cut to 160 characters with their secrets masked, and what
@@ -592,7 +611,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   that, the file of the launchd job that starts the daemon, and the program that job starts it with: `Dot.app` in
   Dot's home and the folder it is built in, item 561, and the `runtime` folder of Dot's home that the desktop app
   installs Dot in, item 575), its plugins and their own files, the data folder of the web-research server that comes
-  with Dot (`web-research`, item 583), its skills (with the
+  with Dot (`web-research`, item 583), the folder the daemon builds the program that writes your recordings down in and
+  runs it from (`voice`, item 626), its skills (with the
   `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's records
   of the MCP servers you added from other agents and on Customize › Connectors, the home of the OpenCode server it starts,
   the playbooks it learned and the file of its emergency stop. The file tools ask you before they write there

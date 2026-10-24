@@ -2,10 +2,15 @@
 
 Without Tailscale, Dot can also be reached from the phone's own Messages, in the conversation you have with yourself:
 see [Channels](channels.md). By voice, where the phone's browser offers it (Safari does; an app added to the home
-screen may not, and the page says when the browser refuses): the composer's microphone dictates a message (a later
-dictation Safari does not hear says so, and Reload brings the microphone back, item 616), and the
-speaker under an answer reads it aloud, with the browser's own speech recognition and voice, in the language chosen in
-Settings › General › Voice (item 574; see [the daemon page](daemon.md#the-daemon-the-web-ui-and-the-service)).
+screen may not, and the page says when the browser refuses): the composer's microphone dictates a message, and the
+speaker under an answer reads it aloud with the browser's own voice, in the language chosen in Settings › General ›
+Voice (item 574; see [the daemon page](daemon.md#the-daemon-the-web-ui-and-the-service)). Safari's own speech
+recognition hears the first dictation of a page and at times none after it, so on an iPhone or an iPad the microphone
+records your voice itself and your Mac writes it down, on the device, every time (item 626): the Mac needs macOS 26 or
+later and Apple's developer tools (`xcode-select --install`), which the page asks it once as it starts. The first time a
+language is used the Mac downloads its dictation model from Apple, so that first one takes longer; the voice goes to
+your Mac and nowhere else ([Safety](safety.md)). A Mac that cannot leaves the microphone Safari's own, where a later
+dictation Safari does not hear says so, names what the Mac lacks, and Reload brings the microphone back (item 616).
 Under each message of Dot's a smiley opens the palette of reactions, a thumb's size, and what each does is the same on
 the phone: a 👎 on a run at work reaches it, a ✋ holds it until you write, a 📌 keeps the message as a note (item 586; see
 [Reactions](runs.md#reactions-on-dots-messages)).

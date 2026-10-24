@@ -172,20 +172,29 @@ in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
 links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
-sent is the text as typed. A **microphone** by the send (item 574; where the browser has speech recognition,
-`SpeechRecognition` or Safari's `webkitSpeechRecognition`: Safari, Chrome and the desktop app's web view, not Firefox,
-which shows none) turns the controls under the box into a recorder while it listens (item 605), as a phone's apps do:
+sent is the text as typed. A **microphone** by the send (item 574) turns the controls under the box into a recorder
+while it listens (item 605), as a phone's apps do. It listens one of two ways, which the page chooses as it starts (item
+626):
+
+- with the browser's own speech recognition (`SpeechRecognition` or Safari's `webkitSpeechRecognition`: Safari, Chrome
+  and the desktop app's web view), which shows the words as they come: a dictation. This is the way everywhere but the
+  next;
+- by recording the voice and having the Mac write it down: on an iPhone or an iPad, when the Mac can, and in a browser
+  that has no speech recognition (Firefox), which then shows a microphone it never had. Below, the recording.
+
+The recorder holds:
 
 - a cross that drops the dictation;
-- a wave that moves while the engine hears a sound (drawn from the engine's own word that it hears one: Dot opens no
-  microphone of its own to measure it);
+- a wave that moves while the engine hears a sound (drawn from the engine's own word that it hears one; for a
+  recording, from how loud the microphone's sound is);
 - the time since the browser began to listen;
-- a tick that puts the words in the box, after what it holds, once the engine has settled them.
+- a tick that puts the words in the box, after what it holds, once the engine has settled them (a recording: once the
+  Mac has written it down).
 
 Until the tick the box keeps what it held. The dictation also ends:
 
-- after six seconds with no word, saying nothing was heard;
-- after a pause of fifteen seconds once a word was, the words going into the box;
+- after six seconds with no word (a recording: no sound at all), saying nothing was heard;
+- after a pause of fifteen seconds once a word was (a recording: a sound), the words going into the box;
 - when you type (it is dropped), when you send, and when the page goes out of sight.
 
 It listens in the page's language, given its region ("en" listens as "en-US", item 593), or the one chosen in Settings ›
@@ -205,7 +214,64 @@ iPhone or an iPad, Safari hears the first dictation after the page loads, and at
 and hears nothing (WebKit bugs 317741 and 321436): the wave stays flat. Such a dictation says that Safari heard nothing,
 whoever ended it, and its toast's **Reload** brings the microphone back, the box's words kept as its draft; the
 keyboard's own microphone types meanwhile. A dictation stops a reading aloud first, as Safari does not hear while it
-speaks. Nothing is sent by voice alone: you read the box and send as usual. A message whose answer was lost
+speaks.
+
+**The recording** (item 626) is how an iPhone or an iPad hears every time. Safari's recognition there hears the first
+dictation of a page and at times none after it, and nothing a page does brings it back (item 616 only says so), so where
+the Mac can write down, the page does not use it. Pressing the microphone opens the microphone itself, in the press, so
+that iOS lets the audio start: `getUserMedia` with the browser's own echo cancelling and noise suppression, Web Audio
+and an audio worklet (`voicecapture.js`, a script of the page's own address, which its content security policy
+allows). If iOS puts the audio context aside as it turns to the microphone, the page asks it to run once more; one that
+still does not run says so and what to do. The page keeps the sound in memory as 16 kHz mono 16-bit samples, five
+minutes at the most. A block of the microphone's sound is a sound when it is as loud as 0.01 (the root of its mean
+square, 0 to 1; measured with the speech of `say`: speech mostly 0.1 to 0.2, its pauses 0, the soft ends of its words
+between), and it counts for 0.4 seconds after, so that the pause between two words is no silence. The tick sends
+what was recorded, a voice too quiet to count as a sound included: the Mac says when it heard nothing, and only a tick
+before the first block of sound came in has nothing to send, and drops it. A pause of fifteen seconds after a sound and
+the five minutes send the recording too; six seconds with no sound at all end it by themselves, saying nothing was
+heard, and send nothing. The recorder says **Writing down what you said…** in the wave's place, quietly, until the
+words come, with the cross to give up waiting, and the words go into the box after what it held. Every end (the tick,
+the cross, typing, a message sent, the page out of sight, an error) lets the microphone go at once: its tracks end,
+which puts an iPhone's microphone light out, the audio context closes and the samples are dropped; a press while the
+browser still asks drops it. A failure says what to do in plain words, and the box keeps its words: the Mac could not be
+reached, it cannot write down this language (choose another in Settings › General › Voice), nothing was heard.
+
+The Mac writes it down with macOS 26's own dictation, on the device, through a small program the daemon builds with the
+Swift compiler of Apple's developer tools the first time it is needed (`src/dotagent/voice`). `GET /api/voice` says
+whether the Mac can: `transcribe`, and when it cannot `why`, in words (macOS 26 or later; Apple's developer tools,
+`xcode-select --install`; a compiler and an SDK in them; or what the compiler complained of when a build failed, which
+is not tried again for ten minutes). When it can, the daemon builds the program in the background then, so that the
+first recording does not wait. The answer needs up to three programs of the Mac's (`xcode-select -p` and two of `xcrun`,
+ten seconds each at the most), and a page asks at each load, so the daemon asks once and remembers: a compiler it found,
+for its life; a Mac without the tools, for 30 seconds, so that installing them is seen without a restart; and once the
+program is built it asks nothing at all. A build that fails forgets what the Mac said, and the callers at the same
+moment wait for one question. The page reads the answer in the background as it starts, and nothing of its start waits
+for it, a Mac browser's or Dot.app's included, which never needs it. A composer made before the answer listens the
+browser's way; one that is not listening takes the way the answer gives at its next press, and Settings › General ›
+Voice, which says which way the page listens, is written again when the answer comes in. In a browser with no speech
+recognition (Firefox) a composer made before the answer has no microphone, and one made after it has one when the Mac
+can write down. A Mac that could not be asked at all (the daemon failed, or could not be reached) leaves the page as it
+was, and on an iPhone, an iPad or a browser with no speech recognition, where the Mac's answer decides how the page
+listens, the card says so. Where the Mac cannot write down, an iPhone keeps Safari's recognition, and the toast of item
+616 adds what the Mac lacks. `POST /api/voice/transcribe` takes `{"language": "tr-TR", "data_b64": "<WAV>"}` and answers
+`{"text": "…"}`, empty when nothing was heard. It is behind the token like every route, so the phone paired in Settings
+› Phone reaches it as it reaches the composer, and it reads the recording as a model before it does anything with it: a
+WAV of 16-bit mono sound of 8 to 48 kHz, five minutes and about 10 MB at most, and a language of two or three letters
+and a region (`en-US`, `tr-TR`). Anything else is a 422 that says what to do; so is a Mac that cannot, with
+`context.code` `unavailable`, `unsupported-language`, `no-audio`, `timeout` (60 seconds; five minutes the first time a
+language is used, as macOS downloads its model from Apple then) or `failed`; never a stack.
+
+The daemon writes the samples again behind a header of its own, with 0.8 seconds of silence after them (the dictation
+model drops the last word of a recording that ends as the word does), to a file of mode 0600 in
+`<home>/voice/recordings`, and deletes it whether the words came or not; only those samples reach Apple's audio code.
+The recording and the words are never logged and never kept: the log has how long the recording was and how long it
+took. The program is built once in a daemon's life, in a folder of mode 0700 under `<home>/voice`, from a copy of its
+source made there; a run's commands may read that folder and not change it (it is among what Dot loads and runs,
+[Safety](safety.md)). The daemon keeps the SHA-256 of what it built in memory and hashes the file again before each run,
+and builds anew when it is not the file it built. It starts the program with an argument list (the file and the
+language), a small environment and a time limit, never through a shell, and at most two at once.
+
+Nothing is sent by voice alone: you read the box and send as usual. A message whose answer was lost
 on its way back (the page says the sending failed and keeps the message) is done once when it is sent again, here and in
 the box of a run: the page sends each new message with a key of its own, and the daemon answers the same message sent
 again with what its first sending made. `/` at the start of a word opens the slash menu over the box: the commands of
@@ -1114,7 +1180,9 @@ and Quit. Closing the window keeps the shell in the menu bar.
   other address and any new window, and gives its page nothing it asks of the web view (the microphone, the camera,
   where the Mac is), since wry grants every request no one answers (item 594).
 - **Files** drop into the composer as in the browser.
-- **The microphone** (item 594). The composer's dictation (item 574) is WebKit's speech recognition, which macOS gives
+- **The microphone** (item 594). The composer's dictation (item 574) is WebKit's speech recognition (the app keeps it
+  whatever the Mac can write down: item 626 records only on an iPhone or an iPad and where the browser has none), which
+  macOS gives
   an app only once it says why it asks (its `Info.plist`: the microphone and speech recognition) and, under the hardened
   runtime, is entitled to the microphone (`Dot.entitlements`, the runtime's one exception the app asks for). macOS asks
   you the first time the microphone is pressed, and System Settings › Privacy & Security › Microphone and Speech

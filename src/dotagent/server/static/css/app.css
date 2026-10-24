@@ -3692,6 +3692,24 @@ dialog.modal.versions-dialog {
   text-align: end;
 }
 
+/* While the Mac writes a recording down (item 626) the recorder says so in the wave's place, quietly; the time stands
+   still and the cross stays, to give up waiting. */
+.mic-writing {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  color: var(--faint);
+  font-size: var(--text-sm);
+}
+
+.mic-recorder.writing .mic-wave {
+  display: none;
+}
+
+.mic-recorder.writing .mic-writing {
+  display: block;
+}
+
 .composer .mic-cancel {
   flex: none;
   width: 32px;

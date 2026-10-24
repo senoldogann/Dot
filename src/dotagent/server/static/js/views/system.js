@@ -52,7 +52,9 @@ import { approvalLabel } from "../runmodes.js";
 import { scrollCue } from "../scrollcue.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
-import { canListen, canSpeak, sayOnce, stopReading } from "../voice.js";
+import { canRecord } from "../capture.js";
+import { macVoice, onMacVoice } from "../macvoice.js";
+import { appleTouch, canListen, canSpeak, listeningWay, macOffer, sayOnce, stopReading } from "../voice.js";
 
 const NOT_SET = "—";
 // The roles a model is configured for, and the tab where a missing or refused key is put right.
@@ -223,8 +225,40 @@ function buildComposerCard() {
   return section("Composer", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
 }
 
+/** What the Voice card says of how the microphone listens and where the voice goes (items 574 and 626), for the way the
+ * page listens now and what the Mac said: the sentences, each a hint. */
+function voiceListeningFacts() {
+  const mac = macVoice();
+  const way = listeningWay({
+    recognition: canListen(),
+    recording: canRecord(),
+    mac: mac.transcribe,
+    userAgent: navigator.userAgent,
+    touchPoints: navigator.maxTouchPoints,
+  });
+  // What the Mac still needs before it can write down what is said, as the daemon says it, and that it could not be asked.
+  const macNeeds = macOffer(mac) === "" ? [] : [macOffer(mac)];
+  const unasked =
+    mac.failed === null ? [] : [`The Mac could not be asked whether it can write down what you say: ${mac.failed}`];
+  if (way === "recording") {
+    return [
+      "The microphone records your voice and sends it to your Mac, which writes it down on the device with macOS's own dictation: it goes to no one else, and the Mac keeps nothing. The first time a language is used the Mac downloads its model from Apple. Nothing is sent by voice alone: the words fill the box, and you send them.",
+    ];
+  }
+  if (way === "recognition") {
+    return [
+      "The browser does the listening: Safari and Chrome may send your voice to Apple's or Google's servers to recognize it. Dot sends nothing itself, and nothing is sent by voice alone: the words fill the box, and you send them.",
+      ...(appleTouch(navigator.userAgent, navigator.maxTouchPoints)
+        ? ["Safari on an iPhone or an iPad at times hears only the first dictation after the page loads.", ...macNeeds, ...unasked]
+        : []),
+    ];
+  }
+  return ["This browser has no speech recognition, so the composer shows no microphone.", ...macNeeds, ...unasked];
+}
+
 /** The voice (item 574), kept in this browser: the language the microphone listens in and an answer is read aloud in, and whether
- * an answer that comes in is read aloud. Where the browser has no speech recognition or no voice, the card says so. */
+ * an answer that comes in is read aloud. Where the browser has no speech recognition or no voice, the card says so. Returns
+ * the card and `dispose()`: the card is made again as the Mac's answer comes in, when it comes after the card was made. */
 function buildVoiceCard() {
   const language = el(
     "select",
@@ -249,23 +283,17 @@ function buildVoiceCard() {
     onToggled: () => aloud.paint(),
   });
   aloud.paint();
-  const facts = [];
-  if (canSpeak()) {
-    facts.push(
-      "An answer is read with a voice kept on this Mac when there is one for the language. A network voice (Chrome's “Google …” voices) sends the text it reads to a server, and the browser speaks with one only when it has no other.",
-    );
-  } else {
+  const speech = canSpeak()
+    ? "An answer is read with a voice kept on this Mac when there is one for the language. A network voice (Chrome's “Google …” voices) sends the text it reads to a server, and the browser speaks with one only when it has no other."
+    : "This browser cannot speak, so no answer is read aloud.";
+  if (!canSpeak()) {
     aloud.toggle.disabled = true;
-    facts.push("This browser cannot speak, so no answer is read aloud.");
   }
-  if (canListen()) {
-    facts.push(
-      "The browser does the listening: Safari and Chrome may send your voice to Apple's or Google's servers to recognize it. Dot sends nothing itself, and nothing is sent by voice alone: the words fill the box, and you send them.",
-    );
-  } else {
-    facts.push("This browser has no speech recognition, so the composer shows no microphone.");
-  }
-  return section(
+  // The facts stand in a box of their own, so that they are written again when the Mac's answer comes in.
+  const facts = el("div", { class: "stack" });
+  const paintFacts = () => facts.replaceChildren(...[speech, ...voiceListeningFacts()].map((fact) => el("div", { class: "hint" }, fact)));
+  paintFacts();
+  const element = section(
     "Voice",
     null,
     el(
@@ -278,9 +306,10 @@ function buildVoiceCard() {
         el("div", { class: "hint" }, "What the microphone listens for and the voice speaks in: the page's own language, or one you choose (an answer in Turkish is read in Türkçe)."),
       ),
       aloud.element,
-      facts.map((fact) => el("div", { class: "hint" }, fact)),
+      facts,
     ),
   );
+  return { element, dispose: onMacVoice(paintFacts) };
 }
 
 // What each reaction on one of Dot's messages does while its run works, for the six that have a setting for what they do
@@ -2263,18 +2292,22 @@ function buildDotLookCard() {
 
 export function mountGeneral(root, ctx) {
   const look = buildDotLookCard();
+  const voice = buildVoiceCard();
   ctx.head.setLead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, the voice (the microphone and answers read aloud), what a chat shows of what ran without asking, what a reaction on Dot's message does once its run has ended, and the token this browser is signed in with.");
   root.append(
     buildNameCard(),
     look.element,
     buildNotifications(),
     buildComposerCard(),
-    buildVoiceCard(),
+    voice.element,
     buildChatCard(),
     buildReactionsCard(),
     buildTokenCard(),
   );
-  return look.dispose;
+  return () => {
+    look.dispose();
+    voice.dispose();
+  };
 }
 
 /** The providers Dot can reach and the models each of them offers; `?model=<ref>` in the address shows that model. */

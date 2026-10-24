@@ -191,6 +191,13 @@ def web_research_dir() -> Path:
     return dot_home() / "web-research"
 
 
+def voice_dir() -> Path:
+    """Where the daemon builds the program that writes recordings down (item 626) and keeps, for as long as it takes to
+    write one down, the recording itself: a folder of mode 0700 for each, made when the daemon first needs it. What is
+    built here the daemon runs, so a run's commands may not change it (``runtime._dot_paths``)."""
+    return dot_home() / "voice"
+
+
 def ensure_layout() -> None:
     """Create the private directory tree (mode 0700) if it does not exist yet."""
     for directory in (

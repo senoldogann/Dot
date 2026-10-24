@@ -1,14 +1,17 @@
-// Voice (item 574): the composer's microphone and the reading of answers aloud, both by what the browser itself offers
-// (speech recognition and speech synthesis). Dot sends no voice anywhere: the browser recognizes it, and Safari and
-// Chrome may send it to Apple's or Google's servers to do so (docs/safety.md). Nothing is sent by voice alone: the words
-// go into the box when the owner ends the dictation (item 605), and the owner sends them as usual. An answer is read
-// with a voice the browser keeps on this Mac when it has one for the language, since a network voice (Chrome's
-// "Google ..." voices) sends the text it reads to a server.
+// Voice (item 574): the composer's microphone and the reading of answers aloud. The microphone listens one of two ways
+// (item 626, `listeningWay`): with the browser's own speech recognition, a dictation (below), or, where that cannot be
+// trusted (Safari on an iPhone goes deaf after the first dictation of a page) or is not there (Firefox), by recording the
+// voice and sending it to the owner's Mac, which writes it down on the device (recording.js). A dictation sends no voice
+// anywhere itself: the browser recognizes it, and Safari and Chrome may send it to Apple's or Google's servers to do so
+// (docs/safety.md). Nothing is sent by voice alone: the words go into the box when the owner ends the dictation or the
+// recording (item 605), and the owner sends them as usual. An answer is read with a voice the browser keeps on this Mac
+// when it has one for the language, since a network voice (Chrome's "Google ..." voices) sends the text it reads to a
+// server.
 
 // How long a dictation waits for its first word before it stops by itself, saying it heard nothing; and, once it heard
 // one, how long a pause may last before it ends by itself with what it heard (item 605): long enough to think.
-const SILENCE_MS = 6000;
-const PAUSE_MS = 15000;
+export const SILENCE_MS = 6000;
+export const PAUSE_MS = 15000;
 // The most characters of an answer one utterance holds: some browsers stop a long one in the middle.
 const CHUNK_CHARS = 220;
 
@@ -91,8 +94,32 @@ export function voicePlace(shell, userAgent, touchPoints) {
 
 /** Whether the page is on an iPhone, an iPod or an iPad (one that asks for a computer's pages says it is a Mac with a
  * touch screen), where every browser is Safari's engine (item 616). */
-function appleTouch(userAgent, touchPoints) {
+export function appleTouch(userAgent, touchPoints) {
   return /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && touchPoints > 1);
+}
+
+/**
+ * How the composer's microphone listens on this page (item 626): `"recording"`, the page records the voice itself and the
+ * Mac writes it down, `"recognition"`, the browser's own speech recognition does (a dictation), or `null`, no microphone.
+ * An iPhone or an iPad records when the Mac can write down, since Safari's recognition there hears the first dictation of a
+ * page and at times none after it; where the Mac cannot it keeps the recognition, which is better than no microphone. A
+ * browser with no speech recognition (Firefox) records when the Mac can write down, and has no microphone when it cannot.
+ * Everywhere else, a Mac's Safari or Chrome and Dot.app, the recognition stays: it shows the words as the owner speaks and
+ * does not go deaf there.
+ * @param {{ recognition: boolean, recording: boolean, mac: boolean, userAgent: string, touchPoints: number }} where
+ *   `recognition`, the browser has speech recognition; `recording`, it can record the microphone (capture.js `canRecord`);
+ *   `mac`, the Mac says it can write down (`GET /api/voice`)
+ * @returns {"recording" | "recognition" | null}
+ */
+export function listeningWay({ recognition, recording, mac, userAgent, touchPoints }) {
+  const macWrites = mac && recording;
+  if (appleTouch(userAgent, touchPoints) && macWrites) {
+    return "recording";
+  }
+  if (recognition) {
+    return "recognition";
+  }
+  return macWrites ? "recording" : null;
 }
 
 // What a dictation that heard nothing says on an iPhone or an iPad when an earlier one of the page began (item 616).
@@ -100,6 +127,27 @@ function appleTouch(userAgent, touchPoints) {
 // nothing at all, whatever is said (WebKit bugs 317741 and 321436); a new page hears again.
 const DEAF_AGAIN =
   "Safari heard nothing this time. On an iPhone or an iPad it at times hears only the first dictation after the page loads: reload the page and press the microphone again, or use the keyboard's microphone.";
+
+/**
+ * What the owner may do to have the Mac write down what is said, which hears every time, when it cannot yet: the one
+ * thing it lacks (`why` of `GET /api/voice`, in the daemon's own words), as a sentence; the empty text where it lacks
+ * nothing (item 626).
+ * @param {{ transcribe: boolean, why: string | null } | null} mac
+ */
+export function macOffer(mac) {
+  return mac?.why ? `A Mac that writes down what you say hears every time. ${mac.why}.` : "";
+}
+
+/**
+ * The toast of a dictation Safari did not hear (`DEAF_AGAIN`), with, when the Mac could write down what is said but lacks
+ * something, what it lacks (`macOffer`): the way out of Safari's recognition (item 626).
+ * @param {string} words
+ * @param {{ transcribe: boolean, why: string | null } | null} mac
+ */
+export function deafWords(words, mac) {
+  const offer = macOffer(mac);
+  return offer === "" ? words : `${words} ${offer}`;
+}
 
 // How many dictations of a page began to listen, by its document: a page loaded anew starts at none.
 const pageDictations = new WeakMap();
@@ -138,6 +186,60 @@ export function problemWords(code, place) {
     default:
       return `Speech recognition stopped: ${code}.`;
   }
+}
+
+/**
+ * What to tell the owner of the error the browser gave when the page asked for the microphone to record it (item 626), in
+ * the words of `place` (`voicePlace`): the browser's own words for it are no use to read. A refusal says where to allow
+ * the microphone, and what types into the box meanwhile.
+ * @param {{ name?: string, message?: string } | null | undefined} error
+ * @param {"app" | "mac" | "other"} place
+ */
+export function captureProblem(error, place) {
+  switch (error?.name) {
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+    case "SecurityError":
+      if (place === "app") {
+        return `macOS has not given Dot the microphone. Allow Dot in System Settings › Privacy & Security › Microphone. ${DICTATION.app}`;
+      }
+      return place === "mac"
+        ? `The browser has not allowed the microphone on this page. Allow it for this address in the browser, and the browser in System Settings › Privacy & Security › Microphone. ${DICTATION.mac}`
+        : `The browser has not allowed the microphone on this page. Allow it for this address in the browser's settings, and the browser in the device's settings. ${DICTATION.other}`;
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return problemWords("audio-capture", place);
+    case "NotReadableError":
+    case "AbortError":
+      return "The microphone could not be opened: another app may be using it.";
+    case "InvalidStateError":
+      return "The browser would not start the sound for the microphone. Press the microphone again; if that does not help, reload the page.";
+    default:
+      return `The microphone could not start: ${error?.message ?? "the browser gave no reason"}`;
+  }
+}
+
+// The `context.code` of the failures the Mac says itself, with words written for the owner (`VoiceError`).
+const MAC_SAYS = new Set(["unavailable", "unsupported-language", "no-audio", "timeout", "failed"]);
+
+/**
+ * What to tell the owner of the error a recording met on its way to the Mac and back, in plain words (item 626): a Mac
+ * that could not be reached, a language it cannot write down, or what the Mac said of its own failures, which is words
+ * for the owner. Anything else (a request the Mac could not read, a daemon that failed) is a failure of the page's or the
+ * daemon's, not words for the owner: it is told as one, and the caller logs the error itself.
+ * @param {{ status?: number, message?: string, context?: { code?: string } } | null | undefined} error
+ */
+export function sendProblem(error) {
+  if (error?.status === 0) {
+    return "The Mac could not be reached, so what you said was not written down. Check that Dot is running on it and that this device still reaches it, then try again.";
+  }
+  if (error?.context?.code === "unsupported-language") {
+    return "The Mac cannot write down this language. Choose another in Settings › General › Voice.";
+  }
+  if (MAC_SAYS.has(error?.context?.code ?? "") && typeof error?.message === "string" && error.message !== "") {
+    return error.message;
+  }
+  return "The Mac could not write down what you said.";
 }
 
 /**
