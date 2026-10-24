@@ -251,7 +251,7 @@ async def _execute_one(
 ) -> ToolOutcome:
     started: float = time.monotonic()
     # The secrets Dot holds, masked in the step's events as the forms of keys are.
-    known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     await ctx.runtime.bus.emit(
         ctx.run_id,
         "tool_call",

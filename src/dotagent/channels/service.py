@@ -285,7 +285,7 @@ class Channels:
         seen: Seen = self._imessage.seen()
         if seen.error is None:
             return seen
-        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         masked: SeenError = seen.error.model_copy(update={"message": redact_known(seen.error.message, known)})
         return seen.model_copy(update={"error": masked})
 

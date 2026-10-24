@@ -26,6 +26,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.memory.embedder import Embedder, build_embedder
 from dotagent.memory.ranking import Similar, Vector, fused_scores, most_similar, ranked_by_use
 from dotagent.memory.words import lowercase, search_terms
+from dotagent.secrets import mask_filled
 from dotagent.store.db import Store
 from dotagent.store.models import AwakeNotes, MemoryRecord, MemoryScore
 
@@ -118,7 +119,9 @@ def normalize_tags(tags: Sequence[str]) -> tuple[str, ...]:
 
 
 def _checked_text(content: str, max_chars: int) -> str:
-    text: str = normalize_text(content)
+    # Every write of a note comes here, a model's save, a lesson, a pin and the owner's own: a value filled into a page
+    # is never kept in one, nor sent to the embedding model (item 621). Nothing refuses a note for holding one.
+    text: str = normalize_text(mask_filled(content))
     if len(text) < _MIN_NOTE_CHARS:
         raise InvalidValueError("the note is empty", {"content": content})
     if len(text) > max_chars:
@@ -427,10 +430,11 @@ def vetted_dot_lines(
 def owner_prompt_lines(section: OwnerSection, secrets: Sequence[str] = ()) -> tuple[str, ...]:
     """The section as the prompt lists it: the owner's own lines first, marked as theirs, then Dot's. A line of Dot's
     that the gate refuses (:func:`dot_line_problem`, with ``secrets``, the values Dot holds) is left out here too, also
-    one written before the gate was: the prompt says a line with the owner's mark outranks the others."""
+    one written before the gate was: the prompt says a line with the owner's mark outranks the others. A value filled
+    into a page is not among ``secrets`` (the gate must not tell by it, item 621); no line shows one, it is masked."""
     return (
-        *(f"{OWNER_MARK} {line}" for line in section.owner_lines),
-        *(line for line in section.dot_lines if dot_line_problem(line, secrets) is None),
+        *(mask_filled(f"{OWNER_MARK} {line}") for line in section.owner_lines),
+        *(mask_filled(line) for line in section.dot_lines if dot_line_problem(line, secrets) is None),
     )
 
 

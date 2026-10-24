@@ -77,6 +77,13 @@ make one of their own. A file that is not there is refused before `security` run
 whole, which `security` would look for under `~/Library/Keychains` (item 628): `security` does not fail on a missing
 keychain file, it reads and writes the login keychain in its place, and a test's item was found there.
 
+Dot's own vault (item 621) keeps its secrets in the login Keychain, and no test asks it: the tests of the vault and of
+its tools stand in a dictionary for it (`MemorySecretStore` in `tests/smoke/vault_stand_ins.py`), and the one test of the
+real `security` (`tests/smoke/test_vault_keychain.py`) uses the `keychain_file` fixture, a keychain of its own. A
+keychain file that is not there is no safe stand-in, for `security` does not fail on it: it keeps, reads and removes the
+item in the login keychain in its place. So `LoginKeychain` refuses a `DOT_KEYCHAIN` that names no file before it starts
+a process (the smoke tests point `DOT_KEYCHAIN` at such a path), and a test that needs `security` makes a file first.
+
 The web-research server that comes with Dot (item 583) is out of every test that does not ask for it: its package is
 installed where the tests run, so each of the runtimes a test builds would start a Python process of its own, and its
 tools would be among those a test counts. `tests/conftest.py` looks for the package under a name nothing has, for the

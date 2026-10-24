@@ -386,7 +386,9 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
     a line of tool guidance the adopted harness gives every run (item 584). A review model or an embedding service that
     fails raises its error."""
     agent_id: str | None = await _agent_of(runtime.store, case.run_id)
-    held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # The gates of the lessons and of the harness text refuse by a value: the values filled into a page are not
+    # among them (item 621).
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     habits: tuple[str, ...] = rules_of((await adopted_text(runtime.store, held))[0])
     # A note saved while reading outside content is not shown to the model that writes the lessons (item 384), so its
     # words cannot pass into a lesson of a clean run, which would be saved unmarked.
@@ -791,7 +793,9 @@ async def propose_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, 
     time sees the list before or after. An unknown run is not found."""
     run: RunRecord = await runtime.store.get_run(run_id)
     text: str = " ".join(words.split())
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # A gate: the values filled into a page are not among the secrets it looks for (item 621); the lesson is saved
+    # with them masked (:func:`dotagent.memory.service.save_memory`).
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     problem: str | None = lesson_problem(text, min(_MAX_CHARS, runtime.config.memory.max_chars), secrets)
     if problem is not None:
         raise InvalidValueError(f"the words are not a lesson ({problem})", {"run_id": run_id, "chars": len(text)})

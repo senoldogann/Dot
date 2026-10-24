@@ -394,8 +394,8 @@ left out, cut at a word to the size of a note (`[memory] max_chars`, 600) when i
 one of yours (it never rests, as a note you wrote yourself in Settings › Memory does not). It is marked as read
 from outside content when the run it came from read some at any point, as a note a run saves while it reads such
 content is: such a note is never handed to a run on its own, and a search that finds it marks the run that read it
-(see [Safety](safety.md#safety)). A message that holds something that looks like an API key or a private key, or a
-secret Dot holds, is not kept, as the memory tools refuse such a note: the 📌 is refused, says why and stays off.
+(see [Safety](safety.md#safety)). A message that holds something that looks like an API key or a private key, or a key
+Dot holds, is not kept, as the memory tools refuse such a note: the 📌 is refused, says why and stays off.
 Taking the 📌 back forgets the note when it is as it was made; a note that was there before, or that you changed
 since, stays.
 
@@ -415,7 +415,8 @@ page](daemon.md#the-daemon-the-web-ui-and-the-service).
 | Shell and files | `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`, `search_files`, `write_notes`           |
 | Terminal        | `terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`                                                |
 | Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`, `judge_items`                                               |
-| Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_eval`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab`, and while 1Password is connected `browser_logins` and `browser_fill_login` (item 493) |
+| Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_eval`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab`, and, while 1Password is connected or the vault holds a login, `browser_logins` and `browser_fill_login` (items 493 and 621) |
+| Vault           | `vault_contacts` (item 621): the contact details you saved in Settings › Vault and the billing address of each card, for a run to type where a form asks; it never shows a password, a card number, an expiry or a security code (a card is kept, and no tool of a run fills it) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete` |

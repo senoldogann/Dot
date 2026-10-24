@@ -1,6 +1,7 @@
 """Value types shared by the browser connector and the browser tools."""
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
@@ -216,7 +217,8 @@ SecretKind = Literal[
 ]
 
 
-# The part of a login a field of a page takes when Dot fills it from the owner's password manager (item 493).
+# The part of a login a field of a page takes when Dot fills it from the owner's password manager (item 493) or from
+# Dot's own vault (item 621).
 VaultFieldKind = Literal["username", "password", "otp"]
 
 
@@ -227,6 +229,21 @@ class VaultFill(FrozenModel):
     ref: str
     kind: VaultFieldKind
     value: SecretStr
+
+
+@dataclass(frozen=True, slots=True)
+class HeldValue:
+    """A value Dot filled into a page (item 621) and the documents it may be in: those whose address ``covers`` accepts,
+    the origin of the document that holds the field it went into (:class:`dotagent.vault.hosts.SameOrigin`). Whatever
+    Dot does to a document by what the value is (keeps it out of the addresses its requests ask for, marks its fields
+    again) it does to such documents alone, and it does not look into any other: a page that was never given the value
+    would otherwise learn it from how Dot acts. Two fills of the same value into the same origin are equal."""
+
+    value: str
+    covers: Callable[[str], bool]
+
+    def __repr__(self) -> str:
+        return "HeldValue(<hidden>)"
 
 
 class SecretField(FrozenModel):

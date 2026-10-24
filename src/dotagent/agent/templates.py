@@ -13,6 +13,7 @@ from dotagent.core.text import redact_known
 from dotagent.core.types import FrozenModel
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
+from dotagent.secrets import mask_filled
 from dotagent.store.models import AgentLook, AgentRecord
 
 # The longest instructions an agent file holds: those of an agent (``AgentRequest``).
@@ -571,7 +572,8 @@ def team_of(name: str) -> AgentTeam | None:
 def agent_file(record: AgentRecord, known: Sequence[str]) -> AgentFile:
     """``record`` as a file. Words that hold a secret are refused, so that no file of an agent carries one: one of the
     ``known`` secrets Dot holds (:func:`dotagent.secrets.known_secrets`), or a key, a token or a password by its form
-    (:func:`~dotagent.core.text.redact_known`); the owner takes it out of the agent first."""
+    (:func:`~dotagent.core.text.redact_known`); the owner takes it out of the agent first. A value filled into a page
+    is not among ``known`` (the refusal must not tell by it, item 621), and the file carries none: it is masked."""
     if any(redact_known(words, known) != words for words in (record.name, record.role, record.instructions)):
         raise InvalidValueError(
             "the agent's name, role or instructions hold what looks like a secret; take it out, then export the agent",
@@ -580,9 +582,9 @@ def agent_file(record: AgentRecord, known: Sequence[str]) -> AgentFile:
     return AgentFile(
         format="dot-agent",
         version=1,
-        name=record.name,
-        role=record.role,
-        instructions=record.instructions,
+        name=mask_filled(record.name),
+        role=mask_filled(record.role),
+        instructions=mask_filled(record.instructions),
         model=record.model,
         effort=record.effort,
         approvals=record.approvals,

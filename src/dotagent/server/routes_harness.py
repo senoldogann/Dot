@@ -46,7 +46,8 @@ def harness_router(ctx: ServerContext) -> APIRouter:
     async def view(query: HarnessQuery) -> HarnessView:
         limits = ctx.runtime.config.harness
         # The values Dot holds are asked for in a stored text as when it was written (item 587).
-        held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        # (The values filled into a page are not among them: the gate refuses by a value, item 621.)
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
         counts: dict[str, int] = await store.count_harness_versions()
         current: HarnessVersion | None = await adopted(store)
         page: list[HarnessVersion] = await store.list_harness_versions(query.limit, query.offset)
@@ -123,7 +124,8 @@ def harness_router(ctx: ServerContext) -> APIRouter:
             tool_guidance=kept.tool_guidance if request.tool_guidance is None else request.tool_guidance,
         )
         # The secrets Dot holds are read off the event loop: the .env file is read for them.
-        secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        # A gate: the values filled into a page are not among the secrets it refuses by (item 621).
+        secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
         version: HarnessVersion = await create_version(
             store, ctx.runtime.config.harness, text, request.summary, OWNER, "", secrets
         )
@@ -132,7 +134,8 @@ def harness_router(ctx: ServerContext) -> APIRouter:
     @router.post("/harness/{version_id}/adopt")
     async def adopt_version(version_id: str) -> HarnessVersion:
         """Adopt a version; one whose text the gate for learned texts refuses now is not adopted (item 587)."""
-        return await adopt(store, version_id, time.time(), await asyncio.to_thread(known_secrets))
+        # A gate: the values filled into a page are not among the secrets it refuses by (item 621).
+        return await adopt(store, version_id, time.time(), await asyncio.to_thread(known_secrets, filled=False))
 
     @router.post("/harness/{version_id}/retire")
     async def retire_version(version_id: str) -> HarnessVersion:

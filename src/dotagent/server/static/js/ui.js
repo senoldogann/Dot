@@ -171,20 +171,27 @@ const NOT_TEXT = new Set(["button", "checkbox", "radio", "submit", "reset", "fil
  * above the foot. Cancel, the cross and Escape close it, asking first ("Discard your changes?") when a field was
  * changed; none of them works while a submit runs. It closes by itself, and asks nothing, when the page goes to another.
  *
+ * `valid()`, when given, says whether the form is good to submit (item 621): the main button is off while it says no, and
+ * Enter in a field submits nothing; it is asked again as the owner types or chooses, and when the page calls `revalidate()`
+ * (a field it filled itself).
+ *
  * `alternative` (`{ label, onSubmit }`) is a second way to submit, between Cancel and the main button; `leading` are
  * nodes for the foot's left end (an action of the form that is no submit); `ready` is a promise that settles once the
  * fields a page fills in later are filled (the models, the agents), after which an untouched form counts as unchanged;
  * `submitOnEnter` makes Enter in a one-line field submit; `size` is "narrow", "regular" or "wide"; `danger` makes the
  * main button the red one.
  *
- * Returns `closed`, a promise of whether it was submitted, and `fail(error)`, which shows the reason of a failure of an
- * action of the form that is no submit (and clears it for null).
+ * Returns `closed`, a promise of whether it was submitted, `fail(error)`, which shows the reason of a failure of an
+ * action of the form that is no submit (and clears it for null), `revalidate()`, and `accept(control)`: the value the
+ * control holds now is not a change of the owner's but one the page filled in (a secret they asked to see), so closing
+ * the dialog does not ask about it.
  * @param {{
  *   title: string,
  *   description?: string,
  *   body: Node | Node[],
  *   submitLabel: string,
  *   onSubmit: () => Promise<unknown>,
+ *   valid?: (() => boolean) | null,
  *   danger?: boolean,
  *   alternative?: { label: string, onSubmit: () => Promise<unknown> } | null,
  *   leading?: Node[],
@@ -200,6 +207,7 @@ export function formDialog({
   body,
   submitLabel,
   onSubmit,
+  valid = null,
   danger = false,
   alternative = null,
   leading = [],
@@ -234,6 +242,11 @@ export function formDialog({
   });
 
   const spinner = el("span", { class: "spinner", "aria-hidden": "true" });
+  // The main button is off while a request runs and while the form is not good to submit.
+  const canSubmit = () => valid === null || valid();
+  function paintPrimary() {
+    primary.disabled = dialog.getAttribute("aria-busy") === "true" || !canSubmit();
+  }
   // What the owner has typed or picked, as the fields stood when the dialog was shown (and, with `ready`, when the fields
   // a page fills in later were filled, unless the owner had touched one by then).
   let baseline = "";
@@ -285,11 +298,12 @@ export function formDialog({
     busy: (which) => {
       const at = which !== null;
       dialog.setAttribute("aria-busy", String(at));
-      for (const button of [cross, cancel, other, primary]) {
+      for (const button of [cross, cancel, other]) {
         if (button !== null) {
           button.disabled = at;
         }
       }
+      paintPrimary();
       spinner.remove();
       if (at) {
         (which === "alternative" && other !== null ? other : primary).prepend(spinner);
@@ -329,7 +343,9 @@ export function formDialog({
       const target = event.target;
       if (target instanceof HTMLInputElement && !NOT_TEXT.has(target.type)) {
         event.preventDefault();
-        void flow.submit(onSubmit, "primary");
+        if (canSubmit()) {
+          void flow.submit(onSubmit, "primary");
+        }
       }
     }
   });
@@ -356,8 +372,12 @@ export function formDialog({
   // A dialog the browser closed by itself (its second Escape in a row, whatever the page answered) is a dialog dismissed.
   dialog.addEventListener("close", () => flow.abandon());
 
+  for (const kind of ["input", "change"]) {
+    fields.addEventListener(kind, paintPrimary);
+  }
   document.body.append(dialog);
   dialog.showModal();
+  paintPrimary();
   const first = firstFieldOf(fields.querySelectorAll(FORM_FIELDS), (field) => field.getClientRects().length > 0);
   (first ?? primary).focus();
   baseline = stateNow();
@@ -370,7 +390,18 @@ export function formDialog({
     ready.then(settled, settled);
   }
 
-  return { closed, fail: showProblem };
+  /** The value `control` holds now is the one it started with: the page filled it in, the owner wrote nothing. */
+  function accept(control) {
+    const controls = [...fields.querySelectorAll(FORM_CONTROLS)];
+    const index = controls.indexOf(control);
+    if (index !== -1) {
+      const states = JSON.parse(baseline);
+      states[index] = control.value;
+      baseline = JSON.stringify(states);
+    }
+  }
+
+  return { closed, fail: showProblem, revalidate: paintPrimary, accept };
 }
 
 /** Show a screenshot at full size until it is clicked or Escape is pressed. */

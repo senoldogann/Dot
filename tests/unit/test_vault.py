@@ -3,18 +3,21 @@ typed, as an address writes it and inside a JSON string), and what
 the policy makes of a fill: asked in every mode but yolo whatever the rules say, a rule's hand-off alone stricter, and
 answered by the owner, not the review model; the shell never runs 1Password's command line."""
 
+import time
 from pathlib import Path
 
 import pytest
+from playwright.async_api import Error as PlaywrightError
 
-from dotagent.browser.session import BrowserSession, no_runs_at_work
+from dotagent.browser.session import BrowserSession, no_runs_at_work, sending_document
+from dotagent.browser.types import HeldValue
 from dotagent.config import load_config, load_default_config
 from dotagent.core.errors import BrowserError, ForbiddenUrlError
 from dotagent.policy.engine import decide, route_for
 from dotagent.policy.shell import assess_shell
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import Behavior, RuleRecord
-from dotagent.vault.hosts import fills_on, website_hosts
+from dotagent.vault.hosts import SameOrigin, fills_on, website_hosts
 from dotagent.vault.masking import MASK, in_address, mask_error, masked
 
 
@@ -179,3 +182,103 @@ def test_an_address_that_carries_a_value_is_named_by_its_host_its_scheme_or_alon
     )
     assert BrowserSession._named("http://[secret-value/x", live, True) == "[an address that carries a filled value]"
     assert BrowserSession._named("https://example.com/x", live, False) == "https://example.com/x"
+
+
+class _Shown:
+    """A frame as a request names it: the address it shows now and the frame it lies in."""
+
+    def __init__(self, url: str, parent: "_Shown | None" = None) -> None:
+        self.url: str = url
+        self.parent_frame: _Shown | None = parent
+
+
+class _Sent:
+    """A request, whose frame is the browser's to name: a service worker's has none, and nor has the first request of a
+    popup (Playwright raises for both)."""
+
+    def __init__(self, frame: _Shown | None) -> None:
+        self._frame: _Shown | None = frame
+
+    @property
+    def frame(self) -> _Shown:
+        if self._frame is None:
+            raise PlaywrightError("Frame for this navigation request is not available")
+        return self._frame
+
+
+def test_the_document_that_sent_a_request_is_the_one_its_frame_shows_and_none_for_a_request_of_no_frame() -> None:
+    shop: _Shown = _Shown("https://shop.test/pay")
+    assert sending_document(_Sent(shop)) == "https://shop.test/pay"  # type: ignore[arg-type]
+    assert sending_document(_Sent(_Shown("about:blank", shop))) == "https://shop.test/pay"  # type: ignore[arg-type]
+    assert sending_document(_Sent(_Shown("about:blank"))) is None  # type: ignore[arg-type]
+    assert sending_document(_Sent(None)) is None  # type: ignore[arg-type]
+
+
+def test_what_no_request_may_carry_is_looked_for_in_the_requests_a_page_sends_from_the_origin_it_was_typed_into(
+    tmp_path: Path,
+) -> None:
+    """A page of another origin, in any tab, that tried addresses and saw which were refused would learn a weak
+    password: no request of its documents is held to a value it was not given. A request that no document can be named
+    for is not either, and every request is under the rules of the URLs whoever sent it."""
+    session: BrowserSession = _session(tmp_path)
+    forever: float = float("inf")
+    shop: SameOrigin | None = SameOrigin.of("https://shop.test/signin")
+    github: SameOrigin | None = SameOrigin.of("https://github.com/login")
+    assert shop is not None and github is not None
+    session._vault_secrets[HeldValue("Summer2024!", shop)] = forever
+    session._vault_secrets[HeldValue("Wint3r-Passw0rd", github)] = forever
+    session._vault_secrets[HeldValue("482913", shop)] = time.monotonic() - 1
+
+    def judged(address: str, sender: str | None, navigation: bool = False) -> bool:
+        page = object() if navigation else None
+        return session._judge(address, navigation, "document" if navigation else "fetch", page, sender).allowed  # type: ignore[arg-type]
+
+    signin: str = "https://shop.test/signin"
+    assert not judged("https://x.test/p?w=Summer2024%21", signin)
+    assert not judged("https://x.test/p?w=Summer2024%21", "https://shop.test/other?id=1")
+    assert not judged("https://x.test/p?w=Wint3r-Passw0rd", "https://github.com/settings")
+    for sender in (
+        "https://evil.test/a",
+        "https://shop.test:8443/pay",
+        "http://shop.test/pay",
+        "https://sub.shop.test/pay",
+        "about:blank",
+        "data:text/html,x",
+        "chrome-error://chromewebdata/",
+        None,
+    ):
+        assert judged("https://x.test/p?w=Summer2024%21", sender), sender
+        assert judged("https://x.test/p?w=Wint3r-Passw0rd", sender), sender
+    # Each value is the business of the documents of its own origin.
+    assert judged("https://x.test/p?w=Summer2024%21", "https://github.com/settings")
+    assert judged("https://x.test/p?w=Wint3r-Passw0rd", signin)
+    # A value whose minutes are over is kept out of no address.
+    assert judged("https://x.test/p?c=482913", signin)
+    # The rules on addresses hold for every sender: Dot's own port is no one's to reach.
+    own: str = f"http://127.0.0.1:{session._server.port}/x"
+    assert not judged(own, None) and not judged(own, "https://evil.test/a")
+    # Dot's words for an address name it without the value of any origin: they are read by no page.
+    assert (
+        session._shown("https://x.test/p?w=Summer2024%21") == "https://x.test/[an address that carries a filled value]"
+    )
+
+
+def test_a_navigation_of_a_tabs_main_frame_is_the_runs_own_and_is_judged_by_no_value_filled(tmp_path: Path) -> None:
+    """The run opens an address, clicks a link, types into the form a page then sends: a refusal by a value of its
+    navigation would tell it whether a guess is the password (22 calls from a list of 1,640 words found one). What it
+    asks for is judged by the rules on addresses alone; the fetches and the frames of a page are judged by the value."""
+    session: BrowserSession = _session(tmp_path)
+    shop: SameOrigin | None = SameOrigin.of("https://shop.test/signin")
+    assert shop is not None
+    session._vault_secrets[HeldValue("Summer2024!", shop)] = float("inf")
+    signin: str = "https://shop.test/signin"
+    address: str = "https://shop.test/search?q=Winter1990;Summer2024!;Autumn1999"
+    # A navigation of the main frame, from the page the password was typed into: the run's own.
+    assert session._judge(address, True, "document", object(), signin).allowed  # type: ignore[arg-type]
+    assert session._judge(address, True, "document", object(), None).allowed  # type: ignore[arg-type]
+    # The same address as a fetch or a frame of that page is refused, the page's own doing.
+    assert not session._judge(address, False, "fetch", None, signin).allowed
+    assert not session._judge(address, True, "document", None, signin).allowed, "a frame of the page"
+    # The rules on addresses still judge it.
+    own: str = f"http://127.0.0.1:{session._server.port}/x"
+    assert not session._judge(own, True, "document", object(), signin).allowed  # type: ignore[arg-type]

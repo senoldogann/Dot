@@ -118,7 +118,7 @@ async def _shown(info: ActionInfo, decision: Decision) -> tuple[ActionInfo, Deci
     """The step and the policy's decision of it as their records show them (item 551): what a ``policy`` event, an
     approval, its card and the error a refusal raises keep of it. The secrets Dot holds are read off the event loop
     (:func:`dotagent.secrets.known_secrets` reads the env file)."""
-    known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     return masked_action(info, known), _masked_reason(decision, known)
 
 
@@ -580,9 +580,12 @@ class RunGate:
         owner's rules say. Its record and its error mask the secrets, as they hold the one refused."""
         if not self.tainted:
             return
-        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
-        if not carries_secret(info, arguments, known):
+        # A refusal: the values filled into a page are not among the secrets it looks for (item 621); the record of it
+        # masks them all.
+        sendable: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
+        if not carries_secret(info, arguments, sendable):
             return
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         shown: ActionInfo = masked_action(info, known)
         decision: Decision = Decision(
             verdict="deny",

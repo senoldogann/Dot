@@ -641,7 +641,9 @@ async def _describe_owner(runtime: Runtime, runs: Sequence[RunRecord], now: floa
     # What the model wrote of the owner stands unfenced at the end of every prompt, so it goes through the one gate for
     # learned texts first (item 587): a line that holds a secret, a link, an address, a character that prints nothing
     # or the owner's own mark is dropped and logged, and the night goes on.
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # The gate refuses by a value, so the values filled into a page are not among the secrets it looks for (item 621);
+    # the prompt shows the lines with them masked (:func:`dotagent.memory.service.owner_prompt_lines`).
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     vetted, refused = vetted_dot_lines(draft.lines, secrets)
     for number, problem in refused:
         log.warning("owner_line_refused", line=number, problem=problem)

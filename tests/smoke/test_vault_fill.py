@@ -22,6 +22,7 @@ from urllib.parse import quote, quote_plus
 import pytest
 import pytest_asyncio
 from PIL import Image
+from playwright.async_api import Page
 
 from dotagent.agent.gate import RunGate, SiteLocks
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
@@ -38,7 +39,6 @@ from dotagent.server import UI_SOURCE
 from dotagent.store.models import ApprovalRecord, RunRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.context import ToolContext
-from dotagent.vault.masking import MASK
 from dotagent.vault.onepassword import TOKEN_NAME
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -94,6 +94,17 @@ Object.defineProperty(document.querySelector("input"), "ownerDocument", {{ get: 
 <form action="/home" method="get"><label>Password <input name="pass" type="password"></label></form>""",
             "/plain-login": """<!doctype html><title>Plain sign in</title>
 <form action="/home"><label>Password <input name="pass" type="password"></label></form>""",
+            "/script-login": """<!doctype html><title>Script sign in</title>
+<label>Password <input name="pass" type="password"></label>
+<button type="button" onclick="fetch('/home?p=' + encodeURIComponent(document.querySelector('input').value))
+  .then(() => { document.title = 'sent'; }, () => { document.title = 'refused'; })">Sign in</button>""",
+            "/address-login": """<!doctype html><title>Address sign in</title>
+<label>Password <input name="pass" type="password"></label>
+<button type="button" onclick="location.href = '/home?p=' + encodeURIComponent(document.querySelector('input').value)">
+Sign in</button>""",
+            "/editable-login": """<!doctype html><title>Editable sign in</title><h1>Editable sign in</h1>
+<div id="code" contenteditable="true" role="textbox" aria-label="Code"></div>
+<label>Password <input name="pass" type="password" autocomplete="current-password"></label>""",
             "/home": _HOME,
         }
         if path == "/home" and "?" in self.path:
@@ -259,6 +270,11 @@ async def _form(ctx: ToolContext, gate: RunGate, site: _Site) -> dict[str, str]:
     return refs
 
 
+def _addressed(site: _Site) -> bool:
+    """Whether a GET that reached the site had the password in its address, as it is or escaped."""
+    return any(PASSWORD in address or quote_plus(PASSWORD) in address for address in site.addresses)
+
+
 def _unseen(*texts: str) -> None:
     """No value is in ``texts``, as typed or as an address writes it (a form sent by GET puts it there)."""
     for text in texts:
@@ -285,10 +301,10 @@ async def test_a_yolo_run_fills_the_login_and_no_result_shows_a_value(runtime: R
     with Image.open(io.BytesIO(shot.data)) as picture:
         pixel: object = picture.convert("RGB").getpixel((500, 330))
     assert isinstance(pixel, tuple) and all(abs(channel - 0x33) < 24 for channel in pixel), pixel
-    # The view of the form shows what its fields hold, masked.
+    # The view of the form hides the value of every field Dot filled, in yolo too (item 621).
     seen: ToolResult = await _call(ctx, gate, "browser_snapshot", {})
     _unseen(seen.text)
-    assert MASK in seen.text, seen.text
+    assert seen.text.count("[hidden]") == 3, seen.text
     # No script runs in the chat's tabs while the filled tab is open.
     with pytest.raises(BrowserError, match="scripts stay off"):
         await _call(ctx, gate, "browser_eval", {"script": "document.querySelector('input[type=password]').value"})
@@ -349,15 +365,53 @@ async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_ge
     assert field is not None, shown.text
     with pytest.raises(BrowserError, match="its method is GET"):
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": field.group(1)})
-    # A form that names no method goes by GET as well: Dot's Chrome refuses the request that would carry the password.
+    # A form that names no method goes by GET as well, as a browser reads it (item 621): it gets no password either.
     plain: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/plain-login"})
     bare: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', plain.text)
     assert bare is not None, plain.text
-    await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": bare.group(1)})
-    with pytest.raises(BrowserError) as refused:
-        await _call(ctx, gate, "browser_act", {"steps": [{"action": "press", "ref": bare.group(1), "key": "Enter"}]})
-    _unseen(str(refused.value))
-    assert not any(quote_plus(PASSWORD) in address for address in site.addresses), site.addresses
+    with pytest.raises(BrowserError, match="its method is GET, or it names none"):
+        await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": bare.group(1)})
+    # A page whose script builds an address from a field that is in no form says nothing of how it is sent: a request
+    # of its own that would carry the password is refused by Dot's Chrome and never reaches the site.
+    scripted: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/script-login"})
+    loose: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', scripted.text)
+    assert loose is not None, scripted.text
+    await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": loose.group(1)})
+    button: re.Match[str] | None = re.search(r'button "Sign in"[^\n]*?\[ref=([^\]]+)\]', scripted.text)
+    assert button is not None, scripted.text
+    await _call(ctx, gate, "browser_act", {"steps": [{"action": "click", "ref": button.group(1)}]})
+    after: ToolResult = await _call(ctx, gate, "browser_snapshot", {})
+    assert "title: refused" in after.text, after.text
+    assert not _addressed(site), site.addresses
+    # The tab's own address is the run's, and a request the run caused is judged by no value (a refusal by it would tell
+    # a run that guesses whether it guessed): the page sends the tab to an address that holds the password, and what
+    # the run is shown of it is masked.
+    moving: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/address-login"})
+    near: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', moving.text)
+    assert near is not None, moving.text
+    await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": near.group(1)})
+    submit: re.Match[str] | None = re.search(r'button "Sign in"[^\n]*?\[ref=([^\]]+)\]', moving.text)
+    assert submit is not None, moving.text
+    went: ToolResult = await _call(ctx, gate, "browser_act", {"steps": [{"action": "click", "ref": submit.group(1)}]})
+    assert _addressed(site), "the tab went to the address"
+    _unseen(went.text)
+
+
+async def test_a_one_time_code_and_a_password_go_into_no_element_that_is_edited(runtime: Runtime, site: _Site) -> None:
+    """An element that is edited (``contenteditable``) takes typed text, shows it in the text of the page, and has no
+    autocomplete to keep Chrome from storing it; a one-time code is too short to be masked as text. It gets neither the
+    code nor the password, and nothing is typed or held back."""
+    ctx, gate = await _context(runtime, "yolo")
+    opened: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/editable-login"})
+    editable: re.Match[str] | None = re.search(r'"Code"[^\n]*?\[ref=([^\]]+)\]', opened.text)
+    assert editable is not None, opened.text
+    for part in ("otp", "password"):
+        with pytest.raises(BrowserError, match="is not a form field") as refused:
+            await _call(ctx, gate, "browser_fill_login", {"login": "i1", part: editable.group(1)})
+        _unseen(str(refused.value))
+    page: Page = runtime.browser._threads[ctx.thread_id].tabs[0].page
+    assert await page.locator("#code").inner_text() == ""
+    assert not runtime.browser.holds_back(ctx.thread_id)
 
 
 async def test_in_auto_the_owner_answers_the_fill_and_not_the_review_model(runtime: Runtime, site: _Site) -> None:

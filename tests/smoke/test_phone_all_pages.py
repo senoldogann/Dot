@@ -30,7 +30,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import ThreadRecord
+from dotagent.store.models import ThreadRecord, VaultRecord
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 
@@ -140,9 +140,65 @@ async def _served(home: Path) -> AsyncIterator[tuple[Runtime, int]]:
         await close_runtime(runtime)
 
 
+async def _vault(runtime: Runtime) -> None:
+    """Records of Dot's vault with long words (item 621): their rows only, as the page lists them; no secret is made, so
+    no Keychain is asked."""
+    now: float = time.time()
+    long_site: str = "a-very-long-name-of-a-site-that-keeps-going.shop.example.org"
+    await runtime.store.add_vault_items(
+        [
+            VaultRecord(
+                id="vlt_a",
+                kind="login",
+                label=long_site,
+                website=long_site,
+                username="a.long.username.of.an.account@example.org",
+                created_at=now,
+                updated_at=now,
+            ),
+            VaultRecord(
+                id="vlt_b",
+                kind="card",
+                label="Travel · Visa •••• 4242",
+                brand="visa",
+                last4="4242",
+                nickname="Travel",
+                fields={"city": "Izmir"},
+                created_at=now,
+                updated_at=now,
+            ),
+            VaultRecord(
+                id="vlt_c",
+                kind="card",
+                label="American Express •••• 0005",
+                brand="amex",
+                last4="0005",
+                created_at=now,
+                updated_at=now,
+            ),
+            VaultRecord(
+                id="vlt_d",
+                kind="contact",
+                label="Home of the whole family",
+                fields={
+                    "name": "Ada Augusta Lovelace of the long name",
+                    "address": "12 Main Street, Flat 4, The Old Mill",
+                    "city": "Izmir",
+                },
+                created_at=now,
+                updated_at=now,
+            ),
+            VaultRecord(
+                id="vlt_e", kind="login", label="example.com", website="example.com", created_at=now, updated_at=now
+            ),
+        ]
+    )
+
+
 async def _fill(runtime: Runtime, port: int) -> str:
     """Something to show: a campaign with a long title and goal, a schedule with options of its own, and a team of eight
-    agents with long names and roles (item 610); the team's id."""
+    agents with long names and roles (item 610), and some of the vault's items; the team's id."""
+    await _vault(runtime)
     thread: ThreadRecord = await runtime.store.create_thread(_CAMPAIGN_TITLE, "test")
     await runtime.store.create_campaign(
         _CAMPAIGN_TITLE, _CAMPAIGN_GOAL, thread.id, SCRIPTED_MODEL, "medium", "standard", None, "ask", (), "own"
@@ -213,6 +269,7 @@ _ROUTES: tuple[str, ...] = (
     "/customize/connectors",
     "/agents",
     "/settings/memory",
+    "/settings/vault",
     "/settings/appearance",
     "/settings/system",
     "/diagnostics",

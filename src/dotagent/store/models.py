@@ -2,11 +2,12 @@
 
 from typing import Literal, Self
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort, OneMessage, Speed
 from dotagent.policy.types import ApprovalMode
+from dotagent.vault.cards import Brand
 
 # Which Chrome the browser tools work in: Dot's own, or the one the user has open (attached over its debugging port).
 type BrowserMode = Literal["own", "attach"]
@@ -377,6 +378,30 @@ class ShownPage(FrozenModel):
     title: str
     html: str
     created_at: float
+
+
+# What an item of Dot's own vault is (item 621).
+VaultKind = Literal["login", "card", "contact"]
+
+
+class VaultRecord(FrozenModel):
+    """An item of Dot's own vault as the database keeps it (item 621): what a list shows and a run is told, never a
+    secret (those are in the Keychain, :mod:`dotagent.vault.secretstore`). A login has a website and a username, a
+    card a brand, its last four digits and a nickname, a contact its ``fields`` (``name``, ``address``, ``address2``,
+    ``city``, ``region``, ``postal_code``, ``country``, ``phone``, ``email``); a card's ``fields`` are its billing
+    address, if it has one."""
+
+    id: str
+    kind: VaultKind
+    label: str
+    website: str | None = None
+    username: str | None = None
+    brand: Brand | None = None
+    last4: str | None = None
+    nickname: str | None = None
+    fields: dict[str, str] = Field(default_factory=dict)
+    created_at: float
+    updated_at: float
 
 
 class RuleRecord(FrozenModel):

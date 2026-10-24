@@ -219,7 +219,7 @@ async def _write(runtime: Runtime, run_id: str, force: bool) -> RecapView:
     text, ref = await _written(runtime, run, record)
     # The recap stays in the run's record and goes to every page: the secrets Dot holds are masked in it, as in a
     # compaction's note.
-    masked: str = shown(text, await asyncio.to_thread(known_secrets))
+    masked: str = shown(text, await asyncio.to_thread(known_secrets, filled=True))
     event: EventRecord = await runtime.bus.emit(
         run.id, RECAP_EVENT, {"text": masked, "model": ref.label, "steps": run.steps, "status": run.status}, True
     )

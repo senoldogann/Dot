@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -17,7 +18,7 @@ from typing import Literal
 from dotagent.core.errors import ConfigError, MissingSecretError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import env_file_path
-from dotagent.core.text import KNOWN_SECRET_MIN_CHARS
+from dotagent.core.text import KNOWN_SECRET_MIN_CHARS, mask_known
 from dotagent.core.types import FrozenModel
 
 KEYCHAIN_SERVICE: str = "dot-agent"
@@ -42,6 +43,11 @@ log = get_logger(__name__)
 
 # The values :func:`resolve_secret` returned in this process, for :func:`known_secrets`.
 _resolved: set[str] = set()
+# The values of the owner's password manager and of Dot's own vault that were filled into a page in this process
+# (:func:`hold_filled`), for :func:`known_secrets`. One set that is never changed, only replaced under the lock: the
+# worker threads that read the secrets Dot holds never iterate a set that another thread is adding to.
+_filled: frozenset[str] = frozenset()
+_filled_lock: threading.Lock = threading.Lock()
 
 
 class SecretState(FrozenModel):
@@ -222,15 +228,42 @@ def optional_secret(name: str) -> str | None:
         return None
 
 
-def known_secrets() -> tuple[str, ...]:
-    """The secrets Dot holds, to be masked wherever they stand (review Y3,
-    :func:`dotagent.core.text.redact_known`): the values :func:`resolve_secret` returned in this process and every
-    value of ``<home>/.env``, each once, the longest first, none shorter than
-    :data:`~dotagent.core.text.KNOWN_SECRET_MIN_CHARS`. None of them is ever logged or put in an error."""
+def hold_filled(*values: str) -> None:
+    """Note values that a login of a password manager or of Dot's vault gave a page (item 621): they are among
+    :func:`known_secrets` (``filled`` true) from then on, for as long as this process runs, so that every place that
+    masks the secrets Dot holds masks them too (what a model says, an approval, an event, the tail of a log, a note a
+    run saves). They are masks and no more: a run that cannot have seen them is not judged by them, and nothing
+    refuses or chooses by them (``known_secrets(filled=False)``)."""
+    global _filled
+    with _filled_lock:
+        _filled = _filled | frozenset(value for value in values if value)
+
+
+def known_secrets(*, filled: bool) -> tuple[str, ...]:
+    """The secrets Dot holds (review Y3): the values :func:`resolve_secret` returned in this process, every value of
+    ``<home>/.env`` and, with ``filled`` true, the values filled into a page from a vault (:func:`hold_filled`), each
+    once, the longest first, none shorter than :data:`~dotagent.core.text.KNOWN_SECRET_MIN_CHARS`. None of them is ever
+    logged or put in an error.
+
+    ``filled`` has no default, so that each caller says which it is (item 621). A caller that *masks* (text shown,
+    logged, stored or sent on with the values replaced, :func:`dotagent.core.text.redact_known`) passes true: a value a
+    page was given stands nowhere. A caller that *refuses, blocks or chooses another outcome* because a value is
+    present passes false: a run never saw a filled value, so what it writes, saves or sends is not judged by it, and
+    an outcome that differs by whether a guess is the value tells the run the value (the checks of items 525 and 621).
+    A caller that does both refuses by false and then stores or shows the text with every value masked
+    (:func:`mask_filled`, or true)."""
     path: Path = env_file_path()
     saved: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
-    values: set[str] = {value for value in (*_resolved, *saved.values()) if len(value) >= KNOWN_SECRET_MIN_CHARS}
+    held: frozenset[str] = _filled if filled else frozenset()
+    values: set[str] = {value for value in (*_resolved, *held, *saved.values()) if len(value) >= KNOWN_SECRET_MIN_CHARS}
     return tuple(sorted(values, key=len, reverse=True))
+
+
+def mask_filled(text: str) -> str:
+    """``text`` with the values filled into a page masked where they stand, and nothing else (item 621): for a text
+    that is stored or shown after a check that did not look at them (a note, a harness text, a line of the owner
+    section, an exported agent). The values are in memory, so it reads no file and may be called on the event loop."""
+    return mask_known(text, tuple(_filled))
 
 
 def _tail(value: str) -> str:

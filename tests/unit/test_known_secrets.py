@@ -18,11 +18,11 @@ def test_the_values_dot_looked_up_and_those_of_its_env_file_are_known_the_longes
     monkeypatch.setenv("DOT_TEST_LOOKED_UP_KEY", looked_up)
     (tmp_path / ".env").write_text(f'NOTES_TOKEN="{saved}"\nDEBUG=1\nSHORT=MARKER-\n', encoding="utf-8")
     assert resolve_secret("DOT_TEST_LOOKED_UP_KEY") == looked_up
-    known: tuple[str, ...] = known_secrets()
+    known: tuple[str, ...] = known_secrets(filled=True)
     assert saved in known and looked_up in known
     assert known.index(saved) < known.index(looked_up)
     assert all(len(longer) >= len(shorter) for longer, shorter in pairwise(known))
     assert "1" not in known and "MARKER-" not in known
     # A value the env file no longer holds, and that nobody looked up, is no longer known.
     (tmp_path / ".env").write_text("DEBUG=1\n", encoding="utf-8")
-    assert saved not in known_secrets() and looked_up in known_secrets()
+    assert saved not in known_secrets(filled=True) and looked_up in known_secrets(filled=True)

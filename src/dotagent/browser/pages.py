@@ -15,6 +15,7 @@ from playwright.async_api import Error as PlaywrightError
 
 from dotagent.browser.safety import dialog_is_financial, safe_download_name
 from dotagent.browser.snapshot import SnapshotLine
+from dotagent.browser.types import HeldValue
 from dotagent.core.errors import BrowserError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -55,6 +56,10 @@ class Tab:
     # thread while the tab is open. Going on to another page does not end it: going back can bring the filled page
     # back whole, from Chrome's cache of pages, without loading it again.
     vault_held: bool = False
+    # What was filled into the tab that is secret and can be told from other text (item 621): a field of a later
+    # document of the tab that holds one of them is marked again, as the field it was filled into (``remark_held``),
+    # in the documents of the sites it was filled for and in no other.
+    filled_values: set[HeldValue] = field(default_factory=set)
 
 
 @dataclass(slots=True)

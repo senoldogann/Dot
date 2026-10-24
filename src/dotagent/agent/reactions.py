@@ -107,10 +107,11 @@ def note_text(text: str, limit: int) -> str:
 
 async def _holds_a_secret(text: str) -> bool:
     """Whether ``text`` looks like it holds an API key or a private key, or holds a secret Dot keeps (read from the env
-    file, in a thread of its own, off the event loop): the memory tools refuse such a note, and so does a pin."""
+    file, in a thread of its own, off the event loop): the memory tools refuse such a note, and so does a pin. A value
+    filled into a page is not one of them (item 621): the pin is saved with it masked, as every note is."""
     if looks_like_key(text):
         return True
-    held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     return any(secret in text for secret in held)
 
 

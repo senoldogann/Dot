@@ -694,7 +694,8 @@ behind a filter; see [Models and providers](models.md#models-and-providers)), **
 `web_search` asks in turn, moved up or down, turned off or added, a search API's key saved, and each tried with one
 search; see [Runs](runs.md)), **Browser** (which Chrome Dot browses with
 and what Chrome has to allow first; see [Browser
-use](browser-and-computer-use.md#browser-use)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
+use](browser-and-computer-use.md#browser-use)), **Vault** (the logins, cards and contact details you give Dot; below),
+**Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
 what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, the
 versions, fifty at a time, with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
 harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a sign-in code for its home-screen app; see
@@ -711,14 +712,61 @@ folded it is a row of the page, as a group of the health checks is (item 576).
 In a Mac's window the sidebar is the settings' nav while they are open (item 562): **Back to chats** (to the chat last
 open; in the desktop app under the traffic lights, whose row holds the button that hides the sidebar where the chats'
 head holds it, item 577) and the tabs in four groups (Interface, Models, How Dot works, This Mac), each with what it
-holds at its right (the main model, how many AI services have a key, how many notes Dot keeps, a green dot when a phone
-reaches Dot); whether the daemon answers and the emergency stop are the page's, as on every page. The page is the open
-tab alone, in a column of 920 px under its own name and the line that says what it is for, each section a name over a
-card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On a phone they are a list in
-groups whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)).
-The earlier addresses of the memory, rules and system pages lead to their tabs, and the schedules' tab
-(`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into the box by both
-Command keys pressed together: see below.
+holds at its right (the main model, how many AI services have a key, how many notes Dot keeps, how many items the vault
+holds, a green dot when a phone reaches Dot); whether the daemon answers and the emergency stop are the page's, as on
+every page. The page is the open tab alone, in a column of 920 px under its own name and the line that says what it is
+for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On
+a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
+phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
+the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
+the box by both Command keys pressed together: see below.
+
+### Settings › Vault
+
+**Vault** (item 621, `#/settings/vault`, in the group This Mac) is where you keep the logins, cards and contact
+details you give Dot. It signs in with a login and types your contact details into pages where a form asks; a card is
+kept and shown to you, and Dot fills it into no page. Passwords and cards are kept in your Mac's Keychain, not in
+Dot's database; what Dot sees and what it cannot see is in [Safety](safety.md#safety). The page has the tabs **All**,
+**Logins**, **Cards** and **Contacts**, each with its count, a search (**Search the vault**: it looks in the labels,
+sites, usernames, nicknames, last four digits and the details of contacts and billing addresses), and **New item**, a
+menu of **Login**, **Card**, **Contact** and **Import from CSV…**. An empty vault says "Nothing saved yet. Add a
+login, a card or contact details with New item." Each item is a row with its mark, its label (a login's site, a card's
+nickname or brand, a contact's label), the line under it (a login's username, a card's brand and last four digits, a
+contact's details) and **Edit** and **Delete** (which asks first).
+
+- **New login** (a dialog, item 615): Website (the site's address alone: one with a user name or a password in it is
+  refused), Username or email (optional), Password (dots until the eye is pressed), Notes (optional); **Save login**
+  stays off until there are a site and a password. The foot says Dot can use the login to sign in for you.
+- **New card**: **Upload a photo** reads the card on this Mac (Vision; the picture is kept nowhere and sent nowhere)
+  and fills the number, the expiry and the name it found, for you to check; or type them. The number is grouped as it
+  is typed, its brand is named beside it, and a number whose check digit does not fit says so; the expiry is month and
+  year (a card that has expired is refused); the security code (optional, 3 or 4 digits) and the name on the card
+  (optional) are dots until their eyes are pressed; then a nickname (optional; a run is told it, so it holds no card
+  number), and **Add a billing address (optional)**, which opens the fields of an address. **Save card** stays off
+  until the card is good. The foot says Dot never sees the number.
+- **New contact**: Label, Full name, Address, Address line 2, City, State or region, Postal code, Country (a list),
+  Phone and Email; **Save contact** stays off until there are a label, a detail and, if an email is given, one that
+  can be one.
+- **Edit** opens the same dialog. A secret is not shown: its box is empty and means "keep what is saved", and its eye
+  asks the daemon for it (only from this Mac's own address), each time it shows it, and puts it in the box; the page
+  hides it again after twenty seconds and takes the text out of the box, so that nothing that reads the page's
+  accessibility tree finds it (the next show asks again; the saved notes take no text until their eye is pressed), and
+  for thirty seconds after the eye a screenshot of the Mac that a run takes leaves Dot's windows out (see
+  [Safety](safety.md#safety)). A box left alone keeps what is saved; a saved secret you showed and emptied (the
+  security code, the name on the card, the notes) is removed.
+- **Import from CSV…** reads the export of a password manager (Chrome, Edge, Safari, Firefox, 1Password, Bitwarden),
+  known by its header row, in memory, and says how many logins went in, how many rows were left out and why (no site,
+  no password, not a web address, an address with a user name or a password in it, not a login, already in the vault)
+  and that the CSV file holds your passwords in plain text and is to be deleted. One-time-code seeds are left out;
+  the vault keeps none.
+
+The routes (all under `/api/vault`; the 1Password routes above share the prefix): `GET /vault/items` (the items by
+label with `counts`) and `GET /vault/items/{id}` answer no secret; `GET /vault/counts` (the tabs' numbers); `POST
+/vault/items` and `PUT /vault/items/{id}` take a `kind` (`login`, `card` or `contact`) and the values, a part left out
+of a `PUT` being kept; `DELETE /vault/items/{id}` removes the Keychain item and the record; `POST
+/vault/items/{id}/reveal` (`{"part": "password"}`) answers that one part, once, to a request that names this Mac's own
+address (403 from a phone); `POST /vault/items/import` (`{"csv": "…"}`) and `POST /vault/card-photo` (`{"image":
+"<base64>"}`) read what they are given in memory. An error names what failed and never a value.
 
 **Dot's first conversation** (item 420). On a first open, while Dot has not introduced itself (`[assistant] introduced`)
 and there is no chat yet, New chat shows Dot's first conversation in the place of the greeting, over the composer, with
@@ -1056,6 +1104,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /plugin-gallery`, `POST /plugin-gallery/{id}` | the plugins of Customize › Plugins' gallery (item 542), each with where it stands (`available`, `installed`, `taken`), its skills, its repository and pinned commit, and the plugins Dot reads that are not the gallery's (`others`); install one: its pinned commit downloaded from GitHub, its skills checked against the hash the gallery keeps and put in Dot's plugins, offered to the runs that start after (404 for no such plugin, 409 for a name taken, a download that fails or files that are not the ones pinned, which leave nothing behind) |
 | `DELETE /installed-plugins/{name}` | take a plugin out of Dot (item 497): its MCP servers stop, its skills leave the runs that start after (Dot reads its plugins again, item 542), and its folder in Dot's plugins goes to the Trash (409 for one of `[plugins] dirs`; of a plugin whose folder went without Dot, only the servers are stopped) |
 | `GET /accounts`, `POST /accounts/{provider}/start`, `DELETE /accounts/{provider}/{address}` | the accounts of Google and Microsoft signed in through their own sign-ins and whether the client you registered with each is saved (item 422); start a sign-in, only from this Mac's own address (the provider's page to open; 422 when the client is not saved); sign an account out |
+| `GET /vault/items`, `GET /vault/counts`, `GET\|PUT\|DELETE /vault/items/{id}`, `POST /vault/items`, `POST /vault/items/{id}/reveal`, `POST /vault/items/import`, `POST /vault/card-photo` | Dot's own vault of logins, cards and contacts (item 621, Settings › Vault, [above](#settings--vault)): the list and one item with no secret in either; make, change and delete an item (its secrets in the Keychain, its record in the database; a delete takes both); the eye, one secret part, once, only from this Mac's own address (403 otherwise); an import of a CSV export and the reading of a card's photo, both in memory (422 with why for a file that is no list of logins, a card whose number or expiry is not good, a site that is no web address) |
 | `GET /vault`, `POST /vault/connect`, `POST /vault/token` (`{"token": "ops_…"}`), `DELETE /vault` | the owner's 1Password (item 493): whether `op` is installed and Dot holds a service account's token, and the vaults it reads with how many logins each; Connect, which makes the vault "Shared with Dot" and a service account that only reads it through the owner's `op` and the 1Password app, which asks first; a token of the owner's, kept once it reads a vault (422 for one that is no `ops_` token); both only from this Mac's own address; Disconnect, which forgets the token. No token and no value is ever answered |
 | `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state`, an account's of Google or Microsoft first, else an MCP server's, and answers a page of Dot's own look that names the account or service and says how it came out (item 437; 400 for a state nobody waits for, for an account's that failed, and for one that waited more than 10 minutes; what the address carries is shown only for a state that waits) |
 | `GET /assistant`, `PUT /assistant` (`{"name": "Miro", "owner": "Ada", "introduced": true}`, each optional) | the name the owner calls Dot by, the owner's name (the first name of their account on this Mac until they give one) and whether Dot has had its first conversation (item 420); a change, live and in the config file (422 for a blank name, a control character or a name too long) |

@@ -10,6 +10,7 @@ export const TABS = [
   { id: "keys", label: "AI services", icon: "key" },
   { id: "websearch", label: "Web search", icon: "search" },
   { id: "browser", label: "Browser", icon: "globe" },
+  { id: "vault", label: "Vault", icon: "lock" },
   { id: "rules", label: "Rules", icon: "shield" },
   { id: "memory", label: "Memory", icon: "database" },
   { id: "harness", label: "Self-improvement", icon: "sparkle" },
@@ -23,7 +24,7 @@ export const GROUPS = [
   { title: "Interface", tabs: ["general", "appearance"] },
   { title: "Models", tabs: ["models", "keys", "websearch"] },
   { title: "How Dot works", tabs: ["rules", "memory", "harness"] },
-  { title: "This Mac", tabs: ["browser", "phone", "channels", "snapshots", "system"] },
+  { title: "This Mac", tabs: ["browser", "vault", "phone", "channels", "snapshots", "system"] },
 ];
 
 /**

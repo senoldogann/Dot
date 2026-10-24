@@ -254,7 +254,11 @@ async def test_the_final_set_plays_the_text_as_a_run_would_take_it(
         asked.append(ask)
         return nothing_played(ask)
 
-    monkeypatch.setattr("dotagent.cli_harness.known_secrets", lambda: held)
+    def gate_list(*, filled: bool) -> tuple[str, ...]:
+        assert not filled, "the gate refuses by a value: it must not ask for the values filled into a page (item 621)"
+        return held
+
+    monkeypatch.setattr("dotagent.cli_harness.known_secrets", gate_list)
     monkeypatch.setattr("dotagent.cli_harness.probe_apart", play)
     assert await cmd_harness_final(HarnessFinalCommand(name="harness-final", version_id=None)) == 0
     assert [ask.text for ask in asked] == [GivenText(habits="", tool_guidance=GUIDANCE)]

@@ -521,7 +521,7 @@ class ChannelRouter:
         if event.kind in ("assistant", "tool_call"):
             # Masked before it is cut: a secret cut in two is no secret a pattern knows (the loop masked it already, as
             # the event was made; this does not rely on that).
-            known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+            known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
             if event.kind == "assistant":
                 thinking: object = event.data.get("thinking")
                 if isinstance(thinking, str):
@@ -577,7 +577,7 @@ class ChannelRouter:
         """Send a message of progress: masked of the secrets Dot holds as an answer is, and within the channel's
         size. It is no Markdown, so it is not read as such; a failure is logged."""
         channel: Channel = self._channels[channel_id]
-        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         await self._deliver(channel_id, redact_known(text, known)[: channel.limit], known)
         log.info("channel_progress_told", channel=channel_id, run_id=run_id, lines=text.count("\n") + 1)
 
@@ -600,7 +600,7 @@ class ChannelRouter:
         channel's size, with the link to the run's page for the rest (or, with no address a phone can open, the words
         that say it is in Dot). A failure is logged."""
         channel: Channel = self._channels[channel_id]
-        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         words: str = as_plain_text(redact_known(text, known))
         link: str | None = self._base if run_id is None else self.link(run_id)
         await self._deliver(channel_id, cut_with_link(words, channel.limit, link), known)
@@ -612,7 +612,7 @@ class ChannelRouter:
         what the answer names that was left out. A picture that did not go is logged and told in one line after the
         others; the text has gone by then."""
         channel: Channel = self._channels[channel_id]
-        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         masked: str = redact_known(text, known)
         found: Found = Found(masked, (), ())
         if pictures and self._pictures is not None:

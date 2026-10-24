@@ -101,7 +101,8 @@ async def propose_from_run(runtime: Runtime, run_id: str, scope: ProposalScope) 
     error."""
     case: LessonCase = await case_of(runtime, run_id)
     signals: tuple[str, ...] = await stored_signals(runtime.store, case)
-    held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # The gates of the harness text refuse by a value: the values filled into a page are not among them (item 621).
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     current, parent = await adopted_text(runtime.store, held)
     request: ProposalRequest = ProposalRequest(
         goal=case.goal,

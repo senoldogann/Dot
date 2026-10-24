@@ -37,6 +37,7 @@ _TABS: list[str] = [
     "Memory",
     "Self-improvement",
     "Browser",
+    "Vault",
     "Phone",
     "Channels",
     "SnapShots",

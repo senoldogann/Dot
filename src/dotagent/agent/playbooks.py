@@ -1378,7 +1378,7 @@ async def _write_reply(
     whether the run read content third parties can author (``tainted``, :func:`presented`)."""
     root: Path = playbooks_dir()
     own: list[PlaybookEntry] = owned(await asyncio.to_thread(list_playbooks, root), run.agent_id)
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     draft: PlaybookDraft = redacted_draft(written, secrets)
     playbook: Playbook = Playbook(
         name=playbook_name(draft.kind),

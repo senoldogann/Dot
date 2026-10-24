@@ -128,7 +128,7 @@ async def answer_aside(runtime: Runtime, run_id: str, question: str) -> AsideAns
         raise
     # The model answers from the whole record, the results of the run's tools in it: a secret it quotes is masked in
     # what is stored and shown, as the run's own replies are (item 551).
-    answer = redact_known(answer, await asyncio.to_thread(known_secrets))
+    answer = redact_known(answer, await asyncio.to_thread(known_secrets, filled=True))
     await runtime.bus.emit(
         run.id, ASIDE_ANSWER_EVENT, {"id": aside_id, "text": answer, "model": ref.label, "attempts": attempts}, True
     )

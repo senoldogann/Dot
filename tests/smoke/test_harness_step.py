@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 import pytest
 
+from dotagent import secrets as dot_secrets
 from dotagent.agent.manager import RunManager
 from dotagent.agent.review import COMPOSE_TOOL, EXPERIENCE_TOOL, PROPOSE_TOOL
 from dotagent.config import AppConfig, load_default_config
@@ -987,6 +988,13 @@ _HELD: str = "pw-7731-kxq9-zz"
 _NEW_GUIDANCE: str = "- Run the tests before you say a change is done."
 
 
+def _gate_list(*, filled: bool) -> tuple[str, ...]:
+    """The values Dot holds, as a gate of a text asks for them: the values a page was given are not among them, so a
+    gate that asks for them fails the test (item 621)."""
+    assert not filled, "a gate refuses by a value: it must not ask for the values filled into a page"
+    return (_HELD,)
+
+
 def _recording(inner: Prober, asked: list[ProbeAsk]) -> Prober:
     """``inner``, keeping each ask it is given."""
 
@@ -1013,8 +1021,8 @@ async def test_the_step_plays_the_base_and_the_survivor_as_a_run_would_take_them
     """Item 587, pre-push review round 2: the base was played as it was stored (the probe installs what it is given, and
     cannot know the values Dot holds), as `base` and again as `confirm-base`, while every run of the owner's took it
     without the component the gate refuses. What is played is what a run would take, the confirmation included."""
-    monkeypatch.setattr("dotagent.harness.step.known_secrets", lambda: (_HELD,))
-    monkeypatch.setattr("dotagent.harness.propose.known_secrets", lambda: (_HELD,))
+    monkeypatch.setattr("dotagent.harness.step.known_secrets", _gate_list)
+    monkeypatch.setattr("dotagent.harness.propose.known_secrets", _gate_list)
     turns: list[ScriptedTurn] = [_FINISH, _habit(), _KEEP, _effects(1)]
     async with _session(login_env, turns, {"step_repeats": 2, "adopt": "auto"}) as (runtime, manager):
         old: HarnessVersion = await _in_use_before_the_gate(runtime, habits)
@@ -1059,13 +1067,34 @@ async def test_a_candidate_that_leaves_the_habits_alone_is_played_on_the_same_ha
         assert played[CONFIRM_BASE] == played[BASE] and played[confirm_label(survivor)] == played[survivor]
 
 
+async def test_the_step_plays_a_base_that_holds_a_value_a_page_was_given_with_it_masked_and_not_left_out(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 621: the gate that leaves a component out of what is played does not look for a value a vault filled into
+    a page (a refusal by it would tell whoever can ask a model the value), and the text is played with it masked."""
+    filled: str = "S3cret-Passw0rd!"
+    monkeypatch.setattr(dot_secrets, "_filled", frozenset())
+    dot_secrets.hold_filled(filled)
+    turns: list[ScriptedTurn] = [_FINISH, _guidance(_NEW_GUIDANCE), _KEEP, _effects(1)]
+    async with _session(login_env, turns, {"step_repeats": 2, "adopt": "auto"}) as (runtime, manager):
+        await _in_use_before_the_gate(runtime, f"- the shop wants {filled}.")
+        run: RunRecord = await _run(manager)
+        asked: list[ProbeAsk] = []
+        step: HarnessStep = await run_step(runtime, 1.0, run.id, _recording(_scored(frozenset(TASKS)), asked), True)
+        assert (step.state, step.error) == ("done", None)
+        survivor: str = str(json.loads(step.outcome)["probed"])
+        played: dict[str, GivenText] = {ask.label: ask.text for ask in asked}
+        assert played[BASE] == GivenText(habits="- the shop wants ***.", tool_guidance=GUIDANCE)
+        assert played[survivor] == GivenText(habits="- the shop wants ***.", tool_guidance=_NEW_GUIDANCE)
+
+
 async def test_the_composer_and_the_experience_writer_are_shown_the_texts_as_a_run_would_take_them(
     login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Item 587, pre-push review round 2: the composer was shown the base as it was stored (here with a link) and the
     candidates as they were written (the first came to hold a value Dot holds since), and the experience writer was
     told which components a candidate changed by the same texts. A candidate is played as a run would take it too."""
-    monkeypatch.setattr("dotagent.harness.step.known_secrets", lambda: (_HELD,))
+    monkeypatch.setattr("dotagent.harness.step.known_secrets", _gate_list)
     turns: list[ScriptedTurn] = [
         _FINISH,
         _habit(f"- the key is {_HELD}"),

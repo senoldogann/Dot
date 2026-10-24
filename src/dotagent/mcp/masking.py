@@ -29,7 +29,7 @@ def shown_url(url: str) -> str:
 def shown_command(command: str, arguments: list[str]) -> str:
     """A command line as it may be shown: an option that names a secret (``--api-key sk-...``) and a key of a known
     form are masked."""
-    return redact_known(shlex.join([command, *arguments]), known_secrets())
+    return redact_known(shlex.join([command, *arguments]), known_secrets(filled=True))
 
 
 def _hidden(value: JsonValue, url: str | None, known: tuple[str, ...]) -> JsonValue:
@@ -47,7 +47,7 @@ def _hidden(value: JsonValue, url: str | None, known: tuple[str, ...]) -> JsonVa
 def masked_context(context: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
     """What an error of an MCP server tells (its address and arguments, the causes httpx gives with the whole URL, the
     tail of what the server printed), with a key in any of them masked."""
-    known: tuple[str, ...] = known_secrets()
+    known: tuple[str, ...] = known_secrets(filled=True)
     address: JsonValue = context.get("url")
     url: str | None = address if isinstance(address, str) else None
     arguments: JsonValue = context.get("args")

@@ -20,6 +20,7 @@ from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
 from dotagent.tools.browser import FILL_LOGIN_TOOL
 from dotagent.tools.consult import CONSULT_TOOL
+from dotagent.tools.contacts import CONTACTS_TOOL
 from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE, DELEGATE_TOOL
 from dotagent.tools.groups import ACCOUNTS_GROUP, group_lines, tools_in
@@ -683,17 +684,29 @@ def _mcp_section(tool_names: Sequence[str]) -> str:
     return _MCP_SECTION if any(name.startswith(_MCP_TOOL_PREFIX) for name in tool_names) else ""
 
 
-# The owner's 1Password (item 493): the run names a login and its fields, and Dot types it, unseen.
-_VAULT_SECTION: str = """# Logins
-- The user's 1Password holds logins Dot may fill into pages: browser_logins lists them by id, title and website, and \
-browser_fill_login fills one into the current page, given the refs of its username, password and one-time code fields. \
-Dot types the values; you never see them, and no answer of yours needs them. Use it whenever a page asks you to sign \
-in to a site a login is for, instead of asking the user for a password; it fills a login only on its own site."""
+# The owner's logins and contacts (items 493 and 621): the run names an item and the fields, and Dot types it, unseen.
+# Each line is only for a run that has its tool.
+_LOGINS_LINE: str = (
+    "- The user keeps logins Dot may fill into pages, in their 1Password and in their own vault: browser_logins lists "
+    "them by id, title and website, and browser_fill_login fills one into the current page, given the refs of its "
+    "username, password and (1Password only) one-time code fields. Dot types the values; you never see them, and no "
+    "answer of yours needs them. Use it whenever a page asks you to sign in to a site a login is for, instead of "
+    "asking the user for a password; it fills a login only on its own site."
+)
+_CONTACTS_LINE: str = (
+    "- vault_contacts lists the user's saved contact details (name, address, phone, email, and the billing address of "
+    "their cards) as their own words: type them where a form asks, instead of asking the user for them."
+)
+_VAULT_LINES: tuple[tuple[str, str], ...] = (
+    (FILL_LOGIN_TOOL, _LOGINS_LINE),
+    (CONTACTS_TOOL, _CONTACTS_LINE),
+)
 
 
 def _vault_section(tool_names: Sequence[str]) -> str:
-    """Only for a run that may fill a login: 1Password is connected, and the run has the tool."""
-    return _VAULT_SECTION if FILL_LOGIN_TOOL in tool_names else ""
+    """For a run that may fill a login or read a contact: the lines of the tools it has."""
+    lines: list[str] = [line for tool, line in _VAULT_LINES if tool in tool_names]
+    return "\n".join(["# Logins and contacts", *lines]) if lines else ""
 
 
 def _accounts_section(tool_names: Sequence[str]) -> str:

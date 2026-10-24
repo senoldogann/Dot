@@ -311,4 +311,4 @@ def read_tail(folder: Path, name: str, count: int) -> LogTail:
             data: bytes = handle.read()
     except FileNotFoundError as error:
         raise NotFoundError("the log went while it was read", {"name": name, "folder": str(folder)}) from error
-    return LogTail(name=name, lines=tail_lines(data, start > 0, count, known_secrets()))
+    return LogTail(name=name, lines=tail_lines(data, start > 0, count, known_secrets(filled=True)))

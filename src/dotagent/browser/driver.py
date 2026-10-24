@@ -3,7 +3,7 @@
 import asyncio
 import json
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -25,6 +25,7 @@ from dotagent.browser.snapshot import (
 )
 from dotagent.browser.types import (
     Dropdown,
+    HeldValue,
     ScriptEnd,
     SecretField,
     SecretFieldCheck,
@@ -146,12 +147,13 @@ _EDITOR_QUIET_MS: int = 50
 _EDITOR_MAX_MS: int = 500
 _DRAG_MOVES: int = 10  # mouse moves on the way: some drag libraries start a drag only after the pointer moved
 
-# What the field a step writes into says about the secret it takes: "password" for a password input, then its
-# autocomplete tokens; null for an element that takes no typed text and no choice (a dropdown takes one: a card's
-# expiry month and year are often dropdowns, item 554). Given a label, or an element inside one, the field is the
-# label's control, which is where Playwright's fill writes (its retarget(node, "follow-label")). The model never sees
-# this check and cannot disable it.
-_FIELD_MARKING_SCRIPT: str = """(element) => {
+# The element a step writes into when it is given ``element``: a label, or an element inside one (the AI snapshot gives
+# a div, a span or a b in a label a ref of its own), is its label's control, which is where Playwright's fill writes
+# (its retarget(node, "follow-label")). It is one definition: the marking of the field, the control a login is filled
+# into (:func:`fill_login_field`) and everything that is asked of it are made on the element this gives (item 621; a
+# check that read the element a ref names while the fill wrote the control let a password into a form that sends by
+# GET).
+_CONTROL_OF: str = """const controlOf = (element) => {
   let field = element;
   if (!field.matches('input, textarea, select') && !field.isContentEditable)
     field = field.closest('button, [role=button], [role=checkbox], [role=radio]') || field;
@@ -160,31 +162,99 @@ _FIELD_MARKING_SCRIPT: str = """(element) => {
     const label = field.closest('label');
     if (label && label.control) field = label.control;
   }
+  return field;
+};"""
+_CONTROL_SCRIPT: str = "(element) => {\n" + _CONTROL_OF + "\n  return controlOf(element);\n}"
+# What the field a step writes into says about the secret it takes: "password" for a password input, then its
+# autocomplete tokens; null for an element that takes no typed text and no choice (a dropdown takes one: a card's
+# expiry month and year are often dropdowns, item 554). The model never sees this check and cannot disable it. A field
+# Dot filled a value into says "off" in its own autocomplete (:data:`_MARK_FIELD`, item 621) and keeps what the page
+# wrote there in ``data-dot-autocomplete``, which is what counts as its marking.
+_FIELD_MARKING_SCRIPT: str = (
+    "(element) => {\n"
+    + _CONTROL_OF
+    + """
+  const field = controlOf(element);
   const takesValue = field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement
     || field instanceof HTMLSelectElement;
   if (!takesValue) return null;
-  const marking = field.getAttribute('autocomplete') || '';
+  const filled = field.hasAttribute('data-dot-vault') ? ' dot-vault' : '';
+  const written = field.hasAttribute('data-dot-autocomplete')
+    ? field.getAttribute('data-dot-autocomplete') : field.getAttribute('autocomplete');
+  const marking = (written || '') + filled;
   return field instanceof HTMLInputElement && field.type === 'password' ? `password ${marking}` : marking;
 }"""
+)
+# What the marking of a field says when Dot filled a login into it (item 621): the value of such a field shows as
+# hidden in every view of the page, in every mode.
+_VAULT_MARK: str = "dot-vault"
 # The secrets each part of a login may go into (item 493): a password into a password field alone, so that it shows in
 # no text; a one-time code into a field marked for one or a plain one; a username into anything but a password field.
 _PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-password", "new-password"})
-# Whether the form a field is in names GET as the way it sends what is typed (item 493), in the page's address: its
-# method, or one its submit buttons name, is GET or a word no browser knows, which a browser reads as GET. A form that
-# names none, as a page whose script sends it writes, is left to the guard of Dot's Chrome, which refuses a request
-# whose address carries a password or a code.
+# Whether the form a field is in sends what is typed in the page's address (item 493): its method is GET, as the method
+# of a form that names none is, and of one that names a word no browser knows (``form.method`` is what a browser makes
+# of the attribute), or a submit button of the form names GET. It is asked of the control (:data:`_CONTROL_OF`) and of
+# no other element: a div has no form. A page whose script sends the form some other way is not seen here: the guard
+# of Dot's Chrome refuses a fetch or a frame of the page whose address carries a password or a one-time code (item
+# 621).
 _SENDS_BY_GET_SCRIPT: str = """(field) => {
   const form = field.form;
   if (!form) return false;
-  return (form.hasAttribute('method') && form.method === 'get')
+  return form.method === 'get'
     || [...form.elements].some((control) => ['submit', 'image'].includes(control.type)
       && control.hasAttribute('formmethod') && control.formMethod === 'get');
 }"""
-# The mark of a field a login was filled into (item 493), which every screenshot covers, in every mode: the field shows
-# the username, and a password once the page shows it.
+# The mark of a field a login was filled into (items 493 and 621), which every screenshot covers, in every mode: the
+# field shows the username, and a password once the page shows it.
 _FILLED_SELECTOR: str = "[data-dot-vault]"
-_MARK_FILLED_SCRIPT: str = "(element) => element.setAttribute('data-dot-vault', '')"
-
+# What Dot does to a field it fills a value into, before the value goes in, and again to a field of a later document
+# that holds a value it filled (:func:`remark_held`):
+# - the field is marked (``data-dot-vault``), so that every view of the page shows its value as hidden and every
+#   screenshot covers it;
+# - its autocomplete says "off", and what the page wrote there moves to ``data-dot-autocomplete``. Chrome keeps no value
+#   of such a field in the state it saves for a page: not to give it back when the page is gone back to or forward to,
+#   not in the files of its session on disk, not among the entries it makes of a form that was sent (measured for an
+#   input and for a dropdown).
+_MARK_FIELD: str = """const markField = (element) => {
+  if (!element.hasAttribute('data-dot-autocomplete'))
+    element.setAttribute('data-dot-autocomplete', element.getAttribute('autocomplete') || '');
+  element.setAttribute('autocomplete', 'off');
+  element.setAttribute('data-dot-vault', '');
+};"""
+_PREPARE_SCRIPT: str = f"(element) => {{ {_MARK_FIELD} markField(element); }}"
+_REMARK_SCRIPT: str = (
+    f"(elements, indexes) => {{ {_MARK_FIELD} for (const index of indexes) markField(elements[index]); }}"
+)
+# Every field of a document, in the open shadow roots it holds too, in page order, up to a limit; and what each holds:
+# its value and, for a dropdown, the label of the option it shows (a text longer than a password may be is left out,
+# so that a page with a long text in a box sends none of it). Given the address the frame had when Dot read it, it
+# returns before it touches a field when the document is another (``null``): a frame that moves between Dot's reading
+# of its address and this script (item 621, N1) is a frame Dot has not looked at.
+_FIELDS_LIMIT: int = 2000
+_ALL_FIELDS_SCRIPT: str = f"""(expected) => {{
+  if (document.URL !== expected) return null;
+  const found = [];
+  const walk = (root) => {{
+    for (const element of root.querySelectorAll('input, textarea, select')) {{
+      if (found.length < {_FIELDS_LIMIT}) found.push(element);
+    }}
+    for (const host of root.querySelectorAll('*')) {{
+      if (host.shadowRoot && found.length < {_FIELDS_LIMIT}) walk(host.shadowRoot);
+    }}
+  }};
+  walk(document);
+  return found;
+}}"""
+_MOST_HELD_CHARS: int = 600
+_FIELD_VALUES_SCRIPT: str = f"""(elements) => elements.map((element) => {{
+  const short = (text) => (text.length <= {_MOST_HELD_CHARS} ? text : '');
+  return element instanceof HTMLSelectElement
+    ? [short(element.value), element.selectedOptions.length ? short(element.selectedOptions[0].label) : '']
+    : [short(element.value)];
+}})"""
+# The shortest value (letters and digits only) that a field is marked for holding: a month is two digits and a number
+# in any quantity field would be taken for it.
+_HELD_FROM_CHARS: int = 3
 # Whether the element has the keyboard focus and takes typed text: a text input or a textarea, not disabled or
 # read-only.
 _TAKES_TEXT_SCRIPT: str = """(element) => element.getRootNode().activeElement === element
@@ -296,18 +366,24 @@ async def _once_more_after_navigation[T](page: Page, what: str, call: Callable[[
         raise _failure(what, page, {}, second) from second
 
 
-async def capture_lines(page: Page, timeout_ms: int, hide_secrets: bool) -> tuple[SnapshotLine, ...]:
+async def capture_lines(
+    page: Page, timeout_ms: int, hide_secrets: bool, vault_filled: bool = False, held: Collection[HeldValue] = ()
+) -> tuple[SnapshotLine, ...]:
     """One AI snapshot with boxes, the options of collapsed dropdowns folded onto their lines. Taking it replaces the
     ref table of every frame, so refs always mean the latest. With ``hide_secrets`` (every mode but yolo, item 467)
-    the value of a field the page marks secret shows as ``[hidden]``."""
+    the value of a field the page marks secret shows as ``[hidden]``; once a login was filled into the tab
+    (``vault_filled``, item 621) so does the value of a field Dot filled it into, in every mode, and so does a field
+    of a later document of the same origin that holds one of the values ``held`` (:func:`remark_held`)."""
     raw: str = await _once_more_after_navigation(
         page,
         "taking the page snapshot failed",
         lambda: page.aria_snapshot(mode="ai", boxes=True, timeout=timeout_ms),
     )
     lines: tuple[SnapshotLine, ...] = parse_snapshot(raw)
-    if hide_secrets:
-        lines = hide_values(lines, await secret_refs(page, filled_fields(lines)))
+    if vault_filled and held:
+        await remark_held(page, held)
+    if hide_secrets or vault_filled:
+        lines = hide_values(lines, await secret_refs(page, filled_fields(lines), hide_secrets))
     return fold_options(lines)
 
 
@@ -317,10 +393,11 @@ async def _count(locator: Locator) -> int:
         return await locator.count()
 
 
-async def _is_secret(page: Page, ref: str) -> bool:
-    """Whether the field ``ref`` is marked secret. A ref of another shape is never put into a selector, and a field
-    that cannot be asked (gone since the snapshot, its frame closed, too slow) counts as secret: a value is never shown
-    for want of an answer."""
+async def _is_secret(page: Page, ref: str, every_secret: bool = True) -> bool:
+    """Whether the field ``ref`` is marked secret, or (item 621) is one Dot filled a login into. With
+    ``every_secret`` false it is the second alone that counts. A ref of another shape is never put into a selector, and
+    a field that cannot be asked (gone since the snapshot, its frame closed, too slow) counts as secret: a value is
+    never shown for want of an answer."""
     if _REF_FORMAT.fullmatch(ref) is None:
         return True
     locator: Locator = page.locator(f"aria-ref={ref}")
@@ -335,16 +412,110 @@ async def _is_secret(page: Page, ref: str) -> bool:
     except PlaywrightError as error:
         _log.warning("browser_field_unreadable", ref=ref, url=page.url, error=str(error))
         return True
-    return secret_kind(marking) is not None
+    if isinstance(marking, str) and _VAULT_MARK in marking.split():
+        return True
+    return every_secret and secret_kind(marking) is not None
 
 
-async def secret_refs(page: Page, fields: tuple[SnapshotLine, ...]) -> frozenset[str]:
-    """The refs of ``fields`` that the page marks secret (item 467), each field asked by its own ref, all at once. What
-    the page is like now does not decide for the snapshot taken before: a field added and taken away since, in a frame
-    that went or not, is gone, and so is hidden; only the field the snapshot showed answers for its value."""
+async def secret_refs(page: Page, fields: tuple[SnapshotLine, ...], every_secret: bool = True) -> frozenset[str]:
+    """The refs of ``fields`` that the page marks secret (item 467) and those Dot filled a login into (item 621), each
+    field asked by its own ref, all at once; with ``every_secret`` false, the second alone. What the page is
+    like now does not decide for the snapshot taken before: a field added and taken away since, in a frame that went or
+    not, is gone, and so is hidden; only the field the snapshot showed answers for its value."""
     refs: list[str] = [field.ref for field in fields if field.ref is not None]
-    answers: list[bool] = await asyncio.gather(*(_is_secret(page, ref) for ref in refs))
+    answers: list[bool] = await asyncio.gather(*(_is_secret(page, ref, every_secret) for ref in refs))
     return frozenset(ref for ref, secret in zip(refs, answers, strict=True) if secret)
+
+
+def _held_core(text: str) -> str:
+    """``text`` as its letters and digits alone, in one case: how a page writes a number, an expiry or a code (``4242
+    4242``, ``08 / 39``) does not make it another value."""
+    return "".join(char for char in text.casefold() if char.isalnum())
+
+
+def _holding(values: object, wanted: frozenset[str]) -> list[int]:
+    """The places in ``values`` (what each field of a document holds, :data:`_FIELD_VALUES_SCRIPT`) of a field that
+    holds one of ``wanted``."""
+    if not isinstance(values, list):
+        return []
+    return [
+        index
+        for index, candidates in enumerate(values)
+        if isinstance(candidates, list)
+        and any(isinstance(candidate, str) and _held_core(candidate) in wanted for candidate in candidates)
+    ]
+
+
+_BLANK_DOCUMENTS: frozenset[str] = frozenset({"", "about:blank", "about:srcdoc"})
+
+
+def document_of(frame: Frame) -> str | None:
+    """The address of the document ``frame`` shows, for telling which site it is of: its own; for a blank one
+    (``about:blank`` and ``about:srcdoc`` are made by a script of the frame they lie in, and are of its site) that of
+    the frame it lies in, and so on up; for a blob (``blob:https://site/id``) the address it was made at. ``None`` when
+    no document can be named: a blank main frame (a tab just opened, whose opener is not known here) or a frame that is
+    gone. Nothing is done by what a value is to a document of which no site is named."""
+    current: Frame | None = frame
+    while current is not None:
+        address: str = current.url.removeprefix("blob:")
+        if address not in _BLANK_DOCUMENTS:
+            return address
+        current = current.parent_frame
+    return None
+
+
+async def remark_held(page: Page, held: Collection[HeldValue]) -> None:
+    """Mark again every field that holds a value Dot filled into the tab, in each document of the origin the value was
+    filled into (item 621): the page and its frames, a frame of another origin never looked into. A tab that goes back
+    or forward is in a new document, whose fields Chrome, or the page's own script, may fill with the value again,
+    without Dot's mark: a field that holds one of the values (their letters and digits alone compared, none shorter
+    than :data:`_HELD_FROM_CHARS`) is marked as it was filled, so that every view hides its value and every screenshot
+    covers it. What is compared stays in Dot: the values never go into the page, and no script runs in a document that
+    was not given them: by which of its fields Dot marked, a page that never held a value would read it. The script is
+    told the address the frame had when Dot read it and touches no field of a document that is another by then (a frame
+    that moves between the reading and the script is one Dot has not looked at). A frame that does not answer in time
+    is left and the log says so; the view asks each of its fields about its mark all the same, and a field that cannot
+    be asked counts as secret."""
+    work: list[Awaitable[None]] = []
+    for frame in page.frames:
+        if frame.is_detached():
+            continue
+        expected: str = frame.url
+        document: str | None = document_of(frame)
+        if document is None:
+            continue
+        wanted: frozenset[str] = frozenset(
+            core
+            for core in (_held_core(one.value) for one in held if one.covers(document))
+            if len(core) >= _HELD_FROM_CHARS
+        )
+        if wanted:
+            work.append(_remark_frame(frame, expected, wanted))
+    await asyncio.gather(*work)
+
+
+async def _remark_frame(frame: Frame, expected: str, wanted: frozenset[str]) -> None:
+    """:func:`remark_held` in one frame, which has :data:`_FIELD_PROBE_TIMEOUT_MS` twice over to answer. ``expected``
+    is the address the frame had when Dot read it: the script returns before it touches a field if the document is
+    another."""
+    try:
+        async with asyncio.timeout(2 * _FIELD_PROBE_TIMEOUT_MS / 1000):
+            fields: JSHandle = await frame.evaluate_handle(_ALL_FIELDS_SCRIPT, expected)
+            try:
+                if await fields.evaluate("(found) => found === null"):
+                    _log.debug("browser_frame_moved", url=truncate_middle(expected, _ERROR_CHARS))
+                    return
+                found: list[int] = _holding(await fields.evaluate(_FIELD_VALUES_SCRIPT), wanted)
+                if found:
+                    await fields.evaluate(_REMARK_SCRIPT, found)
+            finally:
+                await fields.dispose()
+    except (PlaywrightError, TimeoutError) as error:
+        _log.warning(
+            "browser_fields_not_checked",
+            url=truncate_middle(frame.url, _ERROR_CHARS),
+            error=truncate_middle(str(error), _ERROR_CHARS),
+        )
 
 
 async def page_title(page: Page) -> str:
@@ -612,6 +783,16 @@ async def _into_editor(
     return True
 
 
+# Why a value is not typed into an element that is no form field: only an input, a textarea or a dropdown is hidden in
+# every view and every picture of the page, and has the autocomplete that keeps Chrome from storing what is in it (an
+# editable element that is none of those, a ``contenteditable`` or a ``role=textbox``, is neither). A ref that names
+# something that is not the control of a form field is refused for every part of a login, the username too.
+_NOT_A_FORM_FIELD: str = (
+    "the element {ref} is not a form field (an input, a textarea or a dropdown): Dot types the login's {kind} only "
+    "into one, since only a form field is hidden in what the page shows of it"
+)
+
+
 def _takes(kind: VaultFieldKind, field: SecretKind | None) -> bool:
     """Whether a field marked ``field`` may take the part ``kind`` of a login."""
     if kind == "password":
@@ -627,24 +808,36 @@ async def fill_login_field(
     kind: VaultFieldKind,
     value: str,
     fills_on: Callable[[str], bool],
-    typing: Callable[[], None],
+    typing: Callable[[str], None],
     timeout_ms: int,
 ) -> None:
-    """Fill the field ``ref`` with ``value``, the part ``kind`` of a login of the password manager (item 493), once the
-    field is one that part may go into and the document that holds it is one of the login's sites (``fills_on`` of the
-    address of its frame): a password into a password field alone, nothing into a frame of another site. The frame and
-    its address are the browser's: a script of the frame can make the element itself name another document.
-    ``typing()`` runs once the field passed, just before the value goes into the element that passed. Neither the
-    value nor Playwright's log of the call is in what it raises."""
+    """Fill the field ``ref`` with ``value``, the part ``kind`` of a login of the password manager (item 493) or of
+    Dot's vault (item 621), once the field is one that part may go into and the document that holds it is one of the
+    login's sites (``fills_on`` of the address of its frame): every part into a form field alone, a password into a
+    password field, nothing into a frame of another site. ``ref`` may name an element inside the label of the field;
+    the field is the control of that label (:data:`_CONTROL_OF`), found once, and every check, the mark and the fill
+    are of it. The frame and its address are the browser's: a script of the frame can make the element itself name
+    another document. ``typing(document)`` runs once the field passed, just before the value goes into the element
+    that passed, with the address of the document that holds it: the value is scoped to that document's origin.
+    Neither the value nor Playwright's log of the call is in what it raises."""
     locator: Locator = await live_locator(page, ref, "fill")
     try:
-        element: ElementHandle = await locator.element_handle(timeout=timeout_ms)
+        named: ElementHandle = await locator.element_handle(timeout=timeout_ms)
     except PlaywrightError as error:
         raise BrowserError(
             "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
         ) from error
+    control: JSHandle | None = None
     try:
         try:
+            # The element a ref names is not always the field: a div, a span or a b in a label is given a ref of its
+            # own, and Playwright's fill writes the label's control. The control is resolved once, and the frame, the
+            # marking, the form, the mark and the fill are all of that one element (item 621: the form was read off
+            # the element the ref named, a div that has none, while the fill wrote the input in its label).
+            control = await named.evaluate_handle(_CONTROL_SCRIPT)
+            element: ElementHandle | None = control.as_element()
+            if element is None:
+                raise BrowserError(_NOT_A_FORM_FIELD.format(ref=ref, kind=kind), {"ref": ref, "url": page.url})
             frame: Frame | None = await element.owner_frame()
             marking: object = await element.evaluate(_FIELD_MARKING_SCRIPT)
             by_get: object = await element.evaluate(_SENDS_BY_GET_SCRIPT)
@@ -661,6 +854,8 @@ async def fill_login_field(
                     "frame": None if frame is None else truncate_middle(frame.url, _ERROR_CHARS),
                 },
             )
+        if not isinstance(marking, str):
+            raise BrowserError(_NOT_A_FORM_FIELD.format(ref=ref, kind=kind), {"ref": ref, "url": page.url})
         field: SecretKind | None = secret_kind(marking)
         if not _takes(kind, field):
             raise BrowserError(
@@ -671,13 +866,14 @@ async def fill_login_field(
         if kind != "username" and by_get is True:
             # An address is written into the page's views, its history and logs, and shortened where it is long.
             raise BrowserError(
-                f"the form of the field {ref} sends what is typed in the page's address (its method is GET): Dot fills "
-                f"a login's {kind} only into a form that keeps it out of the address",
+                f"the form of the field {ref} sends what is typed in the page's address (its method is GET, or it "
+                f"names none, which is GET): Dot fills a login's {kind} only into a form that keeps it out of the "
+                "address",
                 {"ref": ref, "url": page.url, "part": kind},
             )
-        typing()
+        typing(frame.url)
         try:
-            await element.evaluate(_MARK_FILLED_SCRIPT)
+            await element.evaluate(_PREPARE_SCRIPT)
             await element.fill(value, timeout=timeout_ms)
         except PlaywrightError:
             # Playwright's log of the call is left out, here and in the chain of the error: it may name what was typed.
@@ -685,7 +881,9 @@ async def fill_login_field(
                 "the field did not take the login", {"ref": ref, "url": page.url, "part": kind}
             ) from None
     finally:
-        await element.dispose()
+        if control is not None:
+            await control.dispose()
+        await named.dispose()
 
 
 async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> None:
@@ -817,10 +1015,15 @@ async def scroll_page(
         raise _failure("scrolling failed", page, {"direction": direction, "ref": ref}, error) from error
 
 
-async def screenshot_jpeg(page: Page, quality: int, timeout_ms: int, hide_secrets: bool) -> bytes:
+async def screenshot_jpeg(
+    page: Page, quality: int, timeout_ms: int, hide_secrets: bool, held: Collection[HeldValue] = ()
+) -> bytes:
     """Viewport screenshot in CSS pixels (so a pixel in the picture is a pixel for ``click_at``, also on Retina). The
-    fields a login of the password manager was filled into are covered in every mode (item 493), and with
-    ``hide_secrets`` (every mode but yolo, item 467) the fields the page marks secret too, in every frame."""
+    fields a login of the password manager or of Dot's vault was filled into are covered in every mode (items 493 and
+    621), a field of a later document that holds one of the values ``held`` among them (:func:`remark_held`), and
+    with ``hide_secrets`` (every mode but yolo, item 467) the fields the page marks secret too, in every frame."""
+    if held:
+        await remark_held(page, held)
     covered: str = f"{secret_selector()}, {_FILLED_SELECTOR}" if hide_secrets else _FILLED_SELECTOR
     mask: list[Locator] = [frame.locator(covered) for frame in page.frames if not frame.is_detached()]
     try:

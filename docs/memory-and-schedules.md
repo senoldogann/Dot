@@ -193,8 +193,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   from such a run, and the reflection's journal that names it, carry the mark too; a lesson you save yourself does
   not. The same words saved again leave a note's mark as it was. Your own rewrite of a note, on the Memory page, takes
   the mark off: you vouch for its text. A note that holds an API key or one of the
-  secrets Dot holds is refused, and the model is told to record where the key lives, not the key; the notes you write
-  yourself are not refused.
+  keys Dot holds is refused, and the model is told to record where the key lives, not the key; a password that a login
+  filled into a page is masked in a note, never a reason to refuse it (see [Safety](safety.md#safety)); the notes you
+  write yourself are not refused.
 - The default embedding model, `bge-m3`, is multilingual: English and Turkish notes are found by meaning (on a small
   hand-written set, the right note came first for 15 of 17 Turkish questions, against 10 with the English-centric
   `mxbai-embed-large`). `min_similarity` and `inject_min_similarity` are set for its scores. For another Ollama model

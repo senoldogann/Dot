@@ -214,7 +214,11 @@ Both modes share what follows.
   through when the run read outside content (item 525). A login of your 1Password is the one other way in, in every
   mode (item 493): `browser_logins` lists the logins Dot may fill (titles and websites), and `browser_fill_login` fills
   one into the current page, each fill asking you first outside `yolo`. Dot fills it, not the model, and the values
-  show in no result of the chat's tools. It fills only on the login's own site, never a password or a code in your own
+  show in no result of the chat's tools. The logins of Dot's own vault (Settings › Vault, item 621) are filled the same
+  way (its cards are kept there and filled into no page). A password or a code goes only into an input, a textarea or
+  a dropdown, never into an element that is edited (`contenteditable`); a ref that names an element inside the label of
+  a field names that field. A form with no method is a form that sends by GET, to a browser, and gets no password. It
+  fills only on the login's own site, never a password or a code in your own
   Chrome (`attach`: that Chrome's requests are not held, so nothing would keep a value out of an address), and not in a
   chat in which a script (`browser_eval`) ran in a tab that is still open; once it filled one, no script runs in the
   chat's tabs while that tab is open. [Safety](safety.md#safety) has the whole of it. Outside `yolo` the run never reads

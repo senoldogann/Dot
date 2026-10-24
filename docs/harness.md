@@ -57,7 +57,9 @@ letters of `https` or after a dot keeps a pattern from seeing them side by side.
   variation selector, the Hangul and Khmer fillers, the combining grapheme joiner, the soft hyphen) and the Braille
   blank. The gate lists the ranges of the property in code, since Python has no property for them. An emoji written with
   its variation selector is refused too.
-- **A secret**: one of the values Dot holds, the value of a key that names a secret, or a key of a known form.
+- **A secret**: one of the values Dot holds (its keys, not a password that a login filled into a page: a refusal by
+  that would tell a run the password it guesses, and a text that holds it is given masked, item 621), the value of a
+  key that names a secret, or a key of a known form.
 - **A link**: an address with its scheme or `www.`; `data:`, `javascript:`, `mailto:` and the other addresses that act
   without slashes; `//host.tld`; a host with a path or a port after it; a numeric address that is not this Mac's or a
   local network's; and a host named bare on a top-level domain the gate knows (`evil.example`). A domain that is also a

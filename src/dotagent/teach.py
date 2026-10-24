@@ -95,7 +95,7 @@ async def draft_taught_skill(runtime: "Runtime", recording: Recording, words: st
             kinds=kinds_shown(entries, host),
         )
     )
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     draft: PlaybookDraft = redacted_draft(written, secrets)
     return TaughtSkill(
         name=taught_name(draft.kind),

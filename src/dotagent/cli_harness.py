@@ -142,7 +142,9 @@ async def cmd_harness_show(command: HarnessShowCommand) -> int:
         return 0
     async with _store() as store:
         lineage: Lineage = await lineage_of(store, version.id)
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # The refusals the gate would make now, as a run would meet them (the values filled into a page are not among
+    # its secrets, item 621).
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     sys.stdout.write("\n".join([*render_version(version, secrets), *render_lineage(lineage)]) + "\n")
     return 0
 
@@ -223,7 +225,8 @@ async def cmd_harness_set(command: HarnessSetCommand) -> int:
     if habits is None and tool_guidance is None:
         raise InvalidValueError("name a file for --habits or --tool-guidance", {})
     config = load_user_config()
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # A gate: the values filled into a page are not among the secrets it refuses by (item 621).
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     async with _store() as store:
         current: HarnessVersion | None = await adopted(store)
         kept: HarnessText = NO_HARNESS if current is None else raw_text_of(current)
@@ -249,7 +252,8 @@ _TAINTED_WARNING: str = (
 
 
 async def cmd_harness_adopt(command: HarnessAdoptCommand) -> int:
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # A gate: the values filled into a page are not among the secrets it refuses by (item 621).
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     async with _store() as store:
         wanted: HarnessVersion = await store.get_harness_version(command.version_id)
         why: tuple[str, ...] = await taint_of(store, wanted)
@@ -384,7 +388,8 @@ async def cmd_harness_final(command: HarnessFinalCommand) -> int:
             raise InvalidValueError("no version is adopted; name one to play the final set under", {})
     # What the final set plays is the text as a run would take it: a component the gate refuses now left out, the values
     # Dot holds asked for here, since the probe's own home cannot know them (item 587).
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # (A value filled into a page is not among them: the gate refuses by a value, item 621; the text comes masked.)
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     ask: ProbeAsk = ProbeAsk(
         label=version.id,
         text=given_text(version, secrets),

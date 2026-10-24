@@ -91,6 +91,7 @@ from dotagent.store.models import (
     TrashedMemory,
     UnattendedCount,
     UnattendedRun,
+    VaultRecord,
     WorkingRun,
 )
 from dotagent.store.stats import (
@@ -161,6 +162,11 @@ CREATE TABLE IF NOT EXISTS rules (
     id TEXT PRIMARY KEY, position INTEGER NOT NULL, enabled INTEGER NOT NULL, behavior TEXT NOT NULL,
     tool_glob TEXT NOT NULL, match_regex TEXT NOT NULL, description TEXT NOT NULL, created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS vault_items (
+    id TEXT PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, website TEXT, username TEXT, brand TEXT, last4 TEXT,
+    nickname TEXT, fields TEXT NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS vault_items_kind ON vault_items(kind, label);
 CREATE TABLE IF NOT EXISTS queued_messages (
     id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, position INTEGER NOT NULL, text TEXT NOT NULL,
     attachments TEXT NOT NULL, mode TEXT NOT NULL, model TEXT, effort TEXT, approvals TEXT, goal_mode INTEGER,
@@ -818,6 +824,28 @@ def _rule(row: aiosqlite.Row) -> RuleRecord:
         match_regex=row["match_regex"],
         description=row["description"],
         created_at=row["created_at"],
+    )
+
+
+def _fields_json(fields: dict[str, str]) -> str:
+    kept: JsonObject = {name: value for name, value in fields.items()}
+    return dumps_compact(kept)
+
+
+def _vault_item(row: aiosqlite.Row) -> VaultRecord:
+    stored: JsonObject = parse_json_object(row["fields"], "vault item fields")
+    return VaultRecord(
+        id=row["id"],
+        kind=row["kind"],
+        label=row["label"],
+        website=row["website"],
+        username=row["username"],
+        brand=row["brand"],
+        last4=row["last4"],
+        nickname=row["nickname"],
+        fields={name: value for name, value in stored.items() if isinstance(value, str)},
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
     )
 
 
@@ -3617,6 +3645,80 @@ class Store:
     async def delete_rule(self, rule_id: str) -> None:
         await self._db.execute("DELETE FROM rules WHERE id = ?", (rule_id,))
         await self._db.commit()
+
+    # ----- vault items ---------------------------------------------------------------------------
+
+    async def list_vault_items(self) -> list[VaultRecord]:
+        """Every item of Dot's own vault (item 621), by label."""
+        rows = await self._all("SELECT * FROM vault_items ORDER BY label COLLATE NOCASE, created_at", ())
+        return [_vault_item(row) for row in rows]
+
+    async def get_vault_item(self, item_id: str) -> VaultRecord:
+        row = await self._one("SELECT * FROM vault_items WHERE id = ?", (item_id,))
+        if row is None:
+            raise NotFoundError("no such item in the vault", {"item_id": item_id})
+        return _vault_item(row)
+
+    async def vault_counts(self) -> dict[str, int]:
+        """How many items of each kind the vault holds, a kind without any counted as 0."""
+        rows = await self._all("SELECT kind, COUNT(*) AS items FROM vault_items GROUP BY kind", ())
+        counts: dict[str, int] = {"login": 0, "card": 0, "contact": 0}
+        for row in rows:
+            counts[str(row["kind"])] = int(row["items"])
+        return counts
+
+    @_writing
+    async def add_vault_items(self, records: Sequence[VaultRecord]) -> None:
+        """Keep ``records`` (an import keeps many): all of them are stored or none."""
+        await self._db.executemany(
+            "INSERT INTO vault_items(id, kind, label, website, username, brand, last4, nickname, fields, created_at,"
+            " updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    record.id,
+                    record.kind,
+                    record.label,
+                    record.website,
+                    record.username,
+                    record.brand,
+                    record.last4,
+                    record.nickname,
+                    _fields_json(record.fields),
+                    record.created_at,
+                    record.updated_at,
+                )
+                for record in records
+            ],
+        )
+        await self._db.commit()
+
+    @_writing
+    async def update_vault_item(self, record: VaultRecord) -> None:
+        cursor = await self._db.execute(
+            "UPDATE vault_items SET label = ?, website = ?, username = ?, brand = ?, last4 = ?, nickname = ?,"
+            " fields = ?, updated_at = ? WHERE id = ?",
+            (
+                record.label,
+                record.website,
+                record.username,
+                record.brand,
+                record.last4,
+                record.nickname,
+                _fields_json(record.fields),
+                record.updated_at,
+                record.id,
+            ),
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("no such item in the vault", {"item_id": record.id})
+
+    @_writing
+    async def delete_vault_item(self, item_id: str) -> bool:
+        """Forget the record of an item; ``False`` when there was none."""
+        cursor = await self._db.execute("DELETE FROM vault_items WHERE id = ?", (item_id,))
+        await self._db.commit()
+        return cursor.rowcount > 0
 
     # ----- queued messages ---------------------------------------------------------------------
 

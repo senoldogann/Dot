@@ -146,6 +146,9 @@ While it is connected, a run that may act gets `browser_logins`, the logins' tit
 `browser_fill_login`, which fills one into the current page. Dot fills only on the login's own site, asks you before
 each fill in every mode but `yolo`, and masks the values in everything the browser and web tools give back.
 
+Dot keeps logins, cards and contact details of its own too, in Settings › Vault (item 621, see [Dot's own
+vault](daemon.md#settings--vault)); its logins are listed and filled by the same tools, beside 1Password's.
+
 A service Dot has no way to reach is not listed: Canva (its MCP server lets in approved clients only, and its page told
 Dot's "Unsupported client" on 2026-10-22), Asana and Box (clients registered by hand) left Connectors with item 542,
 where they said **Not tried yet** and offered nothing to do. Vercel's server, which let in approved clients only, lets

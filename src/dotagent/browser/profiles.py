@@ -42,6 +42,9 @@ HIDE_CRASH_BUBBLE: str = "--hide-crash-restore-bubble"
 _PROFILE_FOLDER_MODE: int = 0o700
 _JSON_OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject)
 _SQLITE_COMPANIONS: tuple[str, ...] = ("", "-journal", "-wal", "-shm")
+# Where Chrome keeps the session of its last run: the history of each tab, with the body of every form it sent by POST
+# (so that the page can be sent again), as it keeps it for a restore (item 621).
+_SESSIONS: str = "Sessions"
 
 
 def _databases(*names: str) -> tuple[str, ...]:
@@ -153,6 +156,14 @@ def clear_site_data(folder: Path) -> None:
     profile: Path = folder / _PROFILE_DIR
     for name in (*_COOKIES, *_SITE_STORAGE, *_SAVED_SIGN_INS, *_CACHES):
         _remove(profile / name)
+
+
+def clear_session_files(folder: Path) -> None:
+    """Delete the files in which Chrome keeps the session of its last run on the profile in ``folder``, while no Chrome
+    holds it (blocking): the history of each tab, with the body of every form it sent by POST, which can be a card's
+    number or a password (item 621). Dot's Chrome opens no page of its last run (:func:`keep_session_cookies`), so
+    nothing is lost; its sign-ins are in the cookies and the storage of the sites."""
+    _remove(folder / _PROFILE_DIR / _SESSIONS)
 
 
 def empty_incognito() -> None:
