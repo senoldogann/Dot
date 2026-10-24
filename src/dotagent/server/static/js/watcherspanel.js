@@ -69,7 +69,8 @@ function whenLine(view) {
   return el("div", { class: "row-meta when-line" }, ...joined(parts));
 }
 
-function watcherRow(view, handlers) {
+/** A row of the list. `looking` says that its Check now is at work: the button shows it and takes no second press. */
+function watcherRow(view, handlers, looking) {
   const kind = kindOf(view.kind);
   const toggle = el("button", {
     class: "switch",
@@ -96,7 +97,8 @@ function watcherRow(view, handlers) {
       el(
         "div",
         { class: "row-meta" },
-        view.account === "" ? null : el("span", { class: "chip", title: "The account it looks in" }, view.account),
+        // An address longer than the row is cut with an ellipsis, so that it never runs past the row; the title has it whole.
+        view.account === "" ? null : el("span", { class: "chip", title: `The account it looks in: ${view.account}` }, el("span", { class: "chip-text" }, view.account)),
         el("span", { class: "chip", title: view.kind === "calendar" ? "How long before an event it tells you" : "How often it looks" }, minutesText(view)),
         el("span", { class: "chip", title: ACTIONS.find((action) => action.id === view.action)?.hint ?? "" }, view.action === "run" ? "Starts a run" : "Tells you"),
       ),
@@ -112,12 +114,13 @@ function watcherRow(view, handlers) {
         {
           class: "btn ghost sm icon-only",
           type: "button",
-          title: view.enabled ? "Check now: look at once instead of waiting" : "Switch it on to check it",
+          title: looking ? "Looking now: a look can take a few minutes" : view.enabled ? "Check now: look at once instead of waiting" : "Switch it on to check it",
           "aria-label": `Check ${view.name} now`,
-          disabled: !view.enabled,
+          "aria-busy": looking ? "true" : null,
+          disabled: !view.enabled || looking,
           onclick: () => handlers.onCheck(view),
         },
-        icon("refresh"),
+        looking ? el("span", { class: "spinner", "aria-hidden": "true" }) : icon("refresh"),
       ),
       el("button", { class: "btn ghost sm icon-only", type: "button", title: "Edit this watcher", "aria-label": `Edit ${view.name}`, onclick: () => handlers.onEdit(view, row) }, icon("pencil")),
       el("button", { class: "btn ghost sm icon-only", type: "button", title: "Delete this watcher", "aria-label": `Delete ${view.name}`, onclick: () => handlers.onDelete(view) }, icon("trash")),
@@ -295,6 +298,9 @@ export function mountWatchers() {
   let options = null;
   // The id of the watcher whose form is open, or null: while one is, the list is not painted again over it.
   let editing = null;
+  // The ids of the watchers whose Check now is at work. A look takes up to three minutes, and a second press would queue
+  // another whole look behind it, so the row shows the first one and its button takes no more (item 612).
+  const looking = new Set();
   const holder = el("div", null, loadingPanel());
   const count = el("span", { class: "hint" });
   const formSlot = el("div", { class: "watcher-form-slot", hidden: true });
@@ -327,7 +333,7 @@ export function mountWatchers() {
       onEdit: (view, row) => startEditing(view, row),
       onDelete: (view) => attempt(() => remove(view)),
     };
-    holder.replaceChildren(el("div", { class: "watcher-list" }, views.map((view) => watcherRow(view, handlers))));
+    holder.replaceChildren(el("div", { class: "watcher-list" }, views.map((view) => watcherRow(view, handlers, looking.has(view.id)))));
   }
 
   async function reload() {
@@ -366,12 +372,23 @@ export function mountWatchers() {
   }
 
   async function check(view) {
-    const result = await api.post(`/watchers/${view.id}/try`, null);
-    const { outcome } = result;
-    if (outcome.error !== null) {
-      toast("error", `${view.name} could not look: ${clip(outcome.error, ERROR_CHARS)}`);
-    } else {
-      toast("ok", `${view.name}: ${outcome.summary}`);
+    if (looking.has(view.id)) {
+      return;
+    }
+    looking.add(view.id);
+    paint();
+    try {
+      const { outcome } = await api.post(`/watchers/${view.id}/try`, null);
+      if (outcome.error !== null) {
+        toast("error", `${view.name} could not look: ${clip(outcome.error, ERROR_CHARS)}`);
+      } else {
+        toast("ok", `${view.name}: ${outcome.summary}`);
+      }
+    } finally {
+      looking.delete(view.id);
+      if (!disposed) {
+        paint();
+      }
     }
     await reload();
   }

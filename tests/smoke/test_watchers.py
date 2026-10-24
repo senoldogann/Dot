@@ -14,9 +14,10 @@ import asyncio
 import dataclasses
 import re
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -31,11 +32,14 @@ from dotagent.core.paths import failsafe_path
 from dotagent.core.types import JsonObject
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
-from dotagent.events import SYSTEM_RUN_ID
+from dotagent.events import SYSTEM_RUN_ID, EventBus
+from dotagent.llm.router import ModelRouter
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.oauth.tokens import Account
+from dotagent.proactive import watching
 from dotagent.proactive.github import GITHUB_TOKEN_NAME
+from dotagent.proactive.judge import Verdict
 from dotagent.proactive.watchers import WATCHERS_CHAT_KEY, WATCHERS_KEY, WatcherRecord, get_watcher
 from dotagent.proactive.watching import LookOutcome, look_at, look_due, try_now
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -603,6 +607,197 @@ async def test_a_flood_is_judged_up_to_the_limit_of_a_look_and_the_row_says_what
     # What was left unjudged was handled all the same: it is not asked about or told at the next look.
     later: LookOutcome = await _look(runtime, manager, str(watcher["id"]), 400)
     assert (later.found, later.told) == (0, 0) and len(MODEL.questions) == 4
+
+
+# ----------------------------------------------------------------------------------- a look that stalls or is cut
+
+
+def _slow_model(monkeypatch: pytest.MonkeyPatch, stalls: Callable[[int], bool]) -> asyncio.Event:
+    """Make the fast model stall on the watchers' questions that ``stalls`` names by their number (from 1): such a call
+    waits for the returned gate and answers when it is set; the others answer at once."""
+    gate: asyncio.Event = asyncio.Event()
+    original = MODEL.complete
+    asked: list[int] = []
+
+    async def complete(request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        if any(tool.name == "watcher_verdict" for tool in request.tools):
+            asked.append(len(asked) + 1)
+            if stalls(asked[-1]):
+                await gate.wait()
+        return await original(request, sink)
+
+    monkeypatch.setattr(MODEL, "complete", complete)
+    return gate
+
+
+def _rents(count: int) -> list[JsonObject]:
+    """``count`` mails of the landlord's, one after another."""
+    return [_mail(f"r{number}", _LANDLORD, f"Rent, part {number}", NOW + 10 + number) for number in range(count)]
+
+
+def _rent_told(number: int) -> str:
+    return f"Mr Stone: Rent, part {number} (it is about your landlord)"
+
+
+async def test_a_question_of_a_watcher_has_a_limit_under_the_looks_and_under_a_runs_calls(runtime: Runtime) -> None:
+    """Item 612: the limit of a model call was the run's (420 seconds), longer than the look's (180), so one stalled
+    answer ended the look and a model that did not answer could never be told as unjudged."""
+    assert watching.JUDGE_TIMEOUT_S < watching.LOOK_TIMEOUT_S < runtime.config.agent.model_call_timeout_s
+
+
+async def test_each_mail_is_judged_told_and_kept_before_the_next_one_is_asked(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, told: Told, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 612: a look judged every mail before it told any, so what a look that was cut had judged was lost."""
+    watcher: JsonObject = await _make(client, words="the rent")
+    watcher_id: str = str(watcher["id"])
+    await _look(runtime, manager, watcher_id, 0)
+    WORLD.gmail = [
+        _mail("r0", _LANDLORD, "Rent, part 0", NOW + 10),
+        _mail("shop", "Shop <sale@shop.example>", "Half price", NOW + 11),
+        _mail("r1", _LANDLORD, "Rent, part 1", NOW + 12),
+    ]
+    kept_when_asked: list[tuple[str, ...]] = []
+    original = MODEL.complete
+
+    async def spying(request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        if any(tool.name == "watcher_verdict" for tool in request.tools):
+            kept_when_asked.append((await _state(runtime, watcher_id)).state.seen)
+        return await original(request, sink)
+
+    monkeypatch.setattr(MODEL, "complete", spying)
+    outcome: LookOutcome = await _look(runtime, manager, watcher_id, 60)
+    assert (outcome.found, outcome.told) == (3, 2) and "1 not for you" in outcome.summary
+    # Oldest first, and each one written down (told, or judged not to be the owner's) before the next is asked about.
+    assert kept_when_asked == [(), ("r0",), ("r0", "shop")]
+    assert told.texts() == [_rent_told(0), _rent_told(1)]
+
+
+async def test_a_look_that_is_cut_has_told_and_kept_what_it_finished_and_the_next_look_takes_the_rest(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, told: Told, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 612 (the final review): with a few dozen mails and a model that stalled, the look judged them all before it
+    told one, was cut, and told and kept nothing; the next look asked about the same mails and was cut again."""
+    watcher: JsonObject = await _make(client)
+    watcher_id: str = str(watcher["id"])
+    await _look(runtime, manager, watcher_id, 0)
+    WORLD.gmail = _rents(3)
+    # The model answers the first question and stalls on the next ones; the look's limit is under the call's.
+    gate: asyncio.Event = _slow_model(monkeypatch, lambda number: number >= 2)
+    monkeypatch.setattr(watching, "JUDGE_TIMEOUT_S", 60.0)
+    monkeypatch.setattr(watching, "LOOK_TIMEOUT_S", 3.0)
+    cut: LookOutcome = await _look(runtime, manager, watcher_id, 60)
+    assert cut.error is not None and "took more than 3 seconds" in cut.error
+    assert "dealt with 1 of the 3 new ones (1 told)" in cut.error and "the next look takes the rest" in cut.error
+    assert (cut.found, cut.told) == (3, 1)
+    assert told.texts() == [_rent_told(0)]
+    stopped: WatcherRecord = await _state(runtime, watcher_id)
+    assert stopped.state.seen == ("r0",) and stopped.state.error == cut.error
+    # The cursor stays, so that the mails that were not dealt with are looked at again.
+    assert stopped.state.since == NOW
+    # The model answers again: the next look asks about the two that are left and about nothing it dealt with.
+    gate.set()
+    rest: LookOutcome = await _look(runtime, manager, watcher_id, 400)
+    assert rest.error is None and (rest.found, rest.told) == (2, 2)
+    assert told.texts() == [_rent_told(0), _rent_told(1), _rent_told(2)]
+    assert len(MODEL.questions) == 3
+    assert (await _state(runtime, watcher_id)).state.error is None
+
+
+async def test_the_review_probe_a_slow_model_and_a_short_limit_tells_what_each_look_finishes_and_asks_once(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, told: Told, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The probe of the final review, scaled down: mails that fit, a fast model that takes a fixed time to answer and a
+    look cut at about two answers' time (three mails here, the hour of this test holding three tells). It told nothing
+    in the first look and asked about the same mails again in the second; each look now tells what it finished, and no
+    mail is asked about twice."""
+    answer_s: float = 0.5
+    watcher: JsonObject = await _make(client)
+    watcher_id: str = str(watcher["id"])
+    await _look(runtime, manager, watcher_id, 0)
+    WORLD.gmail = _rents(3)
+    original = MODEL.complete
+
+    async def slow(request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        if any(tool.name == "watcher_verdict" for tool in request.tools):
+            await asyncio.sleep(answer_s)
+        return await original(request, sink)
+
+    monkeypatch.setattr(MODEL, "complete", slow)
+    # Two answers fit the look with a margin of a quarter of a second each way, and a third cannot.
+    monkeypatch.setattr(watching, "LOOK_TIMEOUT_S", 2.5 * answer_s)
+    first: LookOutcome = await _look(runtime, manager, watcher_id, 60)
+    assert first.error is not None and "took more than 1 seconds" in first.error
+    assert 1 <= first.told <= 2 and len(told.owner) == first.told
+    assert (await _state(runtime, watcher_id)).state.seen == tuple(f"r{number}" for number in range(first.told))
+    # The next look has time for what is left, and asks about nothing it dealt with: one question for each mail.
+    monkeypatch.setattr(watching, "LOOK_TIMEOUT_S", 30.0)
+    second: LookOutcome = await _look(runtime, manager, watcher_id, 400)
+    assert second.error is None and (second.found, second.told) == (3 - first.told, 3 - first.told)
+    assert told.texts() == [_rent_told(number) for number in range(3)]
+    assert len(MODEL.questions) == 3
+    assert (await _state(runtime, watcher_id)).state.error is None
+
+
+async def test_a_model_call_that_stalls_ends_at_its_own_limit_and_its_mail_is_told_unchecked(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, told: Told, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 612: the question of a watcher has a limit of its own, under the look's, and a question that is not
+    answered by then is a mail the model could not judge: told, saying so, and the look goes on."""
+    watcher: JsonObject = await _make(client)
+    watcher_id: str = str(watcher["id"])
+    await _look(runtime, manager, watcher_id, 0)
+    WORLD.gmail = _rents(3)
+    _slow_model(monkeypatch, lambda number: number == 2)
+    monkeypatch.setattr(watching, "JUDGE_TIMEOUT_S", 0.5)
+    monkeypatch.setattr(watching, "LOOK_TIMEOUT_S", 8.0)
+    limits: list[float] = []
+    judge = watching.judge
+
+    async def counting(router: ModelRouter, fast: str, timeout_s: float, *rest: Any) -> Verdict:
+        limits.append(timeout_s)
+        return await judge(router, fast, timeout_s, *rest)
+
+    monkeypatch.setattr(watching, "judge", counting)
+    outcome: LookOutcome = await _look(runtime, manager, watcher_id, 60)
+    # The look ended by itself, long before its own limit, with every mail told.
+    assert outcome.error is None and (outcome.found, outcome.told) == (3, 3)
+    assert told.texts() == [
+        _rent_told(0),
+        "Mr Stone: Rent, part 1 (it could not be checked against your words)",
+        _rent_told(2),
+    ]
+    # Every question had the watcher's limit and not the agent's.
+    assert limits == [0.5, 0.5, 0.5]
+
+
+async def test_a_look_cut_while_it_tells_has_told_and_kept_each_item_or_neither(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, told: Told, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 612: a tell that is out is written down as kept before the look can be cut, so that the next look does not
+    tell it again (and does not start its run again)."""
+    watcher: JsonObject = await _make(client)
+    watcher_id: str = str(watcher["id"])
+    await _look(runtime, manager, watcher_id, 0)
+    WORLD.gmail = _rents(3)
+    tell = watching.tell_owner
+
+    async def dawdling(bus: EventBus, title: str, text: str, url: str) -> None:
+        await tell(bus, title, text, url)
+        await asyncio.sleep(0.4)
+
+    monkeypatch.setattr(watching, "tell_owner", dawdling)
+    monkeypatch.setattr(watching, "LOOK_TIMEOUT_S", 0.6)
+    cut: LookOutcome = await _look(runtime, manager, watcher_id, 60)
+    assert cut.error is not None and "took more than 1 seconds" in cut.error
+    stopped: WatcherRecord = await _state(runtime, watcher_id)
+    assert 1 <= len(told.owner) < 3
+    assert len(stopped.state.seen) == len(told.owner) == cut.told
+    # The next look takes what is left, and no mail is told twice.
+    monkeypatch.setattr(watching, "LOOK_TIMEOUT_S", 30.0)
+    rest: LookOutcome = await _look(runtime, manager, watcher_id, 400)
+    assert rest.error is None
+    assert told.texts() == [_rent_told(0), _rent_told(1), _rent_told(2)]
 
 
 async def test_an_outlook_account_is_read_the_same_way(
@@ -1203,5 +1398,149 @@ async def test_the_panel_makes_a_watcher_checks_it_now_shows_a_failure_and_chang
                 await page.get_by_role("button", name="Delete", exact=True).click()
                 await expect(row).to_have_count(0)
                 await page.close()
+        finally:
+            await browser.close()
+
+
+# What the row of a watcher measures: the page's slide, the row, the name, the address chip and whether its text is cut
+# short, and the buttons, each as a rectangle of the window.
+_ROW_BOXES: str = """(id) => {
+  const row = document.querySelector(`[data-watcher="${id}"]`);
+  const box = (node) => node.getBoundingClientRect().toJSON();
+  const address = row.querySelector(".chip-text") ?? row.querySelector(".row-meta .chip");
+  return {
+    slid: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    row: box(row),
+    name: box(row.querySelector(".row-title")),
+    chip: box(address.closest(".chip")),
+    cut: address.scrollWidth > address.clientWidth,
+    buttons: [...row.querySelectorAll(".row-actions button")].map(box),
+  };
+}"""
+_LONG_NAME: str = "The landlord of the flat on Elm Street and the rent for the whole year"
+_LONG_ADDRESS: str = f"{'a' * 60}.{'b' * 60}@{'c' * 60}.example.com"
+# The windows the row is measured in: a desk, an iPhone and the narrowest iPhone.
+_SIZES: tuple[tuple[int, int], ...] = ((1280, 900), (390, 844), (320, 640))
+
+
+@pytest.mark.browser
+async def test_a_long_account_address_gives_way_and_the_name_keeps_its_width_on_a_phone(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 612 (the final review): an address of 130 characters ran out of the row, its chip not wrapping, and a long
+    name was left a column of 80 pixels (a character or two a line) beside the switch, the kind chip and the three
+    buttons. The address ends in an ellipsis inside the row; the name has the row's width, its kind chip under it when
+    it needs the room, and the buttons stand at the end of the row's last line."""
+    port: int | None = client.base_url.port
+    assert port is not None
+    made: JsonObject = await _make(client, name=_LONG_NAME, account=_LONG_ADDRESS)
+    lost: JsonObject = await _make(client, name="Lost", account="nobody@example.com")
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, height in _SIZES:
+                phone: bool = width < 720
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height},
+                    is_mobile=phone,
+                    has_touch=phone,
+                    reduced_motion="reduce",
+                )
+                await page.goto(ui_url("127.0.0.1", port, TOKEN))
+                await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+                row: Locator = page.locator(f'[data-watcher="{made["id"]}"]')
+                await expect(row).to_be_visible()
+                found: dict[str, Any] = await page.evaluate(_ROW_BOXES, made["id"])
+                where: str = f"at {width} px"
+                assert found["slid"] <= 1, f"the page slides {found['slid']} px {where}"
+                # The address is cut inside the row, and the buttons are in it.
+                assert found["cut"], f"the address is not cut short {where}"
+                assert found["chip"]["right"] <= found["row"]["right"] + 1, f"the address runs out of the row {where}"
+                assert all(
+                    button["right"] <= found["row"]["right"] + 1 and button["left"] >= found["row"]["left"]
+                    for button in found["buttons"]
+                ), f"a button is out of the row {where}"
+                # The name keeps the row's width: on a desk it is one line, on a phone it is not squeezed to a sliver.
+                if phone:
+                    assert found["name"]["width"] >= 0.6 * found["row"]["width"], (
+                        f"the name is {found['name']['width']:.0f} px wide in a row of {found['row']['width']:.0f} "
+                        f"{where}"
+                    )
+                else:
+                    assert found["name"]["height"] < 30, f"the name wraps {where}"
+                # The buttons work from where they stand: a trial press checks that each takes the click, that nothing
+                # covers it.
+                for label in ("Check", "Edit", "Delete"):
+                    await row.get_by_role("button", name=re.compile(f"^{label} ")).click(trial=True)
+                # A look that failed adds its note to the row: the buttons are still in it.
+                bad: Locator = page.locator(f'[data-watcher="{lost["id"]}"]')
+                await bad.get_by_role("button", name="Check Lost now").click()
+                await expect(bad.locator(".note.bad")).to_contain_text("nobody@example.com")
+                shut: dict[str, Any] = await page.evaluate(_ROW_BOXES, lost["id"])
+                assert shut["slid"] <= 1 and all(
+                    button["right"] <= shut["row"]["right"] + 1 for button in shut["buttons"]
+                ), f"the row of a failed look is wider than the page {where}"
+                await page.close()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+async def test_check_now_shows_that_it_is_looking_and_takes_no_second_press(
+    runtime: Runtime, client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 612 (the final review): Check now had no busy state, so the button stayed pressable while a look of up to
+    three minutes ran, and each press queued another whole look behind it."""
+    port: int | None = client.base_url.port
+    assert port is not None
+    made: JsonObject = await _make(client)
+    other: JsonObject = await _make(client, name="Other")
+    # The first look, which asks the model nothing; then a mail that fits, whose question the model does not answer
+    # until the test lets it.
+    assert (await client.post(f"/api/watchers/{made['id']}/try")).json()["outcome"]["first"] is True
+    WORLD.gmail = [_mail("new-1", _LANDLORD, "Rent for November", time.time() + 5)]
+    gate: asyncio.Event = _slow_model(monkeypatch, lambda number: number == 1)
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            looks: list[str] = []
+            page.on(
+                "request",
+                lambda request: (
+                    looks.append(request.url) if request.method == "POST" and "/try" in request.url else None
+                ),
+            )
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            check: Locator = page.locator(f'[data-watcher="{made["id"]}"]').get_by_role(
+                "button", name="Check Landlord now"
+            )
+            await expect(check).to_be_enabled()
+            await check.click()
+            await expect(check).to_be_disabled()
+            await expect(check).to_have_attribute("aria-busy", "true")
+            await expect(check).to_have_attribute("title", re.compile("Looking now"))
+            await expect(check.locator(".spinner")).to_be_visible()
+            # The page draws the list again meanwhile (here, as another watcher is switched off): the row stays busy,
+            # and a press does nothing.
+            other_row: Locator = page.locator(f'[data-watcher="{other["id"]}"]')
+            await other_row.get_by_role("switch", name="Switch off Other").click()
+            await expect(other_row.get_by_role("switch", name="Switch on Other")).to_have_attribute(
+                "aria-checked", "false"
+            )
+            await expect(check).to_be_disabled()
+            await expect(check.locator(".spinner")).to_be_visible()
+            await check.dispatch_event("click")
+            await asyncio.sleep(0.3)
+            assert len(looks) == 1
+            # The look ends when the model answers: the toast says what it did and the button is pressable again.
+            gate.set()
+            await expect(page.locator(".toast", has_text="1 new, 1 told")).to_be_visible()
+            await expect(check).to_be_enabled()
+            await expect(check).not_to_have_attribute("aria-busy", "true")
+            await expect(check.locator(".spinner")).to_have_count(0)
+            assert len(looks) == 1
+            await page.close()
         finally:
             await browser.close()

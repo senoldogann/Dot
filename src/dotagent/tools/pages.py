@@ -47,7 +47,8 @@ _DESCRIPTION: str = (
     "series, and keep still under prefers-reduced-motion. Libraries that fit, in a pinned version: Apache ECharts or "
     "Chart.js for charts, Mermaid for diagrams, D3 for a drawing of your own, three.js for 3D. A page you made in the "
     f"workspace ({', '.join(sorted(PAGE_SUFFIXES))}) is shown by its path instead of html, with the style sheets, "
-    "scripts, pictures and fonts beside it that it names written in; what a script loads by itself does not load. The "
+    "scripts, pictures (a srcset's too) and fonts beside it that it names written in; a frame, an object or an embed "
+    "loads nothing, and neither does what a script loads by itself. The "
     "answer gives the page's address, which your browser may open to see what you showed."
 )
 
@@ -139,6 +140,13 @@ def shown_words(page: ShownPage, address: str, files: PageFiles | None) -> str:
             f" Left out as the page would have been longer than {PAGE_MAX_CHARS:,} characters with them: "
             f"{', '.join(dict.fromkeys(files.too_large))} (make them smaller to show them)."
         )
+    if files.framed:
+        words += (
+            " Not loaded, as a shown page loads no frame, object or embed (write what they hold into the page): "
+            f"{', '.join(dict.fromkeys(files.framed))}."
+        )
+    if files.cut:
+        words += f" {files.cut}"
     return words
 
 

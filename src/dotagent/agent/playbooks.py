@@ -57,6 +57,7 @@ import re
 import shutil
 import tempfile
 import time
+import unicodedata
 from collections.abc import Collection, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -146,6 +147,12 @@ _RESULT_CHARS: int = 160
 # The kind of work names the folder: its letters and digits with single hyphens between.
 _UNSAFE: re.Pattern[str] = re.compile(r"[^a-z0-9]+")
 _SLUG_CHARS: int = 50
+# The letters that no decomposition turns into ASCII ones, in the spelling a name takes: the dotless i of Turkish, and
+# the letters German, the Nordic languages, Polish, Croatian and Icelandic have of their own. The others (ş, ğ, ü, ö, ç,
+# å, é, ...) are a letter and a mark, which NFKD splits and :func:`slug` drops.
+_ASCII_LETTERS: dict[int, str] = str.maketrans(
+    {"ı": "i", "ß": "ss", "ø": "o", "æ": "ae", "œ": "oe", "ł": "l", "đ": "d", "ð": "d", "þ": "th"}
+)
 # A frontmatter value stays on one line: the loader reads a folded one too, but a line is what the file shows.
 _FRONTMATTER_WIDTH: int = 1 << 16
 # The tool calls that are not acting: they plan, ask, remember, consult, read a skill, find help or end the run.
@@ -339,9 +346,14 @@ class PlaybookEntry(FrozenModel):
 
 
 def slug(text: str) -> str:
-    """The folder part of a skill's name for ``text`` (the kind of work): lower-case letters and digits with single
-    hyphens between, at most :data:`_SLUG_CHARS` long, empty when the text has none."""
-    return _UNSAFE.sub("-", text.lower()).strip("-")[:_SLUG_CHARS].strip("-")
+    """The folder part of a skill's name for ``text`` (the kind of work): lower-case ASCII letters and digits with
+    single hyphens between, at most :data:`_SLUG_CHARS` long, empty when the text has none. A letter with a mark is the
+    letter (ş is s, ü is u, ğ is g) and the few that have none are spelled in ASCII (ı is i, ß is ss), so that "Şirket
+    yıllık raporu" is ``sirket-yillik-raporu`` and not ``irket-y-ll-k-raporu`` (item 612); a name written before that
+    keeps its folder, and a kind is found by its slug now."""
+    marked: str = unicodedata.normalize("NFKD", text.lower().translate(_ASCII_LETTERS))
+    letters: str = "".join(char for char in marked if not unicodedata.combining(char))
+    return _UNSAFE.sub("-", letters).strip("-")[:_SLUG_CHARS].strip("-")
 
 
 def taught_name(kind: str) -> str:

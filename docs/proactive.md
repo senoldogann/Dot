@@ -98,15 +98,22 @@ its place in the store, so a restart neither repeats nor misses: mail asks from 
 by its id, GitHub's request is conditional on `Last-Modified` and waits at least as long as `X-Poll-Interval` says, and
 an event is told once for the time it has (one that moves is told again at its new time). **The first look of a watcher
 only notes what is there** and tells nothing, so a new watcher does not tell the mail already in the inbox. **Check
-now** on a row looks at once: the first look, or what came since.
+now** on a row looks at once: the first look, or what came since. A look can take minutes, so while one goes on the
+row's button shows a spinner and takes no second press (each press had queued another whole look behind the first;
+item 612). A row on a phone gives the watcher's name the room between the switch and the edge: its kind chip goes under
+a long name, an address that is longer than the row ends in an ellipsis (its title has it whole), and the three buttons
+stand at the end of the row's last line.
 
 **Mail.** A new unread mail of the inbox (Gmail's or Outlook's) is read as the mail tools read it: sender, recipients,
 subject and the first lines. For each, one question to the fast model (`[models] fast`): is it one you want to hear of,
 by your words, and one line why. The mail is data written by others, so it goes in the fence of the mail tools, alone in
 its question, with your words outside it, and the model answers by calling one tool, a verdict: one mail cannot change
-the verdict of another. A mail the model cannot judge (no key, a pause, a failure, a reply with no verdict) is **told,
-not dropped**, with the words "it could not be checked against your words". A mail that is read already, or came more
-than a day ago, is not told.
+the verdict of another. A mail the model cannot judge (no key, a pause, a failure, a reply with no verdict, or one that
+does not come within 30 seconds) is **told, not dropped**, with the words "it could not be checked against your words".
+A mail that is read already, or came more than a day ago, is not told. The mails of a look are dealt with one at a
+time, the oldest first: each is judged, told and written down as handled before the next is asked about, so a look
+that is cut has told and kept what it finished, and the next look takes the rest (a look judged them all before it told
+any, so one cut told nothing and the next asked about the same mails again, item 612).
 
 **GitHub.** The notifications API with the personal access token Dot keeps when you add GitHub on Customize › Connectors
 (`MCP_GITHUB_GITHUB_PAT` in its `.env`); with none, the watcher says on its row to add it. GitHub's notifications need a
@@ -119,10 +126,15 @@ declined events are left out, and, when you gave words, those that do not have t
 looks at least every five minutes, and again when the next event comes inside its minutes.
 
 **Limits.** At most `[watchers] tells_per_hour` (20) tells from one watcher in an hour; what comes past it that hour is
-said in one line ("and 7 more"). A mail or notification handled is never told twice. One look judges at most
-`judged_per_look` (25) of them, the newest first, and reads at most 50 mails: the rest of a flood is left unjudged and
-not told, and the row says how many. A watcher that fails (no account, a refused token, a provider that cannot be
-reached) says so on its row, with the error, and tries again no sooner than five minutes later; the others look on.
+said in one line ("and 7 more"). A mail or notification handled is never told twice. One look judges at most the newest
+`judged_per_look` (25) of them (oldest first), and reads at most 50 mails: the rest of a flood is left unjudged and not
+told, and the row says how many. A look ends at 180 seconds, between two mails or in the question it waits for, and
+says so on the row with how far it came ("it had dealt with 3 of the 7 new ones (2 told)"); an item it was telling is
+told and written down first. One question of the fast model has 30 seconds of its own, under the look's and not the 420
+of `[agent] model_call_timeout_s`, which is for a run's step and which one stalled answer could outlast the look with:
+a question that is not answered is a mail the model could not judge. A watcher that fails (no account, a refused token,
+a provider that cannot be reached, a look that was cut) says so on its row, with the error, and tries again no sooner
+than five minutes later; the others look on.
 Nothing looks while the emergency stop is engaged. A watcher switches on and off on its row, and at most 20 can be made.
 
 **What a tell is.** A push to your phone (title: the watcher's name; text: the mail's sender and subject with the
@@ -180,5 +192,5 @@ it.
 | `POST /api/watchers` | make one, 201: `{"name", "kind": "mail" \| "calendar" \| "github", "enabled", "account", "words", "minutes", "action": "tell" \| "run", "goal"}`; 422 for what its kind lacks (mail needs an account and words, the calendar an account, GitHub takes none, a run needs its goal), for `minutes` outside 1 to 1440, and past 20 watchers |
 | `PATCH /api/watchers/{id}` | change the whole of its choices, as for a new one; what it handled is kept unless its kind or its account changed, and one switched on again looks at once (404 for none) |
 | `DELETE /api/watchers/{id}` | delete it; answers what was deleted; the chats of the runs it started stay (404 for none) |
-| `POST /api/watchers/{id}/try` | Check now: one look at once, whatever its time: `{"outcome": {"first", "found", "told", "summary", "error"}, "watcher": …}`; a look that fails answers 200 with the failure in `outcome.error` (404 for none; 409 for a watcher switched off, while `[watchers] enabled` is false and while the emergency stop is engaged) |
+| `POST /api/watchers/{id}/try` | Check now: one look at once, whatever its time: `{"outcome": {"first", "found", "told", "summary", "error"}, "watcher": …}`; a look that fails answers 200 with the failure in `outcome.error`, and `found` and `told` say how far it came (404 for none; 409 for a watcher switched off, while `[watchers] enabled` is false and while the emergency stop is engaged) |
 | `PUT /api/brief` | set it: `{"enabled": true, "time": "08:00", "days": "every" \| "weekdays", "lines": [...]}`; 422 for a time that is not `HH:MM`, a line over 300 characters, more than 20 lines, and what the scheduler refuses (too many schedules switched on) |

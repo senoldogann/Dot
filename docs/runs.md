@@ -363,10 +363,11 @@ later run, while the run reads a note that vouches for nothing.
 - The run starts as untrusted as the run of the message, or the chat's last run, ended, as any follow-up does
   (item 508): a message you type starts a run unmarked, and a reaction is too small a word to vouch for what a run
   read.
-- At most one follow-up run starts for a message and a reaction (taken back and put again, it starts none more),
-  and at most `[reactions] follow_ups_per_hour` (20) in an hour in all; past that the reaction is kept as feedback
-  and the page says so. What a delegated run said and what a campaign's session said are kept as feedback and
-  start nothing: the campaign plans its own sessions.
+- At most one follow-up run starts for a message and a reaction (taken back and put again, it starts none more; a
+  message has one key, `answer` or `step-<n>` with `n` written as a number from 1, so `step-01` is no second name of
+  `step-1`: the daemon refuses it, item 612), and at most `[reactions] follow_ups_per_hour` (20) in an hour in all;
+  past that the reaction is kept as feedback and the page says so. What a delegated run said and what a campaign's
+  session said are kept as feedback and start nothing: the campaign plans its own sessions.
 - A 👍 and a ❤️ are kept as feedback, and so is anything a setting says is only feedback (below). The reaction is a
   row of the store (it stays until it is taken back, and goes with its chat), and an event of its run
   (`reaction_added`, `reaction_removed`: the chat, the message, the reaction, what it did and the run it started),
@@ -523,9 +524,20 @@ address, each when it is one `read_file` reads without a question (in the worksp
 a crawl's or an MCP answer's) and the page with it stays one page (500,000 characters): a file that would not fit is
 measured before it is read and left out, and the page is shown without it; a page that still comes out longer (a file
 that grew while it was read) is shown as it was written. A sheet a style imports (`@import`) is not written in. The
-answer names the files left out. What a script loads by itself (a module's imports, a fetch) does not load. The tool's
-answer gives the page's address on this Mac (`/pages/<id>`), which the run's browser may open to see what it showed
-(item 601, [Browser](browser-and-computer-use.md)).
+answer names the files left out. What a script loads by itself (a module's imports, a fetch) does not load.
+What a page commonly names is told the same way (item 612). The pictures of a `srcset` (of an `img`, and of a `source`
+in a `picture`) and the icon of the page (`<link rel="icon">`, `apple-touch-icon` and the like) are written in as a
+tag's picture is; Chrome draws a `srcset` whose pictures are written in from its last candidate, whatever the screen.
+A frame, an object and an embed load nothing in a shown page (its policy has no frame, object or default source), so the
+files they name are not written in: the answer names them as not loaded, and says to write what they hold into the page.
+A picture that three `img` tags or more name by their `src` is written once, in a table at the end of the page that a
+small script of Dot's gives the tags from (each tag keeps `alt` and its other attributes and takes `data-dot-pic` in the
+place of its `src`), so that an icon in each row of a thousand is in every row and its bytes are in the page once; a
+picture named fewer times, or by a tag with a `srcset`, is written where it is named. Each file is found, read and
+encoded once however often the page names it. Writing the files in has ten seconds (a page that names files by the
+thousands is looked at for that long): after it the rest of the page is shown as written, and the answer says so. The
+tool's answer gives the page's address on this Mac (`/pages/<id>`), which the run's browser may open to see what it
+showed (item 601, [Browser](browser-and-computer-use.md)).
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the

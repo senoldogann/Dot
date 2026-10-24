@@ -657,6 +657,42 @@ async def test_the_speaker_of_an_answer_reads_it_again_or_stops_it_and_an_answer
     await page.context.close()
 
 
+async def test_an_answer_being_read_stops_when_the_owner_leaves_the_chat(
+    browser: Browser, address: str, runtime: Runtime, replies: Replies
+) -> None:
+    """Item 612 (the final review): a long answer kept talking over whatever the owner opened next, with no button on
+    the screen that stopped it, and the speaker found again said it was not reading and started the reading anew."""
+    replies.push(finish("Done. The report is in the folder."))
+    page: Page = await _open(browser, address, 1280)
+    await page.locator(GOAL).fill("make the report")
+    await page.locator(GOAL).press("Enter")
+    answer: Locator = page.get_by_role("article", name="Answer")
+    await expect(answer).to_contain_text("The report is in the folder")
+    await answer.get_by_role("button", name="Read the answer aloud").click()
+    await expect(answer.get_by_role("button", name="Stop reading")).to_be_visible()
+    assert await _voice(page, "[voice.queue.length, voice.cancels]") == [1, 0]
+    chat: str = page.url
+    # Leaving the chat ends the reading: the voice has nothing left to say, and said so to the browser.
+    await page.goto(f"{address}/#/settings/general")
+    await expect(page.get_by_role("switch", name="Read answers aloud")).to_be_visible()
+    assert await _voice(page, "[voice.queue.length, voice.cancels]") == [0, 1]
+    # The speaker of the chat, found again, is quiet, and one press reads the answer again.
+    await page.goto(chat)
+    speaker: Locator = page.get_by_role("article", name="Answer").get_by_role("button", name="Read the answer aloud")
+    await expect(speaker).to_have_attribute("aria-pressed", "false")
+    assert await _voice(page, "[voice.queue.length, voice.cancels]") == [0, 1]
+    await speaker.click()
+    assert await _voice(page, "[voice.queue.length, voice.spoken.length]") == [1, 2]
+    await expect(page.get_by_role("article", name="Answer").get_by_role("button", name="Stop reading")).to_be_visible()
+    # A message sent in the chat meanwhile takes the chat to the page of its next run, which ends the reading too.
+    replies.push(finish("A second answer."))
+    await page.locator(MESSAGE).fill("and once more")
+    await page.locator(MESSAGE).press("Enter")
+    await expect(page.get_by_role("article", name="Answer").last).to_contain_text("A second answer.")
+    assert await _voice(page, "[voice.queue.length, voice.cancels]") == [0, 2]
+    await page.context.close()
+
+
 _VOICES: str = """() => {
   window.__voice.voices = [
     { name: "Google English", lang: "en-US", localService: false },

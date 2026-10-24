@@ -27,8 +27,10 @@ HOLD_ENDED_EVENT: Final[str] = "reaction_hold_ended"
 # The key of the answer a run ended with, and of what it said in a step.
 ANSWER: Final[str] = "answer"
 STEP_PREFIX: Final[str] = "step-"
-# What a key looks like in a request: the answer, or a step number.
-MESSAGE_PATTERN: Final[str] = rf"^(?:{ANSWER}|{STEP_PREFIX}[0-9]{{1,6}})$"
+# What a key looks like in a request: the answer, or a step number written as its number is, from 1 (steps count from
+# 1). A message has one key: ``step-01`` and ``step-0001`` named the first step as ``step-1`` does, and were each a
+# message of their own to the claim of a follow-up, so one reaction started one follow-up run for each (item 612).
+MESSAGE_PATTERN: Final[str] = rf"^(?:{ANSWER}|{STEP_PREFIX}[1-9][0-9]{{0,5}})$"
 _MESSAGE: Final[re.Pattern[str]] = re.compile(MESSAGE_PATTERN)
 
 # How much of a message the note a run at work reads quotes, and how much the follow-up of a finished run reads.

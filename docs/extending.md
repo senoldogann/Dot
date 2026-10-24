@@ -565,8 +565,11 @@ the first sentence of "When" (at most 200 characters, cut between words), and an
 text, one JSON object (in a code fence or not), is read as its call: the roles that write or judge what Dot learns (the
 lessons, the skills, the owner section, the merges, the harness's proposer, composer and experience writer) are read so,
 while a role that lets an action happen (the review of a step, the goal's verdict, a rule drafted from your words)
-answers by its call alone (item 614). The skill is a folder
-`learned-<kind>/SKILL.md` under `<home>/playbooks` with "Kind of
+answers by its call alone (item 614). The skill is a folder `learned-<kind>/SKILL.md` under `<home>/playbooks` (the
+folder is the kind in lower-case letters, digits and hyphens: a letter with a mark is the letter, and the few that have
+none are spelled in ASCII, so "Şirket yıllık raporu" is `learned-sirket-yillik-raporu`; a skill written before item 612
+keeps the folder it has, and a run of its kind still finds and updates it, since the kinds are compared by this spelling
+on both sides) with "Kind of
 work", "When", "Steps", "Parameters" and "Evidence" (the goal, every run it was learned from with its acting steps, the
 date), plus a `playbook.json` that keeps the kind and counts its use; the folder is written whole under a hidden name
 and then takes its own. The model is shown the kinds of the skills the run's owner keeps (those of the run's site first)

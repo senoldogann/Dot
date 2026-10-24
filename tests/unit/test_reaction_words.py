@@ -49,11 +49,20 @@ def test_the_palette_has_the_seven_reactions_with_their_signs_and_their_words() 
 
 
 def test_a_message_is_the_answer_or_a_step() -> None:
-    assert [is_message(key) for key in (ANSWER, "step-1", "step-123456")] == [True, True, True]
+    assert [is_message(key) for key in (ANSWER, "step-1", "step-10", "step-123456")] == [True] * 4
     assert [
         is_message(key) for key in ("", "answers", "step-", "step-1234567", "step-x", "step--1", "Answer", "1")
     ] == [False] * 8
     assert (step_message(3), message_step("step-3"), message_step(ANSWER)) == ("step-3", 3, None)
+
+
+def test_a_message_has_one_key_the_one_a_step_is_written_with() -> None:
+    """Item 612 (the final review): ``step-01`` and ``step-0001`` named the first step as ``step-1`` does, and each was
+    a message of its own to the claim of a follow-up. Steps count from 1 and a key is written as its number is."""
+    assert [is_message(key) for key in ("step-0", "step-00", "step-01", "step-001", "step-0001", "step-010")] == [
+        False
+    ] * 6
+    assert [is_message(step_message(number)) for number in (1, 9, 10, 99, 100, 999_999)] == [True] * 6
 
 
 def test_a_quote_is_one_line_of_plain_words_in_guillemets_cut_at_its_size() -> None:
