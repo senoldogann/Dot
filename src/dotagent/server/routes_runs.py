@@ -81,6 +81,9 @@ from dotagent.store.models import (
     RunRecord,
     ScheduleOptions,
     ScheduleRecord,
+    TeamRecord,
+    ThreadRecord,
+    chat_team,
 )
 from dotagent.store.stats import RunCosts
 from dotagent.tools.schedule import chat_options, schedule_mode
@@ -144,9 +147,10 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         active: bool = run_id in ctx.manager.active_run_ids()
         elsewhere: bool = run_id in ctx.manager.elsewhere_run_ids()
         run: RunRecord = await store.get_run(run_id)
+        thread: ThreadRecord = await store.get_thread(run.thread_id)
         return RunDetail(
             run=run,
-            title=(await store.get_thread(run.thread_id)).title,
+            title=thread.title,
             children=await store.list_child_runs(run_id),
             active=active,
             elsewhere=elsewhere,
@@ -160,6 +164,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             agent=None if run.agent_id is None else await store.get_agent(run.agent_id),
             keep_going=run.goal_mode and keep_going_ask(run.goal) is not None,
             choices=await store.chat_choices(run.thread_id),
+            team=chat_team(await store.find_team(thread.team_id)),
         )
 
     @router.get("/runs")
@@ -203,6 +208,22 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.goal_mode,
                     files,
                     request.browser,
+                )
+            elif request.team_id is not None:
+                team: TeamRecord = await store.get_team(request.team_id)
+                run = await ctx.manager.start_for_team(
+                    team,
+                    request.goal,
+                    mode,
+                    request.model,
+                    UI_SOURCE,
+                    request.effort,
+                    request.speed,
+                    request.once,
+                    request.approvals,
+                    request.goal_mode,
+                    files,
+                    picks,
                 )
             elif request.agent_id is not None:
                 agent: AgentRecord = await store.get_agent(request.agent_id)

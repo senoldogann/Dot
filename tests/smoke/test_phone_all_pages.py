@@ -41,6 +41,7 @@ _SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
 _CAMPAIGN_GOAL: str = "Collect 50 leads into leads.csv and keep a count of the ones that answered"
 _CAMPAIGN_TITLE: str = "Find leads for the studio and write what each one answered"
 _SCHEDULE_GOAL: str = "Read the inbox in the morning and list what needs an answer"
+_TEAM_PURPOSE: str = "Reads what the studio's clients wrote, finds what each of them asked for and drafts the answers"
 
 # What a person sees at a glance, measured on the drawn page. ``squeezed``: a box of no width whose words spill out of
 # it. ``outside``: a box past the window's edge that no box scrolls. ``stranded``: a list row whose buttons stand on a
@@ -139,8 +140,9 @@ async def _served(home: Path) -> AsyncIterator[tuple[Runtime, int]]:
         await close_runtime(runtime)
 
 
-async def _fill(runtime: Runtime, port: int) -> None:
-    """Something to show: a campaign with a long title and goal, and a schedule with options of its own."""
+async def _fill(runtime: Runtime, port: int) -> str:
+    """Something to show: a campaign with a long title and goal, a schedule with options of its own, and a team of eight
+    agents with long names and roles (item 610); the team's id."""
     thread: ThreadRecord = await runtime.store.create_thread(_CAMPAIGN_TITLE, "test")
     await runtime.store.create_campaign(
         _CAMPAIGN_TITLE, _CAMPAIGN_GOAL, thread.id, SCRIPTED_MODEL, "medium", "standard", None, "ask", (), "own"
@@ -161,6 +163,28 @@ async def _fill(runtime: Runtime, port: int) -> None:
             },
         )
         assert made.status_code == 201, made.text
+        ids: list[str] = []
+        for number in range(1, 9):
+            agent: httpx.Response = await client.post(
+                "/api/agents",
+                json={
+                    "name": f"Researcher number {number} of the long names",
+                    "role": "Finds the sources of a claim, reads them to the end and writes down what each one says",
+                    "instructions": "",
+                    "model": "",
+                    "effort": None,
+                    "approvals": None,
+                    "tools": None,
+                },
+            )
+            assert agent.status_code == 201, agent.text
+            ids.append(agent.json()["id"])
+        team: httpx.Response = await client.post(
+            "/api/teams",
+            json={"name": "The research desk of the whole studio", "purpose": _TEAM_PURPOSE, "agents": ids},
+        )
+        assert team.status_code == 201, team.text
+        return str(team.json()["id"])
 
 
 async def _page(browser: Browser, port: int, width: int, scheme: Literal["light", "dark"], route: str) -> Page:
@@ -194,20 +218,20 @@ _ROUTES: tuple[str, ...] = (
     "/diagnostics",
 )
 # The pages whose looks at a phone's widths are kept as pictures for reading by eye.
-_SHOWN: tuple[str, ...] = ("/campaigns", "/schedules", "/customize/plugins", "/customize/connectors")
+_SHOWN: tuple[str, ...] = ("/campaigns", "/schedules", "/customize/plugins", "/customize/connectors", "/agents")
 
 
 async def test_the_pages_fit_a_phone_and_their_heads_and_rows_keep_their_words(
     own_home: Path, tmp_path: Path, mac_at_rest: None
 ) -> None:
     async with _served(own_home) as (runtime, port), async_playwright() as playwright:
-        await _fill(runtime, port)
+        team_id: str = await _fill(runtime, port)
         browser: Browser = await playwright.webkit.launch()
         try:
             seen: list[str] = []
             for width in _WIDTHS:
                 for scheme in _SCHEMES:
-                    for route in _ROUTES:
+                    for route in (*_ROUTES, f"/teams/{team_id}"):
                         page: Page = await _page(browser, port, width, scheme, route)
                         measured: dict[str, Any] = await page.evaluate(_MEASURE)
                         where: str = f"{route} at {width} {scheme}"

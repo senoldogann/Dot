@@ -84,7 +84,7 @@ export function mount(root) {
 
   root.append(
     el("a", { class: "back", href: "#/agents" }, icon("arrowLeft"), "All agents"),
-    pageHead("Team", "Today's messages between Dot and your agents, oldest first.", null),
+    pageHead("Handoffs", "Today's messages between Dot and your agents, oldest first.", null),
     holder,
   );
   const stopLifecycle = onLifecycle((event) => {

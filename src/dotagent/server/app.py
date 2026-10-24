@@ -63,6 +63,7 @@ from dotagent.server.routes_runs import runs_router
 from dotagent.server.routes_snapshots import snapshots_router
 from dotagent.server.routes_system import health_router, proof_router, system_router
 from dotagent.server.routes_teach import teach_router
+from dotagent.server.routes_teams import teams_router
 from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
 from dotagent.server.routes_vault import vault_router
@@ -172,6 +173,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(campaigns_router(ctx))
     app.include_router(harness_router(ctx))
     app.include_router(agents_router(ctx))
+    app.include_router(teams_router(ctx))
     app.include_router(teach_router(ctx))
     app.include_router(browser_router(ctx))
     app.include_router(connections_router(ctx))

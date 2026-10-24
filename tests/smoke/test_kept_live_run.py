@@ -165,7 +165,7 @@ async def test_a_run_at_work_that_is_opened_again_goes_on_from_its_newest_stored
             # 551): the words before it are on the page.
             await expect(page.locator(".bubble.live")).to_contain_text("came in at")
             await page.goto(f"{address}/#/agents")
-            await expect(page.locator(".agent-row").first).to_be_visible()
+            await expect(page.locator(".agent-card").first).to_be_visible()
             # Back on the run, the page follows its stream again: waited for, as the view it kept shows the call
             # at once.
             async with page.expect_request(lambda request: f"/api/runs/{run.id}/stream" in request.url):

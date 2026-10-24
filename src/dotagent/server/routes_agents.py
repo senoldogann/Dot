@@ -34,7 +34,15 @@ from dotagent.server.views import (
     TeamView,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import DOT_AGENT, DOT_AGENT_ID, AgentLook, AgentRecord, MemoryRecord, RunRecord
+from dotagent.store.models import (
+    DOT_AGENT,
+    DOT_AGENT_ID,
+    AgentLook,
+    AgentRecord,
+    MemoryRecord,
+    RunRecord,
+    TeamRecord,
+)
 from dotagent.tools.team import MESSAGE_AGENT_TOOL, find_agent
 
 # How many of its newest runs an agent's page shows.
@@ -150,10 +158,19 @@ def agents_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/agents")
     async def list_agents() -> list[AgentSummary]:
-        """Dot first, then the agents the owner made, oldest first, each with its newest run."""
+        """Dot first, then the agents the owner made, oldest first, each with its newest run and the title of the chat
+        that run is in."""
         latest: dict[str, RunRecord] = await store.latest_agent_runs()
-        dot: AgentSummary = AgentSummary(record=await dot_record(store), latest=None)
-        return [dot] + [AgentSummary(record=agent, latest=latest.get(agent.id)) for agent in await store.list_agents()]
+        titles: dict[str, str] = await store.thread_titles([run.thread_id for run in latest.values()])
+        dot: AgentSummary = AgentSummary(record=await dot_record(store), latest=None, latest_title=None)
+        return [dot] + [
+            AgentSummary(
+                record=agent,
+                latest=latest.get(agent.id),
+                latest_title=titles.get(latest[agent.id].thread_id) if agent.id in latest else None,
+            )
+            for agent in await store.list_agents()
+        ]
 
     async def created(request: AgentRequest) -> AgentRecord:
         return await saved(_checked(request, known))
@@ -199,7 +216,11 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         teammates their parts (``joined``). The others are all checked (their model and tools) before any is made or
         given anything, so a team one of whose agents this home cannot make makes none. Past the checks they are made
         one by one, not in one transaction: a store that fails part way leaves the ones made, and two Uses at once may
-        make an agent twice, as two clicks of a template's Use may."""
+        make an agent twice, as two clicks of a template's Use may.
+
+        The team is then the owner's (item 610): a record of the agents, in the team's order, made when the owner has
+        none from this ready team and found, completed with the members it lacked, when they have. The owner may
+        have renamed it or taken an agent out; a Use brings the missing members back and keeps the rest as it is."""
         chosen: AgentTeam = find_team(team_id)
         agents: list[AgentRecord] = await store.list_agents()
         have_them: list[AgentRecord] = []
@@ -213,7 +234,20 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         made: list[AgentRecord] = [await saved(request) for request in to_make]
         joined: list[str] = [record.name for record in have_them if _cannot_message(record)]
         kept: list[AgentRecord] = [await _joined(record) if _cannot_message(record) else record for record in have_them]
-        return TeamUse(made=made, kept=kept, joined=joined)
+        by_name: dict[str, AgentRecord] = {record.name.casefold(): record for record in [*made, *kept]}
+        members: list[AgentRecord] = [by_name[find_template(each).name.casefold()] for each in chosen.members]
+        team: TeamRecord | None = await store.find_ready_team(chosen.id)
+        if team is None:
+            team = await store.create_team(chosen.name, chosen.purpose, [member.id for member in members], chosen.id)
+            return TeamUse(made=made, kept=kept, joined=joined, team=team, created=True, added=[])
+        lacking: list[AgentRecord] = [member for member in members if member.id not in team.agents]
+        if lacking:
+            team = await store.update_team(
+                team.id, team.name, team.purpose, [*team.agents, *(member.id for member in lacking)]
+            )
+        return TeamUse(
+            made=made, kept=kept, joined=joined, team=team, created=False, added=[member.name for member in lacking]
+        )
 
     async def _joined(record: AgentRecord) -> AgentRecord:
         """``record`` able to message its teammates: ``message_agent`` added to the tools it names."""

@@ -248,7 +248,7 @@ async def test_a_run_makes_a_lasting_teammate_and_learns_of_it_at_its_next_step(
             await page_ui.wait_for_timeout(_SETTLE_MS)
             await page_ui.goto(f"http://{host}:{port}/#/agents")
             await page_ui.wait_for_timeout(_SETTLE_MS)
-            row = page_ui.locator(f".agent-row[data-agent='{pilot['id']}']")
+            row = page_ui.locator(f".agent-card[data-agent='{pilot['id']}']")
             assert await row.locator(".agent-made").inner_text() == "Made by Dot"
             await page_ui.screenshot(path=str(tmp_path / "agents-made-by-dot.png"))
         finally:
@@ -359,7 +359,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await page_ui.keyboard.press("Escape")
             await page_ui.goto(f"http://{host}:{port}/#/agents")
             await page_ui.wait_for_timeout(_SETTLE_MS)
-            rows_text: list[str] = await page_ui.locator(".agent-row").all_inner_texts()
+            rows_text: list[str] = await page_ui.locator(".agent-card").all_inner_texts()
             assert len(rows_text) == 2 and "Scout" in rows_text[1] and "Find two sources" in rows_text[1], rows_text
             # The templates under them say nothing of a tool list that loaded, and no empty part is written as "null".
             templates = page_ui.locator("section[aria-label='Templates']")
@@ -410,7 +410,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             assert dressed.json()["look"] == {"shape": "droplet", "expression": "curious", "colour": "violet"}
             await page_ui.goto(f"http://{host}:{port}/#/agents")
             await page_ui.wait_for_timeout(_SETTLE_MS)
-            worn = page_ui.locator(f".agent-row[data-agent='{agent_id}'] .avatar")
+            worn = page_ui.locator(f".agent-card[data-agent='{agent_id}'] .avatar")
             assert await worn.get_attribute("data-colour") == "violet"
             assert await worn.get_attribute("data-shape") == "droplet"
             assert await worn.get_attribute("data-hue") is None

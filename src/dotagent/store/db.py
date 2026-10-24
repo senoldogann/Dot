@@ -49,6 +49,7 @@ from dotagent.store.models import (
     CampaignEntryKind,
     CampaignRecord,
     ChatChoices,
+    ChatTeam,
     DraftChannel,
     DraftRecord,
     DraftStatus,
@@ -83,6 +84,7 @@ from dotagent.store.models import (
     SentMessage,
     ShownPage,
     StepRow,
+    TeamRecord,
     ThreadRecord,
     ThreadSummary,
     TrashedMemory,
@@ -211,6 +213,10 @@ CREATE TABLE IF NOT EXISTS campaigns (
 CREATE TABLE IF NOT EXISTS agents (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, instructions TEXT NOT NULL, model TEXT NOT NULL,
     effort TEXT, approvals TEXT, tools TEXT NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS teams (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, purpose TEXT NOT NULL, agents TEXT NOT NULL, created_at REAL NOT NULL,
+    ready_team TEXT
 );
 CREATE TABLE IF NOT EXISTS campaign_entries (
     id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, run_id TEXT, ts REAL NOT NULL, kind TEXT NOT NULL,
@@ -439,6 +445,7 @@ def _thread(row: aiosqlite.Row) -> ThreadRecord:
         source=row["source"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        team_id=row["team_id"],
     )
 
 
@@ -462,6 +469,13 @@ def _summary(row: aiosqlite.Row) -> ThreadSummary:
         last_role="assistant" if answer != "" else "user",
         loop_cron=row["loop_cron"],
         loop_next_at=row["loop_next_at"],
+        team=None
+        if row["team_id"] is None
+        else ChatTeam(
+            id=row["team_id"],
+            name=row["team_name"],
+            agents=_agent_ids(parse_json_value(row["team_agents"], "team agents")),
+        ),
     )
 
 
@@ -629,6 +643,24 @@ def _tool_names(value: object) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise StoreError("a stored agent has a tool list that is not a list of names", {"tools": repr(value)})
     return tuple(value)
+
+
+def _agent_ids(value: object) -> tuple[str, ...]:
+    """The stored agents of a team (item 610): a JSON array of agent ids."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise StoreError("a stored team has an agent list that is not a list of ids", {"agents": repr(value)})
+    return tuple(value)
+
+
+def _team(row: aiosqlite.Row) -> TeamRecord:
+    return TeamRecord(
+        id=row["id"],
+        name=row["name"],
+        purpose=row["purpose"],
+        agents=_agent_ids(parse_json_value(row["agents"], "team agents")),
+        created_at=row["created_at"],
+        ready_team=row["ready_team"],
+    )
 
 
 # How many of its run's own events before a step's result are searched for the call it ended (item 469): a call the gate
@@ -1052,13 +1084,15 @@ _ADDED_HARNESS_EXPERIENCE_COLUMNS: tuple[tuple[str, str], ...] = (("tainted", "I
 # since its runs began or since they marked it unread (item 131), and one without choices of its own yet (a
 # ``ChatChoices`` as JSON, item 199), and one that is no chat of a schedule (a firing's chat names its schedule, item
 # 257; a firing from before names none). ``history_version`` counts the times the chat's history was written anew,
-# by a compaction or by a rewind to a version before (item 282).
+# by a compaction or by a rewind to a version before (item 282). ``team_id`` (item 610) is the team a chat is with, NULL
+# for every chat there was: none was with a team.
 _ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (
     ("pinned_at", "REAL"),
     ("seen_at", "REAL"),
     ("choices", "TEXT"),
     ("schedule_id", "TEXT"),
     ("history_version", "INTEGER NOT NULL DEFAULT 0"),
+    ("team_id", "TEXT"),
 )
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
 _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -1133,6 +1167,8 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_agent ON runs(agent_id, created_at)")
     # The chats of a schedule, whose runs its next firing reads (item 257).
     await connection.execute("CREATE INDEX IF NOT EXISTS threads_schedule ON threads(schedule_id)")
+    # The chats of a team (item 610), which its page and its card list.
+    await connection.execute("CREATE INDEX IF NOT EXISTS threads_team ON threads(team_id)")
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_status ON approvals(status, created_at)")
     # The steps kept for the owner: the same one once in a chat, and the ones whose time is over (item 482).
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_kept ON approvals(digest, status)")
@@ -1735,14 +1771,15 @@ class Store:
     # ----- threads and messages ------------------------------------------------------------
 
     @_writing
-    async def create_thread(self, title: str, source: str) -> ThreadRecord:
+    async def create_thread(self, title: str, source: str, team_id: str | None = None) -> ThreadRecord:
+        """A new thread; with ``team_id`` it is a chat with that team (item 610), which every run of it is told."""
         now: float = time.time()
         record: ThreadRecord = ThreadRecord(
-            id=new_id("thr"), title=title, source=source, created_at=now, updated_at=now
+            id=new_id("thr"), title=title, source=source, created_at=now, updated_at=now, team_id=team_id
         )
         await self._db.execute(
-            "INSERT INTO threads(id, title, source, created_at, updated_at) VALUES(?, ?, ?, ?, ?)",
-            (record.id, record.title, record.source, record.created_at, record.updated_at),
+            "INSERT INTO threads(id, title, source, created_at, updated_at, team_id) VALUES(?, ?, ?, ?, ?, ?)",
+            (record.id, record.title, record.source, record.created_at, record.updated_at, record.team_id),
         )
         await self._db.commit()
         return record
@@ -1814,33 +1851,46 @@ class Store:
         )
         await self._db.commit()
 
-    async def list_thread_summaries(self, limit: int, same_chat: bool = False) -> list[ThreadSummary]:
+    async def list_thread_summaries(
+        self, limit: int, same_chat: bool = False, team_id: str | None = None
+    ) -> list[ThreadSummary]:
         """The chats, the pinned ones first (the last pinned first, so they are listed however old), then the latest
         activity first: every thread with a run a person started on it, with the latest of those runs. Threads holding
         only delegated runs are left out, and so are the threads of a campaign's sessions after the first, which start
         in threads of their own: the campaign's page lists them, and the campaign's conversation stays a chat. The
         runs a rewind took out of their chat (item 282) are not counted. Each chat says its loop (item 580), the
-        schedules that make none of their own going on in their chat when ``same_chat`` (``[scheduler] same_chat``)."""
+        schedules that make none of their own going on in their chat when ``same_chat`` (``[scheduler] same_chat``),
+        and the team it is with (item 610); with ``team_id``, only the chats with that team are listed."""
         rows: list[aiosqlite.Row] = await self._all(
             "WITH ranked AS ("
             " SELECT thread_id, id, status, mode, created_at, finished_at,"
             "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place,"
             "  COUNT(*) OVER (PARTITION BY thread_id) AS run_count"
             " FROM runs WHERE parent_run_id IS NULL AND rewound_at IS NULL"
-            " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns)))"
+            " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns))"
+            " AND (? IS NULL OR thread_id IN (SELECT id FROM threads WHERE team_id = ?)))"
             " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
             "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
             "  r.created_at AS latest_created_at,"
             "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread,"
-            "  COALESCE(latest.agent_id, latest.campaign_id) AS actor_id,"
+            "  COALESCE(latest.agent_id, latest.campaign_id, team.id) AS actor_id,"
+            "  team.id AS team_id, team.name AS team_name, team.agents AS team_agents,"
             "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result,"
             f"  (SELECT s.cron FROM schedules AS s WHERE {_CHAT_LOOP}"
             "   ORDER BY s.next_run_at IS NULL, s.next_run_at LIMIT 1) AS loop_cron,"
             f"  (SELECT MIN(s.next_run_at) FROM schedules AS s WHERE {_CHAT_LOOP}) AS loop_next_at"
             " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
-            " JOIN runs AS latest ON latest.id = r.id"
+            " JOIN runs AS latest ON latest.id = r.id LEFT JOIN teams AS team ON team.id = t.team_id"
             " ORDER BY t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?",
-            (_LAST_MESSAGE_READ_CHARS, _LAST_MESSAGE_READ_CHARS, int(same_chat), int(same_chat), limit),
+            (
+                team_id,
+                team_id,
+                _LAST_MESSAGE_READ_CHARS,
+                _LAST_MESSAGE_READ_CHARS,
+                int(same_chat),
+                int(same_chat),
+                limit,
+            ),
         )
         return [_summary(row) for row in rows]
 
@@ -5159,7 +5209,8 @@ class Store:
     async def delete_agent(self, agent_id: str) -> None:
         """Forget the agent; its runs and its lessons stay, as Dot's (their ``agent_id`` is cleared). Its schedules
         (item 462) are switched off with :data:`AGENT_DELETED_STATUS` and named for no agent, in the same write: one
-        never goes on firing as Dot, with every tool, nor fails at every tick for an agent that is gone."""
+        never goes on firing as Dot, with every tool, nor fails at every tick for an agent that is gone. The teams that
+        had the agent (item 610) keep the agents they have left."""
         await self.get_agent(agent_id)
         await self._db.execute("UPDATE runs SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
         await self._db.execute("UPDATE memories SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
@@ -5167,6 +5218,10 @@ class Store:
             "UPDATE schedules SET enabled = 0, next_run_at = NULL, agent_id = NULL, last_status = ? WHERE agent_id = ?",
             (AGENT_DELETED_STATUS, agent_id),
         )
+        for team in await self.list_teams():
+            if agent_id in team.agents:
+                left: str = dumps_compact([member for member in team.agents if member != agent_id])
+                await self._db.execute("UPDATE teams SET agents = ? WHERE id = ?", (left, team.id))
         await self._db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
         await self._db.commit()
 
@@ -5202,6 +5257,110 @@ class Store:
             (),
         )
         return {row["agent_id"]: _run(row) for row in rows}
+
+    async def thread_titles(self, thread_ids: Sequence[str]) -> dict[str, str]:
+        """The titles of the chats ``thread_ids``, by id; a thread that is not there has none."""
+        if not thread_ids:
+            return {}
+        rows = await self._all(
+            f"SELECT id, title FROM threads WHERE id IN ({','.join('?' * len(thread_ids))})", tuple(thread_ids)
+        )
+        return {row["id"]: row["title"] for row in rows}
+
+    # ----------------------------------------------------------------------------------------------------- teams
+
+    async def _require_agents(self, agent_ids: Sequence[str]) -> None:
+        """Refuse a team's agents that are not agents the owner has, or that name one twice (item 610). Asked inside
+        the write that stores the team, so that an agent deleted a moment ago is not put in one."""
+        repeated: list[str] = sorted({each for each in agent_ids if agent_ids.count(each) > 1})
+        if repeated:
+            raise InvalidValueError("a team names an agent twice", {"agents": ", ".join(repeated)})
+        if not agent_ids:
+            return
+        rows = await self._all(
+            f"SELECT id FROM agents WHERE id IN ({','.join('?' * len(agent_ids))})", tuple(agent_ids)
+        )
+        known: set[str] = {row["id"] for row in rows}
+        missing: list[str] = [each for each in agent_ids if each not in known]
+        if missing:
+            raise InvalidValueError(
+                f"a team's agents are agents you have: no agent has the id {', '.join(missing)}",
+                {"agents": ", ".join(missing)},
+            )
+
+    @_writing
+    async def create_team(self, name: str, purpose: str, agents: Sequence[str], ready_team: str | None) -> TeamRecord:
+        """Store a new team (item 610) of the owner's agents ``agents`` (their ids, in the order the pages show them);
+        ``ready_team`` is the ready team (item 504) it was made from, ``None`` for one the owner put together. Its
+        agents are the owner's own and stay theirs; the team is this record."""
+        await self._require_agents(agents)
+        record: TeamRecord = TeamRecord(
+            id=new_id("team"),
+            name=name,
+            purpose=purpose,
+            agents=tuple(agents),
+            created_at=time.time(),
+            ready_team=ready_team,
+        )
+        await self._db.execute(
+            "INSERT INTO teams(id, name, purpose, agents, created_at, ready_team) VALUES(?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                record.name,
+                record.purpose,
+                dumps_compact(list(record.agents)),
+                record.created_at,
+                record.ready_team,
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    @_writing
+    async def update_team(self, team_id: str, name: str, purpose: str, agents: Sequence[str]) -> TeamRecord:
+        """Replace a team's name, purpose and agents (item 610); its id, its chats and the ready team it came from stay.
+        An agent it had and no longer names stays the owner's."""
+        await self.get_team(team_id)
+        await self._require_agents(agents)
+        await self._db.execute(
+            "UPDATE teams SET name = ?, purpose = ?, agents = ? WHERE id = ?",
+            (name, purpose, dumps_compact(list(agents)), team_id),
+        )
+        await self._db.commit()
+        return await self.get_team(team_id)
+
+    async def get_team(self, team_id: str) -> TeamRecord:
+        row = await self._one("SELECT * FROM teams WHERE id = ?", (team_id,))
+        if row is None:
+            raise NotFoundError("team not found", {"team_id": team_id})
+        return _team(row)
+
+    async def find_team(self, team_id: str | None) -> TeamRecord | None:
+        """The team ``team_id``; ``None`` for none named (a chat with no team) and for one that is not there."""
+        row = None if team_id is None else await self._one("SELECT * FROM teams WHERE id = ?", (team_id,))
+        return None if row is None else _team(row)
+
+    async def list_teams(self) -> list[TeamRecord]:
+        """Every team the owner has, oldest first."""
+        rows = await self._all("SELECT * FROM teams ORDER BY created_at, rowid", ())
+        return [_team(row) for row in rows]
+
+    async def find_ready_team(self, ready_team: str) -> TeamRecord | None:
+        """The team made from the ready team ``ready_team`` (item 504), the oldest of them; ``None`` when the owner has
+        none."""
+        row = await self._one(
+            "SELECT * FROM teams WHERE ready_team = ? ORDER BY created_at, rowid LIMIT 1", (ready_team,)
+        )
+        return None if row is None else _team(row)
+
+    @_writing
+    async def delete_team(self, team_id: str) -> None:
+        """Remove the team (item 610) and nothing it holds: its agents stay the owner's, and its chats stay, as Dot's
+        (they are with no team now, so that a later message in one is told no team's context)."""
+        await self.get_team(team_id)
+        await self._db.execute("UPDATE threads SET team_id = NULL WHERE team_id = ?", (team_id,))
+        await self._db.execute("DELETE FROM teams WHERE id = ?", (team_id,))
+        await self._db.commit()
 
     @_writing
     async def delete_campaign(self, campaign_id: str) -> None:

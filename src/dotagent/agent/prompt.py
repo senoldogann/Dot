@@ -40,6 +40,16 @@ class AgentBrief(FrozenModel):
     team: str
 
 
+class TeamBrief(FrozenModel):
+    """What the prompt tells a run that leads a team (item 610): the owner's own words for the team's name and what it
+    does, and the agents in it, by name and role, in the team's order. The run is Dot's, with Dot's tools: the brief
+    adds no permission and no tool, only whom to hand the parts of the work to."""
+
+    name: str
+    purpose: str
+    members: tuple[AgentBrief, ...]
+
+
 class PromptInputs(FrozenModel):
     mode: RunMode
     source: str
@@ -76,6 +86,9 @@ class PromptInputs(FrozenModel):
     agent: AgentBrief | None
     # The other agents the run may message (item 87), by name and role; empty when there are none.
     team: tuple[AgentBrief, ...]
+    # The team a chat with the run's thread is with (item 610): the run leads it, and the prompt opens with it; None for
+    # any other run.
+    lead: TeamBrief | None
     # Where the run's scripts reach its Chrome with the DevTools Protocol (item 265): Dot's own Chrome with a port set,
     # else None.
     devtools: str | None
@@ -823,6 +836,7 @@ def turn_note(
 def build_system_prompt(inputs: PromptInputs) -> str:
     work, rest, closing = _TEXTS[inputs.style]
     sections: list[str] = [
+        _lead_section(inputs.lead, inputs.tool_names),
         _agent_section(inputs.agent),
         f"{work}\n{_ending(inputs.mode, inputs.campaign_session)}",
         _ALWAYS_A_WAY,
@@ -899,6 +913,47 @@ def _member_line(member: AgentBrief) -> str:
     return f"  - {named}: {member.role}" if member.role else f"  - {named}"
 
 
+def _lead_member_line(member: AgentBrief) -> str:
+    """An agent of the team the run leads, by name and role, each on one line. One that a run of Dot's made (item 307)
+    is said to be: its role was written by a model, not by the owner, who put it in the team."""
+    name: str = " ".join(member.name.split())
+    role: str = " ".join(member.role.split())
+    named: str = f"{name} (made by Dot)" if member.made_by_dot else name
+    return f"  - {named}: {role}" if role else f"  - {named}"
+
+
+def _lead_section(lead: TeamBrief | None, tool_names: Sequence[str]) -> str:
+    """The head of the prompt of a run that leads a team (item 610), where the voice of an agent stands for an agent's
+    run: the team's name and what the owner made it for (their words, which the run follows within the rules below, as
+    it follows an agent's instructions), its agents by name and role, and that a part an agent's role fits is handed to
+    that agent with ``message_agent``, the answers put together, and only what no role covers answered by the run
+    itself. The text is built from the team as it is when the run starts, so an agent taken out of the team or deleted
+    is not named. It adds no tool: a run without ``message_agent`` is told to do the work itself."""
+    if lead is None:
+        return ""
+    name: str = " ".join(lead.name.replace('"', "'").split())
+    purpose: str = " ".join(lead.purpose.split())
+    lines: list[str] = [
+        f'You lead the team "{name}", the owner\'s agents working together; every message in this chat is for the team.'
+    ]
+    if purpose:
+        lines.append(f"What the owner made the team for, which you follow within the rules below: {purpose}")
+    if not lead.members:
+        lines.append("The team has no agent now, so there is nobody to hand a part to: do the work yourself.")
+        return "\n".join(lines)
+    lines.append("The team's agents:")
+    lines.extend(_lead_member_line(member) for member in lead.members)
+    if MESSAGE_AGENT_TOOL in tool_names:
+        lines.append(
+            "Hand each agent the part of the work its role fits with message_agent (several at once work in "
+            "parallel), and put their answers together into one answer for the owner. Answer yourself only what no "
+            "agent's role covers."
+        )
+    else:
+        lines.append("This run has no message_agent tool, so it cannot hand the agents a part: do the work yourself.")
+    return "\n".join(lines)
+
+
 def _agent_section(agent: AgentBrief | None) -> str:
     """The agent's own voice, first: who it is and what the owner told it (item 86), or Dot, for an agent a run of Dot's
     made (item 307)."""
@@ -935,6 +990,7 @@ def collect_prompt_inputs(
     devtools: str | None,
     style: PromptStyle,
     harness: GivenText,
+    lead: TeamBrief | None = None,
 ) -> PromptInputs:
     """Gather the facts about this machine and moment that the prompt states."""
     return PromptInputs(
@@ -960,6 +1016,7 @@ def collect_prompt_inputs(
         helpers=tuple(helpers),
         agent=agent,
         team=tuple(team),
+        lead=lead,
         devtools=devtools,
         style=style,
         habits=harness.habits,

@@ -1,6 +1,6 @@
 """The team (item 87) through the real loop and the API: a run of Dot's sends an agent a message with message_agent,
 the agent answers in a run of its own (its voice, its tools, the team source), the reply comes back as the tool's
-result, the Team page and the agent's page show the exchange, and the delegated row in Dot's chat wears the agent's
+result, the Handoffs page and the agent's page show the exchange, and the delegated row in Dot's chat wears the agent's
 face. An agent answers in the stricter of its own approvals and the sender's (item 135). Dot builds a team of its own
 within bounds, and a run in another chat uses it (item 307). No network and no model service: the scripted model plays
 every run.

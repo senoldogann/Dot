@@ -415,7 +415,7 @@ async def test_a_qr_code_that_comes_after_the_tab_was_left_is_let_go_of(stand_in
             await asyncio.wait_for(holding.wait(), 30)
             # The tab is left before the code is there; the code then comes.
             await page.evaluate("location.hash = '#/agents'")
-            await expect(page.locator(".agent-row").first).to_be_visible()
+            await expect(page.locator(".agent-card").first).to_be_visible()
             before: int = await page.evaluate("window.__blobs.made.length")
             release.set()
             await page.wait_for_function("(count) => window.__blobs.made.length > count", arg=before)

@@ -46,11 +46,15 @@ ReactionName = Literal["good", "love", "wrong", "again", "remember", "explain", 
 
 
 class ThreadRecord(FrozenModel):
+    """A chat's thread. ``team_id`` is the team the chat is with (item 610), ``None`` for any other chat: every run of
+    the thread is told that team's context, whoever started it."""
+
     id: str
     title: str
     source: str
     created_at: float
     updated_at: float
+    team_id: str | None
 
 
 class ChatChoices(FrozenModel):
@@ -90,6 +94,15 @@ class RunPicks(FrozenModel):
 NO_PICKS: RunPicks = RunPicks(plugins=(), skills=(), plan_first=False, accounts=())
 
 
+class ChatTeam(FrozenModel):
+    """The team a chat is with (item 610), as the chat's row and page name it: ``id`` (the chat's ``actor_id``), the
+    team's name and the ids of its agents in order, whose faces the chat wears."""
+
+    id: str
+    name: str
+    agents: tuple[str, ...]
+
+
 class ThreadSummary(FrozenModel):
     """One chat of the sidebar: a thread with the runs a person started on it (``run_count`` of them) and the latest of
     those runs, which the chat opens on. ``updated_at`` is the later of the last message and the start of the latest
@@ -97,12 +110,13 @@ class ThreadSummary(FrozenModel):
     sidebar counts a working chat's time from it). ``pinned_at`` is when the owner pinned the chat, ``None`` for one not
     pinned (item 130). ``unread`` is true when the latest run ended after the owner last saw the chat, or ended and the
     owner marked the chat unread (item 131). ``actor_id`` names whose face the chat wears (item 277): the agent of the
-    latest run, else the campaign that run is a session of; ``None`` for a chat with Dot, which wears a creature of its
-    own. ``last_message`` is the chat's latest words on one plain line: the answer of the latest run once it ended with
-    one, else the message that started it; ``last_role`` says whose they are. ``loop_cron`` is the rhythm of the chat's
-    loop (item 580): of the switched-on repeating schedule whose runs go on in the chat (``/loop``, or one a run of it
-    made) that fires next, ``None`` for a chat with no such schedule; ``loop_next_at`` is when it fires next. Threads
-    that only hold delegated runs are not chats and are never listed."""
+    latest run, else the campaign that run is a session of, else the team the chat is with (``team``, item 610);
+    ``None`` for a chat with Dot, which wears a creature of its own. ``last_message`` is the chat's latest words on one
+    plain line: the answer of the latest run once it ended with one, else the message that started it; ``last_role``
+    says whose they are. ``loop_cron`` is the rhythm of the chat's loop (item 580): of the switched-on repeating
+    schedule whose runs go on in the chat (``/loop``, or one a run of it made) that fires next, ``None`` for a chat
+    with no such schedule; ``loop_next_at`` is when it fires next. Threads that only hold delegated runs are not chats
+    and are never listed."""
 
     id: str
     title: str
@@ -121,6 +135,7 @@ class ThreadSummary(FrozenModel):
     last_role: ChatLineRole
     loop_cron: str | None
     loop_next_at: float | None
+    team: ChatTeam | None
 
 
 class RunRecord(FrozenModel):
@@ -244,6 +259,26 @@ DOT_AGENT: AgentRecord = AgentRecord(
     look=None,
     paused_at=None,
 )
+
+
+class TeamRecord(FrozenModel):
+    """A team the owner has (item 610): a name, what it does, and its agents, by id, in the order the pages show them. A
+    chat with the team (a thread whose ``team_id`` it is) works as the team: Dot leads its agents and hands each its
+    part. ``ready_team`` is the ready team (item 504) it was made from, ``None`` for one the owner put together from
+    their own agents, so that a second Use of that ready team finds this record. Its agents are the owner's: removing
+    the team removes this record and nothing else."""
+
+    id: str
+    name: str
+    purpose: str
+    agents: tuple[str, ...]
+    created_at: float
+    ready_team: str | None
+
+
+def chat_team(team: TeamRecord | None) -> ChatTeam | None:
+    """The team as a chat's row and page name it (:class:`ChatTeam`); ``None`` for a chat with no team."""
+    return None if team is None else ChatTeam(id=team.id, name=team.name, agents=team.agents)
 
 
 class EventRecord(FrozenModel):
