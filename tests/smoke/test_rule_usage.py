@@ -1,6 +1,7 @@
 """How each rule was used on past steps (item 473), through the daemon's route and the Rules page on a seeded store:
 every enabled rule says how many steps it fits and decides with today's rules, a step counting for the first rule that
-fits it unless its run was in yolo; a rule switched off says nothing; the days asked are checked."""
+fits it unless its run was in yolo; a rule switched off says nothing, and its Details say that it is off; the days asked
+are checked."""
 
 import asyncio
 import time
@@ -169,13 +170,20 @@ async def test_each_rule_row_says_how_it_was_used(
                 )
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"http://127.0.0.1:{port}/#/settings/rules")
-                lines: Locator = page.locator(".rule-usage")
-                await expect(lines).to_have_count(2)
+                # How a rule was used is under its Details (item 622): open each, and the lines come as they are read.
+                rows: Locator = page.locator(".rule-list > .rule-row")
+                await expect(rows).to_have_count(3)
+                for index in range(3):
+                    await rows.nth(index).get_by_role("button", name="Details", exact=True).click()
+                lines: Locator = page.locator(".rule-fact", has_text="Used lately").locator("dd")
+                await expect(lines).to_have_count(3)
                 await expect(lines.nth(0)).to_have_text("Fits 1 step of the last 30 days: decides 1.")
                 await expect(lines.nth(1)).to_have_text(
                     "Fits 3 steps of the last 30 days: decides 1; 1 was in YOLO runs, which ask nothing; rule #1"
                     " decides 1 first."
                 )
+                # The rule switched off decides nothing, and says so, where a rule on has its line.
+                await expect(lines.nth(2)).to_have_text("It is switched off, so it decides nothing.")
                 await expect(page.locator(".rule-list")).not_to_contain_text("null")
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"usage-{width}-{scheme}.png"), full_page=True)

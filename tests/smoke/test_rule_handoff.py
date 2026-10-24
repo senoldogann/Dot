@@ -1,9 +1,10 @@
 """A rule in four answers, end to end (item 48): a *hand it to me* rule on ``write_file`` stops the write, the run asks
-the user to do the step, and goes on when the user says they did it. The Rules tab shows the rule as a sentence with
-the four answers in a segmented control, in a headless Chrome at a wide and at a phone width, in light and in dark. A
-step kept for the owner when nobody answered (item 482) shows as kept, and I did it carries the work on."""
+the user to do the step, and goes on when the user says they did it. The Rules tab shows the rule as a sentence that
+ends in its answer, its why under Details (item 622), in a headless Chrome at a wide and at a phone width, in light and
+in dark. A step kept for the owner when nobody answered (item 482) shows as kept, and I did it carries the work on."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -186,12 +187,19 @@ async def test_a_hand_it_to_me_rule_stops_the_write_asks_and_the_run_goes_on_whe
                     page: Page = await browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"http://{host}:{port}/#/settings/rules")
-                    await expect(page.locator(".segmented.answers button")).to_have_count(4)
-                    await expect(page.locator(".rule-sentence-preview")).to_contain_text("When Dot would use")
-                    rows = page.locator(".list-row .rule-sentence")
+                    rows = page.locator(".rule-list > .rule-row")
                     await expect(rows).to_have_count(1)
-                    await expect(rows.first).to_contain_text("When Dot would use")
-                    await expect(rows.first.locator(".badge")).to_have_text("Hand it to me")
+                    await expect(rows.first.locator(".rule-sentence")).to_have_text(
+                        "When Dot wants to write a file, it leaves it to you."
+                    )
+                    await expect(rows.first.locator(".badge")).to_have_text("leaves it to you")
+                    # The hand-off asks nothing and does the step by no one, so its sentence says so under its answer,
+                    # and the rule's why, which an approval card shows, is under its Details.
+                    await expect(rows.first.locator(".badge")).to_have_attribute(
+                        "title", re.compile(r"^Dot does not do it\. It says what needs doing and waits")
+                    )
+                    await rows.first.get_by_role("button", name="Details", exact=True).click()
+                    await expect(rows.first.locator(".rule-facts")).to_contain_text(_WHY)
                     await page.screenshot(path=str(tmp_path / f"rules-{width}-{scheme}.png"))
                     await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
                     await expect(page.get_by_text("Dot needs you to take over this step")).to_be_visible()

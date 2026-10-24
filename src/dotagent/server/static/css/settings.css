@@ -1182,25 +1182,6 @@
   white-space: nowrap;
 }
 
-/* Rules read as sentences: "When Dot would use shell, matching ^git push: ask me first." The four answers sit in a
-   segmented control that wraps on a phone. */
-.rule-sentence {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 8px;
-  line-height: var(--leading-md);
-}
-
-/* A rule's arrows (item 449): the chevron of the icon set, turned to point up or down the order. */
-.rule-move.up .icon {
-  transform: rotate(-90deg);
-}
-
-.rule-move.down .icon {
-  transform: rotate(90deg);
-}
-
 /* The fallbacks (items 478 and 563): a numbered row for each model, in the order a run tries them, with its arrows and its
    ×, over the row that adds one: the words of the row, in the accent, with the select lying over them, clear. */
 .standby-list {
@@ -1276,110 +1257,6 @@
 .standby-add:focus-within {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
-}
-
-.rule-sentence-preview {
-  color: var(--text-2);
-}
-
-.rule-sentence-preview svg {
-  flex: none;
-  color: var(--accent);
-}
-
-.rule-preview code {
-  color: var(--text);
-}
-
-/* A rule tried on the steps of the last days before it is added (item 469): a few lines, the steps it fits. */
-.rule-tryout p {
-  margin: 0;
-}
-
-/* How a rule was used on the last days, under its description (item 473). */
-.rule-list .rule-usage {
-  margin-top: var(--space-half);
-  word-break: break-word;
-}
-
-.rule-tryout-problem {
-  color: var(--warn);
-}
-
-.segmented.answers {
-  flex-wrap: wrap;
-}
-
-@container (max-width: 640px) {
-  .segmented.answers button {
-    flex: 1 1 auto;
-  }
-}
-
-/* The rule in your own words (item 110): the sentences to start from are soft pills under the box; on the line of
-   the Draft button, what the draft says: the read-back in the text colour, or why no rule came of the words. */
-.rule-examples {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.rule-example {
-  min-height: 32px;
-  padding: 4px 16px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text);
-  font-size: var(--text-ui);
-  line-height: var(--leading-ui);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--motion-quick) var(--ease);
-}
-
-.rule-example:hover {
-  background: var(--surface-2);
-}
-
-/* The Draft button keeps the end of its line; what the draft said takes the rest, or the line above it on a phone. */
-.rule-words-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 8px 16px;
-}
-
-.rule-outcome {
-  display: flex;
-  flex: 1 1 240px;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-  padding-top: 8px;
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
-  color: var(--muted);
-}
-
-.rule-outcome .icon,
-.rule-outcome .spinner {
-  flex: none;
-  margin-top: var(--space-half);
-}
-
-.rule-outcome.ok .icon {
-  color: var(--ok);
-}
-
-.rule-outcome.bad {
-  color: var(--bad);
-}
-
-.rule-readback {
-  color: var(--text);
-  font-weight: var(--weight-label);
 }
 
 /* The name field of Settings › General sits at the end of its row, like a switch would; where the row has no room for
@@ -3126,18 +3003,522 @@
   }
 }
 
-/* ---------- Rules (items 373 and 565): what is always on, the sandbox, the rules checked in order and what a rule can
-   answer, in cards of the settings' look; the ways to write one wait for New rule. ---------- */
+/* ---------- Rules (items 373, 565 and 622): the line that adds a rule, the rules as sentences, and Advanced ---------- */
 
-/* What no rule lifts: the lock and its name, four checked lines in two columns, and what a yolo run does. */
-.rule-always {
-  padding: 20px;
+/* The adder: "When Dot wants to [ … ]  It should [ … ]  Add rule" is one line of a card, and under it what the choice does.
+   Where the page is narrow the captions stand over their controls: the box, then the choice and the button. */
+.rule-adder-row {
+  padding: var(--space-4) var(--space-5);
 }
 
+.rule-adder {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.rule-adder-label {
+  flex: none;
+  color: var(--text);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-label);
+}
+
+.rule-adder > .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rule-adder > .select {
+  flex: none;
+}
+
+.rule-hint {
+  margin: var(--space-3) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+@container (max-width: 640px) {
+  .rule-adder {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .rule-adder > .rule-adder-when,
+  .rule-adder > .input,
+  .rule-adder > .rule-adder-it {
+    grid-column: 1 / -1;
+  }
+
+  .rule-adder > .rule-adder-it {
+    margin-top: var(--space-2);
+  }
+
+  .rule-adder > .select {
+    width: 100%;
+  }
+}
+
+/* What came of the words: Dot reading them, or why no rule came, with the way out. */
+.rule-outcome {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.rule-outcome .icon,
+.rule-outcome .spinner {
+  flex: none;
+  margin-top: var(--space-half);
+}
+
+.rule-outcome.bad .icon {
+  color: var(--bad);
+}
+
+.rule-outcome-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.rule-outcome-text p {
+  margin: 0;
+}
+
+.rule-outcome-title {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+/* The rule drafted, read back before it is added: the sentence, what it would have done lately, the two buttons, and under
+   Details the parts of the rule to be changed. */
+.rule-pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.rule-understood {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+}
+
+.rule-understood > .icon {
+  align-self: center;
+  flex: none;
+  color: var(--ok);
+}
+
+.rule-understood-label {
+  font-weight: var(--weight-label);
+}
+
+.rule-lately {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.rule-lately:empty {
+  display: none;
+}
+
+/* The buttons of the rule to add: Details at the left, as on a rule's row, and the two ways on at the right. */
+.rule-pending-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.rule-pending-buttons > .rule-more {
+  margin-right: auto;
+  margin-left: calc(var(--space-3) * -1);
+}
+
+/* On a narrow page the two ways on share a line, as wide as their words, and Details goes under them. */
+@container (max-width: 640px) {
+  .rule-pending-buttons {
+    display: grid;
+    grid-template-columns: minmax(min-content, 1fr) auto;
+  }
+
+  .rule-pending-buttons > .rule-back {
+    justify-self: start;
+    margin-left: calc(var(--space-4) * -1);
+  }
+
+  .rule-pending-buttons > .rule-more {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+    margin-right: 0;
+  }
+}
+
+/* The parts of the rule to add, under its Details: shut, unless they are the owner's to fill in. */
+.rule-details-body[hidden] {
+  display: none;
+}
+
+.rule-tryout-buttons {
+  display: flex;
+}
+
+/* A rule tried on the steps of the last days before it is added (item 469): a few lines, the steps it fits. */
+.rule-tryout p {
+  margin: 0;
+}
+
+.rule-tryout-problem {
+  color: var(--warn);
+}
+
+/* The rules: a numbered list in the order they are checked in, each a row of its switch, its sentence and its actions,
+   its Details under them. */
+.rule-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rule-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "switch main actions"
+    ". facts facts";
+  align-items: start;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.rule-row + .rule-row {
+  border-top: 1px solid var(--border);
+}
+
+.rule-row > .switch {
+  grid-area: switch;
+  margin-top: var(--space-1);
+}
+
+.rule-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* The sentence runs on as text, its answer the badge that ends it; its place in the order is a small number before it. */
+.rule-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  line-height: var(--leading-md);
+}
+
+.rule-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rule-text > .badge {
+  margin-left: var(--space-2);
+}
+
+.rule-answer {
+  white-space: nowrap;
+}
+
+/* A long answer ("goes ahead, whatever it has read") wraps inside its badge on a narrow page. */
+.rule-sentence .badge {
+  vertical-align: baseline;
+  white-space: normal;
+}
+
+.rule-sentence code {
+  color: var(--text);
+}
+
+.rule-number {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-label);
+  line-height: var(--leading-xs);
+  align-self: flex-start;
+  margin-top: var(--space-1);
+}
+
+/* A rule that never decides says so under its sentence, in words that say what helps. */
+.rule-never {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.rule-never .icon {
+  flex: none;
+  margin-top: var(--space-half);
+}
+
+.rule-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-block: calc(var(--space-1) * -1);
+}
+
+.rule-more .chev {
+  display: inline-flex;
+  transition: transform var(--motion-quick) var(--ease);
+}
+
+.rule-more[aria-expanded="true"] .chev {
+  transform: rotate(90deg);
+}
+
+/* The arrows show when the pointer is on the row or a key is in it, and always on a touch screen. */
+@media (hover: hover) {
+  .rule-row .rule-move,
+  .rule-row .rule-move:disabled {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease);
+  }
+
+  .rule-row:hover .rule-move:not(:disabled),
+  .rule-row:focus-within .rule-move:not(:disabled) {
+    opacity: 1;
+  }
+
+  .rule-row:hover .rule-move:disabled,
+  .rule-row:focus-within .rule-move:disabled {
+    opacity: 0.3;
+  }
+}
+
+/* What a rule is made of: the tool, the pattern, why, and how it was used. */
+.rule-facts {
+  grid-area: facts;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.rule-facts[hidden] {
+  display: none;
+}
+
+.rule-fact {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.rule-fact dt {
+  color: var(--muted);
+}
+
+.rule-fact dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rule-pattern {
+  white-space: pre-wrap;
+}
+
+.rule-problem {
+  margin: 0;
+  padding: var(--space-3) var(--space-5) 0;
+}
+
+/* On a narrow page a rule's actions stand under its sentence, Details at the left, the arrows and the delete at the right. */
+@container (max-width: 640px) {
+  .rule-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "switch main"
+      ". actions"
+      ". facts";
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .rule-actions {
+    margin-block: 0;
+  }
+
+  .rule-more {
+    order: -1;
+    margin-right: auto;
+    margin-left: calc(var(--space-3) * -1);
+  }
+
+  .rule-fact {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+/* Under the rules: how two that fit are told apart, and that the built-in checks come first. */
+.rule-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.rule-foot p {
+  margin: 0;
+}
+
+.rule-see-all {
+  margin-left: calc(var(--space-2) * -1);
+}
+
+/* With no rule: the shield, what Dot does meanwhile and the sentences to start from, in the middle of the card. */
+.rule-empty {
+  padding: var(--space-6) var(--space-5);
+}
+
+.rule-empty .empty-state {
+  max-width: none;
+  padding: 0;
+}
+
+.rule-empty .empty-line {
+  max-width: none;
+}
+
+/* The sentences to start from are soft pills: one puts its words and its choice in the adder. */
+.rule-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.rule-example {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  text-align: center;
+  cursor: pointer;
+  transition: background var(--motion-quick) var(--ease);
+}
+
+.rule-example:hover {
+  background: var(--surface-2);
+}
+
+.rule-empty .rule-examples {
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+/* Advanced: one fold at the foot of the page, shut; the rest of the page is in it, in rows of a card. */
+.rule-advanced-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius);
+  cursor: pointer;
+  list-style: none;
+}
+
+.rule-advanced-head::-webkit-details-marker {
+  display: none;
+}
+
+.rule-advanced-head .chev {
+  display: inline-flex;
+}
+
+.rule-advanced-head:hover {
+  background: var(--surface-2);
+}
+
+.rule-advanced[open] > .rule-advanced-head {
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.rule-advanced-title {
+  color: var(--text);
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  font-weight: var(--weight-title);
+}
+
+.rule-advanced-lead {
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.rule-advanced-body {
+  border-top: 1px solid var(--border);
+}
+
+/* What no rule lifts: the lock and its name, five checked lines in two columns, and what a yolo run does. */
 .rule-always-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .rule-tile {
@@ -3163,8 +3544,8 @@
 .rule-always-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 32px;
-  margin: 16px 0 0;
+  gap: var(--space-2) 32px;
+  margin: var(--space-4) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -3172,22 +3553,29 @@
 .rule-always-list li {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--space-3);
   color: var(--text);
   font-size: var(--text-ui);
   line-height: var(--leading-ui);
 }
 
 .rule-always-list .icon {
+  flex: none;
   margin-top: var(--space-half);
   color: var(--ok);
 }
 
 .rule-always-note {
-  margin: 16px 0 0;
+  margin: var(--space-4) 0 0;
   color: var(--muted);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
+}
+
+@container (max-width: 640px) {
+  .rule-always-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* The sandbox's explanation reads as a line and, under it, the finer print: what off does, when it applies, its key. */
@@ -3204,106 +3592,6 @@
   color: color-mix(in srgb, var(--character-blue) 62%, var(--text));
 }
 
-/* The card of the rules: its rows are hairline-parted, as a settings card's are. */
-.page[data-layout="page"] .rule-list > .list-row {
-  padding: 16px 20px;
-}
-
-.rule-list .row-text {
-  font-size: var(--text-sm);
-}
-
-.rule-problem {
-  margin: 0;
-  padding: 12px 20px 0;
-}
-
-/* With no rule: the shield, what the preset does meanwhile and the sentences to start from, in the middle of the card. */
-.rule-empty {
-  padding: 32px 20px 24px;
-}
-
-.rule-empty .empty-state {
-  max-width: none;
-  padding: 0;
-}
-
-.rule-empty .empty-line {
-  max-width: none;
-}
-
-.rule-empty .rule-examples {
-  justify-content: center;
-  margin-top: 16px;
-}
-
-.rule-empty .rule-example {
-  text-align: center;
-}
-
-/* What a rule can answer, under the rules (or the empty card), set apart by the card's hairline: the four answers in two
-   columns, each its badge over what Dot does then. */
-.rule-legend {
-  padding: 20px;
-}
-
-.rule-legend-title {
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--text-xs);
-  line-height: var(--leading-xs);
-  font-weight: var(--weight-label);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
-.rule-legend-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 32px;
-  margin: 12px 0 0;
-}
-
-.rule-legend-item dt {
-  margin: 0;
-}
-
-.rule-legend-item dd {
-  margin: var(--space-2) 0 0;
-  color: var(--text-2);
-  font-size: var(--text-ui);
-  line-height: var(--leading-ui);
-}
-
-/* The ways to write a rule, a section of one card of two rows: what lies under a row's title keeps off it; the buttons
-   of the form are Close at the left and the test and Add rule at the right, going under it on a narrow screen. */
-.rule-body {
-  margin-top: var(--space-3);
-}
-
-.rule-form-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.rule-form-main {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-@container (max-width: 640px) {
-  .rule-always-list,
-  .rule-legend-list {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 /* A schedule's goal reads as its first two lines in the list: the whole of it is in its form (item 373). */
 .schedule-list .row-text {
   display: -webkit-box;
@@ -3313,7 +3601,7 @@
 }
 
 /* A form that opens under the sticky header scrolls clear of it (item 373). */
-.rule-forms {
+.rule-adder-card {
   scroll-margin-top: 80px;
 }
 

@@ -1,7 +1,8 @@
 """Trying a rule on past steps (item 469), through the daemon's route and the Rules page on a seeded store: the store
 finds where a day starts without reading the whole table, the route counts what the rule fits and would decide (a yolo
 run's steps, a step the gate did not let through and one from before item 468 apart) and writes nothing, a pattern
-that is not one is refused, and the page's Test shows what the rule would have done, each step leading to its run."""
+that is not one is refused, a rule drafted on the page is tried at once and said in a line (item 622), and its Details'
+Test shows what the rule would have done, each step leading to its run."""
 
 import asyncio
 import re
@@ -17,8 +18,12 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 from dotagent.agent.authorization import StepDecision
 from dotagent.agent.gate import TAINT_EVENTS
 from dotagent.agent.manager import RunManager
+from dotagent.agent.review import RULE_TOOL
 from dotagent.config import load_config
 from dotagent.core.types import JsonObject
+from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -31,16 +36,30 @@ pytestmark = [pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "rule-preview-token"
 OPUS: str = "anthropic:claude-opus-5-5"
+# The rule the page's drafter is given for "run git push", once for each window the page test opens: the review model is
+# the scripted one, which answers the draft as written here.
+_DRAFT: ScriptedTurn = ScriptedTurn(
+    text="",
+    calls=(
+        ScriptedCall(
+            tool=RULE_TOOL,
+            arguments={"tool": "shell", "answer": "allow", "commands": ["git push"], "mentions": [], "problem": ""},
+        ),
+    ),
+)
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
-    (home / "config.toml").write_text(f'[browser]\nheadless = true\n\n[models]\nmain = "{OPUS}"\n', encoding="utf-8")
+    (home / "config.toml").write_text(
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{OPUS}"\nreview = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+    )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
+    await built.router.register("ollama", ScriptedProvider("ollama", [_DRAFT, _DRAFT]))
     try:
         yield built
     finally:
@@ -241,12 +260,26 @@ async def test_the_rules_page_tests_a_rule_before_it_is_added(
                 )
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"http://127.0.0.1:{port}/#/settings/rules")
-                await page.get_by_role("button", name="New rule").click()
+                # A rule drafted from the words is tried at once, and a line says what it would have done lately.
+                await page.get_by_role("textbox", name="When Dot wants to", exact=True).fill("run git push")
+                await page.get_by_role("combobox", name="It should", exact=True).select_option("allow")
+                await page.get_by_role("button", name="Add rule", exact=True).click()
+                pending: Locator = page.locator(".rule-pending")
+                await expect(pending.locator(".rule-lately")).to_have_text(
+                    "It would have applied to 6 of the 8 things Dot did in the last 30 days."
+                )
+                # The whole of it is under Details, with the button that tries the rule again once a part is changed.
+                await pending.get_by_role("button", name="Details", exact=True).click()
+                test: Locator = page.get_by_role("button", name="Test on the last 30 days")
+                tried: Locator = page.locator(".rule-tryout")
+                await expect(tried).to_contain_text("Would have matched 6 of 8 steps in the last 30 days.")
                 await page.get_by_role("textbox", name="Tool").fill("shell")
                 await page.get_by_role("textbox", name="Pattern").fill("git push")
-                test: Locator = page.get_by_role("button", name="Test on the last 30 days")
+                await expect(tried).to_be_hidden()
                 await test.click()
-                tried: Locator = page.locator(".rule-tryout")
+                await expect(pending.locator(".rule-lately")).to_have_text(
+                    "It would have applied to 6 of the 8 things Dot did in the last 30 days."
+                )
                 await expect(tried).to_contain_text("Would have matched 6 of 8 steps in the last 30 days.")
                 await expect(tried).to_contain_text("1 ran in YOLO, which asks nothing whatever the rules say.")
                 await expect(tried).to_contain_text("1 is settled before any rule, by checks no rule changes")

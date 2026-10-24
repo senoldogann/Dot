@@ -178,7 +178,8 @@ answer keeps its words, Ollama's too.
   and each of them asks Dot first: Dot weighs it as the same action of its own tools, by your rules, the preset and the
   run's approval mode, and asks you, the review model or nobody as for any run; a refusal tells the agent why, and it
   goes on. A subagent it asks for is refused, as its session would not be the run's. Its commands run outside Dot's
-  sandbox (Settings › Rules › Sandbox for a run's commands), each after Dot's policy, and its web fetches reach no address of this Mac or its network
+  sandbox (Settings › Rules › Advanced › Keep Dot's commands in a safe box), each after Dot's policy, and its web
+  fetches reach no address of this Mac or its network
   unless `[web] allow_private_hosts` says so. Besides its own, the agent has Dot's tools for what OpenCode has none for
   (item 284): Dot's browser with your sign-ins, the Mac's applications, memory, schedules, notify, a page in the
   conversation, skills, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow

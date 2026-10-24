@@ -1,0 +1,268 @@
+[
+  {
+    "draft": {
+      "tool": "shell",
+      "answer": "allow",
+      "commands": [
+        "git status",
+        "git diff"
+      ],
+      "mentions": []
+    },
+    "behavior": "allow",
+    "tool_glob": "shell",
+    "match_regex": "\\A[^\\n]*\\n[ \\t]*(?:cd[ \\t]+[^\\n\\r;&|`$<>()]+&&[ \\t]*)?(?:git[ \\t]+status|git[ \\t]+diff)(?:[ \\t][^\\n\\r;&|`$<>()]*)?\\Z",
+    "description": "For “git status” or “git diff” run alone in the shell, with plain arguments (after a cd at most): Dot does it without asking.",
+    "sentence": "When Dot wants to run “git status” or “git diff” (with plain arguments, after changing folder at most), it goes ahead without asking."
+  },
+  {
+    "draft": {
+      "tool": "shell",
+      "answer": "allow",
+      "commands": [
+        "git push"
+      ],
+      "mentions": []
+    },
+    "behavior": "allow",
+    "tool_glob": "shell",
+    "match_regex": "\\A[^\\n]*\\n[ \\t]*(?:cd[ \\t]+[^\\n\\r;&|`$<>()]+&&[ \\t]*)?(?:git[ \\t]+push)(?:[ \\t][^\\n\\r;&|`$<>()]*)?\\Z",
+    "description": "For “git push” run alone in the shell, with plain arguments (after a cd at most): Dot does it without asking.",
+    "sentence": "When Dot wants to run “git push” (with plain arguments, after changing folder at most), it goes ahead without asking."
+  },
+  {
+    "draft": {
+      "tool": "shell",
+      "answer": "ask",
+      "commands": [
+        "rm"
+      ],
+      "mentions": []
+    },
+    "behavior": "ask",
+    "tool_glob": "shell",
+    "match_regex": "(?:\\brm\\b)",
+    "description": "For any shell command that mentions “rm”: Dot asks you first.",
+    "sentence": "When Dot wants to run a command that mentions “rm”, it asks you first."
+  },
+  {
+    "draft": {
+      "tool": "shell",
+      "answer": "handoff",
+      "commands": [
+        "rm",
+        "sudo",
+        "chmod"
+      ],
+      "mentions": []
+    },
+    "behavior": "handoff",
+    "tool_glob": "shell",
+    "match_regex": "(?:\\brm\\b|\\bsudo\\b|\\bchmod\\b)",
+    "description": "For any shell command that mentions “rm”, “sudo” or “chmod”: Dot hands it to you.",
+    "sentence": "When Dot wants to run a command that mentions “rm”, “sudo” or “chmod”, it leaves it to you."
+  },
+  {
+    "draft": {
+      "tool": "shell",
+      "answer": "preapproved",
+      "commands": [
+        "npm test"
+      ],
+      "mentions": []
+    },
+    "behavior": "preapproved",
+    "tool_glob": "shell",
+    "match_regex": "\\A[^\\n]*\\n[ \\t]*(?:cd[ \\t]+[^\\n\\r;&|`$<>()]+&&[ \\t]*)?(?:npm[ \\t]+test)(?:[ \\t][^\\n\\r;&|`$<>()]*)?\\Z",
+    "description": "For “npm test” run alone in the shell, with plain arguments (after a cd at most): Dot does it without asking, even after reading untrusted content.",
+    "sentence": "When Dot wants to run “npm test” (with plain arguments, after changing folder at most), it goes ahead, whatever it has read."
+  },
+  {
+    "draft": {
+      "tool": "shell",
+      "answer": "ask",
+      "commands": [],
+      "mentions": []
+    },
+    "behavior": "ask",
+    "tool_glob": "shell",
+    "match_regex": "",
+    "description": "For every use of shell: Dot asks you first.",
+    "sentence": "When Dot wants to run a command, it asks you first."
+  },
+  {
+    "draft": {
+      "tool": "browser_*",
+      "answer": "handoff",
+      "commands": [],
+      "mentions": [
+        "mybank.com"
+      ]
+    },
+    "behavior": "handoff",
+    "tool_glob": "browser_*",
+    "match_regex": "(?:\\bmybank\\.com\\b)",
+    "description": "For any use of browser_* (2 tools) that mentions “mybank.com”: Dot hands it to you.",
+    "sentence": "When Dot wants to use the web browser for something that mentions “mybank.com”, it leaves it to you."
+  },
+  {
+    "draft": {
+      "tool": "browser_open",
+      "answer": "ask",
+      "commands": [],
+      "mentions": [
+        "x.com"
+      ]
+    },
+    "behavior": "ask",
+    "tool_glob": "browser_open",
+    "match_regex": "(?:\\bx\\.com\\b)",
+    "description": "For any use of browser_open that mentions “x.com”: Dot asks you first.",
+    "sentence": "When Dot wants to open a web page that mentions “x.com”, it asks you first."
+  },
+  {
+    "draft": {
+      "tool": "write_file",
+      "answer": "ask",
+      "commands": [],
+      "mentions": []
+    },
+    "behavior": "ask",
+    "tool_glob": "write_file",
+    "match_regex": "",
+    "description": "For every use of write_file: Dot asks you first.",
+    "sentence": "When Dot wants to write a file, it asks you first."
+  },
+  {
+    "draft": {
+      "tool": "write_file",
+      "answer": "allow",
+      "commands": [],
+      "mentions": [
+        "notes"
+      ]
+    },
+    "behavior": "allow",
+    "tool_glob": "write_file",
+    "match_regex": "(?:\\bnotes\\b)",
+    "description": "For any use of write_file that mentions “notes”: Dot does it without asking.",
+    "sentence": "When Dot wants to write a file that mentions “notes”, it goes ahead without asking."
+  },
+  {
+    "draft": {
+      "tool": "*",
+      "answer": "allow",
+      "commands": [],
+      "mentions": []
+    },
+    "behavior": "allow",
+    "tool_glob": "*",
+    "match_regex": "",
+    "description": "For every use of any tool: Dot does it without asking.",
+    "sentence": "When Dot wants to do anything, it goes ahead without asking."
+  },
+  {
+    "draft": {
+      "tool": "*",
+      "answer": "ask",
+      "commands": [],
+      "mentions": [
+        "invoice",
+        "tax"
+      ]
+    },
+    "behavior": "ask",
+    "tool_glob": "*",
+    "match_regex": "(?:\\binvoice\\b|\\btax\\b)",
+    "description": "For any use of any tool that mentions “invoice” or “tax”: Dot asks you first.",
+    "sentence": "When Dot wants to do anything that mentions “invoice” or “tax”, it asks you first."
+  },
+  {
+    "draft": {
+      "tool": "web_search",
+      "answer": "allow",
+      "commands": [],
+      "mentions": []
+    },
+    "behavior": "allow",
+    "tool_glob": "web_search",
+    "match_regex": "",
+    "description": "For every use of web_search: Dot does it without asking.",
+    "sentence": "When Dot wants to search the web, it goes ahead without asking."
+  },
+  {
+    "draft": {
+      "tool": "shell",
+      "answer": "allow",
+      "commands": [
+        "git commit -m"
+      ],
+      "mentions": []
+    },
+    "behavior": "allow",
+    "tool_glob": "shell",
+    "match_regex": "\\A[^\\n]*\\n[ \\t]*(?:cd[ \\t]+[^\\n\\r;&|`$<>()]+&&[ \\t]*)?(?:git[ \\t]+commit[ \\t]+\\-m)(?:[ \\t][^\\n\\r;&|`$<>()]*)?\\Z",
+    "description": "For “git commit -m” run alone in the shell, with plain arguments (after a cd at most): Dot does it without asking.",
+    "sentence": "When Dot wants to run “git commit -m” (with plain arguments, after changing folder at most), it goes ahead without asking."
+  },
+  {
+    "draft": {
+      "tool": "shell",
+      "answer": "ask",
+      "commands": [
+        "c++"
+      ],
+      "mentions": []
+    },
+    "behavior": "ask",
+    "tool_glob": "shell",
+    "match_regex": "(?:\\bc\\+\\+)",
+    "description": "For any shell command that mentions “c++”: Dot asks you first.",
+    "sentence": "When Dot wants to run a command that mentions “c++”, it asks you first."
+  },
+  {
+    "draft": {
+      "tool": "browser_open",
+      "answer": "ask",
+      "commands": [],
+      "mentions": [
+        "don’t panic"
+      ]
+    },
+    "behavior": "ask",
+    "tool_glob": "browser_open",
+    "match_regex": "(?:\\bdon’t[ \\t]+panic\\b)",
+    "description": "For any use of browser_open that mentions “don’t panic”: Dot asks you first.",
+    "sentence": "When Dot wants to open a web page that mentions “don’t panic”, it asks you first."
+  },
+  {
+    "draft": {
+      "tool": "write_file",
+      "answer": "allow",
+      "commands": [],
+      "mentions": [
+        "50 €"
+      ]
+    },
+    "behavior": "allow",
+    "tool_glob": "write_file",
+    "match_regex": "(?:\\b50[ \\t]+€)",
+    "description": "For any use of write_file that mentions “50 €”: Dot does it without asking.",
+    "sentence": "When Dot wants to write a file that mentions “50 €”, it goes ahead without asking."
+  },
+  {
+    "draft": {
+      "tool": "write_file",
+      "answer": "ask",
+      "commands": [],
+      "mentions": [
+        "şirket raporu"
+      ]
+    },
+    "behavior": "ask",
+    "tool_glob": "write_file",
+    "match_regex": "(?:\\bşirket[ \\t]+raporu\\b)",
+    "description": "For any use of write_file that mentions “şirket raporu”: Dot asks you first.",
+    "sentence": "When Dot wants to write a file that mentions “şirket raporu”, it asks you first."
+  }
+]
