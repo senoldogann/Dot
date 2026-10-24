@@ -1731,12 +1731,48 @@ button.context-row {
   visibility: hidden;
 }
 
+/* A picture is drawn whole in the view, as tall as the view and no taller, and a press shows it at full size over the
+   page. In the dialog of a page without the panel the view is a frame around the picture: the dialog is as tall as it,
+   never the empty sheet a fixed height left under a wide picture. */
+.file-view[data-kind="image"] .file-body {
+  display: flex;
+  justify-content: center;
+}
+
+.file-picture {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.file-picture:disabled {
+  cursor: default;
+}
+
 .file-picture img {
   display: block;
   max-width: 100%;
-  height: auto;
-  margin: 0 auto;
+  max-height: 100%;
+  border: 1px solid var(--border);
   border-radius: var(--radius-xs);
+}
+
+dialog.modal.file-dialog:has(.file-view[data-kind="image"]) {
+  width: fit-content;
+  min-width: min(420px, calc(100vw - 32px));
+  height: fit-content;
+  max-height: calc(100dvh - 48px);
+}
+
+dialog.modal.file-dialog .file-picture img {
+  max-height: calc(100dvh - 144px);
 }
 
 .file-text {
@@ -1744,6 +1780,95 @@ button.context-row {
   font: var(--code-size) / var(--code-leading) var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Source files read by an agent (the file panel's editor view). */
+.file-view[data-kind="text"]:has(.file-code-editor) .file-body {
+  padding: 0;
+}
+
+.file-code-path {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.file-code-language {
+  flex: none;
+  color: var(--accent);
+  font-weight: var(--weight-label);
+  text-transform: uppercase;
+}
+
+.file-code-breadcrumb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-code-editor {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  padding: var(--space-3) 0 var(--space-4);
+  overflow-wrap: normal;
+  white-space: normal;
+}
+
+.file-code-editor code {
+  display: block;
+}
+
+.file-code-row {
+  display: flex;
+  min-width: max-content;
+  min-height: 1em;
+}
+
+.file-code-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex: 0 0 48px;
+  padding: 0 12px 0 4px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.file-code-content {
+  display: block;
+  min-width: max-content;
+  padding-inline: var(--space-4);
+  white-space: pre;
+}
+
+.file-code-keyword {
+  color: var(--bad);
+  font-weight: var(--weight-label);
+}
+
+.file-code-string {
+  color: var(--ok);
+}
+
+.file-code-comment {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.file-code-number,
+.file-code-literal {
+  color: var(--accent);
 }
 
 /* A document's headings, a Markdown file's (item 269) and a slide's title stand out from their text more than an
