@@ -388,8 +388,9 @@ is wider than the screen, the narrowest iPhone's too.
 *What Dot follows now* is a card with the adopted version's summary, an *In use* pill and **Set aside** at its head, and
 its texts side by side under it where the page is wide enough (*Habits · how to work*, *Tool guidance · what this Mac
 wants*), or that Dot's built-in instructions alone are in use. **Write your own**, at the head of *Versions* (item 566),
-opens the form, which stays shut until then; it takes habits and tool guidance (prefilled from the adopted version) and
-a summary, and says what each takes (item 412): that writing one is optional since the nightly learning proposes
+opens the form in a dialog (item 615), so that the page keeps its size; it takes habits and tool guidance (prefilled
+from the adopted version) and a summary, and says what each takes (item 412): that writing one is optional since the
+nightly learning proposes
 versions, what a habit and a line of tool guidance are, the limits a version keeps and what each button does, with
 examples in the empty fields and **Start from an example**, which puts them in; **Save for later** keeps it as a
 candidate and **Save and use** adopts it at once; what cannot be a component is refused with why. *Versions* lists the

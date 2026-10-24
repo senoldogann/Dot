@@ -1,13 +1,14 @@
 // Settings › Self-improvement (items 393 and 566, docs/harness.md: the harness): what Dot improves around its model, in plain
 // words (item 503). An overview of four tiles, the version in use with its two texts, the versions with Use and Set aside and
-// a form for one of the owner's, the nightly learning with the nights it ran, the lessons they kept, and how it is set.
+// a form for one of the owner's, which opens in a dialog (item 615), the nightly learning with the nights it ran, the
+// lessons they kept, and how it is set.
 
 import { api } from "../api.js";
 import { clip, dateTime, el, joined, nextNight, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, foldCard, loadingPanel, setCard, setRow, setSection } from "../panels.js";
 import { readFailed } from "../state.js";
-import { attempt, confirmDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 import { codeText } from "./memory.js";
 
 const STATE_TONE = { adopted: "b-ok", probed: "b-warn", candidate: "b-info", retired: "b-muted" };
@@ -434,15 +435,22 @@ const EXAMPLE_GUIDANCE = [
 ].join("\n");
 const EXAMPLE_SUMMARY = "Read before editing, stop after two failures, short answers";
 
-/** The form that writes a version of the owner's: a card that stays shut until its opener (`opener`, a button for the head
- * of Versions) asks for it, optional as its first lines say. */
-function buildForm(onWritten) {
+/**
+ * The fields that write a version of the owner's, for the dialog that holds them (item 615): habits and tool guidance,
+ * which start from the version in use, and a summary, optional as its first lines say. `view` is the daemon's view of
+ * the harness, for the words about the nightly learning and the limits a version keeps; Start from an example, which puts
+ * one in the fields, is in it too. Returns the element and `submit(adoptNow)`, which saves the version, in use or not,
+ * and throws when the summary is empty or the daemon refuses it.
+ */
+function buildForm(view) {
   const habits = el("textarea", { class: "textarea", rows: "5", "aria-label": "Habits", spellcheck: "false", placeholder: `For example:\n${EXAMPLE_HABITS}` });
   const guidance = el("textarea", { class: "textarea", rows: "5", "aria-label": "Tool guidance", spellcheck: "false", placeholder: `For example:\n${EXAMPLE_GUIDANCE}` });
   const summary = el("input", { class: "input", type: "text", maxlength: "200", "aria-label": "Summary", placeholder: `For example: ${EXAMPLE_SUMMARY}` });
-  const save = el("button", { class: "btn sm", type: "button" }, "Save for later");
-  const adopt = el("button", { class: "btn primary sm", type: "button" }, icon("check"), "Save and use");
-  const example = el("button", { class: "btn ghost sm", type: "button" }, icon("pencil"), "Start from an example");
+  if (view.adopted !== null) {
+    habits.value = view.adopted.habits;
+    guidance.value = view.adopted.tool_guidance;
+  }
+  const example = el("button", { class: "btn ghost", type: "button" }, icon("pencil"), "Start from an example");
   example.addEventListener("click", () => {
     habits.value = EXAMPLE_HABITS;
     guidance.value = EXAMPLE_GUIDANCE;
@@ -450,73 +458,45 @@ function buildForm(onWritten) {
     habits.focus();
   });
   // What the form is for, in plain words: writing a version is optional, the nightly learning writes them (item 412).
-  const intro = el("p", { class: "hint harness-intro" });
-  const bounds = el("p", { class: "hint" });
+  const nightly =
+    view.step_time === "off"
+      ? "Once a time of day is set for the nightly learning ([harness] step_time in the config file), Dot reads what its runs did each night and proposes versions by itself."
+      : `Each night at ${view.step_time} Dot reads what its runs did and proposes versions by itself.`;
+  const intro = el(
+    "p",
+    { class: "hint harness-intro" },
+    `Optional: you need not write anything here. ${nightly} They appear under Versions for you to use. Write one yourself only when you want every run to keep a way of working you choose.`,
+  );
+  const bounds = el(
+    "p",
+    { class: "hint" },
+    `At most ${view.habits_chars} characters of habits and ${view.tool_guidance_chars} of tool guidance, ${view.component_lines} lines each, no line past 300 characters; no secret, link, e-mail address, home path or account name, no character that prints nothing, no line that starts like a heading or a note of the system: a version with one is refused.`,
+  );
   async function submit(adoptNow) {
     if (summary.value.trim() === "") {
       summary.focus();
       throw new Error("Say in a line what the version changes.");
     }
-    save.disabled = true;
-    adopt.disabled = true;
-    try {
-      await api.post("/harness", {
-        habits: habits.value,
-        tool_guidance: guidance.value,
-        summary: summary.value.trim(),
-        adopt: adoptNow,
-      });
-      toast("ok", adoptNow ? "In use: the runs that start from now on follow it." : "Saved under Versions, not in use.");
-      summary.value = "";
-      await onWritten();
-    } finally {
-      save.disabled = false;
-      adopt.disabled = false;
-    }
+    await api.post("/harness", {
+      habits: habits.value,
+      tool_guidance: guidance.value,
+      summary: summary.value.trim(),
+      adopt: adoptNow,
+    });
+    toast("ok", adoptNow ? "In use: the runs that start from now on follow it." : "Saved under Versions, not in use.");
   }
-  save.addEventListener("click", () => attempt(() => submit(false)));
-  adopt.addEventListener("click", () => attempt(() => submit(true)));
   const element = el(
     "div",
-    { class: "harness-form", hidden: true },
+    { class: "harness-form" },
     intro,
+    el("div", { class: "harness-example" }, example),
     field("Habits", habits, "How Dot should work, as you would brief a new colleague: one rule a line. Every run reads them after Dot's own way of working."),
     field("Tool guidance", guidance, "What the commands, applications and sites of this Mac want: one line each. Every run reads it after the list of its tools."),
     field("Summary", summary, "One line for the list of versions: what this version changes."),
     bounds,
     el("p", { class: "hint" }, "Save for later keeps it under Versions without using it; Save and use puts it into every run that starts from now on. Set aside, on a version, stops using it, and Dot follows its built-in instructions alone again."),
-    el("div", { class: "panel-foot" }, example, el("span", { class: "spacer" }), save, adopt),
   );
-  const opener = el("button", { class: "harness-write", type: "button", "aria-expanded": "false" });
-  function paintOpener(isOpen) {
-    opener.replaceChildren(icon(isOpen ? "x" : "pencil"), isOpen ? "Close" : "Write your own");
-    opener.setAttribute("aria-expanded", String(isOpen));
-  }
-  paintOpener(false);
-  opener.addEventListener("click", () => {
-    element.hidden = !element.hidden;
-    paintOpener(!element.hidden);
-    if (!element.hidden) {
-      habits.focus();
-    }
-  });
-  return {
-    element,
-    opener,
-    fill: (text) => {
-      habits.value = text.habits;
-      guidance.value = text.tool_guidance;
-    },
-    /** Say what the nightly learning does and the limits a version keeps, from the daemon's view of the harness. */
-    describe: (view) => {
-      const nightly =
-        view.step_time === "off"
-          ? "Once a time of day is set for the nightly learning ([harness] step_time in the config file), Dot reads what its runs did each night and proposes versions by itself."
-          : `Each night at ${view.step_time} Dot reads what its runs did and proposes versions by itself.`;
-      intro.textContent = `Optional: you need not write anything here. ${nightly} They appear under Versions for you to use. Write one yourself only when you want every run to keep a way of working you choose.`;
-      bounds.textContent = `At most ${view.habits_chars} characters of habits and ${view.tool_guidance_chars} of tool guidance, ${view.component_lines} lines each, no line past 300 characters; no secret, link, e-mail address, home path or account name, no character that prints nothing, no line that starts like a heading or a note of the system: a version with one is refused.`;
-    },
-  };
+  return { element, submit };
 }
 
 export function mount(root, ctx) {
@@ -525,13 +505,10 @@ export function mount(root, ctx) {
   let steps = [];
   let experiences = [];
   const holder = el("div", null, loadingPanel());
-  // The form is filled from the version in use once, and again after the owner's own save, never over what the owner
-  // is typing when a row's Use or Set aside reloads the page.
-  let fillForm = true;
-  const form = buildForm(() => {
-    fillForm = true;
-    return reload();
-  });
+  // The button at the head of Versions opens the form of the owner's own version in a dialog (item 615). It is made once:
+  // the page is drawn again with every read.
+  const opener = el("button", { class: "harness-write", type: "button", "aria-haspopup": "dialog" }, icon("pencil"), "Write your own");
+  opener.addEventListener("click", () => writeOwn());
 
   /** The versions, the one in use first (also when it is older than the page the daemon gave) and the others as the
    * daemon lists them, the newest first; under them, how many older ones there are to show. */
@@ -578,10 +555,6 @@ export function mount(root, ctx) {
     if (view === null) {
       return;
     }
-    if (fillForm) {
-      form.fill(view.adopted === null ? { habits: "", tool_guidance: "" } : view.adopted);
-    }
-    fillForm = false;
     const handlers = {
       onAdopt: (version) => attempt(() => adoptVersion(version)),
       onRetire: (version) => attempt(() => retireVersion(version)),
@@ -596,8 +569,8 @@ export function mount(root, ctx) {
         setSection({ title: "What Dot follows now", body: followBody(view, handlers) }),
         setSection({
           title: ["Versions", el("span", { class: "harness-count" }, String(view.versions_total))],
-          actions: form.opener,
-          body: el("div", { class: "harness-stack" }, form.element, versionsBody(handlers)),
+          actions: opener,
+          body: versionsBody(handlers),
         }),
         setSection({ title: "Nightly learning", body: nightlyBody(view, steps) }),
         setSection({
@@ -610,7 +583,30 @@ export function mount(root, ctx) {
         howItLearns(view),
       ),
     );
-    form.describe(view);
+  }
+
+  /** The form that writes a version of the owner's, in a dialog: it starts from the version in use as the daemon last
+   * said it, and Save for later and Save and use are its two ways to save beside Cancel. */
+  function writeOwn() {
+    if (view === null) {
+      return;
+    }
+    const form = buildForm(view);
+    const saved = (adoptNow) => async () => {
+      await form.submit(adoptNow);
+      await reload();
+      return true;
+    };
+    formDialog({
+      title: "Write your own version",
+      description: "Habits and tool guidance for every run, written by you.",
+      body: form.element,
+      submitLabel: "Save and use",
+      alternative: { label: "Save for later", onSubmit: saved(false) },
+      size: "wide",
+      returnFocus: opener,
+      onSubmit: saved(true),
+    });
   }
 
   async function reload() {

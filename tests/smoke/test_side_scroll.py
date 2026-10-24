@@ -393,27 +393,31 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
             await page.get_by_role("button", name="Show more notes").click()
             await expect(notes).to_have_count(_NOTES)
             await expect(page.get_by_role("button", name="Show more notes")).to_be_hidden()
-            # A note near the end is being corrected while another is forgotten.
+            # A note near the end is corrected in a dialog (item 615): the page behind keeps its place as the dialog
+            # opens, and the notes read stay read as it closes.
             note_id: str = await notes.nth(_NOTES - 3).get_attribute("data-memory") or ""
             corrected: Locator = page.locator(f"[data-memory='{note_id}']")
-            await corrected.get_by_role("button", name="Edit this note").click()
-            await expect(corrected.get_by_role("textbox", name="Note")).to_be_visible()
+            await corrected.get_by_role("button", name="Edit this note").scroll_into_view_if_needed()
             before: int = int(await page.evaluate("window.scrollY"))
             assert before > 400, f"the page does not scroll: {before}"
+            await corrected.get_by_role("button", name="Edit this note").click()
+            dialog: Locator = page.get_by_role("dialog", name="Edit note")
+            await expect(dialog.get_by_role("textbox", name="Note")).to_be_focused()
+            assert await _window_kept(page, before)
+            # The correction is saved: the note goes to the head of the list, where the notes changed last stand, the
+            # list stays, and the page stays where it was.
+            await dialog.get_by_role("textbox", name="Note").fill("A corrected note about the garden.")
+            await dialog.get_by_role("button", name="Save").click()
+            await expect(page.locator(".toast", has_text="Note updated.")).to_be_visible()
+            await expect(dialog).to_have_count(0)
+            await expect(notes.first).to_contain_text("A corrected note about the garden.")
+            await expect(notes).to_have_count(_NOTES)
+            assert await _window_kept(page, before)
+            # Another note is forgotten: the notes read stay read, one fewer, and the page stays where it was.
+            before = int(await page.evaluate("window.scrollY"))
             await notes.last.get_by_role("button", name="Forget this note").click()
             await page.get_by_role("dialog").get_by_role("button", name="Forget").click()
             await expect(page.locator(".toast", has_text="Forgotten.")).to_be_visible()
-            # The notes read stay read, one fewer, the page stays where it was and the form stays open.
-            await expect(notes).to_have_count(_NOTES - 1)
-            assert await _window_kept(page, before)
-            await expect(corrected.get_by_role("textbox", name="Note")).to_be_visible()
-            # The correction is saved: the note goes to the head of the list, where the notes changed last stand, and
-            # the list stays.
-            before = int(await page.evaluate("window.scrollY"))
-            await corrected.get_by_role("textbox", name="Note").fill("A corrected note about the garden.")
-            await corrected.get_by_role("button", name="Save").click()
-            await expect(page.locator(".toast", has_text="Note updated.")).to_be_visible()
-            await expect(notes.first).to_contain_text("A corrected note about the garden.")
             await expect(notes).to_have_count(_NOTES - 1)
             assert await _window_kept(page, before)
             await page.screenshot(path=str(tmp_path / "memory-forgotten-1280-light.png"), animations="disabled")

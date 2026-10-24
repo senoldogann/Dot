@@ -33,6 +33,7 @@ import { lookPicker } from "../lookpicker.js";
 import {
   choiceRowSetting,
   choiceSetting,
+  field,
   foldCard,
   foldGroup,
   inlineError,
@@ -50,7 +51,7 @@ import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
 import { scrollCue } from "../scrollcue.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
-import { attempt, confirmDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 import { canListen, canSpeak, sayOnce, stopReading } from "../voice.js";
 
 const NOT_SET = "—";
@@ -1699,20 +1700,7 @@ function buildBrowser(isDisposed, head) {
   // The profiles of Dot's own Chrome (item 355): Default, Incognito and the ones added; runs work on
   // the one in use.
   const profileList = el("div", { class: "profile-list", role: "list", "aria-label": "Profiles" });
-  const profileName = el("input", {
-    class: "input sm grow",
-    type: "text",
-    maxlength: "48",
-    autocomplete: "off",
-    spellcheck: "false",
-    placeholder: "Work",
-    "aria-label": "Name of the new profile",
-  });
-  const addForm = el("form", { class: "set-row profile-add", hidden: true }, profileName, el("button", { class: "btn sm", type: "submit" }, "Add"));
-  addForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    attempt(addProfile);
-  });
+  // Add profile asks for the new profile's name in a dialog (item 615).
   const addButton = el(
     "button",
     {
@@ -1720,10 +1708,8 @@ function buildBrowser(isDisposed, head) {
       type: "button",
       title: "Add a profile of Dot's Chrome",
       "aria-label": "Add profile",
-      onclick: () => {
-        addForm.hidden = false;
-        profileName.focus();
-      },
+      "aria-haspopup": "dialog",
+      onclick: () => openAddProfile(),
     },
     icon("plus"),
     el("span", { class: "label" }, "Add profile"),
@@ -1732,7 +1718,7 @@ function buildBrowser(isDisposed, head) {
     title: "Profiles",
     lead: "Each profile of Dot's own Chrome keeps its own cookies and sign-ins, and runs work on the one in use.",
     actions: addButton,
-    body: setCard(profileList, addForm),
+    body: setCard(profileList),
   });
   profileSetting.hidden = true;
   const port = el("input", {
@@ -1920,14 +1906,35 @@ function buildBrowser(isDisposed, head) {
     }
   }
 
-  async function addProfile() {
-    const name = profileName.value.trim();
-    if (name === "") {
-      return;
-    }
-    await changeProfiles(api.post("/browser/profiles", { name }), `${name} is added; Use makes runs work on it.`);
-    profileName.value = "";
-    addForm.hidden = true;
+  /** The name of a new profile, asked for in a dialog; the card shows the profile once the daemon made it. */
+  function openAddProfile() {
+    const name = el("input", {
+      class: "input",
+      type: "text",
+      maxlength: "48",
+      autocomplete: "off",
+      spellcheck: "false",
+      placeholder: "Work",
+      "aria-label": "Name of the new profile",
+    });
+    formDialog({
+      title: "Add a profile",
+      description: "Each profile of Dot's own Chrome keeps its own cookies and sign-ins, and runs work on the one in use.",
+      body: field("Name", name, ""),
+      submitLabel: "Add",
+      size: "narrow",
+      submitOnEnter: true,
+      returnFocus: addButton,
+      onSubmit: async () => {
+        const typed = name.value.trim();
+        if (typed === "") {
+          name.focus();
+          return false;
+        }
+        await changeProfiles(api.post("/browser/profiles", { name: typed }), `${typed} is added; Use makes runs work on it.`);
+        return true;
+      },
+    });
   }
 
   async function clearProfile(profile, label) {

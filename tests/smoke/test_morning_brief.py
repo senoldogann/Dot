@@ -15,6 +15,14 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 import pytest_asyncio
+from form_dialogs import (
+    asks_before_dropping,
+    closes_with_escape,
+    foot_is_in_view,
+    keeps_inside_the_window,
+    open_form,
+    shows_the_failure,
+)
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 from pydantic import TypeAdapter
 from structlog.testing import capture_logs
@@ -631,9 +639,11 @@ async def _no_schedules(runtime: Runtime) -> None:
 
 
 @pytest.mark.browser
-async def test_the_card_sets_the_brief_the_list_labels_it_and_a_switch_in_the_list_turns_the_card_off(
+async def test_the_settings_open_in_a_dialog_set_the_brief_the_list_labels_it_and_a_switch_in_the_list_turns_it_off(
     runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
+    """Item 615: the card is a line, its switch and a Settings button; the time, the days and the owner's lines are in a
+    dialog that button opens, with Write one now beside Save, on a desktop and on a phone."""
     port: int | None = client.base_url.port
     assert port is not None
     async with async_playwright() as playwright:
@@ -653,9 +663,10 @@ async def test_the_card_sets_the_brief_the_list_labels_it_and_a_switch_in_the_li
                 await page.goto(f"http://127.0.0.1:{port}/#/schedules")
                 card: Locator = page.locator("[data-brief]")
                 switch: Locator = card.get_by_role("switch", name="Morning brief on")
+                settings: Locator = card.get_by_role("button", name="Morning brief settings")
                 await expect(card.get_by_role("heading", name="Morning brief")).to_be_visible()
                 await expect(switch).to_have_attribute("aria-checked", "false")
-                # The owner's schedules lead the page; the brief is a line under them, its settings folded (item 609).
+                # The owner's schedules lead the page; the brief is a line under them (item 609).
                 assert await page.evaluate(
                     """() => {
                       const list = document.querySelector('.schedule-panel');
@@ -666,41 +677,167 @@ async def test_the_card_sets_the_brief_the_list_labels_it_and_a_switch_in_the_li
                     }"""
                 )
                 await expect(card.locator(".brief-summary")).to_have_text("Off")
-                await expect(card.get_by_label("Time")).to_be_hidden()
-                await card.get_by_role("button", name="Show the brief's settings").click()
-                await expect(card.get_by_role("button", name="Hide the brief's settings")).to_have_attribute(
-                    "aria-expanded", "true"
-                )
-                await expect(card.get_by_label("Time")).to_have_value("08:00")
-                await expect(card.get_by_role("button", name="Every day")).to_have_attribute("aria-pressed", "true")
-                await expect(card.get_by_text("No mail or calendar account is signed in")).to_be_visible()
-                # Set it: a time, the weekdays, lines of its own, and switch it on.
-                await card.get_by_label("Time").fill("07:30")
-                await card.get_by_role("button", name="Weekdays").click()
-                await card.get_by_label("Also tell me about").fill("the roof repair\n\nthe visa office")
+                # Its settings are not in the page (item 615): the Settings button opens them in a dialog.
+                await expect(page.get_by_label("Time")).to_have_count(0)
+                await expect(settings).to_have_attribute("aria-haspopup", "dialog")
+                dialog: Locator = await open_form(page, settings, "Morning brief")
+                await expect(dialog.get_by_label("Time")).to_have_value("08:00")
+                await expect(dialog.get_by_role("button", name="Every day")).to_have_attribute("aria-pressed", "true")
+                await expect(dialog.get_by_text("No mail or calendar account is signed in")).to_be_visible()
+                await expect(dialog.get_by_role("button", name="Write one now")).to_be_visible()
+                await keeps_inside_the_window(page)
+                await foot_is_in_view(page, dialog)
+                await page.screenshot(path=str(tmp_path / f"brief-dialog-{width}-{scheme}.png"))
+                # What is typed is not dropped without asking; dropped, the fields are the saved brief again.
+                await asks_before_dropping(page, dialog, dialog.get_by_label("Also tell me about"), "the roof")
+                dialog = await open_form(page, settings, "Morning brief")
+                await expect(dialog.get_by_label("Also tell me about")).to_have_value("")
+                await closes_with_escape(page, dialog, settings)
+                # Set it: a time, the weekdays and lines of its own, saved from the dialog; off until its switch.
+                dialog = await open_form(page, settings, "Morning brief")
+                await dialog.get_by_label("Time").fill("07:30")
+                await dialog.get_by_role("button", name="Weekdays").click()
+                await dialog.get_by_label("Also tell me about").fill("the roof repair\n\nthe visa office")
+                await dialog.get_by_role("button", name="Save", exact=True).click()
+                await expect(dialog).to_have_count(0)
+                await expect(settings).to_be_focused()
+                kept: JsonObject = (await client.get("/api/brief")).json()
+                assert (kept["enabled"], kept["time"], kept["days"]) == (False, "07:30", "weekdays")
+                await expect(card.locator(".brief-summary")).to_have_text("Off")
                 await switch.click()
                 await expect(switch).to_have_attribute("aria-checked", "true")
-                await expect(card.get_by_text("Next ")).to_be_visible()
                 await expect(card.locator(".brief-summary")).to_have_text("Weekdays at 07:30")
                 saved: JsonObject = (await client.get("/api/brief")).json()
                 assert (saved["enabled"], saved["time"], saved["days"]) == (True, "07:30", "weekdays")
                 assert saved["lines"] == ["the roof repair", "the visa office"]
-                # The list shows it as the brief, a read-only run; its pencil leads to the card, not to a form.
+                dialog = await open_form(page, settings, "Morning brief")
+                await expect(dialog.get_by_text("Next ")).to_be_visible()
+                await closes_with_escape(page, dialog, settings)
+                # The list shows it as the brief, a read-only run; its pencil opens the settings, not a form in the row.
                 row: Locator = page.locator(f'[data-schedule="{saved["schedule_id"]}"]')
                 await expect(row.locator(".badge", has_text="Brief")).to_be_visible()
                 await expect(row.locator(".chip", has_text="research")).to_be_visible()
                 await row.get_by_role("button", name="Edit Morning brief").click()
-                await expect(card.get_by_label("Time")).to_be_focused()
-                await expect(page.locator("[data-schedule-form]")).to_have_count(1)
+                await expect(dialog).to_be_visible()
+                await expect(dialog.get_by_label("Time")).to_be_focused()
+                await expect(page.locator("[data-schedule-form]")).to_have_count(0)
+                await page.keyboard.press("Escape")
+                await expect(dialog).to_have_count(0)
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"brief-{width}-{scheme}.png"), full_page=True)
-                # Switched off in the list, the card follows and keeps what was set.
+                # Switched off in the list, the line follows and the dialog opens on what was set.
                 await row.get_by_role("switch", name="Switch off Morning brief").click()
                 await expect(switch).to_have_attribute("aria-checked", "false")
-                await expect(card.get_by_text("Switched off")).to_be_visible()
-                await expect(card.get_by_label("Time")).to_have_value("07:30")
-                await expect(card.get_by_label("Also tell me about")).to_have_value("the roof repair\nthe visa office")
+                await expect(card.locator(".brief-summary")).to_have_text("Off")
+                dialog = await open_form(page, settings, "Morning brief")
+                await expect(dialog.get_by_text("Switched off")).to_be_visible()
+                await expect(dialog.get_by_label("Time")).to_have_value("07:30")
+                await expect(dialog.get_by_label("Also tell me about")).to_have_value(
+                    "the roof repair\nthe visa office"
+                )
                 await page.close()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_brief_the_daemon_refuses_says_why_in_the_dialog_and_keeps_what_was_typed(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    await _no_schedules(runtime)
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            settings: Locator = page.locator("[data-brief]").get_by_role("button", name="Morning brief settings")
+            await expect(settings).to_be_enabled()
+            dialog: Locator = await open_form(page, settings, "Morning brief")
+            # The daemon refuses a line of more than 300 characters, and says so inside the dialog.
+            lines: Locator = dialog.get_by_label("Also tell me about")
+            await lines.fill("x" * 301)
+            await dialog.get_by_label("Time").fill("06:15")
+            await dialog.get_by_role("button", name="Save", exact=True).click()
+            await shows_the_failure(dialog, "at most 300 characters")
+            await expect(lines).to_have_value("x" * 301)
+            await expect(dialog.get_by_label("Time")).to_have_value("06:15")
+            assert (await client.get("/api/brief")).json()["time"] == "08:00"
+            # Put right, it saves and closes; the failure does not stay on the page.
+            await lines.fill("the roof repair")
+            await dialog.get_by_role("button", name="Save", exact=True).click()
+            await expect(dialog).to_have_count(0)
+            assert (await client.get("/api/brief")).json()["time"] == "06:15"
+            # A refusal of Write one now is said in the dialog too, not in a toast under it.
+            await _set(client, {"enabled": True, "time": "08:00", "days": "every", "lines": []})
+            await page.reload()
+            await expect(settings).to_be_enabled()
+            await page.route(
+                "**/api/schedules/*/run",
+                lambda route: route.fulfill(status=409, json={"message": "A run of it is going."}),
+            )
+            dialog = await open_form(page, settings, "Morning brief")
+            await dialog.get_by_role("button", name="Write one now").click()
+            await shows_the_failure(dialog, "A run of it is going.")
+            await expect(page).to_have_url(re.compile(r"#/schedules$"))
+            # Write one now saves what was changed first: the brief written now is the one the dialog says, and leaving
+            # the page drops nothing (the review of item 615).
+            await page.keyboard.press("Escape")
+            await expect(dialog).to_have_count(0)
+            await page.unroute("**/api/schedules/*/run")
+            await page.route(
+                "**/api/schedules/*/run", lambda route: route.fulfill(status=200, json={"id": "run_written_now"})
+            )
+            dialog = await open_form(page, settings, "Morning brief")
+            await dialog.get_by_label("Time").fill("07:45")
+            await dialog.get_by_role("button", name="Write one now").click()
+            await expect(page).to_have_url(re.compile(r"#/runs/run_written_now$"))
+            assert (await client.get("/api/brief")).json()["time"] == "07:45"
+            await page.close()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_link_in_the_dialog_asks_before_it_takes_what_was_typed_to_another_page(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 615: Add one, in the settings of the brief, leads to Connectors and takes the dialog with it. Left alone
+    it goes at once; with a line typed, it asks first, as Cancel does: Keep editing stays, Discard goes."""
+    await _no_schedules(runtime)
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            settings: Locator = page.locator("[data-brief]").get_by_role("button", name="Morning brief settings")
+            await expect(settings).to_be_enabled()
+            dialog: Locator = await open_form(page, settings, "Morning brief")
+            await dialog.get_by_label("Also tell me about").fill("the roof repair")
+            await dialog.get_by_role("link", name="Add one").click()
+            question: Locator = page.locator("dialog", has_text="Discard your changes?")
+            await expect(question).to_be_visible()
+            await question.get_by_role("button", name="Keep editing").click()
+            await expect(question).to_have_count(0)
+            await expect(page).to_have_url(re.compile(r"#/schedules$"))
+            await expect(dialog.get_by_label("Also tell me about")).to_have_value("the roof repair")
+            await dialog.get_by_role("link", name="Add one").click()
+            await page.locator("dialog", has_text="Discard your changes?").get_by_role("button", name="Discard").click()
+            await expect(page).to_have_url(re.compile(r"#/customize/connectors$"))
+            await expect(page.get_by_role("dialog")).to_have_count(0)
+            # Nothing typed: the link goes at once.
+            await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            await expect(settings).to_be_enabled()
+            dialog = await open_form(page, settings, "Morning brief")
+            await dialog.get_by_role("link", name="Add one").click()
+            await expect(page).to_have_url(re.compile(r"#/customize/connectors$"))
+            await expect(page.get_by_role("dialog")).to_have_count(0)
+            await page.close()
         finally:
             await browser.close()
 
@@ -720,9 +857,13 @@ async def test_write_one_now_starts_a_brief_and_opens_its_page(
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
             await page.goto(f"http://127.0.0.1:{port}/#/schedules")
-            await page.locator("[data-brief]").get_by_role("button", name="Show the brief's settings").click()
-            await page.locator("[data-brief]").get_by_role("button", name="Write one now").click()
+            settings: Locator = page.locator("[data-brief]").get_by_role("button", name="Morning brief settings")
+            await expect(settings).to_be_enabled()
+            await settings.click()
+            await page.get_by_role("dialog", name="Morning brief").get_by_role("button", name="Write one now").click()
             await expect(page).to_have_url(re.compile(r"#/runs/run_"))
+            # The page the dialog belonged to is gone, and so is the dialog.
+            await expect(page.get_by_role("dialog")).to_have_count(0)
             run_id: str = page.url.rsplit("/", 1)[1]
             started: RunRecord = await runtime.store.get_run(run_id)
             assert (started.mode, started.source) == ("research", "schedule")
@@ -733,11 +874,12 @@ async def test_write_one_now_starts_a_brief_and_opens_its_page(
 
 
 @pytest.mark.browser
-async def test_the_folded_line_says_a_time_set_elsewhere_and_a_brief_that_could_not_be_read(
+async def test_the_line_says_a_time_set_elsewhere_and_a_brief_that_could_not_be_read(
     runtime: Runtime, scheduler: Scheduler, client: httpx.AsyncClient
 ) -> None:
     """The pre-push review of item 609: folded, the card's line gave the card's own time for a schedule set elsewhere at
-    times the card cannot show, and a first read that failed said so only in the folded settings."""
+    times the card cannot show, and a first read that failed said so only in the folded settings; the settings are in a
+    dialog now (item 615), and the line says both, with the button of the dialog off until the brief is read."""
     await _no_schedules(runtime)
     await _set(client, {"enabled": True, "time": "08:00", "days": "every", "lines": []})
     record: ScheduleRecord = await _brief_schedule(client)
@@ -767,10 +909,16 @@ async def test_the_folded_line_says_a_time_set_elsewhere_and_a_brief_that_could_
             await page.goto(f"http://127.0.0.1:{port}/#/schedules")
             card: Locator = page.locator("[data-brief]")
             await expect(card.locator(".brief-summary")).to_have_text(
-                "On, at times this card cannot show: open it to see"
+                "On, at times this card cannot show: open its settings to see"
             )
+            # The settings say it too, with the card's own time and the schedule's cron.
+            dialog: Locator = await open_form(
+                page, card.get_by_role("button", name="Morning brief settings"), "Morning brief"
+            )
+            await expect(dialog).to_contain_text("15 8 * * 0")
+            await page.keyboard.press("Escape")
             await page.close()
-            # A brief that cannot be read says so on its line, with a way to try again, though the card is folded.
+            # A brief that cannot be read says so on its line, with a way to try again, and its settings stay shut.
             page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
             await page.route("**/api/brief", lambda route: route.fulfill(status=500, body="{}"))
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
@@ -778,6 +926,7 @@ async def test_the_folded_line_says_a_time_set_elsewhere_and_a_brief_that_could_
             card = page.locator("[data-brief]")
             await expect(card.locator(".brief-summary")).to_contain_text("This could not be loaded")
             await expect(card.locator(".brief-summary").get_by_role("button", name="Try again")).to_be_visible()
+            await expect(card.get_by_role("button", name="Morning brief settings")).to_be_disabled()
             await page.close()
         finally:
             await browser.close()

@@ -279,7 +279,9 @@ the key in use comes from (the daemon's environment, Dot's `.env` file or the Ke
 or more, its last four characters; a key never comes back from the daemon whole. **Check** asks the provider whether it
 takes the key in use: the model listing of OpenAI and Anthropic, the subscription of OpenCode Go and the key's own page
 at OpenRouter (what it has spent and may spend) cost nothing, the Ollama key is tried with one search of its hosted web
-search. **Add key** or **Replace key** saves a key in `<home>/.env` and then runs **Check**; **Remove** takes away the
+search. **Add key** or **Replace key** asks for the key in a dialog (item 615), saves it in `<home>/.env` and then runs
+**Check**; the key is hidden until you show it, a key with a space inside is refused there, and one typed and dropped
+is gone when the dialog opens again; **Remove** takes away the
 key saved there (a key from the environment or the Keychain is left alone). The page warns when the daemon was started
 with the variable in its environment, which comes before a key saved in Dot. A saved or removed key is used from the
 next request of a run on, even in a run under way; so are the Ollama and Anthropic rungs of web search, which join the
