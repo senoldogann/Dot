@@ -248,8 +248,10 @@ once the program is built it asks nothing at all. A build that fails forgets wha
 same moment wait for one question. The page reads the answer in the background as it starts, and nothing of its start
 waits for it, a Mac browser's or Dot.app's included, which never needs it. A composer made before the answer listens the
 browser's way; one that is not listening takes the way the answer gives at its next press, and Settings › General ›
-Voice, which says which way the page listens, is written again when the answer comes in. A Mac that could not be asked
-at all (the daemon failed, or could not be reached) leaves the page as it was, and the card says so. Where the Mac
+Voice, which says which way the page listens, is written again when the answer comes in. In a browser with no speech
+recognition (Firefox) a composer made before the answer has no microphone, and one made after it has. A Mac that could
+not be asked at all (the daemon failed, or could not be reached) leaves the page as it was, and on an iPhone, an iPad
+or a browser with no speech recognition, where the Mac's answer decides how the page listens, the card says so. Where the Mac
 cannot write down, an iPhone keeps Safari's recognition, and the toast of item 616 adds what the Mac lacks.
 `POST /api/voice/transcribe` takes `{"language": "tr-TR", "data_b64": "<WAV>"}` and answers `{"text": "…"}`, empty
 when nothing was heard. It is behind the token like every route, so the phone paired in Settings › Phone reaches it as

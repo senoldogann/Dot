@@ -307,10 +307,12 @@ async def test_pages_that_load_while_a_slow_mac_is_asked_share_one_question_and_
     default), so that no program is built in the folder the other tests build in."""
     asked: list[int] = []
     real = helper.find_compiler
+    # The Mac is asked, and answers only once the test lets it: a route that waited for it would never answer.
+    answer_now: asyncio.Event = asyncio.Event()
 
     async def slow() -> object:
         asked.append(1)
-        await asyncio.sleep(0.5)
+        await answer_now.wait()
         return await real()
 
     monkeypatch.setattr(helper, "find_compiler", slow)
@@ -332,10 +334,11 @@ async def test_pages_that_load_while_a_slow_mac_is_asked_share_one_question_and_
     ) as client:
         loads: list[asyncio.Task[httpx.Response]] = [asyncio.create_task(client.get("/api/voice")) for _ in range(6)]
         await asyncio.sleep(0.1)
-        began: float = time.monotonic()
-        health: httpx.Response = await client.get("/api/health")
+        # Answered while the Mac has not answered yet: no route waits for it (a wall clock would fail under load).
+        health: httpx.Response = await asyncio.wait_for(client.get("/api/health"), 10)
         assert health.status_code == 200
-        assert time.monotonic() - began < 0.3, "a route waited for the Mac to be asked"
+        assert not answer_now.is_set() and asked == [1], "a route waited for the Mac to be asked"
+        answer_now.set()
         answers: list[httpx.Response] = await asyncio.gather(*loads)
         assert [answer.json() for answer in answers] == [{"transcribe": False, "why": NO_COMPILER}] * 6
         # The next loads are answered from what the Mac said.
