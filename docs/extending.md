@@ -64,12 +64,13 @@ same asks as anything else the run does ([Safety](safety.md)).
 ## Customize › Connectors
 
 **Connectors** lists 156 services with a search, **Connected** and **All** (each with its count) and **Check again** in
-its head, the accounts under it, and the sections as chips (item 545), one showing its section alone: Popular,
-Password managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac
-(item 492), each titled with its count. Popular stands up as Plugins' New & noteworthy does, four cards a row. Each card
-has the service's mark, what Dot does with it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On
-this Mac, MCP · On this Mac · Key, AppleScript, Dot's browser or Synced folder), where it stands, and its first step in
-words on the line of its name (**Add**, **Allow**, **Sign in**, **Connect**), and lifts under the pointer; a card
+its head, the accounts under it, and the sections as chips (item 545), one showing its section alone: Popular, Password
+managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item
+492), each titled with its count. Popular stands up as Plugins' New & noteworthy does, four cards a row (two on a
+narrower window); on a phone its cards are rows as the other sections' are, the mark beside the words (item 604). Each
+card has the service's mark, what Dot does with it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP ·
+On this Mac, MCP · On this Mac · Key, AppleScript, Dot's browser or Synced folder), where it stands, and its first step
+in words on the line of its name (**Add**, **Allow**, **Sign in**, **Connect**), and lifts under the pointer; a card
 opens the service's own page: each way it connects, with where it stands and its step, the tools of its MCP server once
 it is ready, and where its data goes. **Check again** reads them all anew. `GET /api/plugins` returns the listings
 (`connections/directory.py`).

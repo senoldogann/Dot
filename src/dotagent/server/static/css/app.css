@@ -2570,34 +2570,46 @@ a.pill:hover {
   gap: var(--space-3);
 }
 
-.plugin-section[data-section="popular"] .plugin-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 6%, var(--surface)), var(--surface) 70%);
-}
+/* A Popular card stands up where the section shows two or four side by side: its mark over its words, its button at
+   its top right. On a phone, where the section is one column, it is a row as the other sections' are (item 604): a
+   card of the full width with its mark over its words left them a column of their own at the right. */
+@media (min-width: 721px) {
+  .plugin-section[data-section="popular"] .plugin-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 6%, var(--surface)), var(--surface) 70%);
+  }
 
-.plugin-section[data-section="popular"] .plugin-tile > .plugin-main {
-  display: grid;
-  align-content: start;
-}
+  .plugin-section[data-section="popular"] .plugin-tile > .plugin-main {
+    display: grid;
+    align-content: start;
+  }
 
-.plugin-section[data-section="popular"] .plugin-tile > .plugin-mark {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius);
-}
+  /* The words keep the one column of the card's main part: a row's rules put its name and what it does in a second
+     column, which here opened beside an empty one and pushed them right (item 604). */
+  .plugin-section[data-section="popular"] .plugin-tile .plugin-main > * {
+    grid-column: 1;
+    grid-row: auto;
+  }
 
-.plugin-section[data-section="popular"] .plugin-tile > .plugin-add {
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-}
+  .plugin-section[data-section="popular"] .plugin-tile > .plugin-mark {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius);
+  }
 
-.plugin-section[data-section="popular"] .plugin-does {
-  -webkit-line-clamp: 3;
+  .plugin-section[data-section="popular"] .plugin-tile > .plugin-add {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+  }
+
+  .plugin-section[data-section="popular"] .plugin-does {
+    -webkit-line-clamp: 3;
+  }
 }
 
 /* The accounts side by side where they fit, each provider a block of its own. */
