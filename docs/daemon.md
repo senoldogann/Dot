@@ -241,25 +241,25 @@ Swift compiler of Apple's developer tools the first time it is needed (`src/dota
 whether the Mac can: `transcribe`, and when it cannot `why`, in words (macOS 26 or later; Apple's developer tools,
 `xcode-select --install`; a compiler and an SDK in them; or what the compiler complained of when a build failed, which
 is not tried again for ten minutes). When it can, the daemon builds the program in the background then, so that the
-first recording does not wait. The answer needs up to three programs of the Mac's (`xcode-select -p` and two of
-`xcrun`, ten seconds each at the most), and a page asks at each load, so the daemon asks once and remembers: a compiler
-it found, for its life; a Mac without the tools, for 30 seconds, so that installing them is seen without a restart; and
-once the program is built it asks nothing at all. A build that fails forgets what the Mac said, and the callers at the
-same moment wait for one question. The page reads the answer in the background as it starts, and nothing of its start
-waits for it, a Mac browser's or Dot.app's included, which never needs it. A composer made before the answer listens the
+first recording does not wait. The answer needs up to three programs of the Mac's (`xcode-select -p` and two of `xcrun`,
+ten seconds each at the most), and a page asks at each load, so the daemon asks once and remembers: a compiler it found,
+for its life; a Mac without the tools, for 30 seconds, so that installing them is seen without a restart; and once the
+program is built it asks nothing at all. A build that fails forgets what the Mac said, and the callers at the same
+moment wait for one question. The page reads the answer in the background as it starts, and nothing of its start waits
+for it, a Mac browser's or Dot.app's included, which never needs it. A composer made before the answer listens the
 browser's way; one that is not listening takes the way the answer gives at its next press, and Settings › General ›
 Voice, which says which way the page listens, is written again when the answer comes in. In a browser with no speech
-recognition (Firefox) a composer made before the answer has no microphone, and one made after it has. A Mac that could
-not be asked at all (the daemon failed, or could not be reached) leaves the page as it was, and on an iPhone, an iPad
-or a browser with no speech recognition, where the Mac's answer decides how the page listens, the card says so. Where the Mac
-cannot write down, an iPhone keeps Safari's recognition, and the toast of item 616 adds what the Mac lacks.
-`POST /api/voice/transcribe` takes `{"language": "tr-TR", "data_b64": "<WAV>"}` and answers `{"text": "…"}`, empty
-when nothing was heard. It is behind the token like every route, so the phone paired in Settings › Phone reaches it as
-it reaches the composer, and it reads the recording as a model before it does anything with it: a WAV of 16-bit mono
-sound of 8 to 48 kHz, five minutes and about 10 MB at most, and a language of two or three letters and a region
-(`en-US`, `tr-TR`). Anything else is a 422 that says what to do; so is a Mac that cannot, with `context.code`
-`unavailable`, `unsupported-language`, `no-audio`, `timeout` (60 seconds; five minutes the first time a language is
-used, as macOS downloads its model from Apple then) or `failed`; never a stack.
+recognition (Firefox) a composer made before the answer has no microphone, and one made after it has one when the Mac
+can write down. A Mac that could not be asked at all (the daemon failed, or could not be reached) leaves the page as it
+was, and on an iPhone, an iPad or a browser with no speech recognition, where the Mac's answer decides how the page
+listens, the card says so. Where the Mac cannot write down, an iPhone keeps Safari's recognition, and the toast of item
+616 adds what the Mac lacks. `POST /api/voice/transcribe` takes `{"language": "tr-TR", "data_b64": "<WAV>"}` and answers
+`{"text": "…"}`, empty when nothing was heard. It is behind the token like every route, so the phone paired in Settings
+› Phone reaches it as it reaches the composer, and it reads the recording as a model before it does anything with it: a
+WAV of 16-bit mono sound of 8 to 48 kHz, five minutes and about 10 MB at most, and a language of two or three letters
+and a region (`en-US`, `tr-TR`). Anything else is a 422 that says what to do; so is a Mac that cannot, with
+`context.code` `unavailable`, `unsupported-language`, `no-audio`, `timeout` (60 seconds; five minutes the first time a
+language is used, as macOS downloads its model from Apple then) or `failed`; never a stack.
 
 The daemon writes the samples again behind a header of its own, with 0.8 seconds of silence after them (the dictation
 model drops the last word of a recording that ends as the word does), to a file of mode 0600 in
