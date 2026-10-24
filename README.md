@@ -110,12 +110,13 @@ Settings › Providers or `dotx setup`.
 ## What comes with Dot
 
 One MCP server is ready and on in every install: **web-research**, the package `dotagent-web-research`, which Dot's own
-package depends on. Its tools (`mcp__web-research__web_search`, `web_scrape`, `web_map`, `web_extract` and a crawl that
-runs in the background) search the web and read the pages a run asks for. It sends the queries to DuckDuckGo and Yahoo,
-and to Google when those refuse, and requests the pages itself ([What leaves this
-Mac](docs/safety.md#what-leaves-this-mac) says the rest). Switch it off with its switch in Customize › Connectors, or
-with `[builtin_mcp] web_research = false` in `config.toml`; a `[[mcp]]` table named `web-research` replaces it with your
-own ([MCP servers](docs/extending.md#mcp-servers)).
+package depends on. Its tools (`mcp__web-research__web_search`, `web_scrape`, `web_map`, `web_extract`, `web_health`
+and a crawl that runs in the background) search the web and read the pages a run asks for; while you have no list of
+sites set, it also reads pages of its own choosing: the heads of a news search's results for their dates, and another
+copy of a page behind a wall. It sends the queries to DuckDuckGo and Yahoo, and to Google when those refuse, and
+requests the pages itself ([What leaves this Mac](docs/safety.md#what-leaves-this-mac) says the rest). Switch it off
+with its switch in Customize › Connectors, or with `[builtin_mcp] web_research = false` in `config.toml`; a `[[mcp]]`
+table named `web-research` replaces it with your own ([MCP servers](docs/extending.md#mcp-servers)).
 
 ## First steps
 

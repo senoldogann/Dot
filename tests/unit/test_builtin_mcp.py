@@ -27,6 +27,7 @@ from dotagent.mcp.builtin import (
     WEB_RESEARCH,
     address_arguments,
     builtin_servers,
+    host_lists_set,
     reads_found_pages,
     reads_the_archive,
     search_arguments,
@@ -39,7 +40,7 @@ from dotagent.runtime import _dot_paths
 from dotagent.tools import mcp as tools_mcp
 from dotagent.tools import web as tools_web
 from dotagent.tools.browser import checked_url
-from dotagent.tools.mcp import checked_builtin_call, host_lists_set
+from dotagent.tools.mcp import checked_builtin_call
 from dotagent.tools.web import QUERY_MAX_CHARS, SearchArgs, checked_address, search_flags
 
 
