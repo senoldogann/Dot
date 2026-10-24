@@ -166,7 +166,7 @@ function emptyState(onPick) {
   return el(
     "div",
     { class: "rule-empty" },
-    emptyPanel("shield", "No rules yet", "Dot's built-in safety checks decide for now: it asks you before anything risky and does the rest on its own. Add a rule above, or start from one of these:"),
+    emptyPanel("shield", "No rules yet", "For now, Dot's built-in safety checks and the mode you chose decide when it asks you first. Add a rule above, or start from one of these:"),
     el(
       "div",
       { class: "rule-examples", role: "group", "aria-label": "Rules to start from" },

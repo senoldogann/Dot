@@ -134,7 +134,9 @@ function either(words) {
 // What a pattern may hold for one of its alternatives to be words: every character but the signs of a pattern (`\ ^ $ . |
 // ? * + ( ) [ ] { }`) is itself, a sign is itself when a backslash comes before it, which is how the drafter writes the
 // signs of a word (`x\.com`, `c\+\+`), and `[ \t]+` is a space, which is how it writes the space between the words of a
-// command. A space is a character like any other: one at the edge of an alternative is one the rule asks for.
+// command (it fits two spaces or a tab as well, a little more than the one space the sentence says: the sentence errs the
+// safe way for a rule that stops Dot, and the drafter's command pattern allows nothing more by it). A space is a character
+// like any other: one at the edge of an alternative is one the rule asks for.
 const PLAIN_ALTERNATIVE = /^(?:[^\\^$.|?*+()[\]{}]|\\[^\p{L}\p{N}]|\[ \\t\]\+)+$/u;
 const PLAIN_PART = /\\([^\p{L}\p{N}])|\[ \\t\]\+/gu;
 // What words cannot show: a character that is not printed (a line break, a joiner, a mark of direction) and a space that is
