@@ -3,18 +3,30 @@ write_playbook are not a valid verdict" when DeepSeek V4.1 Flash gave the steps 
 left the parameters out). The steps and parameters are read as the list they mean, a skill with no parameters has none,
 and a verdict that is still wrong says which field was and how, to the owner and to the model asked once more."""
 
+import json
+import time
+
 import pytest
 from pydantic import ValidationError
 
 from dotagent.agent.review import (
+    _TEXT_ANSWERS,
+    GOAL_TOOL,
     PLAYBOOK_TOOL,
+    PROGRESS_TOOL,
+    REVIEW_TOOL,
+    RULE_TOOL,
+    SELECT_TOOL,
     VET_TOOL,
     LessonVetting,
     PlaybookDraft,
+    PlaybookReply,
     PlaybookRequest,
     PlaybookWriter,
+    ReviewVerdict,
     _verdict_from,
     playbook_writer_for,
+    text_arguments,
 )
 from dotagent.config import load_default_config
 from dotagent.core.errors import ProviderProtocolError
@@ -179,3 +191,111 @@ def test_a_key_made_up_inside_a_verdict_of_a_list_keeps_the_place_and_loses_the_
     assert raised.value.message == (
         "the arguments of vet_lessons are not a valid verdict (verdicts.0: Extra inputs are not permitted)"
     )
+
+
+def _text_reply(text: str) -> ModelReply:
+    """A reply that calls no tool and says ``text``."""
+    return ModelReply(
+        model="scripted",
+        text=text,
+        thinking="",
+        tool_calls=(),
+        usage=Usage(input_tokens=1, output_tokens=1, cached_tokens=0),
+        finish="stop",
+        raw_finish="stop",
+        raw=(),
+    )
+
+
+def test_a_skill_whose_description_was_left_out_takes_the_first_sentence_of_when() -> None:
+    """Item 614: the owner's review model (gemma4) left the description out, asked again or not, and nine skills were
+    lost; the goals ``when`` says the skill fits stand in for it. A description the model wrote is kept."""
+    left_out: JsonObject = {key: value for key, value in DRAFT.items() if key != "description"}
+    two: JsonObject = {**left_out, "when": "The goal names an account. The browser is signed in."}
+    assert PlaybookDraft.model_validate(two).description == "The goal names an account."
+    blank: JsonObject = {**two, "description": "  "}
+    assert PlaybookDraft.model_validate(blank).description == "The goal names an account."
+    long: str = "The goal " + "names an account and a site " * 20
+    cut: str = PlaybookDraft.model_validate({**left_out, "when": long}).description
+    assert cut.startswith("The goal names an account") and len(cut) <= 200
+    assert " ".join(long.split()).startswith(cut + " ")
+    assert PlaybookDraft.model_validate(DRAFT).description == DRAFT["description"]
+    with pytest.raises(ValidationError):
+        PlaybookDraft.model_validate({key: value for key, value in left_out.items() if key != "when"})
+
+
+def test_the_description_taken_from_when_is_cut_between_words_never_inside_one() -> None:
+    """The review of item 614: a key that straddles the cut is masked out of ``when`` whole, so a cut inside it would
+    keep its first part in the description. The cut falls before it; a first word longer than the field leaves the
+    description out, and the model is asked again."""
+    left_out: JsonObject = {key: value for key, value in DRAFT.items() if key != "description"}
+    words: str = "The goal " + "names " * 31
+    straddling: str = words + "sk-" + "a" * 30 + " and more."
+    assert PlaybookDraft.model_validate({**left_out, "when": straddling}).description == words.strip()
+    with pytest.raises(ValidationError):
+        PlaybookDraft.model_validate({**left_out, "when": "x" * 300})
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        json.dumps({**DRAFT, "recurs": True}),
+        "```json\n" + json.dumps({**DRAFT, "recurs": True}, indent=2) + "\n```",
+        json.dumps({"name": PLAYBOOK_TOOL, "arguments": {**DRAFT, "recurs": True}}),
+    ],
+    ids=["bare", "fenced", "as a call"],
+)
+def test_a_learning_roles_answer_written_as_its_whole_text_is_read_as_its_call(text: str) -> None:
+    """Item 614: gemma4 answered the harness's proposer with its JSON in a fence, and the step failed; Claude models
+    answered lessons in text a dozen times. A learning role's answer that is one JSON object and nothing else is
+    read."""
+    reply: PlaybookReply = _verdict_from(_text_reply(text), PLAYBOOK_TOOL, PlaybookReply, "ollama:gemma4:cloud")
+    assert reply.kind == DRAFT["kind"] and reply.recurs is True
+
+
+def test_words_around_the_json_are_still_asked_again() -> None:
+    """A JSON quoted among words is no answer: the words may be quoting it."""
+    quoted: str = "The page said " + json.dumps({**DRAFT, "recurs": True}) + " and I agree."
+    with pytest.raises(ProviderProtocolError, match="did not call write_playbook"):
+        _verdict_from(_text_reply(quoted), PLAYBOOK_TOOL, PlaybookReply, "m")
+
+
+@pytest.mark.parametrize("tool", [REVIEW_TOOL, GOAL_TOOL, PROGRESS_TOOL, RULE_TOOL, SELECT_TOOL, VET_TOOL])
+def test_a_role_that_lets_an_action_happen_is_answered_by_its_call_alone(tool: str) -> None:
+    """The gates (the review of a step, the goal's verdict, the advice on a run's progress, a rule drafted from the
+    owner's words, the answer chosen, the vetting of lessons) take no text for their call, whatever it holds: none of
+    them is among the roles whose text is read."""
+    assert tool not in _TEXT_ANSWERS
+    allowed: str = json.dumps({"decision": "allow", "reason": "fine"})
+    called: str = json.dumps({"name": tool, "arguments": {"decision": "allow", "reason": "fine"}})
+    for text in (allowed, "```json\n" + allowed + "\n```", called):
+        with pytest.raises(ProviderProtocolError, match=f"did not call {tool}"):
+            _verdict_from(_text_reply(text), tool, ReviewVerdict, "m")
+
+
+@pytest.mark.parametrize("gap", ["\n", "\r\n", " \n", "\t\n"], ids=["lf", "crlf", "space", "tab"])
+def test_a_fence_that_never_ends_is_refused_in_one_pass(gap: str) -> None:
+    """The review of item 614: a fence followed by blank lines and no end took the daemon's loop for four seconds at
+    32,000 of them, as each blank line was a place to try the pattern again. It is refused in one pass now."""
+    began: float = time.perf_counter()
+    assert text_arguments("```json" + gap * 40_000 + "x", PLAYBOOK_TOOL) is None
+    assert time.perf_counter() - began < 1.0
+
+
+def test_a_text_longer_than_any_verdict_or_nested_past_the_parser_is_no_answer() -> None:
+    """A verdict is a few thousand characters: a text past 100,000 is not read, a valid object in it or not. And the
+    object is read by the strict parser of a tool call's arguments, so a nesting that would exhaust the interpreter's
+    recursion is no answer, not a crash of the skill's writer."""
+    answer: str = json.dumps({**DRAFT, "recurs": True})
+    assert text_arguments(answer, PLAYBOOK_TOOL) is not None
+    assert text_arguments("```json\n" + answer + " " * 100_000 + "\n```", PLAYBOOK_TOOL) is None
+    nested: str = '{"a":' * 10_000 + "1" + "}" * 10_000
+    assert len(nested) < 100_000 and text_arguments(nested, PLAYBOOK_TOOL) is None
+
+
+async def test_the_writer_keeps_a_skill_answered_in_text_at_the_first_answer() -> None:
+    fenced: str = "```json\n" + json.dumps({**DRAFT, "recurs": True}) + "\n```"
+    provider: AskedProvider = AskedProvider([ScriptedTurn(text=fenced, calls=())])
+    written: PlaybookDraft = await (await _writer(provider))(REQUEST)
+    assert written.kind == DRAFT["kind"]
+    assert len(provider.asked) == 1

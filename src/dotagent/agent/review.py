@@ -22,14 +22,16 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Annotated, Literal
 
-from pydantic import Field, StringConstraints, ValidationError, field_validator
+from pydantic import Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from dotagent.core.errors import (
     InvalidValueError,
+    JsonParseError,
     ProviderProtocolError,
     ProviderRefusedError,
     ProviderTransportError,
 )
+from dotagent.core.jsonutil import parse_json_object
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
@@ -773,6 +775,23 @@ class PlaybookDraft(FrozenModel):
     def _parameters_as_list(cls, value: object) -> object:
         return _list_from_text(value, 1)
 
+    # A model that leaves the description out (item 614: gemma4 did, asked again or not, and a skill was lost each
+    # time) still says in ``when`` the goals the skill fits: its first sentence stands in, cut between words to the 200
+    # characters of the field, as the line a later run reads to decide. Never inside a word: the secrets a skill is
+    # masked of are matched whole, and a cut one would keep its first part (the review of item 614); a first word longer
+    # than the field leaves the description out, and the model is asked again. A description the model wrote is kept.
+    @model_validator(mode="before")
+    @classmethod
+    def _description_from_when(cls, value: object) -> object:
+        if not isinstance(value, dict) or str(value.get("description") or "").strip():
+            return value
+        when: str = " ".join(str(value.get("when") or "").split())
+        first: str = re.split(r"(?<=[.!?])\s", when, maxsplit=1)[0] if when else ""
+        if len(first) > 200:
+            head: str = first[:201]
+            first = head.rsplit(" ", 1)[0] if " " in head else ""
+        return {**value, "description": first} if first else value
+
 
 class PlaybookReply(PlaybookDraft):
     """What the review model answers when it writes the skill of a run (item 585): the skill and one more field, whether
@@ -1306,6 +1325,58 @@ def goal_digest(transcript: str) -> str:
     return truncate_middle(redact_secrets(transcript), _DIGEST_CHARS)
 
 
+# The roles whose answer may come as text when the model writes the call's arguments as its whole answer (item 614):
+# the ones that write or judge what Dot learns. The roles that let an action happen or not (the review of a step,
+# the goal's verdict, the advice to a run at work, a rule drafted from the owner's words, the answer selected, the
+# vetting of lessons) are answered by the call alone: a model reading a page could quote its JSON, and a quote is no
+# verdict.
+_TEXT_ANSWERS: frozenset[str] = frozenset(
+    {
+        LESSONS_TOOL,
+        PLAYBOOK_TOOL,
+        OWNER_TOOL,
+        OUTDATED_TOOL,
+        MERGE_TOOL,
+        OVERLAP_TOOL,
+        REVISE_TOOL,
+        PROPOSE_TOOL,
+        COMPOSE_TOOL,
+        EXPERIENCE_TOOL,
+    }
+)
+# A verdict is a few thousand characters (a harness text is at most 1500): a longer text is no answer, and is not read.
+_TEXT_ANSWER_CHARS: int = 100_000
+# The fence's first line ends at its first line break, with only spaces and tabs before it, so a fence followed by blank
+# lines and no end is refused in one pass (the review of item 614: with ``\s*`` each blank line was a place to try
+# again, and 32,000 of them held the daemon's loop for four seconds).
+_FENCE: re.Pattern[str] = re.compile(r"^```[A-Za-z]*[ \t\r]*\n(?P<body>.*)\n```$", re.DOTALL)
+
+
+def text_arguments(text: str, tool: str) -> JsonObject | None:
+    """The arguments of ``tool`` a reply gave as its whole text, or ``None``: one JSON object and nothing else, in a
+    code fence or not, either the arguments themselves or a call that names ``tool`` (``{"name": tool, "arguments":
+    {...}}``, as some models write a call they could not make). Words around the object are no answer: they may quote
+    it. A text longer than :data:`_TEXT_ANSWER_CHARS` is none either, and the object is read by the strict parser of a
+    tool call's arguments (:func:`parse_json_object`, which refuses nesting past its depth)."""
+    if len(text) > _TEXT_ANSWER_CHARS:
+        return None
+    body: str = text.strip()
+    fenced: re.Match[str] | None = _FENCE.match(body)
+    if fenced is not None:
+        body = fenced.group("body").strip()
+    if not body.startswith("{"):
+        return None
+    try:
+        parsed: JsonObject = parse_json_object(body, f"the text answer of {tool}")
+    except JsonParseError:
+        return None
+    named: object = parsed.get("name", parsed.get("tool"))
+    inner: object = parsed.get("arguments", parsed.get("parameters", parsed.get("input")))
+    if named == tool and isinstance(inner, dict):
+        return inner
+    return parsed
+
+
 def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: type[V], model: str) -> V:
     """The verdict a reply carries; anything else is a protocol error that names what was wrong with it, but for a
     reply the provider ended as a refusal, a :class:`ProviderRefusedError` that names the model."""
@@ -1320,16 +1391,23 @@ def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: ty
         raise ProviderRefusedError(
             f"the review model {model} declined to answer (stop reason: {reply.raw_finish})", context
         )
-    if not calls:
-        raise ProviderProtocolError(f"the review model did not call {tool}", context)
-    broken: str | None = invalid_arguments_text(calls[0].arguments)
-    if broken is not None:
-        raise ProviderProtocolError(
-            f"the arguments of {tool} were not valid JSON",
-            {**context, "arguments": truncate_middle(broken, _PROBLEM_CHARS)},
-        )
+    arguments: JsonObject
+    if calls:
+        broken: str | None = invalid_arguments_text(calls[0].arguments)
+        if broken is not None:
+            raise ProviderProtocolError(
+                f"the arguments of {tool} were not valid JSON",
+                {**context, "arguments": truncate_middle(broken, _PROBLEM_CHARS)},
+            )
+        arguments = calls[0].arguments
+    else:
+        written: JsonObject | None = text_arguments(reply.text, tool) if tool in _TEXT_ANSWERS else None
+        if written is None:
+            raise ProviderProtocolError(f"the review model did not call {tool}", context)
+        log.info("review_answer_from_text", tool=tool, model=model)
+        arguments = written
     try:
-        return verdict_type.model_validate(calls[0].arguments)
+        return verdict_type.model_validate(arguments)
     except ValidationError as exc:
         raise ProviderProtocolError(
             f"the arguments of {tool} are not a valid verdict ({_fields_wrong(exc)})",
