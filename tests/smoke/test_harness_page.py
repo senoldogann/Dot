@@ -16,6 +16,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from form_dialogs import closes_with_escape, foot_is_in_view, keeps_inside_the_window, open_form, shows_the_failure
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -148,23 +149,33 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
         await expect(overview.locator(".stat-tile")).to_have_count(4)
         await expect(overview).to_contain_text("Built-in")
         await expect(overview).to_contain_text("The nightly learning is off")
-        # The form says what goes in it (item 412): that it is optional, what each field takes, with examples; it
-        # stays shut until the owner asks for it, with the button at the head of Versions (item 566).
+        # The form says what goes in it (item 412): that it is optional, what each field takes, with examples; it is
+        # not in the page: the button at the head of Versions (item 566) opens it in a dialog (item 615).
         write = page.locator(".harness-form")
-        await expect(write).to_be_hidden()
+        await expect(write).to_have_count(0)
         await expect(page.get_by_role("textbox", name="Habits")).to_have_count(0)
-        await page.get_by_role("button", name="Write your own").click()
+        opener = page.get_by_role("button", name="Write your own")
+        await expect(opener).to_have_attribute("aria-haspopup", "dialog")
+        dialog = await open_form(page, opener, "Write your own version")
         await expect(write.locator(".harness-intro")).to_contain_text("Optional: you need not write anything here.")
         await expect(write.locator(".harness-intro")).to_contain_text(
             "Once a time of day is set for the nightly learning"
         )
         assert "For example:" in (await page.get_by_role("textbox", name="Habits").get_attribute("placeholder") or "")
-        await write.get_by_role("button", name="Start from an example").click()
+        await foot_is_in_view(page, dialog)
+        await page.screenshot(path=tmp_path / "harness-dialog-1280.png")
+        await dialog.get_by_role("button", name="Start from an example").click()
         await expect(page.get_by_role("textbox", name="Habits")).to_have_value(re.compile(r"^- Read a file whole"))
         await expect(page.get_by_role("textbox", name="Summary")).not_to_have_value("")
+        # What the example put in the fields is a change: Escape asks first, and Keep editing leaves it all.
+        await page.keyboard.press("Escape")
+        await page.get_by_role("button", name="Keep editing").click()
+        await expect(page.get_by_role("textbox", name="Habits")).to_have_value(re.compile(r"^- Read a file whole"))
         await page.get_by_role("textbox", name="Habits").fill(f"- {HABIT}")
         await page.get_by_role("textbox", name="Summary").fill("Read first")
-        await page.get_by_role("button", name="Save and use").click()
+        await dialog.get_by_role("button", name="Save and use").click()
+        await expect(dialog).to_have_count(0)
+        await expect(opener).to_be_focused()
         in_use = _section(page, "What Dot follows now")
         await expect(in_use.get_by_text(HABIT)).to_be_visible()
         await expect(in_use.locator(".badge", has_text="In use")).to_be_visible()
@@ -187,9 +198,12 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
         await expect(in_use.get_by_text(HABIT)).to_be_visible()
         await expect(page.get_by_text("every night at", exact=False)).to_have_count(0)
         await expect(page.get_by_text("Set a time of day in the config file", exact=False)).to_be_visible()
-        # The button that opened the form shuts it again.
-        await page.get_by_role("button", name="Close").click()
-        await expect(write).to_be_hidden()
+        # The form is made from the version in use each time it opens: its habits are the one's, its summary is empty,
+        # and nobody changed it, so Escape shuts it at once and the focus is back on the button.
+        dialog = await open_form(page, opener, "Write your own version")
+        await expect(page.get_by_role("textbox", name="Habits")).to_have_value(f"- {HABIT}")
+        await expect(page.get_by_role("textbox", name="Summary")).to_have_value("")
+        await closes_with_escape(page, dialog, opener)
         await page.screenshot(path=tmp_path / "harness-1280.png", full_page=True)
     finally:
         await page.close()
@@ -400,6 +414,57 @@ async def test_a_version_composed_before_the_taint_was_noted_and_one_the_gate_re
         await store.retire_harness(stored.id, time.time())
     for version_id in (part.id, composed.id, odd.id):
         await store.retire_harness(version_id, time.time())
+
+
+async def test_the_form_of_a_version_saves_for_later_and_says_inside_the_dialog_what_is_missing_or_refused(
+    browser: Browser, client: httpx.AsyncClient, runtime: Runtime, tmp_path: Path
+) -> None:
+    """Item 615: Write your own opens a dialog, on a desktop and on a phone, whose foot holds Start from an example,
+    Cancel, Save for later and Save and use in view; a missing summary and a text the gate refuses are said above the
+    foot with what was typed kept; Save for later makes a version that is not in use, and closes the dialog."""
+    store = runtime.store
+    before: set[str] = {version.id for version in await store.list_harness_versions()}
+    for width in (1280, 390):
+        page: Page = await _open(browser, client, width)
+        try:
+            opener = page.get_by_role("button", name="Write your own")
+            dialog = await open_form(page, opener, "Write your own version")
+            habits = dialog.get_by_role("textbox", name="Habits")
+            summary = dialog.get_by_role("textbox", name="Summary")
+            await expect(habits).to_be_focused()
+            await keeps_inside_the_window(page)
+            await foot_is_in_view(page, dialog)
+            await page.screenshot(path=tmp_path / f"harness-dialog-{width}.png")
+            # The summary is the one thing it needs: the dialog says so, the summary takes the focus, the habits stay.
+            await habits.fill("- Read a file whole before you change it.")
+            await dialog.get_by_role("button", name="Save and use").click()
+            await shows_the_failure(dialog, "Say in a line what the version changes.")
+            await expect(summary).to_be_focused()
+            await expect(habits).to_have_value("- Read a file whole before you change it.")
+            # A text the gate for learned texts refuses (a link) is refused by the daemon, and said in the dialog too.
+            await summary.fill(f"Reads the rules first at {width}")
+            await habits.fill("- Read https://example.com/rules first.")
+            await dialog.get_by_role("button", name="Save for later").click()
+            await shows_the_failure(dialog, "the text cannot be a component of the harness")
+            await page.screenshot(path=tmp_path / f"harness-refused-dialog-{width}.png")
+            await expect(habits).to_have_value("- Read https://example.com/rules first.")
+            await expect(summary).to_have_value(f"Reads the rules first at {width}")
+            assert {version.id for version in await store.list_harness_versions()} == before
+            # Put right, Save for later keeps it among the versions, not in use, and the dialog is gone.
+            in_use: object = (await client.get("/api/harness")).json()["adopted"]
+            await habits.fill("- Read the rules of the place first.")
+            await dialog.get_by_role("button", name="Save for later").click()
+            await expect(dialog).to_have_count(0)
+            await expect(
+                page.locator("[data-version]").filter(has_text=f"Reads the rules first at {width}")
+            ).to_have_count(1)
+            assert (await client.get("/api/harness")).json()["adopted"] == in_use
+        finally:
+            await page.close()
+        for version in await store.list_harness_versions():
+            if version.id not in before:
+                await store.retire_harness(version.id, time.time())
+        before |= {version.id for version in await store.list_harness_versions()}
 
 
 async def test_the_versions_come_fifty_at_a_time_and_the_ones_in_use_and_older_stay_listed(

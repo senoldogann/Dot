@@ -11,6 +11,14 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from form_dialogs import (
+    asks_before_dropping,
+    closes_with_escape,
+    foot_is_in_view,
+    keeps_inside_the_window,
+    open_form,
+    shows_the_failure,
+)
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -145,10 +153,32 @@ async def test_a_note_is_kept_with_its_tags_from_the_card_at_the_head(
             "Dot already remembers exactly this note; the tags were merged into it."
         )
         await expect(row).to_have_count(1)
-        # A note is corrected and forgotten in place, from the buttons at the right of its row.
-        await row.get_by_role("button", name="Edit this note").click()
-        await row.get_by_role("textbox", name="Tags").fill("work, invoices")
-        await row.get_by_role("button", name="Save").click()
+        # A note is corrected in a dialog (item 615), and forgotten, from the buttons at the right of its row; the card
+        # at the head, the page's main input, stays where it is.
+        edit: Locator = row.get_by_role("button", name="Edit this note")
+        await expect(edit).to_have_attribute("aria-haspopup", "dialog")
+        dialog: Locator = await open_form(page, edit, "Edit note")
+        await expect(dialog.get_by_role("textbox", name="Note")).to_have_value(
+            "My invoices live in ~/Documents/Invoices, one folder a year."
+        )
+        await foot_is_in_view(page, dialog)
+        await page.screenshot(path=tmp_path / "memory-edit-1280.png")
+        # A refusal of the daemon is said inside the dialog, and what was typed stays.
+        await page.route(
+            "**/api/memories/*",
+            lambda route: (
+                route.fulfill(status=422, json={"message": "A note is at most 20000 characters."})
+                if route.request.method == "PATCH"
+                else route.fallback()
+            ),
+        )
+        await dialog.get_by_role("textbox", name="Tags").fill("work, invoices")
+        await dialog.get_by_role("button", name="Save").click()
+        await shows_the_failure(dialog, "A note is at most 20000 characters.")
+        await expect(dialog.get_by_role("textbox", name="Tags")).to_have_value("work, invoices")
+        await page.unroute("**/api/memories/*")
+        await dialog.get_by_role("button", name="Save").click()
+        await expect(dialog).to_have_count(0)
         await expect(row.locator(".chip")).to_have_text(["work", "invoices"])
         await row.get_by_role("button", name="Forget this note").click()
         await page.get_by_role("dialog").get_by_role("button", name="Forget").click()
@@ -295,6 +325,49 @@ async def test_on_a_touch_phone_the_tags_are_labels_and_remember_stands_at_the_r
         assert len(tops) == 1, tops
         assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
         await page.screenshot(path=tmp_path / "memory-touch-390.png")
+    finally:
+        await page.close()
+
+
+async def test_a_note_is_corrected_in_a_dialog_that_fits_a_phone_and_asks_before_it_drops(
+    browser: Browser, address: str, runtime: Runtime, tmp_path: Path
+) -> None:
+    """Item 615: a note's Edit opens a dialog, a sheet on a phone whose foot is in view; the caret is in the note;
+    nothing typed, Escape shuts it and the focus goes back to the pencil; something typed, it asks first; a note with no
+    words is not saved, and the note says so by taking the focus."""
+    note: str = "The user likes strong tea."
+    await runtime.store.add_memory(note, ("preferences",), None, None, None, False)
+    page: Page = await browser.new_page(
+        viewport={"width": 390, "height": 844},
+        color_scheme="dark",
+        has_touch=True,
+        is_mobile=True,
+        reduced_motion="reduce",
+    )
+    try:
+        await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+        await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+        await page.goto(f"{address}/#/settings/memory")
+        row: Locator = page.locator("[data-memory]")
+        await expect(row).to_have_count(1)
+        edit: Locator = row.get_by_role("button", name="Edit this note")
+        dialog: Locator = await open_form(page, edit, "Edit note")
+        words: Locator = dialog.get_by_role("textbox", name="Note")
+        await expect(words).to_have_value(note)
+        await expect(words).to_be_focused()
+        await keeps_inside_the_window(page)
+        await foot_is_in_view(page, dialog)
+        await page.screenshot(path=tmp_path / "memory-edit-390.png")
+        await closes_with_escape(page, dialog, edit)
+        dialog = await open_form(page, edit, "Edit note")
+        await asks_before_dropping(page, dialog, words, "The user likes strong coffee.")
+        # No words, nothing to keep: the dialog stays and the note has the focus; the note is as it was.
+        dialog = await open_form(page, edit, "Edit note")
+        await words.fill("   ")
+        await dialog.get_by_role("button", name="Save").click()
+        await expect(dialog).to_be_visible()
+        await expect(words).to_be_focused()
+        assert [record.content for record in await runtime.store.list_memories(10, 0)] == [note]
     finally:
         await page.close()
 

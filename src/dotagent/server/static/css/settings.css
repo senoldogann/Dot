@@ -697,10 +697,7 @@
   color: var(--text-2);
 }
 
-.key-form {
-  margin-top: 12px;
-}
-
+/* The field of a key, in the dialog that Add key and Replace key open (item 615). */
 .key-entry {
   display: flex;
   flex-wrap: wrap;
@@ -1431,13 +1428,8 @@
   font-size: var(--text-sm);
 }
 
-.profile-add {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* A link in a section's head, in the accent (Add profile): no box, the plus before its words. */
+/* A link in a section's head, in the accent (Add profile, which opens a dialog, item 615): no box, the plus before its
+   words. */
 .set-link {
   display: inline-flex;
   align-items: center;
@@ -2940,11 +2932,8 @@
   }
 }
 
-/* ---------- Schedules (item 373): the list is the page, and the form that adds one comes when it is asked for. ---------- */
-
-.schedule-form-slot > .card {
-  margin-bottom: var(--space-3);
-}
+/* ---------- Schedules (item 373): the list is the page, and the form that adds one comes when it is asked for, in a
+   dialog (item 615). ---------- */
 
 .schedule-list > .list-row {
   padding-block: var(--space-2);
@@ -2981,9 +2970,9 @@
   overflow-wrap: anywhere;
 }
 
-/* ---------- The Morning brief card (item 570) under the owner's schedules: a line with its name, when it writes and
-   its switch, and folded under it (item 609) the time, the days and the owner's own lines, then when it fires next
-   and when it last did. ---------- */
+/* ---------- The Morning brief card (item 570) under the owner's schedules: a line with its name, when it writes, its
+   switch and the button of its settings (item 609); the time, the days and the owner's own lines, then when it fires
+   next and when it last did, are in the dialog that button opens (item 615). ---------- */
 
 .brief-head {
   display: flex;
@@ -2991,15 +2980,7 @@
   gap: var(--space-3);
 }
 
-.brief-opener .icon {
-  transition: transform var(--motion-quick) var(--ease);
-}
-
-.brief-card.open .brief-opener .icon {
-  transform: rotate(90deg);
-}
-
-.brief-card:not(.open) {
+.brief-card {
   gap: 0;
 }
 
@@ -3027,22 +3008,13 @@
   padding: var(--space-2) 0;
 }
 
-.brief-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
 /* ---------- The Watchers panel (item 571) under the brief: a row for each watcher (none: its head and its line, item
-   609), the form that makes one when it is asked for, and the failure of a look written on the row it belongs to.
-   ---------- */
+   609), the form that makes one, in a dialog when it is asked for (item 615), and the failure of a look written on the
+   row it belongs to. ---------- */
 
 .watcher-lead {
   margin: 0;
   padding: var(--space-2) var(--space-4) 0;
-}
-
-.watcher-form-slot {
-  padding: var(--space-3) var(--space-4) 0;
 }
 
 .watcher-list {
@@ -3314,8 +3286,7 @@
 }
 
 /* A form that opens under the sticky header scrolls clear of it (item 373). */
-.rule-forms,
-.schedule-form-slot {
+.rule-forms {
   scroll-margin-top: 80px;
 }
 
@@ -3656,14 +3627,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Versions: the button that opens the form of your own sits at the right of the name; the form is a card over the
-   list. */
-.harness-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
+/* Versions: the button that opens the form of your own, in a dialog (item 615), sits at the right of the name. */
 .harness-count {
   margin-left: var(--space-2);
   color: var(--muted);
@@ -3688,21 +3652,22 @@
   background: var(--surface-2);
 }
 
-/* What the form is for, and its fields, each a step apart. */
+/* What the form is for, and its fields, each a step apart, in the dialog. */
 .harness-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
 }
 
 .harness-form .textarea {
   min-height: 6lh;
   font-family: var(--mono);
   font-size: var(--text-sm);
+}
+
+/* Start from an example fills the fields, so it stands with them, under what the form is for. */
+.harness-example {
+  display: flex;
 }
 
 /* A row of the lists of versions, nights and lessons: a mark at the left, in a column of one width so that what is

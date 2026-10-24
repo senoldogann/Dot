@@ -10,7 +10,7 @@ import { PHONE } from "../layout.js";
 import { errorPanel, loadingPanel, switchSetting } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
-import { attempt, confirmDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 
 // What the key of each provider is for and where it is made. `needed`: the models of the provider work only with a key
 // (Ollama's run through the app on this Mac and need none; the typed judge is off unless the configuration names it).
@@ -121,10 +121,12 @@ function rolesOn(provider) {
 }
 
 /**
- * The field a key is pasted into, hidden like a password until it is shown. `save(value)` gets the trimmed key and may
- * throw; its message then shows under the field. `close()` empties the field, so a key does not stay in the page.
+ * The field a key is pasted into, for the dialog that holds it (item 615), hidden like a password until it is shown.
+ * Returns the element, `submit(save)`, which hands the trimmed key to `save(value)` and resolves to `false` when there is
+ * none (the field takes the focus), and throws when the key has a space or a line break inside or `save` fails, and
+ * `clear()`, which empties the field, so that a key does not stay in the page.
  */
-function buildForm(label, save, cancel) {
+function buildKeyFields(label) {
   const input = el("input", {
     class: "input mono",
     type: "password",
@@ -136,20 +138,7 @@ function buildForm(label, save, cancel) {
     "aria-label": `${label} API key`,
   });
   const reveal = el("button", { class: "btn ghost sm icon-only key-reveal", type: "button" });
-  const submit = el("button", { class: "btn primary", type: "button" }, "Save");
-  const problem = el("div", { class: "note bad", hidden: true }, icon("alert"), el("span"));
-  const element = el(
-    "div",
-    { class: "key-form", hidden: true },
-    el(
-      "div",
-      { class: "key-entry" },
-      el("div", { class: "key-field" }, input, reveal),
-      submit,
-      el("button", { class: "btn ghost", type: "button", onclick: () => cancel() }, "Cancel"),
-    ),
-    problem,
-  );
+  const element = el("div", { class: "key-entry" }, el("div", { class: "key-field" }, input, reveal));
 
   function paintReveal(shown) {
     const text = shown ? "Hide the key" : "Show the key";
@@ -160,66 +149,25 @@ function buildForm(label, save, cancel) {
     reveal.replaceChildren(icon(shown ? "eyeOff" : "eye"));
   }
 
-  function complain(message) {
-    problem.lastChild.textContent = message;
-    problem.hidden = false;
-  }
-
-  // True while a key is being saved: Enter does not look at the disabled button, so a second press is refused here.
-  let saving = false;
-
-  async function submitKey() {
-    if (saving) {
-      return;
-    }
-    const value = input.value.trim();
-    if (value === "") {
-      input.focus();
-      return;
-    }
-    if (!KEY_PATTERN.test(value)) {
-      complain("A key has no spaces or line breaks inside it. Copy it again from the page of the provider.");
-      return;
-    }
-    problem.hidden = true;
-    saving = true;
-    submit.disabled = true;
-    try {
-      await save(value);
-    } catch (error) {
-      console.error("the key could not be saved", error);
-      complain(error.message);
-    } finally {
-      saving = false;
-      submit.disabled = false;
-    }
-  }
-
   reveal.addEventListener("click", () => paintReveal(input.type === "password"));
-  submit.addEventListener("click", () => attempt(submitKey));
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      attempt(submitKey);
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      cancel();
-    }
-  });
   paintReveal(false);
   return {
     element,
-    isOpen: () => !element.hidden,
-    open() {
-      problem.hidden = true;
-      paintReveal(false);
-      element.hidden = false;
-      input.focus();
+    async submit(save) {
+      const value = input.value.trim();
+      if (value === "") {
+        input.focus();
+        return false;
+      }
+      if (!KEY_PATTERN.test(value)) {
+        throw new Error("A key has no spaces or line breaks inside it. Copy it again from the page of the provider.");
+      }
+      await save(value);
+      return true;
     },
-    close() {
+    clear() {
       input.value = "";
       paintReveal(false);
-      element.hidden = true;
     },
   };
 }
@@ -295,13 +243,9 @@ function buildProvider(initial, isDisposed, host) {
   const facts = el("div", { class: "provider-facts" });
   const shadow = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span"));
   const outcome = el("div", { class: "note", hidden: true, role: "status" });
-  const form = buildForm(about.label, saveKey, () => {
-    form.close();
-    paint();
-    edit.focus();
-  });
 
-  const edit = el("button", { class: "btn primary", type: "button" }, icon("plus"));
+  // Add key and Replace key open the form that takes the key in a dialog (item 615).
+  const edit = el("button", { class: "btn primary", type: "button", "aria-haspopup": "dialog" }, icon("plus"));
   const remove = el(
     "button",
     {
@@ -334,7 +278,6 @@ function buildProvider(initial, isDisposed, host) {
     about.needed ? null : el("p", { class: "provider-use" }, about.use),
     facts,
     actions,
-    form.element,
     shadow,
     outcome,
   );
@@ -505,19 +448,8 @@ function buildProvider(initial, isDisposed, host) {
     }
     edit.className = set ? "btn" : "btn primary";
     edit.replaceChildren(icon(set ? "pencil" : "plus"), set ? "Replace key" : "Add key");
-    edit.hidden = form.isOpen();
     remove.hidden = !view.saved;
     paintModels();
-  }
-
-  // The button that opened the form shows again in its place, and the focus goes back to it.
-  function closeForm() {
-    const wasOpen = form.isOpen();
-    form.close();
-    paint();
-    if (wasOpen) {
-      edit.focus();
-    }
   }
 
   async function runCheck() {
@@ -548,11 +480,9 @@ function buildProvider(initial, isDisposed, host) {
       return;
     }
     view = saved;
-    form.close();
     paint();
     toast("ok", `${about.label} key saved.`);
     void readModels().then(paint);
-    await runCheck();
   }
 
   async function removeKey() {
@@ -578,13 +508,34 @@ function buildProvider(initial, isDisposed, host) {
     void readModels().then(paint);
   }
 
-  edit.addEventListener("click", () => {
+  /** The form that takes the key, in a dialog (item 615). The key is saved and the dialog closed at once; Check, which
+   * asks the provider whether it takes the key, runs on the page after. The field is emptied as the dialog closes. */
+  function openKeyForm() {
     outcome.hidden = true;
-    form.open();
-    paint();
-  });
+    const set = view.source !== null;
+    const form = buildKeyFields(about.label);
+    const opened = formDialog({
+      title: `${set ? "Replace" : "Add"} the ${about.label} key`,
+      description: "Dot keeps it in its .env file on this Mac, and this page never shows it whole.",
+      body: form.element,
+      submitLabel: "Save",
+      size: "narrow",
+      submitOnEnter: true,
+      returnFocus: edit,
+      onSubmit: async () => {
+        if ((await form.submit(saveKey)) === false) {
+          return false;
+        }
+        void attempt(runCheck);
+        return true;
+      },
+    });
+    void opened.closed.then(form.clear);
+  }
+
+  edit.addEventListener("click", openKeyForm);
   paint();
-  return { id: view.provider, element, panel, paint, closeForm };
+  return { id: view.provider, element, panel, paint };
 }
 
 /** The key of each provider, the form that saves one, and where the keys are kept. */
@@ -600,10 +551,6 @@ export function mount(root, ctx) {
   layout.dataset.open = "false";
 
   function choose(id) {
-    const previous = entries.find((entry) => entry.id === chosen);
-    if (previous !== undefined && previous.id !== id) {
-      previous.closeForm();
-    }
     chosen = id;
     layout.dataset.open = "true";
     for (const entry of entries) {

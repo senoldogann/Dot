@@ -4,13 +4,14 @@
 // polls, nothing reaches it from outside), tells you on your phone and keeps a line in the chat Watchers, and, when
 // you ask, starts a run with your goal for what it found. Each row says how its last look went and, when it failed,
 // why. Everything is `GET`, `POST`, `PATCH` and `DELETE /api/watchers`, and `POST /api/watchers/<id>/try` (Check now).
+// New watcher and a watcher's Edit open the form in a dialog (item 615).
 
 import { ago, clip, el, joined, plural } from "./dom.js";
 import { api } from "./api.js";
 import { icon } from "./icons.js";
-import { field, inlineError, loadingPanel, paintOpener, segmented } from "./panels.js";
+import { field, inlineError, loadingPanel, markOpener, segmented } from "./panels.js";
 import { onLifecycle } from "./state.js";
-import { attempt, confirmDialog, toast } from "./ui.js";
+import { attempt, confirmDialog, formDialog, toast } from "./ui.js";
 
 const KINDS = [
   { id: "mail", label: "New mail", hint: "A new mail in a Google or Microsoft account you signed in", mark: "mail", what: "new mail" },
@@ -122,7 +123,11 @@ function watcherRow(view, handlers, looking) {
         },
         looking ? el("span", { class: "spinner", "aria-hidden": "true" }) : icon("refresh"),
       ),
-      el("button", { class: "btn ghost sm icon-only", type: "button", title: "Edit this watcher", "aria-label": `Edit ${view.name}`, onclick: () => handlers.onEdit(view, row) }, icon("pencil")),
+      el(
+        "button",
+        { class: "btn ghost sm icon-only", type: "button", title: "Edit this watcher", "aria-label": `Edit ${view.name}`, "aria-haspopup": "dialog", onclick: () => handlers.onEdit(view) },
+        icon("pencil"),
+      ),
       el("button", { class: "btn ghost sm icon-only", type: "button", title: "Delete this watcher", "aria-label": `Delete ${view.name}`, onclick: () => handlers.onDelete(view) }, icon("trash")),
     ),
   );
@@ -135,11 +140,13 @@ function bodyOf(view, changes) {
 }
 
 /**
- * The form that makes a watcher (`view` null) or changes one. `options` is what the daemon offers (`GET
- * /api/watchers/options`): the accounts signed in, whether GitHub's token is kept, the minutes each kind starts with.
- * `onSaved()` runs after the daemon took it, `onCancel()` on Cancel.
+ * The fields that make a watcher (`view` null) or change one, for the dialog that holds them (item 615). `options` is
+ * what the daemon offers (`GET /api/watchers/options`): the accounts signed in, whether GitHub's token is kept, the
+ * minutes each kind starts with. Returns the element and `submit()`, which asks the daemon and resolves to `false` when
+ * a field the watcher needs is empty (the field takes the focus) and throws when the daemon refuses or no account is
+ * signed in for a kind that reads one.
  */
-function watcherForm({ view, options, onSaved, onCancel }) {
+function watcherForm({ view, options }) {
   const editing = view !== null;
   const name = el("input", { class: "input", type: "text", maxlength: "80", autocomplete: "off", placeholder: "Landlord", "aria-label": "Name" });
   const account = el("select", { class: "select", "aria-label": "Account" });
@@ -164,9 +171,6 @@ function watcherForm({ view, options, onSaved, onCancel }) {
     icon("shield"),
     el("span", null, "What came in was written by someone else, so the run starts marked untrusted: what reaches other people or lasts asks first, in the approval mode you chose as the default. At most a few runs an hour."),
   );
-  const save = el("button", { class: "btn primary", type: "button" }, icon(editing ? "check" : "plus"), editing ? "Save changes" : "Add watcher");
-  const cancel = el("button", { class: "btn ghost", type: "button", onclick: onCancel }, "Cancel");
-
   function paintKind() {
     const kind = kinds.value();
     accountField.hidden = kind === "github";
@@ -219,25 +223,25 @@ function watcherForm({ view, options, onSaved, onCancel }) {
     const nameText = name.value.trim();
     if (nameText === "") {
       name.focus();
-      return;
+      return false;
     }
     if ((kind === "mail" || kind === "calendar") && account.value === "") {
       account.focus();
-      toast("error", "Sign in a Google or Microsoft account first (Customize › Connectors).");
-      return;
+      // The dialog is over the page, and a toast would stand under it: the reason is shown in the dialog.
+      throw new Error("Sign in a Google or Microsoft account first (Customize › Connectors).");
     }
     if (kind === "mail" && words.value.trim() === "") {
       words.focus();
-      return;
+      return false;
     }
     if (actions.value() === "run" && goal.value.trim() === "") {
       goal.focus();
-      return;
+      return false;
     }
     const wanted = Number(minutes.value);
     if (!Number.isInteger(wanted) || wanted < 1 || wanted > 1440) {
       minutes.focus();
-      return;
+      return false;
     }
     const body = {
       name: nameText,
@@ -249,25 +253,19 @@ function watcherForm({ view, options, onSaved, onCancel }) {
       action: actions.value(),
       goal: actions.value() === "run" ? goal.value.trim() : "",
     };
-    save.disabled = true;
-    try {
-      if (editing) {
-        await api.patch(`/watchers/${view.id}`, body);
-        toast("ok", "Watcher saved.");
-      } else {
-        await api.post("/watchers", body);
-        toast("ok", "Watcher added: its first look only notes what is there, and it tells what comes after.");
-      }
-      await onSaved();
-    } finally {
-      save.disabled = false;
+    if (editing) {
+      await api.patch(`/watchers/${view.id}`, body);
+      toast("ok", "Watcher saved.");
+    } else {
+      await api.post("/watchers", body);
+      toast("ok", "Watcher added: its first look only notes what is there, and it tells what comes after.");
     }
+    return true;
   }
 
-  save.addEventListener("click", () => attempt(submit));
   const element = el(
-    "section",
-    { class: editing ? "stack grow" : "card card-pad stack", dataset: { watcherForm: editing ? view.id : "new" } },
+    "div",
+    { class: "stack", dataset: { watcherForm: editing ? view.id : "new" } },
     el(
       "div",
       { class: "form-grid" },
@@ -282,12 +280,11 @@ function watcherForm({ view, options, onSaved, onCancel }) {
     noAccounts,
     noGithub,
     runNote,
-    el("div", { class: "row" }, el("span", { class: "spacer" }), cancel, save),
   );
   for (const wide of [wordsField, goalField]) {
     wide.classList.add("wide");
   }
-  return { element };
+  return { element, submit };
 }
 
 /** The panel. Returns the element, `reload()` and `dispose()`. */
@@ -296,29 +293,26 @@ export function mountWatchers() {
   let ticket = 0;
   let views = null;
   let options = null;
-  // The id of the watcher whose form is open, or null: while one is, the list is not painted again over it.
-  let editing = null;
   // The ids of the watchers whose Check now is at work. A look takes up to three minutes, and a second press would queue
   // another whole look behind it, so the row shows the first one and its button takes no more (item 612).
   const looking = new Set();
   const holder = el("div", null, loadingPanel());
   const count = el("span", { class: "hint" });
-  const formSlot = el("div", { class: "watcher-form-slot", hidden: true });
-  // The page's one primary button is New schedule: a watcher is made from a quieter one (item 609).
+  // The page's one primary button is New schedule: a watcher is made from a quieter one (item 609), and its form opens in
+  // a dialog (item 615).
   const addButton = el("button", { class: "btn sm", type: "button" });
-  paintOpener(addButton, "New watcher", false);
+  markOpener(addButton, "New watcher");
   const lead = el("p", { class: "hint watcher-lead" }, "Dot tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and in the chat Watchers.");
   const element = el(
     "section",
     { class: "memory-panel notes-panel watcher-panel", dataset: { watchers: "" } },
     el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "Watchers"), count, el("span", { class: "spacer" }), addButton),
     lead,
-    formSlot,
     holder,
   );
 
   function paint() {
-    if (views === null || editing !== null) {
+    if (views === null) {
       return;
     }
     // With none, the head says so and the panel is its head and its line (item 609): no picture of an empty list.
@@ -330,7 +324,7 @@ export function mountWatchers() {
     const handlers = {
       onToggle: (view) => attempt(() => change(view, { enabled: !view.enabled })),
       onCheck: (view) => attempt(() => check(view)),
-      onEdit: (view, row) => startEditing(view, row),
+      onEdit: (view) => openForm(view),
       onDelete: (view) => attempt(() => remove(view)),
     };
     holder.replaceChildren(el("div", { class: "watcher-list" }, views.map((view) => watcherRow(view, handlers, looking.has(view.id)))));
@@ -409,62 +403,39 @@ export function mountWatchers() {
     await reload();
   }
 
-  // The row of the watcher turns into its form; saving or cancelling paints the list again.
-  function startEditing(view, row) {
+  /** The form that makes a watcher (`view` null) or changes `view`, in a dialog (item 615); the list is read again once the
+   * daemon took it. The dialog holds the form, so the list behind it can be read again without touching what is typed. */
+  function openForm(view) {
     if (options === null) {
       return;
     }
-    editing = view.id;
-    const form = watcherForm({
-      view,
-      options,
-      onSaved: async () => {
-        editing = null;
+    const form = watcherForm({ view, options });
+    formDialog({
+      title: view === null ? "New watcher" : "Edit watcher",
+      description:
+        view === null
+          ? "Dot looks every few minutes, and tells you on your phone and in the chat Watchers when what you care about comes."
+          : `Change “${clip(view.name, 60)}”. It looks by the new choices from its next look.`,
+      body: form.element,
+      submitLabel: view === null ? "Add watcher" : "Save changes",
+      size: "wide",
+      // The rows are painted again once a watcher is saved: its Edit button is found anew.
+      returnFocus: () => (view === null ? addButton : holder.querySelector(`[data-watcher="${view.id}"] [aria-label^="Edit "]`)),
+      onSubmit: async () => {
+        if ((await form.submit()) === false) {
+          return false;
+        }
         await reload();
-      },
-      onCancel: () => {
-        editing = null;
-        paint();
+        return true;
       },
     });
-    row.replaceChildren(form.element);
-  }
-
-  function newForm() {
-    if (options === null) {
-      return;
-    }
-    const form = watcherForm({
-      view: null,
-      options,
-      onSaved: async () => {
-        closeForm();
-        await reload();
-      },
-      onCancel: closeForm,
-    });
-    formSlot.replaceChildren(form.element);
-  }
-
-  function closeForm() {
-    formSlot.hidden = true;
-    formSlot.replaceChildren();
-    paintOpener(addButton, "New watcher", false);
   }
 
   addButton.addEventListener("click", () =>
     attempt(async () => {
-      if (!formSlot.hidden) {
-        closeForm();
-        return;
-      }
       // The form needs what the daemon offers; it is read again here, so that an account signed in meanwhile is there.
       options = await api.get("/watchers/options");
-      newForm();
-      formSlot.hidden = false;
-      paintOpener(addButton, "New watcher", true);
-      formSlot.scrollIntoView({ block: "nearest" });
-      formSlot.querySelector("input")?.focus();
+      openForm(null);
     }),
   );
 
@@ -474,7 +445,7 @@ export function mountWatchers() {
     }
   });
   const timer = setInterval(() => {
-    if (!disposed && editing === null && formSlot.hidden) {
+    if (!disposed) {
       attempt(reload);
     }
   }, REFRESH_MS);

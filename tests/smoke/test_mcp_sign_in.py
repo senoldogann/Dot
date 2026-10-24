@@ -581,20 +581,27 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             await expect(_server_row(page, "open").get_by_role("button", name="Remove")).to_be_visible()
             await expect(page.locator(".plugin-tile[data-plugin='notion'] .chip")).to_have_text("MCP · Sign in")
             await expect(page.locator(".plugin-tile[data-plugin='deepwiki'] .chip")).to_have_text("MCP · Open to all")
-            # Added by its address: it asks for a sign-in, which happens on the page that opens, and comes back here.
-            await page.get_by_label("Server name").fill("signed")
-            await page.get_by_label("Server address or command").fill(f"{world.signed}/mcp")
-            await page.locator(".connect-add").get_by_role("button", name="Add").click()
+            # Added by its address, from the dialog of Add server (item 615): it asks for a sign-in, which happens on
+            # the page that opens, and comes back here.
+            await page.locator(".plugin-own").get_by_role("button", name="Add server").click()
+            adding: Locator = page.get_by_role("dialog", name="Add your own MCP server")
+            await adding.get_by_label("Server name").fill("signed")
+            await adding.get_by_label("Server address or command").fill(f"{world.signed}/mcp")
+            await adding.get_by_role("button", name="Add", exact=True).click()
+            await expect(adding).to_have_count(0)
             signed: Locator = _server_row(page, "signed")
             await expect(signed.locator(".badge")).to_have_text("Waiting for your sign-in")
-            # The page asks every 2 s how the server stands; a field being typed in keeps its focus and its words
-            # (review A3: each asking drew the page anew and took the focus away).
-            typing: Locator = page.get_by_label("Server name")
+            # The page asks every 2 s how the server stands; a dialog opened meanwhile keeps its field, its focus and
+            # its words (review A3: each asking drew the page anew and took the focus from a field in it).
+            await page.locator(".plugin-own").get_by_role("button", name="Add server").click()
+            typing: Locator = adding.get_by_label("Server name")
             await typing.fill("typing")
             await page.wait_for_timeout(2600)
             await expect(typing).to_be_focused()
             await expect(typing).to_have_value("typing")
-            await typing.fill("")
+            await page.keyboard.press("Escape")
+            await page.get_by_role("button", name="Discard").click()
+            await expect(adding).to_have_count(0)
             async with page.context.expect_page() as opened:
                 await signed.get_by_role("link", name="Open the sign-in page").click()
             sign_in: Page = await opened.value
@@ -604,7 +611,7 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             await expect(signed.locator(".badge")).to_have_text("Ready", timeout=READY_WITHIN_S * 1000)
             await expect(signed).to_contain_text("1 tool: whoami")
             await expect(signed.get_by_role("button", name="Sign in again")).to_be_visible()
-            assert await page.get_by_label("Server name").input_value() == ""
+            await expect(page.get_by_label("Server name")).to_have_count(0)
             await page.screenshot(path=str(tmp_path / "connect-mcp-1280-light.png"), full_page=True)
             # Removed, after a yes.
             await _server_row(page, "open").get_by_role("button", name="Remove").click()

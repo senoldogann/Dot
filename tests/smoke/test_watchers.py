@@ -22,6 +22,14 @@ from typing import Any
 import httpx
 import pytest
 import pytest_asyncio
+from form_dialogs import (
+    asks_before_dropping,
+    closes_with_escape,
+    foot_is_in_view,
+    keeps_inside_the_window,
+    open_form,
+    shows_the_failure,
+)
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 from structlog.testing import capture_logs
 
@@ -1335,17 +1343,21 @@ async def test_the_panel_makes_a_watcher_checks_it_now_shows_a_failure_and_chang
                 await expect(panel.get_by_role("heading", name="Watchers")).to_be_visible()
                 # With none, the head says so and nothing stands for an empty list (item 609).
                 await expect(panel.get_by_text("None yet")).to_be_visible()
-                # Make a mail watcher with the owner's words.
+                # Make a mail watcher with the owner's words, in a dialog (item 615).
                 await panel.get_by_role("button", name="New watcher").click()
-                form: Locator = panel.locator("[data-watcher-form='new']")
+                form: Locator = page.get_by_role("dialog", name="New watcher")
+                await expect(form).to_be_visible()
                 await expect(form.get_by_role("combobox", name="Account")).to_have_text(re.compile("ada@gmail.com"))
                 await expect(form.get_by_label("Minutes")).to_have_value("5")
                 await form.get_by_label("Name", exact=True).fill("Landlord")
                 await form.get_by_role("button", name="Add watcher").click()
-                # Words are what a mail watcher is for: without them nothing is made.
+                # Words are what a mail watcher is for: without them nothing is made, and the dialog stays.
                 await expect(panel.locator("[data-watcher]")).to_have_count(0)
+                await expect(form).to_be_visible()
+                await expect(form.get_by_label("What you want to hear of")).to_be_focused()
                 await form.get_by_label("What you want to hear of").fill("my landlord, anything about the rent")
                 await form.get_by_role("button", name="Add watcher").click()
+                await expect(form).to_have_count(0)
                 made: Locator = panel.locator("[data-watcher]", has_text="Landlord")
                 await expect(made).to_be_visible()
                 # By its id from here on: the one made later has the same words.
@@ -1379,9 +1391,10 @@ async def test_the_panel_makes_a_watcher_checks_it_now_shows_a_failure_and_chang
                     "aria-checked", "false"
                 )
                 await expect(row.get_by_role("button", name="Check Landlord now")).to_be_disabled()
-                # Edit: the row turns into its form with what it has; the kind brings the fields it needs.
+                # Edit opens the dialog with what the watcher has; the kind brings the fields it needs.
                 await row.get_by_role("button", name="Edit Landlord").click()
-                edit: Locator = panel.locator("[data-watcher-form]:not([data-watcher-form='new'])")
+                edit: Locator = page.get_by_role("dialog", name="Edit watcher")
+                await expect(edit).to_be_visible()
                 await expect(edit.get_by_label("What you want to hear of")).to_have_value(
                     "my landlord, anything about the rent"
                 )
@@ -1391,8 +1404,12 @@ async def test_the_panel_makes_a_watcher_checks_it_now_shows_a_failure_and_chang
                 await edit.get_by_role("button", name="Tell me and start a run").click()
                 await expect(edit.get_by_label("Goal of the run")).to_be_visible()
                 await expect(edit.get_by_text("starts marked untrusted")).to_be_visible()
+                # Changed, so Cancel asks first; dropped, the watcher is as it was.
                 await edit.get_by_role("button", name="Cancel").click()
+                await page.get_by_role("button", name="Discard").click()
+                await expect(edit).to_have_count(0)
                 await expect(row).to_be_visible()
+                await expect(row.locator(".chip", has_text="New mail")).to_be_visible()
                 # Delete asks first.
                 await row.get_by_role("button", name="Delete Landlord").click()
                 await page.get_by_role("button", name="Delete", exact=True).click()
@@ -1400,6 +1417,79 @@ async def test_the_panel_makes_a_watcher_checks_it_now_shows_a_failure_and_chang
                 await page.close()
         finally:
             await browser.close()
+
+
+@pytest.mark.browser
+async def test_new_watcher_and_edit_are_a_dialog_that_fits_asks_before_it_drops_and_says_why_it_failed(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 615: New watcher and a watcher's Edit open the form in a dialog over the page, which does not grow; the
+    caret is in the name; Escape closes it, asking first when something was typed, and the focus goes back to the button
+    that opened it; the daemon's refusal (the twenty watchers there may be) is shown inside it with what was typed still
+    there; on a phone it is a sheet whose foot is in view."""
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, height, scheme in ((1280, 900, "light"), (390, 844, "dark")):
+                await runtime.store.kv_set(WATCHERS_KEY, '{"items":[]}')
+                WORLD.reset()
+                phone: bool = width < 720
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height},
+                    color_scheme=scheme,
+                    is_mobile=phone,
+                    has_touch=phone,
+                    reduced_motion="reduce",
+                )
+                await page.goto(ui_url("127.0.0.1", port, TOKEN))
+                await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+                panel: Locator = page.locator("[data-watchers]")
+                opener: Locator = panel.get_by_role("button", name="New watcher")
+                await expect(opener).to_have_attribute("aria-haspopup", "dialog")
+                # No form stands in the page: it comes with the button.
+                await expect(page.get_by_label("What you want to hear of")).to_have_count(0)
+                dialog: Locator = await open_form(page, opener, "New watcher")
+                name: Locator = dialog.get_by_label("Name", exact=True)
+                await expect(name).to_be_focused()
+                await keeps_inside_the_window(page)
+                await foot_is_in_view(page, dialog)
+                await page.screenshot(path=str(tmp_path / f"new-watcher-{width}-{scheme}.png"))
+                await closes_with_escape(page, dialog, opener)
+                dialog = await open_form(page, opener, "New watcher")
+                await asks_before_dropping(page, dialog, name, "Bank")
+                await expect(opener).to_be_focused()
+                # Twenty watchers are the most there may be: the next is refused, and the dialog says so with what was
+                # typed still in it.
+                for number in range(20):
+                    await _make(client, name=f"Watcher {number}")
+                dialog = await open_form(page, opener, "New watcher")
+                await name.fill("One more")
+                await dialog.get_by_label("What you want to hear of").fill("the bank")
+                await dialog.get_by_role("button", name="Add watcher").click()
+                await shows_the_failure(dialog, "at most 20 watchers")
+                await page.screenshot(path=str(tmp_path / f"new-watcher-refused-{width}-{scheme}.png"))
+                await expect(name).to_have_value("One more")
+                await expect(dialog.get_by_label("What you want to hear of")).to_have_value("the bank")
+                assert len((await client.get("/api/watchers")).json()) == 20
+                await dialog.get_by_role("button", name="Cancel").click()
+                await page.get_by_role("button", name="Discard").click()
+                await expect(dialog).to_have_count(0)
+                # Edit opens the same dialog filled, and Escape gives the focus back to that Edit button.
+                await page.reload()
+                edit: Locator = panel.get_by_role("button", name="Edit Watcher 0")
+                dialog = await open_form(page, edit, "Edit watcher")
+                await expect(dialog.get_by_label("Name", exact=True)).to_have_value("Watcher 0")
+                await expect(dialog.get_by_label("What you want to hear of")).to_have_value(
+                    "my landlord, anything about the rent"
+                )
+                await foot_is_in_view(page, dialog)
+                await closes_with_escape(page, dialog, edit)
+                await page.close()
+        finally:
+            await browser.close()
+    await runtime.store.kv_set(WATCHERS_KEY, '{"items":[]}')
 
 
 # What the row of a watcher measures: the page's slide, the row, the name, the address chip and whether its text is cut

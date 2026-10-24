@@ -7,10 +7,9 @@
 
 import { api, blobUrl } from "./api.js";
 import { clip, el, plural } from "./dom.js";
-import { icon } from "./icons.js";
 import { markContent, markTile } from "./marks.js";
 import { field } from "./panels.js";
-import { attempt, confirmDialog } from "./ui.js";
+import { attempt, confirmDialog, formDialog } from "./ui.js";
 
 export const STATE_WORDS = {
   allowed: "Allowed",
@@ -155,10 +154,10 @@ function toolsDialog(offered) {
 
 /**
  * The services and where each stands, read with `load()`: `onChange()` runs whenever what is shown should be drawn
- * again (a step started or ended, the servers changed, a key's form opened or closed). While Dot tries a server or waits
- * for a sign-in, it asks again how the servers stand by itself. Returns the state (`plugins`, `listing`, `servers`) and
- * what reads and acts on it; `dispose()` stops the asking, empties a key's form that is open and lets go of the icons
- * read.
+ * again (a step started or ended, the servers changed). While Dot tries a server or waits for a sign-in, it asks again
+ * how the servers stand by itself. Returns the state (`plugins`, `listing`, `servers`) and what reads and acts on it; a
+ * service's key and 1Password's token are asked for in a dialog each (item 615). `dispose()` stops the asking and lets go
+ * of the icons read.
  */
 export function createCatalogue(onChange) {
   let disposed = false;
@@ -173,10 +172,6 @@ export function createCatalogue(onChange) {
   const busy = new Set();
   // The icons of the applications of this Mac shown, by application: the `blob:` URL of each, pending or made.
   const appIcons = new Map();
-  // The service whose secrets are being asked for, and the fields typed into, kept while the page paints again.
-  let asking = null;
-  const secretFields = new Map();
-
   function changed() {
     if (!disposed) {
       onChange();
@@ -239,8 +234,8 @@ export function createCatalogue(onChange) {
   /** The first step `plugin` offers, by its ways in order: `{ label, take }` for a button, `{ label, link }` for the
    * sign-in page an MCP server waits on, or null when it has none to take, as while Dot tries its server. A service
    * whose name a server of the config or of a plugin holds already is not added again. A service that takes a key
-   * (item 408) asks for it first (`keyed`): its step opens the form that takes it. 1Password's step is its page
-   * (`page`, item 493), which offers its two ways to connect. */
+   * (item 408) asks for it first (`keyed`): its step opens the dialog that takes it (item 615). 1Password's step is its
+   * page (`page`, item 493), which offers its two ways to connect. */
   function firstStep(plugin) {
     for (const way of plugin.ways) {
       const now = wayNow(way);
@@ -258,7 +253,8 @@ export function createCatalogue(onChange) {
           }
           const service = now.service;
           if (service !== undefined && service !== null && service.secrets.length > 0) {
-            return { label: "Add", key: `mcp:${way.ref}`, keyed: true, take: () => askSecrets(service) };
+            const button = () => document.querySelector(`[data-plugin="${plugin.id}"] .plugin-add`);
+            return { label: "Add", key: `mcp:${way.ref}`, keyed: true, take: () => askSecrets(service, button) };
           }
           return { label: "Add", key: `mcp:${way.ref}`, keyed: false, take: () => add({ service: way.ref, name: null, address: null, secrets: {} }) };
         }
@@ -319,36 +315,21 @@ export function createCatalogue(onChange) {
     return el("span", { class: "badge b-ok" }, plural(logins, "login", "logins"));
   }
 
-  /** Open the form that takes a service account token for 1Password, on its page (item 493). */
-  function askVault() {
-    ask("vault");
-  }
-
-  /** The form under 1Password's way that takes a service account token the owner made (item 493): a password field,
-   * where to make one, Connect and Cancel. The token goes to the daemon once, which keeps it in its .env. */
-  function vaultForm() {
-    let input = secretFields.get("vault")?.get("token");
-    if (input === undefined) {
-      input = el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": "1Password: service account token" });
-      secretFields.set("vault", new Map([["token", input]]));
-    }
-    const kept = input;
-    const connect = el("button", { class: "btn primary sm", type: "button", disabled: busy.has("vault") }, "Connect");
-    connect.addEventListener("click", () =>
-      attempt(async () => {
-        await pasteVaultToken(kept.value.trim());
-        kept.value = "";
-        asking = null;
-        changed();
-      }),
-    );
-    const cancel = el("button", { class: "btn sm", type: "button", onclick: () => stopAsking() }, "Cancel");
-    return el(
-      "div",
-      { class: "connect-add plugin-secrets" },
-      field("Service account token", kept, el("a", { href: VAULT_TOKEN_HELP, target: "_blank", rel: "noopener noreferrer" }, "Make one that reads a vault of yours")),
-      el("div", { class: "connect-add-actions" }, connect, cancel),
-    );
+  /** Ask for a service account token for 1Password, on its page, in a dialog (items 493 and 615): a password field,
+   * where to make one, Cancel and Connect. The token goes to the daemon once, which keeps it in its .env; the field is
+   * emptied as the dialog closes. Resolves once the dialog is closed. `returnFocus` finds the button the dialog gives
+   * the focus back to when the page was drawn again meanwhile. */
+  function askVault(returnFocus) {
+    const input = el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": "1Password: service account token" });
+    return formDialog({
+      title: "Use a service account token",
+      description: "A token you made at 1password.com that reads a vault of yours. Dot keeps it in its .env file on this Mac.",
+      body: field("Service account token", input, el("a", { href: VAULT_TOKEN_HELP, target: "_blank", rel: "noopener noreferrer" }, "Make one that reads a vault of yours")),
+      submitLabel: "Connect",
+      size: "narrow",
+      returnFocus,
+      onSubmit: () => pasteVaultToken(input.value.trim()),
+    }).closed;
   }
 
   /** Connect 1Password with the owner's op, through the 1Password app, which asks them first (item 493). */
@@ -398,77 +379,29 @@ export function createCatalogue(onChange) {
     return el("span", { class: "chip" }, WAY_NAMES[first.kind]);
   }
 
-  /** Empty what was typed into the form of `id` (a service's, or "vault"). */
-  function forgetTyped(id) {
-    for (const input of secretFields.get(id)?.values() ?? []) {
-      input.value = "";
-    }
-  }
-
-  /** Open the form of `id` (a service's, or "vault"): one open before closes with what was typed in it, as its Cancel
-   * would (item 559). */
-  function ask(id) {
-    if (asking !== null && asking !== id) {
-      forgetTyped(asking);
-    }
-    asking = id;
-    changed();
-  }
-
-  function askSecrets(service) {
-    ask(service.id);
-    const fields = secretFields.get(service.id);
-    if (fields !== undefined) {
-      const [first] = fields.values();
-      first?.focus();
-    }
-  }
-
-  /** Close the form of the key being asked for, and empty what was typed in it: Cancel and the way away from the page
-   * leave no key behind for the next form to show (item 559). */
-  function stopAsking() {
-    if (asking === null) {
-      return;
-    }
-    forgetTyped(asking);
-    asking = null;
-    changed();
-  }
-
-  /** The form that takes a service's secrets (item 408): a password field for each, where to get one, Add and Cancel.
-   * The values go to the daemon once, which keeps them in its .env; the fields are emptied after. */
-  function secretsForm(service) {
-    let fields = secretFields.get(service.id);
-    if (fields === undefined) {
-      fields = new Map(
-        service.secrets.map((secret) => [
-          secret.name,
-          el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": `${service.name}: ${secret.label}` }),
-        ]),
-      );
-      secretFields.set(service.id, fields);
-    }
-    const addButton = el("button", { class: "btn primary sm", type: "button", disabled: busy.has(`mcp:${service.id}`) }, icon("plus"), "Add");
-    addButton.addEventListener("click", () =>
-      attempt(async () => {
-        const secrets = Object.fromEntries([...fields].map(([name, input]) => [name, input.value]));
-        await add({ service: service.id, name: null, address: null, secrets });
-        for (const input of fields.values()) {
-          input.value = "";
-        }
-        asking = null;
-        changed();
-      }),
-    );
-    const cancel = el("button", { class: "btn sm", type: "button", onclick: () => stopAsking() }, "Cancel");
-    return el(
-      "div",
-      { class: "connect-add plugin-secrets" },
-      ...service.secrets.map((secret) =>
-        field(secret.label, fields.get(secret.name), secret.help === null ? "" : el("a", { href: secret.help, target: "_blank", rel: "noopener noreferrer" }, "Where to get one")),
+  /**
+   * Ask for the secrets of a service that takes them (item 408), in a dialog (item 615): a password field for each,
+   * where to get one, Cancel and Add. The values go to the daemon once, which keeps them in its .env; the fields are
+   * emptied as the dialog closes, so a key typed and then cancelled is gone when the dialog opens again (item 559).
+   * Resolves once the dialog is closed. `returnFocus` finds the button the dialog gives the focus back to when the page
+   * was drawn again meanwhile.
+   */
+  function askSecrets(service, returnFocus) {
+    const inputs = service.secrets.map((secret) => [
+      secret,
+      el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": `${service.name}: ${secret.label}` }),
+    ]);
+    return formDialog({
+      title: `Add ${service.name}`,
+      description: "Dot tries the server before it keeps it, and keeps the key in its .env file on this Mac.",
+      body: inputs.map(([secret, input]) =>
+        field(secret.label, input, secret.help === null ? "" : el("a", { href: secret.help, target: "_blank", rel: "noopener noreferrer" }, "Where to get one")),
       ),
-      el("div", { class: "connect-add-actions" }, addButton, cancel),
-    );
+      submitLabel: "Add",
+      size: "narrow",
+      returnFocus,
+      onSubmit: () => add({ service: service.id, name: null, address: null, secrets: Object.fromEntries(inputs.map(([secret, input]) => [secret.name, input.value])) }),
+    }).closed;
   }
 
   /** Do `work` with `key` busy: what is shown is drawn again as it starts and once it is done. */
@@ -625,8 +558,6 @@ export function createCatalogue(onChange) {
     },
     /** Whether the step that acts on `key` is under way. */
     busy: (key) => busy.has(key),
-    /** The service whose key is being asked for, or null. */
-    asking: () => asking,
     appIcon,
     wayNow,
     connected,
@@ -634,10 +565,8 @@ export function createCatalogue(onChange) {
     standing,
     howChip,
     askSecrets,
-    secretsForm,
     askVault,
     vaultBadge,
-    vaultForm,
     connectVault,
     disconnectVault,
     takeStep,
@@ -650,7 +579,6 @@ export function createCatalogue(onChange) {
     load,
     dispose() {
       disposed = true;
-      stopAsking();
       clearTimeout(polling);
       for (const pending of appIcons.values()) {
         // An icon that could not be read was reported where it was asked for; there is no URL to let go of.

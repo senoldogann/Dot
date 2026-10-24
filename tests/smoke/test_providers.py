@@ -11,7 +11,15 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright, expect
+from form_dialogs import (
+    asks_before_dropping,
+    closes_with_escape,
+    foot_is_in_view,
+    keeps_inside_the_window,
+    open_form,
+    shows_the_failure,
+)
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -182,5 +190,48 @@ async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
             assert await phone.locator(".provider-item[aria-current]").count() == 0
             assert phone_errors == []
             await phone.context.close()
+        finally:
+            await browser.close()
+
+
+async def test_add_key_is_a_dialog_that_says_what_a_key_may_not_hold_and_keeps_none_after_it(
+    runtime: Runtime, served: str, tmp_path: Path
+) -> None:
+    """Item 615: Add key opens a dialog (the page does not grow, a sheet on a phone with its foot in view) with the
+    key's field, hidden until it is shown; a key with a space inside is refused there, above the foot, and stays typed;
+    a key typed and dropped, shown or not, is gone when the dialog opens again. No key is saved: nothing here is sent
+    to a provider."""
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            for width, scheme in ((1280, "dark"), (390, "light")):
+                page, errors = await _page(browser, served, width, scheme)
+                await page.locator(".provider-item").filter(has_text="TypeSafe").click()
+                opener: Locator = page.get_by_role("button", name="Add key")
+                await expect(opener).to_have_attribute("aria-haspopup", "dialog")
+                # No field of a key stands in the page: the button opens it.
+                await expect(page.get_by_label("TypeSafe API key")).to_have_count(0)
+                dialog: Locator = await open_form(page, opener, "Add the TypeSafe key")
+                key: Locator = dialog.get_by_label("TypeSafe API key")
+                await expect(key).to_be_focused()
+                await expect(key).to_have_attribute("type", "password")
+                await keeps_inside_the_window(page)
+                await foot_is_in_view(page, dialog)
+                await page.screenshot(path=str(tmp_path / f"key-{width}-{scheme}.png"))
+                # Shown, a key with a space inside is refused, with the reason in the dialog and the key still typed.
+                await dialog.get_by_role("button", name="Show the key").click()
+                await expect(key).to_have_attribute("type", "text")
+                await key.fill("a key with spaces")
+                await dialog.get_by_role("button", name="Save").click()
+                await shows_the_failure(dialog, "A key has no spaces or line breaks inside it")
+                await expect(key).to_have_value("a key with spaces")
+                # Dropped, the key is gone, and the field is hidden again when the dialog opens once more.
+                await asks_before_dropping(page, dialog, key, "tsk-typed-and-dropped")
+                dialog = await open_form(page, opener, "Add the TypeSafe key")
+                await expect(key).to_have_value("")
+                await expect(key).to_have_attribute("type", "password")
+                await closes_with_escape(page, dialog, opener)
+                assert errors == []
+                await page.context.close()
         finally:
             await browser.close()

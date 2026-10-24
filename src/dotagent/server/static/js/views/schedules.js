@@ -2,8 +2,9 @@
 // sidebar above Customize. Each schedule keeps how its runs start (mode, approvals, goal mode, model, reasoning level,
 // time zone) and can be changed later. Run now starts one of its runs by hand, switched on or off, and its Firings
 // list its last runs, at its time and by hand (item 455). The owner's schedules lead the page (item 609); under them the
-// Morning brief (item 570), a schedule of its own labelled in the list, which its card sets, folded to a line, and the
-// Watchers (item 571), a head and a line while there are none.
+// Morning brief (item 570), a schedule of its own labelled in the list, which its card sets, a line with a button for
+// its settings, and the Watchers (item 571), a head and a line while there are none. New schedule and a schedule's Edit
+// open the form in a dialog, so that the list keeps its place (item 615).
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
@@ -12,10 +13,10 @@ import { mountWatchers } from "../watcherspanel.js";
 import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, pageHead, paintOpener, segmented } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, markOpener, pageHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
 import { getSnapshot, loadModels, onLifecycle, onStreamBack, readFailed } from "../state.js";
-import { attempt, confirmDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 
 // A run starting or ending, and a schedule switched off after its runs failed in a row (item 458), paint the list again.
 const LIFECYCLE_KINDS = new Set(["run_started", "run_finished", "schedule_stopped"]);
@@ -254,7 +255,7 @@ function scheduleRow(view, handlers) {
     {
       class: "btn ghost sm icon-only",
       type: "button",
-      title: view.brief ? "Edit the morning brief on its card, at the top of this page" : "Edit this schedule",
+      title: view.brief ? "Edit the morning brief's settings" : "Edit this schedule",
       "aria-label": `Edit ${record.name}`,
       onclick: () => handlers.onEdit(view),
     },
@@ -296,7 +297,7 @@ function scheduleRow(view, handlers) {
         "div",
         { class: "row" },
         el("span", { class: "row-title" }, record.name),
-        view.brief ? el("span", { class: "badge b-info", title: "Dot writes it each morning; its card at the top of this page sets it" }, "Brief") : null,
+        view.brief ? el("span", { class: "badge b-info", title: "Dot writes it each morning; the Morning brief under your schedules sets it" }, "Brief") : null,
       ),
       el("div", { class: "row-meta" }, optionChips(record, agent)),
       goalText(record.goal),
@@ -344,10 +345,12 @@ function zoneList() {
 }
 
 /**
- * The form that creates a schedule (`view` null) or changes one. `onSaved()` runs after the daemon accepted it, and
- * `onCancel()` on Cancel: the creation form hides, an edit gives its schedule's row back.
+ * The fields that create a schedule (`view` null) or change one, for the dialog that holds them (item 615). Returns the
+ * element; `submit()`, which asks the daemon and resolves to `false` when a field the schedule needs is empty (the
+ * field takes the focus) and throws when the daemon refuses; and `ready`, which settles once the agents and the models
+ * the selects offer are read.
  */
-function scheduleForm({ view, onSaved, onCancel }) {
+function scheduleForm({ view }) {
   const record = view === null ? null : view.record;
   const options =
     record === null
@@ -408,7 +411,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
     paintApprovalsDefault();
   });
   paintAgents();
-  api
+  const agentsRead = api
     .get("/agents")
     .then((summaries) => {
       agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
@@ -493,7 +496,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
   }
 
   model.addEventListener("change", paintEffort);
-  loadModels()
+  const modelsRead = loadModels()
     .then((providers) => {
       models = allModels(providers).filter((candidate) => candidate.tools);
       const chosen = model.value;
@@ -567,8 +570,6 @@ function scheduleForm({ view, onSaved, onCancel }) {
     cron.value = record.cron ?? "";
     at.value = view.run_at_input ?? "";
   }
-  const save = el("button", { class: "btn primary", type: "button" }, icon(record === null ? "plus" : "check"), record === null ? "Add schedule" : "Save changes");
-  const cancel = el("button", { class: "btn ghost", type: "button", onclick: onCancel }, "Cancel");
 
   async function submit() {
     const nameText = name.value.trim();
@@ -577,19 +578,19 @@ function scheduleForm({ view, onSaved, onCancel }) {
     const cronText = cron.value.trim();
     if (nameText === "") {
       name.focus();
-      return;
+      return false;
     }
     if (goalText === "") {
       goal.focus();
-      return;
+      return false;
     }
     if (recurring && cronText === "") {
       cron.focus();
-      return;
+      return false;
     }
     if (!recurring && at.value === "") {
       at.focus();
-      return;
+      return false;
     }
     const body = {
       name: nameText,
@@ -610,26 +611,20 @@ function scheduleForm({ view, onSaved, onCancel }) {
       // The form has no speed of its own: a schedule keeps the one its chat gave it (item 291).
       speed: options.speed,
     };
-    save.disabled = true;
-    try {
-      if (record === null) {
-        // The page makes the form anew for the next one (`newScheduleForm`), its choices back at their defaults.
-        await api.post("/schedules", body);
-        toast("ok", "Schedule added.");
-      } else {
-        await api.patch(`/schedules/${record.id}`, { ...body, enabled: enabled.getAttribute("aria-checked") === "true" });
-        toast("ok", "Schedule saved.");
-      }
-      await onSaved();
-    } finally {
-      save.disabled = false;
+    if (record === null) {
+      // The page makes the form anew for the next one, its choices back at their defaults (item 559).
+      await api.post("/schedules", body);
+      toast("ok", "Schedule added.");
+    } else {
+      await api.patch(`/schedules/${record.id}`, { ...body, enabled: enabled.getAttribute("aria-checked") === "true" });
+      toast("ok", "Schedule saved.");
     }
+    return true;
   }
 
-  save.addEventListener("click", () => attempt(submit));
   const element = el(
-    "section",
-    { class: record === null ? "card card-pad stack" : "stack grow", dataset: { scheduleForm: String(id) } },
+    "div",
+    { class: "stack", dataset: { scheduleForm: String(id) } },
     el(
       "div",
       { class: "form-grid" },
@@ -651,9 +646,8 @@ function scheduleForm({ view, onSaved, onCancel }) {
       cronField,
       atField,
     ),
-    el("div", { class: "row" }, el("span", { class: "spacer" }), cancel, save),
   );
-  return { element };
+  return { element, submit, ready: Promise.all([agentsRead, modelsRead]) };
 }
 
 export function mount(root, ctx) {
@@ -661,24 +655,14 @@ export function mount(root, ctx) {
   // Grows with every load, so a slow answer never overwrites a newer one.
   let ticket = 0;
   let views = null;
-  // The id of the schedule whose form is open, or null.
-  let editing = null;
   // The schedules whose Firings are open: they stay open, and are read again, as the list is painted again.
   const openFirings = new Set();
   const holder = el("div", null, loadingPanel());
   const count = el("span", { class: "hint" });
-  // The form that adds a schedule stays away until New schedule asks for it; the list is what this page is for.
-  const formSlot = el("div", { class: "schedule-form-slot", hidden: true });
+  // The form that adds a schedule opens in a dialog when New schedule asks for it; the list is what this page is for.
   const addButton = el("button", { class: "btn primary sm", type: "button" });
-  paintOpener(addButton, "New schedule", false);
-  addButton.addEventListener("click", () => {
-    formSlot.hidden = !formSlot.hidden;
-    paintOpener(addButton, "New schedule", !formSlot.hidden);
-    if (!formSlot.hidden) {
-      formSlot.scrollIntoView({ block: "nearest" });
-      formSlot.querySelector("input")?.focus();
-    }
-  });
+  markOpener(addButton, "New schedule");
+  addButton.addEventListener("click", () => openForm(null));
   const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "The scheduler is not running, so nothing fires until the daemon restarts."));
   // The brief's card reads again whenever the list does: a switch in the list, a run's end, a failure that switched it off.
   const brief = mountBrief(ctx, () => reload());
@@ -686,7 +670,7 @@ export function mount(root, ctx) {
   const watchers = mountWatchers();
 
   function paint() {
-    if (views === null || editing !== null) {
+    if (views === null) {
       return;
     }
     if (views.length === 0) {
@@ -696,7 +680,7 @@ export function mount(root, ctx) {
     const handlers = {
       onToggle: (record) => attempt(() => toggle(record)),
       onDelete: (record) => attempt(() => remove(record)),
-      onEdit: (view) => (view.brief ? brief.focus() : startEditing(view)),
+      onEdit: (view) => (view.brief ? brief.open() : openForm(view)),
       onRunNow: (record) => attempt(() => runNow(record)),
       onFirings: (record, button, list) => attempt(() => toggleFirings(record, button, list)),
       firingsOpen: (id) => openFirings.has(id),
@@ -766,26 +750,34 @@ export function mount(root, ctx) {
     await reload();
   }
 
-  // The row of the schedule turns into its form; saving or cancelling paints the list again.
-  // While a form is open the list is not painted again, so a run starting or ending does not throw the edit away.
-  function startEditing(view) {
-    const row = holder.querySelector(`[data-schedule="${view.record.id}"]`);
-    if (row === null) {
-      return;
-    }
-    editing = view.record.id;
-    const form = scheduleForm({
-      view,
-      onSaved: async () => {
-        editing = null;
+  /** The form that adds a schedule (`view` null) or changes `view`'s, in a dialog; the list is read again once the daemon
+   * took it. The dialog holds the form, so a run starting or ending paints the list behind it without touching what is
+   * typed. A form is made anew each time, so the next schedule starts from the defaults, not from the last one's choices
+   * (its approvals and its agent among them), which a schedule that runs unattended would take unless the owner noticed
+   * them (item 559). */
+  function openForm(view) {
+    const form = scheduleForm({ view });
+    const record = view === null ? null : view.record;
+    formDialog({
+      title: record === null ? "New schedule" : "Edit schedule",
+      description:
+        record === null
+          ? "Dot carries out the goal by itself, once or on a repeating schedule, while the daemon runs."
+          : `Change “${clip(record.name, 60)}”. Its next run starts with the new choices.`,
+      body: form.element,
+      submitLabel: record === null ? "Add schedule" : "Save changes",
+      size: "wide",
+      ready: form.ready,
+      // A schedule's row is painted again once it is saved: its Edit button is found anew.
+      returnFocus: () => (record === null ? addButton : holder.querySelector(`[data-schedule="${record.id}"] [aria-label^="Edit "]`)),
+      onSubmit: async () => {
+        if ((await form.submit()) === false) {
+          return false;
+        }
         await reload();
-      },
-      onCancel: () => {
-        editing = null;
-        paint();
+        return true;
       },
     });
-    row.replaceChildren(form.element);
   }
 
   async function toggle(record) {
@@ -817,26 +809,6 @@ export function mount(root, ctx) {
 
   const status = getSnapshot().status;
   schedulerNote.hidden = status === null || status.scheduler_running;
-  const closeForm = () => {
-    formSlot.hidden = true;
-    paintOpener(addButton, "New schedule", false);
-  };
-  // The form that adds a schedule, made anew once one is added (item 559): the next starts from the defaults, not from
-  // the last one's choices (its approvals and its agent among them), which a schedule that runs unattended would take
-  // unless the owner noticed them.
-  function newScheduleForm() {
-    const form = scheduleForm({
-      view: null,
-      onSaved: async () => {
-        closeForm();
-        newScheduleForm();
-        await reload();
-      },
-      onCancel: closeForm,
-    });
-    formSlot.replaceChildren(form.element);
-  }
-  newScheduleForm();
   ctx.setTitle("Schedules");
   root.append(
     pageHead("Schedules", "Goals that Dot runs by itself, once or on a repeating schedule.", null),
@@ -847,7 +819,6 @@ export function mount(root, ctx) {
       el("span", null, "Schedules fire only while the daemon runs and this Mac is awake. A firing that was missed while the daemon was down is skipped, not replayed."),
     ),
     schedulerNote,
-    formSlot,
     el(
       "section",
       { class: "memory-panel notes-panel schedule-panel" },
