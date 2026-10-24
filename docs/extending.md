@@ -334,15 +334,18 @@ url = "https://mcp.example.com/mcp"       # a remote server; transport = "http" 
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; headers are never logged
 ```
 
-**A server comes with Dot** (item 583): `web-research`, the MCP server of the package `dotagent-web-research` (1.3.1,
-item 623), which Dot's own package depends on, so that every install has it ready and on. Its tools search the web and
+**A server comes with Dot** (item 583): `web-research`, the MCP server of the package `dotagent-web-research` (1.4.1,
+item 630), which Dot's own package depends on, so that every install has it ready and on. Its tools search the web and
 read what a run asks for, and each is named `mcp__web-research__<tool>`: `web_search` (Brave or Serper first when their
 key is in the server's environment, then DuckDuckGo, Yahoo and Google, a provider that walls or fails resting ten
 minutes; each result's date with how sure it is, read from the page's head for news), `web_scrape` (one page, or two to
 ten in one call, as Markdown; a page behind a wall is read another way, from the archive or another outlet's copy, which
-the answer names; `archive: true` reads the Internet Archive's copy), `web_map`, `web_extract`, `web_health` (the state
+the answer names; `archive: true` reads the Internet Archive's copy; a page its scripts draw is waited for, and one
+that is still an empty shell, or that is what its site answers any address with, says so: `rendered_shell`,
+`soft_404`, `looks_missing`), `web_map` (a site that redirects is mapped at the host it lands on), `web_extract`,
+`web_health` (the state
 of its search providers), and a crawl in the background (`web_crawl_start`, `web_crawl_status`, `web_crawl_results`,
-`web_crawl_cancel`). Dot starts it with the servers of `[[mcp]]`, as it starts those: on the Python the daemon runs on
+`web_crawl_cancel`; an ended crawl says why it stopped, `stopped_by`, and how many links it left, `not_visited`). Dot starts it with the servers of `[[mcp]]`, as it starts those: on the Python the daemon runs on
 (`python -P -m web_scraper.mcp_server`: `-P` keeps the workspace, where a run's commands write, off its import path),
 with `WEB_TOOLS_DATA_DIR=<home>/web-research`, where it keeps its crawl jobs, a folder a run's commands cannot change,
 as they cannot change the other files Dot loads and runs, and with `PYTHON_DOTENV_DISABLED=1`, so that it reads no

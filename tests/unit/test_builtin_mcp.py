@@ -498,14 +498,17 @@ def test_the_server_reads_no_page_of_its_own_while_the_owner_has_a_list_of_sites
     web_research_comes: None, home: Path
 ) -> None:
     """Item 623: since 1.3.0 the server reads the heads of a search's results for their dates and looks for another copy
-    of a walled page, which no list of the owner's binds; with a list set, both are off."""
+    of a walled page, which no list of the owner's binds; with a list set, both are off. Item 630: since 1.4.0 it asks a
+    page's host for an address that cannot exist, to tell a missing page; with a list set, that is off too."""
     config: AppConfig = load_default_config()
     assert "WEB_TOOLS_SEARCH_RESOLVE_DATES" not in builtin_servers(config)[0].env
+    assert "WEB_TOOLS_SOFT_404_CHECK" not in builtin_servers(config)[0].env
     allowed: AppConfig = config.model_copy(
         update={"browser": config.browser.model_copy(update={"allowed_hosts": ["example.org"]})}
     )
     env: dict[str, str] = dict(builtin_servers(allowed)[0].env)
     assert env["WEB_TOOLS_SEARCH_RESOLVE_DATES"] == "off" and env["WEB_TOOLS_SCRAPE_RECOVER"] == "off"
+    assert env["WEB_TOOLS_SOFT_404_CHECK"] == "off"
     more: list[str] = [*config.browser.blocked_hosts, "news.example"]
     blocked: AppConfig = config.model_copy(
         update={"browser": config.browser.model_copy(update={"blocked_hosts": more})}
@@ -538,11 +541,11 @@ def test_the_archive_is_judged_as_a_site_the_call_reaches_while_a_host_list_is_s
     assert checked_builtin_call(_tool("web_scrape"), plain, _lists(allowed=["docs.python.org"]))[0] == plain
 
 
-def test_the_installed_server_reads_the_two_switches_dot_sets(
+def test_the_installed_server_reads_the_switches_dot_sets(
     web_research_comes: None, home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Item 623, the review: the names Dot sets are the ones the installed server reads, so that a later version that
-    renamed one does not quietly let the lists stop binding."""
+    renamed one does not quietly let the lists stop binding (the missing-page check's too, item 630)."""
     from web_scraper.web_tools.settings import WebToolsSettings  # type: ignore[import-untyped]
 
     config: AppConfig = load_default_config()
@@ -553,3 +556,4 @@ def test_the_installed_server_reads_the_two_switches_dot_sets(
         monkeypatch.setenv(name, value)
     settings = WebToolsSettings.from_env()
     assert settings.search_resolve_dates == "off" and settings.scrape_recover == "off"
+    assert settings.soft_404_check is False

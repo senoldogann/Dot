@@ -114,9 +114,13 @@ run needs, sent where the configuration points:
   (1.3.0). For a search of news or of a span of dates it reads the head of each of the top results' pages for its date,
   and when a page it is asked for answers with a wall (a captcha, a 401, 403 or 429), `web_scrape` looks for another
   copy: the Internet Archive's (`web.archive.org`), the page's AMP or print version, the site's feed, and another
-  outlet's copy found by searching for its title, whose address the answer names (1.3.0). Neither is done while you have
-  a list of sites set (`[browser] allowed_hosts`, or `blocked_hosts` beyond the defaults): Dot then starts the server
-  with both off, as the lists bind the addresses a call holds and these would be pages the server chose (item 623). Its
+  outlet's copy found by searching for its title, whose address the answer names (1.3.0). To tell a page that is not
+  there from one that is (a site that answers every address with its home page), it asks a page's host, once a
+  session and only for a page that does not name itself, for an address that cannot exist, and compares (1.4.0). None
+  of the three is done while you have a list of sites set (`[browser] allowed_hosts`, or `blocked_hosts` beyond the
+  defaults): Dot then starts the server with all three off, as the lists bind the addresses a call holds and these
+  would be pages the server chose (items 623 and 630). A page that its own scripts draw is waited for until its text
+  stops growing, eight seconds at the most (1.4.0), and `web_map` may read one in its headless Chrome. Its
   `web_scrape`, `web_map`, `web_extract` and crawls request the pages they are asked for, with the `robots.txt` and the
   sitemaps of their sites (a headless Chrome of its own reads a page that needs JavaScript), and with `archive: true`
   the Internet Archive's copy; `web_health` asks nothing of anyone. It refuses the addresses of this Mac, of private

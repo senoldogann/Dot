@@ -60,10 +60,15 @@ def _web_research(enabled: bool, bound: bool) -> McpServerConfig:
     workspace, the working folder, is read still; what is in the environment reaches the headless browser's driver, and
     a ``NODE_OPTIONS`` there is a file run outside the sandbox. The package reads only the working folder's now (its
     own change), and the variable closes that one too. With ``bound`` (:func:`host_lists_set`) the server reads no page
-    of its own accord: no dates from the heads of a search's results, no other copy of a walled page."""
+    of its own accord: no dates from the heads of a search's results, no other copy of a walled page, and since 1.4.0
+    no address of a page's host that cannot exist, which tells a missing page from a real one (item 630)."""
     env: dict[str, str] = {"WEB_TOOLS_DATA_DIR": str(web_research_dir()), "PYTHON_DOTENV_DISABLED": "1"}
     if bound:
-        env |= {"WEB_TOOLS_SEARCH_RESOLVE_DATES": "off", "WEB_TOOLS_SCRAPE_RECOVER": "off"}
+        env |= {
+            "WEB_TOOLS_SEARCH_RESOLVE_DATES": "off",
+            "WEB_TOOLS_SCRAPE_RECOVER": "off",
+            "WEB_TOOLS_SOFT_404_CHECK": "off",
+        }
     return McpServerConfig(
         name=WEB_RESEARCH,
         command=sys.executable,
