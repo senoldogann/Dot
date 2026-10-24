@@ -24,8 +24,6 @@ from dotagent.store.models import (
 
 # The channel of a run is that of its latest tool result; a run without one has worked in no channel yet.
 _LAST_RESULT: int = 1
-# A schedule that fires within this many seconds is listed among the working rows, with when.
-_DUE_WITHIN_S: float = 3600.0
 # How many of the newest runs are read for the ones that ended today.
 _RECENT_RUNS: int = 60
 _TITLE_CHARS: int = 120
@@ -121,28 +119,6 @@ async def _working_row(store: Store, run: RunRecord) -> ActivityRow:
     if run.parent_run_id is not None:
         return await _run_row(store, run, "working", "delegated", "delegated by another run", _title(run.goal))
     return await _run_row(store, run, "working", "run", "", _title(run.goal))
-
-
-def _schedule_row(schedule: ScheduleRecord, now: float) -> ActivityRow:
-    due: float = schedule.next_run_at if schedule.next_run_at is not None else now
-    minutes: int = max(0, round((due - now) / 60))
-    return ActivityRow(
-        id=schedule.id,
-        section="working",
-        kind="schedule",
-        title=_title(schedule.name),
-        detail="fires now" if minutes == 0 else f"fires in {minutes} min",
-        channel="",
-        since=due,
-        href="#/schedules",
-        run_id=None,
-        status="scheduled",
-        minutes=None,
-        tokens=None,
-        steps=None,
-        parent_run_id=None,
-        actor_id=schedule.id,
-    )
 
 
 def _note_row(note: MemoryRecord, kind: str) -> ActivityRow:
@@ -284,7 +260,8 @@ def _reflection_failed_row(failure: ReflectionFailure) -> ActivityRow:
 async def activity_view(store: Store, manager: RunManager, now: float) -> ActivityView:
     """The three sections at ``now``: waiting (the approvals and questions runs wait for, the questions runs left for
     the user, the runs the user holds),
-    working (the live runs that wait for nothing, the schedules due within the hour), ended_delegated (the runs that
+    working (the live runs that wait for nothing: a schedule about to fire is no work yet, and is under due, item 608),
+    ended_delegated (the runs that
     the runs of working delegated and that have ended, oldest first), recent (the runs that ended today but those,
     and the reflection that ran today, newest first), learned_today (the journal and the lessons written today) and
     due (the schedules and campaign sessions due before the day ends)."""
@@ -329,9 +306,6 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
         for child in await store.list_child_runs(run.id):
             if child.id not in live and child.status in _ENDED:
                 ended_delegated.append(await _working_row(store, child))
-    for schedule in await store.list_schedules():
-        if schedule.enabled and schedule.next_run_at is not None and schedule.next_run_at - now <= _DUE_WITHIN_S:
-            working.append(_schedule_row(schedule, now))
     under: set[str] = {row.id for row in ended_delegated}
     recent: list[ActivityRow] = []
     today: float = start_of_today(now)

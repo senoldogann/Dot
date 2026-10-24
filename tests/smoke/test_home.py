@@ -214,6 +214,8 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
 
     activity = (await client.get("/api/activity")).json()
     assert [row["kind"] for row in activity["learned_today"]] == ["lesson"]
+    # Working holds what works (item 608): the schedule five minutes off is due, not working.
+    assert "schedule" not in [row["kind"] for row in activity["working"]]
     assert activity["learned_today"][0]["href"] == f"#/runs/{ended.id}"
     if _still_today(due_at):
         assert [(row["kind"], row["title"]) for row in activity["due"]] == [("schedule", "Evening digest")]
