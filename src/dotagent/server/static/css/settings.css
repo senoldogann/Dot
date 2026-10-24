@@ -214,6 +214,21 @@
   }
 }
 
+/* A sentence with a button beside it gives the button a line of its own once the sentence would stand in a narrow
+   column, six lines high: the token this browser keeps (General) and Appearance's two choices that follow the theme
+   (item 606). */
+@media (max-width: 720px) {
+  .card-pad.row,
+  .setting > .row:has(> .hint.grow) {
+    flex-wrap: wrap;
+  }
+
+  .card-pad.row > .grow,
+  .setting > .row > .hint.grow {
+    flex: 1 1 15rem;
+  }
+}
+
 /* The roles (item 563): a model's select in a row of the Roles card, the provider of the model chosen in the box of the
    select, before its chevron. */
 .model-pick {
@@ -2861,6 +2876,18 @@
     flex-direction: column;
     align-items: stretch;
   }
+
+  /* A note the owner decides on (the forgotten ones, the ones proposed): its buttons stand in a row under its words, not
+     in a column at their side, which left the words 140 px and three or four lines for a sentence (item 606). */
+  .note-row:has(> .note-decide) {
+    flex-wrap: wrap;
+  }
+
+  .note-row > .note-decide {
+    flex: 1 1 100%;
+    flex-direction: row;
+    align-items: center;
+  }
 }
 
 /* What Dot knows about you: the reflection's lines, and a box for yours. */
@@ -3652,6 +3679,15 @@
   background: var(--surface-2);
 }
 
+/* The button that opens the form, and the one that opens a version's texts, are no `.btn`: on a phone each is as high as
+   one (item 606). */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .harness-write,
+  .version-toggle {
+    min-height: 36px;
+  }
+}
+
 /* What the form is for, and its fields, each a step apart, in the dialog. */
 .harness-form {
   display: flex;
@@ -3865,6 +3901,13 @@
 
   .version-details {
     padding-left: 0;
+  }
+
+  /* A version's buttons (its texts, Use, Set aside) wrap rather than reach 9 px past the edge of a phone 320 px wide
+     (item 606). */
+  .version-tools {
+    flex-wrap: wrap;
+    max-width: 100%;
   }
 }
 

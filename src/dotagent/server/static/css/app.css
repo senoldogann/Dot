@@ -2254,6 +2254,11 @@ a.pill:hover {
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* WebKit sizes a box of its own (this name, a flex item) by the width of its text with the space of the variable font's
+     regular weight, and draws the bold text wider by a third of a pixel a space: the box is a hair short, and the
+     ellipsis cut Creative Design to "Creative Desi…" with 60 px to spare (item 606). The words sit a hair closer, which
+     nobody sees, so that the text is a hair shorter than its box. */
+  word-spacing: -0.03em;
 }
 
 .gallery-card a.gallery-card-name::after {
@@ -2842,6 +2847,13 @@ dialog.modal.versions-dialog {
 .chat-skill-goal {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* How long ago a chat ended is two words that keep to a line: beside a long goal they were squeezed to "3m" over "ago"
+   (item 606). */
+.chat-skill-row > .hint {
+  flex: none;
+  white-space: nowrap;
 }
 
 .chat-skill-problem {
@@ -7206,6 +7218,19 @@ a.memory-line:hover .memory-change {
   color: inherit;
 }
 
+/* On a phone the toasts stand under the bar, across the page, not at the foot: there they lay over the composer, its
+   send button and the stop button of a run at work, for three seconds and a half, and for nine when it was an error
+   (item 606). The bar's height, measured (layout.js), holds the status bar's safe area of an iPhone's home-screen app. */
+@media (max-width: 720px) {
+  .toast-region {
+    top: calc(var(--stagebar-h) + var(--seen-top) + var(--space-2));
+    right: calc(var(--space-3) + var(--safe-right));
+    bottom: auto;
+    left: calc(var(--space-3) + var(--safe-left));
+    max-width: none;
+  }
+}
+
 dialog.modal {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
@@ -9414,6 +9439,18 @@ button.attach-chip:hover {
     margin-top: 0;
     padding: 0 var(--space-3);
   }
+
+  /* The badge of a ready team the owner has under Your teams already stands under the words on a phone (item 606): beside
+     them it took 100 px of the 253 the head has, and the description stood in 141, seven lines high. */
+  .team-card > .template-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    row-gap: var(--space-2);
+  }
+
+  .team-card > .template-head > .row-main {
+    flex: 1 1 100%;
+  }
 }
 
 .cluster.end {
@@ -9781,6 +9818,31 @@ button.attach-chip:hover {
     width: 28px;
     height: 28px;
   }
+
+  /* What is tapped without being a button (item 606): the name of a file the run changed and the quiet link from an
+     approval to a rule are lines of words, 20 px high; each box grows to a finger's height without moving the line it
+     stands on. The head of a licence's notice, the row that opens it, is as high as a button. */
+  .run-changes-file,
+  .approval-rule {
+    padding-block: 8px;
+    margin-block: -8px;
+  }
+
+  .notice-head {
+    min-height: 36px;
+    align-content: center;
+  }
+
+  /* The star that makes a model a favourite and the word that changes the default, in the list of models, were 28 px. */
+  .model-star,
+  .model-star-room {
+    width: 32px;
+    height: 32px;
+  }
+
+  .model-change {
+    min-height: 32px;
+  }
 }
 
 /* ---------- Settings › System's Diagnostics (item 370) and Open source licences (item 371) ---------- */
@@ -9823,6 +9885,27 @@ button.attach-chip:hover {
   flex: none;
   white-space: nowrap;
   text-align: right;
+}
+
+/* The list of Python packages (item 606): a version breaks after a dot (licences.js leaves a place there), never inside a
+   number ("0.143." over "1"), and on a phone the cells between the columns keep 8 px at each side, not 16, so that a name
+   has the room for its letters; the first and the last keep the 16 of the card. */
+.table:has(tr[data-package]) td:nth-child(2) {
+  overflow-wrap: normal;
+}
+
+@media (max-width: 720px) {
+  .table:has(tr[data-package]) :is(th, td) {
+    padding-inline: 8px;
+  }
+
+  .table:has(tr[data-package]) :is(th, td):first-child {
+    padding-left: 16px;
+  }
+
+  .table:has(tr[data-package]) :is(th, td):last-child {
+    padding-right: 16px;
+  }
 }
 
 .log-controls {

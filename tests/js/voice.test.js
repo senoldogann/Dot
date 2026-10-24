@@ -170,7 +170,8 @@ test("an answer of eighty thousand characters of one kind is turned into words i
     const started = performance.now();
     spokenText(text);
     const took = performance.now() - started;
-    assert.ok(took < 100, `${kind}: ${took.toFixed(0)} ms for ${text.length} characters`);
+    // The quadratic patterns took seconds; a loaded Mac takes a few hundred milliseconds for a kind at most (item 606).
+    assert.ok(took < 1000, `${kind}: ${took.toFixed(0)} ms for ${text.length} characters`);
   }
 });
 

@@ -1129,6 +1129,14 @@
   }
 }
 
+/* A tab not chosen is its icon alone, 31 px wide: a finger's width on a phone (item 606). */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .inspector-tab {
+    min-width: 36px;
+    justify-content: center;
+  }
+}
+
 /* The agents of a chat (items 227 and 296), in the Agents tab: a row for
    each, the face with its state at the corner; the goal over the provider's mark, the model and the state in a word,
    and what it does or did last; how long it took and a chevron at the right; the whole row is the way to its page. */
@@ -1541,6 +1549,24 @@ button.context-row {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* On a phone the button that opens the file on the Mac is its icon, and the file's name and its facts keep the room: its
+   words took 170 px of the head and left the name "flights…" and the facts "Text, 5…" (item 606). The words stay for a
+   screen reader, as a tab's do (the details' tabs). */
+@media (max-width: 720px) {
+  .file-head > .btn {
+    position: relative;
+  }
+
+  .file-head > .btn > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* The sheets' tabs and what the cell clicked holds; nothing while there is nothing to show. */
