@@ -51,3 +51,9 @@ async def test_a_keychain_file_that_is_there_is_asked(there: str, no_process: li
     with pytest.raises(AssertionError, match="a process was started"):
         await Keychain(there).read("google", "someone@example.com")
     assert no_process != []
+
+
+def test_a_keychain_file_named_by_a_path_that_is_not_whole_is_refused() -> None:
+    """``security`` looks for such a name under ~/Library/Keychains, the check for the file in the working folder."""
+    with pytest.raises(SignInError, match="not a whole path"):
+        Keychain("accounts.keychain-db")

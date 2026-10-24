@@ -86,6 +86,10 @@ class Keychain:
     written one at a time: two saves at once would mix their pieces in one slot."""
 
     def __init__(self, file: str | None) -> None:
+        # A path that is not whole would be looked for under ~/Library/Keychains by ``security`` and in the working
+        # folder by the check of :meth:`_run`: one could be there and the other not (item 628).
+        if file is not None and not os.path.isabs(file):
+            raise SignInError("the keychain file's path is not a whole path", {"file": file})
         if file is not None and _PLAIN_PATH.fullmatch(file) is None:
             raise SignInError(
                 "the keychain file's path has a space, a quote or a backslash, which security's prompt would split",
