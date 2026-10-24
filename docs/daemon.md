@@ -372,8 +372,14 @@ answer's first line reworded (at least half its words in it). It must hold twent
 and most of the answer, so a note that is a small part of the answer stays. A message with a line the answer lacks, a
 word changed or moved on one of its lines, a number or a "not" the answer lost, or a first line that only adds words to
 the answer's or has a number of its own, stays; a first line that swaps a word for another ("No tests
-pass:" for "All tests pass:") is taken for a rewording, and the answer, the run's last word, stands for it. A copy out
-of the conversation
+pass:" for "All tests pass:") is taken for a rewording, and the answer, the run's last word, stands for it. A reply that
+the finish wrote again in other words, each line reworded, goes too (item 620): the loop knows it, as the finish came
+right after its note on that reply and nothing else did, and the run's end names it (the reply's step, in `restated` of
+its `run_finished` event). It goes when the answer is at least half its length, each of its lines has at least half of
+its words in the answer (a reworded line keeps its names and the words that carry it), and the answer holds each of its
+numbers and each word that turns its sense ("not", "değil"); a reply the run went on working after, one the answer only
+points at ("see above"), or one with a line, a number or a "not" the answer left out, stays. A copy out of the
+conversation
 keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as the markdown
 it was written in, a list as a list, a table as a table and code in its fence, with the formatted copy alongside for the
 applications that read it; the line under a message or an answer stays out, and a copy within a block of code is its

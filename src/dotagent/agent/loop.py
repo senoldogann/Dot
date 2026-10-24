@@ -124,6 +124,7 @@ from dotagent.agent.prompt import (
     turn_note,
 )
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
+from dotagent.agent.restating import restates
 from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
     GoalChecker,
@@ -439,6 +440,9 @@ class RunOutcome(FrozenModel):
     status: Literal["done", "failed"]
     result: str
     needs: str
+    # The steps of the text replies the answer restates (item 620), which the run's page leaves out; the manager writes
+    # them into the run's ``run_finished`` event once the run's inbox is shut.
+    restated: tuple[int, ...] = ()
 
 
 class RunEnd(FrozenModel):
@@ -1102,6 +1106,17 @@ def _cut_short_end(reply: ModelReply) -> RunOutcome:
         result=f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with '{_ended_with(reply)}').",
         needs="",
     )
+
+
+def _with_restated(restating: Sequence[tuple[int, str]], outcome: RunOutcome) -> RunOutcome:
+    """``outcome`` with the steps of the text replies its answer restates (item 620). A task run that answers in a plain
+    reply is told to finish (``_NO_TOOL_NOTE``, item 460), as such a reply may be a step announced; when its next step
+    is the finish and nothing else, the reply was the answer, and the finish writes it again, often reworded, which the
+    page's comparison of words cannot tell (the owner's chat showed a screenshot's description twice, 2026-10-24). A
+    reply the answer does not restate (:func:`restates`: one it only points at, or one with a line, a number or a "not"
+    it left out) stands. Nothing awaits here: the run ends at once after its inbox was found empty."""
+    steps: tuple[int, ...] = tuple(step for step, text in restating if restates(text, outcome.result))
+    return outcome.model_copy(update={"restated": steps}) if steps else outcome
 
 
 async def _stored_note(agent: AgentRun, text: str) -> Message:
@@ -2033,6 +2048,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     step_origin: CallOrigin = CallOrigin(run_id=run.id, purpose="step")
     ratio: float = 1.0
     nudges: int = 0
+    # The text replies the loop told to finish (``_NO_TOOL_NOTE``) since the run last acted: their steps and texts. A
+    # finish that follows them with no other call may restate them (item 620).
+    noted_replies: list[tuple[int, str]] = []
     sent_back: int = 0
     used_tools: bool = False
     plan_reminded: bool = False
@@ -2350,8 +2368,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         ended: RunOutcome | None = None
         # The calls of the reply that ended the run that did not work, whose results its answer did not wait for.
         unread: tuple[ToolOutcome, ...] = ()
+        # The replies this step's finish restates, when it ends the run (item 620).
+        restating: tuple[tuple[int, str], ...] = ()
         if reply.tool_calls:
             used_tools = True
+            # A step that calls anything but finish goes on with the work: the replies told to finish were steps
+            # announced, not the answer, and stay.
+            if any(call.name != FINISH_TOOL for call in reply.tool_calls):
+                noted_replies = []
             # Only text replies in a row end a task run; a step that acts starts the count again.
             if _acts(reply.tool_calls, questions):
                 nudges = 0
@@ -2413,6 +2437,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             if finished is not None:
                 ended = _finish_result(finished)
                 unread = _failed_before_finish(outcomes, finished)
+                # The finish takes the replies told to finish before it; one sent back is a new start for them.
+                restating = tuple(noted_replies)
+                noted_replies = []
             elif past_limit is not None:
                 return _run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
             else:
@@ -2467,6 +2494,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 )
             else:
                 nudges += 1
+                if answered:
+                    noted_replies.append((steps, reply.text))
                 history.append(await _stored_note(agent, _NO_TOOL_NOTE if answered else _EMPTY_NOTE))
                 continue
         # The run wants to end here. Past its limit it ends with this finish: nothing sends it back, goal mode's verdict
@@ -2478,7 +2507,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 if checker is None
                 else await _check_goal_at_limit(agent, checker, history, goal, ended, sent_back, facts)
             )
-            return _run_end(agent, history, goal, at_limit, facts)
+            return _run_end(agent, history, goal, _with_restated(restating, at_limit), facts)
         # Otherwise a finish that came in the reply of a call that did not work is sent back once, to read what
         # happened (item 552); so is a plan with open steps, so the plan the user sees matches the work, a session of a
         # campaign that has no targets yet, and, with verify_answer_paths, an answer that names paths that do not
@@ -2523,7 +2552,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
         if isinstance(settled, RunOutcome):
             if not agent.inbox.asks():
-                return _run_end(agent, history, goal, settled, facts)
+                return _run_end(agent, history, goal, _with_restated(restating, settled), facts)
             # The user sent something during this step, such as the answer to a question the run left: the run reads it
             # before it ends. Nothing awaits between this check and the moment the manager shuts the inbox.
             continue

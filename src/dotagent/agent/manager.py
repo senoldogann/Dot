@@ -2714,6 +2714,7 @@ class RunManager:
         needs: str = ""
         error: JsonObject | None = None
         lessons: LessonCase | None = None
+        restated: tuple[int, ...] = ()
         try:
             async with self._place_for(run):
                 await runtime.store.set_run_status(run.id, "running")
@@ -2732,6 +2733,7 @@ class RunManager:
                     ended.outcome.needs,
                     ended.lessons,
                 )
+                restated = ended.outcome.restated
         except RunHoldLapsed as exc:
             status, result = "cancelled", exc.message
         except (RunCancelled, asyncio.CancelledError):
@@ -2747,7 +2749,7 @@ class RunManager:
         finally:
             runtime.peers.end(run.id)
             inbox.shutdown()
-            recorded: bool = await self._close(run, status, result, needs, error, inbox, finished)
+            recorded: bool = await self._close(run, status, result, needs, error, inbox, finished, restated)
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
         if recorded and lessons is not None and not self._stopping:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
@@ -2780,6 +2782,7 @@ class RunManager:
         error: JsonObject | None,
         inbox: RunInbox,
         finished: asyncio.Event,
+        restated: tuple[int, ...] = (),
     ) -> bool:
         """Record the end of the run (:meth:`_record_end`), then release its handle and set ``finished`` whatever
         happens; returns whether the end was recorded. A stop that comes meanwhile waits for the record and stops
@@ -2787,7 +2790,7 @@ class RunManager:
         failure to record it is logged here with its traceback; an end the store refused is stored later
         (:meth:`store_left_ends`), and the run stays as the store has it until then."""
         try:
-            await _to_its_end(self._record_end(run, status, result, needs, error, inbox))
+            await _to_its_end(self._record_end(run, status, result, needs, error, inbox, restated))
             return True
         except Exception:
             log.exception("run_end_not_recorded", run_id=run.id, status=status)
@@ -2809,6 +2812,7 @@ class RunManager:
         needs: str,
         error: JsonObject | None,
         inbox: RunInbox,
+        restated: tuple[int, ...] = (),
     ) -> None:
         """Store how the run ended and tell about it: its waiters are released, the answers that reached its inbox
         (shut by :meth:`_drive`) too late are kept, the status and result are stored with the scores of the notes it
@@ -2821,6 +2825,9 @@ class RunManager:
         data: JsonObject = {"status": status, "result": clean, "needs": redact_secrets(needs)}
         if error is not None:
             data["error"] = redact_json(error)
+        if restated:
+            # The steps of the replies the answer restates, which the run's page leaves out (item 620).
+            data["restated"] = list(restated)
         try:
             await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
             ended: EventRecord = await runtime.store.end_run(run.id, status, clean, data)

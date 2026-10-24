@@ -66,6 +66,7 @@ class _SteeredAtTheEnd(RunManager):
         needs: str,
         error: JsonObject | None,
         inbox: asyncio.Queue[UserInput],
+        restated: tuple[int, ...] = (),
     ) -> None:
         try:
             self.steer(run.id, "One more thing.", ())
@@ -73,7 +74,7 @@ class _SteeredAtTheEnd(RunManager):
             self.refused.append(True)
         else:
             self.refused.append(False)
-        await super()._record_end(run, status, result, needs, error, inbox)
+        await super()._record_end(run, status, result, needs, error, inbox, restated)
 
 
 class _StoreFailsAtTheEnd(RunManager):
@@ -87,6 +88,7 @@ class _StoreFailsAtTheEnd(RunManager):
         needs: str,
         error: JsonObject | None,
         inbox: asyncio.Queue[UserInput],
+        restated: tuple[int, ...] = (),
     ) -> None:
         raise StoreError("the database is locked", {"run_id": run.id})
 
