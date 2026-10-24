@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
+from dotagent.channels.types import TITLES
 from dotagent.config import PromptStyle
 from dotagent.core.types import FrozenModel
 from dotagent.harness.components import GivenText
@@ -480,6 +481,15 @@ _QUESTIONS_GO_ON: str = (
     "with wait only when nothing useful can be done until they answer."
 )
 
+# A run started by a message on a channel (item 572) sends its final answer back there, to the owner's phone, as plain
+# text (channels/text.py): told so, it writes for a phone's screen (item 627).
+_ON_A_PHONE: str = (
+    "This run was started by the user's message in {channel}, on their phone, and your final answer goes back there as "
+    "plain text, where no Markdown is drawn. Write it for a phone's screen: short paragraphs of one to three sentences "
+    "with a blank line between them; a list only for separate points, one short point to an item; no tables, headings "
+    "or nested lists; quotes, parentheses, arrows and file paths only where they are needed."
+)
+
 _DELEGATED: str = (
     "This run was started by another run (its parent) for one self-contained part of the parent's work, and the "
     "parent is waiting for your final answer. You cannot ask the user questions: decide, and put everything the "
@@ -616,6 +626,9 @@ def _environment(inputs: PromptInputs) -> str:
         lines.append(f"- {_UNATTENDED_LEAVING if inputs.questions == 'leave' else _UNATTENDED}")
     if inputs.source == DELEGATE_SOURCE:
         lines.append(f"- {_DELEGATED}")
+    channel: str | None = next((title for name, title in TITLES.items() if name == inputs.source), None)
+    if channel is not None:
+        lines.append(f"- {_ON_A_PHONE.format(channel=channel)}")
     # A delegated run has no ask_user, so it has no questions to leave.
     if inputs.questions == "leave" and ASK_USER_TOOL in inputs.tool_names:
         lines.append(f"- {_LEFT_QUESTIONS}")

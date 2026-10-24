@@ -1,7 +1,9 @@
 """The words Dot sends on a channel (item 572): an answer as plain text, cut to the channel's size with a link to the
 chat for the rest, and the one line that tells a run waits for the owner. A messaging app shows what it is given as it
 is: no Markdown is drawn, so what an answer holds of it is read as plain text (item 617): a list item with a bullet, a
-heading on a line of its own, a table a row to a line, and none of the marks of emphasis, quotes and rules."""
+heading on a line of its own, a table a row to a line, and none of the marks of emphasis, quotes and rules. On a phone's
+narrow screen a list of long items reads as one block, so its items stand apart, and a heading ends with a colon, as a
+title typed in a message does (item 627)."""
 
 import re
 from collections.abc import Sequence
@@ -41,6 +43,17 @@ _STARS: re.Pattern[str] = re.compile(r"(?<![\w*/\\])\*(?=[^\s*])([^*\n]+?)(?<=[^
 _UNDERSCORES: re.Pattern[str] = re.compile(r"(?<![\w_\\])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w_])")
 _BLANK_RUNS: re.Pattern[str] = re.compile(r"\n{3,}")
 _TRAILING_SPACES: re.Pattern[str] = re.compile(r"[ \t]+$", re.MULTILINE)
+# Spaces between two words: a run of them is one space (item 627); an indent, before the first word, stays.
+_SPACE_RUNS: re.Pattern[str] = re.compile(r"(?<=\S)[ \t]{2,}(?=\S)")
+# A list whose items are all this short reads as one block, a line to each (things to buy, steps of a word or two); a
+# list with a longer item, which wraps on a phone's screen, has a blank line between its items, before it and after
+# it, so that each item reads as its own (item 627).
+_SHORT_ITEM: int = 60
+# A heading that ends in a letter, a digit or a closing bracket or quote takes a colon, as a title typed in a message
+# does; one that ends in a mark of its own (a question) keeps it.
+_CLOSERS: str = ")]}\"'”’»"
+# The level of a line that goes on with the list item above it (its words wrapped onto an indented line).
+_GOES_ON: int = -1
 # The marks a list item wears in plain text (a bullet, a nested one, a task's box), and how a table's cells are joined.
 BULLET: str = "•"
 NESTED_BULLET: str = "◦"
@@ -148,6 +161,7 @@ def _inline(line: str) -> str:
         if marked == text:
             break
         text = marked
+    text = _SPACE_RUNS.sub(" ", text)
     return _HELD.sub(lambda found: held[int(found.group(1))], text)
 
 
@@ -169,73 +183,145 @@ class _Lists:
     def close(self) -> None:
         self._indents.clear()
 
+    def open(self) -> bool:
+        """Whether a list item is open: an indented line under it goes on with it."""
+        return bool(self._indents)
 
-def _list_item(line: str, lists: _Lists) -> str | None:
-    """``line`` as a list item in plain text: ``• words``, a nested one ``  ◦ words`` (two spaces more for each level
-    below), a task with its box (``☐``, ``☑``), a numbered item as it is written with the indent of its level; ``None``
-    for a line that is no list item. An item with no words comes back as its mark alone."""
+
+class _Lines:
+    """The plain lines as they are made, each with the level of the list item it is (0, or 1 and more for a nested
+    one), :data:`_GOES_ON` for a line that goes on with the item above it, or ``None`` for any other line."""
+
+    def __init__(self) -> None:
+        self.texts: list[str] = []
+        self.levels: list[int | None] = []
+        # Which lines are headings: one with words after it is titled with a colon (:func:`_titled`).
+        self.headings: set[int] = set()
+
+    def add(self, text: str, level: int | None = None) -> None:
+        self.texts.append(text)
+        self.levels.append(level)
+
+    def add_heading(self, words: str) -> None:
+        self.headings.add(len(self.texts))
+        self.add(words)
+
+    def ends_blank(self) -> bool:
+        """Whether there is no line yet, or the last one is blank."""
+        return not self.texts or self.texts[-1] == ""
+
+
+def _list_item(line: str, lists: _Lists) -> tuple[str, int] | None:
+    """``line`` as a list item in plain text, with its level: ``• words``, a nested one ``  ◦ words`` (two spaces more
+    for each level below), a task with its box (``☐``, ``☑``), a numbered item as it is written with the indent of its
+    level; ``None`` for a line that is no list item. An item with no words comes back as its mark alone."""
     bullet: re.Match[str] | None = _BULLET.match(line)
     if bullet is not None:
         level: int = lists.level(bullet.group("indent"))
         words: str = bullet.group("words") or ""
         task: re.Match[str] | None = _TASK.match(words)
         if task is not None:
-            return f"{'  ' * level}{_BOXES[task.group('done')]} {words[task.end() :]}".rstrip()
+            return f"{'  ' * level}{_BOXES[task.group('done')]} {words[task.end() :]}".rstrip(), level
         mark: str = BULLET if level == 0 else NESTED_BULLET
-        return f"{'  ' * level}{mark} {words}".rstrip()
+        return f"{'  ' * level}{mark} {words}".rstrip(), level
     numbered: re.Match[str] | None = _NUMBERED.match(line)
     if numbered is not None:
         level = lists.level(numbered.group("indent"))
-        return f"{'  ' * level}{numbered.group('number')} {numbered.group('words')}".rstrip()
+        return f"{'  ' * level}{numbered.group('number')} {numbered.group('words')}".rstrip(), level
     return None
 
 
-def _prose_line(line: str, out: list[str], lists: _Lists) -> None:
+def _titled(words: str) -> str:
+    """A heading's words as a title typed in a message, over what follows it (item 627): a colon after them when they
+    end in a letter, a digit or a closing bracket or quote, and as they are when they end in a mark of their own."""
+    if words == "" or not (words[-1].isalnum() or words[-1] in _CLOSERS):
+        return words
+    return f"{words}:"
+
+
+def _prose_line(line: str, out: _Lines, lists: _Lists) -> None:
     """Add the plain-text form of one line of prose to ``out``: a heading on a line of its own with a blank line before
-    it, a rule gone, a quote's marks gone, a list item with its bullet (and none for an item with no words)."""
+    it and a colon after it, a rule gone, a quote's marks gone, a list item with its bullet (and none for an item with
+    no words)."""
     if _RULE.match(line):
         lists.close()
-        out.append("")
+        out.add("")
         return
     heading: re.Match[str] | None = _HEADING.match(line)
     if heading is not None:
         lists.close()
         words: str = _inline(heading.group("words") or "").strip()
         if words != "":
-            if out and out[-1] != "":
-                out.append("")
-            out.append(words)
+            if not out.ends_blank():
+                out.add("")
+            out.add_heading(words)
         return
     unquoted: str = _QUOTE.sub("", line)
-    item: str | None = _list_item(unquoted, lists)
+    item: tuple[str, int] | None = _list_item(unquoted, lists)
     if item is not None:
-        if item.strip() not in ("", BULLET, NESTED_BULLET):
-            out.append(_inline(item))
+        text, level = item
+        if text.strip() not in ("", BULLET, NESTED_BULLET):
+            out.add(_inline(text), level)
         return
     if unquoted.strip() == "":
-        out.append("")
+        out.add("")
         return
     if not unquoted.startswith((" ", "\t")):
         lists.close()
-    out.append(_inline(unquoted))
+        out.add(_inline(unquoted))
+        return
+    # An indented line under an open list item is the rest of its words.
+    out.add(_inline(unquoted), _GOES_ON if lists.open() else None)
+
+
+def _aired(out: _Lines) -> list[str]:
+    """The lines of ``out``, a heading with words after it titled with a colon, and the items of a list that holds a
+    long one standing apart (item 627): a blank line before each item of the list's first level and after the list, the
+    nested items and the rest of an item's words kept under it. The first item stays under a heading right above it,
+    as the heading's first words. A list of short items stays one block."""
+    last_words: int = max((index for index, text in enumerate(out.texts) if text != ""), default=-1)
+    aired: list[str] = []
+    start: int = 0
+    while start < len(out.texts):
+        if out.levels[start] is None:
+            titled: bool = start in out.headings and start < last_words
+            aired.append(_titled(out.texts[start]) if titled else out.texts[start])
+            start += 1
+            continue
+        end: int = start
+        while end < len(out.texts) and out.levels[end] is not None:
+            end += 1
+        if all(len(out.texts[index].strip()) <= _SHORT_ITEM for index in range(start, end)):
+            aired.extend(out.texts[start:end])
+        else:
+            for index in range(start, end):
+                under_heading: bool = index == start and start - 1 in out.headings
+                if out.levels[index] == 0 and aired and aired[-1] != "" and not under_heading:
+                    aired.append("")
+                aired.append(out.texts[index])
+            if end < len(out.texts) and out.texts[end] != "":
+                aired.append("")
+        start = end
+    return aired
 
 
 def as_plain_text(markdown: str) -> str:
     """``markdown`` as the plain text a messaging app shows well: a list item with a bullet (``• ``, a nested one
-    ``  ◦ ``, a numbered one as it is), a heading on a line of its own with a blank line before it, a table one row to a
-    line with its cells joined by `` · `` and its rule line gone, a horizontal rule and a quote's marks gone, fences,
-    paired bold, strike, emphasis and code marks left out, a link as ``words (address)``, and runs of blank lines shrunk
-    to one. The lines of a block of code stay as they are written."""
+    ``  ◦ ``, a numbered one as it is), the items of a list with a long one standing apart, a heading on a line of its
+    own with a blank line before it and a colon after it when words follow, a table one row to a line with its cells
+    joined by `` · `` and its rule line gone, a horizontal rule and a quote's marks gone, fences, paired bold, strike,
+    emphasis and code marks left out, a link as ``words (address)``, a run of spaces between words one space, and runs
+    of blank lines shrunk to one. The lines of a block of code stay as they are written."""
     lines: list[str] = markdown.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     kinds: list[LineKind] = line_kinds(lines)
-    out: list[str] = []
+    out: _Lines = _Lines()
     lists: _Lists = _Lists()
     index: int = 0
     while index < len(lines):
         if kinds[index] != "prose":
             lists.close()
             if kinds[index] == "code":
-                out.append(lines[index])
+                out.add(lines[index])
             index += 1
             continue
         table: tuple[list[str], int] | None = _table_rows(lines, index)
@@ -245,8 +331,9 @@ def as_plain_text(markdown: str) -> str:
             continue
         rows, index = table
         lists.close()
-        out.extend(_inline(row) for row in rows)
-    text: str = _TRAILING_SPACES.sub("", "\n".join(out))
+        for row in rows:
+            out.add(_inline(row))
+    text: str = _TRAILING_SPACES.sub("", "\n".join(_aired(out)))
     return _BLANK_RUNS.sub("\n\n", text).strip()
 
 

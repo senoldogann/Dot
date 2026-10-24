@@ -1,6 +1,7 @@
 """The words Dot sends on a channel (item 572): an answer as plain text, cut to the channel's size with the link to its
 chat, and the one line that tells a run waits for the owner. A messaging app draws no Markdown, so what an answer holds
-of it reads clean (item 617): bullets, headings on lines of their own, tables a row to a line, none of the marks."""
+of it reads clean (item 617): bullets, headings on lines of their own, tables a row to a line, none of the marks. On a
+phone's narrow screen the items of a list with a long one stand apart and a heading ends with a colon (item 627)."""
 
 import pytest
 
@@ -15,7 +16,7 @@ def test_markdown_marks_a_messaging_app_would_show_are_left_out() -> None:
         "See [the docs](https://example.com/docs) and ![a chart](https://example.com/c.png).\n\n\n\nEnd."
     )
     assert as_plain_text(markdown) == (
-        "Plan\n\nDo this first, then that.\n\nprint('hi')\n\n• one\n• two\n\n"
+        "Plan:\n\nDo this first, then that.\n\nprint('hi')\n\n• one\n• two\n\n"
         "See the docs (https://example.com/docs) and a chart (https://example.com/c.png).\n\nEnd."
     )
 
@@ -49,12 +50,21 @@ def test_tasks_wear_a_box_and_an_empty_item_is_left_out() -> None:
     )
 
 
-def test_a_heading_stands_on_a_line_of_its_own_with_a_blank_line_before_it() -> None:
+def test_a_heading_stands_on_a_line_of_its_own_with_a_blank_line_before_it_and_a_colon_after_it() -> None:
     markdown: str = "Intro line\n## First\nbody one\n### Second ###\nbody two\n#### \n# Top"
-    assert as_plain_text(markdown) == "Intro line\n\nFirst\nbody one\n\nSecond\nbody two\n\nTop"
+    # The last heading has no words after it: it is no title of anything, and takes no colon (item 627).
+    assert as_plain_text(markdown) == "Intro line\n\nFirst:\nbody one\n\nSecond:\nbody two\n\nTop"
     # The first line of the text needs no blank line before it, and a hash that is no heading stays.
-    assert as_plain_text("# Title\ntext") == "Title\ntext"
+    assert as_plain_text("# Title\ntext") == "Title:\ntext"
     assert as_plain_text("#hashtag and C# stay") == "#hashtag and C# stay"
+
+
+def test_a_heading_that_ends_in_a_mark_of_its_own_keeps_it() -> None:
+    assert as_plain_text("## What changed?\nA lot.") == "What changed?\nA lot."
+    assert as_plain_text("## Steps:\nOne.\n## Done!\nYes.\n## Plan (draft)\nNo.") == (
+        "Steps:\nOne.\n\nDone!\nYes.\n\nPlan (draft):\nNo."
+    )
+    assert as_plain_text("## Sonuç\nTamam.\n## Özet 2\nBitti.") == "Sonuç:\nTamam.\n\nÖzet 2:\nBitti."
 
 
 def test_a_horizontal_rule_goes_and_a_quotes_marks_go_with_it() -> None:
@@ -124,7 +134,7 @@ def test_the_owners_answer_reads_clean() -> None:
         "| App | CPU |\n|---|---|\n| Safari | 4% |\n\n> Note: numbers change.\n\n---\n\n1. Restart\n2. Check"
     )
     assert as_plain_text(answer) == (
-        "Done. Here is what I found:\n\nSummary\n• Disk: 120 GB free\n• Memory: 8 GB\n  ◦ swap: 2 GB\n\n"
+        "Done. Here is what I found:\n\nSummary:\n• Disk: 120 GB free\n• Memory: 8 GB\n  ◦ swap: 2 GB\n\n"
         "App · CPU\nSafari · 4%\n\nNote: numbers change.\n\n1. Restart\n2. Check"
     )
 
@@ -171,3 +181,41 @@ def test_one_line_joins_the_words_and_marks_a_cut() -> None:
     assert one_line("a\n\n  b   **c**", 40) == "a b c"
     cut: str = one_line("x" * 50, 20)
     assert len(cut) == 20 and cut.endswith("…")
+
+
+LONG: str = (
+    "Dot read the page twice, saved its tables as a file and wrote the three numbers that changed into the note."
+)
+
+
+def test_the_items_of_a_list_with_a_long_one_stand_apart() -> None:
+    """A list whose item wraps on a phone's screen is one block of text there: its items stand apart, with a blank
+    line before and after the list (item 627)."""
+    markdown: str = f"What happened today:\n- {LONG}\n- A short one.\n- {LONG}\nThat is all."
+    assert as_plain_text(markdown) == (
+        f"What happened today:\n\n• {LONG}\n\n• A short one.\n\n• {LONG}\n\nThat is all."
+    )
+    numbered: str = f"1. {LONG}\n2. Two."
+    assert as_plain_text(numbered) == f"1. {LONG}\n\n2. Two."
+
+
+def test_a_list_of_short_items_stays_one_block() -> None:
+    assert as_plain_text("Buy:\n- milk\n- bread\n- eggs\nThanks.") == "Buy:\n• milk\n• bread\n• eggs\nThanks."
+
+
+def test_nested_items_and_an_items_further_words_stay_under_it_in_a_list_that_stands_apart() -> None:
+    markdown: str = f"- {LONG}\n  - a nested one\n  - another\n- Second item\n  its words go on here\n- Third"
+    assert as_plain_text(markdown) == (
+        f"• {LONG}\n  ◦ a nested one\n  ◦ another\n\n• Second item\n  its words go on here\n\n• Third"
+    )
+
+
+def test_a_lists_first_item_stays_under_its_heading() -> None:
+    assert as_plain_text(f"## Next\n- {LONG}\n- Two.") == f"Next:\n• {LONG}\n\n• Two."
+
+
+def test_a_run_of_spaces_between_words_is_one_space_and_code_keeps_its_own() -> None:
+    assert as_plain_text("One.  Two   three\t\tfour.") == "One. Two three four."
+    assert as_plain_text("Run `a  b` now.\n```\nx   =  1\n```") == "Run a  b now.\nx   =  1"
+    # The indent of a nested item is no run between words.
+    assert as_plain_text("- one\n    - two  words") == "• one\n  ◦ two words"
