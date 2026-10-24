@@ -15,13 +15,15 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from channel_stand_ins import PROVIDER, FakeMacos, Osascript, Replies, finish, stop_file
+from channel_stand_ins import PROVIDER, FakeMacos, Osascript, Replies, finish, own_places, stop_file
 from messages_db import URL_BALLOON, MessagesDb
+from picture_files import HEADS
 
 from dotagent.agent.manager import RunManager
 from dotagent.channels.handles import STATE_KEY, ImessageState
 from dotagent.channels.imessage import MARKER
 from dotagent.channels.intake import ATTACHMENT, UNREAD_ANSWER, UNREAD_NOTE
+from dotagent.channels.pictures import Pictures
 from dotagent.channels.router import STOPPED
 from dotagent.channels.service import Channels
 from dotagent.config import ChannelsConfig, load_config
@@ -81,6 +83,13 @@ def messages(tmp_path_factory: pytest.TempPathFactory) -> MessagesDb:
     return MessagesDb(tmp_path_factory.mktemp("messages") / "chat.db")
 
 
+@pytest.fixture(scope="module")
+def owner_home(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The owner's home folder as the pictures of an answer see it (item 617): a folder of the test's own, never the
+    real one, with the folder pictures are copied into inside it."""
+    return tmp_path_factory.mktemp("owner")
+
+
 class World:
     """The channels of a daemon over its stand-ins, and a client of its API."""
 
@@ -92,6 +101,7 @@ class World:
         osascript: Osascript,
         macos: FakeMacos,
         messages: MessagesDb,
+        home: Path,
     ) -> None:
         self.channels: Channels = channels
         self.runtime: Runtime = runtime
@@ -99,6 +109,8 @@ class World:
         self.osascript: Osascript = osascript
         self.macos: FakeMacos = macos
         self.messages: MessagesDb = messages
+        self.home: Path = home
+        self.staging: Path = home / "Pictures" / "Dot"
 
     async def get(self, path: str) -> JsonObject:
         answered: httpx.Response = await self.http.get(path, headers={"Authorization": f"Bearer {TOKEN}"})
@@ -139,7 +151,7 @@ def _part(seen: JsonObject, name: str) -> JsonObject:
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
-async def world(runtime: Runtime, manager: RunManager, messages: MessagesDb) -> AsyncIterator[World]:
+async def world(runtime: Runtime, manager: RunManager, messages: MessagesDb, owner_home: Path) -> AsyncIterator[World]:
     osascript: Osascript = Osascript()
     macos: FakeMacos = FakeMacos()
     channels: Channels = Channels(
@@ -152,6 +164,8 @@ async def world(runtime: Runtime, manager: RunManager, messages: MessagesDb) -> 
         macos=macos,
         poll_s=0.05,
         ask_wait_s=0.3,
+        home=owner_home,
+        staging=owner_home / "Pictures" / "Dot",
     )
     await channels.start()
     context: ServerContext = ServerContext(
@@ -168,7 +182,7 @@ async def world(runtime: Runtime, manager: RunManager, messages: MessagesDb) -> 
     transport: httpx.ASGITransport = httpx.ASGITransport(app=create_app(context))
     async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8765") as http:
         try:
-            yield World(channels, runtime, http, osascript, macos, messages)
+            yield World(channels, runtime, http, osascript, macos, messages, owner_home)
         finally:
             await channels.stop()
 
@@ -416,6 +430,104 @@ async def test_the_last_error_is_masked_of_the_secrets_dot_holds(world: World) -
     assert secret not in message and "Messages got an error: *** (-1728)" in message
 
 
+def _file(path: Path, data: bytes) -> Path:
+    """A file with ``data`` at ``path``, the folders above it made."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return path
+
+
+def _all_exist(*paths: Path) -> bool:
+    return all(path.exists() for path in paths)
+
+
+async def test_an_answer_naming_a_picture_sends_its_text_then_the_picture_and_the_row_is_not_read_back(
+    world: World, replies: Replies
+) -> None:
+    """The owner asked from their iPhone for a screenshot of the Mac's screen (item 617): the answer carried no picture
+    and named a path. Now the text goes marked, with the file's name, and the picture goes after it from a copy in the
+    staging folder; the row Messages writes for it is Dot's own, not a message of the owner's nor an attachment they
+    are told is not read."""
+    replies.clear()
+    own: int = world.messages.chat(PHONE)
+    screen: bytes = HEADS["png"] + b"what the screen showed"
+    shot: Path = _file(world.runtime.workspace / "screenshots" / "ekran-2026-10-24-1617.png", screen)
+    replies.push(finish(f"I sent the screenshot above, and saved it as a file at {shot}"))
+    runs_before: int = len(await world.runs())
+    words_before: int = len(world.osascript.sent)
+    pictures_before: int = len(world.osascript.pictures)
+    world.messages.message(own, "send me a screenshot of the screen", at=time.time())
+    await _until(lambda: len(world.osascript.pictures) == pictures_before + 1, "the picture was sent")
+    assert world.osascript.sent[words_before:] == [
+        (PHONE, f"{MARKER}I sent the screenshot above, and saved it as a file at ekran-2026-10-24-1617.png")
+    ]
+    (sent,) = world.osascript.pictures[pictures_before:]
+    assert sent.handle == PHONE and sent.data == screen and sent.path.name == shot.name
+    # Messages was handed a copy in the staging folder, which is still there; the screenshot is where it was.
+    assert sent.path.parent.parent == world.staging and _all_exist(sent.path, shot)
+    # The row Messages writes for the picture: flagged as the owner's, a file and no words, or only the object's mark.
+    world.messages.message(own, None, attachment=True, at=time.time())
+    world.messages.message(own, "\ufffc", attachment=True, at=time.time())
+    await asyncio.sleep(0.5)
+    assert len(await world.runs()) == runs_before + 1
+    assert world.osascript.sent[words_before + 1 :] == [] and len(world.osascript.pictures) == pictures_before + 1
+
+
+async def test_a_picture_in_a_hidden_folder_is_not_sent_and_the_text_says_it_was_left_out(
+    world: World, replies: Replies
+) -> None:
+    replies.clear()
+    own: int = world.messages.chat(PHONE)
+    secret: Path = _file(world.home / ".ssh" / "id_card.png", HEADS["png"])
+    replies.push(finish(f"Your card is at {secret}"))
+    words_before: int = len(world.osascript.sent)
+    pictures_before: int = len(world.osascript.pictures)
+    world.messages.message(own, "where is my card?", at=time.time())
+    await _until(lambda: len(world.osascript.sent) == words_before + 1, "the answer was sent")
+    await asyncio.sleep(0.4)
+    handle, words = world.osascript.sent[-1]
+    assert handle == PHONE and words.startswith(f"{MARKER}Your card is at {secret}")
+    assert words.endswith("Left out: id_card.png (in a place Dot does not send pictures from).")
+    assert len(world.osascript.pictures) == pictures_before
+
+
+def _gone(path: Path) -> bool:
+    return not path.exists()
+
+
+async def test_the_service_removes_the_copy_of_a_picture_when_its_time_is_over_whatever_the_switch_says(
+    world: World, runtime: Runtime, manager: RunManager, messages: MessagesDb, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The channel of this daemon is never switched on here: the copies are the service's, not the read loop's."""
+    osascript: Osascript = Osascript()
+    channels: Channels = Channels(
+        runtime,
+        manager,
+        "127.0.0.1",
+        8765,
+        script=osascript,
+        messages_db=messages.path,
+        macos=FakeMacos(),
+        poll_s=0.05,
+        home=world.home,
+        staging=tmp_path_factory.mktemp("staging") / "Dot",
+        sweep_s=0.05,
+        copies_kept_s=0.5,
+    )
+    shot: Path = _file(world.runtime.workspace / "shots" / "short-lived.png", HEADS["png"] + b"for a short while")
+    (picture,) = Pictures(world.runtime.workspace, world.home, world.runtime.protected).find(str(shot)).pictures
+    await channels.start()
+    try:
+        assert not channels.is_on("imessage")
+        await channels.imessage.send_picture(picture)
+        (sent,) = osascript.pictures
+        assert _all_exist(sent.path, shot)
+        await _until(lambda: _gone(sent.path.parent), "the copy was removed")
+        assert _all_exist(shot)
+    finally:
+        await channels.stop()
+
+
 async def test_a_removed_number_is_no_longer_read(world: World) -> None:
     removed: JsonObject = _view(await world.post("/api/channels/imessage/remove", {"handle": PHONE}))
     assert removed["handles"] == []
@@ -468,6 +580,7 @@ async def test_a_daemon_that_starts_with_the_channel_on_reads_it_from_the_start(
         messages_db=messages.path,
         macos=FakeMacos(),
         poll_s=0.05,
+        **own_places(),
     )
     await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
     await channels.start()
@@ -508,6 +621,7 @@ async def test_a_message_from_the_iphones_other_apple_id_starts_a_run_and_its_an
         messages_db=messages.path,
         macos=FakeMacos(),
         poll_s=0.05,
+        **own_places(),
     )
     await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
     await channels.start()
@@ -565,6 +679,7 @@ async def test_the_link_at_the_end_of_an_answer_is_not_read_back_as_a_command_wh
         messages_db=messages.path,
         macos=FakeMacos(),
         poll_s=0.05,
+        **own_places(),
     )
     await runtime.store.kv_set("channels.imessage", '{"handles": ["+358401234567"], "cursor": null, "reply_to": null}')
     await channels.start()
@@ -622,6 +737,7 @@ async def _reading(
         messages_db=messages.path,
         macos=FakeMacos(),
         poll_s=0.05,
+        **own_places(),
     )
     await runtime.store.kv_set(STATE_KEY, ImessageState(handles=(PHONE,), cursor=cursor).model_dump_json())
     await channels.start()
@@ -678,7 +794,15 @@ async def test_pairing_and_its_code_still_work_while_the_emergency_stop_is_engag
     db: MessagesDb = MessagesDb(tmp_path / "chat.db")
     osascript: Osascript = Osascript()
     channels: Channels = Channels(
-        runtime, manager, "127.0.0.1", 8765, script=osascript, messages_db=db.path, macos=FakeMacos(), poll_s=0.05
+        runtime,
+        manager,
+        "127.0.0.1",
+        8765,
+        script=osascript,
+        messages_db=db.path,
+        macos=FakeMacos(),
+        poll_s=0.05,
+        **own_places(),
     )
     await runtime.store.kv_set(STATE_KEY, ImessageState().model_dump_json())
     await channels.start()

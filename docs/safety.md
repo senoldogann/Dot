@@ -54,8 +54,13 @@ run needs, sent where the configuration points:
   brief and each tell of a watcher, that is a title, up to 400 characters of text and, when `[server] reach` names the
   address a phone opens it at, the link to the page it opens;
   the text may hold a mail's sender and subject, or what a sender wrote) are sent into your conversation with yourself
-  through Messages, to Apple's iMessage servers and on to your devices, as any iMessage is. What you send there is read
-  from Messages' database on this Mac (see [Channels](channels.md), item 572).
+  through Messages, to Apple's iMessage servers and on to your devices, as any iMessage is. So are the pictures an
+  answer names (item 617): files of Dot's workspace or your home folder that start as a PNG, a JPEG, a GIF, a HEIC or a
+  WebP, at most four of at most 20 MB, never from a hidden folder, from `~/Library` outside Dot's own folder or from a
+  place `[policy] protected_paths` and `sealed_paths` keep from a run; each is sent from a copy Dot makes in
+  `~/Pictures/Dot` and removes an hour later (it removes only the folders it made there, each marked with a file of
+  its own, and nothing else in that folder). What you send there is read from Messages' database on this Mac (see
+  [Channels](channels.md), item 572).
 - **To the browser's makers, if you use the microphone: your voice, from your browser or Dot.app (Apple's); and, when
   the Mac has no voice of the language, the text read aloud.** The composer's microphone and the reading of answers
   aloud (item 574) are the browser's own speech recognition and speech synthesis: Safari and Chrome may send what you
@@ -751,7 +756,10 @@ began, its wait for an answer included, to ten seconds after its end; a step tha
 until it ends, about 33 minutes at the most) is told and not run, and so is a message Messages sends later than it was
 written (Send Later of macOS 15), and a draft to a number or address you paired is refused. What this does not catch is
 a send the guard cannot see, which raises no flag: a script of a page, a program the run wrote and then runs, a
-Shortcut, a job a step left behind. `/stop` is run in any case, and so are the plain words `stop`, `dur` and
+Shortcut, a job a step left behind. A picture Dot sends with an answer (item 617) is a row of that conversation too,
+flagged as yours, with a file, no words and no `◆`: Dot tells it from a picture of yours by its time (from five
+seconds before Dot handed it to Messages to a minute after) and kind, and never reads it as a message. `/stop` is run
+in any case, and so are the plain words `stop`, `dur` and
 `durdur` when they are the whole message (item 611): they only reduce what Dot does. A row received from your paired
 number or address is judged like a sent one, by the window and by Send Later: a run sends as this Mac's account,
 and `[policy] sealed_paths` closes `chat.db` to its commands, but that Messages writes no received copy of what this

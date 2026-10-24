@@ -81,6 +81,16 @@ def chrome_data_dir() -> Path:
     return default_chrome_data_dir()
 
 
+def staging_dir() -> Path:
+    """Where Dot copies a picture it sends over iMessage (item 617): a folder of its own under the owner's Pictures, the
+    one place Messages is known to read a file from. It is the owner's folder and not Dot's home, so a test never uses
+    it: ``DOT_STAGING_DIR`` overrides it, as ``DOT_CHROME_DIR`` does for the owner's Chrome."""
+    override: str | None = os.environ.get("DOT_STAGING_DIR")
+    if override is not None and override != "":
+        return Path(override).expanduser()
+    return Path.home() / "Pictures" / "Dot"
+
+
 def evals_dir() -> Path:
     """Where the reports of eval runs are kept: one JSON file per run."""
     return dot_home() / "evals"

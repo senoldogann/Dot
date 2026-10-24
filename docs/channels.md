@@ -35,9 +35,41 @@ sends the box's message):
   `/stop` and its words still stop the run at work, pairing and its code still work, and what Dot tells you about a
   run that ended (the stop's own end among it) still comes.
 - When a run of that chat ends, its answer is sent back in the same conversation, **marked with `◆ `** at its start.
-  The answer is masked of the secrets Dot holds, sent as plain text (the Markdown marks of an answer are left out) and
-  cut to about 2,000 characters, with a link to the chat in Dot for the rest. A run that failed or was stopped says so,
-  once: a stopped run says *The run was stopped.*, not twice.
+  The answer is masked of the secrets Dot holds, sent as plain text and cut to about 2,000 characters, with a link to
+  the chat in Dot for the rest. A messaging app draws no Markdown, so the answer reads clean (item 617): a list item
+  has a bullet (`• `, a nested one `  ◦ `, a task its box; a numbered item stays as it is), a heading stands on a line
+  of its own with a blank line before it, a table is one row to a line with its cells joined by ` · ` and its rule
+  line gone, a horizontal rule and the `> ` of a quote are gone, and so are the marks of bold, emphasis, strike and
+  code (a link reads *words (address)*). The lines of a block of code stay exactly as they are written. A run that
+  failed or was stopped says so, once: a stopped run says *The run was stopped.*, not twice.
+- **The pictures an answer names go with it** (item 617). A Markdown image (`![words](path)`) or a path to an image
+  file in the answer's words is looked at on disk, and a picture that may go is sent after the text, each as a message
+  of its own with no words, through Messages as the text is. It may go when it is a regular file in Dot's workspace or
+  your home folder (never in a hidden folder such as `~/.ssh` or `~/.config`, nor in `~/Library` outside Dot's own
+  folder, nor in a place `[policy] protected_paths` or `sealed_paths` keeps from a run; a link is judged by the place
+  it leads to), when its first bytes say it is a PNG, a JPEG, a GIF, a HEIC or a WebP, whatever its name says, and
+  when it is not over 20 MB; at most four go with one answer. A path may be written whole (spaces and all), as `~/…`,
+  as a `file://` address or, for a file of the workspace, by its name. The path of a picture that goes is shortened to
+  the file's name in the text (*… saved it as a file at ekran-2026-10-24-1617.png*), and a Markdown image goes whole,
+  since the picture is there. What the answer names that does not go, though it is a file, is said in one line at the
+  end of the text: *Left out: big.png (over 20 MB), 2 more (4 at most in a message).* A file is called there by the
+  name the answer wrote for it, never by the name of what a link leads to (a link in the workspace to a file in
+  `~/.ssh` does not tell that file's name), and the line is masked of the secrets Dot holds as the answer is. A path in
+  a block of code names no picture, only a run that ended done sends any, and a picture that Messages does not take is
+  told in a line of its own after the others (the log has `channel_picture_not_sent`, and the tab's *Last error* the
+  reason).
+  **Messages is handed a copy, not the file**: on a recent macOS Messages does not read every folder an AppleScript
+  names (a file in `~/Documents` fails after the words of the message have gone), and `~/Pictures` is the folder
+  reported to work, so each picture is copied into a folder of its own under `~/Pictures/Dot`, with the file's name
+  and the extension its type gives it, and the copy is removed an hour after the send (at once when Messages did not
+  take it; the ones a daemon that stopped left are removed as the next starts). The copy is made from the file Dot
+  opened and judged, not from the name it found it by, so that a link changed meanwhile cannot lead out of the places
+  above. `~/Pictures/Dot` is your folder, not Dot's home, so Dot removes only what it made: it writes a small file,
+  `.made-by-dot`, into each folder it makes, and removes a folder only when it is a real folder directly in
+  `~/Pictures/Dot`, is named for the time it was made and eight hexadecimal digits, and holds that file; what else is
+  in `~/Pictures/Dot` stays, and so does a folder of Dot's with a folder inside it. (`DOT_STAGING_DIR` in Dot's
+  environment moves the folder, to a place Messages can read; [Development](development.md) says how the tests keep
+  away from yours.)
 - When a run waits for you (an approval, or a question it asked), one line says what it asks and where to answer, and at
   most one line is sent every twenty seconds: *Dot waits for your approval: Run `rm -r build`. Answer it in Dot, not
   here: https://…/#/runs/…*. A wait that comes inside that window is held, never dropped (item 611): a run that left a
@@ -105,6 +137,11 @@ row is a command only when all of these hold:
   the handle the chat is named for** (`is_from_me = 0`, and the sender of the message is that handle, compared in lower
   case and as a number or address is written): your iPhone's Apple ID writing to this Mac's (item 595);
 - it does not start with `◆`: Dot's own messages land in the same conversation as yours, and each starts so;
+- it is not a picture Dot sent (item 617): a picture is a message of its own with a file, no words and no `◆`, which
+  Messages flags as yours like any row, so Dot tells it from a picture of yours by its time and what it is: a row that
+  holds a file and no words, dated from five seconds before Dot handed a picture to Messages to a minute after, is
+  Dot's own and is never read as a message (a picture of yours in that minute is let go with it, where it would only
+  have been told *Dot does not read attachments yet*);
 - it is words: a sticker, an app's message, a payment, or any rich content Messages gives a bundle of its own, is never
   a command (a link preview is read as the link it holds);
 - it is not only a link that Dot wrote: Messages may split the link at the end of one of Dot's messages into a row of
@@ -237,7 +274,12 @@ switched off.
 
 Dot's answers, and what it tells you on its own (the brief's first line, a watcher's tell: a mail's sender and subject
 may be in it, as they are in the push to your phone), go to Apple's iMessage servers and on to your own devices, as any
-iMessage does. Nothing else leaves: what you send is read from this Mac's own database. See [What leaves this
+iMessage does, and so do the pictures an answer names (item 617): files of Dot's workspace or your home folder, at most
+four of at most 20 MB, never from a hidden folder, from `~/Library` outside Dot's own folder or from a place the policy
+keeps from a run. A picture is a file of yours that leaves the Mac, to your own devices: an answer that names one is
+the model's choice, and a run that read a page may be led to name a picture of yours that the page asked for, so the
+channel can be switched off while Dot works on content you do not trust. Nothing else leaves: what you send is read
+from this Mac's own database. See [What leaves this
 Mac](safety.md#what-leaves-this-mac).
 
 ## If it does not work
@@ -254,6 +296,8 @@ Mac](safety.md#what-leaves-this-mac).
 | *Newest message* is a lower row than *Read up to*, or *Moved down* is there | Messages' database was rebuilt or restored: Dot moved its place down to the newest row (item 611) and reads from there, so what you write now is read |
 | a message gets *Dot is stopped: the emergency stop is engaged* | the emergency stop of Dot is engaged: release it (the banner at the top of any page of Dot), then send the message again |
 | a message of Dot's has no link | `[server] reach` names no address a phone can open: see *Links in messages*, and Settings › Phone |
+| the answer ends *Left out: …* | the answer named a file that is not sent: over 20 MB, not a PNG, JPEG, GIF, HEIC or WebP by its first bytes, in a hidden folder, in `~/Library` or outside Dot's workspace and your home folder, or the fifth picture of a message (item 617) |
+| a picture the answer names does not come | Messages did not take the file: *Last error* has what it said and the log `channel_picture_not_sent`; Automation for Messages, or the folder `~/Pictures/Dot` (Dot copies each picture there and Messages reads the copy) |
 | the message is on the Mac, nothing runs | pair the number your iPhone writes from: the chat is named for it |
 | *Last error* names a message that did not go | Messages did not take Dot's answer: Automation, or the address |
 

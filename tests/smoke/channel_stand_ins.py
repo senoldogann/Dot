@@ -5,12 +5,14 @@ import asyncio
 import os
 import threading
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 
+from dotagent.channels.imessage import PICTURE_SCRIPT
 from dotagent.channels.service import Macos
 from dotagent.connections.mac import AutomationState
 from dotagent.core.errors import DesktopError
-from dotagent.core.paths import failsafe_path
+from dotagent.core.paths import dot_home, failsafe_path
 from dotagent.desktop.script import ScriptLanguage
 from dotagent.drafts.scripts import SCRIPTS
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -30,6 +32,15 @@ def stop_file() -> Path:
     stop: Path = failsafe_path()
     assert stop.parent == Path(os.environ["DOT_HOME"]) and "pytest-of-" in str(stop), f"not a test's own home: {stop}"
     return stop
+
+
+def own_places() -> dict[str, Path]:
+    """The ``home`` and the ``staging`` folder a test gives ``Channels`` (item 617), inside the Dot home of the test's
+    own. The pictures an answer names go from the owner's home and a copy of each is made in ``~/Pictures/Dot``: a test
+    never uses the owner's, and a run refuses a staging folder that is not in a pytest folder (``conftest.py``)."""
+    home: Path = dot_home() / "owner"
+    assert "pytest-of-" in str(home), f"not a test's own home: {home}"
+    return {"home": home, "staging": home / "Pictures" / "Dot"}
 
 
 def finish(answer: str) -> ScriptedTurn:
@@ -70,13 +81,26 @@ class Replies:
         return None
 
 
+@dataclass(frozen=True)
+class PictureSent:
+    """A picture handed to Messages: to whom, from which file, and what the file held at that moment (as Messages reads
+    it when the script returns)."""
+
+    handle: str
+    path: Path
+    data: bytes
+
+
 class Osascript:
-    """Stands for ``osascript``: the calls it gets, and the error it raises while one is set."""
+    """Stands for ``osascript``: the calls it gets, and the error it raises while one is set. A picture is read from
+    the file the script names as it is handed over, so that a test sees what Messages would read, and a file that is
+    not there is an error as Messages would make it."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[str, ...]]] = []
         self.timeouts: list[float] = []
         self.error: DesktopError | None = None
+        self.pictures: list[PictureSent] = []
 
     async def __call__(
         self,
@@ -89,15 +113,19 @@ class Osascript:
         assert language == "AppleScript" and confinement == ()
         if self.error is not None:
             raise self.error
+        assert script in (SCRIPTS["message"], PICTURE_SCRIPT), "a script the channel does not send with"
         self.calls.append((script, argv))
         self.timeouts.append(timeout_s)
+        if script == PICTURE_SCRIPT:
+            path: Path = Path(argv[0])
+            assert path.is_absolute() and len(argv) == 2
+            self.pictures.append(PictureSent(handle=argv[1], path=path, data=await asyncio.to_thread(path.read_bytes)))
         return ""
 
     @property
     def sent(self) -> list[tuple[str, str]]:
-        """What was sent to Messages, as (handle, text); the script is the one drafts send with."""
-        assert all(script == SCRIPTS["message"] for script, _ in self.calls)
-        return [(argv[1], argv[0]) for _, argv in self.calls]
+        """What was sent to Messages as words, as (handle, text); the script is the one drafts send with."""
+        return [(argv[1], argv[0]) for script, argv in self.calls if script == SCRIPTS["message"]]
 
 
 class FakeMacos(Macos):
