@@ -9,6 +9,7 @@ aloud is off until the switch is on; then an answer that comes in is read, in th
 answer reads it again or stops it."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -58,11 +59,14 @@ _STAND_INS: str = """
     start() {
       state.starts += 1;
       state.langs.push(this.lang);
-      this.dispatchEvent(new Event("start"));
+      // A browser that still asks for the microphone begins later, or never (item 603).
+      if (!state.startLater) {
+        this.dispatchEvent(new Event("start"));
+      }
     }
     stop() {
       state.stops += 1;
-      setTimeout(() => this.dispatchEvent(new Event("end")), 20);
+      setTimeout(() => this.dispatchEvent(new Event("end")), state.endAfter ?? 20);
     }
     abort() {
       state.aborts += 1;
@@ -203,18 +207,29 @@ def _fresh_replies(replies: Replies) -> None:
 
 
 async def _open(
-    browser: Browser, address: str, width: int, stand_ins: str = _STAND_INS, scheme: Literal["light", "dark"] = "light"
+    browser: Browser,
+    address: str,
+    width: int,
+    stand_ins: str = _STAND_INS,
+    scheme: Literal["light", "dark"] = "light",
+    clock: bool = False,
 ) -> Page:
-    """A page signed in at the home, in a browser of its own, with `stand_ins` in the place of the voice."""
+    """A page signed in at the home, in a browser of its own, with `stand_ins` in the place of the voice; with `clock`,
+    one whose time the test moves (`page.clock.run_for`)."""
     context: BrowserContext = await browser.new_context(
         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
     )
     await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
     await context.add_init_script(stand_ins)
     page: Page = await context.new_page()
+    if clock:
+        await page.clock.install()
     port: int = int(address.rpartition(":")[2])
     await page.goto(ui_url("127.0.0.1", port, TOKEN))
     await expect(page.locator(GOAL)).to_be_visible()
+    if clock:
+        # From here the page's time moves only as the test moves it.
+        await page.clock.pause_at(await page.evaluate("() => Date.now() + 500"))
     return page
 
 
@@ -237,20 +252,38 @@ def _microphone(page: Page) -> Locator:
     return page.locator(".composer .mic-button")
 
 
-async def test_the_microphone_fills_the_box_as_the_owner_speaks_and_nothing_is_sent_by_voice_alone(
+def _recorder(page: Page) -> Locator:
+    return page.locator(".composer .mic-recorder")
+
+
+async def test_the_microphone_records_and_puts_the_words_in_the_box_when_the_owner_is_done(
     browser: Browser, address: str, runtime: Runtime
 ) -> None:
+    """Item 605: pressed, the microphone turns the composer's controls into a recorder, as the owner's other apps do: a
+    cross, a wave, the time since the engine began to listen and a tick. The words go into the box when the owner
+    presses the tick; until then the box keeps what it held, and nothing is sent by voice alone."""
     for width in (1280, 390):
         runs: int = await _run_count(runtime)
         page: Page = await _open(browser, address, width)
         box: Locator = page.locator(GOAL)
         mic: Locator = _microphone(page)
+        recorder: Locator = _recorder(page)
         await expect(mic).to_be_visible()
+        await expect(recorder).to_be_hidden()
         await expect(mic).to_have_attribute("aria-label", "Dictate your message")
         await expect(mic).to_have_attribute("aria-pressed", "false")
         await mic.click()
+        await expect(recorder).to_be_visible()
+        # The recorder stands in the place of the controls: the microphone, the send and the choices give it their line.
+        await expect(mic).to_be_hidden()
+        await expect(page.locator(".composer .send")).to_be_hidden()
         await expect(mic).to_have_attribute("aria-pressed", "true")
-        await expect(mic).to_have_attribute("aria-label", "Stop dictating")
+        await expect(recorder.get_by_role("button", name="Cancel the dictation")).to_be_visible()
+        await expect(recorder.locator(".mic-time")).to_have_text(re.compile(r"^0:0\d$"))
+        # The clock counts from the moment the engine began to listen.
+        await expect(recorder.locator(".mic-time")).to_have_text("0:01", timeout=4000)
+        assert await page.locator(".composer .mic-bar").count() > 20
+        await _fits(page, f"{width} while the microphone listens")
         # The page's language, given its region (item 593).
         assert await _voice(page, "[voice.starts, voice.langs[0]]") == [1, "en-US"]
         # The engine is asked for what makes a dictation: the session goes on and the words come as they are heard.
@@ -258,23 +291,20 @@ async def test_the_microphone_fills_the_box_as_the_owner_speaks_and_nothing_is_s
             True,
             True,
         ]
-        await page.evaluate("() => window.__voice.hear([['hello wor', false]])")
-        await expect(box).to_have_value("hello wor")
-        assert await _voice(page, "voice.interimWords()") == ["hello wor"]
         await page.evaluate("() => window.__voice.hear([['hello world', true], ['how are', false]])")
-        await expect(box).to_have_value("hello world how are")
-        assert await _voice(page, "voice.interimWords()") == ["how are"]
+        await asyncio.sleep(0.2)
+        await expect(box).to_have_value("")
         await page.evaluate("() => window.__voice.hear([['hello world', true], ['how are you', true]])")
+        await recorder.get_by_role("button", name="Put the words in the box").click()
+        # The engine settles what it heard and ends a moment later; the words go into the box then.
         await expect(box).to_have_value("hello world how are you")
-        assert await _voice(page, "voice.interimWords()") == []
+        await expect(recorder).to_be_hidden()
+        await expect(mic).to_be_visible()
+        await expect(mic).to_have_attribute("aria-pressed", "false")
+        assert await _voice(page, "[voice.stops, voice.aborts]") == [1, 0]
         # The box is the composer's own: the send is ready, and no run started.
         await expect(page.locator(".composer")).not_to_have_attribute("data-empty", "")
         assert await _run_count(runtime) == runs
-        # A second press stops it, and the engine ends a moment later.
-        await mic.click()
-        await expect(mic).to_have_attribute("aria-pressed", "false")
-        assert await _voice(page, "[voice.stops, voice.aborts]") == [1, 0]
-        await expect(box).to_have_value("hello world how are you")
         await _fits(page, f"{width} with the microphone")
         await page.context.close()
 
@@ -287,6 +317,7 @@ async def test_a_dictated_message_is_sent_as_the_owner_sends_any(
     page: Page = await _open(browser, address, 1280)
     await _microphone(page).click()
     await page.evaluate("() => window.__voice.hear([['what is the weather in Oulu', true]])")
+    await _recorder(page).get_by_role("button", name="Put the words in the box").click()
     await expect(page.locator(GOAL)).to_have_value("what is the weather in Oulu")
     assert await _run_count(runtime) == runs
     await page.locator(GOAL).press("Enter")
@@ -294,48 +325,142 @@ async def test_a_dictated_message_is_sent_as_the_owner_sends_any(
     assert await _run_count(runtime) == runs + 1
     newest = (await runtime.store.list_runs(1, None))[0]
     assert newest.goal == "what is the weather in Oulu"
-    # The message went: the microphone was let go of, and the dock's box on the run's page has its own.
-    assert await _voice(page, "voice.aborts") == 1
+    # The dictation had ended: the message took nothing from the engine, and the run page's box has its own.
+    assert await _voice(page, "[voice.stops, voice.aborts]") == [1, 0]
     await expect(_microphone(page)).to_have_attribute("aria-pressed", "false")
     await expect(page.locator(MESSAGE)).to_have_value("")
     await page.context.close()
 
 
-async def test_the_box_keeps_what_it_held_and_typing_takes_over_from_the_microphone(
+async def test_the_box_keeps_what_it_held_and_typing_or_the_cross_drops_the_dictation(
     browser: Browser, address: str
 ) -> None:
     page: Page = await _open(browser, address, 1280)
     box: Locator = page.locator(GOAL)
     mic: Locator = _microphone(page)
+    recorder: Locator = _recorder(page)
     await box.fill("Dear Ada,")
     await mic.click()
-    await page.evaluate("() => window.__voice.hear([['thanks', false]])")
-    await expect(box).to_have_value("Dear Ada, thanks")
     await page.evaluate("() => window.__voice.hear([['thanks for the plan', true]])")
-    await expect(box).to_have_value("Dear Ada, thanks for the plan")
-    # What the owner types takes over: the microphone goes off, what the box holds stays, and what is heard after it
-    # changes nothing.
-    await box.press_sequentially(" and the")
-    await expect(mic).to_have_attribute("aria-pressed", "false")
+    await expect(box).to_have_value("Dear Ada,")
+    # The cross drops what was heard: the box keeps what it held.
+    await recorder.get_by_role("button", name="Cancel the dictation").click()
+    await expect(recorder).to_be_hidden()
     assert await _voice(page, "voice.aborts") == 1
-    await page.evaluate("() => window.__voice.hear([['something else entirely', true]])")
     await asyncio.sleep(0.2)
-    await expect(box).to_have_value("Dear Ada, thanks for the plan and the")
+    await expect(box).to_have_value("Dear Ada,")
+    # What the owner types takes over too: the dictation is dropped and what the box holds stays.
+    await mic.click()
+    await page.evaluate("() => window.__voice.hear([['something else entirely', true]])")
+    await box.press_sequentially(" and the")
+    await expect(recorder).to_be_hidden()
+    assert await _voice(page, "voice.aborts") == 2
+    await page.evaluate("() => window.__voice.hear([['more words', true]])")
+    await asyncio.sleep(0.2)
+    await expect(box).to_have_value("Dear Ada, and the")
+    # A dictation the owner ends with the tick goes after what the box held.
+    await mic.click()
+    await page.evaluate("() => window.__voice.hear([['plan', true]])")
+    await recorder.get_by_role("button", name="Put the words in the box").click()
+    await expect(box).to_have_value("Dear Ada, and the plan")
     await page.context.close()
 
 
-async def test_the_microphone_stops_by_itself_after_a_silence(browser: Browser, address: str) -> None:
-    page: Page = await _open(browser, address, 1280)
+async def test_the_microphone_ends_by_itself_after_a_pause_with_what_it_heard(browser: Browser, address: str) -> None:
+    """Item 605: once a word is heard, a pause of fifteen seconds ends the dictation, and its words go into the box;
+    six seconds stop only a dictation that heard nothing."""
+    page: Page = await _open(browser, address, 1280, clock=True)
     mic: Locator = _microphone(page)
     await mic.click()
     await page.evaluate("() => window.__voice.hear([['a few words', true]])")
+    await page.clock.run_for(6_600)
     await expect(mic).to_have_attribute("aria-pressed", "true")
-    await asyncio.sleep(_SILENCE_WAIT_S)
+    await page.clock.run_for(9_000)
     await expect(mic).to_have_attribute("aria-pressed", "false")
     assert await _voice(page, "[voice.stops, voice.aborts]") == [1, 0]
     await expect(page.locator(GOAL)).to_have_value("a few words")
     # It heard words, so it says nothing of a silence (item 593).
     await expect(page.locator(".toast")).to_have_count(0)
+    await page.context.close()
+
+
+async def test_the_tick_waits_for_the_engine_to_settle_what_it_heard(browser: Browser, address: str) -> None:
+    """Item 605: the engine settles the words it may still change after its stop. The recorder stays, its buttons off,
+    and the settled words go into the box when the engine ends; one that does not end within three seconds is ended
+    with the words it has."""
+    page: Page = await _open(browser, address, 1280, clock=True)
+    mic: Locator = _microphone(page)
+    recorder: Locator = _recorder(page)
+    done: Locator = recorder.get_by_role("button", name="Put the words in the box")
+    await page.evaluate("() => { window.__voice.endAfter = 1000; }")
+    await mic.click()
+    await page.evaluate("() => window.__voice.hear([['hello wor', false]])")
+    # The tick pressed by the keyboard.
+    await done.focus()
+    await page.keyboard.press("Enter")
+    await expect(recorder).to_be_visible()
+    await expect(done).to_be_disabled()
+    await expect(page.locator(GOAL)).to_have_value("")
+    # The engine settles what it may still change, then ends: the settled words go into the box.
+    await page.evaluate("() => window.__voice.hear([['hello world', true]])")
+    await page.clock.run_for(1_100)
+    await expect(page.locator(GOAL)).to_have_value("hello world")
+    await expect(recorder).to_be_hidden()
+    # The keyboard's focus the tick had goes to the box with the words.
+    await expect(page.locator(GOAL)).to_be_focused()
+    # An engine that does not end: three seconds after the tick, the dictation ends with what it heard.
+    await page.locator(GOAL).fill("")
+    await page.locator(GOAL).blur()
+    await page.evaluate("() => { window.__voice.endAfter = 60000; }")
+    await mic.click()
+    await page.evaluate("() => window.__voice.hear([['still here', true]])")
+    await done.click()
+    await page.clock.run_for(2_900)
+    await expect(recorder).to_be_visible()
+    await page.clock.run_for(200)
+    await expect(recorder).to_be_hidden()
+    await expect(page.locator(GOAL)).to_have_value("still here")
+    assert await _voice(page, "voice.aborts") == 1
+    # A tick pressed by the pointer leaves the focus be: a phone opens no keyboard on the screen for it.
+    await expect(page.locator(GOAL)).not_to_be_focused()
+    await page.context.close()
+
+
+async def test_a_tick_before_the_engine_began_leaves_no_wait_that_ends_the_next_dictation(
+    browser: Browser, address: str
+) -> None:
+    """The pre-push review of item 605: a tick pressed while the browser still asks drops the dictation at once, and its
+    wait for the engine was armed after that, for nobody: three seconds later it ended the next dictation."""
+    page: Page = await _open(browser, address, 1280, clock=True)
+    mic: Locator = _microphone(page)
+    recorder: Locator = _recorder(page)
+    await page.evaluate("() => { window.__voice.startLater = true; }")
+    await mic.click()
+    await recorder.get_by_role("button", name="Put the words in the box").click()
+    await expect(recorder).to_be_hidden()
+    assert await _voice(page, "voice.aborts") == 1
+    await page.evaluate("() => { window.__voice.startLater = false; }")
+    await mic.click()
+    await page.evaluate("() => window.__voice.hear([['still speaking', true]])")
+    await page.clock.run_for(3_100)
+    await expect(mic).to_have_attribute("aria-pressed", "true")
+    assert await _voice(page, "voice.aborts") == 1
+    await page.context.close()
+
+
+async def test_a_microphone_pressed_by_the_keyboard_gives_its_focus_to_the_tick(browser: Browser, address: str) -> None:
+    """Item 605: the microphone goes out of sight while it listens, so the focus of a keyboard that pressed it goes to
+    the tick, and back to the box when the recorder ends."""
+    page: Page = await _open(browser, address, 1280)
+    mic: Locator = _microphone(page)
+    recorder: Locator = _recorder(page)
+    await mic.focus()
+    await page.keyboard.press("Enter")
+    await expect(recorder.get_by_role("button", name="Put the words in the box")).to_be_focused()
+    await recorder.get_by_role("button", name="Cancel the dictation").focus()
+    await page.keyboard.press("Enter")
+    await expect(recorder).to_be_hidden()
+    await expect(page.locator(GOAL)).to_be_focused()
     await page.context.close()
 
 
@@ -352,7 +477,7 @@ async def test_a_microphone_the_browser_refuses_says_so_and_so_does_a_dictation_
     await expect(page.locator(".toast.error")).to_contain_text("Nothing was heard. Check that the browser may use")
     await page.locator(".toast").first.click()
     await mic.click()
-    await mic.click()
+    await _recorder(page).get_by_role("button", name="Put the words in the box").click()
     await expect(mic).to_have_attribute("aria-pressed", "false")
     await expect(page.locator(".toast")).to_have_count(0)
     await mic.click()

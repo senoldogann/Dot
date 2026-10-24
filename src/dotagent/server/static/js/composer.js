@@ -361,8 +361,8 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   }
 
   const wired = wireComposer(textarea, { maxPx, send, commands, edited, picked: (pick) => picks.add(pick.kind, pick.name) });
-  // The microphone, where the browser has speech recognition (item 574): it fills the box as the owner speaks; a message is
-  // still sent by the owner's own press.
+  // The microphone, where the browser has speech recognition (item 574): its recorder stands in the place of the controls
+  // while it listens, and the words go into the box when it ends (item 605); a message is still sent by the owner's press.
   const microphone = createMicrophone({ textarea, setInterim: wired.setInterim });
   // The "+" opens a menu: the files, and the task the owner shows Dot once (item 423, teach.js). A composer with no chat
   // behind it (the curtain while Dot opens) adds files alone.
@@ -389,7 +389,16 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     attachments.list,
     picks.list,
     attachments.picker,
-    el("div", { class: microphone === null ? "composer-bar" : "composer-bar has-mic" }, plusButton, wired.field, options, microphone?.button, sendButton),
+    el(
+      "div",
+      { class: microphone === null ? "composer-bar" : "composer-bar has-mic" },
+      plusButton,
+      wired.field,
+      options,
+      microphone?.button,
+      microphone?.recorder,
+      sendButton,
+    ),
   );
   sendButton.addEventListener("click", () => (stopping() ? stop() : send()));
 

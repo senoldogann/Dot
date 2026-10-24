@@ -3661,6 +3661,92 @@ dialog.modal.versions-dialog {
   }
 }
 
+/* The recorder (item 605): while the microphone listens it stands in the place of the composer's controls, under the
+   box it fills at the end: a cross that drops the dictation, a wave that moves while the engine hears a sound, the time
+   since it began to listen, and a tick that puts the words in the box. */
+.mic-recorder {
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.composer-bar.recording > .mic-recorder {
+  display: flex;
+  flex: 1 0 100%;
+}
+
+.composer-bar.recording > :is(.plus-button, .composer-options, .mic-button, .send, .context-meter) {
+  display: none;
+}
+
+.mic-wave {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-half);
+  min-width: 0;
+  height: 28px;
+  overflow: hidden;
+}
+
+.mic-bar {
+  flex: none;
+  width: 3px;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--text-2);
+  transform: scaleY(0.12);
+  transition: transform var(--motion-quick) linear;
+}
+
+.mic-time {
+  flex: none;
+  min-width: 4ch;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.composer .mic-cancel {
+  flex: none;
+  width: 32px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-2);
+}
+
+.composer .mic-done {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mic-bar {
+    transition: none;
+  }
+}
+
+/* On a phone the box keeps its line, and the recorder the whole line under it, where the "+", the send and the
+   choices were. */
+@media (max-width: 720px) {
+  .composer-bar.has-mic.recording {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "field"
+      "recorder";
+  }
+
+  .composer-bar.recording > .mic-recorder {
+    grid-area: recorder;
+  }
+}
+
 /* A pill reads an icon and its value (the mark of a provider and "Muse Spark 1.3"), soft at rest: the secondary ink
    on no ground; a tint under the pointer and while its menu is open. Its name is for screen readers only. */
 .composer-pill {
