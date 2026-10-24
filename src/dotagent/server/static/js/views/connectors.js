@@ -5,8 +5,9 @@
 // Support, This Mac): each a card with its mark, what Dot does with it and how it connects, and its first step in words
 // (Add, Allow, Sign in), or where it stands once it is connected. A card opens the service's own page: what Dot does
 // with it, each way it connects with where it stands and its step, its tools, where its data goes. The services, where
-// they stand and their steps are catalogue.js's; a service Dot has no way to reach is not listed (item 542). Under the
-// sections, an MCP server of one's own by its address; Connected lists too the servers that come from Dot's config, a
+// they stand and their steps are catalogue.js's; a service Dot has no way to reach is not listed (item 542). A service's
+// key, 1Password's token and an MCP server of one's own are asked for in dialogs (item 615). Under the sections, an MCP
+// server of one's own by its address; Connected lists too the servers that come from Dot's config, a
 // plugin or another agent of the Mac, and the one that comes with Dot, whose switch is on its tile (item 583). The
 // plugins Dot installs are Plugins' (views/plugins.js).
 
@@ -17,7 +18,7 @@ import { el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { markContent, markTile } from "../marks.js";
 import { emptyPanel, errorPanel, field, loadingPanel, segmented, switchToggle } from "../panels.js";
-import { attempt } from "../ui.js";
+import { attempt, formDialog } from "../ui.js";
 
 /** The sections of the services, in the order the page shows them and its chips name them (items 492 and 545). */
 const SECTIONS = [
@@ -147,8 +148,8 @@ function vaultGuide(vault) {
   return `Reads ${plural(logins, "login", "logins")} in ${names}: the logins you move there are the ones runs may fill.`;
 }
 
-/** The buttons of 1Password's way (item 493): Connect 1Password and a token instead while it is not connected, with
- * the token's form once asked for; Disconnect once it is. */
+/** The buttons of 1Password's way (item 493): Connect 1Password and a token instead while it is not connected, the token
+ * asked for in a dialog (item 615); Disconnect once it is. */
 function vaultActions(catalogue, vault) {
   const acting = catalogue.busy("vault");
   if (vault.connected) {
@@ -160,8 +161,19 @@ function vaultActions(catalogue, vault) {
     acting ? "Waiting for 1Password…" : "Connect 1Password",
   );
   // A token is read with op too: without it neither way connects.
-  const token = el("button", { class: "btn sm ghost", type: "button", disabled: acting || vault.cli === null, onclick: () => catalogue.askVault() }, "Use a service account token instead");
-  return el("div", { class: "plugin-actions" }, connect, token, catalogue.asking() === "vault" ? catalogue.vaultForm() : null);
+  const token = el(
+    "button",
+    {
+      class: "btn sm ghost",
+      type: "button",
+      "aria-haspopup": "dialog",
+      dataset: { vaultToken: "" },
+      disabled: acting || vault.cli === null,
+      onclick: () => attempt(() => catalogue.askVault(() => document.querySelector("[data-vault-token]"))),
+    },
+    "Use a service account token instead",
+  );
+  return el("div", { class: "plugin-actions" }, connect, token);
 }
 
 /** One way of a service on its page: what it is, how it connects, where it stands, what to do and its step. */
@@ -178,9 +190,13 @@ function wayRow(catalogue, way) {
       const service = now.service;
       const keyed = service !== null && service !== undefined && service.secrets.length > 0;
       const button = el("button", { class: "btn sm primary", type: "button", disabled: catalogue.busy(`mcp:${way.ref}`) }, "Add");
-      button.addEventListener("click", () => attempt(() => (keyed ? catalogue.askSecrets(service) : catalogue.add({ service: way.ref, name: null, address: null, secrets: {} }))));
-      // A service that takes a key asks for it here too (item 408): its form, with its own Add, takes the button's place.
-      actions = el("div", { class: "plugin-actions" }, keyed && catalogue.asking() === way.ref ? catalogue.secretsForm(service) : button);
+      if (keyed) {
+        button.setAttribute("aria-haspopup", "dialog");
+      }
+      const here = () => document.querySelector(`[data-way="mcp"][data-ref="${way.ref}"] .btn.primary`);
+      button.addEventListener("click", () => attempt(() => (keyed ? catalogue.askSecrets(service, here) : catalogue.add({ service: way.ref, name: null, address: null, secrets: {} }))));
+      // A service that takes a key asks for it here too (item 408): in a dialog, with its own Add (item 615).
+      actions = el("div", { class: "plugin-actions" }, button);
       badge = el("span", { class: "badge b-muted" }, serviceWords(service));
     } else {
       badge = el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
@@ -268,8 +284,6 @@ export function mount(root, ctx) {
   function tile(plugin) {
     const isConnected = catalogue.connected(plugin);
     const step = isConnected ? null : catalogue.firstStep(plugin);
-    const asked = catalogue.asking();
-    const askedService = asked === null ? null : (catalogue.servers.services.find((one) => one.id === asked && plugin.ways.some((way) => way.kind === "mcp" && way.ref === one.id)) ?? null);
     let action = null;
     if (step !== null && step.page) {
       // A service whose step is its page (1Password, item 493): its button leads there.
@@ -290,6 +304,8 @@ export function mount(root, ctx) {
           type: "button",
           title: `${step.label}: ${plugin.name}`,
           "aria-label": `${step.label} ${plugin.name}`,
+          // A service that takes a key asks for it in a dialog (item 615).
+          "aria-haspopup": step.keyed ? "dialog" : null,
           disabled: catalogue.busy(step.key),
         },
         step.label,
@@ -307,7 +323,6 @@ export function mount(root, ctx) {
         el("a", { class: "plugin-name", href: `#/customize/connectors/${plugin.id}` }, plugin.name),
         el("div", { class: "plugin-does" }, plugin.does),
         el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), waiting ? el("span", { class: "badge b-warn" }, "Waiting for macOS…") : catalogue.standing(plugin)),
-        askedService === null ? null : catalogue.secretsForm(askedService),
       ),
       action,
     );
@@ -347,7 +362,9 @@ export function mount(root, ctx) {
     );
   }
 
-  function addForm() {
+  /** The form that adds an MCP server of one's own by its name and address, in a dialog (item 615): Dot tries the server
+   * before it keeps it. */
+  function addServer() {
     const name = el("input", { class: "input", type: "text", maxlength: "24", autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "my-server", "aria-label": "Server name" });
     const address = el("input", {
       class: "input mono",
@@ -358,34 +375,21 @@ export function mount(root, ctx) {
       placeholder: "https://example.com/mcp",
       "aria-label": "Server address or command",
     });
-    const button = el("button", { class: "btn primary", type: "button" }, icon("plus"), "Add");
-    button.addEventListener("click", () =>
-      attempt(async () => {
-        button.disabled = true;
-        try {
-          await catalogue.add({ service: null, name: name.value.trim(), address: address.value.trim(), secrets: {} });
-        } finally {
-          button.disabled = false;
-        }
-        name.value = "";
-        address.value = "";
-      }),
-    );
-    return el(
-      "div",
-      { class: "connect-add" },
-      field("Name", name, "Lowercase letters, digits and dashes."),
-      field("Address", address, "Its URL, or the command that starts it on this Mac."),
-      el("div", { class: "connect-add-actions" }, button),
-    );
+    formDialog({
+      title: "Add your own MCP server",
+      description: "Dot tries the server before it keeps it, signs in to it in this browser when it asks, and offers its tools to the runs that start after.",
+      body: [field("Name", name, "Lowercase letters, digits and dashes."), field("Address", address, "Its URL, or the command that starts it on this Mac.")],
+      submitLabel: "Add",
+      size: "narrow",
+      returnFocus: () => document.querySelector("[data-add-server]"),
+      onSubmit: () => catalogue.add({ service: null, name: name.value.trim(), address: address.value.trim(), secrets: {} }),
+    });
   }
 
   function matches(plugin) {
     return words === "" || foldSearch(`${plugin.name} ${plugin.does}`).includes(words);
   }
 
-  // Made once, so that what is typed in them stays while the page paints again.
-  const form = addForm();
   const search = el("input", { class: "input customize-search", type: "search", placeholder: "Search connectors", "aria-label": "Search connectors", autocomplete: "off", spellcheck: "false" });
   search.addEventListener("input", () => {
     words = foldSearch(search.value);
@@ -493,13 +497,18 @@ export function mount(root, ctx) {
       el(
         "section",
         { class: "card connect-section plugin-own", dataset: { kind: "mcp" } },
-        el("div", { class: "card-head" }, icon("plug"), el("span", { class: "grow" }, "Your own MCP server")),
+        el(
+          "div",
+          { class: "card-head" },
+          icon("plug"),
+          el("span", { class: "grow" }, "Your own MCP server"),
+          el("button", { class: "btn sm", type: "button", "aria-haspopup": "dialog", dataset: { addServer: "" }, onclick: addServer }, icon("plus"), "Add server"),
+        ),
         el(
           "div",
           null,
           el("p", { class: "hint connect-hint" }, "MCP servers hand their tools to Dot. Dot tries one before it keeps it, signs in to it in this browser when it asks, and offers its tools to the runs that start after."),
           shown === "all" && words === "" ? others.map(serverTile) : null,
-          form,
         ),
       ),
     );

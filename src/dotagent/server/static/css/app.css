@@ -1595,7 +1595,7 @@ a.pill:hover {
 
 /* The cards of Customize › Connectors (item 316): a card's lines stand clear of the line under its head and of its first
    row, as far from them as a row's text is from its own lines (item 287); a second line follows the first closely. The
-   form that adds an MCP server by its address (item 279) sits under the servers, its fields side by side when they fit. */
+   form that adds an MCP server by its address (item 279) opens in a dialog from the card's head (item 615). */
 .connect-hint {
   margin: 0;
   padding: var(--pad-row);
@@ -1604,35 +1604,6 @@ a.pill:hover {
 .connect-hint + .connect-hint {
   margin-top: calc(-1 * var(--space-2));
   padding-top: 0;
-}
-
-.connect-add {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 16px;
-  padding: var(--pad-row);
-  border-top: 1px solid var(--border);
-}
-
-.connect-add > .field {
-  flex: 1 1 200px;
-  min-width: 0;
-}
-
-.connect-add > .field:nth-child(2) {
-  flex-grow: 3;
-}
-
-.connect-add-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-@media (max-width: 720px) {
-  .connect-add-actions {
-    flex-basis: 100%;
-  }
 }
 
 /* Customize (items 316, 317, 542 and 545): its three tabs, links drawn as a segmented control, each opening with the
@@ -1768,11 +1739,10 @@ a.pill:hover {
   margin-left: auto;
 }
 
-/* Over the link of the tile's name, whose ::after covers the tile: its step, its actions and the form that takes a
-   service's key (item 559), which a click would otherwise pass through to the service's page. */
+/* Over the link of the tile's name, whose ::after covers the tile: its step and its actions, which a click would otherwise
+   pass through to the service's page. */
 .plugin-tile .plugin-add,
-.plugin-tile .plugin-actions,
-.plugin-tile .plugin-secrets {
+.plugin-tile .plugin-actions {
   position: relative;
   z-index: 1;
 }
@@ -7278,15 +7248,173 @@ dialog.lightbox::backdrop {
   padding: 16px 20px 16px;
 }
 
+/* Every dialog has one frame (item 615): the head with the title and the line under it, what the dialog holds, and the
+   foot of its actions. A form's has a cross at the right of the head, and a foot that stays in view while its fields
+   scroll. */
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.modal-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-close {
+  flex: none;
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) 0 0;
+}
+
+/* A form in a dialog (item 615): the head and the foot stay, and the fields between them scroll when they are many.
+   Where a dialog of a question is narrow, a form's is wide enough for two fields side by side. */
+dialog.modal.form-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - var(--seen-top) - var(--seen-bottom) - 32px);
+  max-height: calc(100dvh - var(--seen-top) - var(--seen-bottom) - 32px);
+  overflow: hidden;
+}
+
+dialog.modal.form-dialog-narrow {
+  width: min(440px, calc(100vw - 32px));
+  max-width: min(440px, calc(100vw - 32px));
+}
+
+dialog.modal.form-dialog-wide {
+  width: min(720px, calc(100vw - 32px));
+  max-width: min(720px, calc(100vw - 32px));
+}
+
+dialog.modal.form-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* A form's head is a grid, so that its line runs under the cross too and wraps at the dialog's width: the title and the
+   cross share the first row, the line takes the second. */
+.form-dialog .modal-head {
+  display: grid;
+  flex: none;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 var(--space-3);
+  align-items: start;
+}
+
+.form-dialog .modal-titles {
+  display: contents;
+}
+
+.form-dialog .modal-head h3 {
+  grid-area: 1 / 1;
+}
+
+.form-dialog .modal-close {
+  grid-area: 1 / 2;
+}
+
+.form-dialog .modal-head p {
+  grid-area: 2 / 1 / 3 / 3;
+}
+
+.modal-fields {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-2) var(--space-5) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Why a submit failed, above the foot and outside the fields that scroll, so that it is seen wherever they are. */
+.form-dialog-error {
+  flex: none;
+  margin: 0 var(--space-5) var(--space-3);
+  overflow-wrap: anywhere;
+}
+
+.form-dialog .modal-actions {
+  flex: none;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+}
+
+/* An action of the form that is no submit (Write one now, Start from an example) stands at the foot's left end. */
+.modal-actions-lead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-right: auto;
+}
+
+/* On a phone a form is a sheet of the full width, from the foot of what is seen, round at the top: the keyboard lifts
+   the seen part (layout.js), and the foot with it. */
+@media (max-width: 720px) {
+  dialog.modal.form-dialog,
+  dialog.modal.form-dialog-narrow,
+  dialog.modal.form-dialog-wide {
+    top: auto;
+    bottom: var(--seen-bottom);
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    max-height: calc(100vh - var(--seen-top) - var(--seen-bottom) - var(--space-6));
+    max-height: calc(100dvh - var(--seen-top) - var(--seen-bottom) - var(--space-6));
+    border-bottom: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  /* The sheet's sides are 16 px, not 20, so that Cancel and two ways to save share a line of the foot on most phones. What
+     the form does besides submitting stands on a line of its own; Cancel and the main button (and the second way to
+     submit) share the line under it as wide as each other, and go on to another line where their words do not fit on one:
+     a button is never narrower than its words (a phone's buttons have a least width of their own, which would let them
+     shrink under them). */
+  .form-dialog .modal-head,
+  .modal-fields {
+    padding-inline: var(--space-4);
+  }
+
+  .form-dialog-error {
+    margin-inline: var(--space-4);
+  }
+
+  .form-dialog .modal-actions {
+    padding-inline: var(--space-4);
+    padding-bottom: calc(var(--space-4) + var(--safe-bottom));
+  }
+
+  .form-dialog .modal-actions > .btn {
+    padding-inline: var(--space-3);
+  }
+
+  .form-dialog .modal-actions-lead {
+    flex: 1 0 100%;
+    margin-right: 0;
+  }
+
+  .form-dialog .modal-actions-lead > .btn {
+    flex: 1 1 auto;
+    min-width: max-content;
+  }
+
+  .form-dialog .modal-actions > .btn {
+    flex: 1 1 0;
+    min-width: max-content;
+  }
+}
+
 /* Three ways out of a dialog (Edit from here, item 282) stand side by side in a dialog made wider for them; where even
    that does not fit, they stand one above the other, as wide as the dialog, the last choice on top and Cancel at the
-   foot. */
-dialog.modal:has(.modal-actions > :nth-child(3)) {
+   foot. A form's foot is its own (above). */
+dialog.modal:not(.form-dialog):has(.modal-actions > :nth-child(3)) {
   max-width: min(540px, calc(100vw - 32px));
 }
 
 @media (max-width: 580px) {
-  .modal-actions:has(> :nth-child(3)) {
+  dialog.modal:not(.form-dialog) .modal-actions:has(> :nth-child(3)) {
     flex-direction: column-reverse;
     align-items: stretch;
   }

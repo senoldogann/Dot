@@ -136,7 +136,7 @@ work:
 
 - **Connect 1Password** makes the vault "Shared with Dot" and a service account that only reads it, with your own
   `op` signed in through the 1Password app (Settings › Developer › Integrate with 1Password CLI), which asks you first.
-- **Use a service account token instead** takes one you made at 1password.com.
+- **Use a service account token instead** takes one you made at 1password.com, asked for in a dialog (item 615).
 
 Either way Dot keeps the token in its `.env` (`DOT_ONEPASSWORD_TOKEN`), and the page says how many logins the vaults
 hold. Move the logins a run may use into the vault; your other vaults stay out of its reach. **Disconnect** forgets the
@@ -186,8 +186,9 @@ The ways a service connects:
   over standard input and output: Memory, Sequential Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation,
   and with a key (**MCP · On this Mac · Key**) Brave Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana
   and Atlassian (API token); a value the owner knows, such as a site's address, is asked for with the keys, without a
-  link. A service that takes a key asks for it under its tile, in a form over the tile's link so that it can be clicked,
-  and on its page, with where to get one; a key typed and then cancelled is gone when the form opens again (item 559);
+  link. A service that takes a key asks for it in a dialog (item 615) that its tile's **Add** and its page's open, with
+  where to get one; a key typed and then dropped is gone when the dialog opens again (item 559), and the daemon's
+  refusal is said inside it, with the key still typed;
   Dot keeps each in its `.env` (mode 0600) under `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the
   server's headers or environment refer to it as `${...}`, so the value is in no record and leaves the daemon only to
   the service; **Remove** takes the key out of `.env` with the service's own server, and nothing else does (`keep` in
@@ -242,7 +243,9 @@ longer offers). A server that does not answer leaves the choice unwritten and th
 to (Linear, Postman) lists and connects its tools with that sign-in, so the choice asks for none again (item 499).
 
 **Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
-command that starts it on this Mac, added as the services are. Connected lists, besides the services, every server Dot
+command that starts it on this Mac, added as the services are, from the card's **Add server** button, which asks the
+name and the address in a dialog (item 615; a name the daemon refuses is said inside it, with what you typed still
+there). Connected lists, besides the services, every server Dot
 has from its config, a plugin or another agent (Customize › Skills › Found on this Mac), with **Ready** and its tools,
 **Left out** and why, or **Off**.
 

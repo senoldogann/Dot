@@ -15,8 +15,8 @@ colour (item 542); the Accounts card heads the list and no service's own page, a
 macOS is never asked here and System Settings never opens: the test answers for them (``_Mac``). The sign-ins are read
 for real, from a cookie file in the profile of Dot's browser.
 
-A service that takes a key (item 408) asks for it in its tile, where the form can be clicked, typed in and added from,
-and the key typed is gone once the form is cancelled (item 559).
+A service that takes a key (item 408) asks for it in a dialog from its tile (item 615; item 559 had it under the tile),
+and the key typed is gone once the dialog is dropped; so is the name and address of an MCP server of one's own.
 """
 
 import asyncio
@@ -29,6 +29,14 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
+from form_dialogs import (
+    asks_before_dropping,
+    closes_with_escape,
+    foot_is_in_view,
+    keeps_inside_the_window,
+    open_form,
+    shows_the_failure,
+)
 from playwright.async_api import Browser, FloatRect, Locator, Page, Route, async_playwright, expect
 from pydantic import JsonValue
 
@@ -438,29 +446,34 @@ async def test_the_list_of_connectors_stands_still_when_the_accounts_card_has_re
             await browser.close()
 
 
-async def test_a_keyed_services_tile_takes_its_key_where_it_is_clicked_and_keeps_none_after_cancel(
-    address: str, mac_at_rest: None
+async def test_a_keyed_services_tile_asks_for_its_key_in_a_dialog_and_keeps_none_after_cancel(
+    address: str, mac_at_rest: None, tmp_path: Path
 ) -> None:
-    """Item 559: the form that asks for a service's key sits under the tile's link, which covers the tile to open the
-    service's page, so a click on its field, Add or Cancel went to that page, where the form was gone. It now stands
-    over the link: the key is typed and added from the tile, and a key typed and cancelled is not there when the form
-    opens again. Wide and on a phone. The daemon's answer to the add is the test's own (Tavily is a service on the
-    internet)."""
+    """Item 559, in a dialog since item 615: the form that asks for a service's key sat under the tile's link, which
+    covers the tile to open the service's page, so a click on its field, Add or Cancel went to that page. It is a dialog
+    over the page now: the key is typed and added from it, a key typed and dropped is not there when the dialog opens
+    again, the daemon's refusal is said inside it with the key still typed, and on a phone it is a sheet whose foot is
+    in view. The daemon's answer to the add is the test's own (Tavily is a service on the internet)."""
     port: int = int(address.rpartition(":")[2])
     added: list[JsonValue] = []
+    answers: list[int] = []
 
     async def adding(route: Route) -> None:
         if route.request.method != "POST":
             await route.continue_()
             return
         added.append(route.request.post_data_json)
-        await route.fulfill(status=200, json={})
+        if answers.pop(0) == 200:
+            await route.fulfill(status=200, json={})
+        else:
+            await route.fulfill(status=422, json={"message": "Tavily did not take the key."})
 
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(headless=True)
         try:
             for width, height, phone in ((1280, 860, False), (390, 844, True)):
                 added.clear()
+                answers[:] = [422, 200]
                 page: Page = await browser.new_page(
                     viewport={"width": width, "height": height},
                     is_mobile=phone,
@@ -472,29 +485,82 @@ async def test_a_keyed_services_tile_takes_its_key_where_it_is_clicked_and_keeps
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"{address}/#/customize/connectors")
                 tavily: Locator = _tile(page, "tavily")
-                form: Locator = tavily.locator(".plugin-secrets")
-                key: Locator = tavily.get_by_label("Tavily: API key")
+                opener: Locator = tavily.get_by_role("button", name="Add Tavily")
                 await expect(tavily).to_be_visible()
-                await tavily.get_by_role("button", name="Add Tavily").click()
-                await expect(form).to_be_visible()
+                await expect(opener).to_have_attribute("aria-haspopup", "dialog")
+                dialog: Locator = await open_form(page, opener, "Add Tavily")
+                key: Locator = dialog.get_by_label("Tavily: API key")
                 await expect(key).to_be_focused()
-                # Typed into with a click on the field, and cancelled with a click: neither goes to the service's page.
-                await key.click(timeout=5000)
-                await page.keyboard.type("tvly-typed-and-cancelled")
-                await form.get_by_role("button", name="Cancel").click(timeout=5000)
-                await expect(form).to_have_count(0)
+                # Nothing of it stands in the tile, whose link would take a click to the service's page.
+                await expect(tavily.get_by_label("Tavily: API key")).to_have_count(0)
+                await keeps_inside_the_window(page)
+                await foot_is_in_view(page, dialog)
+                await page.screenshot(path=str(tmp_path / f"key-{width}.png"))
+                # Typed and dropped, with a question first: the key is not there when the dialog opens again.
+                await asks_before_dropping(page, dialog, key, "tvly-typed-and-cancelled")
                 await expect(page).to_have_url(f"{address}/#/customize/connectors")
-                # The form opens empty again, and Add sends what is typed in it now.
-                await tavily.get_by_role("button", name="Add Tavily").click()
+                dialog = await open_form(page, opener, "Add Tavily")
                 await expect(key).to_have_value("")
-                await key.click(timeout=5000)
-                await page.keyboard.type("tvly-the-one-added")
-                await form.get_by_role("button", name="Add", exact=True).click(timeout=5000)
-                await expect(form).to_have_count(0)
+                # The daemon refuses the key: the reason is in the dialog, the key is still typed, nothing is kept.
+                await key.fill("tvly-the-one-added")
+                await dialog.get_by_role("button", name="Add", exact=True).click()
+                await shows_the_failure(dialog, "Tavily did not take the key.")
+                await expect(key).to_have_value("tvly-the-one-added")
+                await page.screenshot(path=str(tmp_path / f"key-refused-{width}.png"))
+                # Add again, and the dialog closes.
+                await dialog.get_by_role("button", name="Add", exact=True).click()
+                await expect(dialog).to_have_count(0)
                 await expect(page).to_have_url(f"{address}/#/customize/connectors")
-                assert len(added) == 1 and isinstance(added[0], dict), added
-                assert added[0]["service"] == "tavily", added
-                assert added[0]["secrets"] == {"TAVILY_API_KEY": "tvly-the-one-added"}, added
+                assert len(added) == 2 and all(isinstance(body, dict) for body in added), added
+                for body in added:
+                    assert isinstance(body, dict)
+                    assert body["service"] == "tavily", added
+                    assert body["secrets"] == {"TAVILY_API_KEY": "tvly-the-one-added"}, added
+                await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_your_own_mcp_server_is_added_from_a_dialog(address: str, mac_at_rest: None, tmp_path: Path) -> None:
+    """Item 615: Your own MCP server, at the foot of the page, is a card with a button, Add server, and the name and the
+    address are asked for in a dialog; a name the daemon refuses is said inside it with what was typed kept; Escape
+    closes it and the focus goes back to the button."""
+    port: int = int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(headless=True)
+        try:
+            for width, height, phone in ((1280, 860, False), (390, 844, True)):
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height},
+                    is_mobile=phone,
+                    has_touch=phone,
+                    reduced_motion="reduce",
+                )
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url("127.0.0.1", port, TOKEN))
+                await page.goto(f"{address}/#/customize/connectors")
+                card: Locator = page.locator(".plugin-own")
+                await expect(card.get_by_text("Your own MCP server")).to_be_visible()
+                # No form stands in the page: the button opens it.
+                await expect(page.get_by_label("Server name")).to_have_count(0)
+                opener: Locator = card.get_by_role("button", name="Add server")
+                await expect(opener).to_have_attribute("aria-haspopup", "dialog")
+                dialog: Locator = await open_form(page, opener, "Add your own MCP server")
+                name: Locator = dialog.get_by_label("Server name")
+                await expect(name).to_be_focused()
+                await keeps_inside_the_window(page)
+                await foot_is_in_view(page, dialog)
+                await page.screenshot(path=str(tmp_path / f"own-server-{width}.png"))
+                await closes_with_escape(page, dialog, opener)
+                # A name the daemon refuses (capitals) is said in the dialog, and what was typed stays.
+                dialog = await open_form(page, opener, "Add your own MCP server")
+                await name.fill("My-Server")
+                await dialog.get_by_label("Server address or command").fill("https://example.com/mcp")
+                await dialog.get_by_role("button", name="Add", exact=True).click()
+                await shows_the_failure(dialog, re.compile(r"\S"))
+                await expect(name).to_have_value("My-Server")
+                await expect(dialog.get_by_label("Server address or command")).to_have_value("https://example.com/mcp")
+                await asks_before_dropping(page, dialog, name, "my-server")
                 await page.close()
         finally:
             await browser.close()

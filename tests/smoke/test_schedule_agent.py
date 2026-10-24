@@ -12,6 +12,14 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from form_dialogs import (
+    asks_before_dropping,
+    closes_with_escape,
+    foot_is_in_view,
+    keeps_inside_the_window,
+    open_form,
+    shows_the_failure,
+)
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.loop import AGENT_CORE_TOOLS
@@ -335,7 +343,10 @@ async def test_the_form_offers_the_agents_and_the_row_names_its_agent(
                 await expect(row.locator(".chip", has_text="Approvals: Auto-accept edits")).to_be_visible()
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"agent-{width}-{scheme}.png"), full_page=True)
-                await page.get_by_role("button", name="Edit guided").click()
+                dialog: Locator = await open_form(page, page.get_by_role("button", name="Edit guided"), "Edit schedule")
+                await keeps_inside_the_window(page)
+                await foot_is_in_view(page, dialog)
+                await page.screenshot(path=str(tmp_path / f"agent-form-{width}-{scheme}.png"))
                 agent: Locator = page.get_by_role("combobox", name="Agent")
                 await expect(agent).to_have_value(guide.id)
                 approvals: Locator = page.get_by_role("combobox", name="Approvals")
@@ -354,7 +365,7 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
 ) -> None:
     """Item 559: the form that adds a schedule was made once and only hidden, and a schedule added left its agent, its
     approvals and its other choices in it, so the next one, which runs unattended, started from them unless the owner
-    saw the selects. The page makes the form anew after each schedule it adds."""
+    saw the selects. The form is made anew each time it opens, in a dialog (item 615)."""
     chosen: AgentRecord = await _agent(client, "Chosen", "ask")
     port: int | None = client.base_url.port
     assert port is not None
@@ -364,7 +375,7 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 1000}, reduced_motion="reduce")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
             await page.goto(f"http://127.0.0.1:{port}/#/schedules")
-            form: Locator = page.locator(".schedule-form-slot")
+            form: Locator = page.get_by_role("dialog", name="New schedule")
             agent: Locator = form.get_by_role("combobox", name="Agent")
             approvals: Locator = form.get_by_role("combobox", name="Approvals")
             await page.get_by_role("button", name="New schedule").click()
@@ -376,6 +387,7 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
             await approvals.select_option("supervised")
             await form.get_by_role("button", name="Add schedule").click()
             await expect(page.locator(".toast.ok", has_text="Schedule added.")).to_be_visible()
+            await expect(form).to_have_count(0)
             added: list[ScheduleRecord] = [
                 record for record in await runtime.store.list_schedules() if record.name == "Morning look"
             ]
@@ -395,5 +407,80 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
                 for record in added:
                     await runtime.store.delete_schedule(record.id)
             await page.close()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+async def test_new_schedule_and_edit_are_a_dialog_that_fits_asks_before_it_drops_and_says_why_it_failed(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 615: New schedule and a schedule's Edit open the form in a dialog over the page, which does not grow; the
+    caret is in the name; Escape closes it, asking first when something was typed, and the focus goes back to the button
+    that opened it; the daemon's refusal is shown inside it with what was typed still there; on a phone it is a sheet
+    whose foot is in view."""
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, height, scheme in ((1280, 900, "light"), (390, 844, "dark")):
+                phone: bool = width < 720
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height},
+                    color_scheme=scheme,
+                    is_mobile=phone,
+                    has_touch=phone,
+                    reduced_motion="reduce",
+                )
+                await page.goto(ui_url("127.0.0.1", port, TOKEN))
+                await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+                opener: Locator = page.get_by_role("button", name="New schedule")
+                await expect(opener).to_have_attribute("aria-haspopup", "dialog")
+                # No form stands in the page: it comes with the button.
+                await expect(page.get_by_label("Cron expression")).to_have_count(0)
+                dialog: Locator = await open_form(page, opener, "New schedule")
+                name: Locator = dialog.get_by_label("Name", exact=True)
+                await expect(name).to_be_focused()
+                await keeps_inside_the_window(page)
+                await foot_is_in_view(page, dialog)
+                await page.screenshot(path=str(tmp_path / f"new-schedule-{width}-{scheme}.png"))
+                # Nobody touched it: Escape closes it at once, the focus back on the button.
+                await closes_with_escape(page, dialog, opener)
+                # Something typed is not dropped without asking.
+                dialog = await open_form(page, opener, "New schedule")
+                await asks_before_dropping(page, dialog, dialog.get_by_label("Name", exact=True), "Evening look")
+                await expect(opener).to_be_focused()
+                # A schedule that fires every minute is refused; the reason is in the dialog, and what was typed stays.
+                dialog = await open_form(page, opener, "New schedule")
+                await dialog.get_by_label("Name", exact=True).fill("Too often")
+                await dialog.get_by_label("Goal", exact=True).fill("Look at the tide.")
+                await dialog.get_by_label("Cron expression", exact=True).fill("* * * * *")
+                await dialog.get_by_role("button", name="Add schedule").click()
+                await shows_the_failure(dialog, "fires too often")
+                await page.screenshot(path=str(tmp_path / f"new-schedule-refused-{width}-{scheme}.png"))
+                await expect(dialog.get_by_label("Name", exact=True)).to_have_value("Too often")
+                await expect(dialog.get_by_label("Goal", exact=True)).to_have_value("Look at the tide.")
+                await expect(dialog.get_by_label("Cron expression", exact=True)).to_have_value("* * * * *")
+                assert [record for record in await runtime.store.list_schedules() if record.name == "Too often"] == []
+                # Put right, it is added, the dialog closes and the list has the row.
+                await dialog.get_by_label("Cron expression", exact=True).fill("0 9 * * 1-5")
+                await dialog.get_by_role("button", name="Add schedule").click()
+                await expect(dialog).to_have_count(0)
+                row: Locator = page.locator("[data-schedule]", has_text="Too often")
+                await expect(row).to_have_count(1)
+                await expect(opener).to_be_focused()
+                # Its Edit opens the same dialog, filled; Escape gives the focus back to that Edit button.
+                edit: Locator = row.get_by_role("button", name="Edit Too often")
+                dialog = await open_form(page, edit, "Edit schedule")
+                await expect(dialog.get_by_label("Name", exact=True)).to_have_value("Too often")
+                await expect(dialog.get_by_label("Cron expression", exact=True)).to_have_value("0 9 * * 1-5")
+                await expect(dialog.get_by_role("switch", name="Switched on")).to_have_attribute("aria-checked", "true")
+                await foot_is_in_view(page, dialog)
+                await closes_with_escape(page, dialog, edit)
+                await page.close()
+                for record in await runtime.store.list_schedules():
+                    if record.name == "Too often":
+                        await runtime.store.delete_schedule(record.id)
         finally:
             await browser.close()

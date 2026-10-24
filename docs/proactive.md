@@ -8,21 +8,23 @@ notifications and, when it is on, iMessage share (see [Telling you](#telling-you
 ## Morning brief
 
 The **Morning brief** card stands under your schedules on the Schedules page, as one line: its name, when it writes
-("Every day at 08:00", or Off) and its switch; the arrow at its right opens its settings, and the page keeps them open
-or folded as you left them (item 609). Its settings are the time of day (08:00, read in `[scheduler]
+("Every day at 08:00", or Off) and its switch (item 609); its **Settings** button opens them in a dialog, so that the
+page keeps its size (item 615). The settings are the time of day (08:00, read in `[scheduler]
 timezone`, which is the zone of this Mac unless the configuration says another), every day or the weekdays, and a box,
 **Also tell me about…**, for your own lines, one thing each (at most 20 lines of 300 characters). Switched on, Dot
 writes the brief at that time, and your phone gets the push of its first line, which opens the brief in its chat.
-**Write one now** starts one by hand, as Run now of a schedule does; the card says when the next one comes and when the
-last one was written, and leads to it.
+**Write one now**, in the dialog's foot beside Save, saves what you changed first and starts one by hand, as Run now of
+a schedule does; the dialog says when the next one comes and when the last one was written, and leads to it. Cancel, the
+cross and Escape close the dialog, asking first whether to discard what you changed; a refusal of the daemon (a line of
+more than 300 characters) is said inside it, with what you typed still there.
 
 **It is a schedule.** The brief is a schedule of the scheduler you already have (see
 [Schedules](memory-and-schedules.md#schedules)), marked as the brief, so that it shows in the list under the card with a
 **Brief** label, and switches off there too, which the card follows. It fires once at its time; a firing missed because
 the daemon was off or the Mac asleep is skipped, not replayed; its failures count as any schedule's (`[scheduler]
-stop_after_failures`). Its row has no form of its own: its pencil leads to the card, since its goal is not text you
-edit. A brief that was never switched on makes no schedule, and one switched off keeps its schedule (switched off) and
-what you set.
+stop_after_failures`). Its row has no form of its own: its pencil opens the brief's settings, since its goal is not text
+you edit. A brief that was never switched on makes no schedule, and one switched off keeps its schedule (switched off)
+and what you set.
 
 **It only reads.** Its run mode is `research`, whatever its row says (the mode is set again at every firing, so a change
 of the schedule through the API does not make a brief that acts): it can read, search, browse and look at the screen,
@@ -76,7 +78,9 @@ goes to your phone's push service and, with iMessage on, to Apple's iMessage ser
 ## Watchers
 
 **Watchers** is the panel under the brief on Schedules (with none, its head says *None yet* and a line says what a
-watcher does, item 609); **New watcher** makes one. A watcher has:
+watcher does, item 609); **New watcher** makes one, and a watcher's pencil changes it, in a dialog (item 615) that
+asks before it drops what you typed and says inside it why the daemon refused (twenty watchers are the most). A
+watcher has:
 
 - a **kind**: **New mail** in a Google or Microsoft account you signed in (see [Mail and
   calendars](runs.md#mail-and-calendars)); **Calendar**, an event about to start in one of those accounts; or

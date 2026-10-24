@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
+from form_dialogs import closes_with_escape, foot_is_in_view, keeps_inside_the_window, open_form, shows_the_failure
 from PIL import Image
 from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
@@ -497,9 +498,28 @@ async def test_settings_browser_adds_uses_and_deletes_a_profile(tmp_path: Path) 
                 profiles: Locator = page.get_by_role("list", name="Profiles")
                 await expect(profiles.get_by_role("listitem")).to_have_count(2)
                 await expect(profiles.locator("[data-profile='default']")).to_contain_text("In use")
-                await page.get_by_role("button", name="Add profile").click()
-                await page.get_by_role("textbox", name="Name of the new profile").fill("Work")
-                await _changed(page, "/api/browser/profiles", page.get_by_role("button", name="Add", exact=True).click)
+                # The name of a new profile is asked for in a dialog (item 615), not in a field in the page.
+                opener: Locator = page.get_by_role("button", name="Add profile")
+                await expect(opener).to_have_attribute("aria-haspopup", "dialog")
+                await expect(page.get_by_role("textbox", name="Name of the new profile")).to_have_count(0)
+                dialog: Locator = await open_form(page, opener, "Add a profile")
+                name: Locator = dialog.get_by_role("textbox", name="Name of the new profile")
+                await expect(name).to_be_focused()
+                await keeps_inside_the_window(page)
+                await foot_is_in_view(page, dialog)
+                await page.screenshot(path=tmp_path / f"profile-dialog-{width}-{scheme}.png")
+                await closes_with_escape(page, dialog, opener)
+                # A name the daemon refuses is said inside the dialog, and what was typed stays.
+                dialog = await open_form(page, opener, "Add a profile")
+                await name.fill("Default")
+                await dialog.get_by_role("button", name="Add", exact=True).click()
+                await shows_the_failure(dialog, "the two profiles every Dot has are written default and incognito")
+                await expect(name).to_have_value("Default")
+                await name.fill("Work")
+                await _changed(
+                    page, "/api/browser/profiles", dialog.get_by_role("button", name="Add", exact=True).click
+                )
+                await expect(dialog).to_have_count(0)
                 work: Locator = profiles.locator("[data-profile='Work']")
                 await expect(work).to_be_visible()
                 await _changed(page, "/api/browser/profile", page.get_by_role("button", name="Use Work for runs").click)

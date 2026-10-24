@@ -126,7 +126,8 @@ opens in the browser you read Dot in, and Sign in… covers signing in for Dot).
 
 **Profiles** (item 355): Dot's own Chrome works on one profile at a time, each with its own cookies and
 sign-ins. **Default** is the profile Dot always had (`browser-profile` in its home); **Incognito** (`browser-incognito`)
-is emptied before Chrome starts on it and after it closes, so it keeps nothing; **Add profile** makes another
+is emptied before Chrome starts on it and after it closes, so it keeps nothing; **Add profile** asks the name of another
+in a dialog (item 615) and makes it
 (`browser-profiles/<name>`, up to 24, a name of up to 48 letters, digits, spaces, `-` and `_`). **Use** makes runs work
 on a profile from Chrome's next start (`[browser] profile`, `POST /api/browser/profile`, refused while runs are active);
 **Clear** signs every site out of it (item 532): it deletes the cookies, what the sites stored (local and session

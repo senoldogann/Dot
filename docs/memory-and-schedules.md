@@ -162,8 +162,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   back awake, `DELETE /api/memories/trash/{id}` and `dotx memory purge` delete it at once, and the reflection
   deletes the notes that stayed longer, and none else. A note in the trash is in no search, list or count.
 - `memory_update` lets the agent correct a note in place, and the note is then the agent's, even one you wrote: the
-  prompt no longer shows the model's words as yours. You edit one on the Memory page or with `PATCH /api/memories/{id}`,
-  and it keeps its author. The page also shows who wrote each note and how often runs used it.
+  prompt no longer shows the model's words as yours. You edit one on the Memory page, in a dialog its Edit opens (item
+  615), or with `PATCH /api/memories/{id}`, and it keeps its author. The page also shows who wrote each note and how often runs used it.
 - Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings, each
   cut to the best `candidate_pool` (30) notes among the ones that may be found: resting and expired notes, and the
   lessons of an agent in the search of another run, take none of those places (item 557).
@@ -252,14 +252,16 @@ composer (items 281 and 400; see [Runs](runs.md)); a chat with such a schedule w
 `[agent] reflection_time` (see Reflection in [Autonomy](autonomy.md)); it is not a schedule and does not count against
 `max_schedules`.
 
-The **Morning brief** (item 570) is a schedule too, set on a card under your schedules and labelled **Brief** in the
-list: a read-only run (`research`) at the time you set whose goal Dot builds each time it fires, from what it knows of
+The **Morning brief** (item 570) is a schedule too, set on a card under your schedules (its **Settings** open in a
+dialog, item 615) and labelled **Brief** in the list: a read-only run (`research`) at the time you set whose goal Dot
+builds each time it fires, from what it knows of
 itself, and whose first line goes to your phone. It counts against `max_schedules` while it is on, switches off in the
 list and fires, skips and fails as any schedule does (see [Dot comes to you](proactive.md)). The **Watchers** panel
 under it (item 571) is not a schedule: it looks at mail, calendar events and GitHub notifications and tells you of what
 you care about.
 
-On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
+On Schedules the list is the page and **New schedule** opens the form, in a dialog over the page (item 615), as a
+schedule's pencil opens the same dialog filled; a schedule is created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task or research: a chat that only talks
 schedules tasks), model, reasoning
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat, when its failures switch it
@@ -269,8 +271,11 @@ configured ones and the standard speed; a `PATCH` that leaves `agent_id` out kee
 makes it Dot's).
 Options left on "default" take the configured value when the schedule fires. A schedule the agent creates takes its
 chat's choices, which are yours: the model of a run cannot pick another approval mode for it, nor an agent; one made
-in a chat with one of your agents runs as that agent (item 463), and one made in Dot's chat as Dot. While the form is
-open, **New schedule** reads **Close**, with a cross.
+in a chat with one of your agents runs as that agent (item 463), and one made in Dot's chat as Dot. The dialog has a
+cross at its top right and Cancel at its foot; Escape closes it too, and asks first (*Discard your changes?*) when you
+changed a field. A schedule the daemon refuses (a cron that fires every minute) is said inside the dialog, above its
+foot, with what you typed still there; a form made anew for each schedule starts from the defaults, not from the last
+one's choices. On a phone the dialog is a sheet of the window's width whose foot stays in view above the keyboard.
 
 **Run now** (the play button of a schedule's row, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
 once, switched on or off, due or not; the button says that it does real work, as at its time, with the approvals its run

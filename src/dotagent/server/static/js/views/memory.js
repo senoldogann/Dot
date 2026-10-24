@@ -1,5 +1,6 @@
 // Settings › Memory (items 218 and 566): add a note, look things up by meaning or by words, narrow the notes to the lessons, the
-// preferences or the ones saved while a run read outside content, correct a note and forget what is out of date. Under the
+// preferences or the ones saved while a run read outside content, correct a note (in a dialog, item 615) and forget what
+// is out of date. Under the
 // notes: what Dot knows about you and how its learning fares. The notes are read a page at a time (item 218). Item 584: the
 // notes can be listed by when and how often they were used, pinned (a pinned note never rests) and, when the nightly
 // reflection merged notes that say the same, the merge taken back; the notes that rested long are proposed to be forgotten,
@@ -9,8 +10,8 @@ import { api, query } from "../api.js";
 import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { orderControl, proposedSection, trashSection } from "../memorylife.js";
-import { emptyPanel, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
-import { attempt, confirmDialog, toast } from "../ui.js";
+import { emptyPanel, field, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
+import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 
 const PAGE_SIZE = 30;
 // The most notes the route reads at once (MemoriesQuery in server/views.py).
@@ -153,32 +154,11 @@ function mergedBadge(record) {
       );
 }
 
-/** The note in place as a small form: its words and tags, saved with `onSave(content, tags)` or left with `onCancel`. */
-function editForm(record, onSave, onCancel) {
-  const words = el("textarea", { class: "textarea", rows: "3", maxlength: "20000", "aria-label": "Note" });
-  words.value = record.content;
-  const tagInput = el("input", { class: "input", type: "text", autocomplete: "off", "aria-label": "Tags" });
-  tagInput.value = record.tags.join(", ");
-  const save = el("button", { class: "btn primary sm", type: "button" }, icon("check"), "Save");
-  const cancel = el("button", { class: "btn ghost sm", type: "button", onclick: onCancel }, "Cancel");
-  save.addEventListener("click", () => {
-    const text = words.value.trim();
-    if (text === "") {
-      words.focus();
-      return;
-    }
-    save.disabled = true;
-    onSave(text, parseTags(tagInput.value)).finally(() => {
-      save.disabled = false;
-    });
-  });
-  return el("div", { class: "stack tight grow" }, words, tagInput, el("div", { class: "row" }, el("span", { class: "spacer" }), cancel, save));
-}
-
 /**
  * One note with its tags, its age, who wrote it and buttons to pin, correct or forget it (and to take back the merge that
  * made it). `similarity` is null unless the row is a search hit; `rested` is since when the note rests, when it does by a
- * date; `actions` is `{ forget(record), edit(record, content, tags), pin(record), unmerge(record) }`.
+ * date; `actions` is `{ forget(record), edit(record), pin(record), unmerge(record) }`, `edit` opening the dialog that
+ * corrects the note (item 615).
  */
 function memoryRow({ record, similarity, score, rested }, actions) {
   const row = el("div", { class: "note-row", dataset: { memory: record.id } });
@@ -220,7 +200,11 @@ function memoryRow({ record, similarity, score, rested }, actions) {
     },
     icon("trash"),
   );
-  const edit = el("button", { class: "btn ghost sm icon-only", type: "button", title: "Edit this note", "aria-label": "Edit this note" }, icon("pencil"));
+  const edit = el(
+    "button",
+    { class: "btn ghost sm icon-only", type: "button", title: "Edit this note", "aria-label": "Edit this note", "aria-haspopup": "dialog" },
+    icon("pencil"),
+  );
   const match =
     similarity === null
       ? null
@@ -264,9 +248,7 @@ function memoryRow({ record, similarity, score, rested }, actions) {
       el("div", { class: "note-actions" }, unmerge, pin, edit, forget),
     );
   }
-  edit.addEventListener("click", () => {
-    row.replaceChildren(editForm(record, (content, tags) => actions.edit(record, content, tags), showNote));
-  });
+  edit.addEventListener("click", () => actions.edit(record));
   showNote();
   return row;
 }
@@ -619,13 +601,45 @@ export function mount(root, ctx) {
   async function editNote(record, text, tagList) {
     await api.patch(`/memories/${record.id}`, { content: text, tags: tagList });
     toast("ok", "Note updated.");
-    await reload();
-    await loadAsked();
+    // The daemon took the change: reading the notes again failing says nothing of the save, so it does not fail the
+    // dialog (the review of item 615); the page shows what it read last.
+    try {
+      await reload();
+      await loadAsked();
+    } catch (error) {
+      console.warn("the notes could not be read again", error);
+    }
+  }
+
+  /** The words and tags of a note, in a dialog (item 615); the notes are read again once the daemon took the change. The
+   * Remember box at the head of the page stays where it is: it is the page's main input. */
+  function openEdit(record) {
+    const words = el("textarea", { class: "textarea", rows: "6", maxlength: "20000", "aria-label": "Note" });
+    words.value = record.content;
+    const tagInput = el("input", { class: "input", type: "text", autocomplete: "off", "aria-label": "Tags" });
+    tagInput.value = record.tags.join(", ");
+    formDialog({
+      title: "Edit note",
+      description: "What Dot remembers, in your words. Tags say what it is about.",
+      body: [field("Note", words, ""), field("Tags", tagInput, "Optional, separated by commas.")],
+      submitLabel: "Save",
+      // The notes are drawn again once one is saved: the row's own Edit is found anew.
+      returnFocus: () => document.querySelector(`[data-memory="${record.id}"] [aria-label="Edit this note"]`),
+      onSubmit: async () => {
+        const text = words.value.trim();
+        if (text === "") {
+          words.focus();
+          return false;
+        }
+        await editNote(record, text, parseTags(tagInput.value));
+        return true;
+      },
+    });
   }
 
   const rowActions = {
     forget: (record) => attempt(() => forgetNote(record)),
-    edit: (record, text, tagList) => attempt(() => editNote(record, text, tagList)),
+    edit: (record) => openEdit(record),
     pin: (record) => attempt(() => pinNote(record)),
     unmerge: (record) => attempt(() => unmergeNote(record)),
   };
