@@ -30,7 +30,7 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module"), pyt
 TOKEN: str = "builtin-mcp-page-token"
 SERVER: str = "web-research"
 # The tools the tile names first, and how many the server lists.
-SHOWN: str = "8 tools: web_search, web_scrape, web_map, web_extract, web_crawl_start, web_crawl_status, …"
+SHOWN: str = "9 tools: web_search, web_scrape, web_map, web_extract, web_health, web_crawl_start, …"
 _SCREENS: tuple[tuple[int, str], ...] = ((1280, "light"), (390, "dark"), (320, "dark"))
 
 

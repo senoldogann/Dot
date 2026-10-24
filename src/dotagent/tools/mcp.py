@@ -1,19 +1,25 @@
 """Tools of MCP servers: each tool a connected server offers becomes a tool named ``mcp__<server>__<tool>``."""
 
-import functools
 import re
 import secrets
 
 from mcp.types import CallToolResult
 from pydantic import JsonValue
 
-from dotagent.config import AppConfig, load_default_config
+from dotagent.config import AppConfig
 from dotagent.core.errors import McpRejected, ToolInputError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolSpec
-from dotagent.mcp.builtin import address_arguments, reads_found_pages, search_arguments
+from dotagent.mcp.builtin import (
+    ARCHIVE_URL,
+    address_arguments,
+    host_lists_set,
+    reads_found_pages,
+    reads_the_archive,
+    search_arguments,
+)
 from dotagent.mcp.hub import McpHub, tool_parameters
 from dotagent.mcp.naming import PREFIX
 from dotagent.mcp.types import McpTool
@@ -100,20 +106,6 @@ def classify_mcp_call(tool: McpTool, arguments: JsonObject) -> ActionInfo:
     )
 
 
-@functools.cache
-def _packaged_blocked_hosts() -> frozenset[str]:
-    """The hosts ``[browser] blocked_hosts`` names as Dot ships it: the cloud metadata addresses, which the server
-    refuses itself."""
-    return frozenset(host.lower() for host in load_default_config().browser.blocked_hosts)
-
-
-def host_lists_set(config: AppConfig) -> bool:
-    """Whether the owner has set a list of hosts: an ``allowed_hosts`` at all, or ``blocked_hosts`` beyond those Dot
-    ships (the cloud metadata addresses, so that the list as shipped is not a list the owner set)."""
-    own: set[str] = {host.lower() for host in config.browser.blocked_hosts} - _packaged_blocked_hosts()
-    return bool(config.browser.allowed_hosts) or bool(own)
-
-
 def _words(value: JsonValue) -> list[str]:
     """The strings an argument holds: the text itself, or those among the items of a list. The server refuses an
     argument of any other shape before it sends anything."""
@@ -143,7 +135,9 @@ def checked_builtin_call(
       read otherwise.
     - A search that asks the server to read the pages it found (``read``) is refused while the owner has set a host
       list (:func:`host_lists_set`): those are addresses the server picks, and the lists would not bind them. Dot's
-      ``web_search`` has no such argument, so this is the one rule that is the server's own.
+      ``web_search`` has no such argument, so this is the one rule that is the server's own. A scrape that asks for
+      the Internet Archive's copy (``archive``) reaches ``web.archive.org`` whatever the address it names: while a list
+      is set, that site is judged as an address is (item 623), and the call is refused where the lists leave it out.
 
     The kind and the risk of the action stay those of :func:`classify_mcp_call`, a read or a call that may reach out,
     low or medium: never lower than those of Dot's own web tools, a network read of low risk. Raises ToolInputError for
@@ -159,6 +153,8 @@ def checked_builtin_call(
             "without read, then read the pages you choose with web_scrape, which Dot checks",
             {"tool": tool.exposed_name, "read": arguments.get("read")},
         )
+    if reads_the_archive(tool.remote_name, arguments) and host_lists_set(config):
+        checked_address(ARCHIVE_URL, config)
     checked: JsonObject = dict(arguments)
     flags: list[Flag] = []
     words: list[str] = [text for name in search_arguments(tool.remote_name) for text in _words(arguments.get(name))]

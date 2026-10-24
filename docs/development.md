@@ -102,10 +102,10 @@ note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama serve
 shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved later cannot change what
 runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and when asked,
 `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for `uv.lock`,
-cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). Its export of
-`uv.lock` leaves `dotagent-web-research` out while uv gets it from its repository (item 583): that requirement has
-no hash, which `pip-audit --disable-pip` refuses. Its own repository audits it, and what it depends on is still
-exported and audited. When something under
+cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). It exports the whole of
+`uv.lock`, `dotagent-web-research` with it, since PyPI has it and the lock holds its hashes (item 623; while uv got it
+from its repository, item 583, it was left out, as `pip-audit --disable-pip` refuses a requirement with no hash).
+When something under
 `.github/` changes, every week and when asked, `.github/workflows/zizmor.yml` audits the workflows and Dependabot's file
 with [zizmor](https://docs.zizmor.sh/audits/) (item 487): an event's text run as a script, a checkout that keeps its
 token, an action pinned by a commit its repository does not have, a known vulnerable action, a cache read by a release,
@@ -154,20 +154,17 @@ publishes the app (the order is below, and `desktop/release.sh` ends with it).
 
 ### The package, and what it depends on that PyPI must have first
 
-Dot's package depends on `dotagent-web-research==1.2.0` (item 583), the MCP server that comes with Dot. That version is
-not on PyPI yet, so `[tool.uv.sources]` in `pyproject.toml` names its repository at a fixed commit (`e8052177`,
-web-research's `.env` fix, on its pull request #6; to be moved to the merge commit when that merges), which is where `uv
-sync` and `uv.lock` get it. **A uv source is not carried into the built wheel.** The wheel and the sdist ask PyPI for
-`dotagent-web-research==1.2.0` (`Requires-Dist` in their metadata, checked by `uv build` and `unzip -p dist/*.whl
-'*/METADATA'`), so `pip install dotagent-macos` fails, naming that requirement, until PyPI has it. So PyPI must have
-`dotagent-web-research` 1.2.0 **before** `dotagent-macos` 0.2.0 is published, which the tag does: upload it first, from
-its own repository's release; then, in the commit that raises the version, take `[tool.uv.sources]` out and run `uv
-lock` again, which then reads the package from PyPI and writes its hashes, and take `--no-emit-package
-dotagent-web-research` out of the `uv export` of `.github/workflows/audit.yml` (below); then tag and release the app as
-below. A tag cut before PyPI has the dependency publishes a package that nobody can install until it does, and a version
-once published is never replaced. **The name `dotagent-web-research` is open on PyPI until it is uploaded**, and a wheel
-that asks for `dotagent-web-research==1.2.0` takes whatever PyPI holds under it: upload the package, or reserve the
-name, under the owner's own account before 0.2.0 is published, the earlier the better.
+Dot's package depends on `dotagent-web-research` (item 583), the MCP server that comes with Dot, at one version
+(`==1.3.1` in `pyproject.toml`). It is published on PyPI from its own repository (`senoldogann/web-research-stack`): a
+tag `v<version>` there publishes it through trusted publishing under the owner's account, as `release.yml` does Dot's. A
+new version of it goes in Dot by raising that pin and running `uv lock`, in a commit of Dot's own, once PyPI lists the
+version: the wheel and the sdist ask PyPI for the pinned version (`Requires-Dist` in their metadata, which `unzip -p
+dist/*.whl '*/METADATA'` shows), so a Dot published before PyPI has it installs nowhere until it does, and a version
+once published is never replaced. While a version is not on PyPI yet, a `[tool.uv.sources]` table may name its
+repository at a fixed commit for `uv sync` and `uv.lock`, as the work of 0.2.0 did until 1.2.0 was uploaded (item 602).
+A uv source is not carried into the built wheel, and `pip-audit` refuses a requirement that has no hash, as one from a
+repository has none: the table goes, with the `--no-emit-package` it needs in the `uv export` of
+`.github/workflows/audit.yml`, in the commit that raises Dot's version.
 
 ### The desktop app
 

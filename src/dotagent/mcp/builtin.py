@@ -8,13 +8,14 @@ It starts when the package can be imported, ``[builtin_mcp] web_research`` is on
 ``web-research`` replaces it, so that the owner's own checkout of the server wins over this one.
 """
 
+import functools
 import importlib.util
 import sys
 from collections.abc import Collection
 
 from pydantic import JsonValue
 
-from dotagent.config import AppConfig, McpServerConfig
+from dotagent.config import AppConfig, McpServerConfig, load_default_config
 from dotagent.config_edit import BuiltinMcpSetting
 from dotagent.core.paths import web_research_dir
 from dotagent.core.types import JsonObject
@@ -32,7 +33,25 @@ def web_research_installed() -> bool:
     return importlib.util.find_spec(WEB_RESEARCH_PACKAGE) is not None
 
 
-def _web_research(enabled: bool) -> McpServerConfig:
+@functools.cache
+def _packaged_blocked_hosts() -> frozenset[str]:
+    """The hosts ``[browser] blocked_hosts`` names as Dot ships it: the cloud metadata addresses, which the server
+    refuses itself."""
+    return frozenset(host.lower() for host in load_default_config().browser.blocked_hosts)
+
+
+def host_lists_set(config: AppConfig) -> bool:
+    """Whether the owner has set a list of hosts: an ``allowed_hosts`` at all, or ``blocked_hosts`` beyond those Dot
+    ships (the cloud metadata addresses, so that the list as shipped is not a list the owner set). The lists bind the
+    addresses a call of the web-research server holds (item 583), not the pages the server reaches on its own: a
+    search's found pages that ``read`` asks for (``tools.mcp`` judges those), and since 1.3.0 the heads of a search's
+    top results read for their dates and another copy of a walled page (the archive, another outlet's), which the
+    server does not read while a list is set (:func:`builtin_servers`, item 623)."""
+    own: set[str] = {host.lower() for host in config.browser.blocked_hosts} - _packaged_blocked_hosts()
+    return bool(config.browser.allowed_hosts) or bool(own)
+
+
+def _web_research(enabled: bool, bound: bool) -> McpServerConfig:
     """The server as Dot starts it: the Python the daemon runs on, so that it finds the package wherever Dot is
     installed, and its data in Dot's home. ``-P`` keeps the working directory off its import path: the server starts in
     the workspace, where a run's commands write, and a file there named like a module it imports would run in it.
@@ -40,12 +59,16 @@ def _web_research(enabled: bool) -> McpServerConfig:
     above the package's folder, in the app's layout Dot's own key file, and a ``.env`` that a program left in the
     workspace, the working folder, is read still; what is in the environment reaches the headless browser's driver, and
     a ``NODE_OPTIONS`` there is a file run outside the sandbox. The package reads only the working folder's now (its
-    own change), and the variable closes that one too."""
+    own change), and the variable closes that one too. With ``bound`` (:func:`host_lists_set`) the server reads no page
+    of its own accord: no dates from the heads of a search's results, no other copy of a walled page."""
+    env: dict[str, str] = {"WEB_TOOLS_DATA_DIR": str(web_research_dir()), "PYTHON_DOTENV_DISABLED": "1"}
+    if bound:
+        env |= {"WEB_TOOLS_SEARCH_RESOLVE_DATES": "off", "WEB_TOOLS_SCRAPE_RECOVER": "off"}
     return McpServerConfig(
         name=WEB_RESEARCH,
         command=sys.executable,
         args=["-P", "-m", _WEB_RESEARCH_MODULE],
-        env={"WEB_TOOLS_DATA_DIR": str(web_research_dir()), "PYTHON_DOTENV_DISABLED": "1"},
+        env=env,
         enabled=enabled,
     )
 
@@ -81,6 +104,32 @@ def address_arguments(tool: str) -> tuple[str, ...]:
     return _ADDRESS_ARGUMENTS.get(tool, ())
 
 
+# The Internet Archive's copy of a page, which ``web_scrape`` reads with ``archive: true``: a site the call reaches
+# whatever the address it names (item 623).
+ARCHIVE_URL: str = "https://web.archive.org/"
+
+
+# The words the server reads as false (Pydantic's lax booleans): any other value of ``archive`` may be read as true.
+_ARCHIVE_OFF: frozenset[str] = frozenset({"0", "false", "f", "no", "n", "off"})
+
+
+def reads_the_archive(tool: str, arguments: JsonObject) -> bool:
+    """Whether the call may ask ``web_scrape`` for the Internet Archive's copy of the page. The server reads
+    ``archive`` as Pydantic's lax booleans do (``1``, ``1.0``, ``"t"``, ``"y"`` are true), so only a plain off is off:
+    absent, ``false``, zero, or a word it reads as false; anything else is taken for on, as a count of ``read`` that
+    cannot be read is (the review of item 623: the check failed open)."""
+    if tool != "web_scrape":
+        return False
+    archive: JsonValue = arguments.get("archive")
+    if archive is None or archive is False:
+        return False
+    if isinstance(archive, int | float) and not isinstance(archive, bool):
+        return archive != 0
+    if isinstance(archive, str):
+        return archive.strip().lower() not in _ARCHIVE_OFF
+    return True
+
+
 def reads_found_pages(tool: str, arguments: JsonObject) -> bool:
     """Whether the call asks ``web_search`` to read the pages the search chose (``read`` above 0), which are addresses
     the server picks and Dot cannot check beforehand. The server takes a count written as text too; a count that cannot
@@ -111,5 +160,5 @@ def builtin_servers(config: AppConfig, taken: Collection[str] = ()) -> tuple[Mcp
     installed is not, and neither is one whose name another server has (``taken``): that server replaces it."""
     servers: list[McpServerConfig] = []
     if web_research_installed() and WEB_RESEARCH not in taken:
-        servers.append(_web_research(config.builtin_mcp.web_research))
+        servers.append(_web_research(config.builtin_mcp.web_research, host_lists_set(config)))
     return tuple(servers)

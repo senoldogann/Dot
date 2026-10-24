@@ -415,7 +415,7 @@ page](daemon.md#the-daemon-the-web-ui-and-the-service).
 | Drafts          | `draft_message`                                                                                                    |
 | Mail, calendars | `mail_search`, `mail_read`, `calendar_events`                                                                      |
 | Skills          | `skill`, `find_help`                                                                                               |
-| MCP             | `mcp__<server>__<tool>`; the server `web-research` comes with Dot (item 583): `mcp__web-research__web_search`, `web_scrape`, `web_map`, `web_extract` and the crawl tools `web_crawl_start`, `web_crawl_status`, `web_crawl_results`, `web_crawl_cancel` |
+| MCP             | `mcp__<server>__<tool>`; the server `web-research` comes with Dot (item 583): `mcp__web-research__web_search`, `web_scrape`, `web_map`, `web_extract`, `web_health` and the crawl tools `web_crawl_start`, `web_crawl_status`, `web_crawl_results`, `web_crawl_cancel` |
 
 The shell and the file tools work in `<home>/workspace` unless a path says otherwise. Dot is told to change the text
 of a file with `edit_file` and to write a file whole with `write_file`, and to keep the shell for running things

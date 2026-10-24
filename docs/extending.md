@@ -334,19 +334,25 @@ url = "https://mcp.example.com/mcp"       # a remote server; transport = "http" 
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; headers are never logged
 ```
 
-**A server comes with Dot** (item 583): `web-research`, the MCP server of the package `dotagent-web-research`, which
-Dot's own package depends on, so that every install has it ready and on. Its tools search the web and read what a run
-asks for, and each is named `mcp__web-research__<tool>`: `web_search` (DuckDuckGo, then Yahoo, and Google only when
-those refuse), `web_scrape` (one page, or two to ten in one call, as Markdown; `archive: true` reads the Internet
-Archive's copy), `web_map`, `web_extract`, and a crawl in the background (`web_crawl_start`, `web_crawl_status`,
-`web_crawl_results`, `web_crawl_cancel`). Dot starts it with the servers of `[[mcp]]`, as it starts those: on the Python
-the daemon runs on (`python -P -m web_scraper.mcp_server`: `-P` keeps the workspace, where a run's commands write, off
-its import path), with `WEB_TOOLS_DATA_DIR=<home>/web-research`, where it keeps its crawl jobs, a folder a run's
-commands cannot change, as they cannot change the other files Dot loads and runs, and with `PYTHON_DOTENV_DISABLED=1`,
-so that it reads no `.env` into its environment: neither Dot's own key file nor one that a program left in the
-workspace, its working folder (the browser it starts for a page that needs JavaScript runs with that environment, and a
-`NODE_OPTIONS` in it is a file run outside the sandbox). Its tools are offered and judged like any server's: the six
-that declare themselves read-only run as reads, the other two by their flags (`web_crawl_start` may reach out,
+**A server comes with Dot** (item 583): `web-research`, the MCP server of the package `dotagent-web-research` (1.3.1,
+item 623), which Dot's own package depends on, so that every install has it ready and on. Its tools search the web and
+read what a run asks for, and each is named `mcp__web-research__<tool>`: `web_search` (Brave or Serper first when their
+key is in the server's environment, then DuckDuckGo, Yahoo and Google, a provider that walls or fails resting ten
+minutes; each result's date with how sure it is, read from the page's head for news), `web_scrape` (one page, or two to
+ten in one call, as Markdown; a page behind a wall is read another way, from the archive or another outlet's copy, which
+the answer names; `archive: true` reads the Internet Archive's copy), `web_map`, `web_extract`, `web_health` (the state
+of its search providers), and a crawl in the background (`web_crawl_start`, `web_crawl_status`, `web_crawl_results`,
+`web_crawl_cancel`). Dot starts it with the servers of `[[mcp]]`, as it starts those: on the Python the daemon runs on
+(`python -P -m web_scraper.mcp_server`: `-P` keeps the workspace, where a run's commands write, off its import path),
+with `WEB_TOOLS_DATA_DIR=<home>/web-research`, where it keeps its crawl jobs, a folder a run's commands cannot change,
+as they cannot change the other files Dot loads and runs, and with `PYTHON_DOTENV_DISABLED=1`, so that it reads no
+`.env` into its environment: neither Dot's own key file nor one that a program left in the workspace, its working folder
+(the browser it starts for a page that needs JavaScript runs with that environment, and a `NODE_OPTIONS` in it is a file
+run outside the sandbox). While you have a list of sites set (`[browser] allowed_hosts`, or `blocked_hosts` beyond the
+defaults), it starts with `WEB_TOOLS_SEARCH_RESOLVE_DATES=off` and `WEB_TOOLS_SCRAPE_RECOVER=off`: the lists bind the
+addresses a call holds, and these two would have the server read pages of its own accord, the heads of a search's
+results and another copy of a walled page (item 623). Its tools are offered and judged like any server's: the seven that
+declare themselves read-only run as reads, the other two by their flags (`web_crawl_start` may reach out,
 `web_crawl_cancel` stops something), and what they return is untrusted content in its fence.
 
 **Dot's own rules judge its calls.** A call of the server's tools is judged by the rules of the tool of Dot's own that
@@ -365,6 +371,8 @@ does the same, in the same functions, so that a rule added to `web_search`, `web
   set `allowed_hosts` or added a host to `blocked_hosts` (the cloud metadata hosts it ships with are no list of yours):
   those addresses are the server's pick, and Dot cannot check them, so the model is told to search without `read` and
   to read the pages with `web_scrape`. Dot's own `web_search` has no such argument.
+- *A `web_scrape` with `archive: true`* reaches `web.archive.org` whatever address it names: while you have a list set,
+  that site is judged as an address is, and the call is refused where your lists leave it out (item 623).
 
 Every other string a tool takes is worked on inside the server and sent nowhere: a filter of the addresses it found, a
 CSS selector, the name of a crawl job, a date or a language code.
@@ -374,8 +382,8 @@ CSS selector, the name of a crawl job, a date or a language code.
 is also refused a step whose words carry a secret that Dot holds (see *Outside content in yolo* in
 [Safety](safety.md)). And what the server does that those tools do not: a redirect it follows to another host; the
 links a crawl follows on the site it starts on (and on its subdomains, with `include_subdomains`); the search
-engines a search asks, which it chooses; and the Internet Archive (`web.archive.org`), which `archive: true` asks for
-the copy of a page. A crawl outlives its run: `web_crawl_start` keeps crawling in the server
+engines a search asks, which it chooses; and, while you have no list set, the Internet Archive (`web.archive.org`),
+which `archive: true` asks for the copy of a page. A crawl outlives its run: `web_crawl_start` keeps crawling in the server
 after the run that started it has stopped, up to its page limit, until it ends or the daemon stops (the server stops
 with it); `web_crawl_cancel` stops it. Where those limits matter, `[builtin_mcp] web_research = false` leaves the
 server out. A server of your own that replaces it is not checked: its tools are not known to Dot.
