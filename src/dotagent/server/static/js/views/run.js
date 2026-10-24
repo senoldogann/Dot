@@ -1,7 +1,7 @@
 // One run as a conversation: the question, what Dot did about it, its answer, and the box to queue a message for after
 // the run, steer it or follow up on it.
 
-import { actorFace, dotFace, setActorState } from "../actors.js";
+import { actorFace, dotFace, setActorState, teamDuo } from "../actors.js";
 import { agentList } from "../agentlist.js";
 import { api, eventNotShown, follow, query, sse } from "../api.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
@@ -158,10 +158,17 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   let run = detail.run;
   let status = run.status;
   // Dot's face on Dot's own run; a delegated run wears the face of its own hue (item 83); a run of an agent wears the
-  // agent's (item 86).
+  // agent's (item 86); a chat with a team wears the faces of its agents (item 610).
   const agent = detail.agent;
+  const team = detail.team ?? null;
   const face =
-    agent !== null ? actorFace(agent.id, faceState(status), agent.look) : run.parent_run_id === null ? dotFace(faceState(status)) : actorFace(run.id, faceState(status), null);
+    agent !== null
+      ? actorFace(agent.id, faceState(status), agent.look)
+      : run.parent_run_id !== null
+        ? actorFace(run.id, faceState(status), null)
+        : team !== null
+          ? teamDuo(team, faceState(status))
+          : dotFace(faceState(status));
   let model = run.model;
   // A run that a dotx command drives (`elsewhere`) works here too: its page follows it and its Stop asks that
   // command to stop it, but it takes no steer, and its browser is not shown or taken over from here.
@@ -227,7 +234,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   window.dispatchEvent(new CustomEvent(RUN_BACK_EVENT, { detail: { to: parentId === null ? null : `#/runs/${parentId}` } }));
   const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, "Parent run");
   const crumbSep = parentId === null ? null : el("span", { class: "stage-sep", "aria-hidden": "true" }, "/");
-  const stageName = el("span", { class: "stage-name" }, parentId !== null ? clip(run.goal, CRUMB_CHARS) : agent !== null ? agent.name : dotName());
+  // Whose chat it is, named in the bar: the agent, the team (item 610) or Dot.
+  const chatWith = agent !== null ? agent.name : team !== null ? team.name : dotName();
+  const stageName = el("span", { class: "stage-name" }, parentId !== null ? clip(run.goal, CRUMB_CHARS) : chatWith);
   const footTime = el("span", null);
   const footParent = el("span", null, "Part of another run");
   const footStop = el(
@@ -290,7 +299,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // inspector holds after the panel.
   let showChanges = () => undefined;
   const context = createContextPanel({ onOpenChanges: () => showChanges() });
-  const details = createDetails(run, agent, detail.campaign, detail.keep_going);
+  const details = createDetails(run, agent, detail.campaign, detail.keep_going, team);
   const planBody = el("div", { class: "plan-list" }, el("div", { class: "hint" }, NO_PLAN));
   const plan = panelSection({ id: "run-plan", title: "Plan", actions: null, body: planBody });
 
@@ -1262,7 +1271,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
 
   /** A phone's bar under the chat's title: the agent, or Helper on a helper's page, and the model the run uses now. */
   function paintHeading() {
-    headingSub.textContent = `${parentId === null ? actorName : "Helper"} · ${modelName(model)}`;
+    headingSub.textContent = `${parentId === null ? chatWith : "Helper"} · ${modelName(model)}`;
     keepLook();
   }
 

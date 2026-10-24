@@ -191,6 +191,13 @@ export const SCHEDULES_CHANGED_EVENT = "dot:schedules-changed";
 // A request that changes a schedule: one of /schedules, or a chat's new loop (/runs/{id}/loop).
 const SCHEDULE_CHANGE = /^\/(schedules(\/|$|\?)|runs\/[^/]+\/loop$)/;
 
+/** The event the page sends once a request of it changed a team (item 610), made one by Use team or took an agent from
+ * its teams (an agent changed or deleted): the daemon tells of no change of one, and the sidebar names the team of each
+ * chat it lists and wears the faces of its agents. */
+export const TEAMS_CHANGED_EVENT = "dot:teams-changed";
+// A request that changes a team: one of /teams, a ready team's Use, or an agent that is changed or deleted.
+const TEAM_CHANGE = /^\/(teams(\/|$|\?)|agent-teams\/[^/]+\/use$|agents\/[^/]+$)/;
+
 export async function request(method, path, body) {
   await proven();
   const headers = authHeaders();
@@ -210,6 +217,9 @@ export async function request(method, path, body) {
   }
   if (method !== "GET" && SCHEDULE_CHANGE.test(path)) {
     window.dispatchEvent(new CustomEvent(SCHEDULES_CHANGED_EVENT));
+  }
+  if (method !== "GET" && TEAM_CHANGE.test(path)) {
+    window.dispatchEvent(new CustomEvent(TEAMS_CHANGED_EVENT));
   }
   const text = await response.text();
   if (text === "") {

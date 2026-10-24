@@ -396,7 +396,7 @@ async def test_a_run_opened_again_is_drawn_at_once_from_what_the_page_read_witho
             count: int = await calls.count()
             opened: int = len([url for url in streams if f"/runs/{runs[0].id}/stream" in url])
             await page.goto(f"{address}/#/agents")
-            await expect(page.locator(".agent-row").first).to_be_visible()
+            await expect(page.locator(".agent-card").first).to_be_visible()
             await page.go_back()
             await expect(calls).to_have_count(count, timeout=500)
             assert len([url for url in streams if f"/runs/{runs[0].id}/stream" in url]) == opened, streams

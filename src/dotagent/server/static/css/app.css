@@ -8510,6 +8510,421 @@ button.attach-chip:hover {
   white-space: nowrap;
 }
 
+/* Your agents and Your teams (items 610 and 509): a grid of cards that does not grow as one long column. As many abreast
+   as fit, two to four across a page and one on a phone: a column is never narrower than 230 px nor wider than a quarter of
+   the page, less the gaps. */
+.agent-grid,
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(max(230px, calc((100% - 3 * var(--space-3)) / 4)), 1fr));
+  gap: var(--space-3);
+}
+
+/* A team's card holds a name, what it is for and a row of faces, so its columns are wider: three across at most. */
+.team-grid {
+  grid-template-columns: repeat(auto-fill, minmax(max(260px, calc((100% - 2 * var(--space-3)) / 3)), 1fr));
+}
+
+/* An agent's compact card: the face at the left of the name over the role, each on one line, and under them the title of
+   its newest chat with when it began. The whole card is the link to the agent. */
+.agent-card,
+.owned-team {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--motion-quick) var(--ease);
+}
+
+.agent-card {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.agent-card:hover,
+.owned-team:hover {
+  background: color-mix(in srgb, var(--text) 3%, var(--surface));
+  text-decoration: none;
+}
+
+.agent-card:focus-visible,
+.owned-team:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.agent-card > .avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.agent-card-main {
+  min-width: 0;
+}
+
+.agent-card-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-weight: var(--weight-label);
+}
+
+.agent-card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-card-role {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+/* The newest chat of an agent or a team: its title on one line and, at its right, how long ago it began. */
+.agent-card-chat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.agent-card > .agent-card-chat {
+  grid-column: 1 / -1;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.agent-card-chat-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A team the owner has (item 610): the faces of its agents over one another (four, the rest counted) beside its name and
+   what it is for, then how many agents it has and its newest chat. */
+.owned-team {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.owned-team-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.owned-team-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.owned-team-name {
+  font-weight: var(--weight-label);
+  overflow-wrap: anywhere;
+}
+
+.owned-team-purpose {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  overflow-wrap: anywhere;
+}
+
+.owned-team-count {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.owned-team > .agent-card-chat {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.empty-teams {
+  padding: var(--space-3) var(--space-4);
+}
+
+.empty-teams > p {
+  margin: 0;
+}
+
+/* The ready team that is under Your teams already (item 610), beside its name. */
+.team-added {
+  flex: none;
+  align-self: flex-start;
+}
+
+/* The faces of a team's agents laid over one another (item 610), each ringed in the card's own ground so that the faces
+   under it do not show through, the rest counted in a pill of the same size. The size comes from --stack-face. */
+.face-stack {
+  --stack-face: 32px;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+.face-stack-item {
+  display: grid;
+  place-items: center;
+  width: var(--stack-face);
+  height: var(--stack-face);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.face-stack-item + .face-stack-item,
+.face-stack-item + .face-stack-more {
+  margin-left: calc(-0.3 * var(--stack-face));
+}
+
+.face-stack .face-stack-item .avatar {
+  width: var(--stack-face);
+  height: var(--stack-face);
+}
+
+.face-stack-more {
+  display: grid;
+  place-items: center;
+  min-width: var(--stack-face);
+  height: var(--stack-face);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  box-shadow: 0 0 0 2px var(--surface);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.owned-team .face-stack {
+  --stack-face: 28px;
+  flex-wrap: nowrap;
+  max-width: 50%;
+}
+
+/* A team's page: the faces larger, over its name and what it is for, and its agents by name as links (item 610). */
+.team-who .face-stack {
+  --stack-face: 56px;
+  margin-bottom: var(--space-2);
+}
+
+.team-who .face-stack .face-stack-item .avatar {
+  margin-bottom: 0;
+}
+
+/* Seven faces and their count stand in the width of the narrowest phone, 320 px less the page's margins. */
+@media (max-width: 720px) {
+  .team-who .face-stack {
+    --stack-face: 44px;
+  }
+}
+
+.team-roster {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  /* As wide as the page and no wider, whatever the names: the greeting centres what it holds, which would let a long name
+     stretch its box past the window. */
+  width: 100%;
+  min-width: 0;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-roster > li {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* A long name gives way with an ellipsis inside its chip: a chip is never wider than the page. */
+.team-roster .chip {
+  gap: var(--space-2);
+  max-width: 100%;
+  padding: var(--space-half) var(--space-2) var(--space-half) var(--space-half);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.team-roster .chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-roster .chip .avatar {
+  flex: none;
+  margin-bottom: 0;
+}
+
+.team-roster .chip:hover {
+  background: var(--surface-3);
+  text-decoration: none;
+}
+
+.team-roster .chip .avatar {
+  width: 20px;
+  height: 20px;
+}
+
+/* A team without an agent left takes no message (item 610): the note stands where the box would. */
+.team-empty {
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius);
+  background: var(--warn-weak);
+}
+
+/* The page of a team that is not there stands at the top of the page, as high as its words, not in the row that centres
+   the greeting of a team that is. */
+.team-gone {
+  align-self: start;
+}
+
+.team-gone .empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+/* The agents of a team in its editor (item 610): a row each, the box, the face, the name and the role. */
+.team-picks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  max-height: 20rem;
+  overflow: auto;
+}
+
+.team-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.team-pick:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+
+.team-pick input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.team-pick .avatar {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+
+.team-pick-name {
+  flex: none;
+  font-weight: var(--weight-label);
+}
+
+.team-pick-role {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.team-picks-count {
+  font-weight: var(--weight-text);
+}
+
+/* The face of a chat with a team, where a row or a bar has the square of one creature (item 610): the faces of two of its
+   agents, one up and left of the other. One agent wears its face alone. */
+.team-duo {
+  --duo-face: 22px;
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: calc(var(--duo-face) + 10px);
+  height: calc(var(--duo-face) + 10px);
+}
+
+.team-duo-face {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: var(--duo-face);
+  height: var(--duo-face);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.team-duo-face:first-child {
+  top: 0;
+  left: 0;
+}
+
+.team-duo-face:last-child:not(:first-child) {
+  right: 0;
+  bottom: 0;
+}
+
+.team-duo[data-count="1"] .team-duo-face {
+  inset: 0;
+  width: auto;
+  height: auto;
+}
+
+.team-duo .team-duo-face .avatar {
+  width: 100%;
+  height: 100%;
+}
+
+/* In the top bar of a chat, where a creature is 28 px (24 on a phone). */
+.stage-title .team-duo {
+  --duo-face: 20px;
+}
+
+@media (max-width: 720px) {
+  .agent-card,
+  .owned-team {
+    padding: var(--space-3);
+  }
+
+  .team-pick {
+    min-height: 40px;
+  }
+
+  .team-roster .chip {
+    min-height: 32px;
+  }
+}
+
 /* The agent's greeting sits over its composer like Dot's on the home page, with its chats under them. */
 .agent-page {
   display: flex;

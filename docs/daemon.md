@@ -13,7 +13,9 @@ page of their own.
 
 The sidebar lists your chats (the conversation threads) grouped by day, newest activity first, the pinned ones above the
 days, and a chat opens at its latest run. Each chat wears a creature of Dot's character engine, as a messenger's list
-shows faces (item 277): a chat with an agent the agent's look, a chat with Dot a shape and a colour its own id picks;
+shows faces (item 277): a chat with an agent the agent's look, a chat with a team (item 610) the faces of two of its
+agents while its latest run is Dot's (an agent's run there wears the agent's face), with the team's name ahead of the
+last line, a chat with Dot a shape and a colour its own id picks;
 the creature works while the chat's run goes on, waits while the run waits for you and is sad once it failed. Its name
 stands over its last line: the answer of its latest run in plain words, or your message, after "You:", while the run
 works. The creatures rest; only those at work move, and the mark of a chat's loop (item 580): a chat that asks again
@@ -629,10 +631,10 @@ item 371) shows the notices that come with the pages (the fonts, the icons, and 
 whose copyright Dot keeps), the Python packages installed beside the daemon with the licence each one's metadata names
 and a search, and the tools Dot uses (Google Chrome, Ollama, Node.js, Tailscale, OpenCode), each with where it is on
 this Mac or that it is not, looked for on the PATH of the owner's shell (`GET /api/licences`).
-Both pages, like the other pages under another (an agent's or a campaign's page, Team, a service's page), have their
-link back at their top in a wide window, with the sidebar beside them too (item 380): the sidebar names the list they
-are under, not the page itself. On a phone the table of processes scrolls sideways in its box, its edge fading while
-more lies to the right.
+Both pages, like the other pages under another (an agent's, a team's or a campaign's page, Handoffs, a service's page), have
+their link back at their top in a wide window, with the sidebar beside them too (item 380): the sidebar names the list
+they are under, not the page itself. On a phone the table of processes scrolls sideways in its box, its edge fading
+while more lies to the right.
 
 Settings › Appearance (⌥⌘A) holds the look of this browser. **Colour scheme** is three cards, each a miniature of Dot's
 window drawn in the scheme it names: System (the default, split down the middle), Light and Dark; ⇧⌥⌘A steps through
@@ -881,7 +883,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
-| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400) |
+| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610) |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
@@ -895,7 +897,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message, its files too when `attachments` names them (item 376; left out, they stay); send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue, each message's `files` named |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
 | `GET /attachments/{id}/image`                                                  | the picture of an image kept for a message (item 376), for its small chip in the box that edits a queued message |
-| `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first, each with the face it wears (`actor_id`), its last line (`last_message`, `last_role`) and its loop (`loop_cron`, `loop_next_at`, item 580); delete some with their runs (409 with the ids while one has a run under way) |
+| `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first, each with the face it wears (`actor_id`), the team it is with (`team`, item 610), its last line (`last_message`, `last_role`) and its loop (`loop_cron`, `loop_next_at`, item 580); delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |
 | `GET /threads/{id}/helpers?limit=N`                                            | the runs a chat's runs delegated, newest first (the side panel's Agents tab; 404 for no chat) |
 | `GET /threads/{id}/terminals`                                                  | the chat's terminal sessions: command, background or not, start, end and exit status (404 for no chat) |

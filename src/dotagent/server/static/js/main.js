@@ -68,7 +68,9 @@ const ROUTES = [
     load: () => import("./views/agents.js"),
     parent: ([id]) => (id === undefined ? null : "/agents"),
   },
-  { tab: "agents", layout: "page", title: "Team", pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
+  { tab: "agents", layout: "page", title: "Handoffs", pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
+  // A team of the owner's (item 610): its agents' faces, a box for a message to it and its chats.
+  { tab: "agents", layout: "page", title: "Team", pattern: /^\/teams\/([A-Za-z0-9_-]+)$/, load: () => import("./views/teams.js"), parent: () => "/agents" },
   {
     tab: "schedules",
     layout: "page",

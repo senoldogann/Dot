@@ -8,10 +8,10 @@
 // read. Each chat stands once (item 202): a chat at work stands under Working, wearing the faces of the runs it delegated
 // (item 507), and goes back among the days once it rests; a pinned one stays under Pinned, with the same faces.
 
-import { ApiError, api, request, SCHEDULES_CHANGED_EVENT } from "./api.js";
+import { ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
 import { icon } from "./icons.js";
-import { actorFace, lookOf } from "./actors.js";
+import { actorFace, lookOf, teamDuo } from "./actors.js";
 import { onAssistant } from "./assistant.js";
 import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
@@ -136,6 +136,19 @@ function chatFaceOf(chat) {
   };
 }
 
+/** Whether a chat's row wears its team (item 610): a chat with a team while its latest run is Dot's, which leads the
+ * team; one whose latest run is an agent's the owner put in it wears that agent's face, as the chat's own page does. */
+function wearsTeam(chat) {
+  return chat.team !== null && chat.team !== undefined && chat.actor_id === chat.team.id;
+}
+
+/** The face a chat wears in its row (item 277): the faces of two of its team's agents, one over the other (`wearsTeam`),
+ * or its creature (`chatFaceOf`). */
+function chatFace(chat, state) {
+  const { id, look } = chatFaceOf(chat);
+  return wearsTeam(chat) ? teamDuo(chat.team, state) : actorFace(id, state, look);
+}
+
 /** A copy of `items` in a random order (Fisher–Yates). */
 function shuffled(items) {
   const copy = [...items];
@@ -189,12 +202,14 @@ function chatText(chat, children) {
   const words = chat.last_message ?? "";
   const last = words === "" || chat.last_role !== "user" ? words : `You: ${words}`;
   const faces = helperFaces(children);
+  // A chat with a team (item 610) says which, ahead of its last words.
+  const team = chat.team === null || chat.team === undefined ? null : el("span", { class: "side-chat-team", title: chat.team.name }, chat.team.name);
   const under =
     faces === null
-      ? last === ""
+      ? last === "" && team === null
         ? null
-        : el("span", { class: "side-chat-last" }, el("span", { class: "side-chat-words" }, last))
-      : el("span", { class: "side-chat-last side-chat-helpers" }, faces);
+        : el("span", { class: "side-chat-last" }, team, last === "" ? null : el("span", { class: "side-chat-words" }, last))
+      : el("span", { class: "side-chat-last side-chat-helpers" }, team, faces);
   return el("span", { class: "side-chat-text" }, el("span", { class: "side-run-goal" }, clip(chat.title, 120)), under);
 }
 
@@ -228,6 +243,7 @@ function loopFace(face, words) {
 function chatLink(chat, onNavigate, face, children) {
   const loop = loopWords(chat);
   const word = [
+    chat.team === null || chat.team === undefined ? undefined : `with ${chat.team.name}`,
     STATUS_WORD[chat.latest_status],
     helperWords(children),
     chat.unread === true ? "unread" : undefined,
@@ -708,15 +724,20 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return node;
   }
 
-  // A chat's creature: the one drawn for it before, while it wears the same look in the same state.
+  // A chat's creature: the one drawn for it before, while the same one wears the same look in the same state.
   function faceOf(chat) {
     const { id, state, look } = chatFaceOf(chat);
-    const key = `${state} ${look.shape} ${look.colour} ${look.expression}`;
+    // A chat that wears its team wears the faces of its agents (item 610): kept while they and the state are the same.
+    // Whose face it is goes in the key: a team's chat whose latest run became an agent's at rest, the page seeing
+    // only the end of it, wears the agent's face, and an agent's new look is drawn.
+    const key = wearsTeam(chat)
+      ? `team ${state} ${chat.team.agents.slice(0, 2).map((agent) => `${agent} ${JSON.stringify(lookOf(agent, null))}`).join(" ")}`
+      : `${state} ${id} ${look.shape} ${look.colour} ${look.expression}`;
     const kept = faces.get(chat.id);
     if (kept !== undefined && kept.key === key) {
       return kept.face;
     }
-    const face = actorFace(id, state, look);
+    const face = chatFace(chat, state);
     faces.set(chat.id, { key, face });
     return face;
   }
@@ -724,8 +745,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // The creature of a chat's row while chats are chosen: one of its own, as the kept one stays in the chat's kept link,
   // which comes back when the choosing ends.
   function pickFaceOf(chat) {
-    const { id, state, look } = chatFaceOf(chat);
-    return actorFace(id, state, look);
+    return chatFace(chat, chatFaceOf(chat).state);
   }
 
   // A chat's entry: its row, wearing while its latest run works (`family`, that run's row and the runs it delegated;
@@ -1076,6 +1096,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const stopStream = onStreamBack(reloadSoon);
   // The daemon tells of no change of a schedule: a page that made one says so, and the marks of the loops follow.
   window.addEventListener(SCHEDULES_CHANGED_EVENT, reloadSoon);
+  // Nor of a team's (item 610): the chats with it are named and drawn as the team is now.
+  window.addEventListener(TEAMS_CHANGED_EVENT, reloadSoon);
   document.addEventListener("visibilitychange", onBackInView);
   window.addEventListener("focus", onBackInView);
 
@@ -1324,6 +1346,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       stopLifecycle();
       stopStream();
       window.removeEventListener(SCHEDULES_CHANGED_EVENT, reloadSoon);
+      window.removeEventListener(TEAMS_CHANGED_EVENT, reloadSoon);
       document.removeEventListener("visibilitychange", onBackInView);
       window.removeEventListener("focus", onBackInView);
       window.removeEventListener("keydown", onEscape);

@@ -147,6 +147,7 @@ from dotagent.store.models import (
     RunPicks,
     RunRecord,
     RunStatus,
+    TeamRecord,
     ThreadRecord,
     WorkingRun,
 )
@@ -961,6 +962,52 @@ class RunManager:
             RunOpening(text=goal, files=files, resumed=None, once=once, carried=(), picks=picks),
             None,
             agent.id,
+        )
+        return run
+
+    async def start_for_team(
+        self,
+        team: TeamRecord,
+        goal: str,
+        mode: RunMode,
+        model: str | None,
+        source: str,
+        effort: Effort | None,
+        speed: Speed,
+        once: OneMessage | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        files: tuple[StoredAttachment, ...],
+        picks: RunPicks,
+    ) -> RunRecord:
+        """Queue the first run of a new chat with ``team`` (item 610): a run of Dot's, with Dot's tools and bounds, in a
+        thread of the team. Every run of that thread, whoever starts it, leads the team (the loop reads the thread's
+        team as it starts), so a follow-up, a queued message, a resumed run and a firing of the chat's loop are told
+        the team too. A team with no agent left takes no message. The rest is as for :meth:`start_picked`."""
+        if not team.agents:
+            raise InvalidValueError(
+                "the team has no agent now: add one to it before you message it", {"team_id": team.id}
+            )
+        ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
+        _check_speed(ref, speed)
+        if effort is not None:
+            await self._check_effort(ref, effort)
+        await self._check_once(ref, once)
+        run, _ = await self._launch(
+            goal,
+            mode,
+            model,
+            None,
+            source,
+            None,
+            effort,
+            speed,
+            approvals,
+            goal_mode_asked(goal, mode, goal_mode),
+            RunOpening(text=goal, files=files, resumed=None, once=once, carried=(), picks=picks),
+            None,
+            None,
+            team.id,
         )
         return run
 
@@ -2183,6 +2230,7 @@ class RunManager:
         opening: RunOpening,
         campaign_id: str | None,
         agent_id: str | None,
+        team_id: str | None = None,
     ) -> tuple[RunRecord, RunHandle]:
         """Create the run, register it and start its task (:meth:`_launch_run`). An emergency stop that comes while it
         is being launched found it not registered yet: the run ends as one once it is."""
@@ -2201,6 +2249,7 @@ class RunManager:
             opening,
             campaign_id,
             agent_id,
+            team_id,
         )
         if self._stops != stops:
             log.info("run_stopped_by_an_emergency_stop_at_its_start", run_id=run.id)
@@ -2222,9 +2271,11 @@ class RunManager:
         opening: RunOpening,
         campaign_id: str | None,
         agent_id: str | None,
+        team_id: str | None = None,
     ) -> tuple[RunRecord, RunHandle]:
         """Create the run, register it and start its task. A run launched by an active, untrusted parent is untrusted;
-        ``campaign_id`` makes it a session of that campaign."""
+        ``campaign_id`` makes it a session of that campaign; ``team_id`` makes the new chat it opens (``thread_id``
+        ``None``) a chat with that team (item 610)."""
         runtime: Runtime = self._runtime
         model_ref: str = model if model is not None else self._main_model
         runs_on: ModelRef = parse_model_ref(model_ref)
@@ -2235,7 +2286,7 @@ class RunManager:
         await self._check_picks(opening.picks, mode, runs_on, agent_id, approval_mode, source)
         with_goal_mode: bool = mode != "chat" and (runtime.config.agent.goal_mode if goal_mode is None else goal_mode)
         if thread_id is None:
-            thread: ThreadRecord = await runtime.store.create_thread(thread_title(goal), source)
+            thread: ThreadRecord = await runtime.store.create_thread(thread_title(goal), source, team_id)
             return await self._register_run(
                 goal,
                 mode,

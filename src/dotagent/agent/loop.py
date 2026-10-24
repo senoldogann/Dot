@@ -114,6 +114,7 @@ from dotagent.agent.progress import (
 )
 from dotagent.agent.prompt import (
     AgentBrief,
+    TeamBrief,
     build_system_prompt,
     collect_prompt_inputs,
     forgotten_unnamed,
@@ -245,6 +246,7 @@ from dotagent.store.models import (
     RunMode,
     RunPicks,
     RunRecord,
+    TeamRecord,
     ThreadRecord,
 )
 from dotagent.store.stats import ACT_TOOLS
@@ -981,6 +983,30 @@ def _team_name(name: str) -> str:
     """The name of the ready team an agent called ``name`` is in (item 512), empty for none."""
     found: AgentTeam | None = team_of(name)
     return "" if found is None else found.name
+
+
+def _team_brief(record: TeamRecord | None, agents: Sequence[AgentRecord], run: RunRecord) -> TeamBrief | None:
+    """What the prompt tells the run that leads the team of its chat (item 610): the team as it is now, its agents in
+    its order and only those that are still agents. Only a run of Dot's leads a team (the owner's message to a chat
+    with a team starts one), not a run of an agent that was put in the chat, and not a run delegated to a helper, which
+    has a chat of its own; ``None`` for the others and for a chat with no team."""
+    if record is None or run.agent_id is not None or run.parent_run_id is not None:
+        return None
+    by_id: dict[str, AgentRecord] = {agent.id: agent for agent in agents}
+    return TeamBrief(
+        name=record.name,
+        purpose=record.purpose,
+        members=tuple(
+            AgentBrief(
+                name=member.name,
+                role=member.role,
+                instructions="",
+                made_by_dot=member.made_by is not None,
+                team=_team_name(member.name),
+            )
+            for member in (by_id[each] for each in record.agents if each in by_id)
+        ),
+    )
 
 
 def _new_teammates_note(agents: Sequence[AgentRecord]) -> str:
@@ -1844,6 +1870,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # than the instructions list are picked by meaning too (item 169), or by their words when the embeddings fail
     # (item 256).
     thread: ThreadRecord = await runtime.store.get_thread(run.thread_id)
+    # The team the chat is with (item 610): every run of its thread, a follow-up too, leads it as the team is now.
+    lead: TeamBrief | None = _team_brief(await runtime.store.find_team(thread.team_id), team, run)
     close_to_title, close = (
         await _close_skills(runtime, run, [thread.title, query], [skill_text(skill) for skill in skills.skills])
         if len(skills.skills) > runtime.config.skills.listed
@@ -1901,6 +1929,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 devtools_address(browser.config),
                 config.prompt,
                 harness_text,
+                lead,
             )
         )
     )

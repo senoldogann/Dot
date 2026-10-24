@@ -37,9 +37,13 @@ schedules' rows "<name> is paused" (see [Memory and schedules](memory-and-schedu
 now** of one of its schedules and the messages of other agents still reach it, and runs already working go on, each with
 its Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
 
-The page is in two parts (item 509): **Your agents**, with their count, and under them **Add ready-made agents**, which
-shows the teams or the single agents, one of the two at a time (**Teams** first; the one chosen last while the app is
-open).
+The page is in three parts (items 509 and 610): **Your teams** and **Your agents**, each with its count, and under
+them **Add ready-made agents**, which shows the teams or the single agents, one of the two at a time (**Teams** first;
+the one chosen last while the app is open). Your agents are a grid of compact cards, as many across as the page has
+room for, two to four, and one on a phone: the face, the name over the role, each on one line, and under them the title
+of the agent's newest chat (the chat's own, as you may have renamed it) with how long ago it began, or that it has
+none. The card is the way to the agent's page, and says "Paused" and "Made by Dot" as the page does; Dot's opens the
+chats.
 
 An agent can start from a template (item 315). **Single agents** shows fourteen: Sales Outbound, Talent Scout, Paid
 Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of Staff, Reviewer, Research Desk,
@@ -82,16 +86,59 @@ what the team does and shows the faces and names of its agents, those you have a
 **Use team** makes, in one click, each agent of the team you do not have yet, as its template's **Use template** makes
 it. An agent of yours with the name of one of them, in any case, is that agent, kept as it is but for one thing: one
 that names its tools without `message_agent` is given it, so that it can hand its teammates their parts, and the toast
-says so; a team one of whose agents this home cannot make (a tool it lacks) makes none of them and says why. A team
-whose agents suggest schedules offers **Add their schedules too, switched off**, for the agents it makes. A team is its
-agents and nothing besides: you ask Dot, or any of them, for the work, and it hands each agent its part through messages
-(below) and puts their answers together. Every template names `message_agent` beside `delegate`, and a member's run is
-told its team (item 512): the prompt's Team section says "You are in the Growth team", lists its teammates first, each
-agent with the team it is in, and says that a part an agent's role fits goes to that agent with `message_agent`, not to
-`delegate`, which is for a part no agent's role covers. An agent is in a team when its name is a member's, read as Use
-team reads it (`team_of`), whoever made it. The API: `GET /api/agent-teams` and `POST /api/agent-teams/{id}/use` (201
-with the agents it `made`, the ones of yours it `kept` as they are now, and the names of those it `joined` by giving
-them `message_agent`; 404 for a team that is not there, 422 for one that cannot be made).
+says so; a team one of whose agents this home cannot make (a tool it lacks) makes none of them and says why. It then
+makes the team itself, a record under **Your teams** (item 610, below); used again, it finds that record, whatever you
+have named it since, and brings back an agent it lacks (one you took out of the team, or deleted) at its end, and the
+toast says which; the card of a ready team you have says **In your teams**. A team whose agents suggest schedules offers
+**Add their schedules too, switched off**, for the agents it makes. Every template names `message_agent` beside
+`delegate`, and a member's run is told its team (item 512): the prompt's Team section says "You are in the Growth team",
+lists its teammates first, each agent with the team it is in, and says that a part an agent's role fits goes to that
+agent with `message_agent`, not to `delegate`, which is for a part no agent's role covers. An agent is in a team when
+its name is a member's, read as Use team reads it (`team_of`), whoever made it. The API: `GET /api/agent-teams` and
+`POST /api/agent-teams/{id}/use` (201 with the agents it `made`, the ones of yours it `kept` as they are now, and the
+names of those it `joined` by giving them `message_agent`, and the team (`team`) with `created` for whether it was made
+now and `added` for the agents it put back; 404 for a team that is not there, 422 for one that cannot be made).
+
+**Your teams** (item 610) are the teams you have, each a record of a name, what it is for (500 characters at most) and
+agents of yours in an order, which holds nothing else: removing a team keeps its agents and its chats, and an agent that
+is deleted leaves the teams that had it. Use team makes one from a ready team, **New team** on the Agents page puts
+agents of yours together (at least one, each once; Dot is no agent to put in a team), and **Edit** in the bar of a
+team's page changes its name, purpose and agents (the agents it has first, in its order, then the others; Save writes
+the ticked ones in that order); **Remove** takes the team away and nothing it names. A team is a card with its agents'
+faces over one another (four, the rest counted), its name and purpose, how many agents it has and its newest chat with
+how long ago it was busy; the card opens the team's page, `#/teams/<id>`: the agents' faces over the team's name and
+what it is for, its agents by name, each a link to its page, a box for a message to the team ("Message Content team",
+which starts as an agent's box does, on Auto, with Dot's model and approvals) and the team's chats. A team that has no
+agent left says so on its page and its card, and takes no message: its box is not there, and the daemon refuses a new
+chat with it (422) until you give it an agent.
+
+A chat with a team works as the team. A message from the team's page starts a run of Dot's, with Dot's tools, approvals
+and policy, in a new chat that names the team (`POST /api/runs` with `team_id`, which goes with a new chat alone: not
+with a thread, an agent or a campaign), and every run of that chat is told at the head of its prompt, whoever starts it,
+a follow-up in the chat's box, a queued message, a resumed run or a firing of the chat's loop: that it leads the team
+"Content team", the agents working together, and that every message in the chat is for the team; what you made the team
+for, which it follows within the rules as it follows an agent's instructions; the team's agents by name and role; and
+that it hands each agent the part of the work its role fits with `message_agent` (several at once work in parallel),
+puts their answers together into one answer for you, and answers itself only what no agent's role covers. The text is
+made as each run starts, from the team as it is then, so an agent taken out of the team or deleted is not named, a team
+with none says there is nobody to hand a part to, and a run that has no `message_agent` is told to do the work itself.
+It is your own configuration, written by you into the prompt as an agent's instructions are, and it adds no permission
+and no tool: the agents a run messages answer in runs of their own, within their own tools and approvals (above). The
+one thing in it a model may have written is the role of an agent a run of Dot's made, which the line marks "made by
+Dot". An agent you message in the team's chat, with `agent_id`, is that agent's run and does not lead the team. Removing
+the team leaves its chats as chats with Dot, whose later messages are told no team.
+
+The chat wears the team: the sidebar's row shows the faces of two of its agents and the team's name ahead of its last
+words while the chat's latest run is Dot's, which leads the team, and the bar of a run of Dot's there (a phone's, under
+the chat's title) the name and the same faces; an agent you put in the chat answers as itself, its run's bar and, while
+its run is the latest, the row wearing its face. The Run tab's Details name the team, a link to its page. The API: `GET
+/api/teams` (each team with its agents as they are now and its
+newest chat), `GET /api/teams/{id}` (with its chats), `POST /api/teams` (201; `name`, `purpose` and `agents`, the ids of
+your agents in order; 422 for an id that is not one of your agents, one named twice, or none), `PUT /api/teams/{id}`
+(the same, whole), `DELETE /api/teams/{id}` (204), and 404 for a team that is not there. `GET /api/agents` gives each
+agent the title of the chat of its newest run (`latest_title`); a chat of `GET /api/threads` and the run of `GET
+/api/runs/{id}` name the team they are with (`team`: its id, name and agents; the chat's `actor_id` is the team's id,
+which no agent's or campaign's is).
 
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
@@ -125,7 +172,7 @@ of its approvals and the sender's, so an agent set to `yolo` asks when a run tha
 sender's conversation, and the reply comes back as the tool's result, the way a delegated run's report does. The prompt
 lists the team by name and role under "Team" whenever there is another agent to message; an agent does not message
 itself, and an answering run messages no one further. The sender's chat shows the exchange as a delegated row wearing
-the agent's face. **Team** (a button on the Agents page, `#/team`) is today's thread of these messages: who to whom, the
+the agent's face. **Handoffs** (a button on the Agents page, `#/team`) lists today's messages: who to whom, the
 message, the reply, the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
 gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
 which older tool output is shortened, once, to 700 characters; a step's request to Anthropic also marks the end of the

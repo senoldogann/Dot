@@ -1,11 +1,12 @@
 // Agents (item 86): the profiles the owner makes, each with a face in its own hue, a name, a role in one line,
 // instructions that open the prompt of its runs, and bounds for them (a model, a reasoning level, approvals, tools).
-// The list (#/agents) shows Dot first and then the agents, each with its newest chat, and under them the teams (item
-// 504) and the templates (item 315) agents start from in one click; an agent's page (#/agents/<id>) greets with its
-// face and role, takes a message for it and lists its chats; the editor makes or changes an agent. An agent goes out as
-// a file from its page and comes back, in this home or another, from the list's Import.
+// The list (#/agents) shows the owner's teams (item 610), each a card with its agents' faces, then Dot and the agents as
+// a grid of compact cards, each with its newest chat, and under them the ready teams (item 504) and the templates (item
+// 315) agents start from in one click; an agent's page (#/agents/<id>) greets with its face and role, takes a message
+// for it and lists its chats; the editor makes or changes an agent. An agent goes out as a file from its page and comes
+// back, in this home or another, from the list's Import. A team's own page is views/teams.js.
 
-import { actorFace, dotFace, fallbackLook, liveFace, rememberLook } from "../actors.js";
+import { actorFace, dotFace, fallbackLook, liveFace, rememberLook, teamFaces } from "../actors.js";
 import { api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
@@ -24,11 +25,14 @@ import { scoreLine } from "./memory.js";
 import { skillRow } from "./skills.js";
 import { messageRow } from "./team.js";
 import { getSnapshot, loadModels, onChange, onLifecycle, onStreamBack } from "../state.js";
+import { teamForm } from "../teamform.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const DOT_ID = "dot";
 const GOAL_CHARS = 90;
 const MAX_GOAL_PX = 320;
+// How many of a team's agents a card shows the face of, the rest counted (item 610).
+const MOST_TEAM_FACES = 4;
 // The face an agent wears in its row: working while its newest run works, at rest otherwise.
 const WORKING = new Set(["queued", "running", "blocked"]);
 // The largest agent file Import reads: its instructions take at most 50,000 characters, of up to four bytes each.
@@ -47,24 +51,69 @@ function hrefOf(record) {
   return record.id === DOT_ID ? "#/runs" : `#/agents/${record.id}`;
 }
 
-/** What the agent's row says under its name: its newest chat, else its role. */
-function secondLine(record, latest) {
-  if (latest === null) {
-    return el("div", { class: "row-text muted" }, record.role === "" ? "No chats yet" : record.role);
-  }
-  return el("div", { class: "row-text muted" }, clip(latest.goal, GOAL_CHARS));
-}
-
-function agentRow({ record, latest }) {
+/**
+ * An agent's compact card in the grid of Your agents (item 610): its face, its name and its role on one line, and under
+ * them the title of its newest chat with when it began, or that it has none. Dot's opens the chats.
+ */
+function agentCard({ record, latest, latest_title: latestTitle }) {
+  // The chat's own title, which the owner may have named; a daemon from before it was sent says the run's goal.
+  const chat = latest === null ? "No chats yet" : clip(latestTitle ?? latest.goal, GOAL_CHARS);
   return el(
     "a",
-    { class: "list-row agent-row", href: hrefOf(record), dataset: { agent: record.id } },
+    { class: "card agent-card", href: hrefOf(record), dataset: { agent: record.id } },
     faceOf(record, latest),
-    el("div", { class: "row-main" }, el("div", { class: "row-title" }, record.name), secondLine(record, latest)),
-    record.made_by === null ? null : el("span", { class: "agent-made" }, "Made by Dot"),
-    // A paused agent (item 465) says so in the list, as on its page.
-    record.paused_at === null ? null : el("span", { class: "badge b-warn", title: "Its schedules start nothing by themselves until you resume it" }, "Paused"),
-    latest === null ? null : el("span", { class: "agent-when" }, ago(latest.created_at)),
+    el(
+      "div",
+      { class: "agent-card-main" },
+      el(
+        "div",
+        { class: "agent-card-name" },
+        el("span", { class: "agent-card-title" }, record.name),
+        record.made_by === null ? null : el("span", { class: "agent-made" }, "Made by Dot"),
+        // A paused agent (item 465) says so in the list, as on its page.
+        record.paused_at === null ? null : el("span", { class: "badge b-warn", title: "Its schedules start nothing by themselves until you resume it" }, "Paused"),
+      ),
+      el("div", { class: "agent-card-role", title: record.role }, record.role === "" ? "No role yet" : record.role),
+    ),
+    el(
+      "div",
+      { class: "agent-card-chat" },
+      el("span", { class: "agent-card-chat-title muted", title: latest === null ? "" : chat }, chat),
+      latest === null ? null : el("span", { class: "agent-when" }, ago(latest.created_at)),
+    ),
+  );
+}
+
+/**
+ * A team's card in Your teams (item 610): its agents' faces over one another (four, the rest counted), its name and what
+ * it is for, how many agents it has and its newest chat with when it was last busy. The whole card opens the team.
+ */
+function teamTile({ record, members, latest }) {
+  for (const member of members) {
+    rememberLook(member.id, member.look);
+  }
+  const working = latest !== null && WORKING.has(latest.latest_status);
+  const names = members.map((member) => member.name);
+  return el(
+    "a",
+    { class: "card owned-team", href: `#/teams/${record.id}`, dataset: { ownedTeam: record.id } },
+    el(
+      "div",
+      { class: "owned-team-head" },
+      teamFaces(record, working ? "working" : "idle", MOST_TEAM_FACES),
+      el("div", { class: "owned-team-main" }, el("div", { class: "owned-team-name" }, record.name), el("div", { class: "owned-team-purpose" }, record.purpose === "" ? "No purpose written yet" : record.purpose)),
+    ),
+    el(
+      "div",
+      { class: "owned-team-count muted", title: names.join(", ") },
+      members.length === 0 ? "No agents left" : plural(members.length, "agent", "agents"),
+    ),
+    el(
+      "div",
+      { class: "agent-card-chat" },
+      el("span", { class: "agent-card-chat-title muted", title: latest === null ? "" : latest.title }, latest === null ? "No chats yet" : clip(latest.title, GOAL_CHARS)),
+      latest === null ? null : el("span", { class: "agent-when" }, ago(latest.updated_at)),
+    ),
   );
 }
 
@@ -146,9 +195,10 @@ function templateCard(template, onUse, known) {
 
 /** A team's card (item 504): its name and what it does, the faces and names of its agents, those the owner has
     already marked Yours (`owned`, their names in lower case, item 512), and Use team, which makes the ones the owner
-    lacks. A team one of whose agents suggests a schedule offers to add the schedules of the agents it makes, switched
-    off as a template's (item 464); `onUse(team, members, alsoSchedules)` makes them. */
-function teamCard(team, templates, onUse, owned) {
+    lacks and puts the team under Your teams (item 610; `added` says it is there already, and Use then brings back an
+    agent it lacks). A team one of whose agents suggests a schedule offers to add the schedules of the agents it makes,
+    switched off as a template's (item 464); `onUse(team, members, alsoSchedules)` makes them. */
+function teamCard(team, templates, onUse, owned, added) {
   const members = team.members.map((id) => templates.get(id));
   const alsoWords = "Also add their schedules, switched off until you read their goals";
   const also = members.some((template) => template.cron !== "")
@@ -178,6 +228,7 @@ function teamCard(team, templates, onUse, owned) {
       "div",
       { class: "template-head" },
       el("div", { class: "row-main" }, el("div", { class: "template-name" }, team.name), el("div", { class: "template-role" }, team.purpose)),
+      added ? el("span", { class: "badge b-muted team-added", title: "This team is under Your teams: Use team brings back an agent it lacks" }, "In your teams") : null,
     ),
     el(
       "ul",
@@ -467,10 +518,22 @@ let shownPane = "teams";
 function mountList(root, ctx) {
   let disposed = false;
   let ticket = 0;
+  let teamsTicket = 0;
+  // The agents the owner has, for the editor of a team, as the list read them last.
+  let owners = [];
   const holder = el("div", null, loadingPanel());
+  const teamsHolder = el("div", null, loadingPanel());
   const editorSlot = el("div", null);
-  // The page in two parts (item 509): the agents the owner has, then the ready-made ones to add, a team or one agent
-  // at a time, one of the two shown.
+  // The page in parts (items 509 and 610): the teams the owner has, the agents the owner has, then the ready-made ones
+  // to add, a team or one agent at a time, one of the two shown.
+  const teamsCount = el("span", { class: "agents-count" });
+  const yourTeams = el(
+    "section",
+    { class: "agents-part", "aria-label": "Your teams" },
+    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your teams", teamsCount)),
+    el("p", { class: "hint" }, "Open a team to give it work: Dot leads it, hands each agent the part its role fits and puts their answers together."),
+    teamsHolder,
+  );
   const mineCount = el("span", { class: "agents-count" });
   const yours = el(
     "section",
@@ -485,7 +548,7 @@ function mountList(root, ctx) {
     try {
       // The tools this home has, so that a card marks one it lacks. A home that cannot list them still shows the
       // templates, their tools unmarked, and says above them that it could not tell which are missing.
-      const [listed, teams, named, summaries] = await Promise.all([
+      const [listed, teams, named, summaries, mine] = await Promise.all([
         api.get("/agent-templates"),
         api.get("/agent-teams"),
         api.get("/tools").then(
@@ -496,6 +559,15 @@ function mountList(root, ctx) {
         api.get("/agents").then(
           (records) => ({ records, problem: null }),
           (error) => ({ records: [], problem: error }),
+        ),
+        // The ready teams the owner has under Your teams (item 610), for the same cards; a list that failed is told in
+        // Your teams, which reads it too, and leaves these cards unmarked.
+        api.get("/teams").then(
+          (records) => new Set(records.map(({ record }) => record.ready_team)),
+          (error) => {
+            console.warn("the teams could not be listed", error);
+            return new Set();
+          },
         ),
       ]);
       // The agents the owner has, by name as Use team reads them, for the marks of a team's card.
@@ -523,7 +595,7 @@ function mountList(root, ctx) {
                     `Your agents could not be listed: ${summaries.problem.message}. The cards mark none of them Yours, and Use team still keeps an agent you have.`,
                   ),
                 ]),
-            el("div", { class: "template-grid" }, teams.map((team) => teamCard(team, byId, useTeam, owned))),
+            el("div", { class: "template-grid" }, teams.map((team) => teamCard(team, byId, useTeam, owned, mine.has(team.id)))),
           ),
           single: el(
             "div",
@@ -594,7 +666,8 @@ function mountList(root, ctx) {
 
   // The team's agents the owner lacks (item 504), then the schedules of those it made when they were asked for,
   // switched off as a template's (item 464). A schedule that could not be added leaves its agent made, and the toast
-  // says which and why. The list then shows the agents.
+  // says which and why. The team is the owner's now (item 610): a record under Your teams, which a second Use finds,
+  // bringing back an agent it lacks. The list then shows the team and the agents.
   async function useTeam(team, members, alsoSchedules) {
     const used = await api.post(`/agent-teams/${team.id}/use`, null);
     for (const record of [...used.made, ...used.kept]) {
@@ -615,16 +688,25 @@ function mountList(root, ctx) {
     const had = used.kept.length === 0 ? "" : ` Already yours and kept as they were: ${AND_LIST.format(used.kept.map((record) => record.name))}.`;
     // A kept agent that named its tools was given message_agent, to hand its teammates their parts (item 512).
     const joined = used.joined.length === 0 ? "" : ` ${AND_LIST.format(used.joined)} can message ${used.joined.length === 1 ? "its" : "their"} teammates now.`;
+    // The team under Your teams: made now, or found with the agents it lacked put back (item 610).
+    const placed = used.created
+      ? ` ${used.team.name} is under Your teams.`
+      : used.added.length === 0
+        ? ""
+        : ` ${AND_LIST.format(used.added)} ${used.added.length === 1 ? "is" : "are"} back in ${used.team.name}.`;
     if (used.made.length === 0) {
-      toast("ok", `You have every agent of the ${team.name} already.${joined}`);
+      toast("ok", `You have every agent of the ${team.name} already.${placed}${joined}`);
     } else if (missed.length > 0) {
-      toast("error", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not every schedule was added: ${missed.join("; ")}.${had}${joined}`);
+      toast("error", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not every schedule was added: ${missed.join("; ")}.${had}${placed}${joined}`);
     } else {
       const off = scheduled.length === 0 ? "" : " Their schedules are switched off: read their goals, then switch them on.";
-      toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${joined}${off}`);
+      toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${placed}${joined}${off}`);
     }
-    // The list shows the agents, and the cards mark them Yours.
-    await Promise.all([reload(), loadTemplates()]);
+    // The list shows the team and the agents, and the cards mark them Yours; the team that was made is brought into view.
+    await Promise.all([reload(), reloadTeams(), loadTemplates()]);
+    if (used.created) {
+      teamsHolder.querySelector(`[data-owned-team="${used.team.id}"]`)?.scrollIntoView({ block: "nearest" });
+    }
   }
 
   async function reload() {
@@ -637,11 +719,33 @@ function mountList(root, ctx) {
       for (const { record } of summaries) {
         rememberLook(record.id, record.look);
       }
+      owners = summaries.map(({ record }) => record).filter((record) => record.id !== DOT_ID);
       mineCount.textContent = String(summaries.length);
-      holder.replaceChildren(el("div", { class: "card" }, summaries.map(agentRow)));
+      holder.replaceChildren(el("div", { class: "agent-grid" }, summaries.map(agentCard)));
     } catch (error) {
       if (!disposed && mine === ticket) {
         holder.replaceChildren(errorPanel(error, () => attempt(reload)));
+      }
+    }
+  }
+
+  // The teams the owner has (item 610), each a card; read on its own, so that a list of agents that fails leaves them.
+  async function reloadTeams() {
+    const mine = ++teamsTicket;
+    try {
+      const teams = await api.get("/teams");
+      if (disposed || mine !== teamsTicket) {
+        return;
+      }
+      teamsCount.textContent = String(teams.length);
+      teamsHolder.replaceChildren(
+        teams.length === 0
+          ? el("div", { class: "card empty-teams" }, el("p", { class: "muted" }, "No teams yet. Start from a ready team below, or put your own agents together with New team."))
+          : el("div", { class: "team-grid" }, teams.map(teamTile)),
+      );
+    } catch (error) {
+      if (!disposed && mine === teamsTicket) {
+        teamsHolder.replaceChildren(errorPanel(error, () => attempt(reloadTeams)));
       }
     }
   }
@@ -650,7 +754,7 @@ function mountList(root, ctx) {
 
   function closeEditor() {
     if (editor !== null) {
-      editor.dispose();
+      editor.dispose?.();
       editor = null;
     }
     editorSlot.replaceChildren();
@@ -667,8 +771,29 @@ function mountList(root, ctx) {
     editor.focus();
   }
 
+  // A team of the agents the owner has (item 610), put together here; Use team on a ready team makes one in a click.
+  async function openTeamEditor() {
+    closeEditor();
+    // The agents are read again, so that one made a moment ago is among them.
+    await reload();
+    editor = teamForm({
+      team: null,
+      agents: owners,
+      onSaved: (saved) => ctx.navigate(`/teams/${saved.id}`),
+      onCancel: closeEditor,
+    });
+    editorSlot.replaceChildren(editor.element);
+    editor.focus();
+  }
+
   const newButton = el("button", { class: "btn primary", type: "button", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
-  const teamLink = el("a", { class: "btn ghost", href: "#/team", title: "Today's messages between agents" }, icon("branch"), el("span", { class: "label" }, "Team"));
+  const newTeamButton = el(
+    "button",
+    { class: "btn", type: "button", title: "Put agents of yours together as a team", "aria-label": "New team", onclick: () => attempt(openTeamEditor) },
+    icon("users"),
+    el("span", { class: "label" }, "New team"),
+  );
+  const teamLink = el("a", { class: "btn ghost", href: "#/team", title: "Today's messages between agents" }, icon("branch"), el("span", { class: "label" }, "Handoffs"));
   const chooser = el("input", { type: "file", accept: ".json,application/json", hidden: true, "aria-label": "Agent file" });
   const importButton = el(
     "button",
@@ -687,18 +812,28 @@ function mountList(root, ctx) {
     }
   });
   root.append(
-    pageHead("Agents", "Dot, and the agents you or Dot made, each with a role and its own chats.", el("div", { class: "cluster" }, teamLink, importButton, chooser, newButton)),
+    pageHead(
+      "Agents",
+      "Dot, your teams, and the agents you or Dot made, each with a role and its own chats.",
+      el("div", { class: "cluster" }, teamLink, importButton, chooser, newTeamButton, newButton),
+    ),
     editorSlot,
+    yourTeams,
     yours,
     templates,
   );
   const stopLifecycle = onLifecycle((event) => {
     if (event.kind === "run_started" || event.kind === "run_finished") {
       attempt(reload);
+      attempt(reloadTeams);
     }
   });
-  const stopBack = onStreamBack(() => attempt(reload));
+  const stopBack = onStreamBack(() => {
+    attempt(reload);
+    attempt(reloadTeams);
+  });
   attempt(reload);
+  attempt(reloadTeams);
   attempt(loadTemplates);
   return () => {
     disposed = true;
@@ -724,11 +859,12 @@ function runRow(run) {
 }
 
 /**
- * Where the composer of `record`'s page keeps its choices. It starts from the agent's own bounds, its approvals and its
- * reasoning level (on every model that offers it), and holds what is chosen there for that page alone: this browser's
- * choices for the home's box would otherwise stand in the agent's place, a mode chosen there for another chat loosening
- * the agent's, and a choice made here would change the home's. Fast mode and goal mode are the home's, which the agent
- * has no bounds for.
+ * Where the composer of a page keeps its choices, for `record`, the agent whose page it is, or, for a team's page (item
+ * 610), the bounds of Dot's own runs (`{ model: "", effort: null, approvals: null }`). It starts from the bounds, the
+ * approvals and the reasoning level (on every model that offers it), and holds what is chosen there for that page alone:
+ * this browser's choices for the home's box would otherwise stand in the agent's place, a mode chosen there for another
+ * chat loosening the agent's, and a choice made here would change the home's. Fast mode and goal mode are the home's,
+ * which the agent has no bounds for.
  */
 function agentKept(record) {
   const levels = new Map();
@@ -762,10 +898,19 @@ function agentKept(record) {
  * reasoning and Options pills; the model starts at the agent's own, the mode at Auto, and /auto, /task, /chat and
  * /research name one as on the home (item 513). */
 function agentComposer(record, ctx) {
+  return startComposer({ name: record.name, bounds: record, owner: { agent_id: record.id }, ctx });
+}
+
+/**
+ * The composer of a page that starts a chat for `name`: an agent's page, or a team's (item 610). `bounds` are where the
+ * choices start (`agentKept`), `owner` what the message says of whose chat it is, `{ agent_id }` or `{ team_id }`, and
+ * `ctx` the page's context, which opens the run the message started. Returns `element`, `focus()` and `dispose()`.
+ */
+export function startComposer({ name, bounds, owner, ctx }) {
   const frame = composerFrame({
-    label: `Message ${record.name}`,
+    label: `Message ${name}`,
     boxLabel: "Message",
-    placeholder: `Message ${record.name}`,
+    placeholder: `Message ${name}`,
     maxPx: MAX_GOAL_PX,
     commands: MESSAGE_MODES.map((option) => ({
       label: `/${option.id}`,
@@ -782,7 +927,7 @@ function agentComposer(record, ctx) {
   const choices = runChoices({
     frame,
     modes: MESSAGE_MODES,
-    kept: agentKept(record),
+    kept: agentKept(bounds),
     optionsTitle: "Approvals",
     more: () => [],
     onMode: (id) => {
@@ -826,7 +971,7 @@ function agentComposer(record, ctx) {
           standing: false,
           thread_id: null,
           attachments: attachments.ids(),
-          agent_id: record.id,
+          ...owner,
           ...frame.picks.body(),
         };
         const created = await api.post("/runs", { ...body, key: keys.of("run", body) });
@@ -938,7 +1083,7 @@ function learnedRows(record, learned, actions) {
  * A section of the agent's page as the home draws its Today strip: a title with its count that folds it, and its rows;
  * null for one without rows, so that an empty section takes no room. `folds` and `toggle(key)` keep what is folded.
  */
-function homeSection(key, title, rows, folds, toggle) {
+export function homeSection(key, title, rows, folds, toggle) {
   if (rows.length === 0) {
     return null;
   }

@@ -854,6 +854,25 @@
   white-space: nowrap;
 }
 
+/* The team a chat is with (item 610), ahead of its last words: its name keeps a share of the line and gives way to the
+   words past half of it. */
+.side-chat-team {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-weight: var(--weight-label);
+}
+
+.side-chat-team:not(:last-child)::after {
+  content: " ·";
+  color: var(--faint);
+  font-weight: var(--weight-text);
+}
+
 .side-chat-meta {
   flex: none;
   display: flex;

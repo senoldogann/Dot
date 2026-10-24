@@ -101,7 +101,7 @@ Mac's window the sidebar is the settings' nav while they are open, the tabs in t
 [the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
 Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px
 (item 331). A service's page of Customize › Connectors and an agent's editor name their cards the same way, a row of the
-home's Today strip keeps its facts to one line that fades where it runs out of room, and Team's empty page says what
+home's Today strip keeps its facts to one line that fades where it runs out of room, and Handoffs' empty page says what
 brings messages there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
@@ -142,11 +142,12 @@ The button at the top left is the one way back (item 338): a chevron on the page
 sidebar comes over the page: the address stays the run's, and no page of chats stands between them (item 401). On a
 delegated run's page it says Back and leads to the run that started it. On any other page opened by a link of another
 page (a service from Connectors, a tab from the settings' list) it says Back and returns to that page; on a page opened
-directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team) it leads there;
-on a page opened from the sidebar it is the way back to the list of chats. The browser's own Back and Forward and a
-reload keep it as it was, and it is reckoned again when the phone turns. A chat that goes on at another of its runs (a
-follow-up, the queue's next message, Continue, an answer, a rewind) stays the same page: it keeps its way to the chats,
-and the browser's Back skips the run it went on from (item 345). The pages' own links back show in a wider window only.
+directly that has one above it (a settings tab, a service's page, an agent's, a team's or a campaign's page, Handoffs) it
+leads there; on a page opened from the sidebar it is the way back to the list of chats. The browser's own Back and
+Forward and a reload keep it as it was, and it is reckoned again when the phone turns. A chat that goes on at another of
+its runs (a follow-up, the queue's next message, Continue, an answer, a rewind) stays the same page: it keeps its way to
+the chats, and the browser's Back skips the run it went on from (item 345). The pages' own links back show in a wider
+window only.
 
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
 that the signed-in address gave Safari, and its sign-in screen asks for a pairing code instead (item 267): Settings ›

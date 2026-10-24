@@ -51,6 +51,7 @@ from dotagent.store.models import (
     CampaignRecord,
     ChatChoices,
     ChatMode,
+    ChatTeam,
     HarnessVersion,
     MemoryOrder,
     MemoryRecord,
@@ -63,6 +64,8 @@ from dotagent.store.models import (
     RunRecord,
     RunStatus,
     ScheduleRecord,
+    TeamRecord,
+    ThreadSummary,
 )
 from dotagent.tailnet import TailnetState
 from dotagent.undo.restore import UndoAction, UndoState
@@ -289,7 +292,9 @@ class StartRunRequest(FrozenModel):
     ``plan_first`` are what the owner picked in the composer for this message (item 318, :func:`picks_of`).
     ``standing`` ("Keep going until done") starts a campaign on the goal instead, with this run as its opening session:
     a task, without goal mode and without picks (see ``RunManager.start_campaign``). ``loop``, a rhythm (``30m``,
-    ``2h``), makes the goal a loop of the run's chat too, as ``/loop`` in a new chat's box does (item 400)."""
+    ``2h``), makes the goal a loop of the run's chat too, as ``/loop`` in a new chat's box does (item 400).
+    ``team_id`` opens a new chat with one of the owner's teams (item 610): a run of Dot's that leads the team, and the
+    chat's later messages, sent to its ``thread_id``, are told the team too."""
 
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
     # Auto (item 495) lets the goal's words settle the mode (agent/mode_words.py); the API's own default is a task.
@@ -306,6 +311,9 @@ class StartRunRequest(FrozenModel):
     browser: BrowserMode | None = None
     # The agent the run belongs to (item 86); None for Dot. Not with standing.
     agent_id: str | None = None
+    # The team a new chat is with (item 610); None for any other message. Not with standing, an agent or a thread: a
+    # chat that has begun goes on in its thread, which knows its team.
+    team_id: str | None = None
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
     plugins: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_PLUGINS)
     skills: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_SKILLS)
@@ -319,6 +327,11 @@ class StartRunRequest(FrozenModel):
     def _fits_standing(self) -> Self:
         if self.standing and self.agent_id is not None:
             raise ValueError("a campaign (standing) is Dot's own: it cannot be started for an agent")
+        if self.team_id is not None and (self.standing or self.agent_id is not None or self.thread_id is not None):
+            raise ValueError(
+                "a team's chat begins with team_id alone: not with an agent, a campaign (standing) or a thread; a "
+                "chat that has begun goes on in its thread, which knows its team"
+            )
         if self.standing and (self.plugins or self.skills or self.accounts or self.plan_first):
             raise ValueError(
                 "plugins, skills, accounts and Plan first go with a message, not with a campaign (standing)"
@@ -701,10 +714,12 @@ class AgentRequest(FrozenModel):
 
 
 class AgentSummary(FrozenModel):
-    """An agent as the list shows it: the record and its newest run, ``None`` before it ran."""
+    """An agent as the list shows it: the record and its newest run, ``None`` before it ran, with the title of the chat
+    that run is in (item 610)."""
 
     record: AgentRecord
     latest: RunRecord | None
+    latest_title: str | None
 
 
 class TeamMessage(FrozenModel):
@@ -734,11 +749,42 @@ class TeamView(FrozenModel):
 class TeamUse(FrozenModel):
     """``POST /api/agent-teams/{id}/use`` (item 504): the agents it made, in the team's order, the owner's agents it
     kept, each with the name of one of the team's members, as they are now, and the names of those of them it gave
-    ``message_agent`` to (item 512)."""
+    ``message_agent`` to (item 512). ``team`` is the owner's team it made, or found and completed (item 610), with
+    ``created`` saying which, and ``added`` the names of the members it put in a team that was there already."""
 
     made: list[AgentRecord]
     kept: list[AgentRecord]
     joined: list[str]
+    team: TeamRecord
+    created: bool
+    added: list[str]
+
+
+class TeamRequest(FrozenModel):
+    """Make or change a team of the owner's agents (item 610): ``agents`` are their ids, in the order the pages show
+    them, at least one and each once."""
+
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+    purpose: Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
+    agents: list[Annotated[str, StringConstraints(max_length=100)]] = Field(min_length=1, max_length=50)
+
+
+class TeamSummary(FrozenModel):
+    """A team as the Agents page lists it (item 610): the record, its agents as they are now, in its order, and its
+    newest chat, ``None`` before it has one."""
+
+    record: TeamRecord
+    members: list[AgentRecord]
+    latest: ThreadSummary | None
+
+
+class TeamDetail(FrozenModel):
+    """A team's page (item 610): the record, its agents as they are now, in its order, and its chats, the newest
+    activity first."""
+
+    record: TeamRecord
+    members: list[AgentRecord]
+    chats: list[ThreadSummary]
 
 
 class LearnedSkillView(FrozenModel):
@@ -950,7 +996,8 @@ class RunDetail(FrozenModel):
     stop it, but it is not steered or taken over from here. ``choices`` are what the next follow-up of the run's chat
     starts with (item 199), ``None`` for a chat that has none of its own yet. ``title`` is the title of the run's chat,
     which a phone's top bar shows (item 295). ``cut_off`` is how the run was cut off (``agent.resume.cut_off_by``),
-    which the line that offers to resume it names (item 299); ``None`` for a run that ended otherwise or works."""
+    which the line that offers to resume it names (item 299); ``None`` for a run that ended otherwise or works.
+    ``team`` is the team the run's chat is with (item 610), ``None`` for any other chat."""
 
     run: RunRecord
     title: str
@@ -967,6 +1014,7 @@ class RunDetail(FrozenModel):
     holding: bool
     keep_going: bool
     choices: ChatChoices | None
+    team: ChatTeam | None
 
 
 class ReactionRequest(FrozenModel):

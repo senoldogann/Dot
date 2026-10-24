@@ -16,15 +16,15 @@ function fact(label, value) {
 }
 
 /**
- * The facts of `run`, of the chat with `agent` (`{ id, name, role }`, or null) and a session of `campaign`
- * (`{ id, title, session }`, or null), as one list (`element`); `keepGoing` says that its goal asked it not to stop
- * until it is done, which put it in goal mode (item 132), which the list names only when it is on.
- * `paint(state)` takes what changes while the run goes, as
+ * The facts of `run`, of the chat with `agent` (`{ id, name, role }`, or null) or with `team` (`{ id, name }`, or null;
+ * item 610) and a session of `campaign` (`{ id, title, session }`, or null), as one list (`element`); `keepGoing` says
+ * that its goal asked it not to stop until it is done, which put it in goal mode (item 132), which the list names only
+ * when it is on. `paint(state)` takes what changes while the run goes, as
  * `{ status, model, calls, failed, compactions, flagged, input, output, finishedAt }`; `finishedAt` is null until the
  * run is over; `compactions` counts the times the run compacted its context and `flagged` those whose check found
  * something (item 260): the list says it once there is one of either.
  */
-export function createDetails(run, agent, campaign, keepGoing) {
+export function createDetails(run, agent, campaign, keepGoing, team) {
   const status = el("dd");
   const model = el("dd");
   const calls = el("dd", { class: "meta-facts" });
@@ -57,6 +57,7 @@ export function createDetails(run, agent, campaign, keepGoing) {
     { class: "facts", id: "panel-run-details", "aria-label": "Details" },
     fact("Status", status),
     agent === null ? null : fact("Agent", el("dd", null, el("a", { href: `#/agents/${agent.id}`, title: agent.role }, agent.name))),
+    team === null ? null : fact("Team", el("dd", null, el("a", { href: `#/teams/${team.id}` }, team.name))),
     fact("Model", model),
     fact("Reasoning", el("dd", null, run.effort === null ? "Model default" : askedLabel(run.effort, run.once))),
     run.speed === "fast" ? fact("Speed", el("dd", null, "Fast mode, on the steps of a model that has it")) : null,
