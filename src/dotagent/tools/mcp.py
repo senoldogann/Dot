@@ -143,9 +143,9 @@ def checked_builtin_call(
     low or medium: never lower than those of Dot's own web tools, a network read of low risk. Raises ToolInputError for
     a call that is refused.
 
-    Not checked, and said in docs/extending.md: a redirect the server follows to another host, the links a crawl
-    follows on the site it starts on, the search engines a search asks, and a secret that no rule of Dot's own tools
-    knows."""
+    Not checked, and said in docs/extending.md: a redirect the server follows to another host (since 1.4.0 a map and a
+    crawl read the whole site the address, its robots.txt or its sitemap lands on), the links a crawl follows on the
+    site it starts on, the search engines a search asks, and a secret that no rule of Dot's own tools knows."""
     if reads_found_pages(tool.remote_name, arguments) and host_lists_set(config):
         raise ToolInputError(
             "web_search with read asks the web-research server to read the pages the search chose, and Dot cannot "
