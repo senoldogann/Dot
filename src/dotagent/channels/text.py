@@ -54,6 +54,8 @@ _SHORT_ITEM: int = 60
 _CLOSERS: str = ")]}\"'”’»"
 # The level of a line that goes on with the list item above it (its words wrapped onto an indented line).
 _GOES_ON: int = -1
+# The indent and the mark of a list item's line in plain text, which are not its words.
+_ITEM_MARK: re.Pattern[str] = re.compile(r"^[ \t]*(?:[•◦☐☑]|\d{1,3}[.)])?[ \t]*")
 # The marks a list item wears in plain text (a bullet, a nested one, a task's box), and how a table's cells are joined.
 BULLET: str = "•"
 NESTED_BULLET: str = "◦"
@@ -276,7 +278,8 @@ def _prose_line(line: str, out: _Lines, lists: _Lists) -> None:
 
 def _aired(out: _Lines) -> list[str]:
     """The lines of ``out``, a heading with words after it titled with a colon, and the items of a list that holds a
-    long one standing apart (item 627): a blank line before each item of the list's first level and after the list, the
+    long one standing apart (item 627), long in its words (an item, a nested one or the rest of an item's words; its
+    indent and mark not counted): a blank line before each item of the list's first level and after the list, the
     nested items and the rest of an item's words kept under it. The first item stays under a heading right above it,
     as the heading's first words. A list of short items stays one block."""
     last_words: int = max((index for index, text in enumerate(out.texts) if text != ""), default=-1)
@@ -291,7 +294,7 @@ def _aired(out: _Lines) -> list[str]:
         end: int = start
         while end < len(out.texts) and out.levels[end] is not None:
             end += 1
-        if all(len(out.texts[index].strip()) <= _SHORT_ITEM for index in range(start, end)):
+        if all(len(_ITEM_MARK.sub("", out.texts[index]).rstrip()) <= _SHORT_ITEM for index in range(start, end)):
             aired.extend(out.texts[start:end])
         else:
             for index in range(start, end):

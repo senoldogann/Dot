@@ -201,6 +201,10 @@ def test_the_items_of_a_list_with_a_long_one_stand_apart() -> None:
 
 def test_a_list_of_short_items_stays_one_block() -> None:
     assert as_plain_text("Buy:\n- milk\n- bread\n- eggs\nThanks.") == "Buy:\n• milk\n• bread\n• eggs\nThanks."
+    # Sixty characters of words are short, whatever the indent and the mark before them; a nested item of more is long.
+    sixty: str = "x" * 60
+    assert as_plain_text(f"- {sixty}\n- b\n    - {sixty}\n12. {sixty}") == f"• {sixty}\n• b\n  ◦ {sixty}\n12. {sixty}"
+    assert as_plain_text(f"- a\n  - {sixty}y\n- b") == f"• a\n  ◦ {sixty}y\n\n• b"
 
 
 def test_nested_items_and_an_items_further_words_stay_under_it_in_a_list_that_stands_apart() -> None:
