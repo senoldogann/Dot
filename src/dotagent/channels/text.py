@@ -14,8 +14,10 @@ _LINK: re.Pattern[str] = re.compile(r"!?\[([^\]\n]*)\]\(([^)\s]+)\)")
 # Bold, strike and code marks that come in pairs on one line; a lone star or underscore stays (``snake_case``, a * b).
 _PAIRED: re.Pattern[str] = re.compile(r"(\*\*|__|~~|`)(?=\S)(.+?)(?<=\S)\1")
 _BLANK_RUNS: re.Pattern[str] = re.compile(r"\n{3,}")
-# What a cut leaves of the answer is followed by this line.
+# What a cut leaves of the answer is followed by this line: with the link to the chat, or, when Dot has no address a
+# phone can open (item 611), where to look.
 _REST: str = "\n\n… The rest of the answer is in Dot: "
+_REST_ON_THE_MAC: str = "\n\n… The rest of the answer is in Dot on your Mac."
 
 
 def as_plain_text(markdown: str) -> str:
@@ -29,12 +31,13 @@ def as_plain_text(markdown: str) -> str:
     return _BLANK_RUNS.sub("\n\n", text).strip()
 
 
-def cut_with_link(text: str, limit: int, link: str) -> str:
+def cut_with_link(text: str, limit: int, link: str | None) -> str:
     """``text`` as it is when it fits ``limit`` characters; else its start, cut at a line or word break when one is
-    close, then a line that says where the rest is: ``link``, the chat in Dot. The result is within ``limit``."""
+    close, then a line that says where the rest is: ``link``, the chat in Dot, or, with no link (``None``: Dot has no
+    address a phone can open), that it is in Dot on the Mac. The result is within ``limit``."""
     if len(text) <= limit:
         return text
-    tail: str = f"{_REST}{link}"
+    tail: str = _REST_ON_THE_MAC if link is None else f"{_REST}{link}"
     head, _ = text_window(text, 0, max(0, limit - len(tail)))
     return f"{head.rstrip()}{tail}"
 

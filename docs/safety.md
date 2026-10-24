@@ -51,7 +51,8 @@ run needs, sent where the configuration points:
 - **To your own devices through Apple, once you switch iMessage on: Dot's answers, and what it tells you on its own.**
   Each answer (masked of the secrets Dot holds, cut to about 2,000 characters), the line that says a run waits for you,
   the notices a message of yours earns, and what Dot tells you on its own (item 582: the first line of the morning
-  brief and each tell of a watcher, that is a title, up to 400 characters of text and the link to the page it opens;
+  brief and each tell of a watcher, that is a title, up to 400 characters of text and, when `[server] reach` names the
+  address a phone opens it at, the link to the page it opens;
   the text may hold a mail's sender and subject, or what a sender wrote) are sent into your conversation with yourself
   through Messages, to Apple's iMessage servers and on to your devices, as any iMessage is. What you send there is read
   from Messages' database on this Mac (see [Channels](channels.md), item 572).
@@ -750,19 +751,23 @@ began, its wait for an answer included, to ten seconds after its end; a step tha
 until it ends, about 33 minutes at the most) is told and not run, and so is a message Messages sends later than it was
 written (Send Later of macOS 15), and a draft to a number or address you paired is refused. What this does not catch is
 a send the guard cannot see, which raises no flag: a script of a page, a program the run wrote and then runs, a
-Shortcut, a job a step left behind. `/stop` is run in any case. A row received from your paired number or address is
-judged like a sent one, by the window and by Send Later: a run sends as this Mac's account, and `[policy] sealed_paths`
-closes `chat.db` to its commands, but that Messages writes no received copy of what this Mac sends to your own address
-cannot be shown, and if it did, a run's message would pass for yours; it costs a message now and then, which is told and
-sent again. With one Apple ID Messages may keep a message to yourself as a sent row and a received row: in one chat,
+Shortcut, a job a step left behind. `/stop` is run in any case, and so are the plain words `stop`, `dur` and
+`durdur` when they are the whole message (item 611): they only reduce what Dot does. A row received from your paired
+number or address is judged like a sent one, by the window and by Send Later: a run sends as this Mac's account,
+and `[policy] sealed_paths` closes `chat.db` to its commands, but that Messages writes no received copy of what this
+Mac sends to your own address cannot be shown, and if it did, a run's message would pass for yours; it costs a message
+now and then, which is told and sent again. With one Apple ID Messages may keep a message to yourself as a sent row and a received row: in one chat,
 with the same words and dated at most ten seconds apart, they are one command, and the second is let go. Pairing someone
 else's number or address gives them Dot: the code you type back shows only that it reached whoever holds the number, so
 with someone else's every message they send you, and every message you send them, would be read as your command.
 Settings › Channels shows what the channel sees of Messages' database (the newest row, the cursor, the two files, the
 last command and error) and warns when its log changed and nothing Dot reads did; it informs and decides nothing.
 Approvals and questions are never answered on a channel: a line says one waits and where to answer, in Dot's UI or the
-phone app, so that a channel's account, if taken, could not approve anything. A message is read up to 4,000 characters
-and 30 a minute, and one that came more than 15 minutes before Dot read it is not run: Dot says so. A row that is not
+phone app, so that a channel's account, if taken, could not approve anything. While the emergency stop is engaged a
+message on a channel starts no run (see Emergency stop, below). A message is read up to 4,000 characters
+and 30 a minute, and one that came more than 15 minutes before Dot read it is not run: Dot says so. A picture or a file
+sent with words is not read (item 611): the words run, the run is told the attachment was not read, and the answer
+starts by saying so to you. A row that is not
 words (a sticker, an app's message, a payment: rich content, which Messages marks with a bundle of its own) is never
 run, and neither is a row that is only a link that Dot wrote, one into its own pages or one in a message it sent a
 minute before: Messages may split the link at the end of a message of Dot's into a row of its own, which has no `◆` and
@@ -791,6 +796,13 @@ event and approval.
   one-time schedule, which has no next time, waits and fires once the stop is released) and no campaign starts a
   session (it starts once the stop is released); a run that a schedule or a campaign was starting when the file
   appeared ends as an emergency stop as soon as it exists
+- while the `STOP` file exists, no watcher looks, and **a message on a channel** (iMessage, [Channels](channels.md),
+  item 611) starts no run and is not queued either: a message queued starts its run when the one at work ends, stop or
+  no stop. A channel is a way to start a run from away, so the same check holds it as holds the schedules and the
+  watchers. Dot answers the message, once, that it is stopped and where to release it (the banner at the top of any
+  page of Dot has the button), and you send it again. What stays open on purpose, so that you can still
+  reach Dot and stop it: `/stop` and the plain words `stop`, `dur` and `durdur` stop the run at work, pairing a number
+  and its code go on, and what Dot tells you of a run that ended still comes
 - with `[desktop] failsafe_corner = true` (the default), moving the pointer into the top-left corner of the screen
   aborts the desktop step in progress, and Dot never clicks that corner
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is

@@ -13,9 +13,10 @@
  *   chat_db_wal: SeenFile | null,
  *   command: { rowid: number, at: number } | null,
  *   error: { message: string, at: number } | null,
+ *   cursor_reset: { from_row: number, to_row: number, at: number } | null,
  *   warning: string | null,
  * }} Seen
- * @typedef {{ on: boolean, handles: string[], seen: Seen }} ImessageView
+ * @typedef {{ on: boolean, handles: string[], seen: Seen, links: string | null }} ImessageView
  */
 
 const UNITS = ["B", "KB", "MB", "GB", "TB"];
@@ -54,8 +55,8 @@ export function moment(seconds, now = Date.now() / 1000, zone = undefined) {
 
 /**
  * The facts of what the channel sees as rows of a label and what it says, in the order the tab shows them: the newest
- * message of the database and when it was first seen, how far Dot has read, when it last looked, the two files, the last
- * command and the last error.
+ * message of the database and when it was first seen, how far Dot has read, when it last moved down (a row only once
+ * it did, item 611), when it last looked, the two files, the last command and the last error.
  * @param {Seen} seen
  * @param {number} [now]
  * @param {string} [zone]
@@ -74,14 +75,39 @@ export function seenFacts(seen, now = Date.now() / 1000, zone = undefined) {
       newest = `row ${seen.newest.rowid}, ${dated}, first seen ${at(seen.newest.seen_at)}`;
     }
   }
+  /** @type {[string, string][]} */
+  const moved = seen.cursor_reset
+    ? [
+        [
+          "Moved down",
+          `from row ${seen.cursor_reset.from_row} to row ${seen.cursor_reset.to_row} at ${at(seen.cursor_reset.at)}: the newest message was below where Dot had read, so Messages' database was rebuilt or restored. What it holds was not run.`,
+        ],
+      ]
+    : [];
   return [
     ["Newest message", newest],
     ["Read up to", seen.cursor === null ? "not set yet" : `row ${seen.cursor}`],
+    ...moved,
     ["Last looked", looked ? at(seen.looked_at) : "never"],
     ["chat.db", file(seen.chat_db, "not found")],
     ["chat.db-wal", file(seen.chat_db_wal, "none: nothing waits in it")],
     ["Last command", seen.command === null ? "none yet" : `row ${seen.command.rowid}, taken ${at(seen.command.at)}`],
     ["Last error", seen.error === null ? "none" : `${seen.error.message} (${at(seen.error.at)})`],
+  ];
+}
+
+/**
+ * What the links in Dot's messages open at (item 611), as a row of the facts: the name a phone reaches Dot by, or, with
+ * none, why no link is sent and where the lines send the owner instead.
+ * @param {string | null} links
+ * @returns {[string, string]}
+ */
+export function linkFact(links) {
+  return [
+    "Links in messages",
+    links === null
+      ? "none: this Mac's own address opens nothing on a phone, and [server] reach names no other, so Dot sends no link and says to open Dot on your Mac (Settings › Phone sets a name)."
+      : `open at ${links}`,
   ];
 }
 

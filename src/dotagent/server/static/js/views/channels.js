@@ -6,7 +6,7 @@
 // to send in it) and what the channel sees of that database, with Check now, which looks at once.
 
 import { api } from "../api.js";
-import { lookWords, seenFacts } from "../channelfacts.js";
+import { linkFact, lookWords, seenFacts } from "../channelfacts.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { errorPanel, loadingPanel, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
@@ -224,12 +224,13 @@ export function mount(root, ctx) {
   }
 
   /** What the channel sees of Messages' database (item 595): the newest message, how far Dot has read, when it looked, the
-   * two files, the last command and the last error, and Check now. */
+   * two files, the last command and the last error, and Check now; and, in the same facts, what the links in Dot's
+   * messages open at (item 611). */
   function seenRow(view) {
     const facts = el(
       "dl",
       { class: "kv kv-rows channel-seen" },
-      seenFacts(view.seen).map(([label, value]) => el("div", null, el("dt", null, label), el("dd", null, value))),
+      [...seenFacts(view.seen), linkFact(view.links)].map(([label, value]) => el("div", null, el("dt", null, label), el("dd", null, value))),
     );
     const row = setRow({
       title: "What Dot sees in Messages",

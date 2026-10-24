@@ -20,8 +20,10 @@ class ImessageView(FrozenModel):
     (``verifying``), whether the program that runs Dot may read Messages' database (``database``) and control Messages
     (``automation``), what keeps the channel from working now (``problem``, and ``needs``, the permission it is for),
     the newest run of its chat (``chat_run_id``, which the page links to), the name of the program macOS holds
-    responsible for Dot (``program``), which is what to switch on in Privacy & Security, and what the channel sees of
-    Messages' database (``seen``, item 595): the newest row, the cursor, the two files, the last command and error."""
+    responsible for Dot (``program``), which is what to switch on in Privacy & Security, what the channel sees of
+    Messages' database (``seen``, item 595): the newest row, the cursor, the two files, the last command and error, and
+    the address the links of its messages open at (``links``, item 611), ``None`` when ``[server] reach`` names none and
+    no link is sent."""
 
     on: bool
     handles: tuple[str, ...]
@@ -33,6 +35,7 @@ class ImessageView(FrozenModel):
     chat_run_id: str | None
     program: str | None
     seen: Seen
+    links: str | None
 
 
 class ChannelsView(FrozenModel):

@@ -111,16 +111,25 @@ class Channels:
         self._asking: asyncio.Future[AutomationState] | None = None
         self._messages_db: Path = chat_db_path() if messages_db is None else messages_db
         self._on: dict[ChannelId, bool] = {"imessage": runtime.config.channels.imessage}
-        # The links of a message go to the name a phone reaches Dot by when there is one, else to this Mac's address;
-        # never to one that carries the access token, which a message would hand to the messaging service. The channel
-        # is told the address too: a row that is only a link into it is Dot's own, never a command of the owner's.
+        # The links of a message go to the name a phone reaches Dot by (``[server] reach``, the address the phone's own
+        # pages open at). With none there is no address a phone can open (item 611): this Mac's own, 127.0.0.1, opens
+        # nothing on a phone, so no link is sent, and the tab says why. Never an address that carries the access token,
+        # which a message would hand to the messaging service. The channel is told this Mac's address too when there is
+        # no name: a row that is only a link into it is Dot's own, never a command of the owner's.
         reach: list[str] = runtime.config.server.reach
-        base: str = f"https://{reach[0]}/" if reach else f"{base_url(host, port)}/"
+        self._links: str | None = f"https://{reach[0]}/" if reach else None
         self._imessage: IMessageChannel = IMessageChannel(
-            runtime.store, script, self._messages_db, runtime.config.desktop.osascript_timeout_s, base, poll_s
+            runtime.store,
+            script,
+            self._messages_db,
+            runtime.config.desktop.osascript_timeout_s,
+            self._links or f"{base_url(host, port)}/",
+            poll_s,
         )
         self._channels: dict[ChannelId, Channel] = {"imessage": self._imessage}
-        self._router: ChannelRouter = ChannelRouter(runtime, manager, self._channels, base, self.is_on, asks_apart_s)
+        self._router: ChannelRouter = ChannelRouter(
+            runtime, manager, self._channels, self._links, self.is_on, asks_apart_s
+        )
         self._tasks: dict[ChannelId, asyncio.Task[None]] = {}
         self._watcher: asyncio.Task[None] | None = None
         self._stack: contextlib.AsyncExitStack = contextlib.AsyncExitStack()
@@ -142,6 +151,8 @@ class Channels:
         """Read what the channels kept, follow the runs of their chats, and read each channel that is on."""
         await self._imessage.load()
         await self._router.load()
+        if self._links is None:
+            log.info("channel_links_not_sent", why="[server] reach names no address a phone can open")
         feed: Subscription = await self._stack.enter_async_context(self._runtime.bus.subscribe_kinds(WATCHED_KINDS))
         self._watcher = asyncio.create_task(_kept_up("watch", partial(self._router.watch, feed)), name="channels-watch")
         for channel_id, on in self._on.items():
@@ -212,6 +223,7 @@ class Channels:
             chat_run_id=await self._router.chat_run_id("imessage"),
             program=await asyncio.to_thread(self._macos.program),
             seen=await self._seen(),
+            links=self._links,
         )
 
     async def _seen(self) -> Seen:

@@ -10,6 +10,7 @@ from dotagent.channels.seen import (
     NEWEST_LOGGED_APART_S,
     UNSEEN_S,
     WAL_UNSEEN,
+    CursorReset,
     Look,
     Seen,
     SeenFile,
@@ -45,6 +46,7 @@ def test_before_the_first_look_nothing_is_seen() -> None:
         command=None,
         error=None,
         warning=None,
+        cursor_reset=None,
     )
 
 
@@ -206,3 +208,18 @@ def test_the_files_are_read_as_os_stat_shows_them(tmp_path: Path) -> None:
     found: SeenFile | None = stat_file(database)
     assert found is not None and found.size == 100 and found.changed_at == database.stat().st_mtime
     assert wal_path(database) == tmp_path / "chat.db-wal" and stat_file(wal_path(database)) is None
+
+
+def test_the_cursor_moved_down_to_the_newest_row_is_kept_as_the_last_error_is() -> None:
+    """Item 611: a database rebuilt or restored has fewer rows than the cursor says were read; the tab says the cursor
+    was moved, from where to where and when, and keeps saying it after the cursor is right again."""
+    watch: Watch = Watch()
+    assert watch.seen(300, START).cursor_reset is None
+    watch.reset(300, 4, START)
+    assert watch.seen(4, START + 1).cursor_reset == CursorReset(from_row=300, to_row=4, at=START)
+    # It stays through looks, and a later move takes its place.
+    watch.looking(START + 5)
+    watch.saw(_look(newest=5, state=((5, 0),)), START + 5)
+    assert watch.seen(5, START + 6).cursor_reset == CursorReset(from_row=300, to_row=4, at=START)
+    watch.reset(9, 2, START + 50)
+    assert watch.seen(2, START + 51).cursor_reset == CursorReset(from_row=9, to_row=2, at=START + 50)

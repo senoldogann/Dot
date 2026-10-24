@@ -4,8 +4,9 @@ it was while a message had arrived, which says the daemon's read-only connection
 
 Each look at the database (a poll every few seconds while the channel is on, or the owner's **Check now**) leaves a
 :class:`Look`, and :class:`Watch` follows them: the newest row Dot saw and when it first saw it, when it last looked,
-the size and time of the last change of ``chat.db`` and ``chat.db-wal``, the last row it took as a command and the last
-error. :class:`Seen` is what the tab and ``GET /api/channels`` show of it. None of this decides what is run.
+the size and time of the last change of ``chat.db`` and ``chat.db-wal``, the last row it took as a command, the last
+error, and the last time its cursor had to be moved down to the newest row (item 611). :class:`Seen` is what the tab and
+``GET /api/channels`` show of it. None of this decides what is run.
 
 Messages writes ``chat.db-wal`` for more than a new message: a message it sent is marked delivered and read there too.
 So the warning that Messages has written while Dot saw nothing new is not given for a change of the log that Dot's own
@@ -64,11 +65,22 @@ class SeenError(FrozenModel):
     at: float
 
 
+class CursorReset(FrozenModel):
+    """The cursor was above the newest row of the database (item 611: the database was rebuilt or restored from a
+    backup, and its rows are numbered again from the start): the row it stood at, the newest row it was moved down to,
+    and when."""
+
+    from_row: int
+    to_row: int
+    at: float
+
+
 class Seen(FrozenModel):
     """What the channel sees, as the tab shows it: when Dot last looked (``None`` before the first look), the cursor
     (the row it has read up to), the newest row of the database, the two files as the last look found them (``None``
-    for one that is not there), the last command, the last error, and the warning that Messages has written without
-    Dot seeing anything new (``None`` while it does not hold)."""
+    for one that is not there), the last command, the last error, the warning that Messages has written without Dot
+    seeing anything new (``None`` while it does not hold), and the last time the cursor had to be moved down to the
+    newest row (``None`` when it never was, item 611)."""
 
     looked_at: float | None
     cursor: int | None
@@ -78,6 +90,7 @@ class Seen(FrozenModel):
     command: SeenCommand | None
     error: SeenError | None
     warning: str | None
+    cursor_reset: CursorReset | None = None
 
 
 @dataclass(frozen=True)
@@ -122,6 +135,7 @@ class Watch:
         self._said: bool = False
         self.command: SeenCommand | None = None
         self.error: SeenError | None = None
+        self.cursor_reset: CursorReset | None = None
 
     def looking(self, now: float) -> None:
         """A look starts at ``now``."""
@@ -154,6 +168,11 @@ class Watch:
         self.command = SeenCommand(rowid=rowid, at=now)
         return self.command
 
+    def reset(self, was: int, newest: int, now: float) -> None:
+        """The cursor, at ``was``, was above the newest row of the database, ``newest``, and was moved down to it at
+        ``now`` (item 611). The tab keeps it, as it keeps the last error, after the cursor is right again."""
+        self.cursor_reset = CursorReset(from_row=was, to_row=newest, at=now)
+
     def unseen(self, now: float) -> bool:
         """Whether the log of the database has changed for longer than :data:`UNSEEN_S` with nothing Dot can read
         changing."""
@@ -172,6 +191,7 @@ class Watch:
             chat_db_wal=None if look is None else look.chat_db_wal,
             command=self.command,
             error=self.error,
+            cursor_reset=self.cursor_reset,
             warning=WAL_UNSEEN if self.unseen(now) else None,
         )
 

@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { byteSize, lookWords, moment, seenFacts } from "../../src/dotagent/server/static/js/channelfacts.js";
+import { byteSize, linkFact, lookWords, moment, seenFacts } from "../../src/dotagent/server/static/js/channelfacts.js";
 
 // 2026-10-23 14:02:11 UTC, and the zone every moment is told in so that the test does not depend on the machine's.
 const NOW = Date.UTC(2026, 9, 23, 14, 5, 0) / 1000;
@@ -20,6 +20,7 @@ const UNSEEN = {
   chat_db_wal: null,
   command: null,
   error: null,
+  cursor_reset: null,
   warning: null,
 };
 
@@ -32,6 +33,7 @@ const LOOKED = {
   chat_db_wal: { size: 4_096_000, changed_at: AT(14, 2, 12) },
   command: { rowid: 310, at: AT(13, 58, 40) },
   error: null,
+  cursor_reset: null,
   warning: null,
 };
 
@@ -121,4 +123,28 @@ test("a look with the switch off or nothing paired says that no message is read"
     lookWords({ on: true, handles: ["+358401234567"], seen: empty }, null, NOW, ZONE)[1],
     "Dot looked: the database holds no message. Nothing new to run.",
   );
+});
+
+test("a cursor that was moved down to the newest row is a fact beside the one it changed, and only once it was", () => {
+  const moved = { ...LOOKED, cursor: 4, newest: { rowid: 4, dated: AT(14, 2, 11), seen_at: AT(14, 2, 13) }, cursor_reset: { from_row: 300, to_row: 4, at: AT(14, 2, 12) } };
+  const facts = seenFacts(moved, NOW, ZONE);
+  assert.deepEqual(
+    facts.map(([label]) => label),
+    ["Newest message", "Read up to", "Moved down", "Last looked", "chat.db", "chat.db-wal", "Last command", "Last error"],
+  );
+  assert.equal(
+    Object.fromEntries(facts)["Moved down"],
+    "from row 300 to row 4 at 14:02:12: the newest message was below where Dot had read, so Messages' database was rebuilt or restored. What it holds was not run.",
+  );
+  // A channel that never had to is told by seven facts, as it always was.
+  assert.equal(seenFacts(LOOKED, NOW, ZONE).length, 7);
+});
+
+test("the links in Dot's messages are a fact: the name they open at, or why there are none", () => {
+  assert.deepEqual(linkFact("https://mac.example.ts.net/"), ["Links in messages", "open at https://mac.example.ts.net/"]);
+  const [label, none] = linkFact(null);
+  assert.equal(label, "Links in messages");
+  assert.match(none, /^none: /);
+  assert.match(none, /\[server\] reach/);
+  assert.match(none, /open Dot on your Mac/);
 });

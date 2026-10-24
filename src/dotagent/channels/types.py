@@ -12,6 +12,16 @@ TITLES: dict[ChannelId, str] = {"imessage": "iMessage"}
 # The message that stops the run at work in the channel's chat. The router runs it, and a channel runs it even when it
 # cannot tell who wrote it: it only reduces what Dot does.
 STOP_COMMAND: str = "/stop"
+# The plain words that stop it as well (item 611), the owner writing in English or in Turkish. Few and exact: a message
+# that is only one of them, in any case, but not a sentence that holds one.
+STOP_WORDS: frozenset[str] = frozenset({STOP_COMMAND, "stop", "dur", "durdur"})
+
+
+def is_stop(text: str) -> bool:
+    """Whether ``text`` is a message that only says stop: ``/stop``, ``stop``, ``dur`` or ``durdur``, in any case and
+    with a closing dot or exclamation mark. A sentence that holds one of them (``please stop``, ``stop it``) is not."""
+    return text.strip().rstrip(".!").strip().casefold() in STOP_WORDS
+
 
 # What a channel calls with a message of the owner it accepted (see :class:`~dotagent.channels.intake.Intake`): the
 # router posts it into the channel's chat.
