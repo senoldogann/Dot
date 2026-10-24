@@ -257,22 +257,39 @@ currency, so list sites that bill in one currency. Empty by default.
    so an expression can fit that folder too), a line break and its target (the command, the path, the address);
    one that takes longer than 0.25 s to match is stopped and the action refused, as for a rule that cannot be read, so
    that a pattern that backtracks for long cannot hold the daemon (item 387). A rule
-   reads as a sentence in Settings › Rules, "When Dot would use `shell`, matching `\bgit push\b`: ask me first", and
-   is managed there or through `/api/rules`; the page lists the rules in the order they are checked, a rule's arrows
-   move it one place up or down that order, and **New rule** opens the two ways to write one (with no rule yet, the
-   page offers three sentences to start from, one of which opens them with it in the box; under the rules it tells
-   what each of the four answers does, and above them it lists what is always on, item 565). A rule that an earlier
-   enabled rule fits wherever it fits (no expression, or the same one, on a tool pattern that takes in its own: `*`,
-   the same pattern, or one that matches its plain tool name) never decides, nor does a rule that one handing the step
+   reads as a sentence in Settings › Rules, "When Dot wants to run a command that mentions “git push”, it asks you
+   first", and is managed there or through `/api/rules`. The page (item 622) is one line that adds a rule, "When Dot
+   wants to … It should … Add rule", over the rules in the order they are checked. The choice of the line is *Allow on
+   its own* (`allow`), *Ask me first* (`ask`) or *Leave it to me* (`handoff`), and it starts at *Ask me first*, which
+   cannot make Dot do more than it does now. No answer of a rule refuses outright, so there is no "never" (the nearest
+   is the one that leaves the step to you), and *Allow, whatever it has read* (`preapproved`) is set under Details. A
+   rule is a sentence that ends in its answer as a badge, read from its tool and its pattern and from nothing else, not
+   from its why, which may say anything, and saying neither less nor more than its pattern fits. A pattern of whole
+   words (a word boundary, `\b`, at each end of a word that is a letter or a digit) reads as "mentions “git push”", one
+   of the letters of a word anywhere (no boundary at all) as "contains “ls”", and the drafter's pattern for a command a
+   rule lets Dot run as "run “git push” (with plain arguments, after changing folder at most)", the arguments plain
+   when they hold none of `;` `&` `|` `$` `<` `>` `(` `)` or a backtick, which chain a command to it, substitute one
+   into it or send it on. Any other pattern is shown as it is, whole where the rule lets Dot act, for it is more or
+   less than words: a boundary at one end of a word only (it fits "git pushes" and not "digit push"), whole words in
+   one alternative and the letters anywhere in another, a boundary beside a sign, a character that is not printed, a
+   space that is not the plain one. A rule has its switch, its delete, its arrows, which move it one place up or down
+   that order and show when the pointer is on the row (always on a touch screen, and only while there is more than one
+   rule), and its **Details**: the tool, the pattern, why, and how it was used. With no rule yet, the page offers three
+   sentences to start from, each putting its words and its choice in the line. Under the rules it says how two that fit
+   are told apart and that the checks above come first; the sandbox switch and the list of what is always on are in
+   one fold, **Advanced**, shut until it is opened. A rule that an earlier enabled rule fits wherever it fits (no
+   expression, or the same one, on a tool pattern that takes in its own: `*`, the same pattern, or one that matches its
+   plain tool name) never decides, nor does a rule that one handing the step
    to you fits wherever it fits, wherever that one stands, while a hand-off is kept from deciding only by an earlier
-   hand-off; the page says so with the number of the rule that decides in its place (items 449 and 481); whether two
-   different expressions overlap it does not tell. Under each
-   enabled rule, the page says how it was used on the steps of the last 30 days, with today's rules (`GET
-   /api/rules/usage`, item 473): how many steps it fits, how many it decides (as the first rule to fit, or as a
-   hand-off wherever it stands), how many of those ran in yolo runs or were settled before any rule, and which rules
-   decide the others. Before a rule is
-   added, **Test on the last 30 days** under its fields (`POST /api/rules/preview`, item 469) tries it on the steps of
-   past runs, as the policy matches rules, and writes nothing. It says how many steps it fits and which earlier rules
+   hand-off; the page says so under the rule, in words, with the number of the rule that decides in its place and what
+   helps, and marks it *Never used* (items 449 and 481); whether two different expressions overlap it does not tell.
+   Under each enabled rule's Details, the page says how it was used on the steps of the last 30 days, with today's
+   rules (`GET /api/rules/usage`, item 473): how many steps it fits, how many it decides (as the first rule to fit, or
+   as a hand-off wherever it stands), how many of those ran in yolo runs or were settled before any rule, and which
+   rules decide the others. Before a rule is added it is tried on the steps of past runs (`POST /api/rules/preview`,
+   item 469), as the policy matches rules, and nothing is written: a line says how many of the things Dot did in the
+   last 30 days it fits, and under the draft's Details **Test on the last 30 days** gives the whole of it, again once a
+   part is changed: how many steps it fits and which earlier rules
    decide some of them first. Of the rest, it counts apart the steps of yolo runs, which ask nothing whatever the rules
    say, and those settled before any rule is read, by the checks above that no rule changes (money, credentials,
    messages and posts, a login from your 1Password, Dot's own files, the always-on review, a research run, a spend
@@ -287,9 +304,10 @@ currency, so list sites that bill in one currency. Empty by default.
    through) is counted as such. Then come the newest steps it fits, each leading to its run. A drafted rule is tried at
    once. A try-out reads at most 20,000 steps and two seconds, the newest first, and says so when it read only those; a
    pattern that takes too long on a past step stops it, with that said, as the daemon would refuse the step. Only steps
-   still in the database count, and a batch of browser or desktop steps is one step, as its record keeps it. It can
-   also be said in your own words ("let Dot run git status and git
-   diff without asking me"): the review model drafts its parts, the tool, the answer and the commands or words the
+   still in the database count, and a batch of browser or desktop steps is one step, as its record keeps it. A rule is
+   said in your own words, in the box "When Dot wants to" ("run git status and git diff") and the choice "It should":
+   the page makes them one sentence ("When Dot wants to run git status and git diff, it should do it without asking
+   me.") for the review model, which drafts the rule's parts, the tool, the answer and the commands or words the
    action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it
    run alone with plain arguments (after a `cd` at most; nothing chained to it, substituted into it or sent on with
    `|` or `>`), and a rule that stops Dot fits the command or the word wherever the action mentions it, as a whole
@@ -298,15 +316,23 @@ currency, so list sites that bill in one currency. Empty by default.
    more, since a word fits `git push; anything` as well as `git push` (item 561). The same goes for the AppleScript
    tool (`apple_script`, or a pattern that covers it), which runs shell lines with `do shell script`: a word fits a
    script that runs a command outside the workspace as well, and the tool has no form for commands, so a rule that lets
-   Dot act in it is for every use of the tool. The draft fills the form, its
-   description the sentence the rule reads
-   back as ("For “git status” run alone in the shell, …: Dot does it without asking."), and applies once you add it.
-   Words that cover every action ("Dot can run everything without asking me") draft a rule for every tool ("For every
-   use of any tool: Dot does it without asking."), which the protections that are always on still bound; words that
-   make no rule are answered with the reason, in English.
-   An approval card offers *Make a rule of this*, which opens the tab with a sentence about the action in the box; the
-   card of what no rule decides (money, credentials, a message or a post in your name, a login from your password
-   manager, a change of Dot's own files) offers none and says so (items 429 and 559).
+   Dot act in it is for every use of the tool. The draft is read back as a sentence from its expression, "Dot
+   understood: When Dot wants to run “git status” (with plain arguments, after changing folder at most), it goes ahead
+   without asking.", its description the sentence the drafter wrote ("For “git status” run alone in the shell, with
+   plain arguments (after a cd at most): Dot does it without asking."), with its parts under Details, to be changed
+   (its answer is the choice you made until another part is changed, since the drafter writes the expression for that
+   answer); it applies once you say **Add it**, and **Change the words** goes back to the box. A draft whose answer is
+   not the one you chose (you chose *Ask me first* and the model drafted a rule that lets Dot act) is not offered, and
+   nothing is added: the page says what it understood and what you chose. Words that cover every action ("Dot can run
+   everything without asking me") draft a rule for every tool ("For every use of any tool: Dot does it without
+   asking."), which the protections that are always on still bound; words that make no rule are answered with the
+   reason, in English, and the words stay in the box, with **Fill in the details yourself**, which opens the parts of
+   the rule to fill in under the choice you made. The words and the choice stay as they were while a draft is read or
+   waits to be added.
+   An approval card offers *Make a rule of this*, which opens the tab with what Dot wanted to do in the box and *Allow
+   on its own* as the choice (`#/settings/rules?wants=…&should=allow`); the card of what no rule decides (money,
+   credentials, a message or a post in your name, a login from your password manager, a change of Dot's own files)
+   offers none and says so (items 429 and 559).
 7. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
    when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 
@@ -622,9 +648,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   powers; `desktop_open_app` opens one from Dot's own process, and asks first for one whose bundle is not on the sealed
   system volume, however it names it: by the bundle's path, or by a name or a bundle id Launch Services resolves to
   one, which a run that registered a bundle it made can give it too. Settings › Rules switches it while the daemon
-  runs ("Sandbox for a run's commands", `PUT /api/shell/sandbox`): from the next command on, with no restart, and the config
-  file keeps it; a terminal session already open keeps how it started. Switching it on where `sandbox-exec` does not
-  start is refused, and nothing changes.
+  runs (under Advanced, "Keep Dot's commands in a safe box", `PUT /api/shell/sandbox`): from the next command on, with
+  no restart, and the config file keeps it; a terminal session already open keeps how it started. Switching it on where
+  `sandbox-exec` does not start is refused, and nothing changes.
 - What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
   startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
   so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`

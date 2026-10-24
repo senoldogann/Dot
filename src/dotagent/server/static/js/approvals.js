@@ -155,15 +155,16 @@ function guarded(approval) {
 }
 
 /**
- * The way from an approval to a rule (item 110): the Rules page with a sentence in its box that names the tool and the
- * action, for the owner to change before Dot drafts the rule.
+ * The way from an approval to a rule (item 110): the Rules page with what Dot wanted to do in the box "When Dot wants to"
+ * (the tool and the action) and "Allow on its own" as the choice, for the owner to change before Dot drafts the rule
+ * (item 622).
  */
 function ruleOffer(approval) {
   const action = typeof approval.args.summary === "string" ? approval.args.summary : approval.summary;
-  const sentence = `Let Dot use ${approval.tool} for this without asking me: ${clip(action, 300)}`;
+  const wants = `use ${approval.tool}: ${clip(action, 300)}`;
   return el(
     "a",
-    { class: "approval-rule", href: `#/settings/rules?sentence=${encodeURIComponent(sentence)}` },
+    { class: "approval-rule", href: `#/settings/rules?wants=${encodeURIComponent(wants)}&should=allow` },
     icon("shield"),
     "Make a rule of this",
   );

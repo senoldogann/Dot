@@ -18,7 +18,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 import dotagent.policy.sandbox
 from dotagent.agent.gate import RunGate
@@ -51,7 +51,7 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (390, "light"),
     (390, "dark"),
 )
-SWITCH: str = "Sandbox for a run's commands"
+SWITCH: str = "Keep Dot's commands in a safe box"
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -213,6 +213,11 @@ async def test_the_rules_page_shows_the_switch_and_moves_it(login_env: dict[str,
                     )
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{address}/#/settings/rules")
+                    # The switch is in Advanced, which is shut until it is asked for (item 622).
+                    advanced: Locator = page.locator("details.rule-advanced")
+                    await expect(advanced).not_to_have_attribute("open", "")
+                    await expect(page.get_by_role("switch", name=SWITCH)).to_be_hidden()
+                    await advanced.locator("> summary").click()
                     switch: Locator = page.get_by_role("switch", name=SWITCH)
                     await switch.wait_for()
                     await page.wait_for_function(
@@ -221,7 +226,7 @@ async def test_the_rules_page_shows_the_switch_and_moves_it(login_env: dict[str,
                         arg=SWITCH,
                     )
                     assert await switch.get_attribute("aria-checked") == "true"
-                    card: Locator = page.locator("section[aria-label='Sandbox']")
+                    card: Locator = advanced.locator(".rule-advanced-body")
                     assert "[shell] sandbox" in (await card.text_content() or "")
                     assert await card.evaluate("(card) => card.getBoundingClientRect().right <= window.innerWidth")
                     await page.screenshot(path=tmp_path / f"sandbox-switch-{width}-{scheme}-on.png")

@@ -311,10 +311,10 @@ async def test_on_an_iphone_a_field_has_the_size_it_has_on_the_mac(own_home: Pat
     words and the composer's box have the sizes of a phone's text, 15 and 16 px (item 329), and the composer's own size,
     15 px, none raised to keep the page from zooming; on a Pixel, where only 16 px keeps the page from zooming into a
     field, they are 16 px."""
-    # Each page, the field measured, and the button that opens it (the rules' forms wait for New rule, item 373).
+    # Each page, the field measured, and the button that opens it (the rules' box is on the page, item 622).
     fields: tuple[tuple[str, str, str | None], ...] = (
         ("#/settings/models", "Default model", None),
-        ("#/settings/rules", "The rule in your words", "New rule"),
+        ("#/settings/rules", "When Dot wants to", None),
         ("#/runs", "Goal", None),
     )
     sizes: dict[str, list[str]] = {}

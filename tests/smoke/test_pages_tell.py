@@ -309,14 +309,19 @@ async def test_the_rules_page_follows_the_rules_changed_on_another_page(
                 json={"behavior": "ask", "tool_glob": "shell", "match_regex": "rm -rf", "description": RULE},
             )
             assert rule.status_code == 201, rule.text
-            row: Locator = page.locator(".list-row").filter(has_text=RULE)
-            await expect(row).to_be_visible()
+            # The row reads as a sentence (item 622); the rule's why is under its Details.
+            row: Locator = page.locator(".rule-row").filter(has_text="“rm -rf”")
+            await expect(row.locator(".rule-sentence")).to_have_text(
+                "When Dot wants to run a command that contains “rm -rf”, it asks you first."
+            )
+            await row.get_by_role("button", name="Details", exact=True).click()
+            await expect(row.locator(".rule-facts")).to_contain_text(RULE)
             switched: httpx.Response = await api.patch(f"/api/rules/{rule.json()['id']}", json={"enabled": False})
             assert switched.status_code == 200, switched.text
-            await expect(row).to_have_class("list-row faint")
+            await expect(row).to_have_class("rule-row faint")
             # The page draws the row again as the rules change: scroll to what is there when the script runs, not to
             # an element that may have left the page by then (item 540).
-            await page.evaluate("document.querySelector('.list-row.faint')?.scrollIntoView({ block: 'center' })")
+            await page.evaluate("document.querySelector('.rule-row.faint')?.scrollIntoView({ block: 'center' })")
             await _shot(page, tmp_path / "rules-followed.png")
             deleted: httpx.Response = await api.delete(f"/api/rules/{rule.json()['id']}")
             assert deleted.status_code == 200, deleted.text
