@@ -2,7 +2,8 @@
 
 Without Tailscale, Dot can also be reached from the phone's own Messages, in the conversation you have with yourself:
 see [Channels](channels.md). By voice, where the phone's browser offers it (Safari does; an app added to the home
-screen may not, and the page says when the browser refuses): the composer's microphone dictates a message, and the
+screen may not, and the page says when the browser refuses): the composer's microphone dictates a message (a later
+dictation Safari does not hear says so, and Reload brings the microphone back, item 616), and the
 speaker under an answer reads it aloud, with the browser's own speech recognition and voice, in the language chosen in
 Settings › General › Voice (item 574; see [the daemon page](daemon.md#the-daemon-the-web-ui-and-the-service)).
 Under each message of Dot's a smiley opens the palette of reactions, a thumb's size, and what each does is the same on

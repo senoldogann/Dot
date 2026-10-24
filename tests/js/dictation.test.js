@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { createDictation } from "../../src/dotagent/server/static/js/voice.js";
+import { createDictation, readAloud } from "../../src/dotagent/server/static/js/voice.js";
 
 /** A recognition engine that does what it is told and says only what the test makes it say. */
 class FakeRecognition extends EventTarget {
@@ -35,14 +35,38 @@ class FakeRecognition extends EventTarget {
   }
 }
 
-// A phone's browser: what voice.js reads of the page when a dictation runs.
-globalThis.window = { SpeechRecognition: FakeRecognition };
-globalThis.document = {
-  documentElement: { dataset: {} },
-  visibilityState: "visible",
-  addEventListener() {},
-  removeEventListener() {},
+/** The browser's voice, which keeps what it was told: the pieces it speaks and how often its queue was cancelled. */
+const synth = {
+  spoken: [],
+  cancelled: 0,
+  speak(utterance) {
+    this.spoken.push(utterance.text);
+  },
+  cancel() {
+    this.cancelled += 1;
+  },
+  getVoices: () => [],
 };
+globalThis.SpeechSynthesisUtterance = class extends EventTarget {
+  constructor(text) {
+    super();
+    this.text = text;
+  }
+};
+
+// A phone's browser: what voice.js reads of the page when a dictation runs.
+globalThis.window = { SpeechRecognition: FakeRecognition, speechSynthesis: synth };
+
+/** The page loaded anew: what its earlier dictations did is forgotten (item 616). */
+function freshPage() {
+  globalThis.document = {
+    documentElement: { dataset: {} },
+    visibilityState: "visible",
+    addEventListener() {},
+    removeEventListener() {},
+  };
+}
+freshPage();
 Object.defineProperty(globalThis, "navigator", {
   value: { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari", maxTouchPoints: 5 },
   configurable: true,
@@ -53,16 +77,20 @@ function heard(transcript, isFinal) {
   return Object.assign([{ transcript, confidence: 0.9 }], { isFinal });
 }
 
-/** A dictation of an empty box, what it told the page, and the engine it made last. */
+/** A dictation of an empty box on a page loaded anew, what it told the page, and the engine it made last. */
 function dictationOf() {
-  const seen = { shown: [], states: [], problems: [], began: 0, sounds: [] };
+  freshPage();
+  const seen = { shown: [], states: [], problems: [], offers: [], began: 0, sounds: [] };
   const dictation = createDictation({
     language: () => "tr-TR",
     text: () => "",
     show: (value) => seen.shown.push(value),
     settled: () => {},
     state: (listening) => seen.states.push(listening),
-    problem: (words) => seen.problems.push(words),
+    problem: (words, offer = null) => {
+      seen.problems.push(words);
+      seen.offers.push(offer);
+    },
     began: () => {
       seen.began += 1;
     },
@@ -174,4 +202,143 @@ test("once a word is heard, a pause may last longer before the dictation ends by
   engine().say("end");
   assert.deepEqual(seen.problems, []);
   assert.deepEqual(seen.shown, ["merhaba"]);
+});
+
+test("the engine's own \"aborted\" is no stop of the owner's: a page's first dictation that heard nothing says so", (t) => {
+  // Item 616: Safari answers the stop of a dictation that heard nothing with "aborted", where Chrome says "no-speech";
+  // the dictation's own abort lets the engine go first, so an "aborted" it hears is the engine's. It said nothing.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  freshPage();
+  const { dictation, seen, engine } = dictationOf();
+  dictation.start();
+  engine().say("start");
+  t.mock.timers.tick(6_000);
+  assert.deepEqual(engine().calls, ["start", "stop"]);
+  engine().say("error", { error: "aborted" });
+  engine().say("end");
+  assert.equal(seen.problems.length, 1);
+  assert.match(seen.problems[0], /^Nothing was heard\. Check that the browser may use the microphone/);
+  assert.deepEqual(seen.offers, [null]);
+  assert.equal(dictation.listening(), false);
+});
+
+test("on an iPhone, a dictation that hears nothing after the page's first says it is Safari's and offers to reload", () => {
+  // Item 616: Safari on an iPhone hears the first dictation after the page loads, and at times a later one opens the
+  // microphone (its start and audiostart) and hears nothing at all (WebKit bugs 317741 and 321436): the owner speaks to a
+  // flat wave. Whoever stops it, it says so, and how to get the microphone back.
+  freshPage();
+  const { dictation, seen, engine } = dictationOf();
+  dictation.start();
+  engine().say("start");
+  engine().say("result", { results: [heard("merhaba", true)] });
+  dictation.stop();
+  engine().say("end");
+  assert.deepEqual(seen.problems, []);
+  dictation.start();
+  engine().say("start");
+  engine().say("audiostart");
+  dictation.stop();
+  engine().say("error", { error: "aborted" });
+  engine().say("end");
+  assert.equal(seen.problems.length, 1);
+  assert.match(seen.problems[0], /^Safari heard nothing this time\./);
+  assert.match(seen.problems[0], /reload the page/);
+  assert.deepEqual(seen.offers, [{ reload: true }]);
+});
+
+test("a later dictation that hears nothing on a computer, or on an iPhone's page anew, says only that nothing was heard", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const iphone = navigator.userAgent;
+  freshPage();
+  Object.defineProperty(globalThis, "navigator", {
+    value: { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140", maxTouchPoints: 0 },
+    configurable: true,
+  });
+  try {
+    const { dictation, seen, engine } = dictationOf();
+    for (let round = 0; round < 2; round += 1) {
+      dictation.start();
+      engine().say("start");
+      t.mock.timers.tick(6_000);
+      engine().say("error", { error: "no-speech" });
+      engine().say("end");
+    }
+    assert.equal(seen.problems.length, 2);
+    assert.ok(seen.problems.every((words) => words.startsWith("Nothing was heard.")), seen.problems.join("\n"));
+    assert.deepEqual(seen.offers, [null, null]);
+  } finally {
+    Object.defineProperty(globalThis, "navigator", {
+      value: { userAgent: iphone, maxTouchPoints: 5 },
+      configurable: true,
+    });
+  }
+});
+
+test("the owner's tick that the engine never answers ends the dictation with what it heard, or says it heard nothing", () => {
+  // Item 616: a deaf Safari may answer no stop at all; the recorder's wait then ends it (microphone.js), which said
+  // nothing either.
+  freshPage();
+  const { dictation, seen, engine } = dictationOf();
+  dictation.start();
+  engine().say("start");
+  engine().say("result", { results: [heard("merhaba", true)] });
+  dictation.stop();
+  dictation.end();
+  assert.deepEqual(engine().calls, ["start", "stop", "abort"]);
+  assert.equal(dictation.listening(), false);
+  assert.deepEqual(seen.shown, ["merhaba"]);
+  assert.deepEqual(seen.problems, []);
+  dictation.start();
+  engine().say("start");
+  dictation.stop();
+  dictation.end();
+  assert.equal(dictation.listening(), false);
+  assert.equal(seen.problems.length, 1);
+  assert.match(seen.problems[0], /^Safari heard nothing this time\./);
+  // A dictation that is over has nothing to end.
+  dictation.end();
+  assert.equal(seen.problems.length, 1);
+});
+
+test("a dictation stops a reading aloud before it listens", () => {
+  // Item 616: Safari on an iPhone does not hear while it speaks, and a microphone that hears the reading would write the
+  // answer into the box.
+  freshPage();
+  let ended = 0;
+  const handle = readAloud("The answer is here.", "en-US", () => {
+    ended += 1;
+  }, () => {});
+  assert.notEqual(handle, null);
+  const cancelled = synth.cancelled;
+  const { dictation } = dictationOf();
+  dictation.start();
+  assert.equal(synth.cancelled, cancelled + 1);
+  assert.equal(ended, 1);
+});
+
+test("an iPad that asks for a computer's pages is an iPad: a later dictation that hears nothing says it is Safari's", () => {
+  const iphone = navigator.userAgent;
+  freshPage();
+  Object.defineProperty(globalThis, "navigator", {
+    value: { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15", maxTouchPoints: 5 },
+    configurable: true,
+  });
+  try {
+    const { dictation, seen, engine } = dictationOf();
+    for (let round = 0; round < 2; round += 1) {
+      dictation.start();
+      engine().say("start");
+      dictation.stop();
+      engine().say("error", { error: "aborted" });
+      engine().say("end");
+    }
+    // The first, the owner's own stop of a silence, says nothing; the second is Safari's deafness.
+    assert.equal(seen.problems.length, 1);
+    assert.match(seen.problems[0], /^Safari heard nothing this time\./);
+  } finally {
+    Object.defineProperty(globalThis, "navigator", {
+      value: { userAgent: iphone, maxTouchPoints: 5 },
+      configurable: true,
+    });
+  }
 });
