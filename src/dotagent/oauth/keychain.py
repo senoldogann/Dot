@@ -7,7 +7,9 @@ pieces it holds (``a2``). New tokens go to the other slot, and that item names i
 that tokens cut off half-written leave the tokens before them whole. The pieces are written and read through
 ``security``'s own prompt (``security -i``, read from its standard input), so that no token is ever on a command line
 another process could read, and anything that looks like a piece is cut out of what ``security`` says before an error
-keeps it. ``DOT_KEYCHAIN`` names another keychain file, so that tests never touch the owner's."""
+keeps it. ``DOT_KEYCHAIN`` names another keychain file, so that tests never touch the owner's. A file it names that is
+not there is refused before ``security`` runs (item 628): ``security`` does not fail on a keychain file that is missing,
+it reads and writes the login keychain in its place, and a test's tokens went there."""
 
 import asyncio
 import base64
@@ -96,6 +98,9 @@ class Keychain:
         return self._locks.setdefault(account, asyncio.Lock())
 
     async def _run(self, arguments: tuple[str, ...], given: bytes | None) -> tuple[int, str, str]:
+        # A keychain file named but not there is never left to ``security``, which would use the login keychain.
+        if self._file and not await asyncio.to_thread(os.path.isfile, self._file[0]):
+            raise SignInError("the keychain file is not there", {"file": self._file[0]})
         try:
             process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
                 _SECURITY,
