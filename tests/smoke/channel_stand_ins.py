@@ -53,7 +53,12 @@ class Replies:
 
     def __init__(self) -> None:
         self._turns: deque[ScriptedTurn] = deque()
+        self._thoughts: deque[str] = deque()
+        self._asked: int = 0
         self.gate: asyncio.Event | None = None
+        # While the gate is set, the calls from this one on (counting from 0 since the last ``clear``) wait for it; with
+        # none, every call does.
+        self.hold_from: int | None = None
 
     @property
     def name(self) -> str:
@@ -62,14 +67,25 @@ class Replies:
     def push(self, *turns: ScriptedTurn) -> None:
         self._turns.extend(turns)
 
+    def think(self, *thoughts: str) -> None:
+        """The thought the model has with each reply from the next on, in order (a reply with none has no thought)."""
+        self._thoughts.extend(thoughts)
+
     def clear(self) -> None:
         self._turns.clear()
+        self._thoughts.clear()
+        self._asked = 0
         self.gate = None
+        self.hold_from = None
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
-        if self.gate is not None:
+        asked: int = self._asked
+        self._asked += 1
+        if self.gate is not None and (self.hold_from is None or asked >= self.hold_from):
             await self.gate.wait()
-        return await ScriptedProvider(PROVIDER, [self._turns.popleft()]).complete(request, sink)
+        reply: ModelReply = await ScriptedProvider(PROVIDER, [self._turns.popleft()]).complete(request, sink)
+        thought: str = self._thoughts.popleft() if self._thoughts else ""
+        return reply.model_copy(update={"thinking": thought}) if thought else reply
 
     async def model_info(self, model: str) -> ModelInfo:
         return await ScriptedProvider(PROVIDER, []).model_info(model)

@@ -70,6 +70,30 @@ sends the box's message):
   in `~/Pictures/Dot` stays, and so does a folder of Dot's with a folder inside it. (`DOT_STAGING_DIR` in Dot's
   environment moves the folder, to a place Messages can read; [Development](development.md) says how the tests keep
   away from yours.)
+- **A run that works longer than fifteen seconds tells what it does** (item 618, `[channels] progress`). iMessage
+  cannot edit a message it sent, so "live" is a few messages and not a stream: a run started from the channel sends one
+  message after 15 seconds of work, then at most one every 30 seconds, and six in all; a run that ends sooner sends only
+  its answer, and none comes after the answer. A message tells what happened since the one before, in plain lines, the
+  newest last: the commands the run ran (`$ ` and the first 60 characters of each), the tools it used in the words the
+  page uses for them (*used the desktop*, *read a page: example.com*, *wrote notes.txt*, *searched the web: …*), and
+  the first sentence of its newest thought (`💭 `, at most 160 characters) when the model thinks. The same thing again
+  and again is counted (*used the desktop ×3*), and a message holds eight lines at most, with a line that counts the
+  earlier steps. A message reads so:
+
+  ```
+  ◆ Working for 45 s:
+  $ ls ~/Desktop
+  read a page: example.com
+  used the desktop ×3
+  💭 The page lists three files.
+  ```
+
+  Only what was done is told, never what came of it: no output of a tool is read, a page is told by its host alone
+  (not its path or its query), a file by its name, and a command and a thought are masked of the secrets Dot holds
+  before they are cut, as an answer is. Only the steps of the run a message started count, not those of the runs it
+  delegated, nor of a run you typed in the chat's page. Settings › Channels › iMessage has the switch (**Progress
+  messages**, on by default), live; off, only the answer comes. A channel that is off or has nobody paired is told
+  nothing, and what a run did meanwhile is not told later.
 - When a run waits for you (an approval, or a question it asked), one line says what it asks and where to answer, and at
   most one line is sent every twenty seconds: *Dot waits for your approval: Run `rm -r build`. Answer it in Dot, not
   here: https://…/#/runs/…*. A wait that comes inside that window is held, never dropped (item 611): a run that left a
@@ -166,9 +190,13 @@ sender.
 **Links.** Messages may keep a link as a row of its own after the words of a message, a link preview, flagged as sent by
 you like any row. A row that is only a link that Dot wrote, one into its own pages (the address its messages link to) or
 one in a message it sent in the minute before, is Dot's own and is never run, whether Messages shows it as a link
-preview or as words; the log says so (`imessage_message_let_go`). A link of yours is yours: one that comes less than 3
-seconds after your words, in the same read, is joined to them as one command (the words, a space, the link), and a link
-alone is a command; one that comes in a later read than your words, or before them, is a command of its own.
+preview or as words; the log says so (`imessage_message_let_go`). A host, or a name that looks like one (`example.com`
+ending a message of progress, `notes.md` in an answer), is Dot's own only as a link preview, written with its
+`https://`, its `www.` and its closing slash or not, and only in the 10 seconds after the message that holds it (item
+618): the same words typed as words are yours, a command like any other, whatever Dot said a moment before. A link of
+yours is yours: one that comes less than 3 seconds after your words, in the same read, is joined to them as one command
+(the words, a space, the link), and a link alone is a command; one that comes in a later read than your words, or before
+them, is a command of its own.
 
 The limits hold for every message: at most 4,000 characters (a longer one is told so and not cut, as cutting could
 change what it asks), at most 30 a minute (the rest of a flood is let go, with one line to say so), and a message with
@@ -276,7 +304,9 @@ Dot's answers, and what it tells you on its own (the brief's first line, a watch
 may be in it, as they are in the push to your phone), go to Apple's iMessage servers and on to your own devices, as any
 iMessage does, and so do the pictures an answer names (item 617): files of Dot's workspace or your home folder, at most
 four of at most 20 MB, never from a hidden folder, from `~/Library` outside Dot's own folder or from a place the policy
-keeps from a run. A picture is a file of yours that leaves the Mac, to your own devices: an answer that names one is
+keeps from a run. The messages of progress (item 618) carry the first 60 characters of the commands a run ran, the
+names of the files it read or wrote, the host of the pages it read and the first sentence of a thought, the same way.
+A picture is a file of yours that leaves the Mac, to your own devices: an answer that names one is
 the model's choice, and a run that read a page may be led to name a picture of yours that the page asked for, so the
 channel can be switched off while Dot works on content you do not trust. Nothing else leaves: what you send is read
 from this Mac's own database. See [What leaves this

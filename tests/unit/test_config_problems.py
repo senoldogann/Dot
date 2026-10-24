@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.config import load_config
+from dotagent.config import load_config, load_default_config
 from dotagent.core.errors import ConfigError
 
 
@@ -34,3 +34,15 @@ def test_another_error_is_named_by_its_path_and_a_long_list_is_cut(tmp_path: Pat
     many: ConfigError = _refused(tmp_path, "".join(f"setting_{number} = 1\n" for number in range(7)))
     assert many.message.count(" is not a setting this version of Dot knows") == 5
     assert many.message.endswith("; and 2 more")
+
+
+def test_the_messages_of_progress_are_steps_or_off_and_any_other_word_is_refused_by_the_name_of_the_setting(
+    tmp_path: Path,
+) -> None:
+    """``[channels] progress`` (item 618): on by default, and off with the one word that says so."""
+    assert load_default_config().channels.progress == "steps"
+    off: Path = tmp_path / "off.toml"
+    off.write_text('[channels]\nprogress = "off"\n', encoding="utf-8")
+    assert load_config(off).channels.progress == "off" and load_config(off).channels.imessage is False
+    error: ConfigError = _refused(tmp_path, '[channels]\nprogress = "sometimes"\n')
+    assert error.message.startswith("configuration failed validation: channels.progress: ")

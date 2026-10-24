@@ -6,6 +6,7 @@ channel on, forgets a number, and shows what keeps the channel from working with
 import asyncio
 import os
 import time
+import tomllib
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Literal
@@ -23,6 +24,7 @@ from dotagent.channels.seen import WAL_UNSEEN, wal_path
 from dotagent.channels.service import Channels
 from dotagent.config import load_config
 from dotagent.core.errors import ChannelError, DesktopError
+from dotagent.core.paths import config_path
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -261,6 +263,39 @@ async def test_a_number_is_paired_with_the_code_typed_back_and_the_switch_turns_
         page.get_by_role("group", name="iMessage", exact=True).get_by_role("switch", name="iMessage")
     ).to_have_attribute("aria-checked", "true")
     await page.context.close()
+
+
+async def test_the_switch_of_progress_messages_says_what_a_run_tells_and_is_kept(
+    browser: Browser, served: Served
+) -> None:
+    """A run started from iMessage tells what it does while it works (item 618): the card says so, wide and on a phone,
+    and the switch turns it off and on again at once, in the daemon and in the config file."""
+    for width in (1280, 390):
+        page: Page = await _opened(browser, served, width, "light")
+        card: Locator = page.get_by_role("group", name="iMessage", exact=True)
+        progress: Locator = card.get_by_role("switch", name="Progress messages")
+        await expect(progress).to_have_attribute("aria-checked", "true")
+        await expect(
+            card.get_by_text("While a run you started from iMessage works, Dot sends a few lines of what it is doing")
+        ).to_be_visible()
+        await expect(card.get_by_text("Off, or for a run that ends sooner, only the answer comes.")).to_be_visible()
+        await _fits(page, f"{width} with the switch of progress")
+        await progress.click()
+        await _said(page, "Dot sends only the answers.")
+        await expect(card.get_by_role("switch", name="Progress messages")).to_have_attribute("aria-checked", "false")
+        assert served.channels.progress is False
+        assert tomllib.loads(config_path().read_text(encoding="utf-8"))["channels"]["progress"] == "off"
+        # A page opened again finds it off; the switch of the channel itself is a switch of its own.
+        await page.reload()
+        card = page.get_by_role("group", name="iMessage", exact=True)
+        await expect(card.get_by_role("switch", name="Progress messages")).to_have_attribute("aria-checked", "false")
+        await expect(card.get_by_role("switch", name="iMessage", exact=True)).to_have_count(1)
+        await card.get_by_role("switch", name="Progress messages").click()
+        await _said(page, "Dot tells you what a run is doing as it works.")
+        await expect(card.get_by_role("switch", name="Progress messages")).to_have_attribute("aria-checked", "true")
+        assert served.channels.progress is True
+        assert tomllib.loads(config_path().read_text(encoding="utf-8"))["channels"]["progress"] == "steps"
+        await page.context.close()
 
 
 async def test_a_paired_number_is_forgotten_with_its_button(browser: Browser, served: Served) -> None:

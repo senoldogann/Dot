@@ -5,9 +5,9 @@ context size of a model, a key of ``[models.context]`` (item 250), whether the t
 (item 255), whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), or the names the
 daemon answers to and whether it keeps the Mac awake, ``[server] reach`` and ``keep_awake`` (item 271), or whether the
 notes are found by meaning, ``[memory] embed_enabled`` (item 558), whether a messaging app of the owner reaches Dot,
-``[channels] imessage`` (item 572), what a reaction on Dot's message does once its run has ended, ``[reactions]``
-(item 586), or whether an MCP server that comes with Dot is started, a switch of ``[builtin_mcp]`` (item 583), so the
-comments and the other settings stay as written."""
+``[channels] imessage`` (item 572) and ``progress`` (item 618), what a reaction on Dot's message does once its run
+has ended, ``[reactions]`` (item 586), or whether an MCP server that comes with Dot is started, a switch of
+``[builtin_mcp]`` (item 583), so the comments and the other settings stay as written."""
 
 import os
 import re
@@ -51,7 +51,7 @@ type ConfigTable = Literal[
 ]
 type AgentSetting = Literal["resume"]
 type AssistantSetting = Literal["name", "owner", "introduced"]
-type ChannelsSetting = Literal["imessage"]
+type ChannelsSetting = Literal["imessage", "progress"]
 type BrowserSetting = Literal[
     "mode",
     "raise_window",

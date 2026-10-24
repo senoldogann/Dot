@@ -19,6 +19,7 @@ from dotagent.channels.imessage import (
     database_access,
 )
 from dotagent.channels.pictures import Pictures
+from dotagent.channels.progress import APART_S, FIRST_AFTER_S
 from dotagent.channels.router import ASKS_APART_S, WATCHED_KINDS, ChannelRouter
 from dotagent.channels.seen import Seen, SeenError
 from dotagent.channels.staging import STAGED_KEPT_S, Staging
@@ -112,9 +113,14 @@ class Channels:
         staging: Path | None = None,
         sweep_s: float = SWEEP_S,
         copies_kept_s: float = STAGED_KEPT_S,
+        progress_first_s: float = FIRST_AFTER_S,
+        progress_apart_s: float = APART_S,
     ) -> None:
         self._runtime: Runtime = runtime
         self._sweep_s: float = sweep_s
+        # Whether a run started from a channel tells what it does while it works (item 618): ``[channels] progress``,
+        # and the owner's switch of it, live.
+        self._progress: bool = runtime.config.channels.progress == "steps"
         self._macos: Macos = RealMacos() if macos is None else macos
         self._ask_wait_s: float = ask_wait_s
         # The question macOS asks the owner now, if one is: it ends with their answer.
@@ -145,7 +151,16 @@ class Channels:
         )
         self._channels: dict[ChannelId, Channel] = {"imessage": self._imessage}
         self._router: ChannelRouter = ChannelRouter(
-            runtime, manager, self._channels, self._links, self.is_on, asks_apart_s, pictures
+            runtime,
+            manager,
+            self._channels,
+            self._links,
+            self.is_on,
+            asks_apart_s,
+            pictures,
+            lambda: self._progress,
+            progress_first_s=progress_first_s,
+            progress_apart_s=progress_apart_s,
         )
         self._tasks: dict[ChannelId, asyncio.Task[None]] = {}
         self._watcher: asyncio.Task[None] | None = None
@@ -164,6 +179,17 @@ class Channels:
 
     def is_on(self, channel_id: ChannelId) -> bool:
         return self._on[channel_id]
+
+    @property
+    def progress(self) -> bool:
+        """Whether a run started from a channel tells what it does while it works (item 618)."""
+        return self._progress
+
+    def set_progress(self, on: bool) -> None:
+        """Switch the messages of progress on or off at once."""
+        if self._progress != on:
+            self._progress = on
+            log.info("channel_progress_switched", on=on)
 
     async def start(self) -> None:
         """Read what the channels kept, follow the runs of their chats, and read each channel that is on."""
@@ -225,7 +251,7 @@ class Channels:
     # ----- what the page shows ---------------------------------------------------------------
 
     async def view(self) -> ChannelsView:
-        return ChannelsView(imessage=await self._imessage_view())
+        return ChannelsView(imessage=await self._imessage_view(), progress=self._progress)
 
     async def _imessage_view(self) -> ImessageView:
         access: Access = "granted"

@@ -46,6 +46,24 @@ def channels_router(ctx: ServerContext) -> APIRouter:
                 raise
         return await service.view()
 
+    @router.post("/channels/progress")
+    async def switch_progress(request: SwitchRequest) -> ChannelsView:
+        """Switch the messages of progress (item 618) on or off at once, and keep it in the config file (``[channels]
+        progress``, ``steps`` or ``off``); a config file that cannot be changed leaves it as it was. A run at work tells
+        what it does from the next step on, or no more."""
+        service: Channels = channels()
+        async with service.changing:
+            before: bool = service.progress
+            service.set_progress(request.on)
+            try:
+                await asyncio.to_thread(
+                    set_setting, config_path(), "channels", "progress", "steps" if request.on else "off"
+                )
+            except (ConfigError, OSError):
+                service.set_progress(before)
+                raise
+        return await service.view()
+
     @router.post("/channels/imessage/code")
     async def send_imessage_code(request: HandleRequest) -> ChannelsView:
         """Send a pairing code to a number or an address through Messages, for the owner to type back from the iPhone

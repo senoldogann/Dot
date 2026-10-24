@@ -59,8 +59,11 @@ run needs, sent where the configuration points:
   WebP, at most four of at most 20 MB, never from a hidden folder, from `~/Library` outside Dot's own folder or from a
   place `[policy] protected_paths` and `sealed_paths` keep from a run; each is sent from a copy Dot makes in
   `~/Pictures/Dot` and removes an hour later (it removes only the folders it made there, each marked with a file of
-  its own, and nothing else in that folder). What you send there is read from Messages' database on this Mac (see
-  [Channels](channels.md), item 572).
+  its own, and nothing else in that folder). So are the few messages of progress a run started from there sends while
+  it works (item 618, `[channels] progress`, on by default): the first 60 characters of the commands it ran, the names
+  of files it read or wrote, the host of pages it read, a tool's name and the first sentence of its newest thought,
+  masked of the secrets Dot holds, never what a tool answered. What you send there is read from Messages' database on
+  this Mac (see [Channels](channels.md), item 572).
 - **To the browser's makers, if you use the microphone: your voice, from your browser or Dot.app (Apple's); and, when
   the Mac has no voice of the language, the text read aloud.** The composer's microphone and the reading of answers
   aloud (item 574) are the browser's own speech recognition and speech synthesis: Safari and Chrome may send what you

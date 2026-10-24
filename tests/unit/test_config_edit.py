@@ -317,3 +317,22 @@ def test_whether_the_notes_are_found_by_meaning_is_written_under_memory(tmp_path
     assert path.read_text(encoding="utf-8") == '[models]\nmain = "openai:gpt-5.5"\n\n[memory]\nembed_enabled = false\n'
     set_embeddings(path, True)
     assert tomllib.loads(path.read_text(encoding="utf-8"))["memory"] == {"embed_enabled": True}
+
+
+def test_progress_is_written_under_channels_beside_the_switch_of_the_channel_and_the_comments_stay(
+    tmp_path: Path,
+) -> None:
+    """``[channels] progress`` (item 618) is a word, ``steps`` or ``off``, written below the table's header."""
+    config: Path = tmp_path / "config.toml"
+    config.write_text('# mine\n[channels]\nimessage = true  # on\n\n[models]\nmain = "ollama:x"\n', encoding="utf-8")
+    set_setting(config, "channels", "progress", "off")
+    assert tomllib.loads(config.read_text(encoding="utf-8")) == {
+        "channels": {"imessage": True, "progress": "off"},
+        "models": {"main": "ollama:x"},
+    }
+    assert "imessage = true  # on" in config.read_text(encoding="utf-8")
+    set_setting(config, "channels", "progress", "steps")
+    assert tomllib.loads(config.read_text(encoding="utf-8"))["channels"] == {"imessage": True, "progress": "steps"}
+    fresh: Path = tmp_path / "fresh.toml"
+    set_setting(fresh, "channels", "progress", "off")
+    assert fresh.read_text(encoding="utf-8") == '[channels]\nprogress = "off"\n'
