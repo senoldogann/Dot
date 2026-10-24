@@ -27,13 +27,8 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       # The lock as requirements pinned with their hashes, which pip-audit checks as they are, resolving nothing.
-      # dotagent-web-research (item 583) is left out while uv gets it from its repository: that requirement has no hash,
-      # which pip-audit refuses. Its own repository audits it, and what it depends on is exported, so it is audited
-      # here as the rest is. Take the flag out when PyPI holds the package (Dot 0.2.0), with [tool.uv.sources].
       - name: Requirements
-        run: >
-          uv export --frozen --no-emit-project --no-emit-package dotagent-web-research
-          --format requirements-txt -o "$RUNNER_TEMP/requirements.txt"
+        run: uv export --frozen --no-emit-project --format requirements-txt -o "$RUNNER_TEMP/requirements.txt"
       - name: pip-audit
         run: uvx pip-audit@2.10.1 -r "$RUNNER_TEMP/requirements.txt" --disable-pip --progress-spinner off
 

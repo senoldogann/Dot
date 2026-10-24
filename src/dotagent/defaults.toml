@@ -28,8 +28,11 @@ mcp = []
 # beside the [[mcp]] tables. A server of the same name from any other place (a [[mcp]] table, a plugin, another agent,
 # Customize › Connectors) replaces the built-in.
 # web_research: the server web-research (the package dotagent-web-research), whose tools mcp__web-research__web_search,
-# web_scrape, web_map, web_extract and web_crawl_* search the web (DuckDuckGo, Yahoo, and Google when those refuse),
-# read the pages a run asks for and crawl in the background; its crawl jobs are kept in <home>/web-research.
+# web_scrape, web_map, web_extract, web_health and web_crawl_* search the web (DuckDuckGo, Yahoo, and Google when those
+# refuse), read the pages a run asks for and crawl in the background; while no list of sites is set ([browser]
+# allowed_hosts, or blocked_hosts beyond these defaults) they also read pages of their own choosing: the heads of a news
+# search's results for their dates, and another copy of a page behind a wall. Its crawl jobs are kept in
+# <home>/web-research.
 web_research = true
 
 [server]

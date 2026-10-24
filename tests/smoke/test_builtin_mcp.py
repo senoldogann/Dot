@@ -61,19 +61,23 @@ TOKEN: str = "builtin-mcp-token"
 PORT: int = 8765
 ORIGIN: str = f"http://127.0.0.1:{PORT}"
 SERVER: str = "web-research"
-# What the server lists, in its order, and how the policy judges each: the six that only read are reads, a crawl that is
-# queued may reach every site its pages link to, and one that is cancelled is stopped.
+# What the server lists, in its order, and how the policy judges each: the seven that only read are reads (web_health,
+# since 1.3.0, the state of its search providers), a crawl that is queued may reach every site its pages link to, and
+# one that is cancelled is stopped.
 TOOLS: tuple[str, ...] = (
     "web_search",
     "web_scrape",
     "web_map",
     "web_extract",
+    "web_health",
     "web_crawl_start",
     "web_crawl_status",
     "web_crawl_results",
     "web_crawl_cancel",
 )
 READS: frozenset[str] = frozenset(TOOLS) - {"web_crawl_start", "web_crawl_cancel"}
+# The tools that take no string, which the test of the strings below does not meet.
+NO_STRINGS: frozenset[str] = frozenset({"web_health"})
 ANSWER_S: float = 90.0
 
 
@@ -668,13 +672,14 @@ async def test_a_rule_added_to_dots_own_web_tools_binds_the_servers_tools_too(
 
 
 # What each string argument of the server's tools is, that Dot does not judge as words that leave the Mac or an address:
-# worked on in the server and never sent. Read in its code (web_scraper 1.2.0, ``web_tools/service.py``, ``search.py``).
+# worked on in the server and never sent. Read in its code (web_scraper 1.3.0, ``web_tools/service.py``, ``search.py``).
 STAYS_IN_THE_SERVER: dict[str, str] = {
     "web_search.date_from": "a date, which the server parses and sends as a date filter",
     "web_search.date_to": "a date, which the server parses and sends as a date filter",
     "web_search.language": "a language tag the server checks against a pattern of at most 12 characters",
     "web_search.region": "a code of the form xx-xx, which the server checks against a pattern",
     "web_search.provider": "names one of the server's search adapters; an unknown name is an error, nothing is asked",
+    "web_scrape.content_id": "names a page the server read before and keeps, to read on from an offset (1.3.0)",
     "web_map.search": "filters the addresses the server already found",
     "web_map.include_patterns[]": "globs that filter the addresses the server already found",
     "web_map.exclude_patterns[]": "globs that filter the addresses the server already found",
@@ -743,8 +748,8 @@ async def test_every_string_the_servers_tools_take_is_judged_by_dots_rules_or_kn
             if tool.server == SERVER
             for leaf in _strings(tool.input_schema, tool.input_schema, "")
         }
-    # Every tool of the server was looked at.
-    assert {leaf.partition(".")[0] for leaf in leaves} == set(TOOLS)
+    # Every tool of the server that takes a string was looked at.
+    assert {leaf.partition(".")[0] for leaf in leaves} == set(TOOLS) - NO_STRINGS
     unknown: set[str] = {leaf for leaf in leaves if not _judged(leaf) and leaf not in STAYS_IN_THE_SERVER}
     assert not unknown, (
         f"a string the server's tools take, that Dot neither judges nor knows stays in it: {sorted(unknown)}"

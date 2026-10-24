@@ -91,22 +91,33 @@ run needs, sent where the configuration points:
 - **To the search engines and the sites of web-research, the MCP server that comes with Dot: the queries and the pages
   asked for.** Its `web_search` sends the query to DuckDuckGo (its HTML page, then its lite page) and Yahoo, and to
   Google only when those refuse, by a plain request and then through a headless Chrome of its own with a temporary
-  profile, never your Chrome profile. Its `web_scrape`, `web_map`, `web_extract` and crawls request the pages they
-  are asked for, with the `robots.txt` and the sitemaps of their sites (a headless Chrome of its own reads a page
-  that needs JavaScript), and with `archive: true` the copy of a page that the Internet Archive
-  (`web.archive.org`) holds. It refuses the addresses of this Mac, of private networks and of cloud metadata
-  services, needs no key and sends nothing to the people who make it; it keeps its crawl jobs in
-  `<home>/web-research`. `[builtin_mcp] web_research = false` leaves it out (see
+  profile, never your Chrome profile; to Brave's or Serper's search API first only when their key is in its environment
+  (1.3.0). For a search of news or of a span of dates it reads the head of each of the top results' pages for its date,
+  and when a page it is asked for answers with a wall (a captcha, a 401, 403 or 429), `web_scrape` looks for another
+  copy: the Internet Archive's (`web.archive.org`), the page's AMP or print version, the site's feed, and another
+  outlet's copy found by searching for its title, whose address the answer names (1.3.0). Neither is done while you have
+  a list of sites set (`[browser] allowed_hosts`, or `blocked_hosts` beyond the defaults): Dot then starts the server
+  with both off, as the lists bind the addresses a call holds and these would be pages the server chose (item 623). Its
+  `web_scrape`, `web_map`, `web_extract` and crawls request the pages they are asked for, with the `robots.txt` and the
+  sitemaps of their sites (a headless Chrome of its own reads a page that needs JavaScript), and with `archive: true`
+  the Internet Archive's copy; `web_health` asks nothing of anyone. It refuses the addresses of this Mac, of private
+  networks and of cloud metadata services, and since 1.3.1 it connects only to an address it checked in the same step,
+  on each redirect too, so that a name whose answer changes between the check and the connection (DNS rebinding) cannot
+  lead it to one (item 623; its headless Chrome resolves names itself, and each of its requests is checked as it goes);
+  it needs no key for the engines it asks by default, and sends nothing to the people who make it; it keeps its crawl
+  jobs in `<home>/web-research`. `[builtin_mcp] web_research = false` leaves it out (see
   [MCP servers](extending.md#mcp-servers)). Its calls are judged by the rules of Dot's own tools that do the same,
   in the same functions: the words of a search (the query, and the sites the server makes words of it) as the query
   of `web_search` is, so that a key in them earns the flag `exfiltration`, which is refused in every mode but yolo,
   and more than 400 characters are refused; the addresses as the address of `web_fetch` and `web_crawl` is, so that
   `[browser] allowed_hosts` and `blocked_hosts` bind them and a long one, or one with a key in it, earns the same
-  flag; and a search that reads the pages it found is refused while you have set a list, since those addresses are
-  the server's pick. These rules do not reach what they do not reach in Dot's own tools (a secret that is not in the
-  shape of a key, a key cut in pieces), nor a redirect the server follows to another host, the links a crawl
-  follows on the site it starts on, the search engines a search asks, or the Internet Archive that `archive: true`
-  asks; a crawl goes on after its run has stopped, up to its page limit.
+  flag; a search that reads the pages it found is refused while you have set a list, since those addresses are the
+  server's pick; and while you have set a list, a `web_scrape` with `archive: true` is refused where your lists leave
+  out `web.archive.org`, the site it reaches whatever address it names. These rules do not reach what they do not
+  reach in Dot's own tools (a secret that is not in the shape of a key, a key cut in pieces), nor a redirect the
+  server follows to another host, the links a crawl follows on the site it starts on, the search engines a search
+  asks, or, while you have no list set, the Internet Archive that `archive: true` asks; a crawl goes on after its run
+  has stopped, up to its page limit.
 - **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; the one
   set up by default is web-research, above (see [MCP servers](extending.md#mcp-servers)).
 - **To your Google and Microsoft accounts, once you sign one in: what the mail and calendar tools ask.** `mail_search`,
