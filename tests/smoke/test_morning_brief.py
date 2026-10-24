@@ -655,6 +655,22 @@ async def test_the_card_sets_the_brief_the_list_labels_it_and_a_switch_in_the_li
                 switch: Locator = card.get_by_role("switch", name="Morning brief on")
                 await expect(card.get_by_role("heading", name="Morning brief")).to_be_visible()
                 await expect(switch).to_have_attribute("aria-checked", "false")
+                # The owner's schedules lead the page; the brief is a line under them, its settings folded (item 609).
+                assert await page.evaluate(
+                    """() => {
+                      const list = document.querySelector('.schedule-panel');
+                      const brief = document.querySelector('[data-brief]');
+                      const watchers = document.querySelector('[data-watchers]');
+                      const before = (a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+                      return before(list, brief) && before(brief, watchers);
+                    }"""
+                )
+                await expect(card.locator(".brief-summary")).to_have_text("Off")
+                await expect(card.get_by_label("Time")).to_be_hidden()
+                await card.get_by_role("button", name="Show the brief's settings").click()
+                await expect(card.get_by_role("button", name="Hide the brief's settings")).to_have_attribute(
+                    "aria-expanded", "true"
+                )
                 await expect(card.get_by_label("Time")).to_have_value("08:00")
                 await expect(card.get_by_role("button", name="Every day")).to_have_attribute("aria-pressed", "true")
                 await expect(card.get_by_text("No mail or calendar account is signed in")).to_be_visible()
@@ -665,6 +681,7 @@ async def test_the_card_sets_the_brief_the_list_labels_it_and_a_switch_in_the_li
                 await switch.click()
                 await expect(switch).to_have_attribute("aria-checked", "true")
                 await expect(card.get_by_text("Next ")).to_be_visible()
+                await expect(card.locator(".brief-summary")).to_have_text("Weekdays at 07:30")
                 saved: JsonObject = (await client.get("/api/brief")).json()
                 assert (saved["enabled"], saved["time"], saved["days"]) == (True, "07:30", "weekdays")
                 assert saved["lines"] == ["the roof repair", "the visa office"]
@@ -703,6 +720,7 @@ async def test_write_one_now_starts_a_brief_and_opens_its_page(
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
             await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            await page.locator("[data-brief]").get_by_role("button", name="Show the brief's settings").click()
             await page.locator("[data-brief]").get_by_role("button", name="Write one now").click()
             await expect(page).to_have_url(re.compile(r"#/runs/run_"))
             run_id: str = page.url.rsplit("/", 1)[1]
@@ -712,3 +730,54 @@ async def test_write_one_now_starts_a_brief_and_opens_its_page(
         finally:
             await browser.close()
     await scheduler.drain()
+
+
+@pytest.mark.browser
+async def test_the_folded_line_says_a_time_set_elsewhere_and_a_brief_that_could_not_be_read(
+    runtime: Runtime, scheduler: Scheduler, client: httpx.AsyncClient
+) -> None:
+    """The pre-push review of item 609: folded, the card's line gave the card's own time for a schedule set elsewhere at
+    times the card cannot show, and a first read that failed said so only in the folded settings."""
+    await _no_schedules(runtime)
+    await _set(client, {"enabled": True, "time": "08:00", "days": "every", "lines": []})
+    record: ScheduleRecord = await _brief_schedule(client)
+    elsewhere: JsonObject = {
+        "name": BRIEF_NAME,
+        "goal": BRIEF_LISTED_GOAL,
+        "cron": "15 8 * * 0",
+        "at": None,
+        "mode": "research",
+        "model": None,
+        "effort": None,
+        "approvals": None,
+        "goal_mode": None,
+        "timezone": None,
+        "enabled": True,
+    }
+    changed: httpx.Response = await client.patch(f"/api/schedules/{record.id}", json=elsewhere)
+    assert changed.status_code == 200, changed.text
+    assert (await client.get("/api/brief")).json()["custom"] is True
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            card: Locator = page.locator("[data-brief]")
+            await expect(card.locator(".brief-summary")).to_have_text(
+                "On, at times this card cannot show: open it to see"
+            )
+            await page.close()
+            # A brief that cannot be read says so on its line, with a way to try again, though the card is folded.
+            page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.route("**/api/brief", lambda route: route.fulfill(status=500, body="{}"))
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            card = page.locator("[data-brief]")
+            await expect(card.locator(".brief-summary")).to_contain_text("This could not be loaded")
+            await expect(card.locator(".brief-summary").get_by_role("button", name="Try again")).to_be_visible()
+            await page.close()
+        finally:
+            await browser.close()

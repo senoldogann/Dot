@@ -1,8 +1,9 @@
 // Schedules: goals that Dot carries out by itself, once or on a cron schedule, while the daemon runs. A page of the
 // sidebar above Customize. Each schedule keeps how its runs start (mode, approvals, goal mode, model, reasoning level,
 // time zone) and can be changed later. Run now starts one of its runs by hand, switched on or off, and its Firings
-// list its last runs, at its time and by hand (item 455). The Morning brief card is at its head (item 570): the brief is
-// a schedule of its own, labelled in the list, which its card sets. Under it are the Watchers (item 571).
+// list its last runs, at its time and by hand (item 455). The owner's schedules lead the page (item 609); under them the
+// Morning brief (item 570), a schedule of its own labelled in the list, which its card sets, folded to a line, and the
+// Watchers (item 571), a head and a line while there are none.
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
@@ -681,7 +682,7 @@ export function mount(root, ctx) {
   const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "The scheduler is not running, so nothing fires until the daemon restarts."));
   // The brief's card reads again whenever the list does: a switch in the list, a run's end, a failure that switched it off.
   const brief = mountBrief(ctx, () => reload());
-  // The watchers (item 571) sit under it: what Dot tells you of when it happens.
+  // The watchers (item 571), under the brief: what Dot tells you of when it happens.
   const watchers = mountWatchers();
 
   function paint() {
@@ -846,8 +847,6 @@ export function mount(root, ctx) {
       el("span", null, "Schedules fire only while the daemon runs and this Mac is awake. A firing that was missed while the daemon was down is skipped, not replayed."),
     ),
     schedulerNote,
-    brief.element,
-    watchers.element,
     formSlot,
     el(
       "section",
@@ -855,6 +854,8 @@ export function mount(root, ctx) {
       el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "Your schedules"), count, el("span", { class: "spacer" }), addButton),
       holder,
     ),
+    brief.element,
+    watchers.element,
     zoneList(),
   );
   const stopLifecycle = onLifecycle((event) => {
