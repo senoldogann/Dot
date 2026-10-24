@@ -265,7 +265,8 @@ currency, so list sites that bill in one currency. Empty by default.
    is the one that leaves the step to you), and *Allow, whatever it has read* (`preapproved`) is set under Details. A
    rule is a sentence that ends in its answer as a badge, read from its tool and its pattern and from nothing else, not
    from its why, which may say anything, and saying neither less nor more than its pattern fits. A pattern of whole
-   words (a word boundary, `\b`, at each end of a word that is a letter or a digit) reads as "mentions “git push”", one
+   words (a word boundary, `\b`, at each end of a word that is a word character to the engine: a letter, a mark, a
+   decimal digit, a connector such as `_` or `‿`, a joiner) reads as "mentions “git push”", one
    of the letters of a word anywhere (no boundary at all) as "contains “ls”", and the drafter's pattern for a command a
    rule lets Dot run as "run “git push” (with plain arguments, after changing folder at most)", the arguments plain
    when they hold none of `;` `&` `|` `$` `<` `>` `(` `)` or a backtick, which chain a command to it, substitute one
@@ -311,7 +312,10 @@ currency, so list sites that bill in one currency. Empty by default.
    action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it
    run alone with plain arguments (after a `cd` at most; nothing chained to it, substituted into it or sent on with
    `|` or `>`), and a rule that stops Dot fits the command or the word wherever the action mentions it, as a whole
-   word (`x.com` does not fit `netflix.com`). A rule that lets Dot act in the shell is made from commands only: a draft
+   word (`x.com` does not fit `netflix.com`), its edges told as the engine that matches it tells a word character
+   (`x²` fits "run x² now", item 629). So a word that ends in a vowel sign, as Thai and Hindi words often do, is a
+   whole word as any other: in a script written without spaces, a rule that stops Dot at it does not fit it inside
+   running text. A rule that lets Dot act in the shell is made from commands only: a draft
    that gives words for it (for the shell, or for `*`, which covers it) is refused and the review model asked once
    more, since a word fits `git push; anything` as well as `git push` (item 561). The same goes for the AppleScript
    tool (`apple_script`, or a pattern that covers it), which runs shell lines with `do shell script`: a word fits a

@@ -108,6 +108,46 @@ def test_a_mention_fits_as_a_whole_word(url: str, fits: bool) -> None:
     assert _fits(rule, _page(url)) is fits
 
 
+def _note(summary: str) -> ActionInfo:
+    return ActionInfo(tool="write_file", kind="write", risk="low", summary=summary, target="notes.md", flags=())
+
+
+@pytest.mark.parametrize("mention", ["\u200d", "\ufe0f", "\u0301", "\u203f"])
+def test_a_mention_of_nothing_a_person_reads_as_a_word_is_refused(mention: str) -> None:
+    """Item 629: a joiner, a variation selector, a combining mark or a connector alone is a word character to the
+    engine, and still no word to match on."""
+    with pytest.raises(InvalidValueError, match="needs a word to match on"):
+        rule_from_draft(_draft("write_file", "ask", [], [mention]), TOOLS)
+
+
+def test_a_mention_of_a_number_that_is_no_digit_to_the_engine_makes_a_rule() -> None:
+    rule: DraftedRule = rule_from_draft(_draft("write_file", "ask", [], ["½"]), TOOLS)
+    assert _fits(rule, _note("Write ½ now")) is True
+
+
+@pytest.mark.parametrize(
+    ("mention", "summary", "fits"),
+    [
+        # ``²`` and ``½`` are no word characters to the engine (``re`` took them for some): a boundary after them never
+        # fit, and a rule that stops Dot at x² stopped it at nothing.
+        ("x²", "Write the sum of x² and y", True),
+        ("½ cup", "Write a recipe with ½ cup of milk", True),
+        # A circled letter and a vowel sign are word characters to the engine (``re`` took them for none): the mention
+        # is a whole word, not letters that fit inside another one.
+        ("ⓐbc", "Write ⓐbc down", True),
+        ("ⓐbc", "Write xⓐbc down", False),
+        ("का", "Write का now", True),
+        ("का", "Write काम now", False),
+    ],
+)
+def test_a_mention_is_bounded_where_the_engine_that_matches_rules_sees_a_word(
+    mention: str, summary: str, fits: bool
+) -> None:
+    """Item 629: the drafter puts a word boundary where the engine of ``policy.engine`` (``regex``) sees a word."""
+    rule: DraftedRule = rule_from_draft(_draft("write_file", "ask", [], [mention]), TOOLS)
+    assert _fits(rule, _note(summary)) is fits
+
+
 @pytest.mark.parametrize(
     ("draft", "problem"),
     [
