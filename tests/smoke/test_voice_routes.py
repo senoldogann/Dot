@@ -28,6 +28,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.views import _RECORDING_B64_CHARS
+from dotagent.voice import helper
 from dotagent.voice.toolchain import NO_COMPILER
 from dotagent.voice.wav import MAX_RECORDING_SECONDS, RECORDING_RATE, TAIL_SECONDS
 
@@ -119,8 +120,11 @@ async def client(address: str) -> AsyncIterator[httpx.AsyncClient]:
 
 @pytest.fixture
 def mac_can(stand_in: StandIn, monkeypatch: pytest.MonkeyPatch) -> StandIn:
-    """This Mac as one that can write down: the compiler the daemon builds with is the stand-in."""
+    """This Mac as one that can write down: the compiler the daemon builds with is the stand-in. The daemon of this
+    module remembers a Mac without a compiler for a short while, and one with it for its life: the Mac that could not
+    (the test before) is asked again at once, and the stand-in, once found, is the one every test after it finds."""
     monkeypatch.setenv("DOT_SWIFTC", str(stand_in.compiler))
+    monkeypatch.setattr(helper, "MISSING_KEPT_S", 0.0)
     stand_in.says()
     return stand_in
 
@@ -143,7 +147,8 @@ async def test_both_routes_are_behind_the_token_like_every_other(address: str, m
 
 
 async def test_a_mac_that_cannot_says_why_and_writes_nothing_down(client: httpx.AsyncClient, stand_in: StandIn) -> None:
-    """The tests run with a compiler that does not exist (``MISSING_SWIFTC``, tests/smoke/conftest.py)."""
+    """The tests run with a compiler that does not exist (``MISSING_SWIFTC``, tests/smoke/conftest.py). This runs before
+    any test that gives the Mac a compiler: the daemon of the module remembers a compiler it found for its life."""
     answer: httpx.Response = await client.get("/api/voice")
     assert answer.status_code == 200
     assert answer.json() == {"transcribe": False, "why": NO_COMPILER}
@@ -290,3 +295,51 @@ async def test_what_the_program_cannot_do_is_said_in_plain_words_and_leaves_no_r
     # The route works after a failure: the next recording is written down.
     mac_can.says(text="fine again")
     assert (await client.post("/api/voice/transcribe", json=_body(wav_of(SAMPLES)))).json() == {"text": "fine again"}
+
+
+async def test_pages_that_load_while_a_slow_mac_is_asked_share_one_question_and_no_other_route_waits(
+    runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review of item 626: every page load asks `GET /api/voice`, which asked the Mac's tools (three programs, ten
+    seconds each at the most) each time, and the page waited for the answer. The daemon asks once: the pages that load
+    while the Mac is slow wait for that question, no other route does, and what the Mac said is remembered. A daemon of
+    this test's own, for the one of the module has been asked before; the Mac is without a compiler (the tests'
+    default), so that no program is built in the folder the other tests build in."""
+    asked: list[int] = []
+    real = helper.find_compiler
+
+    async def slow() -> object:
+        asked.append(1)
+        await asyncio.sleep(0.5)
+        return await real()
+
+    monkeypatch.setattr(helper, "find_compiler", slow)
+    manager: RunManager = RunManager(runtime)
+    port: int = 18626
+    context: ServerContext = ServerContext(
+        runtime=runtime,
+        manager=manager,
+        scheduler=None,
+        token=TOKEN,
+        host="127.0.0.1",
+        port=port,
+        started_at=time.time(),
+        stopping=asyncio.Event(),
+    )
+    transport = httpx.ASGITransport(app=create_app(context))
+    async with httpx.AsyncClient(
+        transport=transport, base_url=f"http://127.0.0.1:{port}", headers={"Authorization": f"Bearer {TOKEN}"}
+    ) as client:
+        loads: list[asyncio.Task[httpx.Response]] = [asyncio.create_task(client.get("/api/voice")) for _ in range(6)]
+        await asyncio.sleep(0.1)
+        began: float = time.monotonic()
+        health: httpx.Response = await client.get("/api/health")
+        assert health.status_code == 200
+        assert time.monotonic() - began < 0.3, "a route waited for the Mac to be asked"
+        answers: list[httpx.Response] = await asyncio.gather(*loads)
+        assert [answer.json() for answer in answers] == [{"transcribe": False, "why": NO_COMPILER}] * 6
+        # The next loads are answered from what the Mac said.
+        for _ in range(3):
+            assert (await client.get("/api/voice")).json() == {"transcribe": False, "why": NO_COMPILER}
+    assert len(asked) == 1
+    await manager.shutdown()

@@ -156,6 +156,46 @@ def _transcriber(stand: Stand) -> Transcriber:
     return Transcriber(stand.folder / "voice")
 
 
+class Asks:
+    """The times the daemon asked the Mac what it has to build with (up to three programs of the Mac's, ten seconds each
+    at the most), and how long each question takes."""
+
+    def __init__(self) -> None:
+        self.count: int = 0
+        self.delay: float = 0.0
+
+
+@pytest.fixture
+def asks(monkeypatch: pytest.MonkeyPatch) -> Asks:
+    asked: Asks = Asks()
+    real = helper.find_compiler
+
+    async def counting() -> object:
+        asked.count += 1
+        await asyncio.sleep(asked.delay)
+        return await real()
+
+    monkeypatch.setattr(helper, "find_compiler", counting)
+    return asked
+
+
+class Clock:
+    """The clock of the helper, which the test moves: what is kept for a while is kept by it."""
+
+    def __init__(self) -> None:
+        self.now: float = 1000.0
+
+    def monotonic(self) -> float:
+        return self.now
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
+    moved: Clock = Clock()
+    monkeypatch.setattr(helper, "time", moved)
+    return moved
+
+
 async def test_the_program_is_built_once_and_writes_a_recording_down_each_time(stand: Stand) -> None:
     transcriber: Transcriber = _transcriber(stand)
     assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
@@ -376,11 +416,80 @@ async def test_a_mac_without_a_compiler_cannot_and_says_so_without_building(
     transcriber.warm()
     await asyncio.sleep(0.1)
     assert stand.built() == 0 and not (stand.folder / "voice").exists()
-    # The owner installs the tools and reloads the page: a Mac without them is asked again, not remembered.
+
+
+async def test_the_mac_is_asked_what_it_has_to_build_with_once_for_the_daemons_life_and_not_at_all_once_built(
+    stand: Stand, asks: Asks, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review of item 626: a page asks at each load, and an answer needs up to three programs of the Mac's, ten
+    seconds each at the most: a compiler that was found is remembered, and the build and the recordings use it."""
+    transcriber: Transcriber = _transcriber(stand)
+    for _ in range(5):
+        assert await transcriber.ability() == Ability(transcribe=True, why=None)
+    assert asks.count == 1
+    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert asks.count == 1 and stand.built() == 1
+    # Built, the program is there: the Mac is not asked at all, whatever becomes of the tools.
+    monkeypatch.setenv("DOT_SWIFTC", str(stand.folder / "gone"))
+    for _ in range(3):
+        assert await transcriber.ability() == Ability(transcribe=True, why=None)
+    assert await transcriber.transcribe(RECORDING, "en-US") == f"en-US {GIVEN_BYTES} 600"
+    assert asks.count == 1 and stand.built() == 1
+
+
+async def test_callers_at_the_same_moment_share_one_question_to_a_slow_mac(stand: Stand, asks: Asks) -> None:
+    asks.delay = 0.3
+    transcriber: Transcriber = _transcriber(stand)
+    answers: list[Ability] = await asyncio.gather(*(transcriber.ability() for _ in range(6)))
+    assert answers == [Ability(transcribe=True, why=None)] * 6
+    assert asks.count == 1
+    # A build that begins meanwhile waits for the same answer, and asks nothing more.
+    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert asks.count == 1
+
+
+async def test_a_mac_without_the_tools_is_remembered_for_a_short_while_and_then_seen_with_them_without_a_restart(
+    stand: Stand, asks: Asks, clock: Clock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DOT_SWIFTC", str(stand.folder / "no-such-compiler"))
+    transcriber: Transcriber = _transcriber(stand)
+    for _ in range(4):
+        assert await transcriber.ability() == Ability(transcribe=False, why=NO_COMPILER)
+    with pytest.raises(VoiceError, match="This Mac cannot write recordings down"):
+        await transcriber.transcribe(RECORDING, "tr-TR")
+    assert asks.count == 1
+    # The owner installs the tools and reloads the page: for a short while the Mac is remembered as it was...
     monkeypatch.setenv("DOT_SWIFTC", str(stand.folder / "swiftc"))
+    clock.now += helper.MISSING_KEPT_S - 1
+    assert await transcriber.ability() == Ability(transcribe=False, why=NO_COMPILER)
+    assert asks.count == 1
+    # ...and after it the Mac is asked again and found with them: nothing was restarted.
+    clock.now += 1
+    assert await transcriber.ability() == Ability(transcribe=True, why=None)
+    assert asks.count == 2
+    assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
+    assert asks.count == 2 and stand.built() == 1
+
+
+async def test_a_build_that_fails_makes_the_daemon_ask_the_mac_again_what_it_has(
+    stand: Stand, asks: Asks, clock: Clock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An Xcode that was moved or updated leaves the path of its compiler, or of its SDK, out of date: what the Mac said
+    is forgotten with the build it failed, so that the next question is a new one."""
+    stand.refuse.write_text("yes", encoding="utf-8")
+    transcriber: Transcriber = _transcriber(stand)
+    with pytest.raises(VoiceError, match="could not build the program"):
+        await transcriber.transcribe(RECORDING, "tr-TR")
+    assert asks.count == 1
+    # The next ask of a page finds the Mac as it is now, and says the build failed.
+    assert (await transcriber.ability()).transcribe is False
+    assert asks.count == 2
+    # The wait for another build is over: the compiler is where it was, and the build works.
+    stand.refuse.unlink()
+    clock.now += helper.RETRY_BUILD_AFTER_S
     assert await transcriber.ability() == Ability(transcribe=True, why=None)
     assert await transcriber.transcribe(RECORDING, "tr-TR") == f"tr-TR {GIVEN_BYTES} 600"
-    assert stand.built() == 1
+    assert asks.count == 2
 
 
 @pytest.mark.parametrize(

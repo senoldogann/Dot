@@ -26,8 +26,9 @@ def voice_router() -> APIRouter:
     @router.get("/voice")
     async def voice() -> Ability:
         """Whether this Mac can write a recording down and, when it cannot, why in plain words and what to do. A page
-        asks once as it starts; when the Mac can, the program that does it is built now in the background, so that the
-        first recording does not wait for the compiler."""
+        asks as it starts, in the background; when the Mac can, the program that does it is built now in the background,
+        so that the first recording does not wait for the compiler. What the Mac has to build with is asked of the Mac
+        once and remembered (``Transcriber``), not at each ask."""
         ability: Ability = await transcriber.ability()
         if ability.transcribe:
             transcriber.warm()

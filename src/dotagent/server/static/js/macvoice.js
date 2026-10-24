@@ -1,30 +1,71 @@
-// What the Mac says of writing a recording down (item 626): whether it can, and when it cannot, why, in plain words. Read
-// once as the page starts (`GET /api/voice`, in main.js's connect), so that the composer knows at once how its
-// microphone listens (voice.js `listeningWay`); the daemon builds the program that writes down in the background meanwhile,
-// so that the first recording does not wait for it. And the call that has the Mac write a recording down.
+// What the Mac says of writing a recording down (item 626): whether it can, and when it cannot, why, in plain words. The
+// page reads it in the background as it starts (`GET /api/voice`, main.js's connect) and nothing of its start waits for
+// it: a slow Mac takes a while to answer (the daemon asks its developer tools once, up to three programs), and a page that
+// waited would start late for every browser, a Mac's own included, which never needs the answer. The composer knows how
+// its microphone listens (voice.js `listeningWay`) from the answer once it is in: a composer made before it listens the
+// browser's way, and one that is not listening takes the way the answer gives at its next press (microphone.js). The
+// daemon builds the program that writes down in the background meanwhile, so that the first recording does not wait for
+// it. And the call that has the Mac write a recording down.
 
 import { api } from "./api.js";
 import { macLanguage } from "./recording.js";
 import { base64Of } from "./wav.js";
 
-// What the page believes until the Mac has answered: that it cannot (a composer made before the answer, the opening
-// curtain's, listens the browser's own way).
-const NOT_KNOWN = { transcribe: false, why: null };
+// What the page believes until the Mac has answered: that it cannot. `known` says whether the answer is in, and `failed`,
+// when the Mac could not be asked at all, why.
+const NOT_KNOWN = { transcribe: false, why: null, failed: null, known: false };
 
-let mac = NOT_KNOWN;
+/**
+ * The Mac's answer and the read of it, with `get(path)` the daemon's GET (the API client's own; a test gives its own).
+ * @param {(path: string) => Promise<{ transcribe: boolean, why: string | null }>} get
+ */
+export function createMacVoice(get) {
+  let mac = NOT_KNOWN;
+  const listeners = new Set();
 
-/** What the Mac said when the page asked, or that it cannot while it has not been asked. */
-export function macVoice() {
-  return mac;
+  function keep(answer) {
+    mac = answer;
+    for (const listener of [...listeners]) {
+      try {
+        listener(mac);
+      } catch (error) {
+        console.error("a listener of the Mac's answer failed", error);
+      }
+    }
+  }
+
+  return {
+    /** What the Mac said, or that it cannot while it has not answered (`known` is false). */
+    macVoice: () => mac,
+
+    /** Call `listener(answer)` each time the answer comes in; returns what stops it. */
+    onMacVoice(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+
+    /**
+     * Ask the Mac whether it can write a recording down. Nothing waits for it: the page starts meanwhile, and the answer
+     * goes to `macVoice` and the listeners when it comes. A Mac that could not be asked (the daemon failed, or could not be
+     * reached) leaves the page as it was, with the browser's own recognition, and says so in `failed` (the Voice card tells
+     * it) and in the console: the promise settles either way.
+     */
+    loadMacVoice() {
+      return get("/voice").then(
+        (answer) => keep({ transcribe: answer.transcribe, why: answer.why, failed: null, known: true }),
+        (error) => {
+          console.warn("the Mac could not be asked whether it writes recordings down", error);
+          keep({ ...NOT_KNOWN, failed: error.message, known: true });
+        },
+      );
+    },
+  };
 }
 
-/** Ask the Mac whether it can write a recording down. As the other things the page reads as it starts, a failure goes to
- * the page's start (main.js's connect), which says what failed: the route answers for any state of the Mac, so one that
- * fails is a daemon that is broken. */
-export async function loadMacVoice() {
-  mac = await api.get("/voice");
-  return mac;
-}
+const shared = createMacVoice((path) => api.get(path));
+export const macVoice = shared.macVoice;
+export const onMacVoice = shared.onMacVoice;
+export const loadMacVoice = shared.loadMacVoice;
 
 /**
  * The words of `wav`, a recording, written down by the Mac in the language `tag` (the page's voice, as the Mac takes it).

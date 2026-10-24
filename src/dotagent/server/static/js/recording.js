@@ -52,12 +52,14 @@ export function macLanguage(tag) {
  * wav)` sends a recording and gives the words (a promise); both are given.
  *
  * `start()` opens the microphone. `stop()` is the owner's tick (the same when a pause ends it): it lets the microphone go
- * and sends the recording, and the words go into the box when the Mac answers, which `state(false)` then says. `abort()`
- * drops everything and sends nothing. One that is not touched ends by itself: `SILENCE_MS` after the microphone opened with
- * no sound at all it says nothing was heard and sends nothing; `PAUSE_MS` after the last sound once there was one it is
- * the owner's tick; the recording ends at the five minutes the Mac takes, as the tick; and with the page put out of sight
- * while it listens it is dropped (the microphone is let go). `end()` is there for the dictation's interface and does
- * nothing: a recording is with the Mac until it answers, or the owner's cross drops it.
+ * and sends what was recorded, a voice too quiet to count as a sound included (the Mac says when it heard nothing), and
+ * the words go into the box when the Mac answers, which `state(false)` then says. Only a tick before the first block of
+ * the microphone's sound came in has nothing to send, and is dropped. `abort()` drops everything and sends nothing. One
+ * that is not touched ends by itself: `SILENCE_MS` after the microphone opened with no sound at all it says nothing was
+ * heard and sends nothing; `PAUSE_MS` after the last sound once there was one it is the owner's tick; the recording ends
+ * at the five minutes the Mac takes, as the tick; and with the page put out of sight while it listens it is dropped (the
+ * microphone is let go). `end()` is there for the dictation's interface and does nothing: a recording is with the Mac
+ * until it answers, or the owner's cross drops it.
  */
 export function createRecording({
   language,
@@ -244,8 +246,9 @@ export function createRecording({
       return;
     }
     const mine = generation;
-    // A tick before any sound came in (the microphone opened a moment ago) has no recording to send: it is dropped, as
-    // one before the microphone opened is.
+    // A tick before the first block of the microphone's sound came in (it opened a moment ago) has no samples to send: it
+    // is dropped, as one before the microphone opened is. One after quiet blocks alone, a voice that never counted as a
+    // sound, is sent as it is: the owner asked for it, and the Mac says whether it heard anything.
     if (kept === 0) {
       abort();
       return;

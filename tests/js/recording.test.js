@@ -15,6 +15,13 @@ const BLOCK = 2048;
 const BLOCK_MS = (BLOCK / RATE) * 1000;
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1";
 
+// What the page logs for whoever looks into a failure (recording.js): kept, so that a test of a failure says nothing to the
+// terminal, and the test of the failures can see that it was logged.
+const warnings = [];
+console.warn = (...words) => {
+  warnings.push(words);
+};
+
 /** A block of the microphone's sound: a sine wave of `amplitude` (its loudness is that over the root of two); 0 is a silence. */
 function block(amplitude = 0.3) {
   return Float32Array.from({ length: BLOCK }, (_, index) => amplitude * Math.sin(index * 0.2));
@@ -254,7 +261,7 @@ test("the words go into the box after what it held", async (t) => {
   assert.deepEqual(seen.shown, [["Dear Ada, thanks for the plan", null]]);
 });
 
-test("a tick before any sound came in has nothing to send: it is dropped, says nothing and lets the microphone go", async (t) => {
+test("a tick before the first block of sound came in has nothing to send: it is dropped, says nothing and lets the microphone go", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const { recording, seen, mic, mac } = await listening();
   recording.stop();
@@ -268,6 +275,34 @@ test("a tick before any sound came in has nothing to send: it is dropped, says n
   // A block that comes after it is not heard.
   mic.last().block(block());
   assert.deepEqual(seen.sounds, []);
+});
+
+test("a tick after quiet blocks only sends what was recorded, and the Mac's word that it heard nothing is told", async (t) => {
+  // The review of item 626: the owner's tick is a request, and a voice too quiet to count as a sound (the level is a guess
+  // without a real microphone) is not thrown away unheard: the Mac is asked, and says when it heard nothing.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { recording, seen, mic, mac } = await listening();
+  for (let index = 0; index < 10; index += 1) {
+    mic.last().block(block(0.004));
+  }
+  // Never as loud as a sound is: the wave stayed flat and the pause timer was never moved.
+  assert.deepEqual(seen.sounds, []);
+  recording.stop();
+  assert.equal(mac.sent.length, 1, "the owner's tick sent nothing");
+  assert.equal(mic.last().stopped, 1);
+  assert.deepEqual(seen.writing, [true]);
+  const wav = readWav(mac.sent[0].wav);
+  // Ten blocks of 2048 samples at 48 kHz, brought down to 16 kHz.
+  assert.equal(wav.samples, Math.floor((10 * 2048) / 3));
+  assert.ok(wav.peak > 0 && wav.peak < 0.01 * 32767, `peak ${wav.peak}`);
+  mac.answer("");
+  await arrive();
+  assert.deepEqual(seen.shown, []);
+  assert.deepEqual(seen.writing, [true, false]);
+  assert.equal(seen.problems.length, 1);
+  assert.match(seen.problems[0], /^Nothing was heard\. Check that the browser may use the microphone/);
+  assert.deepEqual(seen.states, [true, false]);
+  assert.equal(recording.listening(), false);
 });
 
 test("the cross sends nothing, lets the microphone go and leaves the box as it was", async (t) => {
@@ -425,6 +460,7 @@ test("what goes wrong on the way to the Mac is said in plain words, and the box 
     assert.equal(made.seen.problems.length, 1);
     return made.seen.problems[0];
   };
+  const before = warnings.length;
   const unreachable = Object.assign(new Error("Cannot reach the Dot daemon. Is it running?"), { status: 0 });
   assert.match(await told(unreachable), /^The Mac could not be reached, so what you said was not written down\. Check that Dot is running on it/);
   const language = Object.assign(new Error("This Mac cannot write down tr-TR: choose another language"), {
@@ -439,6 +475,12 @@ test("what goes wrong on the way to the Mac is said in plain words, and the box 
   assert.equal(await told(unreadable), "The Mac could not write down what you said.");
   // Nothing in what the Mac sent back says no words: nothing was heard, and the words of the page's own say what to check.
   assert.match(await told(undefined), /^Nothing was heard\. Check that the browser may use the microphone/);
+  // Each refusal was logged with its error, for whoever looks into it; an answer with no words is no failure.
+  assert.equal(warnings.length - before, 4);
+  assert.deepEqual(
+    warnings.slice(before).map(([what]) => what),
+    Array(4).fill("a recording could not be written down"),
+  );
 });
 
 test("an answer that comes after the cross writes nothing into the box, and nothing twice", async (t) => {

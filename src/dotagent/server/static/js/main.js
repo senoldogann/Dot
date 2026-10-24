@@ -627,8 +627,11 @@ function handleAuthLost() {
 
 async function connect() {
   renderWaiting();
+  // The Mac's answer on writing down what is said is read in the background (item 626): a slow Mac takes a while to
+  // answer, and nothing of the page's start needs it. A composer made before it listens the browser's way.
+  loadMacVoice();
   try {
-    await Promise.all([refresh(), loadLooks(), loadOwnThemes(), loadAssistant(), loadMacVoice()]);
+    await Promise.all([refresh(), loadLooks(), loadOwnThemes(), loadAssistant()]);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       const before = untried === null ? null : keptBefore;

@@ -225,9 +225,11 @@ allows). If iOS puts the audio context aside as it turns to the microphone, the 
 still does not run says so and what to do. The page keeps the sound in memory as 16 kHz mono 16-bit samples, five
 minutes at the most. A block of the microphone's sound is a sound when it is as loud as 0.01 (the root of its mean
 square, 0 to 1; measured with the speech of `say`: speech mostly 0.1 to 0.2, its pauses 0, the soft ends of its words
-between), and it counts for 0.4 seconds after, so that the pause between two words is no silence. The tick, a pause of
-fifteen seconds after a sound and the five minutes send the recording to the Mac (a tick before any sound came in has
-none to send, and drops it). The recorder says **Writing down what you said…** in the wave's place, quietly, until the
+between), and it counts for 0.4 seconds after, so that the pause between two words is no silence. The tick sends
+what was recorded, a voice too quiet to count as a sound included: the Mac says when it heard nothing, and only a tick
+before the first block of sound came in has nothing to send, and drops it. A pause of fifteen seconds after a sound and
+the five minutes send the recording too; six seconds with no sound at all end it by themselves, saying nothing was
+heard, and send nothing. The recorder says **Writing down what you said…** in the wave's place, quietly, until the
 words come, with the cross to give up waiting, and the words go into the box after what it held. Every end (the tick,
 the cross, typing, a message sent, the page out of sight, an error) lets the microphone go at once: its tracks end,
 which puts an iPhone's microphone light out, the audio context closes and the samples are dropped; a press while the
@@ -235,12 +237,20 @@ browser still asks drops it. A failure says what to do in plain words, and the b
 reached, it cannot write down this language (choose another in Settings › General › Voice), nothing was heard.
 
 The Mac writes it down with macOS 26's own dictation, on the device, through a small program the daemon builds with the
-Swift compiler of Apple's developer tools the first time it is needed (`src/dotagent/voice`). The page asks once as it
-starts whether the Mac can (`GET /api/voice`: `transcribe`, and when it cannot `why`, in words: macOS 26 or later;
-Apple's developer tools, `xcode-select --install`; a compiler and an SDK in them; or what the compiler complained of
-when a build failed, which is not tried again for ten minutes), and when it can, the daemon builds the program in the
-background then, so that the first recording does not wait. Where the Mac cannot, an iPhone keeps Safari's recognition,
-and the toast of item 616 adds what the Mac lacks; Settings › General › Voice says which way the page listens.
+Swift compiler of Apple's developer tools the first time it is needed (`src/dotagent/voice`). `GET /api/voice` says
+whether the Mac can: `transcribe`, and when it cannot `why`, in words (macOS 26 or later; Apple's developer tools,
+`xcode-select --install`; a compiler and an SDK in them; or what the compiler complained of when a build failed, which
+is not tried again for ten minutes). When it can, the daemon builds the program in the background then, so that the
+first recording does not wait. The answer needs up to three programs of the Mac's (`xcode-select -p` and two of
+`xcrun`, ten seconds each at the most), and a page asks at each load, so the daemon asks once and remembers: a compiler
+it found, for its life; a Mac without the tools, for 30 seconds, so that installing them is seen without a restart; and
+once the program is built it asks nothing at all. A build that fails forgets what the Mac said, and the callers at the
+same moment wait for one question. The page reads the answer in the background as it starts, and nothing of its start
+waits for it, a Mac browser's or Dot.app's included, which never needs it. A composer made before the answer listens the
+browser's way; one that is not listening takes the way the answer gives at its next press, and Settings › General ›
+Voice, which says which way the page listens, is written again when the answer comes in. A Mac that could not be asked
+at all (the daemon failed, or could not be reached) leaves the page as it was, and the card says so. Where the Mac
+cannot write down, an iPhone keeps Safari's recognition, and the toast of item 616 adds what the Mac lacks.
 `POST /api/voice/transcribe` takes `{"language": "tr-TR", "data_b64": "<WAV>"}` and answers `{"text": "…"}`, empty
 when nothing was heard. It is behind the token like every route, so the phone paired in Settings › Phone reaches it as
 it reaches the composer, and it reads the recording as a model before it does anything with it: a WAV of 16-bit mono

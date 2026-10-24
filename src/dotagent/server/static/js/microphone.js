@@ -39,13 +39,17 @@ const SETTLE_MS = 3000;
  * its controls while the microphone listens, `abort()` for a message sent, and `dispose()`.
  */
 export function createMicrophone({ textarea, setInterim }) {
-  const way = listeningWay({
-    recognition: canListen(),
-    recording: canRecord(),
-    mac: macVoice().transcribe,
-    userAgent: navigator.userAgent,
-    touchPoints: navigator.maxTouchPoints,
-  });
+  /** How the page listens now (voice.js `listeningWay`): the Mac's answer is read in the background as the page starts,
+   * and may come in after a composer is made (item 626). */
+  const listensNow = () =>
+    listeningWay({
+      recognition: canListen(),
+      recording: canRecord(),
+      mac: macVoice().transcribe,
+      userAgent: navigator.userAgent,
+      touchPoints: navigator.maxTouchPoints,
+    });
+  let way = listensNow();
   if (way === null) {
     return null;
   }
@@ -216,10 +220,25 @@ export function createMicrophone({ textarea, setInterim }) {
       loud = isLoud;
     },
   };
-  const dictation =
-    way === "recording"
+  /** The engine of `kind`: a recording for the Mac to write down, or the browser's own dictation. */
+  const engine = (kind) =>
+    kind === "recording"
       ? createRecording({ ...callbacks, writing: showWriting, capture: openCapture, send: writeDown })
       : createDictation(callbacks);
+  let dictation = engine(way);
+
+  /** A composer made before the Mac's answer came in listens the browser's way, and the answer may say that the Mac
+   * writes down what is said (an iPhone's Safari goes deaf, so that is the way for it): a microphone that is not
+   * listening takes the way the page has now, as it is pressed. */
+  function listenTheWayOfNow() {
+    const now = listensNow();
+    if (now === null || now === way || dictation.listening()) {
+      return;
+    }
+    dictation.dispose();
+    way = now;
+    dictation = engine(now);
+  }
 
   /** End the dictation and drop what it heard: the box keeps what it held. */
   function drop() {
@@ -227,7 +246,10 @@ export function createMicrophone({ textarea, setInterim }) {
     dictation.abort();
   }
 
-  button.addEventListener("click", dictation.toggle);
+  button.addEventListener("click", () => {
+    listenTheWayOfNow();
+    dictation.toggle();
+  });
   cancel.addEventListener("click", drop);
   done.addEventListener("click", () => {
     // The engine settles what it heard and ends; the words go into the box then. One that does not end soon is ended

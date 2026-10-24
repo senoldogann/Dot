@@ -7,6 +7,12 @@ can write down (:meth:`Transcriber.warm`), in a folder of mode 0700 under Dot's 
 change (``runtime._dot_paths``). It keeps the SHA-256 of what it built in memory and hashes the file again before each
 run: a file that is not the one built is never run, and the program is built anew.
 
+Whether this Mac can write down needs up to three programs of the Mac's (``xcode-select -p`` and two of ``xcrun``, ten
+seconds each at the most), and a page asks at each load. So the daemon asks the Mac once and remembers: a compiler that
+was found for the daemon's life, what was missing for ``MISSING_KEPT_S`` seconds, so that installing the tools is seen
+without a restart. A build that fails forgets it, since an Xcode that moved leaves a path that is out of date, and once
+the program is built the Mac is not asked at all. One question at a time: the others wait for its answer.
+
 A recording is written to a file of mode 0600 in a private folder, for as long as the program takes to read it, and the
 file is removed whether it worked or not. The recording and the words are never logged and never kept; the log has how
 long the recording was and how long it took to write it down. The program is started with an argument list (never a
@@ -29,7 +35,7 @@ from dotagent.core.errors import InvalidValueError, VoiceError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
-from dotagent.voice.toolchain import find_compiler, small_environment
+from dotagent.voice.toolchain import Toolchain, find_compiler, small_environment
 from dotagent.voice.wav import Recording, canonical_wav
 
 log = get_logger(__name__)
@@ -51,6 +57,10 @@ RUN_TIMEOUT_S: float = 60.0
 FIRST_RUN_TIMEOUT_S: float = 300.0
 # A build that failed is not tried again for this long: the page asks at each load, and the compiler is not quick.
 RETRY_BUILD_AFTER_S: float = 600.0
+# A Mac that lacks what it needs to build with (macOS 26, Apple's developer tools, a compiler and an SDK in them) is not
+# asked again for this long: long enough that the page loads of a Mac without them ask nothing, short enough that the
+# owner who installs the tools and reloads the page is not made to restart the daemon.
+MISSING_KEPT_S: float = 30.0
 # Recordings written down at one time; the others wait, as the model is large.
 _AT_ONCE: int = 2
 # A language as the program is given it: ``tr-TR``, ``en-US``, ``yue-CN``, or a bare ``en``.
@@ -158,6 +168,9 @@ class Transcriber:
         self._building: asyncio.Lock = asyncio.Lock()
         self._built: _Built | None = None
         self._failed: tuple[float, VoiceError] | None = None
+        # What the Mac last said it has to build with, and when (:meth:`_toolchain`); one question at a time.
+        self._tools: tuple[float, Toolchain] | None = None
+        self._asking: asyncio.Lock = asyncio.Lock()
         self._warming: asyncio.Task[None] | None = None
         self._written: set[str] = set()
         self._slots: asyncio.Semaphore = asyncio.Semaphore(_AT_ONCE)
@@ -178,9 +191,24 @@ class Transcriber:
             return None
         return error
 
+    async def _toolchain(self) -> Toolchain:
+        """What this Mac has to build the program with. The Mac is asked (:func:`find_compiler`: up to three programs,
+        ten seconds each) only when the answer is not known: a compiler that was found is kept for the daemon's life,
+        what was missing for ``MISSING_KEPT_S`` seconds. The callers at the same moment wait for one question."""
+        async with self._asking:
+            kept: tuple[float, Toolchain] | None = self._tools
+            if kept is not None and (kept[1].compiler is not None or time.monotonic() - kept[0] < MISSING_KEPT_S):
+                return kept[1]
+            asked: Toolchain = await find_compiler()
+            self._tools = (time.monotonic(), asked)
+            return asked
+
     async def ability(self) -> Ability:
-        """Whether this Mac can write a recording down now; when it cannot, the one thing to do about it."""
-        found = await find_compiler()
+        """Whether this Mac can write a recording down now; when it cannot, the one thing to do about it. A program that
+        was built stays built for the daemon's life: the Mac is not asked about it again."""
+        if self._built is not None:
+            return Ability(transcribe=True, why=None)
+        found: Toolchain = await self._toolchain()
         if found.compiler is None:
             return Ability(transcribe=False, why=found.why)
         failure: VoiceError | None = self._recent_failure()
@@ -270,7 +298,7 @@ class Transcriber:
                     return built.program
                 log.warning("voice_program_changed", program=str(built.program))
                 self._built = None
-            found = await find_compiler()
+            found: Toolchain = await self._toolchain()
             if found.compiler is None:
                 raise VoiceError(
                     f"This Mac cannot write recordings down. {found.why}", {"code": "unavailable", "why": found.why}
@@ -282,6 +310,8 @@ class Transcriber:
                 self._built = await self._build(found.compiler, found.sdk)
             except VoiceError as error:
                 self._failed = (time.monotonic(), error)
+                # What the Mac said may be out of date (an Xcode that was moved): the next build asks the Mac again.
+                self._tools = None
                 log.warning("voice_program_not_built", error=error.message, context=error.context)
                 raise
             self._failed = None

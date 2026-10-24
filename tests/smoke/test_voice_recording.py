@@ -15,7 +15,8 @@ downsampling, its WAV file, its request, and the daemon's."""
 
 import asyncio
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
 
@@ -27,6 +28,7 @@ from playwright.async_api import (
     Locator,
     Page,
     Playwright,
+    Route,
     async_playwright,
     expect,
 )
@@ -185,8 +187,10 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory, home: Path) -> Async
         patch.undo()
 
 
-@pytest_asyncio.fixture(scope="module", loop_scope="module")
-async def address(runtime: Runtime) -> AsyncIterator[str]:
+@asynccontextmanager
+async def _serving(runtime: Runtime) -> AsyncIterator[str]:
+    """A daemon over `runtime`, with a memory of its own of what the Mac has to build with (item 626): a compiler it
+    found stays found for its life."""
     manager: RunManager = RunManager(runtime)
     stopping: asyncio.Event = asyncio.Event()
     listener = bind_listener("127.0.0.1", 0)
@@ -213,6 +217,20 @@ async def address(runtime: Runtime) -> AsyncIterator[str]:
         stopping.set()
         await serving
         await manager.shutdown()
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def address(runtime: Runtime) -> AsyncIterator[str]:
+    async with _serving(runtime) as served:
+        yield served
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def address_without_tools(runtime: Runtime) -> AsyncIterator[str]:
+    """A second daemon, for the tests of a Mac that cannot write down: the first remembers a compiler it found for its
+    life, and this one never finds one, as no test that uses it gives the Mac a compiler."""
+    async with _serving(runtime) as served:
+        yield served
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -260,10 +278,14 @@ async def _open(
     clock: bool = False,
     engine: Engine = "chromium",
     playwright: Playwright | None = None,
+    answered: bool = True,
+    routes: Callable[[Page], Awaitable[None]] | None = None,
 ) -> Page:
     """A page signed in at the home, on an iPhone (its user agent, a touch screen, a phone's window) or on a Mac's
     Chrome, with `scripts` run before the page's own: the microphone and the recognition it is given. With `clock`, a
-    page whose time the test moves."""
+    page whose time the test moves. The page does not wait for the Mac's answer to `GET /api/voice` to start (item 626),
+    so this waits for it, and for the page to have taken it, unless `answered` is false (a test that holds the answer or
+    refuses it); `routes` sets what the page's requests meet, before it loads."""
     options: dict[str, Any]
     if phone and engine == "webkit":
         assert playwright is not None
@@ -282,14 +304,37 @@ async def _open(
     for script in scripts:
         await context.add_init_script(script)
     page: Page = await context.new_page()
+    if routes is not None:
+        await routes(page)
     if clock:
         await page.clock.install()
     page.on("pageerror", lambda error: pytest.fail(f"the page failed: {error}"))
-    await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+    home: str = ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN)
+    if answered:
+        async with page.expect_response(_is_the_macs_answer) as the_answer:
+            await page.goto(home)
+        await (await the_answer.value).finished()
+        await _settle(page)
+    else:
+        await page.goto(home)
     await expect(page.locator(GOAL)).to_be_visible()
     if clock:
         await page.clock.pause_at(await page.evaluate("() => Date.now() + 500"))
     return page
+
+
+def _is_the_macs_answer(response: Any) -> bool:
+    """Whether `response` is the daemon's answer to `GET /api/voice`."""
+    return bool(response.url.endswith("/api/voice"))
+
+
+async def _settle(page: Page) -> None:
+    """Let the tasks the page has queued run: what it does with an answer that has come in. A message of a channel,
+    not a timer, so that a page whose clock the test holds is not waited on."""
+    await page.evaluate(
+        "() => new Promise((resolve) => { const channel = new MessageChannel();"
+        " channel.port1.onmessage = () => resolve(); channel.port2.postMessage(0); })"
+    )
 
 
 def _microphone(page: Page) -> Locator:
@@ -556,12 +601,12 @@ async def test_a_pause_of_fifteen_seconds_after_a_sound_ends_the_recording_and_s
 
 
 async def test_where_the_mac_cannot_an_iphone_keeps_safaris_recognition_and_the_toast_says_what_the_mac_lacks(
-    chromium: Browser, address: str
+    chromium: Browser, address_without_tools: str
 ) -> None:
     """The tests run with a compiler that does not exist (``MISSING_SWIFTC``): the Mac cannot. The page then dictates
     as it did before item 626, and the toast of a later dictation Safari did not hear (item 616) says what the Mac
     lacks."""
-    page: Page = await _open(chromium, address)
+    page: Page = await _open(chromium, address_without_tools)
     mic: Locator = _microphone(page)
     await mic.click()
     await page.evaluate("() => window.__voice.hear('first words')")
@@ -600,6 +645,10 @@ async def test_a_browser_with_no_speech_recognition_shows_the_microphone_when_th
     chromium: Browser, address: str, mac_can: StandIn
 ) -> None:
     page: Page = await _open(chromium, address, scripts=(_MICROPHONE, _NO_RECOGNITION), phone=False, width=1280)
+    # The composer of the home was made as the page started, which does not wait for the Mac's answer: the one made by
+    # the next visit to the home is made after it, and has the microphone this browser never had.
+    await page.goto(f"{address}/#/settings/general")
+    await page.goto(f"{address}/#/runs")
     await expect(_microphone(page)).to_be_visible()
     await _listening(page)
     await page.evaluate("() => window.__mic.speak(0.6)")
@@ -610,25 +659,138 @@ async def test_a_browser_with_no_speech_recognition_shows_the_microphone_when_th
     await page.context.close()
 
 
-async def test_the_voice_card_says_where_the_voice_goes_by_the_way_the_page_listens(
-    chromium: Browser, address: str, monkeypatch: pytest.MonkeyPatch, stand_in: StandIn
+async def test_the_voice_card_of_an_iphone_whose_mac_cannot_write_down_says_what_the_mac_lacks(
+    chromium: Browser, address_without_tools: str
 ) -> None:
     # An iPhone whose Mac cannot write down keeps Safari's recognition, and the card says what the Mac lacks.
-    page: Page = await _open(chromium, address)
-    await page.goto(f"{address}/#/settings/general")
+    page: Page = await _open(chromium, address_without_tools)
+    await page.goto(f"{address_without_tools}/#/settings/general")
     voice: Locator = page.locator("section.card", has=page.get_by_text("Voice", exact=True))
     await expect(voice).to_contain_text("Safari and Chrome may send your voice to Apple's or Google's servers")
     await expect(voice).to_contain_text("Safari on an iPhone or an iPad at times hears only the first dictation")
     await expect(voice).to_contain_text("A Mac that writes down what you say hears every time. Apple's developer tools")
+    await _fits(page, "Settings › General › Voice on a phone, the Mac without the tools")
     await page.context.close()
+
+
+async def test_the_voice_card_of_an_iphone_whose_mac_can_write_down_says_where_the_voice_goes(
+    chromium: Browser, address: str, mac_can: StandIn
+) -> None:
     # With the Mac able, the card says the voice goes to the owner's Mac and nowhere else.
-    monkeypatch.setenv("DOT_SWIFTC", str(stand_in.compiler))
-    page = await _open(chromium, address)
+    page: Page = await _open(chromium, address)
     await page.goto(f"{address}/#/settings/general")
-    voice = page.locator("section.card", has=page.get_by_text("Voice", exact=True))
+    voice: Locator = page.locator("section.card", has=page.get_by_text("Voice", exact=True))
     await expect(voice).to_contain_text("The microphone records your voice and sends it to your Mac")
     await expect(voice).to_contain_text("it goes to no one else, and the Mac keeps nothing")
     await expect(voice).to_contain_text("downloads its model from Apple")
     await expect(voice).not_to_contain_text("Safari and Chrome may send your voice")
     await _fits(page, "Settings › General › Voice on a phone")
+    await page.context.close()
+
+
+async def test_the_page_starts_without_waiting_for_the_macs_answer_and_a_press_after_it_records(
+    chromium: Browser, address: str, mac_can: StandIn
+) -> None:
+    """The review of item 626: `GET /api/voice` was read with the rest of what the page needs to start, and a slow Mac
+    (the daemon asks its developer tools, up to three programs) held up every page, a Mac browser's too. The page starts
+    as the answer is held; a composer made before it listens the browser's way; and, the answer in, the next press
+    records."""
+    release: asyncio.Event = asyncio.Event()
+    held: list[str] = []
+
+    async def hold_the_answer(page: Page) -> None:
+        async def slow(route: Route) -> None:
+            held.append(route.request.url)
+            await release.wait()
+            await route.continue_()
+
+        await page.route("**/api/voice", slow)
+
+    page: Page = await _open(chromium, address, answered=False, routes=hold_the_answer)
+    box: Locator = page.locator(GOAL)
+    # The page started, composer and all, and the Mac has not been heard from.
+    await expect(_microphone(page)).to_be_visible()
+    assert len(held) == 1 and not release.is_set()
+    # The composer was made before the answer: the press asks the browser's recognition, as an iPhone did before.
+    await _microphone(page).click()
+    await page.evaluate("() => window.__voice.hear('browser words')")
+    await _tick(page).click()
+    await expect(box).to_have_value("browser words")
+    assert await page.evaluate("() => window.__voice.starts") == 1
+    assert await _mic(page, "mic.asked") == []
+    # The answer comes: the same composer, not made again, takes the way it gives at its next press.
+    async with page.expect_response(_is_the_macs_answer) as the_answer:
+        release.set()
+    await (await the_answer.value).finished()
+    await _settle(page)
+    await box.fill("")
+    await _listening(page)
+    assert len(await _mic(page, "mic.asked")) == 1
+    assert await page.evaluate("() => window.__voice.starts") == 1, "the browser's recognition was asked again"
+    await page.evaluate("() => window.__mic.speak(0.6)")
+    await asyncio.sleep(1.0)
+    await _tick(page).click()
+    await expect(box).to_have_value(_WORDS, timeout=_WAIT_MS)
+    await _released(page)
+    await page.context.close()
+
+
+async def test_the_voice_card_is_written_again_when_the_macs_answer_comes_in_after_it(
+    chromium: Browser, address: str, mac_can: StandIn
+) -> None:
+    release: asyncio.Event = asyncio.Event()
+
+    async def hold_the_answer(page: Page) -> None:
+        async def slow(route: Route) -> None:
+            await release.wait()
+            await route.continue_()
+
+        await page.route("**/api/voice", slow)
+
+    page: Page = await _open(chromium, address, answered=False, routes=hold_the_answer)
+    await page.goto(f"{address}/#/settings/general")
+    voice: Locator = page.locator("section.card", has=page.get_by_text("Voice", exact=True))
+    # The Mac has not answered: the card says how the browser listens, as it did before.
+    await expect(voice).to_contain_text("The browser does the listening")
+    await expect(voice).not_to_contain_text("The microphone records your voice")
+    async with page.expect_response(_is_the_macs_answer) as the_answer:
+        release.set()
+    await (await the_answer.value).finished()
+    # The same card, written again: it says where the voice goes now.
+    await expect(voice).to_contain_text("The microphone records your voice and sends it to your Mac")
+    await expect(voice).not_to_contain_text("The browser does the listening")
+    await expect(voice).to_contain_text("downloads its model from Apple")
+    await _fits(page, "Settings › General › Voice once the Mac has answered")
+    await page.context.close()
+
+
+async def test_a_mac_that_could_not_be_asked_leaves_the_page_as_it_was_and_the_voice_card_says_so(
+    chromium: Browser, address: str
+) -> None:
+    async def refuse_the_answer(page: Page) -> None:
+        async def failing(route: Route) -> None:
+            await route.fulfill(
+                status=500,
+                content_type="application/json",
+                body='{"message": "Dot failed on an error it did not expect", "context": {}}',
+            )
+
+        await page.route("**/api/voice", failing)
+
+    page: Page = await _open(chromium, address, answered=False, routes=refuse_the_answer)
+    box: Locator = page.locator(GOAL)
+    # The page starts: no toast, no failure screen, and the microphone listens the browser's way, as before.
+    await expect(_microphone(page)).to_be_visible()
+    await expect(page.locator(".toast")).to_have_count(0)
+    await _microphone(page).click()
+    await page.evaluate("() => window.__voice.hear('browser words')")
+    await _tick(page).click()
+    await expect(box).to_have_value("browser words")
+    assert await _mic(page, "mic.asked") == []
+    # The Voice card says that the Mac could not be asked, with the daemon's own words.
+    await page.goto(f"{address}/#/settings/general")
+    voice: Locator = page.locator("section.card", has=page.get_by_text("Voice", exact=True))
+    await expect(voice).to_contain_text(
+        "The Mac could not be asked whether it can write down what you say: Dot failed on an error it did not expect"
+    )
     await page.context.close()
