@@ -266,7 +266,7 @@ currency, so list sites that bill in one currency. Empty by default.
    rule is a sentence that ends in its answer as a badge, read from its tool and its pattern and from nothing else, not
    from its why, which may say anything, and saying neither less nor more than its pattern fits. A pattern of whole
    words (a word boundary, `\b`, at each end of a word that is a word character to the engine: a letter, a mark, a
-   decimal digit or `_`) reads as "mentions “git push”", one
+   decimal digit, a connector such as `_` or `‿`, a joiner) reads as "mentions “git push”", one
    of the letters of a word anywhere (no boundary at all) as "contains “ls”", and the drafter's pattern for a command a
    rule lets Dot run as "run “git push” (with plain arguments, after changing folder at most)", the arguments plain
    when they hold none of `;` `&` `|` `$` `<` `>` `(` `)` or a backtick, which chain a command to it, substitute one

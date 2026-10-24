@@ -115,7 +115,8 @@ def command_pattern(commands: Sequence[str]) -> str:
 def mention_pattern(mentions: Sequence[str]) -> str:
     """A pattern that fits an action that mentions one of ``mentions`` in its summary or its target, as a whole word
     where a mention starts or ends with a word character as the engine that matches rules tells one (a letter, a mark,
-    a decimal digit, ``_``; not ``²`` or ``½``): x.com does not fit netflix.com (item 629)."""
+    a decimal digit, a connector such as ``_`` or ``‿``, a joiner; not ``²`` or ``½``): x.com does not fit netflix.com
+    (item 629)."""
     return "(?:" + "|".join(_bounded(mention) for mention in mentions) + ")"
 
 
