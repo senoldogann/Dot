@@ -4,21 +4,25 @@ switches the channel on, and a message they send to themselves starts a run in t
 back to them marked ◆, while no other conversation is ever read as a command."""
 
 import asyncio
+import contextlib
 import dataclasses
 import threading
 import time
 import tomllib
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from pathlib import Path
 
 import httpx
 import pytest
 import pytest_asyncio
-from channel_stand_ins import PROVIDER, FakeMacos, Osascript, Replies, finish
+from channel_stand_ins import PROVIDER, FakeMacos, Osascript, Replies, finish, stop_file
 from messages_db import URL_BALLOON, MessagesDb
 
 from dotagent.agent.manager import RunManager
+from dotagent.channels.handles import STATE_KEY, ImessageState
 from dotagent.channels.imessage import MARKER
+from dotagent.channels.intake import ATTACHMENT, UNREAD_ANSWER, UNREAD_NOTE
+from dotagent.channels.router import STOPPED
 from dotagent.channels.service import Channels
 from dotagent.config import ChannelsConfig, load_config
 from dotagent.core.errors import ChannelError, DesktopError
@@ -204,7 +208,10 @@ async def test_the_page_shows_a_channel_that_is_off_with_no_one_paired(world: Wo
             "command": None,
             "error": None,
             "warning": None,
+            "cursor_reset": None,
         },
+        # No name for a phone to reach the Mac by: no link is sent (item 611).
+        "links": None,
     }
 
 
@@ -579,6 +586,223 @@ async def test_the_link_at_the_end_of_an_answer_is_not_read_back_as_a_command_wh
         assert len(await runtime.store.list_runs(100, None)) == before + 2
     finally:
         await channels.stop()
+
+
+# ----- item 611: the emergency stop, the cursor, plain stop words, a picture sent with words, and links ----------
+
+
+@contextlib.asynccontextmanager
+async def _reading(
+    runtime: Runtime,
+    manager: RunManager,
+    messages: MessagesDb,
+    *,
+    reach: list[str] | None = None,
+    cursor: int | None = None,
+) -> AsyncIterator[tuple[Channels, Osascript]]:
+    """The channels of a daemon over a ``chat.db`` of the test's own, as a daemon that starts with iMessage on and the
+    owner's number paired finds them: ``cursor`` is where the channel stands in the database (``None``: it sets it at
+    its first poll), ``reach`` the name a phone reaches the Mac by."""
+    configured: Runtime = dataclasses.replace(
+        runtime,
+        config=runtime.config.model_copy(
+            update={
+                "channels": ChannelsConfig(imessage=True),
+                "server": runtime.config.server.model_copy(update={"reach": [] if reach is None else reach}),
+            }
+        ),
+    )
+    osascript: Osascript = Osascript()
+    channels: Channels = Channels(
+        configured,
+        manager,
+        "127.0.0.1",
+        8765,
+        script=osascript,
+        messages_db=messages.path,
+        macos=FakeMacos(),
+        poll_s=0.05,
+    )
+    await runtime.store.kv_set(STATE_KEY, ImessageState(handles=(PHONE,), cursor=cursor).model_dump_json())
+    await channels.start()
+    try:
+        yield channels, osascript
+    finally:
+        await channels.stop()
+
+
+@contextlib.contextmanager
+def _stop_engaged() -> Iterator[Path]:
+    """The owner's emergency stop: the STOP file of the throwaway home, taken away when the block is done."""
+    stop: Path = stop_file()
+    stop.touch()
+    try:
+        yield stop
+    finally:
+        stop.unlink(missing_ok=True)
+
+
+async def test_while_the_emergency_stop_is_engaged_a_message_on_the_channel_starts_no_run_and_is_answered_once(
+    runtime: Runtime, manager: RunManager, replies: Replies, tmp_path: Path
+) -> None:
+    """The channel is the one remote way to start a run, and the stop did not hold it: a message still started a run and
+    its answer went back (item 611). Now the stop holds, the owner is told how to go on, and what was written meanwhile
+    is not run when it is released."""
+    replies.clear()
+    db: MessagesDb = MessagesDb(tmp_path / "chat.db")
+    own: int = db.chat(PHONE)
+    try:
+        async with _reading(runtime, manager, db) as (channels, osascript):
+            await asyncio.sleep(0.4)
+            before: int = len(await runtime.store.list_runs(100, None))
+            with _stop_engaged():
+                db.message(own, "what is two and two?", at=time.time())
+                await _until(lambda: len(osascript.sent) == 1, "the notice")
+                assert osascript.sent == [(PHONE, f"{MARKER}{STOPPED}")]
+                await asyncio.sleep(0.4)
+                assert len(osascript.sent) == 1 and len(await runtime.store.list_runs(100, None)) == before
+                assert channels.imessage.seen().command is not None
+            replies.push(finish("Four."))
+            db.message(own, "and now?", at=time.time())
+            await _until(lambda: len(osascript.sent) == 2, "the answer after the release")
+            assert osascript.sent[1] == (PHONE, f"{MARKER}Four.")
+            assert [run.goal for run in await runtime.store.list_runs(1, None)] == ["and now?"]
+    finally:
+        db.close()
+
+
+async def test_pairing_and_its_code_still_work_while_the_emergency_stop_is_engaged(
+    runtime: Runtime, manager: RunManager, tmp_path: Path
+) -> None:
+    """The stop holds what starts runs, not the way to reach the owner."""
+    db: MessagesDb = MessagesDb(tmp_path / "chat.db")
+    osascript: Osascript = Osascript()
+    channels: Channels = Channels(
+        runtime, manager, "127.0.0.1", 8765, script=osascript, messages_db=db.path, macos=FakeMacos(), poll_s=0.05
+    )
+    await runtime.store.kv_set(STATE_KEY, ImessageState().model_dump_json())
+    await channels.start()
+    try:
+        with _stop_engaged():
+            await channels.imessage.send_code("+358 40 123 4567")
+            handle, text = osascript.sent[-1]
+            assert handle == PHONE and "code is" in text
+            await channels.imessage.confirm(_code_sent(osascript))
+            assert channels.imessage.handles == (PHONE,)
+    finally:
+        await channels.stop()
+        db.close()
+
+
+async def test_a_database_rebuilt_below_the_cursor_is_read_again_from_its_newest_row(
+    runtime: Runtime, manager: RunManager, replies: Replies, tmp_path: Path
+) -> None:
+    """A database rebuilt or restored numbers its rows again from the start; the cursor of the old one is above its
+    newest row, and every message the owner wrote from then on was below it and never read (item 611)."""
+    replies.clear()
+    db: MessagesDb = MessagesDb(tmp_path / "rebuilt.db")
+    own: int = db.chat(PHONE)
+    for number in range(3):
+        db.message(own, f"message {number}", at=time.time() - 5)
+    try:
+        async with _reading(runtime, manager, db, cursor=300) as (channels, osascript):
+            await _until(lambda: channels.imessage.seen().cursor == 3, "the cursor came down to the newest row")
+            reset = channels.imessage.seen().cursor_reset
+            assert reset is not None and (reset.from_row, reset.to_row) == (300, 3)
+            # What the new database already holds is not run, and the tab says what happened.
+            assert osascript.sent == []
+            replies.push(finish("Four."))
+            db.message(own, "what is two and two?", at=time.time())
+            await _until(lambda: len(osascript.sent) == 1, "the answer")
+            assert osascript.sent == [(PHONE, f"{MARKER}Four.")]
+            seen: JsonObject = (await channels.view()).imessage.seen.model_dump()
+            assert seen["cursor"] == 4 and seen["cursor_reset"] == {"from_row": 300, "to_row": 3, "at": reset.at}
+    finally:
+        db.close()
+
+
+async def test_a_message_of_the_word_stop_stops_the_run_at_work(
+    runtime: Runtime, manager: RunManager, replies: Replies, tmp_path: Path
+) -> None:
+    replies.clear()
+    await _until(lambda: not manager.active_run_ids(), "the runs of the tests before ended")
+    db: MessagesDb = MessagesDb(tmp_path / "chat.db")
+    own: int = db.chat(PHONE)
+    replies.push(finish("never said"))
+    replies.gate = asyncio.Event()
+    try:
+        async with _reading(runtime, manager, db) as (_, osascript):
+            await asyncio.sleep(0.4)
+            db.message(own, "tidy up the downloads", at=time.time())
+            await _until(lambda: bool(manager.active_run_ids()), "the run is at work")
+            db.message(own, "Stop", at=time.time())
+            await _until(lambda: not manager.active_run_ids(), "the run was stopped")
+            await _until(lambda: len(osascript.sent) == 2, "the end was told")
+            assert [text for _, text in osascript.sent] == [
+                f"{MARKER}Stopping the run.",
+                f"{MARKER}The run was stopped.",
+            ]
+            newest: list[RunRecord] = await runtime.store.list_runs(1, None)
+            assert (newest[0].goal, newest[0].status) == ("tidy up the downloads", "cancelled")
+    finally:
+        replies.gate.set()
+        replies.gate = None
+        db.close()
+
+
+async def test_a_message_with_words_and_a_picture_runs_on_the_words_and_its_answer_says_the_picture_was_not_read(
+    runtime: Runtime, manager: RunManager, replies: Replies, tmp_path: Path
+) -> None:
+    replies.clear()
+    db: MessagesDb = MessagesDb(tmp_path / "chat.db")
+    own: int = db.chat(PHONE)
+    try:
+        async with _reading(runtime, manager, db) as (_, osascript):
+            await asyncio.sleep(0.4)
+            replies.push(finish("It looks fine to me."))
+            db.message(own, "￼ What is wrong with this screenshot?", at=time.time(), attachment=True)
+            await _until(lambda: len(osascript.sent) == 1, "the answer")
+            assert osascript.sent == [(PHONE, f"{MARKER}{UNREAD_ANSWER}\n\nIt looks fine to me.")]
+            newest: list[RunRecord] = await runtime.store.list_runs(1, None)
+            assert newest[0].goal == f"What is wrong with this screenshot?\n\n{UNREAD_NOTE}"
+            # A picture with no words is still only told it is not read, and starts nothing.
+            db.message(own, None, at=time.time(), attachment=True)
+            await _until(lambda: len(osascript.sent) == 2, "the notice")
+            assert osascript.sent[1] == (PHONE, f"{MARKER}{ATTACHMENT}")
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize(
+    ("reach", "ends"),
+    [
+        ([], "… The rest of the answer is in Dot on your Mac."),
+        (["mac.example.ts.net"], "… The rest of the answer is in Dot: https://mac.example.ts.net/#/runs/"),
+    ],
+)
+async def test_the_link_in_a_message_is_the_name_a_phone_reaches_the_mac_by_and_never_this_macs_own_address(
+    runtime: Runtime, manager: RunManager, replies: Replies, tmp_path: Path, reach: list[str], ends: str
+) -> None:
+    replies.clear()
+    db: MessagesDb = MessagesDb(tmp_path / "chat.db")
+    own: int = db.chat(PHONE)
+    try:
+        async with _reading(runtime, manager, db, reach=reach) as (channels, osascript):
+            await asyncio.sleep(0.4)
+            replies.push(finish("A long answer. " * 200))
+            db.message(own, "tell me everything", at=time.time())
+            await _until(lambda: len(osascript.sent) == 1, "the answer")
+            sent: str = osascript.sent[0][1]
+            run: RunRecord = (await runtime.store.list_runs(1, None))[0]
+            assert len(sent) <= 2000 and "127.0.0.1" not in sent and "localhost" not in sent
+            assert ends in sent
+            if reach:
+                assert sent.endswith(f"{ends}{run.id}")
+            else:
+                assert sent.endswith(ends) and "http" not in sent
+            assert (await channels.view()).imessage.links == (f"https://{reach[0]}/" if reach else None)
+    finally:
+        db.close()
 
 
 async def test_a_server_without_channels_says_so(runtime: Runtime, manager: RunManager) -> None:

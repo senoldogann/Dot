@@ -26,7 +26,9 @@ link the owner sent is a row of its own after their words in the same way: it is
 
 A handle is paired by sending a code to it that the owner types back in Settings › Channels: the code reaches the
 owner's iPhone only when the handle is theirs. The newest row read is kept as the cursor, so that a restart repeats
-nothing; the first poll sets it and answers nothing."""
+nothing; the first poll sets it and answers nothing. A database whose newest row is below the cursor (it was rebuilt or
+restored, and numbers its rows again) would never be read again: the cursor comes down to its newest row, with a line in
+the log and in the tab (item 611)."""
 
 import asyncio
 import errno
@@ -44,7 +46,7 @@ from dotagent.channels.intake import Accept, Intake, Skip, Tell, Verdict
 from dotagent.channels.onetime import OneTimeCode, Redeemed, new_code, redeem, shown_code
 from dotagent.channels.seen import COMMAND_KEY, Look, Seen, SeenCommand, Watch, stat_file, wal_path
 from dotagent.channels.sends import runs_sending_at
-from dotagent.channels.types import STOP_COMMAND, ChannelId, Receive
+from dotagent.channels.types import ChannelId, Receive, is_stop
 from dotagent.core.errors import ChannelError, DesktopError, DesktopPermissionError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
@@ -349,12 +351,15 @@ def read_new(db: Path, after: int, handles: Sequence[str]) -> tuple[list[Row], i
     go on from: the newest in the database, or the last of a full batch. A conversation is a one-to-one chat named for a
     handle; a message is the owner's when Messages flags it as sent by them over iMessage, or (item 595, when the
     iPhone has another Apple ID than this Mac) when it was received over iMessage from the handle its chat is named for,
-    and a reaction to a message is not one."""
+    and a reaction to a message is not one. A database whose newest row is below ``after`` (item 611: it was rebuilt or
+    restored, and numbers its rows again from the start) holds nothing that was read, and nothing is read from it: the
+    row to go on from is its newest, below ``after``, and the caller moves its cursor down to it."""
     connection: sqlite3.Connection = open_messages_db(db)
     try:
         newest: int = int(connection.execute("SELECT COALESCE(MAX(ROWID), 0) FROM message").fetchone()[0])
         if newest <= after or not handles:
-            return [], max(newest, after)
+            # Below ``after`` too: nothing in a database with fewer rows than were read has been read.
+            return [], newest
         marks: str = ", ".join("?" for _ in handles)
         columns: list[str] = _columns(connection)
         found: list[
@@ -531,6 +536,14 @@ class IMessageChannel:
         if cursor is None:
             await self._keep(cursor=upto)
             return
+        if upto < cursor:
+            # The database's newest row is below the cursor (item 611): it was rebuilt or restored, and its rows are
+            # numbered again from the start, so every message from now on has a row below the cursor and would never
+            # be read. Nothing above the newest row was ever read: the cursor comes down to it and reading goes on.
+            log.warning("imessage_cursor_reset", cursor=cursor, newest=upto)
+            self._watch.reset(cursor, upto, now)
+            await self._keep(cursor=upto)
+            return
         for row in self._joined(rows):
             # The cursor moves before the message is handled: one that fails is not read again.
             await self._keep(cursor=row.rowid)
@@ -555,7 +568,6 @@ class IMessageChannel:
                         "rowid": row.rowid,
                         "link_at": row.sent_at,
                         "scheduled": words.scheduled or row.scheduled,
-                        "attachment": words.attachment or row.attachment,
                     }
                 )
                 log.info("imessage_link_joined", rowid=row.rowid)
@@ -570,7 +582,7 @@ class IMessageChannel:
         said: str | None = words.text
         if said is None or said == "" or said.lstrip().startswith(MARKER.strip()):
             return False
-        if words.balloon is not None or only_a_link(said) is not None or said.strip().casefold() == STOP_COMMAND:
+        if words.balloon is not None or only_a_link(said) is not None or is_stop(said):
             return False
         if words.chat != link.chat or words.received != link.received or self._dots_own_link(link):
             return False
@@ -615,10 +627,15 @@ class IMessageChannel:
                 copy_of=original,
             )
             return
-        verdict: Verdict = self._intake.judge(row.text, row.sent_at, row.attachment, self._clock())
+        # A link preview shows the picture of a page, and Messages may flag its row as holding an attachment: that is
+        # no file the owner sent, and a message with a link would else be told to the run, and to the owner, as one
+        # that came with a file.
+        attached: bool = row.attachment and row.balloon != URL_BALLOON
+        verdict: Verdict = self._intake.judge(row.text, row.sent_at, attached, self._clock())
         # What would be run is first checked against what Dot's own runs may have written (item 572), but for the one
-        # message that only stops a run: Dot stops when told to, whoever may have told it.
-        if isinstance(verdict, Accept) and verdict.text.casefold() != STOP_COMMAND:
+        # message that only stops a run: Dot stops when told to, whoever may have told it. That is a whole message of
+        # the stop words (``/stop``, ``stop``, ``dur``, ``durdur``, item 611).
+        if isinstance(verdict, Accept) and not is_stop(verdict.text):
             refused: str | None = await self._not_the_owners(row)
             if refused is not None:
                 verdict = Tell(refused)
@@ -626,7 +643,13 @@ class IMessageChannel:
             case Accept(text):
                 if row.chat != self._state.reply_to:
                     await self._keep(reply_to=row.chat)
-                log.info("imessage_message_read", rowid=row.rowid, chars=len(text), received=row.received)
+                log.info(
+                    "imessage_message_read",
+                    rowid=row.rowid,
+                    chars=len(text),
+                    received=row.received,
+                    attachment=attached,
+                )
                 command: SeenCommand = self._watch.took(row.rowid, self._clock())
                 await receive(text)
                 await self._store.kv_set(COMMAND_KEY, command.model_dump_json())

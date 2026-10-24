@@ -171,6 +171,24 @@ def test_the_cursor_goes_past_the_rows_of_other_chats(db: MessagesDb) -> None:
     assert rows == [] and upto == chatter
 
 
+def test_a_database_with_fewer_rows_than_the_cursor_goes_on_from_its_newest_row(db: MessagesDb) -> None:
+    """Item 611: a database rebuilt or restored numbers its rows again from the start. The cursor of the old one is
+    above its newest row, and nothing above that row was read: the row to go on from is the newest, below the
+    cursor, and no message of it is read as new."""
+    own: int = db.chat(PHONE)
+    newest: int = 0
+    for number in range(3):
+        newest = db.message(own, f"message {number}")
+    assert read_new(db.path, 300, [PHONE]) == ([], newest)
+    # With nothing paired the answer is the same, and a cursor at the newest row stays where it is.
+    assert read_new(db.path, 300, []) == ([], newest)
+    assert read_new(db.path, newest, [PHONE]) == ([], newest)
+    # The message the owner writes next is row 4: read from the cursor the caller moved down.
+    fresh: int = db.message(own, "do the thing")
+    rows, upto = read_new(db.path, newest, [PHONE])
+    assert [(row.rowid, row.text) for row in rows] == [(fresh, "do the thing")] and upto == fresh
+
+
 def test_a_full_batch_goes_on_from_its_last_row(db: MessagesDb) -> None:
     own: int = db.chat(PHONE)
     made: list[int] = [db.message(own, f"m{number}") for number in range(BATCH + 5)]

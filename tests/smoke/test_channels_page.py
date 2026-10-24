@@ -190,9 +190,21 @@ async def test_the_tab_stands_beside_phone_and_says_where_imessage_stands(browse
         seen: Locator = _row(page, "What Dot sees in Messages")
         await expect(seen.get_by_role("button", name="Check now")).to_be_visible()
         await expect(seen.locator("dt")).to_have_text(
-            ["Newest message", "Read up to", "Last looked", "chat.db", "chat.db-wal", "Last command", "Last error"]
+            [
+                "Newest message",
+                "Read up to",
+                "Last looked",
+                "chat.db",
+                "chat.db-wal",
+                "Last command",
+                "Last error",
+                "Links in messages",
+            ]
         )
         await expect(seen.get_by_text("Dot has not looked yet.")).to_be_visible()
+        # With no name for a phone to reach the Mac by, no link is sent, and the facts say so once (item 611).
+        await expect(_fact(page, "Links in messages")).to_contain_text("none: ")
+        await expect(_fact(page, "Links in messages")).to_contain_text("[server] reach")
         if width >= 1280:
             nav: Locator = page.get_by_role("navigation", name="Settings")
             labels: Locator = nav.locator(".settings-nav-label")
@@ -350,3 +362,42 @@ async def test_messages_writing_its_log_while_dot_sees_nothing_new_is_warned_on_
     await page.get_by_role("button", name="Check again").click()
     await expect(warning).to_have_count(0)
     await page.context.close()
+
+
+async def test_a_cursor_moved_down_to_the_newest_row_is_a_fact_of_the_tab(
+    browser: Browser, served: Served, runtime: Runtime
+) -> None:
+    """The cursor above the newest row of a database rebuilt or restored comes down to it (item 611), and the tab says
+    from where to where, at both sizes, beside the row it reads up to now."""
+    was_on: bool = served.channels.is_on("imessage")
+    await served.channels.switch("imessage", True)
+    newest: int = served.messages.message(served.messages.chat("+358409999999"), "to a friend", at=time.time())
+    await runtime.store.kv_set(STATE_KEY, ImessageState(handles=(PHONE,), cursor=newest + 1000).model_dump_json())
+    await served.channels.imessage.load()
+    try:
+        await _until(lambda: served.channels.imessage.seen().cursor_reset is not None)
+        for width in (1280, 390):
+            page: Page = await _opened(browser, served, width, "light")
+            seen: Locator = _row(page, "What Dot sees in Messages")
+            await expect(_fact(page, "Read up to")).to_have_text(f"row {newest}")
+            await expect(_fact(page, "Moved down")).to_contain_text(f"from row {newest + 1000} to row {newest} at ")
+            await expect(_fact(page, "Moved down")).to_contain_text("rebuilt or restored")
+            await expect(seen.locator("dt")).to_have_text(
+                [
+                    "Newest message",
+                    "Read up to",
+                    "Moved down",
+                    "Last looked",
+                    "chat.db",
+                    "chat.db-wal",
+                    "Last command",
+                    "Last error",
+                    "Links in messages",
+                ]
+            )
+            await _fits(page, f"{width} with the cursor moved down")
+            await page.context.close()
+    finally:
+        await served.channels.switch("imessage", was_on)
+        await runtime.store.kv_set(STATE_KEY, ImessageState().model_dump_json())
+        await served.channels.imessage.load()

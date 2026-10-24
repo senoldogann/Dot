@@ -31,6 +31,15 @@ def test_an_answer_that_fits_is_sent_whole_and_a_longer_one_is_cut_with_the_link
     assert cut.startswith("word word")
 
 
+def test_a_cut_with_no_link_says_the_rest_is_in_dot_on_the_mac_and_names_no_address() -> None:
+    """Without an address a phone can open (item 611) the line that ends a cut answer names no link."""
+    assert cut_with_link("short answer", 100, None) == "short answer"
+    cut: str = cut_with_link("word " * 1000, 300, None)
+    assert len(cut) <= 300
+    assert cut.endswith("… The rest of the answer is in Dot on your Mac.")
+    assert "http" not in cut and cut.startswith("word word")
+
+
 def test_a_cut_comes_at_a_line_break_when_one_is_close() -> None:
     lines: str = "\n".join(f"line number {number} of the answer" for number in range(100))
     cut: str = cut_with_link(lines, 400, LINK)

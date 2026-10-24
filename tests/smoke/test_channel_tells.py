@@ -34,8 +34,10 @@ from dotagent.store.models import RunRecord
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 PHONE: str = "+358401234567"
-# Where the links of a daemon on this Mac open, with no name for a phone to reach it by.
-BASE: str = "http://127.0.0.1:8765/"
+# The name a phone reaches the Mac by (``[server] reach``), which the links of a line open at: with none there is no
+# address a phone can open and a line carries no link (item 611).
+REACH: str = "mac.example.ts.net"
+BASE: str = f"https://{REACH}/"
 _WAIT_S: float = 30.0
 # The window of a channel between two lines of tells: short, so that a test can see a line held and then sent.
 APART_S: float = 0.8
@@ -99,21 +101,23 @@ class World:
     """The channels of a daemon over its stand-ins."""
 
     def __init__(
-        self, channels: Channels, runtime: Runtime, osascript: Timed, messages: MessagesDb, base: str = BASE
+        self, channels: Channels, runtime: Runtime, osascript: Timed, messages: MessagesDb, base: str | None = BASE
     ) -> None:
         self.channels: Channels = channels
         self.runtime: Runtime = runtime
         self.osascript: Timed = osascript
         self.messages: MessagesDb = messages
-        self.base: str = base
+        self.base: str | None = base
 
     async def tell(self, title: str, text: str, route: str = "#/runs/run_1") -> None:
         """What the brief and the watchers do: tell the owner, through the one function they share."""
         await tell_owner(self.runtime.bus, title, text, route)
 
     def line(self, title: str, text: str, route: str = "#/runs/run_1") -> str:
-        """What reaches Messages for such a tell: marked ◆, the title, a colon, the text, then the link."""
-        return f"{MARKER}{title}: {text}\n{self.base}{route}"
+        """What reaches Messages for such a tell: marked ◆, the title, a colon, the text, then the link (none without
+        a name to reach the Mac by)."""
+        link: str = "" if self.base is None else f"\n{self.base}{route}"
+        return f"{MARKER}{title}: {text}{link}"
 
     async def pair(self) -> None:
         """Pair the owner's number, as the pairing keeps it in the store."""
@@ -137,16 +141,12 @@ async def serving(
     on: bool = True,
 ) -> AsyncIterator[World]:
     """The channels as a daemon runs them, with the owner's number paired (or not) and iMessage switched on (or off).
-    ``reach`` is the name a phone reaches the Mac by, which the links of a line open at."""
-    configured: Runtime = (
-        runtime
-        if reach is None
-        else dataclasses.replace(
-            runtime,
-            config=runtime.config.model_copy(
-                update={"server": runtime.config.server.model_copy(update={"reach": reach})}
-            ),
-        )
+    ``reach`` is the name a phone reaches the Mac by, which the links of a line open at (:data:`REACH` unless a test
+    says otherwise; an empty list is a Mac with no such name)."""
+    names: list[str] = [REACH] if reach is None else reach
+    configured: Runtime = dataclasses.replace(
+        runtime,
+        config=runtime.config.model_copy(update={"server": runtime.config.server.model_copy(update={"reach": names})}),
     )
     messages: MessagesDb = MessagesDb(folder / "chat.db")
     osascript: Timed = Timed()
@@ -171,7 +171,7 @@ async def serving(
             runtime,
             osascript,
             messages,
-            base=f"https://{reach[0]}/" if reach else BASE,
+            base=f"https://{names[0]}/" if names else None,
         )
     finally:
         await channels.stop()
@@ -258,6 +258,30 @@ async def test_the_line_opens_a_page_of_dot_at_the_address_its_links_open_at(
         ]
         # Never an address that carries the access token, which a message would hand to the messaging service.
         assert "token" not in named.osascript.sent[0][1]
+
+
+async def test_with_no_name_a_phone_reaches_the_mac_by_the_lines_carry_no_link(
+    runtime: Runtime, manager: RunManager, tmp_path: Path
+) -> None:
+    """This Mac's own address, 127.0.0.1, opens nothing on a phone: without ``[server] reach`` a line of tells is the
+    tell and nothing after it (item 611), and what the tab says of links says why."""
+    async with serving(runtime, manager, tmp_path, reach=[]) as bare:
+        assert bare.base is None and bare.channels.router.link("run_1") is None
+        for number in range(1, 5):
+            await bare.tell("Bank mail", f"Mail {number} from the bank", f"#/runs/run_{number}")
+        await _until(lambda: len(bare.osascript.sent) == 1, "the first line")
+        assert bare.osascript.sent[0] == (PHONE, f"{MARKER}Bank mail: Mail 1 from the bank")
+        await _until(lambda: len(bare.osascript.sent) == 2, "the line of the rest")
+        assert bare.osascript.sent[1] == (PHONE, f"{MARKER}Bank mail: and 3 more")
+        assert not any("http" in line or "127.0.0.1" in line for _, line in bare.osascript.sent)
+        assert (await bare.channels.view()).imessage.links is None
+
+
+async def test_with_a_name_the_view_of_the_tab_says_where_the_links_open(
+    runtime: Runtime, manager: RunManager, tmp_path: Path
+) -> None:
+    async with serving(runtime, manager, tmp_path) as named:
+        assert (await named.channels.view()).imessage.links == BASE
 
 
 async def test_a_channel_that_is_off_or_has_no_one_paired_is_told_nothing(world: World) -> None:

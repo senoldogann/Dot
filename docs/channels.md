@@ -14,25 +14,48 @@ A message you send to yourself (or from your iPhone's Apple ID to this Mac's) is
 sends the box's message):
 
 - With no run at work in that chat it starts one. With one at work the message waits in the chat's queue and starts the
-  chat's next run when that one ends, as a message typed while a run works does.
+  chat's next run when that one ends, as a message typed while a run works does; Dot says so, and that `/stop` stops
+  the run at work (item 611).
 - It is your own message, trusted as one typed in the UI. The run starts with the choices the chat keeps for its next
   follow-up: **Auto** for the mode (the message's words settle it, as in the composer), the approvals of `[policy]
   approvals`, the default model. Open the chat in Dot and change the pills of its composer, and the next message of the
   channel starts with what you chose.
-- `/stop` stops the run at work in the chat, as Stop on its page does.
+- `/stop` stops the run at work in the chat, as Stop on its page does, and so do the plain words **stop**, **dur** and
+  **durdur** (item 611: the owner writes in English and in Turkish). A message that is only one of them, in any case,
+  with a closing dot or exclamation mark at most, is a stop: `Stop`, `DUR`, `durdur.`. It is never queued behind the run
+  it is meant to stop, it is read in any case (the window of a step that sends, below, does not hold it back), and it
+  is not joined to a link that follows it. A sentence that holds one (`please stop and tell me why`) is a message like
+  any other. With no run at work, Dot says so and starts nothing.
+- **While the emergency stop is engaged** (the `STOP` file of Dot's home: the button of the web UI, `POST
+  /api/failsafe`, or the file made by hand), a message on the channel starts no run and is not queued either: a message
+  queued starts its run when the one at work ends, stop or no stop. Dot answers it, once for each message, that
+  it is stopped, that nothing was started, and that the banner at the top of any page of Dot has the button that
+  releases it; then you send the message again (item 611, [Safety](safety.md#safety)). It is the same check that holds
+  schedules, campaigns and watchers, and a run that was being started as the file appeared ends as an emergency stop.
+  `/stop` and its words still stop the run at work, pairing and its code still work, and what Dot tells you about a
+  run that ended (the stop's own end among it) still comes.
 - When a run of that chat ends, its answer is sent back in the same conversation, **marked with `◆ `** at its start.
   The answer is masked of the secrets Dot holds, sent as plain text (the Markdown marks of an answer are left out) and
-  cut to about 2,000 characters, with a link to the chat in Dot for the rest. A run that failed or was stopped says so.
+  cut to about 2,000 characters, with a link to the chat in Dot for the rest. A run that failed or was stopped says so,
+  once: a stopped run says *The run was stopped.*, not twice.
 - When a run waits for you (an approval, or a question it asked), one line says what it asks and where to answer, and at
   most one line is sent every twenty seconds: *Dot waits for your approval: Run `rm -r build`. Answer it in Dot, not
-  here: https://…/#/runs/…*. The link goes to the name a phone reaches the Mac by (`[server] reach`, see
-  [Dot on the phone](phone.md)), else to this Mac's own address, and never carries the access token.
+  here: https://…/#/runs/…*. A wait that comes inside that window is held, never dropped (item 611): a run that left a
+  question and went on to need an approval is told when the window of the first line ends, with the newest of the
+  waits that still wait and how many more (*… (and 1 more)*); one you answered meanwhile is not told, as the line
+  would be false.
+- **The links** go to the name a phone reaches the Mac by (`[server] reach`, see [Dot on the phone](phone.md)), as the
+  phone's own pages open there, and never carry the access token. This Mac's own address, `127.0.0.1`, opens nothing on a
+  phone, so with no `[server] reach` no link is sent (item 611): an answer cut short says *The rest of the answer is
+  in Dot on your Mac*, a wait says *Answer it in Dot on your Mac, not here*, a line of tells is the tell and nothing
+  after it, and the tab says why once, in its facts (*Links in messages*, below). Settings › Phone sets the name.
 - What Dot tells you on its own comes the same way (item 582): the first line of the morning brief and each tell of a
   watcher ([Dot comes to you](proactive.md)), as one message, **marked with `◆ `**, that holds the title, a colon, the
-  text and the link to the page the tell opens (the brief's run, the chat Watchers or Schedules): *Your morning brief:
-  Nothing needs you today. https://…/#/runs/…*. It goes to the conversation you wrote in last, masked of the secrets Dot
-  holds and as plain text, while iMessage is on and a number is paired; with the channel off, or no number paired,
-  nothing is sent. Your phone's push and the page's notification carry the same tell, as before. A channel gets at most
+  text and the link to the page the tell opens (the brief's run, the chat Watchers or Schedules; with no `[server]
+  reach` there is no link, item 611): *Your morning brief: Nothing needs you today. https://…/#/runs/…*. It goes
+  to the conversation you wrote in last, masked of the secrets Dot holds and as plain text, while iMessage is on and a
+  number is paired; with the channel off, or no number paired, nothing is sent. Your phone's push and the page's
+  notification carry the same tell, as before. A channel gets at most
   one such message every twenty seconds: the first tell of a burst goes at once, and what comes after it inside the
   twenty seconds is told as one message when they are over, *Bank mail: and 3 more* with the link to the newest (a
   single one that waited goes as itself, and tells under different titles are counted under the name *Dot*). Dot's own
@@ -92,7 +115,11 @@ row is a command only when all of these hold:
   same chat with the same words, dated at most ten seconds apart, are one command, and the second is let go (see *One
   message, two rows*, below);
 - it is newer than the cursor, the row Dot last read, which the store keeps: the first poll sets it and answers nothing,
-  and a restart repeats nothing and loses nothing.
+  and a restart repeats nothing and loses nothing. When the newest row of the database is **below** the cursor, the
+  database was rebuilt or restored from a backup and numbers its rows again from the start: every message you wrote
+  from then on would have a row below the cursor and would never be read, with nothing to say so. The cursor comes
+  down to the newest row (the log has `imessage_cursor_reset`, once, with the two numbers), what the database holds
+  already is not run, and the tab says it in its facts (*Moved down*, below) (item 611).
 
 A message from anyone else, in any other conversation, is never read; nor is one in a paired chat that did not come from
 the handle the chat is named for. Nobody without your Apple ID can write a message into your conversation with yourself,
@@ -108,7 +135,12 @@ alone is a command; one that comes in a later read than your words, or before th
 
 The limits hold for every message: at most 4,000 characters (a longer one is told so and not cut, as cutting could
 change what it asks), at most 30 a minute (the rest of a flood is let go, with one line to say so), and a message with
-only an attachment is told it is not read yet. A message that came in more than 15 minutes before Dot read it (the Mac
+only an attachment is told it is not read yet. A message with **words and a picture or a file** (item 611) runs on its
+words: the run is told, in a note after them, that the message came with an attachment that Dot cannot read here and
+that it must not guess what it shows, and the first line of the answer says so to you (*Dot did not read the picture
+or file that came with your message, so this answers your words only.*). Reading the attachment is a feature of its
+own, not built yet. The picture that a link's preview shows is no file you sent, whatever Messages flags its row
+as. A message that came in more than 15 minutes before Dot read it (the Mac
 slept, Dot was off) is not run: Dot says so, and you send it again if you still want it. A message whose words cannot
 be read is let go and never answered, as it may be one of Dot's own.
 
@@ -123,12 +155,17 @@ When a message you wrote gets no answer, the tab says why. **What Dot sees in Me
 - **Newest message**: the newest row of Messages' database, in any conversation: its number, the date it carries and
   when Dot first saw it. The number moves up when a message arrives. A number that stays put after you wrote means
   Dot's read-only connection saw no new row at all, whatever the rules above say.
-- **Read up to**: the cursor, the row Dot has read up to. **Last looked**: when it looked.
+- **Read up to**: the cursor, the row Dot has read up to. **Moved down** (only once it happened, item 611): the
+  cursor was above the newest row of the database, which was rebuilt or restored, and Dot moved it down to that row:
+  from where to where and when; it stays until Dot starts again. **Last looked**: when it looked.
 - **chat.db** and **chat.db-wal**: the size and the time of the last change of Messages' database and of its
   write-ahead log, where Messages keeps what it has just written until it folds it into the database (`os.stat`; the
   program that runs Dot needs Full Disk Access for them, as for the database).
 - **Last command**: the last row Dot took as a command, and when; it survives a restart. **Last error**: the last thing
   that went wrong, with its time and the secrets Dot holds masked; it stays after the problem is gone.
+- **Links in messages** (item 611): the name the links in Dot's messages open at, or, when `[server] reach` names none,
+  that Dot sends no link and why (`links` in `GET /api/channels`). The log says it once as the daemon starts
+  (`channel_links_not_sent`).
 
 **The warning.** When the log has changed and nothing Dot can read has changed with it, for more than two minutes, the
 tab says: *Messages has written since Dot last saw a new message; Dot may not be seeing the newest. Quit and reopen
@@ -214,11 +251,15 @@ Mac](safety.md#what-leaves-this-mac).
 | *the Messages database is laid out differently* | a macOS update changed `chat.db`: the channel reads nothing until Dot is updated |
 | a number that gets no code | Messages could not send to it: check that it is a number or address of your Apple ID |
 | *Newest message* does not move after you wrote | Dot sees no new row: see *chat.db-wal*; quit and reopen Messages |
+| *Newest message* is a lower row than *Read up to*, or *Moved down* is there | Messages' database was rebuilt or restored: Dot moved its place down to the newest row (item 611) and reads from there, so what you write now is read |
+| a message gets *Dot is stopped: the emergency stop is engaged* | the emergency stop of Dot is engaged: release it (the banner at the top of any page of Dot), then send the message again |
+| a message of Dot's has no link | `[server] reach` names no address a phone can open: see *Links in messages*, and Settings › Phone |
 | the message is on the Mac, nothing runs | pair the number your iPhone writes from: the chat is named for it |
 | *Last error* names a message that did not go | Messages did not take Dot's answer: Automation, or the address |
 
 Left for later: other messaging apps (the router posts what a channel receives and sends what a run ends with; a
-channel is the part that reads and sends), attachments, and answers to approvals on a channel (deliberately not).
+channel is the part that reads and sends), reading attachments (a picture or a file is only said not to be read, item
+611), and answers to approvals on a channel (deliberately not).
 
 The REST routes of the tab (`/api/channels`) are in [the daemon's
 table](daemon.md#the-daemon-the-web-ui-and-the-service).

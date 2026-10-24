@@ -2,12 +2,15 @@
 what macOS says of the permissions of the app that runs Dot. Nothing here reaches anything outside this Mac."""
 
 import asyncio
+import os
 import threading
 from collections import deque
+from pathlib import Path
 
 from dotagent.channels.service import Macos
 from dotagent.connections.mac import AutomationState
 from dotagent.core.errors import DesktopError
+from dotagent.core.paths import failsafe_path
 from dotagent.desktop.script import ScriptLanguage
 from dotagent.drafts.scripts import SCRIPTS
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -18,6 +21,15 @@ from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.tools.meta import FINISH_TOOL
 
 PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
+
+
+def stop_file() -> Path:
+    """The STOP file of the home a test runs in, which a test makes to engage the emergency stop (item 611). Never the
+    owner's own: the home must be the pytest folder of the test's own, and the file is refused otherwise, before it is
+    touched."""
+    stop: Path = failsafe_path()
+    assert stop.parent == Path(os.environ["DOT_HOME"]) and "pytest-of-" in str(stop), f"not a test's own home: {stop}"
+    return stop
 
 
 def finish(answer: str) -> ScriptedTurn:

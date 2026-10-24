@@ -6,6 +6,8 @@ flood. Nothing here decides who the owner is: that is each channel's own check o
 from collections import deque
 from dataclasses import dataclass
 
+from dotagent.channels.types import is_stop
+
 # The longest message Dot reads: a longer one is told so and not read, as cutting it would change what it asks.
 MAX_IN_CHARS: int = 4000
 # The most messages Dot reads in a minute; the rest of a flood is let go.
@@ -20,6 +22,16 @@ TOO_OLD: str = (
     "you still want it."
 )
 ATTACHMENT: str = "Dot does not read attachments yet. Send the words."
+# A message that came with a picture or a file as well as words (item 611) runs on its words, with this note at the end
+# of what the run is given, and the line the answer starts with says the same to the owner. The router finds the note
+# at the end of the run's goal, so the two stay together through the chat's queue.
+UNREAD_NOTE: str = (
+    "(Dot's note: this message came with a picture or a file, which Dot cannot read on this channel yet. Only its "
+    "words reached you. Do not guess what the attachment shows.)"
+)
+UNREAD_ANSWER: str = (
+    "Dot did not read the picture or file that came with your message, so this answers your words only."
+)
 FLOOD: str = "That is more than 30 messages in a minute. Dot reads no more until it is quieter."
 
 
@@ -62,7 +74,8 @@ class Intake:
         """What to do with a message sent at ``sent_at`` that came to be read at ``now``: ``text`` is its words
         (``None`` when they could not be read) and ``attachment`` whether it carries a file. A message whose words
         cannot be read and that carries no file is never answered, as it may be one of Dot's own (the owner's chat
-        holds both)."""
+        holds both). A file with no words is told it is not read; a file with words is accepted with the words and
+        :data:`UNREAD_NOTE` after them, so that the run, and then the owner, know it was not looked at (item 611)."""
         if text is None and not attachment:
             return Skip("its words could not be read")
         while self._seen and now - self._seen[0] >= _WINDOW_S:
@@ -81,4 +94,7 @@ class Intake:
             return Tell(ATTACHMENT) if attachment else Skip("it holds no words")
         if len(words) > MAX_IN_CHARS:
             return Tell(too_long(len(words)))
+        if attachment and not is_stop(words):
+            # The words run, and the run is told what did not reach it (item 611); a stop is left as it was written.
+            return Accept(f"{words}\n\n{UNREAD_NOTE}")
         return Accept(words)
