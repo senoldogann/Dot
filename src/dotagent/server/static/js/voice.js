@@ -1,11 +1,14 @@
 // Voice (item 574): the composer's microphone and the reading of answers aloud, both by what the browser itself offers
 // (speech recognition and speech synthesis). Dot sends no voice anywhere: the browser recognizes it, and Safari and
 // Chrome may send it to Apple's or Google's servers to do so (docs/safety.md). Nothing is sent by voice alone: the words
-// fill the box, and the owner sends them as usual. An answer is read with a voice the browser keeps on this Mac when it
-// has one for the language, since a network voice (Chrome's "Google ..." voices) sends the text it reads to a server.
+// go into the box when the owner ends the dictation (item 605), and the owner sends them as usual. An answer is read
+// with a voice the browser keeps on this Mac when it has one for the language, since a network voice (Chrome's
+// "Google ..." voices) sends the text it reads to a server.
 
-// How long a dictation waits for a word before it stops by itself.
+// How long a dictation waits for its first word before it stops by itself, saying it heard nothing; and, once it heard
+// one, how long a pause may last before it ends by itself with what it heard (item 605): long enough to think.
 const SILENCE_MS = 6000;
+const PAUSE_MS = 15000;
 // The most characters of an answer one utterance holds: some browsers stop a long one in the middle.
 const CHUNK_CHARS = 220;
 
@@ -127,10 +130,11 @@ export function problemWords(code, place) {
  * interimFrom)` puts what was heard on top of them in the box, and `settled()` says that the quieter words are no longer
  * the engine's to change; `state(listening)` says whether the microphone is on, and `problem(words)` why it could not be.
  * `start()`, `stop()` (the engine settles what it has) and `abort()` (it drops what it has) are the owner's; one that is
- * not touched stops by itself after `SILENCE_MS` from the moment the engine began to listen, and with the page put out of
- * sight.
+ * not touched stops by itself after `SILENCE_MS` from the moment the engine began to listen with no word heard, after
+ * `PAUSE_MS` of silence once one was, and with the page put out of sight. `began()` says the engine began to listen, and
+ * `sound(loud)` whether it hears a sound now, for the recorder's clock and wave (item 605); both may be left out.
  */
-export function createDictation({ language, text, show, settled, state, problem }) {
+export function createDictation({ language, text, show, settled, state, problem, began = () => {}, sound = (/** @type {boolean} */ _loud) => {} }) {
   let recognition = null;
   let base = "";
   let timer = null;
@@ -148,7 +152,7 @@ export function createDictation({ language, text, show, settled, state, problem 
 
   function arm() {
     clearTimeout(timer);
-    timer = setTimeout(() => recognition?.stop(), SILENCE_MS);
+    timer = setTimeout(() => recognition?.stop(), heard ? PAUSE_MS : SILENCE_MS);
   }
 
   /** The dictation is over; `words` say why to the owner, or null. */
@@ -182,23 +186,38 @@ export function createDictation({ language, text, show, settled, state, problem 
     // whatever was asked of it meanwhile) is dropped, so that the microphone is not left on for nobody.
     const left = () => recognition !== engine;
     // The engine says it began with `start`, and with `audiostart` as the microphone opens; a word heard says it too.
-    const began = () => {
+    const begin = () => {
       if (left()) {
         engine.abort();
         return;
       }
-      started = true;
+      if (!started) {
+        started = true;
+        began();
+      }
       arm();
     };
-    engine.addEventListener("start", began);
-    engine.addEventListener("audiostart", began);
+    engine.addEventListener("start", begin);
+    engine.addEventListener("audiostart", begin);
+    // A sound, or speech, heard or ended: what the recorder's wave draws.
+    for (const type of ["soundstart", "speechstart", "soundend", "speechend"]) {
+      engine.addEventListener(type, () => {
+        if (!left()) {
+          sound(type.endsWith("start"));
+        }
+      });
+    }
     /** @param {SpeechRecognitionEventLike} event */
     const heardSomething = (event) => {
       if (left()) {
         engine.abort();
         return;
       }
-      started = true;
+      if (!started) {
+        started = true;
+        began();
+      }
+      sound(true);
       const said = transcriptOf(event.results);
       heard = heard || said.final !== "" || said.interim !== "";
       const next = dictated(base, said.final, said.interim);
@@ -274,6 +293,25 @@ export function createDictation({ language, text, show, settled, state, problem 
       document.removeEventListener("visibilitychange", hidden);
     },
   };
+}
+
+// ----- the recorder --------------------------------------------------------------------------------------------------
+
+/** The recorder's clock for `ms` since the engine began: minutes and seconds, as "0:05" and "12:40". */
+export function clockText(ms) {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+// How tall a bar of the wave is in a silence: a dot on the line.
+export const QUIET_BAR = 0.12;
+
+/**
+ * The recorder's wave a moment later: the bars move one place to the left and a new one comes in at the right, tall while
+ * the engine hears a sound (`loud`) and a dot in a silence. `random()` gives a number from 0 to 1, as Math.random does.
+ */
+export function nextWave(bars, loud, random) {
+  return [...bars.slice(1), loud ? 0.3 + 0.7 * random() : QUIET_BAR];
 }
 
 // ----- speaking ----------------------------------------------------------------------------------------------------

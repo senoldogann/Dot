@@ -162,13 +162,25 @@ table's pipes) quieter than its words, bold words, headings and a table's head h
 links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
 sent is the text as typed. A **microphone** by the send (item 574; where the browser has speech recognition,
 `SpeechRecognition` or Safari's `webkitSpeechRecognition`: Safari, Chrome and the desktop app's web view, not Firefox,
-which shows none) fills the box as you speak, after what it holds, the words the engine may still change drawn quieter
-until it settles them. It listens in the page's language, given its region ("en" listens as "en-US", item 593), or the
-one chosen in Settings › General › Voice (English, Türkçe, Suomi, Svenska, Deutsch, Français or Español), and stops at a
-second press, after six seconds of silence, when you type, when you send and when the page goes out of sight. The
-silence is counted from the moment the browser begins to listen, not while it asks for the microphone and its speech
-recognition the first time (an iPhone asks twice), and a second press while it still asks drops the dictation; one that
-the browser starts anyway once you allow it is stopped at once, so the microphone is not left on (item 603). A
+which shows none) turns the controls under the box into a recorder while it listens (item 605), as a phone's apps do:
+
+- a cross that drops the dictation;
+- a wave that moves while the engine hears a sound (drawn from the engine's own word that it hears one: Dot opens no
+  microphone of its own to measure it);
+- the time since the browser began to listen;
+- a tick that puts the words in the box, after what it holds, once the engine has settled them.
+
+Until the tick the box keeps what it held. The dictation also ends:
+
+- after six seconds with no word, saying nothing was heard;
+- after a pause of fifteen seconds once a word was, the words going into the box;
+- when you type (it is dropped), when you send, and when the page goes out of sight.
+
+It listens in the page's language, given its region ("en" listens as "en-US", item 593), or the one chosen in Settings ›
+General › Voice (English, Türkçe, Suomi, Svenska, Deutsch, Français or Español). The silence is counted from the moment
+the browser begins to listen, not while it asks for the microphone and its speech recognition the first time (an iPhone
+asks twice). A press while it still asks drops the dictation, and one the browser starts anyway once you allow it is
+stopped at once, so the microphone is not left on (item 603). A
 microphone that is refused says so and where to allow it: in a Mac's browser, the browser for the address and in System
 Settings › Privacy & Security › Microphone; in the desktop app, which macOS gives the microphone and speech recognition
 only once the app asks for them (a Dot.app built before item 594 cannot), Dot in System Settings, the toast naming macOS

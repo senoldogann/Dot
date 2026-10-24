@@ -5,9 +5,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  QUIET_BAR,
+  clockText,
   dictated,
   languageTag,
   localVoice,
+  nextWave,
   problemWords,
   sentenceChunks,
   voicePlace,
@@ -161,4 +164,26 @@ test("with no voice of the language kept on this Mac none is chosen, and the bro
   assert.equal(localVoice("fi-FI", voices), null);
   assert.equal(localVoice("de-DE", voices), null);
   assert.equal(localVoice("fi-FI", []), null);
+});
+
+test("the recorder's clock reads minutes and seconds since the engine began", () => {
+  // Item 605.
+  assert.equal(clockText(0), "0:00");
+  assert.equal(clockText(5_400), "0:05");
+  assert.equal(clockText(62_000), "1:02");
+  assert.equal(clockText(760_000), "12:40");
+  assert.equal(clockText(-50), "0:00");
+});
+
+test("the recorder's wave moves one bar to the left, a tall one coming in while a sound is heard and a dot in a silence", () => {
+  // Item 605.
+  const quiet = [QUIET_BAR, QUIET_BAR, QUIET_BAR];
+  assert.deepEqual(nextWave(quiet, false, () => 0.5), [QUIET_BAR, QUIET_BAR, QUIET_BAR]);
+  const loud = nextWave(quiet, true, () => 0.5);
+  assert.equal(loud.length, 3);
+  assert.deepEqual(loud.slice(0, 2), [QUIET_BAR, QUIET_BAR]);
+  assert.ok(Math.abs(loud[2] - 0.65) < 1e-9, String(loud[2]));
+  assert.equal(nextWave(quiet, true, () => 0)[2], 0.3);
+  assert.equal(nextWave(quiet, true, () => 1)[2], 1);
+  assert.deepEqual(nextWave([0.9, 0.5, 0.2], false, () => 0.5), [0.5, 0.2, QUIET_BAR]);
 });

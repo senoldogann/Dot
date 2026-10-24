@@ -55,7 +55,7 @@ function heard(transcript, isFinal) {
 
 /** A dictation of an empty box, what it told the page, and the engine it made last. */
 function dictationOf() {
-  const seen = { shown: [], states: [], problems: [] };
+  const seen = { shown: [], states: [], problems: [], began: 0, sounds: [] };
   const dictation = createDictation({
     language: () => "tr-TR",
     text: () => "",
@@ -63,6 +63,10 @@ function dictationOf() {
     settled: () => {},
     state: (listening) => seen.states.push(listening),
     problem: (words) => seen.problems.push(words),
+    began: () => {
+      seen.began += 1;
+    },
+    sound: (loud) => seen.sounds.push(loud),
   });
   return { dictation, seen, engine: () => FakeRecognition.made.at(-1) };
 }
@@ -135,4 +139,39 @@ test("the microphone opening, or a word heard, says the engine began: a second p
   assert.deepEqual(seen.shown, ["merhaba"]);
   engine().say("end");
   assert.equal(seen.problems.length, 1, "the owner's own stop said something");
+});
+
+test("the recorder is told once that the engine began, and whenever it hears a sound or a silence", () => {
+  // Item 605: the clock starts when the engine listens, and the wave moves while it hears a sound.
+  const { dictation, seen, engine } = dictationOf();
+  dictation.start();
+  assert.equal(seen.began, 0);
+  engine().say("start");
+  engine().say("audiostart");
+  assert.equal(seen.began, 1);
+  engine().say("soundstart");
+  engine().say("speechend");
+  engine().say("result", { results: [heard("merhaba", false)] });
+  assert.deepEqual(seen.sounds, [true, false, true]);
+  // An engine the dictation left tells the recorder nothing.
+  dictation.abort();
+  engine().say("soundstart");
+  assert.deepEqual(seen.sounds, [true, false, true]);
+});
+
+test("once a word is heard, a pause may last longer before the dictation ends by itself with what it heard", (t) => {
+  // Item 605: six seconds with no word say nothing was heard; after a word the owner may stop to think.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { dictation, seen, engine } = dictationOf();
+  dictation.start();
+  engine().say("start");
+  t.mock.timers.tick(3_000);
+  engine().say("result", { results: [heard("merhaba", true)] });
+  t.mock.timers.tick(14_999);
+  assert.deepEqual(engine().calls, ["start"]);
+  t.mock.timers.tick(1);
+  assert.deepEqual(engine().calls, ["start", "stop"]);
+  engine().say("end");
+  assert.deepEqual(seen.problems, []);
+  assert.deepEqual(seen.shown, ["merhaba"]);
 });
