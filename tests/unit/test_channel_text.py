@@ -1,7 +1,10 @@
 """The words Dot sends on a channel (item 572): an answer as plain text, cut to the channel's size with the link to its
-chat, and the one line that tells a run waits for the owner."""
+chat, and the one line that tells a run waits for the owner. A messaging app draws no Markdown, so what an answer holds
+of it reads clean (item 617): bullets, headings on lines of their own, tables a row to a line, none of the marks."""
 
-from dotagent.channels.text import as_plain_text, cut_with_link, one_line
+import pytest
+
+from dotagent.channels.text import as_plain_text, cut_with_link, line_kinds, one_line
 
 LINK: str = "https://mac.example.ts.net/#/runs/run_1"
 
@@ -12,13 +15,130 @@ def test_markdown_marks_a_messaging_app_would_show_are_left_out() -> None:
         "See [the docs](https://example.com/docs) and ![a chart](https://example.com/c.png).\n\n\n\nEnd."
     )
     assert as_plain_text(markdown) == (
-        "Plan\n\nDo this first, then that.\n\nprint('hi')\n\n- one\n- two\n\n"
+        "Plan\n\nDo this first, then that.\n\nprint('hi')\n\n• one\n• two\n\n"
         "See the docs (https://example.com/docs) and a chart (https://example.com/c.png).\n\nEnd."
     )
 
 
 def test_a_lone_star_or_underscore_stays_where_it_means_something() -> None:
     assert as_plain_text("2 * 3 = 6 and snake_case_name") == "2 * 3 = 6 and snake_case_name"
+    assert as_plain_text("Match src/*.py and tests/*.py, 2*3*4 and a_b_c.") == (
+        "Match src/*.py and tests/*.py, 2*3*4 and a_b_c."
+    )
+
+
+@pytest.mark.parametrize("mark", ["-", "*", "+"])
+def test_list_items_read_with_a_bullet_and_a_nested_one_with_a_smaller_bullet(mark: str) -> None:
+    markdown: str = f"Steps:\n{mark} one\n{mark} two\n  {mark} nested\n    {mark} deeper\n{mark} three"
+    assert as_plain_text(markdown) == "Steps:\n• one\n• two\n  ◦ nested\n    ◦ deeper\n• three"
+
+
+def test_a_nested_list_is_told_by_how_much_deeper_it_stands_not_by_a_width() -> None:
+    four: str = "- one\n    - four spaces\n        - eight\n- two\n\t- a tab"
+    assert as_plain_text(four) == "• one\n  ◦ four spaces\n    ◦ eight\n• two\n  ◦ a tab"
+
+
+def test_numbered_items_stay_as_they_are_written() -> None:
+    assert as_plain_text("1. one\n2. two\n10) ten") == "1. one\n2. two\n10) ten"
+    assert as_plain_text("1. one\n   - detail\n2. two") == "1. one\n  ◦ detail\n2. two"
+
+
+def test_tasks_wear_a_box_and_an_empty_item_is_left_out() -> None:
+    assert as_plain_text("- [ ] to do\n- [x] done\n- [X] done too\n- \n-\n- real") == (
+        "☐ to do\n☑ done\n☑ done too\n• real"
+    )
+
+
+def test_a_heading_stands_on_a_line_of_its_own_with_a_blank_line_before_it() -> None:
+    markdown: str = "Intro line\n## First\nbody one\n### Second ###\nbody two\n#### \n# Top"
+    assert as_plain_text(markdown) == "Intro line\n\nFirst\nbody one\n\nSecond\nbody two\n\nTop"
+    # The first line of the text needs no blank line before it, and a hash that is no heading stays.
+    assert as_plain_text("# Title\ntext") == "Title\ntext"
+    assert as_plain_text("#hashtag and C# stay") == "#hashtag and C# stay"
+
+
+def test_a_horizontal_rule_goes_and_a_quotes_marks_go_with_it() -> None:
+    assert as_plain_text("above\n\n---\n\nbelow\n***\n___\n* * *\n- - -\nend") == "above\n\nbelow\n\nend"
+    assert as_plain_text("> quoted line\n> > nested\n>no space\n\nplain") == "quoted line\nnested\nno space\n\nplain"
+    assert as_plain_text("> - a list in a quote\n> - two") == "• a list in a quote\n• two"
+
+
+def test_a_table_reads_one_row_a_line_its_cells_joined_and_its_rule_line_gone() -> None:
+    table: str = "| Name | Size |\n|:--|--:|\n| shot.png | 3 MB |\n| notes | |\n\nAfter the table."
+    assert as_plain_text(table) == "Name · Size\nshot.png · 3 MB\nnotes · –\n\nAfter the table."
+    # Without outer pipes, with marks in the cells and an escaped pipe, which is a cell's own.
+    assert as_plain_text("a | b\n---|---\n**x** | `y\\|z`") == "a · b\nx · y|z"
+
+
+def test_lines_that_only_look_like_a_table_stay() -> None:
+    assert as_plain_text("one | two\nnot a rule\n") == "one | two\nnot a rule"
+    # A rule line with another number of cells than the line above it is none, and a lone --- is a horizontal rule.
+    assert as_plain_text("a | b\n---|---|---\nafter") == "a | b\n---|---|---\nafter"
+    assert as_plain_text("a | b\n---\nafter") == "a | b\n\nafter"
+
+
+def test_the_lines_of_a_block_of_code_stay_as_they_are_written() -> None:
+    markdown: str = (
+        "```yaml\n- item\n---\n# comment\n> redirect\n| a | b |\n|---|---|\n**bold**\n```\n"
+        "after **bold** and *it* and _it2_"
+    )
+    assert as_plain_text(markdown) == (
+        "- item\n---\n# comment\n> redirect\n| a | b |\n|---|---|\n**bold**\nafter bold and it and it2"
+    )
+    # A fence of tildes, a fence with more marks than the line in it, and one never closed.
+    assert as_plain_text("~~~\n- a\n~~~\n- b") == "- a\n• b"
+    assert as_plain_text("````\n```\n- a\n```\n````") == "```\n- a\n```"
+    assert as_plain_text("text\n```\n- unclosed\n# still code") == "text\n- unclosed\n# still code"
+
+
+def test_a_fence_indented_under_a_list_item_is_a_fence_and_three_ticks_on_one_line_are_a_code_span() -> None:
+    nested: str = "1. Install:\n    ```bash\n    - not a bullet\n    brew install x\n    ```\n2. Done"
+    assert as_plain_text(nested) == "1. Install:\n    - not a bullet\n    brew install x\n2. Done"
+    tabbed: str = "- Run:\n\t~~~\n\t# not a heading\n\t~~~\n- Next"
+    assert as_plain_text(tabbed) == "• Run:\n\t# not a heading\n• Next"
+    assert as_plain_text("Use ```ls -la``` here, and then - not a list") == "Use ls -la here, and then - not a list"
+    assert line_kinds(["```ls```", "- x"]) == ["prose", "prose"]
+
+
+def test_marks_around_words_go_and_a_code_span_keeps_what_is_in_it() -> None:
+    assert as_plain_text("**bold** __bold__ ~~gone~~ *it* _it_ ***both***") == "bold bold gone it it both"
+    assert (
+        as_plain_text("Use `**not bold**` and `a_b_c` and **use `x` here**.")
+        == "Use **not bold** and a_b_c and use x here."
+    )
+    assert as_plain_text("Edit `__init__.py` and `*.py`.") == "Edit __init__.py and *.py."
+
+
+def test_a_link_keeps_its_address_after_its_words_and_an_address_alone_stays() -> None:
+    assert as_plain_text("See [docs](https://x.example/a_(b)) and [https://y.example](https://y.example).") == (
+        "See docs (https://x.example/a_(b)) and https://y.example."
+    )
+    assert as_plain_text("![](https://x.example/p.png) and <https://z.example/q> and a<br>b") == (
+        "https://x.example/p.png and https://z.example/q and a b"
+    )
+
+
+def test_the_owners_answer_reads_clean() -> None:
+    answer: str = (
+        "Done. Here is what I found:\n\n## Summary\n- **Disk**: 120 GB free\n- **Memory**: 8 GB\n  - swap: 2 GB\n\n"
+        "| App | CPU |\n|---|---|\n| Safari | 4% |\n\n> Note: numbers change.\n\n---\n\n1. Restart\n2. Check"
+    )
+    assert as_plain_text(answer) == (
+        "Done. Here is what I found:\n\nSummary\n• Disk: 120 GB free\n• Memory: 8 GB\n  ◦ swap: 2 GB\n\n"
+        "App · CPU\nSafari · 4%\n\nNote: numbers change.\n\n1. Restart\n2. Check"
+    )
+
+
+def test_no_mark_of_markdown_is_left_in_an_answer_that_is_all_of_them() -> None:
+    answer: str = "# H\n\n- a\n- b\n\n> q\n\n---\n\n| x | y |\n|---|---|\n| 1 | 2 |\n\n**b** _i_ ~~s~~ `c`"
+    plain: str = as_plain_text(answer)
+    for mark in ("#", "- ", "> ", "---", "|", "**", "~~", "`"):
+        assert mark not in plain
+
+
+def test_line_kinds_tell_prose_from_code_and_fences() -> None:
+    lines: list[str] = ["a", "```py", "code", "```", "b", "~~~", "c", "~~~~", "d"]
+    assert line_kinds(lines) == ["prose", "fence", "code", "fence", "prose", "fence", "code", "fence", "prose"]
 
 
 def test_an_answer_that_fits_is_sent_whole_and_a_longer_one_is_cut_with_the_link() -> None:

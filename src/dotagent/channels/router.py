@@ -10,10 +10,11 @@ nothing, and the owner is told so. ``/stop``, or a message of the plain stop wor
 whatever the emergency stop, and a channel's pairing is not the router's, so the owner can still be reached.
 
 Outbound, the answer of each run of the chat is sent when the run ends, masked of the secrets Dot holds, as plain text
-and cut to the channel's size with a link to the chat for the rest. A run that waits for the owner (an approval, a
-question) sends one line with what it asks and the link. Approvals and questions are never answered on a channel: the
-account of a channel, if taken, must not be able to approve. The links are made from ``[server] reach``, the name a
-phone reaches Dot by; with none there is no address a phone can open, and no link is sent (item 611).
+and cut to the channel's size with a link to the chat for the rest; the pictures it names go after it, each as a message
+of its own (item 617). A run that waits for the owner (an approval, a question) sends one line with what it asks and the
+link. Approvals and questions are never answered on a channel: the account of a channel, if taken, must not be able to
+approve. The links are made from ``[server] reach``, the name a phone reaches Dot by; with none there is no address a
+phone can open, and no link is sent (item 611).
 
 What Dot tells the owner on its own (the morning brief and the watchers, ``owner_told`` of ``notify/owner.py``, item
 582) goes out on each channel that is on and paired as one line: the title, the text and the link to the page it opens.
@@ -30,6 +31,7 @@ from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.channels.intake import UNREAD_ANSWER, UNREAD_NOTE
+from dotagent.channels.pictures import Found, Pictures
 from dotagent.channels.text import as_plain_text, cut_with_link, one_line
 from dotagent.channels.types import TITLES, Channel, ChannelId, is_stop
 from dotagent.core.errors import DotError, NotFoundError, RunConflict
@@ -72,6 +74,8 @@ _ASKING_LEAD: dict[str, str] = {"question": "Dot has a question", "handoff": "Do
 _FINISHED_LEAD: dict[str, str] = {"failed": "The run failed.", "cancelled": "The run was stopped."}
 _ASK_CHARS: int = 240
 _FIRST_LINE_CHARS: int = 300
+# The blank line between the text of an answer and the line that says what it names that was left out (item 617).
+_NOTE_APART: int = 2
 # The statuses of an approval or a question that still waits for the owner.
 _OPEN: frozenset[str] = frozenset({"pending", "left"})
 # What a message that comes while the owner's emergency stop is engaged is answered (item 611): nothing was started, and
@@ -125,12 +129,15 @@ class ChannelRouter:
         base: str | None,
         is_on: Callable[[ChannelId], bool],
         asks_apart_s: float = ASKS_APART_S,
+        pictures: Pictures | None = None,
     ) -> None:
         self._store: Store = runtime.store
         self._manager: RunManager = manager
         self._channels: Mapping[ChannelId, Channel] = channels
         self._base: str | None = base
         self._is_on: Callable[[ChannelId], bool] = is_on
+        # Which files an answer names as pictures and which of them go with it (item 617); with none an answer is text.
+        self._pictures: Pictures | None = pictures
         # The chat of each channel by its thread's id, read from the store as the service starts and made on a first
         # message; one chat is made at a time.
         self._chats: dict[str, ChannelId] = {}
@@ -314,7 +321,12 @@ class ChannelRouter:
         if event.kind == "run_finished":
             # The end of a helper's run is not the chat's: the run that delegated it answers.
             if run.parent_run_id is None:
-                await self._say(channel_id, self._answer(event, run.goal.endswith(UNREAD_NOTE)), run.id)
+                await self._say_answer(
+                    channel_id,
+                    self._answer(event, run.goal.endswith(UNREAD_NOTE)),
+                    run.id,
+                    event.data.get("status") == "done",
+                )
             return
         # A wait for the owner: the first of a window goes at once, and one that comes inside it is held and told when
         # it ends, never dropped (item 611): a run that stays blocked must reach the owner, and a run that leaves a
@@ -465,7 +477,56 @@ class ChannelRouter:
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
         words: str = as_plain_text(redact_known(text, known))
         link: str | None = self._base if run_id is None else self.link(run_id)
+        await self._deliver(channel_id, cut_with_link(words, channel.limit, link), known)
+
+    async def _say_answer(self, channel_id: ChannelId, text: str, run_id: str, pictures: bool) -> None:
+        """Send the answer of the run ``run_id`` (item 617): as :meth:`_say` sends a text, then, as messages of their
+        own, the pictures it names (``pictures``: a run that ended done; see :mod:`~dotagent.channels.pictures`). The
+        paths of the pictures that go are out of the text, since the pictures are there, and one line at its end says
+        what the answer names that was left out. A picture that did not go is logged and told in one line after the
+        others; the text has gone by then."""
+        channel: Channel = self._channels[channel_id]
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        masked: str = redact_known(text, known)
+        found: Found = Found(masked, (), ())
+        if pictures and self._pictures is not None:
+            try:
+                found = await asyncio.to_thread(self._pictures.find, masked)
+            except Exception:
+                # The words of the answer go whatever a file does: the pictures are left out and the log has why.
+                log.exception("channel_pictures_not_looked_for", channel=channel_id, run_id=run_id)
+        # What is said of the files is masked as the answer is: the names in it are the answer's own, but a finder may
+        # name a file by what it read on the disk, and none of that goes to a phone unmasked.
+        note: str = redact_known(found.note(), known)
+        words: str = as_plain_text(found.text)
+        room: int = channel.limit - ((len(note) + _NOTE_APART) if note else 0)
+        body: str = cut_with_link(words, room, self.link(run_id)) if words else ""
+        message: str = "\n\n".join(part for part in (body, note) if part)
+        if message:
+            await self._deliver(channel_id, message, known)
+        unsent: list[str] = []
+        for picture in found.pictures:
+            try:
+                await channel.send_picture(picture)
+            except DotError as error:
+                log.warning(
+                    "channel_picture_not_sent",
+                    channel=channel_id,
+                    run_id=run_id,
+                    picture=picture.name,
+                    error=redact_known(error.message, known),
+                )
+                unsent.append(picture.name)
+            except Exception:
+                log.exception("channel_picture_failed", channel=channel_id, run_id=run_id, picture=picture.name)
+                unsent.append(picture.name)
+        if unsent:
+            told: str = redact_known(f"Dot could not send {', '.join(unsent)}. The log has why.", known)
+            await self._deliver(channel_id, told, known)
+
+    async def _deliver(self, channel_id: ChannelId, message: str, known: tuple[str, ...]) -> None:
+        """Hand ``message``, already masked and cut, to the channel; a failure is logged."""
         try:
-            await channel.send(cut_with_link(words, channel.limit, link))
+            await self._channels[channel_id].send(message)
         except DotError as error:
             log.warning("channel_send_failed", channel=channel_id, error=redact_known(error.message, known))

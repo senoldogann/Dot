@@ -3,6 +3,8 @@
 from collections.abc import Awaitable, Callable
 from typing import Literal, Protocol
 
+from dotagent.channels.pictures import Picture
+
 # The channels there are; a channel added later is named here and in TITLES.
 type ChannelId = Literal["imessage"]
 
@@ -49,6 +51,11 @@ class Channel(Protocol):
 
     async def send(self, text: str) -> None:
         """Send ``text`` to the owner. Raises :class:`~dotagent.core.errors.ChannelError` when it did not go."""
+        ...
+
+    async def send_picture(self, picture: Picture) -> None:
+        """Send ``picture``, a file :class:`~dotagent.channels.pictures.Pictures` judged may go, to the owner as a
+        message of its own. Raises :class:`~dotagent.core.errors.ChannelError` when it did not go (item 617)."""
         ...
 
     async def start_from_now(self) -> None:

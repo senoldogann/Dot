@@ -12,7 +12,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from channel_stand_ins import FakeMacos, Osascript
+from channel_stand_ins import FakeMacos, Osascript, own_places
 from messages_db import MessagesDb
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
@@ -85,7 +85,15 @@ async def served(runtime: Runtime, tmp_path_factory: pytest.TempPathFactory) -> 
     listener = bind_listener("127.0.0.1", 0)
     port: int = listener.getsockname()[1]
     channels: Channels = Channels(
-        runtime, manager, "127.0.0.1", port, script=osascript, messages_db=messages.path, macos=macos, poll_s=0.05
+        runtime,
+        manager,
+        "127.0.0.1",
+        port,
+        script=osascript,
+        messages_db=messages.path,
+        macos=macos,
+        poll_s=0.05,
+        **own_places(),
     )
     await channels.start()
     context: ServerContext = ServerContext(

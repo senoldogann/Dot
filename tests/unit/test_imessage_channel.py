@@ -8,6 +8,7 @@ import pytest
 import pytest_asyncio
 from channel_stand_ins import Osascript
 from messages_db import PAYMENT_BALLOON, STICKER_BALLOON, URL_BALLOON, MessagesDb, attributed_body
+from picture_files import HEADS, Layout, layout
 from step_records import step_answered, step_ended
 from structlog.testing import capture_logs
 
@@ -21,10 +22,14 @@ from dotagent.channels.imessage import (
     MARKER,
     MAX_HANDLES,
     OWN_LINK_S,
+    PICTURE_SCRIPT,
     SCHEDULED,
     IMessageChannel,
 )
 from dotagent.channels.intake import ATTACHMENT, FLOOD, MAX_PER_MINUTE, STALE_S, TOO_OLD, UNREAD_NOTE, too_long
+from dotagent.channels.pictures import Picture
+from dotagent.channels.staging import MARKER as STAGING_MARK
+from dotagent.channels.staging import STAGED_KEPT_S, Staging
 from dotagent.core.errors import ChannelError, DesktopError, DesktopPermissionError
 from dotagent.drafts.scripts import SCRIPTS
 from dotagent.store.db import Store
@@ -78,13 +83,17 @@ def clock() -> Clock:
     return Clock()
 
 
-def _channel(store: Store, db: MessagesDb, runner: Osascript, clock: Clock) -> IMessageChannel:
-    return IMessageChannel(store, runner, db.path, 5.0, OWN_BASE, poll_s=0.01, clock=clock)
+def _channel(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, staging: Staging | None = None
+) -> IMessageChannel:
+    return IMessageChannel(store, runner, db.path, 5.0, OWN_BASE, poll_s=0.01, clock=clock, staging=staging)
 
 
-async def _paired(store: Store, db: MessagesDb, runner: Osascript, clock: Clock, *handles: str) -> IMessageChannel:
+async def _paired(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, *handles: str, staging: Staging | None = None
+) -> IMessageChannel:
     """A channel that has the handles paired (as the owner would, with a code typed back) and has set its cursor."""
-    channel: IMessageChannel = _channel(store, db, runner, clock)
+    channel: IMessageChannel = _channel(store, db, runner, clock, staging)
     await channel.load()
     for handle in handles:
         await channel.send_code(handle)
@@ -1207,3 +1216,195 @@ async def test_the_picture_of_a_link_preview_is_no_file_the_owner_sent(
         ANOTHER_LINK,
         f"and this one https://third.example/c\n\n{UNREAD_NOTE}",
     ]
+
+
+# ----- the pictures Dot sends with an answer (item 617) ----------------------------------------------
+
+
+@pytest.fixture
+def home(tmp_path: Path) -> Layout:
+    """A home folder laid out as the owner's, with Dot's workspace in it and the folder pictures are copied into."""
+    return layout(tmp_path)
+
+
+def _staging(home: Layout) -> Staging:
+    return Staging(home.staging, home.finder)
+
+
+def _picture(home: Layout, name: str = "ekran 1.png", data: bytes | None = None) -> Picture:
+    made: Path = home.make(home.workspace / "shots" / name, "png", HEADS["png"] + b"pixels" if data is None else data)
+    (found,) = home.finder.find(str(made)).pictures
+    return found
+
+
+def _left_by_an_earlier_daemon(home: Layout) -> tuple[Path, Path]:
+    """A copy an earlier daemon left in the staging folder, long ago (with the mark every folder of Dot's holds), and a
+    folder of the owner's own beside it."""
+    old: Path = home.staging / f"{int(NOW - STAGED_KEPT_S - 5)}-0123abcd"
+    old.mkdir(parents=True)
+    (old / "left.png").write_bytes(HEADS["png"])
+    (old / STAGING_MARK).write_text("Made by Dot: left by an earlier daemon\n", encoding="utf-8")
+    mine: Path = home.staging / "holiday"
+    mine.mkdir()
+    return old, mine
+
+
+def _what_is_left(old: Path, mine: Path) -> tuple[bool, bool]:
+    return old.exists(), mine.exists()
+
+
+def test_the_script_sends_a_posix_file_to_the_participant_over_imessage_as_the_text_is_sent() -> None:
+    assert "POSIX file (item 1 of argv)" in PICTURE_SCRIPT
+    assert "send thePicture to participant (item 2 of argv) of theService" in PICTURE_SCRIPT
+    assert "1st account whose service type = iMessage" in PICTURE_SCRIPT
+    assert "send theBody to participant (item i of argv) of theService" in SCRIPTS["message"]
+
+
+async def test_a_picture_is_sent_from_a_copy_in_the_staging_folder_to_the_chat_the_owner_wrote_in(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, ADDRESS, staging=_staging(home))
+    db.message(db.chat(ADDRESS), "by address", at=NOW)
+    await channel.poll(Heard())
+    found: Picture = _picture(home)
+    await channel.send_picture(found)
+    (sent,) = runner.pictures
+    script, argv = runner.calls[-1]
+    # The copy, not the file in the workspace, is what Messages is handed; it is the same bytes, in a folder of its own.
+    assert script == PICTURE_SCRIPT and argv == (str(sent.path), ADDRESS) and sent.handle == ADDRESS
+    assert sent.data == HEADS["png"] + b"pixels" and sent.path.name == "ekran 1.png"
+    assert sent.path.parent.parent == home.staging and sent.path != found.path
+    assert str(sent.path) not in script
+    assert found.path.read_bytes() == sent.data
+    # A picture is a message of its own: no words, and so no marker.
+    assert runner.sent == [] and runner.timeouts[-1] == 5.0
+
+
+async def test_a_picture_goes_to_the_first_paired_number_before_the_owner_has_written_anywhere(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, ADDRESS, staging=_staging(home))
+    clock.now = NOW
+    await channel.send_picture(_picture(home))
+    assert [sent.handle for sent in runner.pictures] == [ADDRESS]
+
+
+async def test_the_copy_stays_while_messages_may_need_it_and_goes_when_its_time_is_over(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, staging=_staging(home))
+    clock.now = NOW
+    await channel.send_picture(_picture(home))
+    (sent,) = runner.pictures
+    clock.now = NOW + STAGED_KEPT_S - 1
+    await channel.sweep()
+    assert sent.path.exists()
+    clock.now = NOW + STAGED_KEPT_S
+    await channel.sweep()
+    assert not sent.path.parent.exists() and home.staging.exists()
+
+
+async def test_the_copies_an_earlier_daemon_left_are_removed_as_the_channel_loads(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    old, mine = _left_by_an_earlier_daemon(home)
+    channel: IMessageChannel = _channel(store, db, runner, clock, _staging(home))
+    await channel.load()
+    assert _what_is_left(old, mine) == (False, True)
+
+
+async def test_a_picture_messages_did_not_take_leaves_no_copy_and_the_tab_says_why(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, staging=_staging(home))
+    found: Picture = _picture(home)
+    runner.error = DesktopError(
+        "osascript failed", {"stderr": "Not authorized to send Apple events to Messages. (-1743)"}
+    )
+    with pytest.raises(ChannelError, match="Messages did not take the message"):
+        await channel.send_picture(found)
+    assert list(home.staging.iterdir()) == [] and runner.pictures == []
+    assert (
+        channel.needs == "automation" and channel.problem == "macOS has not let the app that runs Dot control Messages"
+    )
+    assert channel.seen().error is not None
+    # Once Messages takes one, the problem is over.
+    runner.error = None
+    await channel.send_picture(found)
+    assert len(runner.pictures) == 1 and channel.problem is None
+
+
+async def test_a_picture_that_is_not_one_any_more_is_not_sent_and_leaves_no_copy(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, staging=_staging(home))
+    found: Picture = _picture(home)
+    found.path.write_bytes(b"swapped for words")
+    with pytest.raises(ChannelError, match="cannot be sent now"):
+        await channel.send_picture(found)
+    assert runner.pictures == [] and list(home.staging.iterdir()) == []
+
+
+async def test_a_channel_with_no_staging_folder_or_no_paired_number_sends_no_picture(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    found: Picture = _picture(home)
+    unpaired: IMessageChannel = _channel(store, db, runner, clock, _staging(home))
+    await unpaired.load()
+    with pytest.raises(ChannelError, match="nowhere to answer"):
+        await unpaired.send_picture(found)
+    unfolded: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    with pytest.raises(ChannelError, match="no folder to send pictures from"):
+        await unfolded.send_picture(found)
+    assert runner.pictures == [] and not home.staging.exists()
+
+
+async def test_the_row_messages_writes_for_a_picture_dot_sent_is_never_read_as_the_owners(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    """A picture is a row flagged as the owner's with a file and no words (or the mark of the object alone), and with
+    two Apple IDs one received from the handle too; none is a message, and none is told it is not read."""
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, staging=_staging(home))
+    own: int = db.chat(PHONE)
+    owner: int = db.handle(PHONE)
+    clock.now = NOW
+    await channel.send_picture(_picture(home))
+    db.message(own, None, attachment=True, at=NOW + 0.5)
+    db.message(own, "\ufffc", attachment=True, at=NOW + 1)
+    db.message(own, None, attachment=True, from_me=False, sender=owner, at=NOW + 2)
+    db.message(own, "a real command", at=NOW + 3)
+    clock.now = NOW + 5
+    heard: Heard = Heard()
+    with capture_logs() as logs:
+        await channel.poll(heard)
+    assert heard.texts == ["a real command"] and runner.sent == []
+    let_go: list[object] = [entry["reason"] for entry in logs if entry["event"] == "imessage_message_let_go"]
+    assert let_go == ["a picture of Dot's own"] * 3
+
+
+async def test_a_picture_of_the_owners_is_told_it_is_not_read_unless_it_falls_in_the_minute_of_one_of_dots(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, staging=_staging(home))
+    own: int = db.chat(PHONE)
+    clock.now = NOW
+    await channel.send_picture(_picture(home))
+    db.message(own, None, attachment=True, at=NOW - 30)
+    db.message(own, "what is wrong with this?", attachment=True, at=NOW + 2)
+    db.message(own, None, attachment=True, at=NOW + OWN_LINK_S + 30)
+    clock.now = NOW + OWN_LINK_S + 40
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    # The words of a picture sent with words are the owner's command, as item 611 made them; a picture before the send
+    # and one long after are the owner's, and are told that Dot does not read them.
+    assert heard.texts == [f"what is wrong with this?\n\n{UNREAD_NOTE}"]
+    assert runner.sent == [(PHONE, f"{MARKER}{ATTACHMENT}")] * 2
+
+
+async def test_with_no_picture_sent_a_file_and_no_words_is_the_owners_and_is_told_it_is_not_read(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, staging=_staging(home))
+    db.message(db.chat(PHONE), None, attachment=True, at=NOW + 1)
+    await channel.poll(Heard())
+    assert runner.sent == [(PHONE, f"{MARKER}{ATTACHMENT}")]

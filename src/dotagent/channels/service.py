@@ -18,14 +18,17 @@ from dotagent.channels.imessage import (
     Script,
     database_access,
 )
+from dotagent.channels.pictures import Pictures
 from dotagent.channels.router import ASKS_APART_S, WATCHED_KINDS, ChannelRouter
 from dotagent.channels.seen import Seen, SeenError
+from dotagent.channels.staging import STAGED_KEPT_S, Staging
 from dotagent.channels.types import Channel, ChannelId
 from dotagent.channels.views import AutomationAnswer, ChannelsView, ImessageView
 from dotagent.connections import mac
 from dotagent.connections.mac import AutomationState
 from dotagent.core.errors import DesktopError
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import staging_dir
 from dotagent.core.text import redact_known
 from dotagent.desktop import perms
 from dotagent.desktop.codes import chat_db_path
@@ -42,6 +45,8 @@ RESTART_S: float = 30.0
 # How long a step waits for the owner's answer to macOS's question before it answers that the question waits; the
 # question stays on the Mac until it is answered.
 ASK_WAIT_S: float = 60.0
+# How often the copies of pictures that were sent are looked at for those whose time is over (item 617).
+SWEEP_S: float = 60.0
 
 
 class Macos(Protocol):
@@ -103,8 +108,13 @@ class Channels:
         poll_s: float = POLL_S,
         ask_wait_s: float = ASK_WAIT_S,
         asks_apart_s: float = ASKS_APART_S,
+        home: Path | None = None,
+        staging: Path | None = None,
+        sweep_s: float = SWEEP_S,
+        copies_kept_s: float = STAGED_KEPT_S,
     ) -> None:
         self._runtime: Runtime = runtime
+        self._sweep_s: float = sweep_s
         self._macos: Macos = RealMacos() if macos is None else macos
         self._ask_wait_s: float = ask_wait_s
         # The question macOS asks the owner now, if one is: it ends with their answer.
@@ -118,6 +128,12 @@ class Channels:
         # no name: a row that is only a link into it is Dot's own, never a command of the owner's.
         reach: list[str] = runtime.config.server.reach
         self._links: str | None = f"https://{reach[0]}/" if reach else None
+        # The pictures an answer names go from Dot's workspace or the owner's home folder (item 617), as a copy in a
+        # folder of Dot's own under the owner's Pictures, which Messages can read (see ``staging.py``): it is
+        # ``~/Pictures/Dot``, which ``DOT_STAGING_DIR`` moves. The folder is the owner's, so a test gives its own home
+        # and folder, and a test run refuses a staging folder that is not a pytest folder (``tests/conftest.py``).
+        owner_home: Path = Path.home() if home is None else home
+        pictures: Pictures = Pictures(runtime.workspace, owner_home, runtime.protected)
         self._imessage: IMessageChannel = IMessageChannel(
             runtime.store,
             script,
@@ -125,13 +141,15 @@ class Channels:
             runtime.config.desktop.osascript_timeout_s,
             self._links or f"{base_url(host, port)}/",
             poll_s,
+            staging=Staging(staging_dir() if staging is None else staging, pictures, copies_kept_s),
         )
         self._channels: dict[ChannelId, Channel] = {"imessage": self._imessage}
         self._router: ChannelRouter = ChannelRouter(
-            runtime, manager, self._channels, self._links, self.is_on, asks_apart_s
+            runtime, manager, self._channels, self._links, self.is_on, asks_apart_s, pictures
         )
         self._tasks: dict[ChannelId, asyncio.Task[None]] = {}
         self._watcher: asyncio.Task[None] | None = None
+        self._sweeper: asyncio.Task[None] | None = None
         self._stack: contextlib.AsyncExitStack = contextlib.AsyncExitStack()
         # One switch and one pairing step at a time.
         self.changing: asyncio.Lock = asyncio.Lock()
@@ -155,20 +173,29 @@ class Channels:
             log.info("channel_links_not_sent", why="[server] reach names no address a phone can open")
         feed: Subscription = await self._stack.enter_async_context(self._runtime.bus.subscribe_kinds(WATCHED_KINDS))
         self._watcher = asyncio.create_task(_kept_up("watch", partial(self._router.watch, feed)), name="channels-watch")
+        self._sweeper = asyncio.create_task(_kept_up("sweep", self._sweep_copies), name="channels-sweep")
         for channel_id, on in self._on.items():
             if on:
                 self._launch(channel_id)
 
     async def stop(self) -> None:
         tasks: list[asyncio.Task[None]] = [*self._tasks.values()]
-        if self._watcher is not None:
-            tasks.append(self._watcher)
+        for kept in (self._watcher, self._sweeper):
+            if kept is not None:
+                tasks.append(kept)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         self._tasks.clear()
         self._watcher = None
+        self._sweeper = None
         await self._stack.aclose()
+
+    async def _sweep_copies(self) -> None:
+        """Remove the copies of pictures whose time is over, every so often, until cancelled (item 617)."""
+        while True:
+            await self._imessage.sweep()
+            await asyncio.sleep(self._sweep_s)
 
     def _launch(self, channel_id: ChannelId) -> None:
         channel: Channel = self._channels[channel_id]

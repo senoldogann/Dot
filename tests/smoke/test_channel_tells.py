@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from channel_stand_ins import PROVIDER, FakeMacos, Osascript, Replies, finish
+from channel_stand_ins import PROVIDER, FakeMacos, Osascript, Replies, finish, own_places
 from messages_db import URL_BALLOON, MessagesDb
 
 from dotagent.agent.manager import RunManager
@@ -161,6 +161,7 @@ async def serving(
         macos=FakeMacos(),
         poll_s=0.05,
         asks_apart_s=APART_S,
+        **own_places(),
     )
     await channels.start()
     try:

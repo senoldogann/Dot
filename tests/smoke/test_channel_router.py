@@ -6,6 +6,7 @@ channel."""
 
 import asyncio
 import contextlib
+import os
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from pathlib import Path
@@ -13,14 +14,25 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 from channel_stand_ins import PROVIDER, Replies, finish, stop_file
+from picture_files import HEADS, NOT_IMAGE
 
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.channels.intake import UNREAD_ANSWER, UNREAD_NOTE
+from dotagent.channels.pictures import (
+    NOT_A_PICTURE,
+    OUT_OF_PLACE,
+    TOO_BIG,
+    TOO_MANY,
+    Found,
+    Left,
+    Picture,
+    Pictures,
+)
 from dotagent.channels.router import DEFAULT_CHOICES, QUEUED, STOPPED, WATCHED_KINDS, ChannelRouter
 from dotagent.channels.types import Receive
 from dotagent.config import load_config
-from dotagent.core.errors import ConfigError
+from dotagent.core.errors import ChannelError, ConfigError
 from dotagent.core.paths import env_file_path
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -45,6 +57,13 @@ class FakeChannel:
 
     def __init__(self) -> None:
         self.sent: list[str] = []
+        # The pictures sent (item 617), by name, the bytes each held as it was sent, the names whose send fails, and
+        # everything in the order it went: ("text", words) or ("picture", name).
+        self.pictures: list[str] = []
+        self.picture_bytes: list[bytes] = []
+        self.refuses: set[str] = set()
+        self.explodes: set[str] = set()
+        self.order: list[tuple[str, str]] = []
 
     def paired(self) -> bool:
         return True
@@ -54,6 +73,16 @@ class FakeChannel:
 
     async def send(self, text: str) -> None:
         self.sent.append(text)
+        self.order.append(("text", text))
+
+    async def send_picture(self, picture: Picture) -> None:
+        if picture.name in self.explodes:
+            raise RuntimeError("a bug in the channel")
+        if picture.name in self.refuses:
+            raise ChannelError(f"Messages did not take {picture.name}", {})
+        self.pictures.append(picture.name)
+        self.picture_bytes.append(await asyncio.to_thread(picture.path.read_bytes))
+        self.order.append(("picture", picture.name))
 
     async def start_from_now(self) -> None:
         return None
@@ -108,8 +137,17 @@ class Wired:
         self.manager: RunManager = manager
         self.channel: FakeChannel = FakeChannel()
         self.on: bool = True
+        # The pictures an answer names (item 617) go from the runtime's workspace or the owner's home, which is a
+        # folder of the test's own here.
+        self.home: Path = runtime.workspace.parent / "owner"
         self.router: ChannelRouter = ChannelRouter(
-            runtime, manager, {"imessage": self.channel}, base, lambda _: self.on, _ASKS_APART_S
+            runtime,
+            manager,
+            {"imessage": self.channel},
+            base,
+            lambda _: self.on,
+            _ASKS_APART_S,
+            Pictures(runtime.workspace, self.home, runtime.protected),
         )
 
     async def thread(self) -> ThreadRecord:
@@ -776,3 +814,261 @@ async def test_with_no_address_a_phone_can_open_the_lines_carry_no_link_and_say_
 async def test_with_an_address_the_links_are_made_from_it(wired: Wired) -> None:
     newest: RunRecord = (await wired.runs())[-1]
     assert wired.router.link(newest.id) == f"{BASE}#/runs/{newest.id}"
+
+
+# ----- the pictures an answer names, and its text read clean (item 617) -----------------------------------------
+
+
+def _make_picture(path: Path, kind: str = "png", data: bytes | None = None) -> Path:
+    """A picture (or what is named like one) made at ``path``, the folders above it too."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(HEADS[kind] if data is None else data)
+    return path
+
+
+def _linked(link: Path, target: Path) -> Path:
+    """A link at ``link`` that leads to ``target``."""
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(target)
+    return link
+
+
+async def _answered(wired: Wired, replies: Replies, answer: str, goal: str = "send me a picture") -> list[str]:
+    """Post ``goal`` and let the scripted model answer ``answer``; returns the texts the channel was sent for it, once
+    the first has come (the router sends the text first, then the pictures, then a line for those that failed)."""
+    replies.push(finish(answer))
+    before: int = len(wired.channel.order)
+    await wired.router.inbound("imessage", goal)
+    await _until(lambda: len(wired.channel.order) > before, "the answer")
+    return [words for kind, words in wired.channel.order[before:] if kind == "text"]
+
+
+async def _quiet(wired: Wired) -> None:
+    """The runs ended and the router had time to send what it was going to."""
+    await _settled(wired.manager)
+    await asyncio.sleep(0.3)
+
+
+async def test_the_owners_answer_names_a_screenshot_and_the_picture_goes_after_its_text(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    shot: Path = _make_picture(runtime.workspace / "screenshots" / "ekran-2026-10-24-1617.png", "png")
+    before: int = len(wired.channel.order)
+    words: list[str] = await _answered(
+        wired, replies, f"I sent the screenshot above, and saved it as a file at {shot}", "screenshot of my screen"
+    )
+    await _until(lambda: wired.channel.pictures[-1:] == [shot.name], "the picture")
+    # The text first, with the file's name where the long path was; then the picture, a message of its own.
+    assert words == ["I sent the screenshot above, and saved it as a file at ekran-2026-10-24-1617.png"]
+    assert wired.channel.order[before:] == [("text", words[0]), ("picture", shot.name)]
+    assert wired.channel.picture_bytes[-1] == HEADS["png"]
+
+
+async def test_the_text_of_an_answer_reads_clean_on_the_channel(wired: Wired, replies: Replies) -> None:
+    answer: str = (
+        "## Plan\n- **First**: `build` it\n  - then test\n1. one\n2. two\n\n> A note\n\n---\n\n"
+        "| App | CPU |\n|---|---|\n| Safari | 4% |"
+    )
+    assert await _answered(wired, replies, answer, "explain the plan") == [
+        "Plan\n• First: build it\n  ◦ then test\n1. one\n2. two\n\nA note\n\nApp · CPU\nSafari · 4%"
+    ]
+
+
+async def test_a_markdown_image_goes_whole_and_a_picture_in_the_home_folder_goes_too(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    chart: Path = _make_picture(runtime.workspace / "chart-a.png")
+    holiday: Path = _make_picture(wired.home / "Pictures" / "holiday-a.jpg", "jpeg")
+    words: list[str] = await _answered(
+        wired, replies, f"The chart:\n\n![chart]({chart})\n\nAnd the photo at {holiday}.", "show me both"
+    )
+    await _until(lambda: wired.channel.pictures[-2:] == ["chart-a.png", "holiday-a.jpg"], "both pictures")
+    assert words == ["The chart:\n\nAnd the photo at holiday-a.jpg."]
+
+
+async def test_what_is_left_out_is_said_in_one_line_at_the_end_of_the_text(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    names: list[str] = [str(_make_picture(runtime.workspace / "many" / f"m{number}.png")) for number in range(6)]
+    hidden: Path = _make_picture(wired.home / ".ssh" / "hidden-b.png")
+    fake: Path = _make_picture(runtime.workspace / "fake-b.png", data=NOT_IMAGE)
+    big: Path = _make_picture(runtime.workspace / "big-b.png")
+    os.truncate(big, 20 * 1024 * 1024 + 1)
+    before: int = len(wired.channel.pictures)
+    wired.channel.limit = 4000
+    try:
+        words: list[str] = await _answered(
+            wired, replies, "Here: " + " ".join([*names, str(hidden), str(fake), str(big)]), "everything"
+        )
+        await _until(lambda: len(wired.channel.pictures) == before + 4, "four pictures")
+    finally:
+        wired.channel.limit = LIMIT
+    assert wired.channel.pictures[before:] == ["m0.png", "m1.png", "m2.png", "m3.png"]
+    (message,) = words
+    assert message.rsplit("\n\n", 1)[-1] == (
+        f"Left out: hidden-b.png ({OUT_OF_PLACE}), fake-b.png ({NOT_A_PICTURE}), big-b.png ({TOO_BIG}), "
+        f"2 more ({TOO_MANY})."
+    )
+    # What was left out keeps its words in the text; what went is its name.
+    assert message.startswith("Here: m0.png m1.png m2.png m3.png ") and str(hidden) in message
+
+
+async def test_the_one_line_of_what_was_left_out_stays_within_the_channels_size_with_a_cut_answer(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    fake: Path = _make_picture(runtime.workspace / "fake-g.png", data=NOT_IMAGE)
+    words: list[str] = await _answered(
+        wired, replies, f"{fake} " + "More words. " * 100, "a long one with a bad picture"
+    )
+    (message,) = words
+    run: RunRecord = (await wired.runs())[-1]
+    assert len(message) <= LIMIT and message.endswith(f"Left out: fake-g.png ({NOT_A_PICTURE}).")
+    assert f"The rest of the answer is in Dot: {BASE}#/runs/{run.id}" in message
+
+
+async def test_an_answer_that_is_only_a_picture_sends_the_picture_and_no_empty_text(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    only: Path = _make_picture(runtime.workspace / "only-c.png")
+    before: int = len(wired.channel.order)
+    replies.push(finish(f"![]({only})"))
+    await wired.router.inbound("imessage", "just the picture")
+    await _until(lambda: wired.channel.pictures[-1:] == ["only-c.png"], "the picture")
+    await _quiet(wired)
+    assert wired.channel.order[before:] == [("picture", "only-c.png")]
+
+
+async def test_a_picture_that_cannot_be_sent_is_logged_and_told_in_one_line_after_the_others(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    good: Path = _make_picture(runtime.workspace / "good-d.png")
+    bad: Path = _make_picture(runtime.workspace / "bad-d.png")
+    wired.channel.refuses.add("bad-d.png")
+    before: int = len(wired.channel.order)
+    await _answered(wired, replies, f"Both: {bad} and {good}", "send both")
+    await _until(lambda: len(wired.channel.order) == before + 3, "the text, the picture and the line")
+    assert wired.channel.order[before + 1 :] == [
+        ("picture", "good-d.png"),
+        ("text", "Dot could not send bad-d.png. The log has why."),
+    ]
+
+
+async def test_a_file_a_link_leads_to_is_left_out_under_the_name_the_answer_wrote(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    """The line of what was left out goes to the owner's phone (the review of item 617): a link in the workspace to a
+    file in ``~/.ssh`` must not tell the name of that file."""
+    link: Path = _linked(runtime.workspace / "latest-j.png", _make_picture(wired.home / ".ssh" / "bank-token-j.png"))
+    before: int = len(wired.channel.pictures)
+    words: list[str] = await _answered(wired, replies, f"It is {link}", "where is it")
+    await _quiet(wired)
+    (message,) = words
+    assert message.endswith(f"Left out: latest-j.png ({OUT_OF_PLACE}).") and "bank-token-j" not in message
+    assert len(wired.channel.pictures) == before
+
+
+async def test_what_is_said_of_a_picture_is_masked_whatever_name_a_finder_gives_it(
+    wired: Wired, replies: Replies, runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The note of what was left out and the line of what could not be sent are masked of the secrets Dot holds as the
+    answer is, even when a finder names a file by what it read on the disk (the review of item 617)."""
+    secret: str = "hunter2-horse-battery-staple-11"
+    write_env_value(env_file_path(), "SOME_FIFTH_SERVICE_PASSWORD_FILE", secret)
+    named: Path = _make_picture(runtime.workspace / "card-k.png")
+
+    def finding(self: Pictures, text: str) -> Found:
+        picture: Picture = Picture(named, f"card-{secret}.png", "png", named.stat().st_size)
+        return Found(text, (picture,), (Left(f"id-{secret}.png", OUT_OF_PLACE),))
+
+    monkeypatch.setattr(Pictures, "find", finding)
+    wired.channel.refuses.add(f"card-{secret}.png")
+    before: int = len(wired.channel.order)
+    await _answered(wired, replies, "Here you go.", "the card")
+    await _until(lambda: len(wired.channel.order) == before + 2, "the text and the line")
+    note, unsent = (words for _kind, words in wired.channel.order[before:])
+    assert secret not in note + unsent
+    assert note.endswith(f"Left out: id-***.png ({OUT_OF_PLACE}).")
+    assert unsent == "Dot could not send card-***.png. The log has why."
+
+
+async def test_the_words_of_an_answer_go_whatever_looking_for_its_pictures_comes_to(
+    wired: Wired, replies: Replies, runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    named: Path = _make_picture(runtime.workspace / "boom-h.png")
+
+    def broken(self: Pictures, text: str) -> object:
+        raise OSError("the disk said no")
+
+    monkeypatch.setattr(Pictures, "find", broken)
+    words: list[str] = await _answered(wired, replies, f"It is at {named}", "where is it")
+    await _quiet(wired)
+    # Nothing was looked for: the answer goes as it was written, and the watcher goes on.
+    assert words == [f"It is at {named}"] and "boom-h.png" not in wired.channel.pictures
+    replies.push(finish("Still following."))
+    await wired.router.inbound("imessage", "and now?")
+    await _until(lambda: wired.channel.sent[-1:] == ["Still following."], "the next answer")
+
+
+async def test_a_picture_that_fails_in_a_way_nobody_expected_does_not_stop_the_others_or_the_watcher(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    first: Path = _make_picture(runtime.workspace / "first-i.png")
+    second: Path = _make_picture(runtime.workspace / "second-i.png")
+    wired.channel.explodes.add("first-i.png")
+    before: int = len(wired.channel.order)
+    await _answered(wired, replies, f"Both: {first} and {second}", "send both")
+    await _until(lambda: len(wired.channel.order) == before + 3, "the text, the picture and the line")
+    assert wired.channel.order[before + 1 :] == [
+        ("picture", "second-i.png"),
+        ("text", "Dot could not send first-i.png. The log has why."),
+    ]
+    wired.channel.explodes.clear()
+    replies.push(finish("Still following."))
+    await wired.router.inbound("imessage", "and now?")
+    await _until(lambda: wired.channel.sent[-1:] == ["Still following."], "the next answer")
+
+
+async def test_a_run_that_did_not_end_done_sends_no_pictures(wired: Wired, replies: Replies, runtime: Runtime) -> None:
+    named: Path = _make_picture(runtime.workspace / "named-e.png")
+    replies.push(finish("Done."))
+    await wired.router.inbound("imessage", "make a run")
+    await _until(lambda: wired.channel.sent[-1:] == ["Done."], "the run ended")
+    run: RunRecord = (await wired.runs())[-1]
+    before: int = len(wired.channel.order)
+    await runtime.bus.emit(run.id, "run_finished", {"status": "failed", "result": f"The tool broke on {named}"}, False)
+    await _until(lambda: len(wired.channel.order) == before + 1, "the failure was told")
+    await asyncio.sleep(0.3)
+    assert wired.channel.order[before:] == [("text", f"The run failed. The tool broke on {named}")]
+
+
+async def test_an_answer_is_masked_before_the_pictures_in_it_are_looked_for(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    secret: str = "hunter2-horse-battery-staple-9"
+    write_env_value(env_file_path(), "SOME_OTHER_SERVICE_PASSWORD_FILE", secret)
+    named: Path = _make_picture(runtime.workspace / f"card-{secret}.png")
+    before: int = len(wired.channel.pictures)
+    words: list[str] = await _answered(wired, replies, f"The card is {named}", "the card")
+    await _quiet(wired)
+    assert secret not in words[0] and "card-***.png" in words[0]
+    assert len(wired.channel.pictures) == before
+
+
+async def test_a_router_with_no_finder_sends_an_answer_as_text_and_names_no_picture(
+    runtime: Runtime, manager: RunManager, replies: Replies
+) -> None:
+    named: Path = _make_picture(runtime.workspace / "plain-f.png")
+    channel: FakeChannel = FakeChannel()
+    router: ChannelRouter = ChannelRouter(runtime, manager, {"imessage": channel}, BASE, lambda _: True, _ASKS_APART_S)
+    await router.load()
+    async with runtime.bus.subscribe_kinds(WATCHED_KINDS) as feed:
+        watching: asyncio.Task[None] = asyncio.create_task(router.watch(feed))
+        try:
+            replies.push(finish(f"It is at {named}"))
+            await router.inbound("imessage", "where is it")
+            await _until(lambda: bool(channel.sent), "the answer")
+            await asyncio.sleep(0.3)
+        finally:
+            watching.cancel()
+            await asyncio.gather(watching, return_exceptions=True)
+    assert channel.sent == [f"It is at {named}"] and channel.pictures == []

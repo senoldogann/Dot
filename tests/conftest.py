@@ -16,15 +16,19 @@ the Keychain for a key it needs by its own: a test that starts one gives it a ke
 its own.
 
 The MCP server that comes with Dot is out of every test that did not ask for it (item 583), as
-:func:`_no_builtin_servers` says."""
+:func:`_no_builtin_servers` says. The folder Dot copies the pictures it sends into, ``~/Pictures/Dot``, is the owner's:
+no test reaches it (item 617), as :func:`_owners_pictures_stay_theirs` says."""
 
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 
 from dotagent import secrets
+from dotagent.channels.pictures import Pictures
+from dotagent.channels.staging import STAGED_KEPT_S, Staging
 from dotagent.config import load_default_config, providers_by_key
 from dotagent.mcp import builtin
 
@@ -91,6 +95,30 @@ def _no_builtin_servers() -> Iterator[None]:
     its config says ``[builtin_mcp] web_research = false`` where it counts servers."""
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(builtin, "WEB_RESEARCH_PACKAGE", "dot_tests_have_no_web_research_package")
+        yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _owners_pictures_stay_theirs(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """The folder Dot copies the pictures it sends into (``~/Pictures/Dot``, item 617) is the owner's, not Dot's, and a
+    channel that loads lists it and removes the old copies in it. No test reaches it, in two ways:
+
+    - ``DOT_STAGING_DIR`` is a folder of the run's own for the whole run, so a ``Channels`` that was given none, and a
+      daemon a test starts as a child process, use it (as ``DOT_CHROME_DIR`` keeps the owner's Chrome out of a test);
+    - a ``Staging`` built in a test must stand in a pytest folder: one that does not (under the real home, or the
+      default of a ``Channels`` given the owner's home) fails the test before the folder is touched, as
+      :func:`channel_stand_ins.stop_file` refuses a home that is not a test's own."""
+    inside: Path = Path(os.path.realpath(tmp_path_factory.getbasetemp()))
+    built = Staging.__init__
+
+    def refusing(self: Staging, root: Path, pictures: Pictures, kept_s: float = STAGED_KEPT_S) -> None:
+        where: Path = Path(os.path.realpath(root))
+        assert where.is_relative_to(inside), f"a test's staging folder is in a pytest folder, not {where} (the owner's)"
+        built(self, root, pictures, kept_s)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("DOT_STAGING_DIR", str(tmp_path_factory.mktemp("staging") / "Dot"))
+        patch.setattr(Staging, "__init__", refusing)
         yield
 
 

@@ -22,7 +22,10 @@ link and nothing else, with the bundle of one in ``balloon_bundle_id`` (no such 
 the owner's like any row and with no marker. So a row is a command only when it is words. A row with the bundle of any
 other rich content (a sticker, an app, a payment) is let go. A row that is only a link Dot wrote, one into its own pages
 or one in a message it sent a moment before, is Dot's own and let go, whether it is a link preview or plain words. A
-link the owner sent is a row of its own after their words in the same way: it is one command with them.
+link the owner sent is a row of its own after their words in the same way: it is one command with them. A picture Dot
+sends with an answer (item 617) is a row too: a message of its own with a file, no words and no marker. Dot tells it
+from a picture of the owner's by when it was written and what it is (a file and no words, dated within a minute of a
+send of Dot's), and never reads it as a message.
 
 A handle is paired by sending a code to it that the owner types back in Settings › Channels: the code reaches the
 owner's iPhone only when the handle is theirs. The newest row read is kept as the cursor, so that a restart repeats
@@ -44,8 +47,10 @@ from typing import Literal
 from dotagent.channels.handles import STATE_KEY, ImessageState, normalize_handle
 from dotagent.channels.intake import Accept, Intake, Skip, Tell, Verdict
 from dotagent.channels.onetime import OneTimeCode, Redeemed, new_code, redeem, shown_code
+from dotagent.channels.pictures import Picture
 from dotagent.channels.seen import COMMAND_KEY, Look, Seen, SeenCommand, Watch, stat_file, wal_path
 from dotagent.channels.sends import runs_sending_at
+from dotagent.channels.staging import Staged, Staging
 from dotagent.channels.types import ChannelId, Receive, is_stop
 from dotagent.core.errors import ChannelError, DesktopError, DesktopPermissionError
 from dotagent.core.logs import get_logger
@@ -119,6 +124,21 @@ _SENT_KEPT: int = 20
 COPY_S: float = 10.0
 _HEARD_KEPT: int = 20
 _LINK: re.Pattern[str] = re.compile(r"https?://\S+", re.IGNORECASE)
+
+# What a picture is sent with (item 617): the arguments of its ``run`` handler are the path of the file and the
+# recipient, and it is sent over iMessage as the text of a message is (drafts/scripts.py). The path reaches the script
+# as an argument, never as words of it.
+PICTURE_SCRIPT: str = "\n".join(
+    (
+        "on run argv",
+        "  set thePicture to POSIX file (item 1 of argv)",
+        '  tell application "Messages"',
+        "    set theService to 1st account whose service type = iMessage",
+        "    send thePicture to participant (item 2 of argv) of theService",
+        "  end tell",
+        "end run",
+    )
+)
 
 type Script = Callable[[ScriptLanguage, str, tuple[str, ...], tuple[str, ...], float], Awaitable[str]]
 type Access = Literal["granted", "missing", "no_database"]
@@ -426,15 +446,20 @@ class IMessageChannel:
         own_base: str,
         poll_s: float = POLL_S,
         clock: Callable[[], float] = time.time,
+        staging: Staging | None = None,
     ) -> None:
         self._store: Store = store
         self._script: Script = script
         self._db: Path = db
         self._timeout_s: float = timeout_s
         self._own_base: str = own_base
-        # What Dot sent lately and when, for the links in it (:meth:`_dots_own_link`), and the rows that may have been
-        # commands, for their copies (:meth:`_copy_of`).
+        # The folder pictures are copied into to be sent (item 617); a channel with none sends no picture.
+        self._staging: Staging | None = staging
+        # What Dot sent lately and when, for the links in it (:meth:`_dots_own_link`), when it sent a picture, for the
+        # row of it (:meth:`_dots_own_picture`), and the rows that may have been commands, for their copies
+        # (:meth:`_copy_of`).
         self._sent: deque[tuple[float, str]] = deque(maxlen=_SENT_KEPT)
+        self._pictures_sent: deque[float] = deque(maxlen=_SENT_KEPT)
         self._heard: deque[_Heard] = deque(maxlen=_HEARD_KEPT)
         self._poll_s: float = poll_s
         self._clock: Callable[[], float] = clock
@@ -449,11 +474,14 @@ class IMessageChannel:
         self.needs: Needs | None = None
 
     async def load(self) -> None:
-        """Read what the channel kept in the store."""
+        """Read what the channel kept in the store, and remove the copies of pictures that an earlier daemon left in the
+        staging folder (item 617)."""
         kept: str | None = await self._store.kv_get(STATE_KEY)
         self._state = ImessageState() if kept is None else ImessageState.model_validate_json(kept)
         command: str | None = await self._store.kv_get(COMMAND_KEY)
         self._watch.command = None if command is None else SeenCommand.model_validate_json(command)
+        if self._staging is not None:
+            await asyncio.to_thread(self._staging.sweep_old, self._clock())
 
     def seen(self) -> Seen:
         """What the channel sees of Messages' database, for Settings › Channels."""
@@ -488,6 +516,12 @@ class IMessageChannel:
         while True:
             await self.poll(receive)
             await asyncio.sleep(self._poll_s)
+
+    async def sweep(self) -> None:
+        """Remove the copies of pictures that were sent and are due to go (item 617). The service calls it every so
+        often while the daemon runs, switched on or off: a copy goes when its time is over, whatever the switch says."""
+        if self._staging is not None and self._staging.due(self._clock()):
+            await asyncio.to_thread(self._staging.sweep, self._clock())
 
     async def poll(self, receive: Receive) -> None:
         """Read what came in since the last poll; the first poll of a channel sets the cursor and reads nothing. One
@@ -604,6 +638,16 @@ class IMessageChannel:
             for at, said in self._sent
         )
 
+    def _dots_own_picture(self, row: Row) -> bool:
+        """Whether ``row`` is a picture Dot sent (item 617). A picture is a message of its own with no words and no
+        marker, flagged as the owner's like any row, so Dot's is told from a picture the owner sent by when it was
+        written and what it is: a row that holds a file and no words, dated from just before Dot handed a picture to
+        Messages to :data:`OWN_LINK_S` after. It is never read as the owner's message. A picture the owner sends in that
+        minute is let go with it: it would only have been told it is not read."""
+        if not row.attachment or row.text:
+            return False
+        return any(at - _OWN_LINK_BEFORE_S <= row.sent_at <= at + OWN_LINK_S for at in self._pictures_sent)
+
     async def _handle(self, row: Row, receive: Receive) -> None:
         if row.balloon is not None and row.balloon != URL_BALLOON:
             # Rich content (a sticker, an app, a payment) is never a command, whatever words it carries.
@@ -614,6 +658,9 @@ class IMessageChannel:
             log.info("imessage_message_let_go", rowid=row.rowid, reason="a link preview with no link")
             return
         if row.text is not None and row.text.lstrip().startswith(MARKER.strip()):
+            return
+        if self._dots_own_picture(row):
+            log.info("imessage_message_let_go", rowid=row.rowid, reason="a picture of Dot's own")
             return
         if self._dots_own_link(row):
             log.info("imessage_message_let_go", rowid=row.rowid, reason="a link of Dot's own")
@@ -717,13 +764,36 @@ class IMessageChannel:
 
     # ----- sending ---------------------------------------------------------------------------
 
-    async def send(self, text: str) -> None:
+    def _reply_handle(self) -> str:
+        """The number or address Dot answers at: the conversation the owner wrote in last, else the first paired."""
         handle: str | None = self._state.reply_to
         if handle is None or handle not in self._state.handles:
             handle = self._state.handles[0] if self._state.handles else None
         if handle is None:
             raise ChannelError("no number or address is paired, so Dot has nowhere to answer", {})
-        await self._send_to(handle, text)
+        return handle
+
+    async def send(self, text: str) -> None:
+        await self._send_to(self._reply_handle(), text)
+
+    async def send_picture(self, picture: Picture) -> None:
+        """Send ``picture`` to the owner as a message of its own, with no words (item 617). Messages is handed a copy
+        of the file in Dot's staging folder (see :mod:`~dotagent.channels.staging`), which is removed a while after
+        the send, or at once when Messages did not take it. The send is kept in mind for a while, for the row Messages
+        writes for it, which has no marker and is flagged as the owner's like any row (:meth:`_dots_own_picture`)."""
+        handle: str = self._reply_handle()
+        if self._staging is None:
+            raise ChannelError("this channel has no folder to send pictures from", {})
+        sent_at: float = self._clock()
+        staged: Staged = await asyncio.to_thread(self._staging.stage, picture, sent_at)
+        self._pictures_sent.append(sent_at)
+        try:
+            await self._script("AppleScript", PICTURE_SCRIPT, (str(staged.path), handle), (), self._timeout_s)
+        except DesktopError as error:
+            await asyncio.to_thread(self._staging.drop, staged)
+            raise self._not_taken(error) from error
+        self._staging.sent(staged, self._clock())
+        self._clear("automation")
 
     async def _reply(self, handle: str, text: str) -> None:
         """Answer in the conversation a message came from; a failure is logged, as nothing waits for the answer."""
@@ -739,14 +809,19 @@ class IMessageChannel:
         try:
             await self._script("AppleScript", SCRIPTS["message"], (f"{MARKER}{text}", handle), (), self._timeout_s)
         except DesktopError as error:
-            said: object = error.context.get("stderr")
-            detail: str = said if isinstance(said, str) and said else error.message
-            if "-1743" in detail or "not authorized" in detail.casefold():
-                self._fail("macOS has not let the app that runs Dot control Messages", "automation")
-            failure: str = f"Messages did not take the message: {detail}"
-            self._watch.failed(failure, self._clock())
-            raise ChannelError(failure, {}) from error
+            raise self._not_taken(error) from error
         self._clear("automation")
+
+    def _not_taken(self, error: DesktopError) -> ChannelError:
+        """What a send Messages did not take comes to: the channel's problem when macOS has not let the app that runs
+        Dot control Messages, and the failure the tab shows."""
+        said: object = error.context.get("stderr")
+        detail: str = said if isinstance(said, str) and said else error.message
+        if "-1743" in detail or "not authorized" in detail.casefold():
+            self._fail("macOS has not let the app that runs Dot control Messages", "automation")
+        failure: str = f"Messages did not take the message: {detail}"
+        self._watch.failed(failure, self._clock())
+        return ChannelError(failure, {})
 
     # ----- pairing ---------------------------------------------------------------------------
 

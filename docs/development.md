@@ -58,6 +58,13 @@ sets `builtin.WEB_RESEARCH_PACKAGE`, as `tests/smoke/test_builtin_mcp.py` does).
 as a child process finds the package: its config says `[builtin_mcp] web_research = false` where the test counts
 servers.
 
+The folder Dot copies the pictures it sends over iMessage into, `~/Pictures/Dot` (item 617), is yours and not Dot's
+home: a channel that loads lists it and removes the old copies in it, so no test reaches it. `tests/conftest.py` points
+`DOT_STAGING_DIR` at a folder of the run's own for the whole run (a `Channels` that was given none and a daemon that a
+test starts as a child process use it), and fails a test that builds a `Staging` anywhere but in a pytest folder, before
+it touches anything, as `stop_file()` in `tests/smoke/channel_stand_ins.py` refuses a home that is not a test's own. A
+test that builds `Channels` gives it `own_places()`: a home and a staging folder inside the Dot home of its own.
+
 The calls of that server's tools are judged by the rules of Dot's own `web_search`, `web_fetch` and `web_crawl`, which
 are one function each in `tools/web.py` (`search_flags`, `checked_address`); `tools/mcp.py` calls the same functions, so
 a rule added to those tools goes in them and binds the server's tools too (`tests/smoke/test_builtin_mcp.py` changes a
