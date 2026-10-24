@@ -179,10 +179,12 @@ function drawFlow(past, flow, asked, events, reactions) {
   // anchoring would otherwise see the reader's text pushed down by their height.
   let files = null;
   let picks = null;
+  // The replies the run's answer restates, by their steps, as its end names them (item 620).
+  const restated = new Set(events.find((event) => event.kind === "run_finished")?.data.restated ?? []);
   for (const event of events) {
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
-      if (said !== "" && !repeatsAnswer(said, answer)) {
+      if (said !== "" && !restated.has(event.data.step) && !repeatsAnswer(said, answer)) {
         batch = null;
         blocks.push({ say: said, step: event.data.step });
       }

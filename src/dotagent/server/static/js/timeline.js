@@ -496,8 +496,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
    * when a step came after it: a task run told to finish (the loop's note on a reply without a tool) thinks once more and
    * calls finish with the same words (item 460), or with its first line reworded (item 567).
    */
-  function dropRepeatedReply(scope, result) {
-    const repeated = scope.replies.filter((reply) => repeatsAnswer(reply.text, result));
+  function dropRepeatedReply(scope, result, restated) {
+    // The replies the loop knows the answer restates (item 620): the finish followed them and nothing else, and wrote
+    // them again, often every line reworded, which the comparison of words cannot tell.
+    const steps = new Set(restated);
+    const repeated = scope.replies.filter((reply) => steps.has(reply.step) || repeatsAnswer(reply.text, result));
     scope.replies = [];
     for (const reply of repeated) {
       reply.node.remove();
@@ -888,7 +891,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const isRoot = scope.runId === rootRunId;
       settleGroups(scope, record.ts);
       // A reply that streamed the same words was read as they came: its answer does not write them in again.
-      const readAlready = dropRepeatedReply(scope, result);
+      const readAlready = dropRepeatedReply(scope, result, record.data.restated ?? []);
       const answer = answerMessage({
         actorId: scope.actorId,
         status,
@@ -955,7 +958,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const target = bubble ?? newBubble(scope, data.step, false);
       target.node.className = "bubble say";
       target.body.replaceWith(prose(data.text));
-      scope.replies.push({ node: target.node, text: data.text });
+      scope.replies.push({ node: target.node, text: data.text, step: data.step });
       if (!ORDINARY_ENDS.has(data.finish)) {
         target.node.append(el("div", { class: "small muted" }, `This message ended early: ${data.finish}`));
       }

@@ -269,3 +269,136 @@ async def test_a_chat_left_and_come_back_to_while_its_run_works_shows_each_messa
             await expect(chat.get_by_text(_ANSWER)).to_have_count(1)
         finally:
             await browser.close()
+
+
+# The owner's chat of 2026-10-24 (item 620): asked for a screenshot, DeepSeek V4.1 Flash described the screen in a
+# reply, was told to finish, and wrote the description again in other words; no comparison of words could tell.
+_DESCRIBED: str = (
+    "I sent the screenshot above and kept a copy in the screenshots folder.\n\n"
+    "On the screen:\n- The code editor is in front, on the web-research conversation.\n- The Dock shows Messages."
+)
+_REDESCRIBED: str = (
+    "The screenshot is above; a copy is saved as a file in the screenshots folder (2.6 MB).\n\n"
+    "What the screen shows:\n- In front: the code editor, its web-research conversation open.\n"
+    "- Messages sits in the Dock."
+)
+
+
+async def _run_and_read(script: tuple[ScriptedTurn, ...]) -> tuple[list[object], list[str]]:
+    """Run ``script`` as a task run and read its page: the steps its end names as restated (``restated`` of its
+    ``run_finished`` event, or none), and the texts of the chat's replies and answer as the page shows them."""
+    async with _served(ScriptedProvider(_PROVIDER, script)) as (runtime, manager, address):
+        run: RunRecord = await manager.start(
+            _GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(WAIT_S):
+            assert (await manager.wait(run.id)).status == "done"
+        restated: list[object] = [
+            event.data["restated"]
+            for event in await runtime.store.events_of_kind(run.id, "run_finished", 1)
+            if "restated" in event.data
+        ]
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs/{run.id}")
+                await expect(page.locator(".timeline .answer")).to_have_count(1, timeout=15000)
+                said: list[str] = await page.locator(".timeline .bubble.say, .timeline .answer").all_inner_texts()
+            finally:
+                await browser.close()
+        return restated, said
+
+
+async def test_an_answer_the_finish_writes_again_in_other_words_shows_once() -> None:
+    """Item 620: the reply, the note, and the finish that says it again in other words: the page shows the answer
+    alone, as the run's end names the reply it restates."""
+    restated, said = await _run_and_read(
+        (
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo shot"}),)),
+            ScriptedTurn(text=_DESCRIBED, calls=()),
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool="finish", arguments={"answer": _REDESCRIBED, "success": True}),)
+            ),
+        )
+    )
+    assert restated == [[2]]
+    assert len(said) == 1 and "What the screen shows" in said[0], said
+
+
+async def test_a_reply_the_answer_only_points_at_or_that_more_work_followed_stays() -> None:
+    """A finish that only points at the reply ("see above") leaves the reply to be read; and a reply after which the run
+    went on working was a step announced, not the answer."""
+    pointed, said = await _run_and_read(
+        (
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo shot"}),)),
+            ScriptedTurn(text=_DESCRIBED, calls=()),
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool="finish", arguments={"answer": "See above.", "success": True}),)
+            ),
+        )
+    )
+    assert pointed == [] and any("The Dock shows Messages" in text for text in said), said
+    worked, said = await _run_and_read(
+        (
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo shot"}),)),
+            ScriptedTurn(text=_DESCRIBED, calls=()),
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo again"}),)),
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool="finish", arguments={"answer": _REDESCRIBED, "success": True}),)
+            ),
+        )
+    )
+    assert worked == [] and any("The Dock shows Messages" in text for text in said), said
+
+
+async def test_an_earlier_turn_leaves_out_the_reply_its_answer_restated() -> None:
+    """Item 620, in the chat's earlier turn (history.js): once a follow-up was asked, the turn of the run whose finish
+    wrote its reply again in other words holds the answer, not the reply."""
+    script: tuple[ScriptedTurn, ...] = (
+        ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo shot"}),)),
+        ScriptedTurn(text=_DESCRIBED, calls=()),
+        ScriptedTurn(
+            text="", calls=(ScriptedCall(tool="finish", arguments={"answer": _REDESCRIBED, "success": True}),)
+        ),
+        ScriptedTurn(text="Done.", calls=()),
+    )
+    async with _served(ScriptedProvider(_PROVIDER, script)) as (runtime, manager, address):
+        first: RunRecord = await manager.start(
+            _GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(WAIT_S):
+            assert (await manager.wait(first.id)).status == "done"
+        second: RunRecord = await manager.start(
+            "Thanks",
+            "task",
+            SCRIPTED_MODEL,
+            first.thread_id,
+            UI_SOURCE,
+            None,
+            None,
+            "standard",
+            None,
+            "yolo",
+            False,
+            (),
+        )
+        async with asyncio.timeout(WAIT_S):
+            assert (await manager.wait(second.id)).status == "done"
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs/{second.id}")
+                earlier: Locator = page.locator("section.turn").first
+                await expect(earlier.locator(".answer")).to_contain_text("What the screen shows", timeout=15000)
+                await expect(earlier.locator(".turn-ops")).to_be_attached()
+                # The flow is drawn (its call is there), and the reply the answer restated is not in it.
+                await expect(earlier.locator(".turn-ops > *").first).to_be_attached(timeout=15000)
+                assert await earlier.locator(".turn-say").count() == 0
+            finally:
+                await browser.close()
