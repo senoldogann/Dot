@@ -34,8 +34,14 @@ function noticeRow(notice) {
   );
 }
 
+/** A version as its words with a place to break after each dot, so that a narrow column breaks a long one between its
+ * numbers ("2026.9.29." over "20261017") and never inside one (item 606). */
+function versionWords(version) {
+  return version.split(".").flatMap((part, index) => (index === 0 ? [part] : [".", el("wbr"), part]));
+}
+
 function packageRow(item) {
-  return el("tr", { dataset: { package: item.name.toLowerCase() } }, el("td", null, outLink(item.url, item.name)), el("td", { class: "mono" }, item.version), el("td", null, item.licence === "" ? "—" : item.licence));
+  return el("tr", { dataset: { package: item.name.toLowerCase() } }, el("td", null, outLink(item.url, item.name)), el("td", { class: "mono" }, ...versionWords(item.version)), el("td", null, item.licence === "" ? "—" : item.licence));
 }
 
 /** A tool Dot uses: its name and its licence, what Dot uses it for, and where it is on this Mac. */

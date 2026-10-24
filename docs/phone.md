@@ -93,6 +93,16 @@ of its own. A switch's 40 by 24 px track sits in a 48 px box (item 337); a tap a
 switch, and a step's duration shows without a hover. An iPad and a Mac keep their
 sizes. Where a page names a setting of the config file, it says what it is in words, the key after it in faint type.
 
+Every screen was looked at on a phone, shot a screen at a time at 390 by 844 (item 606): what is tapped without being a
+button is 32 px or more (the tabs of the details, the name of a file a run changed, the star of a model, a licence's
+notice); a toast stands under the bar, across the page, and never over the composer, its send button or the stop button
+of a run at work; a sentence with a button beside it (the token this browser keeps, Appearance's two choices that follow
+the theme) gives the button a line of its own; a note the owner decides on (a forgotten one) has its buttons under its
+words; the buttons of a version in Self-improvement wrap rather than reach past the edge of a phone 320 px wide; the
+file's panel keeps the room for the file's name, and Open on the Mac is its icon; Add and Cancel in a service's key form
+have space between them; a ready team the owner has already says so under its words, which have the card's width; and
+the name of a plugin is not cut by an ellipsis while there is room for it, which WebKit did to every name of two words.
+
 On a phone the settings open on a list of their pages in groups (item 330): Interface, Models, How Dot works and This
 Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes there are, whether a
 version of the harness is in use). A row opens its page on its own, the bar naming it, and a card's name stands over the

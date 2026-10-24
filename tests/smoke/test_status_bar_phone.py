@@ -28,7 +28,7 @@ _CASES: dict[str, dict[str, object]] = {
     "long": {"since": -(3600 * 5 + 60 * 20), "helpers": ["running", "running"], "queued": 12, "jump": True},
 }
 _PAGE: str = """<!doctype html><html lang="en" class="chat-shell"><head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="dot-pages" content="">
 <link rel="stylesheet" href="/css/app.css"><link rel="stylesheet" href="/css/shell.css">
 <link rel="stylesheet" href="/css/run.css"><link rel="stylesheet" href="/css/settings.css">
 <link rel="stylesheet" href="/css/themes.css"></head>
