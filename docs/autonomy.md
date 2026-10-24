@@ -338,8 +338,8 @@ not help (handed to `[memory] score_min_uses` runs in the last `score_days`, mor
 lesson you saved yourself is never folded away nor retired, and a note saved while reading outside content never folds
 away nor puts aside a clean older one (item 557). It also puts aside a note of Dot's that a newer note,
 written or changed since the last reflection, made outdated (item 306): the review model reads each such pair of notes
-close in meaning (at most 12 a night, the closest pairs first; your notes, the lessons you saved, the pinned notes and
-the `core` notes are never the older one)
+close in meaning (at most 12 a night, the closest pairs first; your notes, the lessons you saved and the pinned notes,
+the standing ones among them (a `core` note you wrote or pinned), are never the older one)
 and keeps the older one when in doubt; the one it calls outdated rests, names the note that replaced it (the Memory page
 says "Replaced by another note") and the log line `note_outdated` says which. It rests a lesson by tagging
 it `rest`, after which searches skip it while `dotx memory list` and the Memory page still show it, and the log line
@@ -371,8 +371,10 @@ says are the same, at most `merges_per_night` (20) a night (the merged note keep
 rest whole, and **Undo this merge** on the Memory page brings them back); it counts the notes that rested for
 `forget_after_days` (90) as proposals for you to forget or keep, and forgets none; and it deletes from the trash the
 notes you forgot more than `trash_days` (30) ago, the only thing it deletes. A note you wrote, a lesson you saved, a
-pinned note, a `core` note and a journal are never merged, rested or proposed by it, and none of it writes What Dot
-knows about you. `dotx reflect` says what it did, among it how many notes wait for you to forget or keep them.
+pinned note (the standing notes, a `core` note you wrote or pinned, among them) and a journal are never merged, rested
+or proposed by it; a `core` note a run wrote is never merged either, but rests and is proposed as any of a run's until
+you pin it (item 613). None of it writes What Dot knows about you. `dotx reflect` says what it did, among it how many
+notes wait for you to forget or keep them.
 
 **The reflection and the learned skills (item 585).** In the same night a skill whose record counts uses and has no
 date of its last read is given one, and the review model is asked which pairs of skills whose kinds are close in

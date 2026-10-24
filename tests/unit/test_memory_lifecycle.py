@@ -183,7 +183,11 @@ async def test_the_date_a_note_began_to_rest_is_kept_and_for_an_older_one_the_la
         fresh: MemoryRecord = await _note(store, "Written yesterday.")
         owner: MemoryRecord = await _note(store, "The owner's own note.", run=None)
         _age(tmp_path / "dot.db", owner.id, created=now - 500 * DAY_S)
+        # Standing: a run's core note the owner pinned (item 613). A run's core note no one pinned rests as any.
         standing: MemoryRecord = await _note(store, "A standing note.", (CORE_TAG, REST_TAG))
+        await store.set_memory_pin(standing.id, now - DAY_S)
+        asks: MemoryRecord = await _note(store, "A run asked that this stand.", (CORE_TAG,))
+        _age(tmp_path / "dot.db", asks.id, created=now - 300 * DAY_S)
         expired: MemoryRecord = (
             await store.add_memory_once("Ran out.", (), "run_1", None, None, now - 10 * DAY_S, False)
         )[0]
@@ -197,6 +201,7 @@ async def test_the_date_a_note_began_to_rest_is_kept_and_for_an_older_one_the_la
         assert since(by_age) == pytest.approx(now - 150 * DAY_S + rest_days * DAY_S)
         assert since(expired) == pytest.approx(now - 10 * DAY_S)
         assert since(fresh) is None and since(owner) is None and since(standing) is None
+        assert since(asks) == pytest.approx(now - 300 * DAY_S + rest_days * DAY_S)
 
 
 async def test_a_note_that_rested_for_ninety_days_is_proposed_and_only_the_owners_press_forgets_it(
@@ -210,8 +215,9 @@ async def test_a_note_that_rested_for_ninety_days_is_proposed_and_only_the_owner
         _age(path, long_ago.id, created=now - 400 * DAY_S, used=now - 300 * DAY_S)
         await store.rest_memory(rested.id, ("lesson", REST_TAG), now - 100 * DAY_S)
         await store.rest_memory(young.id, ("lesson", REST_TAG), now - 20 * DAY_S)
-        # Never proposed: the owner's note, a standing one, a pinned one, a lesson the owner saved, and the reflection's
-        # own journal of a day (tagged so, and any note it wrote), which the nightly merge leaves alone too.
+        # Never proposed: the owner's note, a standing one (a run's core note the owner pinned, item 613), a pinned
+        # one, a lesson the owner saved, and the reflection's own journal of a day (tagged so, and any note it wrote),
+        # which the nightly merge leaves alone too.
         owner = await _note(store, "The owner's note.", run=None)
         standing = await _note(store, "A standing rule.", (CORE_TAG, REST_TAG))
         pinned = await _note(store, "A pinned lesson.", ("lesson", REST_TAG))
@@ -224,6 +230,7 @@ async def test_a_note_that_rested_for_ninety_days_is_proposed_and_only_the_owner
         for note in (owner, standing, pinned, saved, journal, resting_journal, by_reflection):
             _age(path, note.id, created=now - 500 * DAY_S, rested=now - 400 * DAY_S)
         await store.set_memory_pin(pinned.id, now - 300 * DAY_S)
+        await store.set_memory_pin(standing.id, now - 300 * DAY_S)
         await store.add_event(
             "run_saved", "lesson_saved", {"index": 0, "memory_id": saved.id, "by": "owner", "created": True}
         )

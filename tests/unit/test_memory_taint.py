@@ -161,3 +161,26 @@ async def test_the_owners_rewrite_takes_the_mark_off_and_a_resave_of_the_same_wo
         assert marked is not None and marked.tainted
         vouched: MemoryRecord = await update_memory_note(index, marked.id, OTHER, ["checked"])
         assert not vouched.tainted
+
+
+async def test_a_runs_core_note_is_handed_when_it_fits_and_to_every_run_once_the_owner_pins_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 613: a week of the owner's runs were each handed the notes runs had tagged core about a thesis and a job
+    search, whatever the goal. A run's core note asks to stand; it stands once the owner pins it, and the owner's own
+    core note always does."""
+    async with _index(tmp_path, monkeypatch) as index:
+        asks: MemoryRecord = await index.store.add_memory(
+            "The thesis uses the school's template.", ("core",), "run_1", None, None, False
+        )
+        pinned: MemoryRecord = await index.store.add_memory(
+            "Answers go in Turkish, code in English.", ("core",), "run_2", None, None, False
+        )
+        await index.store.set_memory_pin(pinned.id, 1.0)
+        owners: MemoryRecord = await index.store.add_memory("My name is Senol.", ("core",), None, None, None, False)
+        unrelated: Remembered = await prompt_memories(index, "book a table for two tonight", 4000, None)
+        about_it: Remembered = await prompt_memories(index, "format the thesis with the template", 4000, None)
+    handed: set[str] = {note.id for note in unrelated.records}
+    assert owners.id in handed and pinned.id in handed
+    assert asks.id not in handed, "a run's core note no one pinned was handed to a run it does not fit"
+    assert asks.id in {note.id for note in about_it.records}

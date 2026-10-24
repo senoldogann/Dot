@@ -130,7 +130,7 @@ def test_a_used_agent_note_overtakes_an_unused_one_of_the_same_score_but_not_two
     ]
 
 
-def test_an_agent_note_no_run_was_handed_for_rest_days_rests_and_the_users_and_core_notes_never_do() -> None:
+def test_an_agent_note_no_run_was_handed_for_rest_days_rests_and_the_users_and_standing_notes_never_do() -> None:
     assert resting(_note("old", "run_1", NOW - 91 * DAY_S, 0, None, ()), NOW, 90, None, 3)
     assert not resting(_note("young", "run_1", NOW - 89 * DAY_S, 0, None, ()), NOW, 90, None, 3)
     # Item 306: a note handed long ago goes stale like one never handed; one handed lately does not.
@@ -138,7 +138,11 @@ def test_an_agent_note_no_run_was_handed_for_rest_days_rests_and_the_users_and_c
     assert not resting(_note("used", "run_1", NOW - 400 * DAY_S, 1, NOW - 10 * DAY_S, ()), NOW, 90, None, 3)
     assert resting(_note("retired", "run_1", NOW - DAY_S, 7, NOW, ("lesson", "rest")), NOW, 90, None, 3)
     assert not resting(_note("yours", None, NOW - 400 * DAY_S, 0, None, ()), NOW, 90, None, 3)
-    assert not resting(_note("standing", "run_1", NOW - 400 * DAY_S, 0, None, ("core",)), NOW, 90, None, 3)
+    # Item 613: a run's note tagged core rests as any of a run's; pinned by the owner, it stands and never rests.
+    asks: MemoryRecord = _note("asks to stand", "run_1", NOW - 400 * DAY_S, 0, None, ("core",))
+    assert resting(asks, NOW, 90, None, 3)
+    assert not resting(asks.model_copy(update={"pinned_at": NOW - DAY_S}), NOW, 90, None, 3)
+    assert not resting(_note("yours, standing", None, NOW - 400 * DAY_S, 0, None, ("core",)), NOW, 90, None, 3)
 
 
 def test_a_note_whose_time_ran_out_rests_whoever_wrote_it_and_says_until_when_it_holds() -> None:

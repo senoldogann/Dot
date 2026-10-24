@@ -49,7 +49,9 @@ the agent's `memory_forget`) is not deleted: it waits in the trash for `[memory]
 
 How learning fares, the last card, says for the reflection, the lessons and the skills when each last went well and,
 for one that failed, how many times in a row and why. A work with neither a success nor a failure recorded (one that
-had nothing to learn from leaves no mark) says "nothing recorded yet", not that it has not gone well. Learning that
+had nothing to learn from leaves no mark) says "nothing recorded yet", not that it has not gone well. The nightly
+self-improvement (the harness's step) says "off" while `[harness] step_time` is `off`, and when it last went well if it
+ever ran (item 613). Learning that
 has stopped (a work that failed three times in a row, or no reflection that went well for two days while the
 reflection is on) is told once, as "Dot's learning has stopped", and again only after it worked again; the clock is
 not read while a reflection is under way, so the one that catches up after a Mac slept through its time tells nothing
@@ -69,8 +71,12 @@ dotx memory unmerge NOTE_ID     # take back a merge: its sources wake apart, the
 dotx memory reindex      # embed every note again, for example after changing [memory] embed_model
 ```
 
-- A run starts with the notes tagged `core` (newest first), then the notes you wrote yourself (the ones closest to the
-  goal first), then the agent's notes close enough to the goal and the earlier goals of the conversation
+- A run starts with the standing notes (newest first): tagged `core` and yours, a note you wrote or one you pinned. A
+  run may tag a note `core` to ask that it stand; it stands once you pin it on the Memory page, which marks such a note
+  **Core once pinned** until you do, and until then it is handed when it fits the goal, rests and may be proposed to be
+  forgotten as any of a run's (item 613: notes runs had marked core, of a thesis and a job search, went to every run of
+  a week). Then the notes you wrote yourself (the ones
+  closest to the goal first), then the agent's notes close enough to the goal and the earlier goals of the conversation
   (`inject_min_similarity`; by fit and score), as many as fit a budget of tokens: `inject_share` (2%) of the model's
   context window, at most `inject_tokens` (1500; the cap alone when the provider does not say the window). Each of
   these groups first gets its own share, a quarter of the budget, and what is left then goes to them in the same order,
@@ -85,8 +91,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
   (90), counted from when it was last handed or written, rests: the Memory page lists it under "Resting", a search
-  still finds it, but runs no longer start with it on its own. Your notes, the `core` ones and the ones you pinned
-  never rest that way.
+  still finds it, but runs no longer start with it on its own. Your notes and the ones you pinned (the standing ones
+  among them) never rest that way.
 - A note can hold for a while (item 306): `memory_save` takes `valid_days` for a fact that is true only so long (a
   trip, a deadline, an offer). The model is told until when it holds ("holds until 2026-10-20"); once that day passes
   the note rests, whoever wrote it, and neither a run nor a search is handed it; the Memory page says "Holds until …",
@@ -145,9 +151,10 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - Nothing is forgotten without you (item 584). A note that has rested for `forget_after_days` (90; counted from its
   `rest` tag, or from its last use or write plus `rest_days` for one that rested before dates were kept) is proposed
   to you, never deleted: **Proposed to forget** and `dotx memory proposals` list them, the longest resting first,
-  and your notes, the `core` ones, the pinned ones and the lessons you saved are never among them. **Forget** and
-  **Forget all** (`POST /api/memories/proposals/forget`, `dotx memory forget --proposed`) name the notes by the ids
-  the page showed, so a note that became a proposal after the page was drawn is not forgotten unseen; **Keep**
+  and your notes, the pinned ones (the standing ones among them) and the lessons you saved are never among them.
+  **Forget** and **Forget all** (`POST /api/memories/proposals/forget`, `dotx memory forget --proposed`) name the
+  notes by the ids the page showed, so a note that became a proposal after the page was drawn is not forgotten
+  unseen; **Keep**
   (`POST /api/memories/proposals/keep`, `dotx memory keep`) wakes a note, which is proposed again only after as
   long a rest. A note you forget, from there or from any other Forget, goes to the trash for `trash_days` (30),
   whole with its embedding: `GET /api/memories/trash` and `dotx memory trash` list it (the newest 200, and say how
