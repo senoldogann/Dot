@@ -87,7 +87,8 @@ def rested_since(record: MemoryRecord, now: float, rest_days: int) -> float | No
         return None
     if expired(record, now) and record.expires_at is not None:
         return record.expires_at
-    if record.source_run is None or CORE_TAG in record.tags:
+    # The owner's own never rest; a run's ``core`` note rests as any of a run's until the owner pins it (item 613).
+    if record.source_run is None:
         return None
     began: float = last_activity(record) + rest_days * _DAY_S
     if REST_TAG in record.tags:
@@ -97,12 +98,12 @@ def rested_since(record: MemoryRecord, now: float, rest_days: int) -> float | No
 
 def proposable(record: MemoryRecord, owner_saved: Collection[str]) -> bool:
     """Whether a note may be proposed to the owner for forgetting at all: the agent's own (not one the owner wrote, nor
-    the reflection's own journal of a day, which is no note of the agent's to forget), not standing (``core``), not
-    pinned and not a lesson the owner saved from a run's page."""
+    the reflection's own journal of a day, which is no note of the agent's to forget), not pinned (which a standing one
+    is, item 613: a run's ``core`` note the owner has not pinned may be proposed as any of a run's) and not a lesson the
+    owner saved from a run's page."""
     return (
         record.source_run is not None
         and record.source_run != REFLECTION_SOURCE
-        and CORE_TAG not in record.tags
         and JOURNAL_TAG not in record.tags
         and record.pinned_at is None
         and record.id not in owner_saved

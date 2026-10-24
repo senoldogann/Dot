@@ -79,6 +79,14 @@ class MemoryHit(FrozenModel):
     similarity: float | None
 
 
+def stands(record: MemoryRecord) -> bool:
+    """Whether ``record`` stands for every run (item 613): tagged ``core`` and the owner's own, a note they wrote or one
+    they pinned. A run may tag a note ``core`` to ask that it stand, and it stands once the owner pins it: until then it
+    is handed when it fits, rests and may be proposed to be forgotten as any note of a run's. Every run of a week was
+    handed the core notes runs had written of a thesis and a job search, whatever its goal, and no rule let them go."""
+    return CORE_TAG in record.tags and (record.source_run is None or record.pinned_at is not None)
+
+
 def visible_to(record: MemoryRecord, agent_id: str | None) -> bool:
     """Whether a run of the agent ``agent_id`` (``None`` for Dot) may be handed ``record`` (item 94): Dot's notes go
     to every run, an agent's lessons to its own runs alone."""
@@ -254,15 +262,16 @@ def expired(record: MemoryRecord, now: float) -> bool:
 
 
 def resting(record: MemoryRecord, now: float, rest_days: int, score: MemoryScore | None, min_uses: int) -> bool:
-    """Whether a note rests: its time ran out (:func:`expired`), or it is the agent's (the user's notes, the standing
-    ones and the ones the owner pinned never rest otherwise) and either the reflection retired it (tagged ``rest``:
-    unused, of no help, or replaced by a newer note), or no run was handed it in ``rest_days`` days since it was last
+    """Whether a note rests: its time ran out (:func:`expired`), or it is the agent's (the user's notes and the ones the
+    owner pinned, the standing ones among them, never rest otherwise; a run's ``core`` note rests as any of a run's
+    until the owner pins it, item 613) and either the reflection retired it (tagged ``rest``: unused, of no help, or
+    replaced by a newer note), or no run was handed it in ``rest_days`` days since it was last
     handed or written (item 306: a note handed once long ago goes stale like one never handed), or its ``score`` (how
     the runs handed it lately ended) is negative over at least ``min_uses`` runs. A resting note is not handed to a run
     on its own; a search still finds it unless it was retired or its time ran out."""
     if expired(record, now):
         return True
-    if record.pinned_at is not None or record.source_run is None or CORE_TAG in record.tags:
+    if record.pinned_at is not None or record.source_run is None:
         return False
     if REST_TAG in record.tags:
         return True
@@ -494,10 +503,11 @@ def fit_groups(groups: Sequence[Sequence[MemoryRecord]], budget: int) -> tuple[l
 async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id: str | None) -> Remembered:
     """The notes a run of the agent ``agent_id`` (``None`` for Dot) starts with, without repeats, as many as fit
     ``budget`` tokens, each group within its own share first (:func:`fit_groups`), in this order: the standing ones
-    (tagged ``core``, newest first), the ones the user wrote (closest to ``query`` first), the agent's own lessons and
-    then Dot's notes related to ``query`` (the goal and the earlier goals of its thread; by fit and the agent's own
-    scores) that do not rest (:func:`resting`). Only the notes the run may be handed are among them
-    (:func:`visible_to`); a note that does not fit is left to ``memory_search``. A note saved while reading outside
+    (:func:`stands`: tagged ``core`` and the owner's, newest first), the ones the user wrote (closest to ``query``
+    first), the agent's own lessons and then Dot's notes related to ``query`` (the goal and the earlier goals of its
+    thread; by fit and the agent's own scores) that do not rest (:func:`resting`). Only the notes the run may be
+    handed are among them (:func:`visible_to`); a note that does not fit is left to ``memory_search``. A note saved
+    while reading outside
     content (``tainted``) is never among them (item 384): the start notes are handed as trusted data, with no reader in
     between, so it is left to ``memory_search``, whose answer counts as outside content, and the notes left out so are
     counted (``tainted_left_out``).
@@ -509,7 +519,7 @@ async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id:
     standing: list[MemoryRecord] = [
         record
         for record in await index.store.memories_with_tag(CORE_TAG, _FETCH_NOTES)
-        if visible_to(record, agent_id) and not expired(record, now)
+        if stands(record) and visible_to(record, agent_id) and not expired(record, now)
     ]
     candidates: list[MemoryHit] = await recall_for(index, query, config.candidate_pool, agent_id)
     similarities: dict[str, float] = {hit.record.id: hit.similarity for hit in candidates if hit.similarity is not None}

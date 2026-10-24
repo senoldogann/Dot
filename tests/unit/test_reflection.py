@@ -264,7 +264,10 @@ def test_a_new_note_is_asked_about_with_the_closest_older_note_of_dot_never_one_
     new: MemoryRecord = _note("new", "The invoices are in ~/Dropbox/Invoices now.", 200.0, None, ())
     old: MemoryRecord = _note("old", "The invoices are in ~/Documents/Invoices.", 10.0, None, ())
     kept_out: list[MemoryRecord] = [
-        _note("core", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ("core",)),
+        # A standing note: tagged core and pinned by the owner (item 613).
+        _note("core", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ("core",)).model_copy(
+            update={"pinned_at": 5.0}
+        ),
         _note("owners", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ()).model_copy(
             update={"source_run": None}
         ),
@@ -285,6 +288,10 @@ def test_a_new_note_is_asked_about_with_the_closest_older_note_of_dot_never_one_
     assert outdated_pairs(notes, vectors, 100.0, 1000.0, 0.9, set()) == [(saved, new)]
     # A note written before the last reflection was asked about then.
     assert outdated_pairs(notes, vectors, 300.0, 1000.0, 0.9, {"saved"}) == []
+    # Item 613: a run's note tagged core that the owner never pinned is a note of Dot's as any, and may be outdated.
+    asks: MemoryRecord = _note("asks", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ("core",))
+    vectors["asks"] = (1.0, 0.0)
+    assert outdated_pairs([new, asks], vectors, 100.0, 1000.0, 0.9, set()) == [(asks, new)]
 
 
 def test_a_lesson_rests_after_sixty_days_without_a_run_being_handed_it() -> None:

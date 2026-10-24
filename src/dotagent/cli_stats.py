@@ -371,15 +371,16 @@ def render_learning_health(
 ) -> list[str]:
     """How learning fares (:mod:`dotagent.agent.learning_health`): when each work last went well, its failures in a
     row since with the last error, and, when learning has stopped, why and whether the owner was told. The harness's
-    step (the nightly self-improvement) is "off" while ``[harness] step_time`` keeps it from running (``harness_on``)
-    and it has no record yet."""
+    step (the nightly self-improvement) is "off" while ``[harness] step_time`` keeps it from running (``harness_on``),
+    and says when it last went well if it ever did (item 613: it said it went well days after it was switched off)."""
     if health is None:
         return ["  learning health: nothing recorded yet"]
     lines: list[str] = []
     for work in LEARNING_WORKS:
         state = work_health(health, work)
-        if work == "harness" and not harness_on and state.last_success is None and state.last_failure is None:
-            lines.append(f"  {WORK_NAMES[work].lower()}: off ([harness] step_time)")
+        if work == "harness" and not harness_on:
+            ran: str = "" if state.last_success is None else f"; it last went well {_when(state.last_success)}"
+            lines.append(f"  {WORK_NAMES[work].lower()}: off ([harness] step_time){ran}")
             continue
         went: str = "never went well" if state.last_success is None else f"last went well {_when(state.last_success)}"
         failing: str = (

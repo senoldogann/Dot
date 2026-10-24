@@ -117,7 +117,10 @@ class SaveArgs(ToolArgs):
     tags: list[str] = Field(
         default_factory=list,
         max_length=6,
-        description=f"Optional short topic words. Use '{CORE_TAG}' only for a standing rule every run must know.",
+        description=(
+            f"Optional short topic words. '{CORE_TAG}' asks that the note be handed to every run, for a standing rule "
+            "every run must know; it is handed so once the owner pins it, and until then when it fits, as any note."
+        ),
     )
     valid_days: int | None = Field(
         default=None,

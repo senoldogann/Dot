@@ -297,3 +297,26 @@ async def test_on_a_touch_phone_the_tags_are_labels_and_remember_stands_at_the_r
         await page.screenshot(path=tmp_path / "memory-touch-390.png")
     finally:
         await page.close()
+
+
+async def test_a_runs_core_note_no_one_pinned_says_it_stands_once_pinned(
+    browser: Browser, address: str, runtime: Runtime
+) -> None:
+    """Item 613: a run's note tagged core goes to every run only once the owner pins it; the page says so on it, and on
+    no other note."""
+    asks = await runtime.store.add_memory(
+        "The thesis uses the qwertyz template.", ("core",), "run_1", None, None, False
+    )
+    pinned = await runtime.store.add_memory("The qwertyz answers go in Turkish.", ("core",), "run_2", None, None, False)
+    await runtime.store.set_memory_pin(pinned.id, 1.0)
+    await runtime.store.add_memory("My qwertyz name is Senol.", ("core",), None, None, None, False)
+    page: Page = await _open(browser, address, 1280)
+    try:
+        await page.get_by_role("searchbox", name="Search notes").fill("qwertyz")
+        notes: Locator = page.locator("[data-memory]")
+        await expect(notes).to_have_count(3)
+        asking: Locator = page.locator(f'[data-memory="{asks.id}"]')
+        await expect(asking.locator(".note-asks")).to_have_text("Core once pinned")
+        await expect(page.locator(".note-asks")).to_have_count(1)
+    finally:
+        await page.close()

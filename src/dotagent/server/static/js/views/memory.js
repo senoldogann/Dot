@@ -238,6 +238,17 @@ function memoryRow({ record, similarity, score, rested }, actions) {
           record.tags.map((tag) => el("span", { class: "chip" }, tag)),
           match,
           pinned ? el("span", { class: "badge b-muted", title: "A pinned note never rests." }, icon("pin"), "Pinned") : null,
+          // A run's core note goes to every run only once the owner pins it; till then it goes where it fits (item 613).
+          !pinned && record.source_run !== null && record.tags.includes("core")
+            ? el(
+                "span",
+                {
+                  class: "badge b-muted note-asks",
+                  title: "A run asked that this note go to every run. Pin it and it does; until then it goes to the runs it fits.",
+                },
+                "Core once pinned",
+              )
+            : null,
           mergedBadge(record),
           record.tainted
             ? el(
@@ -756,11 +767,17 @@ export function mount(root, ctx) {
             learningRow("The nightly reflection", view.health.reflection),
             learningRow("Lessons from runs", view.health.lessons),
             learningRow("Skills from runs", view.health.playbooks),
-            // A step that [harness] step_time keeps from running, with no record yet, is off, not failing.
-            !view.harness_on && view.health.harness.last_success === null && view.health.harness.last_failure === null
+            // A step that [harness] step_time keeps from running is off, not failing, and says so though it once ran
+            // (item 613: the page said it last went well days after it was switched off).
+            !view.harness_on
               ? setRow({
                   title: "The nightly self-improvement",
-                  lead: el("span", null, "off. ", el("span", { class: "faint" }, "In the config file: [harness] step_time.")),
+                  lead: el(
+                    "span",
+                    null,
+                    view.health.harness.last_success === null ? "off. " : `off; it last went well ${ago(view.health.harness.last_success)}. `,
+                    el("span", { class: "faint" }, "In the config file: [harness] step_time."),
+                  ),
                 })
               : learningRow("The nightly self-improvement", view.health.harness),
           ]),

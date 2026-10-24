@@ -779,10 +779,11 @@ every_steps = 8
 embed_provider = "ollama"
 embed_model = "bge-m3"
 embed_enabled = true
-# Every run starts with the notes tagged "core" (newest first), the notes you wrote yourself in Settings › Memory or
-# with `dotx memory` (the ones that fit the goal first) and the agent's notes that fit the goal (by fit and score),
-# in that order, as many as fit a budget of tokens: inject_share of the model's context window, at most inject_tokens
-# (the budget alone when the provider does not say the window). A note that does not fit is left to memory_search.
+# Every run starts with the standing notes (a note tagged "core" you wrote or pinned, newest first; a run's "core" note
+# stands once you pin it), the notes you wrote yourself in Settings › Memory or with `dotx memory` (the ones that fit
+# the goal first) and the agent's notes that fit the goal (by fit and score), in that order, as many as fit a budget of
+# tokens: inject_share of the model's context window, at most inject_tokens (the budget alone when the provider does not
+# say the window). A note that does not fit is left to memory_search.
 inject_tokens = 1500
 inject_share = 0.02
 # Candidates each search (words, meaning) hands to the fusion, and the weakest cosine similarity that counts as a match.
@@ -802,9 +803,9 @@ max_chars = 600
 # A search lifts the agent's notes that a run was handed lately (a use a moment ago is worth a first place; the lift
 # halves every use_half_life_days), so the notes that help overtake the ones first written. An agent's note that no run
 # was handed for rest_days, since it was last handed or written, rests: the Memory page lists it under "Resting", a
-# search still finds it, but it is no longer handed to a run on its own. Your notes and the standing ones (core) never
-# rest that way; a note saved for a while (memory_save's valid_days) rests once its time runs out, whoever wrote it, and
-# a search no longer finds it.
+# search still finds it, but it is no longer handed to a run on its own. Your notes and the ones you pinned (the
+# standing ones, a "core" note you wrote or pinned, among them) never rest that way; a note saved for a while
+# (memory_save's valid_days) rests once its time runs out, whoever wrote it, and a search no longer finds it.
 rest_days = 90
 use_half_life_days = 30
 # A note's score is how the runs it was handed in the last score_days ended: its balance is the runs that ended done
@@ -831,9 +832,9 @@ merges_per_night = 20
 # Nothing is forgotten by itself. A note that has rested for forget_after_days days (its rest tag, or no use for
 # rest_days) is proposed to be forgotten: the Memory page lists it, and `dotx memory proposals` too, and only your
 # Forget (the page's, or `dotx memory forget --proposed`) moves it to the trash. Keep wakes a note instead. Your own
-# notes, the standing (core) ones, the ones you pinned and the lessons you saved are never proposed. A note you forget
-# waits in the trash for trash_days days, from where you restore it whole (`dotx memory restore`, the Memory page); the
-# nightly reflection then deletes it for good.
+# notes, the ones you pinned (the standing ones, a "core" note you wrote or pinned, among them) and the lessons you
+# saved are never proposed. A note you forget waits in the trash for trash_days days, from where you restore it whole
+# (`dotx memory restore`, the Memory page); the nightly reflection then deletes it for good.
 forget_after_days = 90
 trash_days = 30
 

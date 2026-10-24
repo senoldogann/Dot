@@ -185,5 +185,9 @@ def test_dotx_stats_shows_when_each_work_last_went_well_its_failures_and_why_lea
         render_learning_health(health, T0 + 120, QUIET_S, False)[3]
         == "  the nightly self-improvement: off ([harness] step_time)"
     )
+    # Item 613: switched off after it ran, it says off, and when it last went well, not that it goes well.
+    ran: LearningHealth = with_outcome(health, "harness", T0 + 30, LEARNED)
+    off_after: str = render_learning_health(ran, T0 + 120, QUIET_S, False)[3]
+    assert off_after.startswith("  the nightly self-improvement: off ([harness] step_time); it last went well ")
     assert lines[4].startswith("  learning has stopped: Drawing lessons from runs failed 3 times in a row")
     assert "(the owner was told " in lines[4]

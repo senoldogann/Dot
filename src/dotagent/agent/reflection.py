@@ -81,7 +81,6 @@ from dotagent.evals import EVAL_SOURCE
 from dotagent.memory.lifecycle import forget_proposals, purge_trash
 from dotagent.memory.ranking import Vector
 from dotagent.memory.service import (
-    CORE_TAG,
     JOURNAL_TAG,
     REFLECTION_SOURCE,
     REST_TAG,
@@ -94,6 +93,7 @@ from dotagent.memory.service import (
     recent_scores,
     save_memory,
     set_owner_section,
+    stands,
     vetted_dot_lines,
 )
 from dotagent.memory.words import search_terms
@@ -359,18 +359,16 @@ def outdated_pairs(
     """The pairs (older, newer) of ``notes`` the outdated judge is asked about (item 306): the newer one written or
     changed since the last reflection (``since``), by a run or by the owner; the older one Dot's own, written before it,
     the same agent's, close to it (:func:`_closeness`), and each note in one pair at most. Neither rests nor ran out of
-    time, and none is a journal note; a standing note (``core``), a note the owner wrote and a note the owner saved or
-    pinned (``owner_saved``) are never the older one, and a note saved while reading outside content (``tainted``) is
-    never the newer one of a clean older note (item 557): page content does not put a trusted fact aside. The closest
-    pairs first (item 584: the likeliest repeats and corrections are asked about before the others, newest first among
-    equals), at most :data:`MOST_OUTDATED_PAIRS`."""
+    time, and none is a journal note; a standing note (:func:`stands`: a ``core`` note the owner wrote or pinned), a
+    note the owner wrote and a note the owner saved or pinned (``owner_saved``) are never the older one, and a note
+    saved while reading outside content (``tainted``) is never the newer one of a clean older note (item 557): page
+    content does not put a trusted fact aside. The closest pairs first (item 584: the likeliest repeats and corrections
+    are asked about before the others, newest first among equals), at most :data:`MOST_OUTDATED_PAIRS`."""
     awake: list[MemoryRecord] = [
         note for note in notes if REST_TAG not in note.tags and JOURNAL_TAG not in note.tags and not expired(note, now)
     ]
     olders: list[MemoryRecord] = [
-        note
-        for note in awake
-        if note.source_run is not None and CORE_TAG not in note.tags and note.id not in owner_saved
+        note for note in awake if note.source_run is not None and not stands(note) and note.id not in owner_saved
     ]
     found: list[tuple[float, MemoryRecord, MemoryRecord]] = [
         (closeness, older, newer)
