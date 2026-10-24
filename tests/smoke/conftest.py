@@ -25,8 +25,9 @@ MISSING_OPENCODE: str = "/nonexistent/dot-tests/opencode"
 MISSING_TAILSCALE: str = "/nonexistent/dot-tests/tailscale"
 MISSING_CAFFEINATE: str = "/nonexistent/dot-tests/caffeinate"
 MISSING_OPEN: str = "/nonexistent/dot-tests/open"
-# The keychain the accounts of the official sign-ins keep their tokens in (item 422): one that does not exist, so that
-# no test reads or writes the owner's login keychain through them; the tests of the sign-ins make one of their own.
+# The keychain the accounts of the official sign-ins keep their tokens in (item 422): one that does not exist, which the
+# Keychain refuses before ``security`` runs (item 628: ``security`` itself would use the login keychain in its place),
+# so that no test reads or writes the owner's login keychain through them; the tests of the sign-ins make their own.
 MISSING_KEYCHAIN: str = "/nonexistent/dot-tests/accounts.keychain-db"
 
 
