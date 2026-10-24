@@ -52,9 +52,9 @@ that asked as it was read made every run, the offline ones too, wait for the Key
 
 The tokens of the accounts signed in (item 422) and the smoke tests keep theirs out of your login keychain the same
 way: `tests/smoke/conftest.py` names a keychain file that is not there (`DOT_KEYCHAIN`), and the tests of the sign-ins
-make one of their own. A file that is not there is refused before `security` runs (item 628): `security` does not
-fail on a missing keychain file, it reads and writes the login keychain in its place, and a test's item was found
-there.
+make one of their own. A file that is not there is refused before `security` runs, and so is a path that is not
+whole, which `security` would look for under `~/Library/Keychains` (item 628): `security` does not fail on a missing
+keychain file, it reads and writes the login keychain in its place, and a test's item was found there.
 
 The web-research server that comes with Dot (item 583) is out of every test that does not ask for it: its package is
 installed where the tests run, so each of the runtimes a test builds would start a Python process of its own, and its
