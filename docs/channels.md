@@ -43,6 +43,14 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   line gone, a horizontal rule and the `> ` of a quote are gone, and so are the marks of bold, emphasis, strike and
   code (a link reads *words (address)*). The lines of a block of code stay exactly as they are written. A run that
   failed or was stopped says so, once: a stopped run says *The run was stopped.*, not twice.
+- **It reads well on a phone's narrow screen** (item 627). A list with an item whose words run over 60 characters (a
+  nested item's too, the bullet not counted), which wraps there, has a blank line between its items and before and after
+  it, its nested items and the rest of an item's words kept under the item, and its first item kept under a heading
+  right above it; a list of short items (things to buy) stays one block. A heading with words after it ends with a
+  colon, as a title typed in a message does (*Summary:*), unless it ends in a mark of its own (*What changed?*). A run
+  of spaces between two words is one space. And the run that answers is told, in its prompt, that its answer goes to
+  your phone as plain text: short paragraphs with a blank line between them, a list only for separate points, no tables,
+  headings or nested lists, and quotes, parentheses and file paths only where they are needed.
 - **The pictures an answer names go with it** (item 617). A Markdown image (`![words](path)`) or a path to an image
   file in the answer's words is looked at on disk, and a picture that may go is sent after the text, each as a message
   of its own with no words, through Messages as the text is. It may go when it is a regular file in Dot's workspace or
