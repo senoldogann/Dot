@@ -1331,5 +1331,7 @@ updating itself, with those tools in its Resources, signed too, is a release's, 
 icons come from Dot's mark: `uv run python desktop/icons/render.py` draws the favicon, the app icon (the mark on a tile
 of night), the three menu bar icons (their hairline of gold wider, so the ball holds on a dark bar), the web app's
 icons and its maskable one (the mark inside the circle a phone may cut it to), and `npm run icons` makes the bundle's
-set from the app icon. A phone that had Dot on its Home Screen keeps the icon it took then: remove Dot from the Home
-Screen and add it again for the new one. The app's own icon changes with the next build of Dot.app.
+set from the app icon. The manifest names only PNGs, the 180 px touch icon among them (item 661): iOS 26 opens what is
+added to the Home Screen as a web app and takes its icon from the manifest, where an SVG of any size outranked every
+picture and was not drawn, so an iPhone added Dot with the letter D. A phone that had Dot on its Home Screen keeps the
+icon it took then: remove Dot from the Home Screen and add it again for the new one. The app's own icon changes with the next build of Dot.app.

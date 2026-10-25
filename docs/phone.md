@@ -189,17 +189,20 @@ not two, and the light scheme's own ground, `#f8f7f4`, as its `theme_color` and 
 screen between the tap and the first frame, the colour the page gives the browser in the light scheme), so that no white
 flash or strip of amber shows while it opens. Beside the plain icons it carries a 512 px `maskable` one, its artwork at
 four fifths of the square on that ground, which a launcher that rounds or crops an icon draws whole; a long press on it
-offers **New chat** (`/#/runs`) and **Settings** (`/#/settings`). iOS draws the added app with one of the page's
-`apple-touch-icon` files (items 410 and 550): 180, 167, 152 and 120 px under the icons folder
-(`/icons/touch-icon-180.png` and its siblings), which the page names at absolute paths, so that a path or a cache of an
-older icon cannot leave it with the letter iOS draws for an address that has none. A web clip added before an icon
-changed keeps the icon it first drew until it is removed and added again; iOS keeps that drawing of the app itself. The
-180 px files at the root (`/apple-touch-icon.png`, its `-precomposed` twin and the `180x180` names) stay for the names
-iOS tries by itself when a page names none. A phone's own process fetches the icon outside the page, so those files,
-the manifest, the favicon and the icons folder are served with a resource policy that lets another origin read them,
-and a name of `[server] reach` written with HTTPS's own port (`:443`) names this server too. A request the daemon
-turns away is logged (`request_refused`, with its path, status, reason, Host and Origin, never the token), so that an
-icon that does not come says why in `dotx.log`.
+offers **New chat** (`/#/runs`) and **Settings** (`/#/settings`). Since iOS 26, which opens what is added to the Home
+Screen as a web app, iOS takes the added app's icon from the manifest, which therefore names only PNGs of a size each,
+the 180 px touch icon among them (item 661): an SVG of any size there outranked every picture and is not drawn, so an
+iPhone added Dot with the letter D. Before, iOS drew it with one of the page's `apple-touch-icon` files (items 410 and
+550), which the page still names: 180, 167, 152 and 120 px under the icons folder (`/icons/touch-icon-180.png` and its
+siblings), which the page names at absolute paths, so that a path or a cache of an older icon cannot leave it with the
+letter iOS draws for an address that has none. A web clip added before an icon changed keeps the icon it first drew
+until it is removed and added again; iOS keeps that drawing of the app itself. The 180 px files at the root
+(`/apple-touch-icon.png`, its `-precomposed` twin and the `180x180` names) stay for the names iOS tries by itself when a
+page names none. A phone's own process fetches the icon outside the page, so those files, the manifest, the favicon and
+the icons folder are served with a resource policy that lets another origin read them, and a name of `[server] reach`
+written with HTTPS's own port (`:443`) names this server too. A request the daemon turns away is logged
+(`request_refused`, with its path, status, reason, Host and Origin, never the token), so that an icon that does not come
+says why in `dotx.log`.
 
 The daemon answers with gzip what a browser asks it for that way (item 381): the pages' scripts and sheets and the API's
 answers, past 1 KiB; the event streams go as they are written, and the fonts and the images, compressed already, as they
