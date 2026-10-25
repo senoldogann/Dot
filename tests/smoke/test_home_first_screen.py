@@ -106,6 +106,8 @@ async def _open_home(browser: Browser, address: str, width: int, height: int, sc
     page: Page = await browser.new_page(
         viewport={"width": width, "height": height}, color_scheme=scheme, reduced_motion="reduce"
     )
+    # A new chat shows the day under its composer only when asked to (Settings › General › Chat).
+    await page.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     await expect(page.locator(".home-today [data-section=recent]")).to_have_count(1)
     await _settled(page)
@@ -202,6 +204,58 @@ async def test_the_greeting_and_the_composer_stand_in_the_middle_and_the_strip_i
             await expect(
                 page.locator(".home-today [data-section=recent] .activity-row:not(.home-today-more)")
             ).to_have_count(_ROWS_SHOWN)
+            await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_a_new_chat_is_the_greeting_and_the_composer_alone_until_the_day_is_asked_for(
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
+) -> None:
+    # The owner asked for it (2026-10-25): a new chat is its composer, without Due today, Learned today, Ended today or
+    # While you were away under it, which Settings › General › Chat brings back, in that browser.
+    _, address = served
+    port: int = int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            asked: list[str] = []
+            for width, height in ((1280, 800), (390, 844)):
+                asked.clear()
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height}, reduced_motion="reduce"
+                )
+                page.on("request", lambda request: asked.append(request.url))
+                await page.goto(ui_url("127.0.0.1", port, TOKEN))
+                await expect(page.locator(".home-start")).to_be_visible()
+                await _settled(page)
+                # The page holds its title for a screen reader and the greeting with the composer: nothing else, and
+                # over the composer Dot's face, its name and the greeting, without the day's line.
+                await expect(page.locator(".home > *")).to_have_count(2)
+                await expect(page.locator(".home-now")).to_have_count(0)
+                await expect(page.locator(".home-greeting")).to_be_visible()
+                await expect(page.locator(".home-today")).to_have_count(0)
+                await expect(page.locator(".home-away")).to_have_count(0)
+                assert not any("/api/away" in url for url in asked), asked
+                bar = await page.locator(".stagebar").bounding_box()
+                stage = await page.locator(".stage").bounding_box()
+                assert bar is not None and stage is not None
+                across, down = await _middle(page.locator(".home-start"))
+                assert abs(down - (bar["y"] + bar["height"] + height) / 2) <= _TOLERANCE_PX, down
+                assert abs(across - (stage["x"] + stage["width"] / 2)) <= _TOLERANCE_PX, across
+                await page.screenshot(path=str(tmp_path / f"new-chat-{width}.png"))
+                await page.close()
+            page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"{address}/#/settings/general")
+            switch: Locator = page.get_by_role("switch", name="Show the day in a new chat")
+            await expect(switch).to_have_attribute("aria-checked", "false")
+            await switch.click()
+            await expect(switch).to_have_attribute("aria-checked", "true")
+            await page.goto(f"{address}/#/runs")
+            await expect(page.locator(".home-now")).to_be_visible()
+            await expect(page.locator(".home-today")).to_be_attached()
+            await expect(page.locator(".home-away")).to_be_attached()
             await page.close()
         finally:
             await browser.close()

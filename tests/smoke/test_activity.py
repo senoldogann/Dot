@@ -312,6 +312,8 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
         try:
             for width, scheme in schemes:
                 page = await browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
+                # A new chat shows the day under its composer only when asked to (Settings › General › Chat).
+                await page.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
                 await page.goto(ui_url(host, port, TOKEN))
                 # The Cost section lives in the side panel's Run tab (items 96, 203): the panel on, and opened as a
                 # drawer on a phone.

@@ -104,6 +104,8 @@ async def page(runtime: Runtime, address: str) -> AsyncIterator[Page]:
             # Without the service worker, so that the answers a test puts in place are the ones the page gets.
             opened: Page = await (await browser.new_context(service_workers="block")).new_page()
             await opened.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            # The home shows the day (its now line, which these tests read) only when asked to (Settings › General).
+            await opened.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
             # Dot has had its first conversation (item 420): the home shows what is going on, as these tests need.
             runtime.assistant.mark_introduced(True)
             await opened.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))

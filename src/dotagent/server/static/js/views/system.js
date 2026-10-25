@@ -6,6 +6,7 @@ import {
   AUTO_COMPUTER,
   AUTO_LINES,
   BUSY_SEND,
+  HOME_DAY,
   READ_ALOUD,
   SEND_KEY,
   VOICE_LANGUAGE,
@@ -421,7 +422,15 @@ function buildChatCard() {
     onToggled: () => lines.paint(),
   });
   lines.paint();
-  return section("Chat", null, el("div", { class: "card-pad stack" }, lines.element));
+  const day = switchSetting({
+    label: "Show the day in a new chat",
+    hint: "Over the composer of a new chat, one line of what is going on today; under it, what waits for you, what works, what is due today, what was learned and what ended, and While you were away. Off, as it starts, a new chat is Dot's greeting and the composer alone; the sidebar still lists the chats that wait or work. Kept in this browser.",
+    read: () => settingValue(HOME_DAY) === "shown",
+    write: async (on) => setValue(HOME_DAY, on ? "shown" : "hidden"),
+    onToggled: () => day.paint(),
+  });
+  day.paint();
+  return section("Chat", null, el("div", { class: "card-pad stack" }, lines.element, day.element));
 }
 
 /** The ways to Diagnostics (item 370) and Open source licences (item 371), pages of their own. */

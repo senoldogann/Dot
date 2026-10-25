@@ -147,6 +147,17 @@ export const AUTO_LINES = {
   paint: () => undefined,
 };
 
+/** Whether a new chat shows the day: the now line over its composer (item 72) and under it While you were away (item
+ * 466) and the Today strip (what waits, works, is due, was learned and ended today, items 124 and 364). It does not
+ * until asked to: a new chat is the greeting and the composer alone. Settings › General chooses it; it puts nothing on
+ * the page. */
+export const HOME_DAY = {
+  key: "dot.homeDay",
+  initial: "hidden",
+  parse: oneOf(["shown", "hidden"]),
+  paint: () => undefined,
+};
+
 /** The languages the microphone listens in and an answer is read aloud in (item 574): the page's own, or one of these tags. */
 export const VOICE_LANGUAGES = [
   { id: "page", label: "The page's language" },
