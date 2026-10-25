@@ -7,9 +7,9 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-from dotagent.server.chatcontext import ChatContext, chat_context
+from dotagent.server.chatcontext import ChatContext, _steps, chat_context
 from dotagent.store.db import Store
-from dotagent.store.models import RunRecord
+from dotagent.store.models import RunRecord, ToolStep
 
 LONG_ADDRESS: str = "https://example.org/search?q=" + "a" * 600
 
@@ -99,3 +99,12 @@ async def test_a_run_gets_the_calls_its_chats_earlier_turns_made_and_not_its_own
         assert (await chat_context(store, await store.get_run("run_1_helper"))).steps == ()
     finally:
         await store.close()
+
+
+def test_a_call_and_a_result_with_no_call_id_pair_with_nothing() -> None:
+    blank: dict[str, object] = {"run_id": "run_1", "call_id": "", "tool": "web_fetch", "text": "", "summary": ""}
+    rows: list[ToolStep] = [
+        ToolStep(**blank, kind="tool_call", args={"url": "https://example.org"}, ok=False, result_kind=""),
+        ToolStep(**blank, kind="tool_result", args={}, ok=True, result_kind="read"),
+    ]
+    assert _steps(rows) == []
