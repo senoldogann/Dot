@@ -96,7 +96,8 @@ def server_folder(config: McpServerConfig) -> Path:
     if config.cwd is None:
         return workspace_dir()
     folder: Path = Path(config.cwd)
-    if folder.is_relative_to(dot_home()):
+    # Judged where the folder really is: a ".." or a link out of Dot's home is not a folder of Dot's home.
+    if folder.resolve().is_relative_to(dot_home().resolve()):
         folder.mkdir(parents=True, exist_ok=True)
     return folder
 
