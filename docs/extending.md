@@ -335,8 +335,8 @@ url = "https://mcp.example.com/mcp"       # a remote server; transport = "http" 
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; headers are never logged
 ```
 
-**A server comes with Dot** (item 583): `web-research`, the MCP server of the package `dotagent-web-research` (1.4.6,
-item 637), which Dot's own package depends on, so that every install has it ready and on. Its tools search the web and
+**A server comes with Dot** (item 583): `web-research`, the MCP server of the package `dotagent-web-research` (1.4.7,
+item 638), which Dot's own package depends on, so that every install has it ready and on. Its tools search the web and
 read what a run asks for, and each is named `mcp__web-research__<tool>`: `web_search` (Brave or Serper first when their
 key is in the server's environment, then DuckDuckGo, Google (read in Camoufox), Yahoo and DuckDuckGo's lite page, a
 provider that walls or fails resting ten minutes; each result's date with how sure it is, read from the page's head for

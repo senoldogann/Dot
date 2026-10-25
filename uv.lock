@@ -714,7 +714,7 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "croniter", specifier = ">=6.2.4" },
-    { name = "dotagent-web-research", specifier = "==1.4.6" },
+    { name = "dotagent-web-research", specifier = "==1.4.7" },
     { name = "fastapi", specifier = ">=0.143.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mcp", specifier = ">=2.3.0" },
@@ -749,7 +749,7 @@ dev = [
 
 [[package]]
 name = "dotagent-web-research"
-version = "1.4.6"
+version = "1.4.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -766,9 +766,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/b2/a2d0896d59b5f56258856b7ac62280e93ecd4f0074a03bdae54c337494a5/dotagent_web_research-1.4.6.tar.gz", hash = "sha256:eac0e98c52dd74640aabc7b53d71a1313b118b2ad52805a6b733e85f4a081d67", size = 589351, upload-time = "2026-10-25T13:33:40.814Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/40/ee9750e8420985ef8eb330310cc07f17096ab8faf56b3ac57af05b2c9c7c/dotagent_web_research-1.4.7.tar.gz", hash = "sha256:4fbd73ee1176394cca55ffe3c405fdcf1a2d2a93c93e98bd02af8ee554e4fac5", size = 597954, upload-time = "2026-10-25T14:45:01.12Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/86/91/fb3ca817467ace0220d0eaaecadaba09fe53bc567a562ec077f28590914f/dotagent_web_research-1.4.6-py3-none-any.whl", hash = "sha256:a8a911c1c7902f7ef94a9ad171cdcfee97b48b3d10ce90ca89532820370705d2", size = 332835, upload-time = "2026-10-25T13:33:39.099Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/e1/bd493b79ecfe2c9a05d80dcb4612d357c3e977074feec1a72e666a504d13/dotagent_web_research-1.4.7-py3-none-any.whl", hash = "sha256:66af0234a77b0f17419cc403b7e7e9ecb1ab9934a14f30ae03b4768fb1b5b9ee", size = 335832, upload-time = "2026-10-25T14:44:59.339Z" },
 ]
 
 [[package]]
