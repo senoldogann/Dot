@@ -500,6 +500,8 @@
 .side-run .status-dot {
   width: 8px;
   height: 8px;
+  /* Its ring reaches 8 px past it, as a 10 px dot's does (item 645). */
+  --pulse-reach: 3;
 }
 
 .side-run .status-dot.s-done,
@@ -829,6 +831,22 @@
     0 0 0 2px var(--loop-ring),
     0 0 6px 1px var(--loop-glow);
   color: var(--mark-on-hue);
+}
+
+/* The glow's breath is a wider glow that comes and goes over the mark's own: its opacity is what changes, which the
+   compositor draws, where a changing shadow was drawn again on every frame and kept the page at work at rest (item
+   645: a third of a core in Dot.app with three loops in the sidebar). */
+.side-loop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* The ring of the row's ground over the glow, as the mark's own shadow draws it, so that the glow never tints it. */
+  box-shadow:
+    0 0 0 2px var(--loop-ring),
+    0 0 12px 3px color-mix(in oklab, var(--mark-violet) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
   animation: loop-glow var(--motion-breath) var(--ease) infinite;
 }
 
@@ -849,14 +867,12 @@
 
 @keyframes loop-glow {
   50% {
-    box-shadow:
-      0 0 0 2px var(--loop-ring),
-      0 0 12px 3px color-mix(in oklab, var(--mark-violet) 70%, transparent);
+    opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .side-loop,
+  .side-loop::after,
   .side-loop .icon {
     animation: none;
   }
@@ -964,6 +980,8 @@
 .side-helper .status-dot {
   width: 8px;
   height: 8px;
+  /* Its ring reaches 8 px past it, as a 10 px dot's does (item 645). */
+  --pulse-reach: 3;
 }
 
 .side-helper-more {

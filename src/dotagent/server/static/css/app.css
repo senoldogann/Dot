@@ -1511,8 +1511,29 @@ a.pill:hover {
 }
 
 .status-dot.s-running {
+  position: relative;
   background: var(--accent);
-  animation: pulse var(--motion-pulse) ease-out infinite;
+}
+
+/* A working run's dot sends out a ring: a disc of the accent that grows past the dot and fades, which the compositor
+   draws (item 645), as a growing shadow was drawn again on every frame. Over the dot it is the dot's own colour. */
+.status-dot.s-running::after,
+.background-row[data-wakes="true"] .status-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  pointer-events: none;
+  animation: pulse-ring var(--motion-pulse) ease-out infinite;
+}
+
+/* Under reduced motion the dot stands still, as the page's other marks of work do. */
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.s-running::after,
+  .background-row[data-wakes="true"] .status-dot::after {
+    display: none;
+  }
 }
 
 .status-dot.s-done {
@@ -6723,11 +6744,13 @@ a.memory-line:hover .memory-change {
 .background-row .status-dot {
   width: 8px;
   height: 8px;
+  /* Its ring reaches 8 px past it, as a 10 px dot's does (item 645). */
+  --pulse-reach: 3;
   background: var(--accent);
 }
 
 .background-row[data-wakes="true"] .status-dot {
-  animation: pulse var(--motion-pulse) ease-out infinite;
+  position: relative;
 }
 
 .background-label {
@@ -7827,6 +7850,19 @@ dialog.lightbox img {
 
   100% {
     box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+/* The ring of a working dot: out to 8 px past it, 2.6 times a 10 px dot; an 8 px dot sets --pulse-reach to 3. */
+@keyframes pulse-ring {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  to {
+    transform: scale(var(--pulse-reach, 2.6));
+    opacity: 0;
   }
 }
 

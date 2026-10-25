@@ -821,16 +821,21 @@ lighter than its body; a folded step of the timeline is one line whose duration 
 (120, 200 and 320 ms) and two easings for what changes, and the rhythms of what repeats (the face's breath and pulse, a
 blink, a spin); a unit test holds every transition and animation to them. The face breathes slowly at rest and pulses
 while a run works; cards, rows, the slash menu and the toasts fade in; a state badge cross-fades. Under the system's
-reduced-motion setting every transform goes (the breath, the pulse, the spinners, the drawer's slide) and the fades
-stay, so a state change is still seen. Dot's mark is a yellow dot with the character's eyes, the o of the wordmark "dot"
-between a d and a t drawn in one line (`static/index.html`); the favicon, the app's icon, the menu bar's and the web
-app's icons are drawn from it (`desktop/icons/render.py`), and the wordmark heads the sign-in card. A window that opens
-the UI plays the opening once: the d and the t hop up, the dot drops in with its eyes shut, bounces twice, opens its
-eyes and blinks, and the page shows through, 1.3 s in all; a click or a key cuts it short, it takes no pointer, and it
-plays neither on a reload nor under reduced motion. The look, the scheme and the density you chose are put on the page
-by a small script in the document's head before the first paint, so a held dark scheme never flashes light on the way
-in; a screenshot tour (`tests/smoke/test_tour.py`) photographs every page in both schemes at 1280 and 390 for reading by
-eye.
+reduced-motion setting every transform goes (the breath, the pulse, the spinners, the ring of a working run's dot, the
+drawer's slide) and the fades stay, so a state change is still seen. What repeats without end changes only what the
+compositor draws, opacity and transform, so a page at rest costs next to nothing (item 645): the loop mark's glow, a
+shadow that changed, was drawn again on every frame and kept a third of a core at work in Dot.app with three loops in
+the sidebar. A unit test holds every endless animation to it, and names the few that still redraw while something works
+in front of you: the ring of the microphone while it listens and of the plan's step at work, and the light over the
+words of a thought being written or a chat being opened. Dot's mark is a yellow dot with the character's eyes, the o of
+the wordmark "dot" between a d and a t drawn in one line (`static/index.html`); the favicon, the app's icon, the menu
+bar's and the web app's icons are drawn from it (`desktop/icons/render.py`), and the wordmark heads the sign-in card. A
+window that opens the UI plays the opening once: the d and the t hop up, the dot drops in with its eyes shut, bounces
+twice, opens its eyes and blinks, and the page shows through, 1.3 s in all; a click or a key cuts it short, it takes no
+pointer, and it plays neither on a reload nor under reduced motion. The look, the scheme and the density you chose are
+put on the page by a small script in the document's head before the first paint, so a held dark scheme never flashes
+light on the way in; a screenshot tour (`tests/smoke/test_tour.py`) photographs every page in both schemes at 1280 and
+390 for reading by eye.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds

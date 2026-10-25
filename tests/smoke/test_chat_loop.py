@@ -324,8 +324,18 @@ async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_
                 # At the creature's foot, on its right.
                 assert badge["x"] + badge["width"] > face["x"] + face["width"] - 1
                 assert badge["y"] + badge["height"] > face["y"] + face["height"] - 1
-                animation: str = await mark.evaluate("node => getComputedStyle(node).animationName")
-                assert animation == ("none" if motion == "reduce" else "loop-glow"), animation
+                # Its glow breathes in a layer of its own whose opacity changes, which the compositor draws; the mark's
+                # own shadow stays still, as a shadow that changed was drawn again on every frame (item 645).
+                glow: dict[str, str] = await mark.evaluate(
+                    "node => { const after = getComputedStyle(node, '::after'); return { own: getComputedStyle(node)"
+                    ".animationName, name: after.animationName, frames: [...document.getAnimations()].filter((one) =>"
+                    " one.animationName === 'loop-glow').flatMap((one) => one.effect.getKeyframes()).flatMap((frame) =>"
+                    " Object.keys(frame)).filter((key) => !['offset', 'easing', 'composite', 'computedOffset']"
+                    ".includes(key)).join() }; }"
+                )
+                assert glow["own"] == "none", glow
+                assert glow["name"] == ("none" if motion == "reduce" else "loop-glow"), glow
+                assert motion == "reduce" or set(glow["frames"].split(",")) == {"opacity"}, glow
                 await sidebar.screenshot(path=tmp_path / f"loop-mark-{scheme}.png")
                 # While chats are chosen for deletion, the row keeps the mark, ticked or not (item 635).
                 await sidebar.get_by_role("button", name="Select", exact=True).click()
