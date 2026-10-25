@@ -836,6 +836,11 @@
   --loop-ring: var(--surface);
 }
 
+/* While chats are chosen (item 635) the mark stays, cut out of a ticked row's ground as of the list's. */
+.side-pick:has(.side-check:checked) .side-loop {
+  --loop-ring: color-mix(in srgb, var(--text) 7%, var(--sidebar));
+}
+
 .side-loop .icon {
   width: 10px;
   height: 10px;

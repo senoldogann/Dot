@@ -327,6 +327,17 @@ async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_
                 animation: str = await mark.evaluate("node => getComputedStyle(node).animationName")
                 assert animation == ("none" if motion == "reduce" else "loop-glow"), animation
                 await sidebar.screenshot(path=tmp_path / f"loop-mark-{scheme}.png")
+                # While chats are chosen for deletion, the row keeps the mark, ticked or not (item 635).
+                await sidebar.get_by_role("button", name="Select", exact=True).click()
+                pick: Locator = sidebar.locator(".side-pick", has_text="Say hello")
+                await expect(pick.locator(".side-loop")).to_have_attribute(
+                    "title", re.compile(r"^Loops every 30 minutes, next (\w{3} )?\d")
+                )
+                await pick.locator(".side-check").check()
+                await expect(pick.locator(".side-loop")).to_be_visible()
+                await sidebar.screenshot(path=tmp_path / f"loop-mark-chosen-{scheme}.png")
+                await sidebar.get_by_role("button", name="Cancel selection").click()
+                await expect(looping).to_have_count(1)
                 await page.get_by_role("button", name="Stop the loop check the build").click()
                 await page.get_by_role("dialog").get_by_role("button", name="Stop").click()
                 await expect(sidebar.locator(".side-loop")).to_have_count(0)

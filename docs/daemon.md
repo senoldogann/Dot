@@ -53,13 +53,13 @@ shows only what needs you: the bell of the approvals waiting — a click opens t
 longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
 while it is being made or lost; what works stands under Working. The sections (Waiting for you, Working, Chats, and
 a channel's) fold on a click of their label, and the folds are kept between visits. The sidebar's head holds only
-the button that folds it away. **Select** turns the list into
-checkboxes: tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event and
-approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to end, or
-cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a drawer. The
-list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats deleted
-under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only when the
-page comes to another chat (item 204).
+the button that folds it away. **Select** turns the list into checkboxes, each chat keeping its creature and the mark of
+its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
+and approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to
+end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a
+drawer. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
+deleted under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only
+when the page comes to another chat (item 204).
 
 A chat's menu opens from the **…** button at the right of its row (shown where the pointer
 rests or the focus is, over the time, and always on a touch screen), from a right-click on the row, or from the
