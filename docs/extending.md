@@ -336,53 +336,53 @@ headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; header
 ```
 
 **A server comes with Dot** (item 583): `web-research`, the MCP server of the package `dotagent-web-research` (1.4.9,
-item 653), which Dot's own package depends on, so that every install has it ready and on. Its tools search the web and
-read what a run asks for, and each is named `mcp__web-research__<tool>`: `web_search` (Brave or Serper first when their
-key is in the server's environment, then DuckDuckGo, Google (read in Camoufox), Yahoo and DuckDuckGo's lite page, a
-provider that walls (Google: after a bot check that Camoufox or the minimised Chrome saw and the other did not read
-past, or that a lesser path, the HTTP request or headless Chrome, saw when neither could ask and no browser read Google)
-or fails three times running resting ten minutes, then twice as long for each failure after a rest, up to an hour, until
-it answers again, and when the first fails and every other rests, the one nearest its rest's end is asked once, in each
-angle of the search, even one resting after a bot check, which a wall then makes rest twice as long; each result's date
-with how sure it is, read from the page's head for news), `web_scrape` (one page, or two to ten in one call, as
-Markdown; a page behind a wall is read once more in Camoufox, a Firefox made to look like a person's browser (not on an
-Intel Mac, which has no Camoufox), and else another way, from the archive or another outlet's copy, which the answer
-names; `archive: true` reads the Internet Archive's copy; a page its scripts draw is waited for, and one that is still
-an empty shell, or that is what its site answers any address with, says so: `rendered_shell`, `soft_404`,
-`looks_missing`), `web_map` (a site that redirects is mapped at the host it lands on only when that is the same site: a
-`www.` flip, `http` to `https` or the same registrable domain; else the one page it leads to, with `redirected_to`),
-`web_extract`, `web_health` (the state of its search providers), and a crawl in the background (`web_crawl_start`,
-`web_crawl_status`, `web_crawl_results`, `web_crawl_cancel`; an ended crawl says why it stopped, `stopped_by`, and how
-many links it left, `not_visited`). Dot starts it with the servers of `[[mcp]]`, as it starts those: on the Python the
-daemon runs on (`python -P -m web_scraper.mcp_server`: `-P` keeps the workspace, where a run's commands write, off its
-import path), with `WEB_TOOLS_DATA_DIR=<home>/web-research`, where it keeps its crawl jobs, a folder a run's commands
-cannot change, as they cannot change the other files Dot loads and runs, and with `PYTHON_DOTENV_DISABLED=1`, so that it
-reads no `.env` into its environment: neither Dot's own key file nor one that a program left in the workspace, its
-working folder (the browser it starts for a page that needs JavaScript runs with that environment, and a `NODE_OPTIONS`
-in it is a file run outside the sandbox). While you have a list of sites set (`[browser] allowed_hosts`, or
-`blocked_hosts` beyond the defaults), it starts with `WEB_TOOLS_SEARCH_RESOLVE_DATES=off` and
-`WEB_TOOLS_SCRAPE_RECOVER=off`: the lists bind the addresses a call holds, and these two would have the server read
-pages of its own accord, the heads of a search's results and another copy of a walled page (item 623). Its tools are
-offered and judged like any server's: the seven that declare themselves read-only run as reads, the other two by their
-flags (`web_crawl_start` may reach out, `web_crawl_cancel` stops something), and what they return is untrusted content
-in its fence.
+item 653), which Dot's own package depends on, so that every install has it ready and on. Its search is a rung of Dot's
+own `web_search` since item 655, which Dot asks with the query a run gave `web_search` (Settings › Web search orders it
+among the others), and its other tools read what a run asks for, each named `mcp__web-research__<tool>`. The search
+(Brave or Serper first when their key is in the server's environment, then DuckDuckGo, Google (read in Camoufox), Yahoo
+and DuckDuckGo's lite page, a provider that walls (Google: after a bot check that Camoufox or the minimised Chrome saw
+and the other did not read past, or that a lesser path, the HTTP request or headless Chrome, saw when neither could ask
+and no browser read Google) or fails three times running resting ten minutes, then twice as long for each failure after
+a rest, up to an hour, until it answers again, and when the first fails and every other rests, the one nearest its
+rest's end is asked once, in each angle of the search, even one resting after a bot check, which a wall then makes rest
+twice as long; each result's date with how sure it is, read from the page's head for news), `web_scrape` (one page, or
+two to ten in one call, as Markdown; a page behind a wall is read once more in Camoufox, a Firefox made to look like a
+person's browser (not on an Intel Mac, which has no Camoufox), and else another way, from the archive or another
+outlet's copy, which the answer names; `archive: true` reads the Internet Archive's copy; a page its scripts draw is
+waited for, and one that is still an empty shell, or that is what its site answers any address with, says so:
+`rendered_shell`, `soft_404`, `looks_missing`), `web_map` (a site that redirects is mapped at the host it lands on only
+when that is the same site: a `www.` flip, `http` to `https` or the same registrable domain; else the one page it leads
+to, with `redirected_to`), `web_extract`, and a crawl in the background (`web_crawl_start`, `web_crawl_status`,
+`web_crawl_results`, `web_crawl_cancel`; an ended crawl says why it stopped, `stopped_by`, and how many links it left,
+`not_visited`). A run is offered those and not the search or `web_health` (the state of its search providers, for the
+doctor): the server's `allow` list names them, and a tool a later version adds is offered once Dot names it, after its
+arguments are judged. Dot starts it with the servers of `[[mcp]]`, as it starts those: on the Python the daemon runs on
+(`python -P -m web_scraper.mcp_server`: `-P` keeps the workspace, where a run's commands write, off its import path),
+with `WEB_TOOLS_DATA_DIR=<home>/web-research`, where it keeps its crawl jobs, a folder a run's commands cannot change,
+as they cannot change the other files Dot loads and runs, and with `PYTHON_DOTENV_DISABLED=1`, so that it reads no
+`.env` into its environment: neither Dot's own key file nor one that a program left in the workspace, its working folder
+(the browser it starts for a page that needs JavaScript runs with that environment, and a `NODE_OPTIONS` in it is a file
+run outside the sandbox). While you have a list of sites set (`[browser] allowed_hosts`, or `blocked_hosts` beyond the
+defaults), it starts with `WEB_TOOLS_SEARCH_RESOLVE_DATES=off` and `WEB_TOOLS_SCRAPE_RECOVER=off`: the lists bind the
+addresses a call holds, and these two would have the server read pages of its own accord, the heads of a search's
+results and another copy of a walled page (item 623). The seven tools a run is offered (item 655) are judged like any
+server's: the five that declare themselves read-only run as reads, the other two by their flags (`web_crawl_start` may
+reach out, `web_crawl_cancel` stops something), and what they return is untrusted content in its fence.
 
 **Dot's own rules judge its calls.** A call of the server's tools is judged by the rules of the tool of Dot's own that
 does the same, in the same functions, so that a rule added to `web_search`, `web_fetch` or `web_crawl` binds these too:
 
-- *The words of a search*, which are the `query` of `web_search` and its `sites` and `exclude_sites` (the server makes
-  words of the query it sends of them), as the query of Dot's `web_search` is: one with a key in it (an `sk-…`,
-  `AKIA…`, `ghp_…` or `xox…` key, or a private key) earns the flag `exfiltration`, which the policy refuses in every
-  mode but yolo, and one of more than 400 characters is refused.
+- *The words of a search*: a run searches with Dot's own `web_search` alone since item 655, whose query is judged
+  (one with a key in it, an `sk-…`, `AKIA…`, `ghp_…` or `xox…` key or a private key, earns the flag `exfiltration`,
+  which the policy refuses in every mode but yolo, and one of more than 400 characters is refused) before its
+  web-research rung sends the server that query and the number of results, and nothing else.
 - *The addresses*, which are the `url` or `urls` of `web_scrape` and the `url` of `web_extract`, `web_map` and
   `web_crawl_start`, as the address of `web_fetch` and `web_crawl` is: checked against `[browser] allowed_hosts` and
   `blocked_hosts` and the places Dot refuses (this Mac, Dot's own interface), and refused with the same words. The
   server is handed the address as it was checked, with its scheme, and an address of more than 2,000 characters, or
   one with a key in it (in its query string, say), earns `exfiltration`.
-- *A `web_search` with `read` above 0*, which has the server read the pages the search chose, is refused while you have
-  set `allowed_hosts` or added a host to `blocked_hosts` (the cloud metadata hosts it ships with are no list of yours):
-  those addresses are the server's pick, and Dot cannot check them, so the model is told to search without `read` and
-  to read the pages with `web_scrape`. Dot's own `web_search` has no such argument.
+- *A search that reads the pages it found* (the server's `read`) cannot be asked: the rung sends no `read`, so the
+  pages a search chose are read only by `web_scrape`, whose addresses are judged.
 - *A `web_scrape` with `archive: true`* reaches `web.archive.org` whatever address it names: while you have a list set,
   that site is judged as an address is, and the call is refused where your lists leave it out (item 623).
 

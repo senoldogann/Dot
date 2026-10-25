@@ -25,6 +25,21 @@ WEB_RESEARCH: str = "web-research"
 # A test that must not start the server looks for the package under a name nothing has (tests/conftest.py).
 WEB_RESEARCH_PACKAGE: str = "web_scraper"
 _WEB_RESEARCH_MODULE: str = "web_scraper.mcp_server"
+# The tools of the server a run is offered (item 655). Its search is not among them: it is a rung of Dot's own
+# web_search, asked by Dot with the query the run gave web_search, so that a run has one search and Settings › Web
+# search orders it; its health check is the doctor's. A tool a later version adds is offered once it is named here,
+# after Dot has judged its arguments (``_SEARCH_ARGUMENTS``, ``_ADDRESS_ARGUMENTS``).
+OFFERED_TOOLS: tuple[str, ...] = (
+    "web_scrape",
+    "web_extract",
+    "web_map",
+    "web_crawl_start",
+    "web_crawl_status",
+    "web_crawl_results",
+    "web_crawl_cancel",
+)
+# The server's search, which web_search's rung calls.
+SEARCH_TOOL: str = "web_search"
 
 
 def web_research_installed() -> bool:
@@ -84,6 +99,7 @@ def _web_research(enabled: bool, bound: bool) -> McpServerConfig:
         env=env,
         enabled=enabled,
         cwd=str(web_research_dir()),
+        allow=list(OFFERED_TOOLS),
     )
 
 

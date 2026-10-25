@@ -24,11 +24,13 @@ run needs, sent where the configuration points:
   they get to improve their models (see [Models and providers](models.md#models-and-providers)).
 - **To the embedding model: each note and each search of the memory.** It is Ollama's `bge-m3` on this Mac by default;
   with `[memory] embed_provider = "openai"` the texts go to OpenAI (see [Memory](memory-and-schedules.md#memory)).
-- **To the search engines: the query.** The `[web] search_backend` ladder asks the owner's SearXNG instance when
-  `[web] searxng_url` names one (the instance passes the query on to its own engines, Google and the others), then
-  Ollama's hosted search when `OLLAMA_API_KEY` is saved, then DuckDuckGo and Brave Search, then DuckDuckGo in Dot's own
-  Chrome; Anthropic's search (relayed by `[models] search`) joins when `ANTHROPIC_API_KEY` is saved, and
-  `[web] anthropic_search = "off"` leaves it out.
+- **To the search engines: the query.** The `[web] search_backend` ladder asks the owner's SearXNG instance when `[web]
+  searxng_url` names one (the instance passes the query on to its own engines, Google and the others), then Ollama's
+  hosted search when `OLLAMA_API_KEY` is saved, then DuckDuckGo and Brave Search, then DuckDuckGo in Dot's own Chrome;
+  Anthropic's search (relayed by `[models] search`) joins when `ANTHROPIC_API_KEY` is saved, and `[web] anthropic_search
+  = "off"` leaves it out. Settings › Web search (item 655) adds the search APIs whose keys the owner saves there
+  (Brave's Search API, Tavily, Exa, Serper: the query goes to that company, the key in a header and nowhere else) and
+  the web-research server's search, and orders them all; the order is `[web] search_order`.
 - **To the sites a run visits: its requests.** The web tools fetch public addresses only, unless
   `[web] allow_private_hosts` allows more (the owner's SearXNG instance is configuration and is reached wherever it
   is, a loopback one too); a page the browser reads for them in place of a plain request a site turned away is held
@@ -139,34 +141,36 @@ run needs, sent where the configuration points:
   may read one in its headless Chrome, which resolves names itself, as a scraped page's does (below). Its `web_scrape`,
   `web_map`, `web_extract` and crawls request the pages they are asked for, with the `robots.txt` and the sitemaps of
   their sites (a headless Chrome of its own reads a page that needs JavaScript), and with `archive: true` the Internet
-  Archive's copy; `web_health` asks nothing of anyone. It refuses the addresses of this Mac, of private networks and of
-  cloud metadata services, and since 1.3.1 it connects only to an address it checked in the same step, on each redirect
-  too, so that a name whose answer changes between the check and the connection (DNS rebinding) cannot lead it to one
-  (item 623; its headless Chrome resolves names itself, and each of its requests is checked as it goes). Since 1.4.5
-  every browser it starts, Chrome or Camoufox, for a page or for a search, is held to that check before its first page
-  (and, since 1.4.7, the installed Chrome that Google's search falls back to when Camoufox cannot start): a page's
-  requests and the windows it opens, and in Chrome its web sockets; a page is returned only if it ended at an address
-  the check allows. Not held: a redirect the browser follows (the guard sees a request's first address), a worker's
-  requests, a web socket in Camoufox, and the browser's own name resolution. The server starts in its own data folder,
-  not the workspace (item 637), so that no file a run leaves in the workspace runs in it or in a program it starts, such
-  as Camoufox's fetch, which since 1.4.7 also runs with `-P` in an empty folder of its own. A Camoufox folder of an
-  older layout in `~/Library/Caches`, which the `camoufox` package deleted when it looked for its browser, is left as it
-  is since 1.4.7 and Camoufox is then said to be missing. The installed Chrome it starts (Google's fallback) has a
-  keychain of its own since 1.4.7, so it asks macOS for none of yours; it needs no key for the engines it asks by
-  default, and sends nothing to the people who make it; it keeps its crawl jobs in `<home>/web-research`. `[builtin_mcp]
-  web_research = false` leaves it out (see [MCP servers](extending.md#mcp-servers)). Its calls are judged by the rules
-  of Dot's own tools that do the same, in the same functions: the words of a search (the query, and the sites the server
-  makes words of it) as the query of `web_search` is, so that a key in them earns the flag `exfiltration`, which is
-  refused in every mode but yolo, and more than 400 characters are refused; the addresses as the address of `web_fetch`
-  and `web_crawl` is, so that `[browser] allowed_hosts` and `blocked_hosts` bind them and a long one, or one with a key
-  in it, earns the same flag; a search that reads the pages it found is refused while you have set a list, since those
-  addresses are the server's pick; and while you have set a list, a `web_scrape` with `archive: true` is refused where
-  your lists leave out `web.archive.org`, the site it reaches whatever address it names. These rules do not reach what
-  they do not reach in Dot's own tools (a secret that is not in the shape of a key, a key cut in pieces), nor a redirect
-  the server follows to another host (since 1.4.5 a map or a crawl whose address, `robots.txt` or sitemap redirects to
-  another site reads only the one page it leads to, and says `redirected_to`), the links a crawl follows on the site it
-  starts on, the search engines a search asks, or, while you have no list set, the Internet Archive that `archive: true`
-  asks; a crawl goes on after its run has stopped, up to its page limit.
+  Archive's copy. Its search runs only as the web-research rung of Dot's `web_search` since item 655: Dot sends it the
+  query a run gave `web_search`, which Dot judged, and the number of results, and nothing else; `web_health`, which asks
+  nothing of anyone, is the doctor's, and a run is offered neither. It refuses the addresses of this Mac, of private
+  networks and of cloud metadata services, and since 1.3.1 it connects only to an address it checked in the same step,
+  on each redirect too, so that a name whose answer changes between the check and the connection (DNS rebinding) cannot
+  lead it to one (item 623; its headless Chrome resolves names itself, and each of its requests is checked as it goes).
+  Since 1.4.5 every browser it starts, Chrome or Camoufox, for a page or for a search, is held to that check before its
+  first page (and, since 1.4.7, the installed Chrome that Google's search falls back to when Camoufox cannot start): a
+  page's requests and the windows it opens, and in Chrome its web sockets; a page is returned only if it ended at an
+  address the check allows. Not held: a redirect the browser follows (the guard sees a request's first address), a
+  worker's requests, a web socket in Camoufox, and the browser's own name resolution. The server starts in its own data
+  folder, not the workspace (item 637), so that no file a run leaves in the workspace runs in it or in a program it
+  starts, such as Camoufox's fetch, which since 1.4.7 also runs with `-P` in an empty folder of its own. A Camoufox
+  folder of an older layout in `~/Library/Caches`, which the `camoufox` package deleted when it looked for its browser,
+  is left as it is since 1.4.7 and Camoufox is then said to be missing. The installed Chrome it starts (Google's
+  fallback) has a keychain of its own since 1.4.7, so it asks macOS for none of yours; it needs no key for the engines
+  it asks by default, and sends nothing to the people who make it; it keeps its crawl jobs in `<home>/web-research`.
+  `[builtin_mcp] web_research = false` leaves it out (see [MCP servers](extending.md#mcp-servers)). Its calls are judged
+  by the rules of Dot's own tools that do the same, in the same functions: the query of its search is the query of Dot's
+  own `web_search`, judged before its rung sends it, so that a key in it earns the flag `exfiltration`, which is refused
+  in every mode but yolo, and more than 400 characters are refused (the rung sends nothing else: no sites, and no
+  reading of the pages a search found, which only `web_scrape` reads, by addresses that are judged); the addresses as
+  the address of `web_fetch` and `web_crawl` is, so that `[browser] allowed_hosts` and `blocked_hosts` bind them and a
+  long one, or one with a key in it, earns the same flag; and while you have set a list, a `web_scrape` with `archive:
+  true` is refused where your lists leave out `web.archive.org`, the site it reaches whatever address it names. These
+  rules do not reach what they do not reach in Dot's own tools (a secret that is not in the shape of a key, a key cut in
+  pieces), nor a redirect the server follows to another host (since 1.4.5 a map or a crawl whose address, `robots.txt`
+  or sitemap redirects to another site reads only the one page it leads to, and says `redirected_to`), the links a crawl
+  follows on the site it starts on, the search engines a search asks, or, while you have no list set, the Internet
+  Archive that `archive: true` asks; a crawl goes on after its run has stopped, up to its page limit.
 - **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; the one
   set up by default is web-research, above (see [MCP servers](extending.md#mcp-servers)).
 - **To your Google and Microsoft accounts, once you sign one in: what the mail and calendar tools ask.** `mail_search`,

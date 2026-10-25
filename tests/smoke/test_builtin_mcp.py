@@ -39,7 +39,7 @@ from dotagent.core.errors import ToolInputError
 from dotagent.core.paths import connected_servers_path, ensure_layout, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.mcp import builtin
-from dotagent.mcp.builtin import address_arguments, builtin_servers, search_arguments
+from dotagent.mcp.builtin import OFFERED_TOOLS, address_arguments, builtin_servers, search_arguments
 from dotagent.mcp.connected import keep_connected
 from dotagent.mcp.hub import open_hub
 from dotagent.mcp.launch import server_environment
@@ -61,10 +61,11 @@ TOKEN: str = "builtin-mcp-token"
 PORT: int = 8765
 ORIGIN: str = f"http://127.0.0.1:{PORT}"
 SERVER: str = "web-research"
-# What the server lists, in its order, and how the policy judges each: the seven that only read are reads (web_health,
-# since 1.3.0, the state of its search providers), a crawl that is queued may reach every site its pages link to, and
-# one that is cancelled is stopped.
-TOOLS: tuple[str, ...] = (
+# What the server lists: nine tools, of which a run is offered seven (item 655), in the order Dot names them. Its search
+# is a rung of Dot's own web_search, which Dot asks, and its health check (since 1.3.0, the state of its search
+# providers) is the doctor's. How the policy judges each offered tool: the five that only read are reads, a crawl that
+# is queued may reach every site its pages link to, and one that is cancelled is stopped.
+SERVER_LISTS: tuple[str, ...] = (
     "web_search",
     "web_scrape",
     "web_map",
@@ -75,9 +76,12 @@ TOOLS: tuple[str, ...] = (
     "web_crawl_results",
     "web_crawl_cancel",
 )
+LISTED: int = len(SERVER_LISTS)
+TOOLS: tuple[str, ...] = OFFERED_TOOLS
+NOT_OFFERED: tuple[str, ...] = ("web_search", "web_health")
 READS: frozenset[str] = frozenset(TOOLS) - {"web_crawl_start", "web_crawl_cancel"}
 # The tools that take no string, which the test of the strings below does not meet.
-NO_STRINGS: frozenset[str] = frozenset({"web_health"})
+NO_STRINGS: frozenset[str] = frozenset()
 ANSWER_S: float = 90.0
 
 
@@ -163,6 +167,7 @@ async def test_a_daemon_with_no_config_starts_the_server_and_offers_its_tools(ho
         assert runtime.builtin_names == frozenset({SERVER})
         assert tuple(tool.remote_name for tool in runtime.mcp.tools) == TOOLS
         assert all(f"mcp__{SERVER}__{name}" in runtime.registry.tools for name in TOOLS)
+        assert not any(f"mcp__{SERVER}__{name}" in runtime.registry.tools for name in NOT_OFFERED)
         started = runtime.mcp.configs()[SERVER]
         assert started.command == sys.executable
         assert started.args[-2:] == ["-m", "web_scraper.mcp_server"]
@@ -178,7 +183,7 @@ async def test_its_tools_are_judged_like_any_servers_the_six_that_read_are_reads
         assert {name for name, action in judged.items() if action.kind == "mcp_read"} == READS
         assert judged["web_crawl_start"].flags == ("external_send",)
         assert judged["web_crawl_cancel"].flags == ("destructive",)
-        assert judged["web_search"].risk == "low" and judged["web_crawl_start"].risk == "medium"
+        assert judged["web_scrape"].risk == "low" and judged["web_crawl_start"].risk == "medium"
 
 
 async def test_a_file_of_the_workspace_named_like_a_module_the_server_imports_is_never_run(home: Path) -> None:
@@ -318,7 +323,7 @@ async def test_a_server_that_was_left_out_is_started_again_from_the_page(
         assert again.status_code == 200, again.text
         assert (again.json()["origin"], again.json()["state"]) == ("builtin", "ready"), again.text
         assert world.runtime.mcp.connected() == (SERVER,)
-        assert f"mcp__{SERVER}__web_search" in world.runtime.registry.tools
+        assert f"mcp__{SERVER}__web_scrape" in world.runtime.registry.tools
         # One that is switched off is not tried: its switch starts it.
         await world.client.put(f"/api/mcp/servers/{SERVER}/switch", json={"on": False})
         refused = await world.client.post(f"/api/mcp/servers/{SERVER}/connect", json={"origin": ORIGIN})
@@ -372,8 +377,9 @@ async def test_dotx_mcp_list_marks_the_server_that_comes_with_dot_and_how_each_t
     await asyncio.to_thread(_write, home / "config.toml", "")
     listed = await _dotx(home, ["mcp", "list"])
     assert listed.returncode == 0, listed
-    assert f"web-research (built-in): ready, {len(TOOLS)} of {len(TOOLS)} tools offered to the model" in listed.stdout
-    assert "mcp__web-research__web_search  [read-only]" in listed.stdout
+    assert f"web-research (built-in): ready, {len(TOOLS)} of {LISTED} tools offered to the model" in listed.stdout
+    assert "mcp__web-research__web_scrape  [read-only]" in listed.stdout
+    assert "mcp__web-research__web_search" not in listed.stdout
     assert "mcp__web-research__web_crawl_start  [acts: external_send]" in listed.stdout
     assert "mcp__web-research__web_crawl_cancel  [acts: destructive]" in listed.stdout
 
@@ -441,8 +447,10 @@ async def test_the_real_server_answers_initialize_and_lists_its_tools_over_stdio
         tools = listed["result"]
         assert isinstance(tools, dict)
         names: list[str] = [tool["name"] for tool in tools["tools"]]
-        assert names == list(TOOLS)
-        assert all(tool["annotations"]["readOnlyHint"] is (tool["name"] in READS) for tool in tools["tools"])
+        assert names == list(SERVER_LISTS)
+        # The search and the health check only read too; a run is offered neither (item 655).
+        reads: frozenset[str] = READS | frozenset(NOT_OFFERED)
+        assert all(tool["annotations"]["readOnlyHint"] is (tool["name"] in reads) for tool in tools["tools"])
     finally:
         process.stdin.close()
         try:
@@ -554,17 +562,41 @@ async def test_a_long_address_is_flagged_and_refused_by_the_policy_as_web_fetchs
         assert short.action.flags == ()
 
 
-async def test_a_search_that_reads_the_pages_it_found_is_refused_while_a_host_list_is_set(home: Path) -> None:
+async def test_the_servers_search_is_web_searchs_rung_asked_with_the_query_and_the_count_alone(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 655: a run is offered no search of the server's; Dot's own web_search asks it as a rung, with the words the
+    run gave web_search, which Dot judged, and how many results, and nothing else: no ``read`` of the pages it found,
+    whatever the owner's lists. Its answer comes back as web_search's hits, each with its date. The call goes to a
+    stand-in of the server: nothing is searched."""
     async with _runtime(home, '[browser]\nblocked_hosts = ["blocked.example"]\n') as runtime:
-        with pytest.raises(ToolInputError) as raised:
-            await _prepare(runtime, "web_search", {"query": "sqlite fts5", "read": 2})
-        assert "read" in raised.value.message and "web_scrape" in raised.value.message
-        plain = await _prepare(runtime, "web_search", {"query": "sqlite fts5"})
-        assert plain.action.kind == "mcp_read"
-    async with _runtime(home) as runtime:
-        # No list set: the search reads as the server's tool says.
-        allowed = await _prepare(runtime, "web_search", {"query": "sqlite fts5", "read": 2})
-        assert allowed.action.kind == "mcp_read"
+        asked: list[tuple[str, str, JsonObject]] = []
+
+        async def stand_in(server: str, tool: str, arguments: JsonObject) -> CallToolResult:
+            asked.append((server, tool, arguments))
+            answer: JsonObject = {
+                "query": arguments["query"],
+                "results": [
+                    {
+                        "title": "SQLite FTS5",
+                        "url": "https://sqlite.org/fts5.html",
+                        "snippet": "Full-text search",
+                        "date": "2026-10-01",
+                    }
+                ],
+                "run": {"provider": "duckduckgo", "warnings": [], "fallback": None},
+            }
+            return CallToolResult(content=[TextContent(type="text", text=json.dumps(answer))], isError=False)
+
+        monkeypatch.setattr(runtime.mcp, "call_unoffered", stand_in)
+        runtime.search_keys.order = ("web_research",)
+        search = runtime.registry.tools["web_search"]
+        context: ToolContext = _context(runtime)
+        prepared = await search.prepare({"query": "sqlite fts5", "max_results": 3}, context)
+        result = await prepared.run(context)
+        assert asked == [(SERVER, "web_search", {"query": "sqlite fts5", "limit": 3})]
+        assert "from web_research" in result.text and "https://sqlite.org/fts5.html" in result.text
+        assert "2026-10-01 · Full-text search" in result.text
 
 
 async def test_the_server_is_handed_the_address_dot_checked(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -591,36 +623,18 @@ KEY: str = "sk-" + "a1b2c3d4" * 4
 
 async def test_a_key_in_a_search_is_flagged_and_refused_by_the_policy_as_web_searchs_is(home: Path) -> None:
     """The second review's finding: Dot's own ``web_search`` flags a query that holds a key (``exfiltration``, refused
-    in every mode but yolo), and the search of the server, on in every install, was a read with no flag. ``sites`` and
-    ``exclude_sites`` become words of the query the server sends. Prepared, never run: nothing is searched."""
+    in every mode but yolo), and the search of the server, on in every install, was a read with no flag. Since item
+    655 a run has no search but Dot's own, which asks the server as a rung: every query is judged by Dot's rule.
+    Prepared, never run: nothing is searched."""
     async with _runtime(home) as runtime:
         context: ToolContext = _context(runtime)
         own = await runtime.registry.tools["web_search"].prepare({"query": f"what is {KEY}"}, context)
         assert own.action.flags == ("exfiltration",)
-        for arguments in (
-            {"query": f"what is {KEY}"},
-            {"query": "sqlite fts5", "sites": [f"{KEY}.example.com"]},
-            {"query": "sqlite fts5", "exclude_sites": ["docs.python.org", f"{KEY}.example.com"]},
-        ):
-            prepared = await _prepare(runtime, "web_search", arguments)
-            assert (prepared.action.kind, prepared.action.flags) == ("mcp_read", own.action.flags), arguments
-            decision = auto_review(prepared.action)
-            assert decision is not None and decision.verdict == "deny", arguments
-        assert KEY not in (await _prepare(runtime, "web_search", {"query": f"what is {KEY}"})).action.summary
-        for plain in (
-            {"query": "sqlite fts5"},
-            {"query": "sqlite fts5", "sites": ["docs.python.org"], "exclude_sites": ["example.com"]},
-        ):
-            prepared = await _prepare(runtime, "web_search", plain)
-            assert (prepared.action.kind, prepared.action.flags) == ("mcp_read", ()), plain
-            assert auto_review(prepared.action) is None, plain
-        # A query longer than web_search takes is refused by both.
-        for tool in (
-            runtime.registry.tools["web_search"].prepare,
-            runtime.registry.tools[f"mcp__{SERVER}__web_search"].prepare,
-        ):
-            with pytest.raises(ToolInputError):
-                await tool({"query": "a" * 401}, context)
+        decision = auto_review(own.action)
+        assert decision is not None and decision.verdict == "deny"
+        assert f"mcp__{SERVER}__web_search" not in runtime.registry.tools
+        with pytest.raises(ToolInputError):
+            await runtime.registry.tools["web_search"].prepare({"query": "a" * 401}, context)
 
 
 async def test_a_key_in_the_query_string_of_an_address_is_flagged_and_refused_as_web_fetchs_is(home: Path) -> None:
@@ -662,7 +676,6 @@ async def test_a_rule_added_to_dots_own_web_tools_binds_the_servers_tools_too(
             monkeypatch.setattr(module, "checked_address", an_address)
         own = await runtime.registry.tools["web_search"].prepare({"query": "sqlite fts5"}, context)
         assert own.action.flags == ("install",)
-        assert (await _prepare(runtime, "web_search", {"query": "sqlite fts5"})).action.flags == ("install",)
         url: str = "https://example.org/"
         for name in ("web_fetch", "web_crawl"):
             assert (await runtime.registry.tools[name].prepare({"url": url}, context)).action.flags == ("install",)
@@ -676,11 +689,6 @@ async def test_a_rule_added_to_dots_own_web_tools_binds_the_servers_tools_too(
 # What each string argument of the server's tools is, that Dot does not judge as words that leave the Mac or an address:
 # worked on in the server and never sent. Read in its code (web_scraper 1.3.0, ``web_tools/service.py``, ``search.py``).
 STAYS_IN_THE_SERVER: dict[str, str] = {
-    "web_search.date_from": "a date, which the server parses and sends as a date filter",
-    "web_search.date_to": "a date, which the server parses and sends as a date filter",
-    "web_search.language": "a language tag the server checks against a pattern of at most 12 characters",
-    "web_search.region": "a code of the form xx-xx, which the server checks against a pattern",
-    "web_search.provider": "names one of the server's search adapters; an unknown name is an error, nothing is asked",
     "web_scrape.content_id": "names a page the server read before and keeps, to read on from an offset (1.3.0)",
     "web_map.search": "filters the addresses the server already found",
     "web_map.include_patterns[]": "globs that filter the addresses the server already found",

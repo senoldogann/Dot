@@ -14,7 +14,7 @@ wrong answer is worse than a skipped rung (measured 2026-10-11: three of six que
 
 import json
 import time
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Literal
@@ -28,6 +28,15 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel
 from dotagent.web.client import ACCEPT_ENCODING, WebClient, read_capped
+from dotagent.web.keyed import (
+    SEARCH_KEYS,
+    WebResearchSearch,
+    search_brave_api,
+    search_exa,
+    search_serper,
+    search_tavily,
+    web_research_hits,
+)
 from dotagent.web.ladder import BENCH_S, EngineBench, SearchEngine, SearchOutcome, Skipped
 from dotagent.web.text import decode_body
 from dotagent.web.types import SearchHit
@@ -333,19 +342,36 @@ def search_ladder(
     anthropic: AnthropicRung | None,
     browser_present: bool,
     searxng_present: bool,
+    order: Sequence[SearchEngine] = (),
+    keyed: Collection[SearchEngine] = (),
+    web_research_present: bool = False,
 ) -> tuple[SearchEngine, ...]:
-    """The engines a search climbs, in order. ``auto`` is the whole ladder: the owner's SearXNG instance when its URL is
-    set, Ollama's hosted search when its key is present, the Anthropic rung where ``anthropic`` puts it (``None``: no
-    key), DuckDuckGo, Brave, and DuckDuckGo in Dot's own Chrome when the run's browser is Dot's own. A named engine is
-    that engine alone."""
+    """The engines a search climbs, in order. ``order``, the one Settings › Web search keeps (item 655), is that
+    order; the browser rung only when the run's browser is Dot's own, and the web-research rung only while its server
+    runs (an engine whose key is not set stays, and is passed over saying so). Without one, ``auto`` is the whole
+    ladder: the owner's SearXNG instance when its URL is set, Ollama's hosted search when its key is present, the
+    Anthropic rung where ``anthropic`` puts it (``None``: no key), the search APIs whose keys are set (``keyed``), the
+    web-research server's search while it runs, DuckDuckGo, Brave, and DuckDuckGo in Dot's own Chrome when the run's
+    browser is Dot's own. A named engine is that engine alone."""
+    ordered: tuple[SearchEngine, ...] = tuple(
+        engine
+        for engine in order
+        if (engine != "browser" or browser_present) and (engine != "web_research" or web_research_present)
+    )
+    # An order whose only rungs cannot be climbed here (the browser rung without Dot's own browser, the web-research
+    # one without its server) leaves the search to the ladder below rather than to no engine.
+    if ordered:
+        return ordered
     match choice:
         case "auto":
             searx: tuple[SearchEngine, ...] = ("searxng",) if searxng_present else ()
             ollama: tuple[SearchEngine, ...] = ("ollama",) if ollama_key_present else ()
             hosted: tuple[SearchEngine, ...] = () if anthropic is None or anthropic == "off" else ("anthropic",)
             head: tuple[SearchEngine, ...] = (*hosted, *ollama) if anthropic == "first" else (*ollama, *hosted)
+            paid: tuple[SearchEngine, ...] = tuple(engine for engine in SEARCH_KEYS if engine in keyed)
+            research: tuple[SearchEngine, ...] = ("web_research",) if web_research_present else ()
             last: tuple[SearchEngine, ...] = ("browser",) if browser_present else ()
-            return (*searx, *head, "duckduckgo", "brave", *last)
+            return (*searx, *head, *paid, *research, "duckduckgo", "brave", *last)
         case "searxng" | "duckduckgo" | "brave" | "ollama" | "anthropic":
             return (choice,)
 
@@ -440,9 +466,12 @@ def engine_attempts(
     anthropic: AnthropicSearch | None,
     read_page: ReadPage | None,
     searxng_url: str | None,
+    keys: Mapping[SearchEngine, str] | None = None,
+    web_research: WebResearchSearch | None = None,
 ) -> dict[SearchEngine, Attempt]:
     """The tries of the engines this run can ask: SearXNG's with the URL of the owner's instance, Ollama's with its
-    key, Anthropic's with its key and model, the browser's with a page reader."""
+    key, Anthropic's with its key and model, the browser's with a page reader; the search APIs with the keys of
+    ``keys`` (one without a key says so and is passed over, item 655) and the web-research server's search."""
 
     async def duckduckgo(query: str, max_results: int) -> tuple[SearchHit, ...]:
         return await search_duckduckgo(client, query, max_results)
@@ -474,6 +503,9 @@ def engine_attempts(
             return await search_ollama(client, key, query, max_results)
 
         attempts["ollama"] = ollama
+    else:
+        # An order may hold it with no key (item 655): it is passed over saying so, as a search API with none is.
+        attempts["ollama"] = _absent("no key: set the Ollama key in Settings › AI services")
     if anthropic is not None:
         relay: AnthropicSearch = anthropic
 
@@ -481,6 +513,10 @@ def engine_attempts(
             return await search_anthropic(client, relay, query, max_results)
 
         attempts["anthropic"] = hosted
+    else:
+        attempts["anthropic"] = _absent(
+            "not set up: it needs the Anthropic key in Settings › AI services and an Anthropic model as [models] search"
+        )
     if read_page is not None:
         reader: ReadPage = read_page
 
@@ -488,7 +524,47 @@ def engine_attempts(
             return await search_in_browser(reader, query, max_results)
 
         attempts["browser"] = browser
+    for engine, variable in SEARCH_KEYS.items():
+        attempts[engine] = _keyed_attempt(client, engine, variable, (keys or {}).get(engine))
+    if web_research is not None:
+        ask: WebResearchSearch = web_research
+
+        async def researched(query: str, max_results: int) -> tuple[SearchHit, ...]:
+            return web_research_hits(await ask(query, max_results), query, max_results)
+
+        attempts["web_research"] = researched
+    else:
+        # The server stopped between the ladder and the search: its rung is passed over, not the search ended.
+        attempts["web_research"] = _absent("the web-research server does not run now")
     return attempts
+
+
+_KEYED: Mapping[SearchEngine, Callable[[WebClient, str, str, int], Awaitable[tuple[SearchHit, ...]]]] = {
+    "brave_api": search_brave_api,
+    "tavily": search_tavily,
+    "exa": search_exa,
+    "serper": search_serper,
+}
+
+
+def _absent(reason: str) -> Attempt:
+    """The try of an engine that cannot be asked here, which says why: the ladder passes it over."""
+
+    async def absent(query: str, max_results: int) -> tuple[SearchHit, ...]:
+        raise WebError(reason, {"query": query})
+
+    return absent
+
+
+def _keyed_attempt(client: WebClient, engine: SearchEngine, variable: str, key: str | None) -> Attempt:
+    """The try of a search API with its key, or, with none, one that says which key to set."""
+
+    async def asked(query: str, max_results: int) -> tuple[SearchHit, ...]:
+        if key is None:
+            raise WebError(f"no key: set {variable} in Settings › Web search", {"query": query})
+        return await _KEYED[engine](client, key, query, max_results)
+
+    return asked
 
 
 def _results_or_error(page: ResultsPage, engine: str, query: str, size: int, max_results: int) -> tuple[SearchHit, ...]:
