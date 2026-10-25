@@ -11,8 +11,10 @@ code { font: 12px ui-monospace, "SF Mono", Menlo, monospace; }
 .muted { color: #696864; font-size: 13px; }
 .wordmark { display: block; overflow: visible; }
 .letter { fill: none; stroke: currentColor; stroke-width: 34; stroke-linecap: round; stroke-linejoin: round; }
-.disc { fill: #ffcd3c; }
-.eye { fill: #1c1b19; }
+.disc { fill: url(#mark-obsidian); }
+.eye { fill: url(#mark-gold); }
+.shine { fill: url(#mark-shine); }
+.rim { fill: none; stroke: #e6c26b; stroke-opacity: 0.55; stroke-width: 2; }
 @media (prefers-color-scheme: dark) {
   html, body { color: #ecebe6; background: #1b1a18; }
   pre { background: #2a2927; }

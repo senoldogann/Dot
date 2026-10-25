@@ -36,15 +36,25 @@ _MARKS: str = "icons/plugins"
 PROVIDER_MARKS: dict[ProviderId, str] = {"google": "google-icon.svg", "microsoft": "microsoft-icon.svg"}
 _STATUS_OK: int = 200
 _STATUS_REFUSED: int = 400
-# The wordmark of ``offline.html`` and ``index.html`` (tests/unit/test_callback_page.py keeps it the same).
+# The wordmark of ``offline.html`` and ``index.html`` (tests/unit/test_callback_page.py keeps it the same), with the
+# mark's gradients in it (item 642, tests/unit/test_mark.py keeps them those of every copy): the ball's obsidian, the
+# eyes' gold and the light on the ball, which app.css's .mark-disc, .mark-eye and .mark-shine take.
 WORDMARK: str = (
-    '<svg class="wordmark" viewBox="-104 -184 600 288" role="img" aria-label="Dot">'
+    '<svg class="wordmark" viewBox="-104 -184 600 288" role="img" aria-label="Dot"><defs>'
+    '<radialGradient id="mark-obsidian" cx="0.34" cy="0.28" r="0.8"><stop offset="0" stop-color="#5a5a5e"/>'
+    '<stop offset="0.32" stop-color="#1c1c1f"/><stop offset="1" stop-color="#000000"/></radialGradient>'
+    '<linearGradient id="mark-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1c1"/>'
+    '<stop offset="0.45" stop-color="#e6c26b"/><stop offset="1" stop-color="#a8782b"/></linearGradient>'
+    '<radialGradient id="mark-shine" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff" stop-opacity="0.75"/>'
+    '<stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>'
     '<path class="wordmark-letter wordmark-d" d="M83 -163V83M83 0A83 83 0 1 1 -83 0A83 83 0 1 1 83 0"/>'
     '<g transform="translate(244 0)"><g class="wordmark-dot"><circle class="mark-disc" r="100"/>'
     '<g class="mark-eye"><path d="M-10.5 -11.5a10.5 10.5 0 0 1 21 0v23a10.5 10.5 0 0 1 -21 0z" '
     'transform="matrix(1.098 -0.112 0.101 1.109 -17.3 -9.14)"/></g>'
     '<g class="mark-eye"><path d="M-10.5 -11.5a10.5 10.5 0 0 1 21 0v23a10.5 10.5 0 0 1 -21 0z" '
-    'transform="matrix(1.030 -0.045 0.101 1.109 37.32 -13.26)"/></g></g></g>'
+    'transform="matrix(1.030 -0.045 0.101 1.109 37.32 -13.26)"/></g>'
+    '<ellipse class="mark-shine" cx="-38" cy="-50" rx="34" ry="18" transform="rotate(-32 -38 -50)"/>'
+    '<circle class="mark-rim" r="99"/></g></g>'
     '<path class="wordmark-letter wordmark-t" d="M413 -133V36A47 47 0 0 0 460 83H476M383 -83H469"/></svg>'
 )
 _ICONS: dict[Tone, str] = {
