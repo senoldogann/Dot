@@ -1,10 +1,10 @@
 /**
  * The pages a run shows in the conversation (`show_page`, item 193). Each sits in a frame sandboxed to its scripts
- * alone, so its origin is opaque: it reads nothing of the UI's and reaches no API. The frame speaks three messages of
+ * alone, so its origin is opaque: it reads nothing of the UI's and reaches no API. The frame speaks four messages of
  * the MCP Apps protocol with the page's bootstrap (dotagent/server/routes_pages.py): it sends the conversation's theme
- * as CSS variables, at first and on every change; it takes the page's height, between MIN_HEIGHT and MAX_HEIGHT; and it
- * opens in the user's browser a link they clicked in the page. A page that loads another page in its frame is
- * closed, and can be shown again.
+ * as CSS variables, at first and on every change; it takes the page's height, between MIN_HEIGHT and MAX_HEIGHT; it
+ * opens in the user's browser a link they clicked in the page; and it writes into the message box the words of a
+ * choice they tapped in it (item 658). A page that loads another page in its frame is closed, and can be shown again.
  *
  * Since item 651 a page is part of the answer: no title over it and no box round it, on the
  * conversation's own ground, with Full screen (in a dialog of the UI) and Open in the browser over its corner. The
@@ -26,6 +26,12 @@ const KEPT_PAGES = 100;
 const CONTEXT_CHANGED = "ui/notifications/host-context-changed";
 const SIZE_CHANGED = "ui/notifications/size-changed";
 const OPEN_LINK = "ui/open-link";
+const MESSAGE = "ui/message";
+// The event that carries the words of a choice the user tapped in a page to the message box (item 658): its detail is
+// `{ text }`, which the page of the run puts in its box for the user to send, cancelling the event to say it did.
+export const PAGE_ANSWER_EVENT = "dot:page-answer";
+// The longest words a choice may give the box.
+const ANSWER_CHARS = 500;
 // The colours of a page (THEME_VARIABLES of dotagent/agent/pages.py), each with the token of the UI it is taken from.
 const COLOURS = [
   ["--background", "--bg"],
@@ -137,6 +143,34 @@ function openLink(frame, url) {
   return null;
 }
 
+/**
+ * The words of a choice the user tapped in the page of `frame` (item 658), written into the message box for them to
+ * send; what kept them out, or null. As for a link, only a click of the user's in the page counts, so a page's script
+ * cannot write into the box on its own, nor with a click made elsewhere; and the box is only filled, never sent.
+ */
+function writeChoice(frame, params) {
+  const parts = Array.isArray(params?.content) ? params.content : [];
+  const text = parts
+    .filter((part) => part?.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("\n")
+    .trim();
+  if (text === "") {
+    return "the choice has no words";
+  }
+  if (navigator.userActivation?.isActive !== true || document.activeElement !== frame) {
+    return "no click of the user in the page asked for it";
+  }
+  // The page of the run takes it (it cancels the event) when it has a box to write in.
+  const event = new CustomEvent(PAGE_ANSWER_EVENT, { cancelable: true, detail: { text: text.slice(0, ANSWER_CHARS) } });
+  if (window.dispatchEvent(event)) {
+    return "there is no message box here to write it in";
+  }
+  // A choice made full screen is made: the dialog closes on the box.
+  frame.closest("dialog")?.close();
+  return null;
+}
+
 function onMessage(event) {
   const frame = frames().find((candidate) => candidate.contentWindow === event.source);
   const message = event.data;
@@ -157,8 +191,8 @@ function onMessage(event) {
     }
     return;
   }
-  if (message.method === OPEN_LINK && (typeof message.id === "string" || typeof message.id === "number")) {
-    const refused = openLink(frame, message.params?.url);
+  if ((message.method === OPEN_LINK || message.method === MESSAGE) && (typeof message.id === "string" || typeof message.id === "number")) {
+    const refused = message.method === OPEN_LINK ? openLink(frame, message.params?.url) : writeChoice(frame, message.params);
     const answer = refused === null ? { result: {} } : { error: { code: -32000, message: refused } };
     event.source.postMessage({ jsonrpc: "2.0", id: message.id, ...answer }, "*");
   }

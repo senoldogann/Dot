@@ -453,6 +453,15 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       paintEmpty();
     },
     autosize: wired.autosize,
+    /** Write `text` into the box (a choice tapped in a page, item 658): in place of nothing, or on a line after what is
+     * there; the box keeps it as a draft, and has the focus, for the user to read and send. */
+    fill: (text) => {
+      textarea.value = textarea.value.trim() === "" ? text : `${textarea.value.replace(/\s+$/, "")}\n${text}`;
+      edited();
+      wired.autosize();
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    },
     watchText: (watcher) => {
       watchers.add(watcher);
       return () => watchers.delete(watcher);

@@ -47,6 +47,8 @@ _DESCRIPTION: str = (
     "Give charts and 3D views a height in pixels: a height in vh follows the frame, which grows with the page, so "
     "the page grows again (clamp one between pixels if you must). Take the look of the user's theme, light or dark, "
     f"from the CSS variables {', '.join(name for name, _ in THEME_VARIABLES)}. "
+    'To let the user choose, give each option an element with data-answer="Option B": a tap writes those words '
+    "into their message box, for them to send. "
     "Make it live: animate its entrance, show values on hover, let a table sort and a chart toggle its "
     "series, and keep still under prefers-reduced-motion. Libraries that fit, in a pinned version: Apache ECharts or "
     "Chart.js for charts, Mermaid for diagrams, D3 for a drawing of your own, three.js for 3D. A page you made in the "

@@ -28,6 +28,7 @@ import { recapSection } from "../recap.js";
 import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
+import { PAGE_ANSWER_EVENT } from "../pageframe.js";
 import { planBubble, planStep, planTargets } from "../planbubble.js";
 import { createReactions, REACTION_EVENTS } from "../reactions.js";
 import { heldChoice } from "../runmodes.js";
@@ -1631,6 +1632,16 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   paintQuestions(detail.questions);
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
+  // A choice tapped in a page of the conversation (item 658) is written into the box, for the user to send.
+  // A delegated run has no box (syncControls): the page is told so rather than filling one nobody sees.
+  const onPageAnswer = (/** @type {Event} */ event) => {
+    if (frame.element.hidden) {
+      return;
+    }
+    frame.fill(/** @type {CustomEvent} */ (event).detail.text);
+    event.preventDefault();
+  };
+  window.addEventListener(PAGE_ANSWER_EVENT, onPageAnswer);
   thread.addEventListener("scroll", onScroll, { passive: true });
   // On a phone the chat is one screen while the page is open (item 352, run.css); the frame stays while the chat goes on
   // at its next run, and goes with the page (main.js).
@@ -1751,6 +1762,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       sessionStorage.removeItem(shownKey);
     }
     window.removeEventListener("scroll", onScroll);
+    window.removeEventListener(PAGE_ANSWER_EVENT, onPageAnswer);
     thread.removeEventListener("scroll", onScroll);
     lessonCuts.disconnect();
     settling.disconnect();
