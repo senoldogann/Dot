@@ -10,7 +10,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from dotagent.config import SchedulerConfig, load_default_config
 from dotagent.core.errors import ConfigError, ToolInputError
+from dotagent.scheduler.plans import ScheduleRequest, _edited_timing
 from dotagent.scheduler.timing import (
     describe_timing,
     firings,
@@ -20,6 +22,7 @@ from dotagent.scheduler.timing import (
     plan_timing,
     resolve_zone,
 )
+from dotagent.store.models import ScheduleOptions, ScheduleRecord
 
 HELSINKI: ZoneInfo = ZoneInfo("Europe/Helsinki")
 MIN_INTERVAL_S: int = 300
@@ -113,6 +116,74 @@ def test_a_single_run_must_be_a_real_moment_in_the_future() -> None:
         plan_once("2027-03-28T03:30", HELSINKI, NOW)
     repeated = plan_once("2026-10-25T03:30", HELSINKI, NOW)
     assert repeated.first_run == datetime(2026, 10, 25, 0, 30, tzinfo=UTC).timestamp()
+
+
+def test_a_single_run_in_the_hour_that_repeats_is_the_one_still_to_come() -> None:
+    """Item 631: 03:00-03:59 happens twice on 2026-10-25. A time of that hour asked for after the change is the one to
+    come, not the one an hour ago that would be refused as past; asked for before the change, the first one comes."""
+    first: float = datetime(2026, 10, 25, 0, 38, 57, tzinfo=UTC).timestamp()  # 03:38:57 EEST
+    second: float = datetime(2026, 10, 25, 1, 38, 57, tzinfo=UTC).timestamp()  # 03:38:57 EET
+    after_the_change: float = datetime(2026, 10, 25, 1, 37, 55, tzinfo=UTC).timestamp()  # 03:37:55 EET
+    assert plan_once("2026-10-25T03:38:57", HELSINKI, after_the_change).run_at == second
+    before_the_change: float = datetime(2026, 10, 25, 0, 37, 55, tzinfo=UTC).timestamp()  # 03:37:55 EEST
+    assert plan_once("2026-10-25T03:38:57", HELSINKI, before_the_change).run_at == first
+    # Between the two: the first has passed, the second is still to come.
+    between: float = datetime(2026, 10, 25, 0, 50, tzinfo=UTC).timestamp()  # 03:50 EEST
+    assert plan_once("2026-10-25T03:38:57", HELSINKI, between).run_at == second
+    # Once both have passed, it is past; an offset names one moment whatever the night.
+    with pytest.raises(ToolInputError, match="not in the future"):
+        plan_once("2026-10-25T03:38:57", HELSINKI, second + 1)
+    assert plan_once("2026-10-25T03:38:57+03:00", HELSINKI, before_the_change).run_at == first
+
+
+def test_an_edited_schedule_whose_time_is_unchanged_keeps_the_moment_of_the_repeated_hour_it_had() -> None:
+    """Item 631, the review: a schedule set for the second 03:38:57, edited with the same time while the first one is
+    still to come, stays on the second; a new time of that hour is the one still to come, as for a new schedule."""
+    first: float = datetime(2026, 10, 25, 0, 38, 57, tzinfo=UTC).timestamp()
+    second: float = datetime(2026, 10, 25, 1, 38, 57, tzinfo=UTC).timestamp()
+    options: ScheduleOptions = ScheduleOptions(
+        model=None,
+        effort=None,
+        speed=None,
+        approvals=None,
+        goal_mode=None,
+        timezone=None,
+        history_runs=None,
+        same_chat=None,
+        stop_after_failures=None,
+        notify=None,
+        agent_id=None,
+    )
+    record: ScheduleRecord = ScheduleRecord(
+        id="sch_1",
+        name="Once",
+        cron=None,
+        run_at=second,
+        goal="Reply pong",
+        mode="task",
+        enabled=True,
+        created_at=0.0,
+        last_run_at=None,
+        next_run_at=second,
+        thread_id=None,
+        last_status="",
+        options=options,
+        runs_failed_in_row=0,
+    )
+    unchanged: ScheduleRequest = ScheduleRequest(
+        name="Once", goal="Reply pong", cron=None, at="2026-10-25T03:38:57", mode="task", options=options
+    )
+    config: SchedulerConfig = load_default_config().scheduler
+    before_the_first: float = first - 60
+    assert _edited_timing(record, unchanged, HELSINKI, config, before_the_first).run_at == second
+    # A record of the first moment, edited with the same time, keeps the first.
+    on_the_first: ScheduleRecord = record.model_copy(update={"run_at": first, "next_run_at": first})
+    assert _edited_timing(on_the_first, unchanged, HELSINKI, config, before_the_first).run_at == first
+    # A record of another time, edited to a time of that hour, gets the moment still to come: the first while it is,
+    # the second once the first has passed.
+    elsewhere: ScheduleRecord = record.model_copy(update={"run_at": second + 3600, "next_run_at": second + 3600})
+    assert _edited_timing(elsewhere, unchanged, HELSINKI, config, before_the_first).run_at == first
+    assert _edited_timing(elsewhere, unchanged, HELSINKI, config, first + 60).run_at == second
 
 
 def test_a_schedule_is_either_recurring_or_single() -> None:
