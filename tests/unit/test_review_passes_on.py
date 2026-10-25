@@ -10,7 +10,7 @@ import pytest
 
 from dotagent.agent.review import LESSONS_TOOL, LessonProposal, LessonRequest, LessonWriter, lesson_writer_for
 from dotagent.config import load_default_config
-from dotagent.core.errors import DotError, ProviderQuotaError, ProviderTransportError
+from dotagent.core.errors import ConfigError, DotError, ProviderQuotaError, ProviderTransportError
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.llm.calls import ModelCall
 from dotagent.llm.roles import ModelRoles
@@ -108,3 +108,14 @@ def test_after_the_review_model_come_the_runs_own_model_then_the_standby_models_
     roles: ModelRoles = ModelRoles(models)
     assert roles.after_review(("ollama:writer",)) == ("ollama:writer", "anthropic:claude-sonnet-5-5")
     assert roles.after_review() == ("anthropic:claude-sonnet-5-5", "ollama:writer")
+
+
+async def test_a_model_of_no_known_provider_among_the_others_does_not_stop_the_question_before_it_is_asked() -> None:
+    # An old run's model of a provider Dot no longer knows: the review model is asked first, as before item 649, and
+    # the unreadable model's own error comes only when the question reaches it.
+    calls: list[ModelCall] = []
+    router: ModelRouter = await _router(_spent(), (), calls)
+    writer: LessonWriter = lesson_writer_for(router, "ollama:spent", ("nocolon",), 30.0, "lessons:test", None)
+    with pytest.raises(ConfigError):
+        await writer(REQUEST)
+    assert [call.model for call in calls] == ["ollama:spent"]
