@@ -151,6 +151,29 @@ test("an engine that ends before it began says nothing of a silence, and a refus
   assert.match(seen.problems[0], /^The browser has not allowed the microphone/);
 });
 
+test("in Dot.app a refusal by macOS comes with the pane to show in System Settings, and anywhere else with no offer", () => {
+  // Item 636: the page asks the Mac to show System Settings where Dot is allowed; the words stand if the Mac cannot.
+  const refused = (event, shell) => {
+    const made = dictationOf();
+    globalThis.document.documentElement.dataset.shell = shell;
+    made.dictation.start();
+    made.engine().say("error", event);
+    made.engine().say("end");
+    return made.seen;
+  };
+  const microphone = refused({ error: "not-allowed", message: "Microphone permission check has failed" }, "desktop");
+  assert.deepEqual(microphone.offers, [{ allow: "microphone" }]);
+  assert.equal(microphone.problems.length, 1);
+  assert.match(microphone.problems[0], /^macOS has not given Dot the microphone or its speech recognition/);
+  const speech = refused({ error: "service-not-allowed", message: "Speech recognition service permission check has failed" }, "desktop");
+  assert.deepEqual(speech.offers, [{ allow: "speech" }]);
+  assert.equal(speech.problems.length, 1);
+  // The same refusal in a browser (a phone's here) has the words alone, and so does every other error in Dot.app.
+  assert.deepEqual(refused({ error: "not-allowed", message: "x" }, undefined).offers, [null]);
+  assert.deepEqual(refused({ error: "network", message: "x" }, "desktop").offers, [null]);
+  assert.deepEqual(refused({ error: "audio-capture", message: "x" }, "desktop").offers, [null]);
+});
+
 test("the microphone opening, or a word heard, says the engine began: a second press then settles what it heard", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const { dictation, seen, engine } = dictationOf();

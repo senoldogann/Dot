@@ -18,7 +18,7 @@ from typing import Any, Literal
 import pytest
 import pytest_asyncio
 from channel_stand_ins import PROVIDER, Replies, finish
-from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -83,9 +83,12 @@ _STAND_INS: str = """
     event.results = results;
     state.recognitions.at(-1).dispatchEvent(event);
   };
-  state.fail = (code) => {
+  state.fail = (code, message) => {
     const event = new Event("error");
     event.error = code;
+    if (message !== undefined) {
+      event.message = message;
+    }
     state.recognitions.at(-1).dispatchEvent(event);
   };
   state.interimWords = () => [...(CSS.highlights.get("md-interim") ?? [])].map((range) => range.toString());
@@ -231,6 +234,53 @@ async def _open(
         # From here the page's time moves only as the test moves it.
         await page.clock.pause_at(await page.evaluate("() => Date.now() + 500"))
     return page
+
+
+async def _open_app(
+    browser: Browser, address: str, allow: dict[str, object] | int | None, width: int = 1280
+) -> tuple[Page, list[object]]:
+    """A page in Dot.app's shell (the `__TAURI__` global the desktop app gives it), `width` wide, whose ask that the Mac
+    show System Settings (`POST /api/voice/allow`, item 636) the test answers and the daemon never sees: with `allow` as
+    the body of a 200, with a status for a failure, or with a connection that breaks for None. Also what the page asked,
+    in order, as the bodies of its requests."""
+    asked: list[object] = []
+
+    async def answer(route: Route) -> None:
+        asked.append(route.request.post_data_json)
+        if allow is None:
+            await route.abort()
+        elif isinstance(allow, int):
+            await route.fulfill(
+                status=allow, json={"message": "Dot failed on an error it did not expect", "context": {}}
+            )
+        else:
+            await route.fulfill(json=allow)
+
+    page: Page = await _open(browser, address, width, f"window.__TAURI__ = {{}};\n{_STAND_INS}")
+    await expect(page.locator("html")).to_have_attribute("data-shell", "desktop")
+    await page.route("**/api/voice/allow", answer)
+    return page, asked
+
+
+async def _toast_fits(page: Page, width: int, label: str) -> None:
+    """The toast stands inside the window, and the page does not reach past its edge for it."""
+    box = await page.locator(".toast").first.bounding_box()
+    assert box is not None, f"{label}: no toast"
+    assert box["x"] >= 0 and box["x"] + box["width"] <= width, f"{label}: the toast reaches outside the window: {box}"
+    await _fits(page, label)
+
+
+async def _watch_allow(page: Page) -> list[object]:
+    """What a page that is not Dot.app asks of `POST /api/voice/allow`, which it must not: every request is written down
+    and fails."""
+    asked: list[object] = []
+
+    async def answer(route: Route) -> None:
+        asked.append(route.request.post_data_json)
+        await route.fulfill(status=500, json={"message": "this page must not ask", "context": {}})
+
+    await page.route("**/api/voice/allow", answer)
+    return asked
 
 
 async def _voice(page: Page, expression: str) -> Any:
@@ -560,18 +610,130 @@ async def test_in_dot_app_a_refused_microphone_names_macos_and_dot_not_a_browser
     browser: Browser, address: str
 ) -> None:
     """Item 593, from the owner's screenshot of Dot.app: its toast said "the browser" there. In the desktop shell it
-    says that macOS has not given Dot the microphone, where to allow it, and that macOS Dictation types meanwhile."""
-    page: Page = await _open(browser, address, 1280, f"window.__TAURI__ = {{}};\n{_STAND_INS}")
-    await expect(page.locator("html")).to_have_attribute("data-shell", "desktop")
-    mic: Locator = _microphone(page)
-    await mic.click()
-    await page.evaluate("() => window.__voice.fail('not-allowed')")
-    toast: Locator = page.locator(".toast.error")
-    await expect(toast).to_contain_text("macOS has not given Dot the microphone or its speech recognition")
-    await expect(toast).to_contain_text("Privacy & Security › Microphone and Speech Recognition")
-    await expect(toast).to_contain_text("macOS Dictation types into the box")
-    await expect(toast).not_to_contain_text("browser")
-    await page.context.close()
+    says that macOS has not given Dot the microphone, where to allow it, and that macOS Dictation types meanwhile. Since
+    item 636 these are the words that stand when the Mac cannot be asked to show System Settings (a 500, and a daemon
+    that is not there): one toast for a press, and the page asked for the microphone's pane."""
+    for allow in (500, None):
+        page, asked = await _open_app(browser, address, allow)
+        mic: Locator = _microphone(page)
+        await mic.click()
+        await page.evaluate("() => window.__voice.fail('not-allowed')")
+        toast: Locator = page.locator(".toast.error")
+        await expect(toast).to_contain_text("macOS has not given Dot the microphone or its speech recognition")
+        await expect(toast).to_contain_text("Privacy & Security › Microphone and Speech Recognition")
+        await expect(toast).to_contain_text("macOS Dictation types into the box")
+        await expect(toast).not_to_contain_text("browser")
+        await expect(page.locator(".toast")).to_have_count(1)
+        assert asked == [{"pane": "microphone"}]
+        await page.context.close()
+
+
+async def test_in_dot_app_a_refused_microphone_has_system_settings_shown_and_says_so_in_one_calm_toast(
+    browser: Browser, address: str
+) -> None:
+    """Item 636, from the owner's Dot.app, where the toast of item 593 came twice for two presses and the permission
+    looked given: the page asks the Mac to show System Settings at the pane, and tells what it did in one toast for a
+    press, calm because it is help, not an error."""
+    ready: dict[str, object] = {"opened": True, "app": "ready"}
+    unknown: dict[str, object] = {"opened": True, "app": "unknown"}
+    for width, answer in ((1280, ready), (390, ready), (1280, unknown)):
+        page, asked = await _open_app(browser, address, answer, width)
+        await _microphone(page).click()
+        await page.evaluate("() => window.__voice.fail('not-allowed', 'Microphone permission check has failed')")
+        calm: Locator = page.locator(".toast.ok")
+        await expect(calm).to_contain_text(
+            "System Settings is open at Microphone: switch Dot on there, and under Speech Recognition too."
+        )
+        await expect(calm).to_contain_text(
+            "macOS Dictation types into the box meanwhile: the Dictation key, or Fn twice."
+        )
+        # Not the words of the refusal as well, and not twice.
+        await expect(page.locator(".toast.error")).to_have_count(0)
+        await expect(page.locator(".toast")).to_have_count(1)
+        assert asked == [{"pane": "microphone"}]
+        await _toast_fits(page, width, f"{width} wide, opened")
+        # Another press, another refusal: one more ask and one more toast, whose words are the same.
+        await calm.click()
+        await expect(page.locator(".toast")).to_have_count(0)
+        await _microphone(page).click()
+        await page.evaluate("() => window.__voice.fail('not-allowed')")
+        await expect(page.locator(".toast.ok")).to_contain_text("System Settings is open at Microphone")
+        await expect(page.locator(".toast")).to_have_count(1)
+        assert asked == [{"pane": "microphone"}, {"pane": "microphone"}]
+        await page.context.close()
+
+
+async def test_in_dot_app_a_refusal_of_speech_recognition_has_its_pane_shown(browser: Browser, address: str) -> None:
+    """Item 636: the pane is Speech Recognition when the engine's message names it, and the words name Microphone as the
+    other place to switch Dot on."""
+    for code in ("service-not-allowed", "not-allowed"):
+        page, asked = await _open_app(browser, address, {"opened": True, "app": "ready"})
+        await _microphone(page).click()
+        await page.evaluate(
+            "(code) => window.__voice.fail(code, 'Speech recognition service permission check has failed')", code
+        )
+        await expect(page.locator(".toast.ok")).to_contain_text(
+            "System Settings is open at Speech Recognition: switch Dot on there, and under Microphone too."
+        )
+        await expect(page.locator(".toast")).to_have_count(1)
+        assert asked == [{"pane": "speech"}]
+        await page.context.close()
+
+
+async def test_in_dot_app_built_before_it_asked_macos_the_toast_says_so_and_nothing_is_to_be_switched_on(
+    browser: Browser, address: str
+) -> None:
+    """Item 636: that Dot.app is given no microphone whatever System Settings shows, so the Mac shows nothing, and the
+    toast says it is an older Dot.app and that a newer one asks. It is an error, since nothing here helps."""
+    for width in (1280, 390):
+        page, asked = await _open_app(browser, address, {"opened": False, "app": "old"}, width)
+        await _microphone(page).click()
+        await page.evaluate("() => window.__voice.fail('not-allowed')")
+        toast: Locator = page.locator(".toast.error")
+        await expect(toast).to_contain_text("This Dot.app was built before Dot asked macOS for the microphone")
+        await expect(toast).to_contain_text("so macOS gives it none, whatever System Settings shows.")
+        await expect(toast).to_contain_text("The next Dot.app asks for it, and Dot offers it as soon as it is out.")
+        await expect(toast).to_contain_text(
+            "macOS Dictation types into the box meanwhile: the Dictation key, or Fn twice."
+        )
+        await expect(toast).not_to_contain_text("switch Dot on")
+        await expect(page.locator(".toast")).to_have_count(1)
+        await expect(page.locator(".toast.ok")).to_have_count(0)
+        assert asked == [{"pane": "microphone"}]
+        await _toast_fits(page, width, f"{width} wide, old")
+        await page.context.close()
+
+
+async def test_a_browser_that_is_not_dot_app_keeps_its_words_and_never_asks_for_system_settings(
+    browser: Browser, address: str
+) -> None:
+    """Item 636: only Dot.app has a System Settings the daemon opens for it. A browser on the Mac names the browser and
+    System Settings, a phone its own settings; neither asks the daemon to show anything."""
+    mac: Page = await _open(browser, address, 1280)
+    mac_asked: list[object] = await _watch_allow(mac)
+    await _microphone(mac).click()
+    await mac.evaluate("() => window.__voice.fail('not-allowed', 'Microphone permission check has failed')")
+    await expect(mac.locator(".toast.error")).to_contain_text("The browser has not allowed the microphone")
+    await expect(mac.locator(".toast")).to_have_count(1)
+    await mac.context.close()
+    phone_context: BrowserContext = await browser.new_context(
+        viewport={"width": 390, "height": 844},
+        has_touch=True,
+        is_mobile=True,
+        user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1",
+    )
+    await phone_context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    await phone_context.add_init_script(_STAND_INS)
+    phone: Page = await phone_context.new_page()
+    phone_asked: list[object] = await _watch_allow(phone)
+    await phone.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+    await _microphone(phone).click()
+    await phone.evaluate("() => window.__voice.fail('not-allowed', 'Microphone permission check has failed')")
+    await expect(phone.locator(".toast.error")).to_contain_text("in the device's settings")
+    await expect(phone.locator(".toast")).to_have_count(1)
+    # Neither asked, though each was refused the microphone and the daemon had a route for it.
+    assert mac_asked == [] and phone_asked == []
+    await phone_context.close()
 
 
 async def test_the_language_is_the_pages_or_the_one_chosen_in_settings(browser: Browser, address: str) -> None:

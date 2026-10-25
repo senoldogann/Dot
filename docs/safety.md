@@ -72,14 +72,17 @@ run needs, sent where the configuration points:
   recognition, the microphone records instead and your voice does not go to the browser's makers (item 626, the next
   entry). In the desktop
   app the recognition is WebKit's, macOS's own, which may send what you say to Apple as Safari's does, once macOS lets
-  the app hear (item 594: the app asks macOS for the microphone and speech recognition). An answer is read aloud with a
-  voice the browser keeps on this Mac when it has one for the language (`localService`: Dot picks it, and macOS's own
-  voices send nothing). A network voice, such as Chrome's "Google …" voices, sends the text it reads to its servers; the
-  browser speaks with one only when the Mac has no voice of that language, and Settings › General › Voice says so. Dot
-  sends nothing itself: it only gets the words the browser hands back, into the box, and sends nothing until you press
-  send. In the desktop app Dot's page takes only the words (item 594): it could record sound with the microphone it is
-  given (`getUserMedia`), as a site given a browser's microphone can, and does so only for the recording of the next
-  entry, which is for a phone's browser and one with no speech recognition.
+  the app hear (item 594: the app asks macOS for the microphone and speech recognition; a Dot.app built before it is
+  given neither, whatever System Settings shows). When macOS refuses it, Dot shows System Settings at the pane where you
+  switch Dot on (item 636): the daemon reads the desktop app's own `Info.plist` and signature on this Mac to tell, sends
+  nothing anywhere and changes no setting. An answer is read aloud with a voice the browser keeps on this Mac when it
+  has one for the language (`localService`: Dot picks it, and macOS's own voices send nothing). A network voice, such as
+  Chrome's "Google …" voices, sends the text it reads to its servers; the browser speaks with one only when the Mac has
+  no voice of that language, and Settings › General › Voice says so. Dot sends nothing itself: it only gets the words
+  the browser hands back, into the box, and sends nothing until you press send. In the desktop app Dot's page takes only
+  the words (item 594): it could record sound with the microphone it is given (`getUserMedia`), as a site given a
+  browser's microphone can, and does so only for the recording of the next entry, which is for a phone's browser and one
+  with no speech recognition.
 - **To your own Mac, from your phone's browser, if you use the microphone there: a recording of your voice, which stays
   on your devices.** On an iPhone or an iPad, where Safari's own speech recognition goes deaf after the first dictation
   of a page, and in a browser with no speech recognition (item 626), the page records the microphone itself and sends

@@ -57,6 +57,13 @@ Chrome and in WebKit, Safari's engine. The program that writes a recording down 
 test that builds the real program, `tests/smoke/test_voice_live.py` (`-m live`, which may download a language's model
 from Apple the first time), records with `say`.
 
+No test shows System Settings (item 636), nor reads the Dot.app on the owner's Mac. The route that shows it is given an
+opener of the test's own (`tests/unit/test_voice_desktop_app.py`), the program `DOT_OPEN` names is one that does not
+exist for every test, and the browser tests answer the page's ask that the Mac show it themselves (`page.route`), so
+that the daemon never sees it. The apps the reader looks at are bundles written in the test's folder, and the `codesign`
+of the unit tests is a stand-in that says what the real one says; the one test that runs the real `codesign`
+(`tests/smoke/test_desktop_app_signature.py`) signs throwaway bundles ad hoc, with no identity and no keychain.
+
 A test never finds your keys unless it is marked `hosted`, `internet` or `live` (item 558, `tests/conftest.py`): in a
 run where none of those is selected the variables of the providers' keys are out of the environment and the login
 Keychain is never asked, from the first fixture on; in a run that holds some, each of the others goes without them

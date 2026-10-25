@@ -11,6 +11,7 @@
 import {
   PAUSE_MS,
   SILENCE_MS,
+  captureOffer,
   captureProblem,
   dictated,
   problemWords,
@@ -46,10 +47,11 @@ export function macLanguage(tag) {
  * The recording of one box. `language()` gives the tag to write down in and `text()` the words the box holds; `show(value,
  * interimFrom)` puts the words written down on top of them (`interimFrom` is always null: nothing is written down while
  * the owner speaks) and `settled()` says that no word is still the engine's to change; `state(listening)` says whether the
- * microphone is on, and `problem(words)` why it could not be. `began()` says the microphone is open, for the recorder's
- * clock, `sound(loud)` whether it hears a sound now, for its wave, and `writing(on)` that the recording is with the Mac,
- * which writes it down. `capture(onBlock, onEnded)` opens the microphone (capture.js `openCapture`) and `send(language,
- * wav)` sends a recording and gives the words (a promise); both are given.
+ * microphone is on, and `problem(words, offer)` why it could not be, with, in Dot.app, the `{ allow: pane }` of a refused
+ * microphone (item 636, voice.js `captureOffer`). `began()` says the microphone is open, for the recorder's clock,
+ * `sound(loud)` whether it hears a sound now, for its wave, and `writing(on)` that the recording is with the Mac, which
+ * writes it down. `capture(onBlock, onEnded)` opens the microphone (capture.js `openCapture`) and `send(language, wav)`
+ * sends a recording and gives the words (a promise); both are given.
  *
  * `start()` opens the microphone. `stop()` is the owner's tick (the same when a pause ends it): it lets the microphone go
  * and sends what was recorded, a voice too quiet to count as a sound included (the Mac says when it heard nothing), and
@@ -126,8 +128,9 @@ export function createRecording({
     }
   }
 
-  /** The recording is over; `words` say why to the owner, or null, and nothing of it is kept. */
-  function finish(words) {
+  /** The recording is over; `words` say why to the owner, or null, with the `offer` that goes with them (voice.js
+   * `captureOffer`), and nothing of it is kept. */
+  function finish(words, offer = undefined) {
     if (phase === "idle") {
       return;
     }
@@ -145,7 +148,7 @@ export function createRecording({
     state(false);
     settled();
     if (words !== null) {
-      problem(words);
+      problem(words, offer);
     }
   }
 
@@ -210,7 +213,7 @@ export function createRecording({
         () => taken(mine),
       );
     } catch (error) {
-      finish(captureProblem(error, place()));
+      finish(captureProblem(error, place()), captureOffer(error, place()));
       return;
     }
     opening.then(
@@ -229,7 +232,7 @@ export function createRecording({
       },
       (error) => {
         if (mine === generation) {
-          finish(captureProblem(error, place()));
+          finish(captureProblem(error, place()), captureOffer(error, place()));
         }
       },
     );

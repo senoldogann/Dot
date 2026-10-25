@@ -15,11 +15,20 @@
 import { canRecord, openCapture } from "./capture.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
-import { macVoice, writeDown } from "./macvoice.js";
+import { allowAtSettings, macVoice, writeDown } from "./macvoice.js";
 import { voiceLanguage } from "./readaloud.js";
 import { createRecording } from "./recording.js";
 import { toast } from "./ui.js";
-import { QUIET_BAR, canListen, clockText, createDictation, deafWords, listeningWay, nextWave } from "./voice.js";
+import {
+  QUIET_BAR,
+  allowToast,
+  canListen,
+  clockText,
+  createDictation,
+  deafWords,
+  listeningWay,
+  nextWave,
+} from "./voice.js";
 
 const START = "Dictate your message";
 const STOP = "Stop dictating";
@@ -31,6 +40,24 @@ const WAVE_MS = 90;
 // How long the tick waits for the engine to settle what it heard before the words it has go into the box all the same
 // (an iPhone's later dictation that heard none then says it is Safari's: item 616).
 const SETTLE_MS = 3000;
+
+/**
+ * macOS refused the microphone in Dot.app (item 636): the Mac shows System Settings at `pane`, where the owner allows Dot,
+ * and one toast says what it did. A Dot.app built before it asked macOS for the microphone is told so instead, since no
+ * switch of System Settings gives it one. `today` are the words of the refusal, which stand when the Mac could not be asked
+ * or answered something else.
+ * @param {"microphone" | "speech"} pane
+ * @param {string} today
+ */
+async function showSettings(pane, today) {
+  let said = null;
+  try {
+    said = allowToast(await allowAtSettings(pane), pane);
+  } catch (error) {
+    console.warn("System Settings could not be shown for the microphone", error);
+  }
+  toast(said?.kind ?? "error", said?.words ?? today);
+}
 
 /**
  * The microphone of the box `textarea`, or null where the page cannot listen (the browser has no speech recognition and
@@ -206,13 +233,19 @@ export function createMicrophone({ textarea, setInterim }) {
     state,
     // Safari's deafness on an iPhone (item 616) is undone by a new page: the toast offers to reload it, and says that the
     // Mac could write down what is said instead, when it could with something it lacks (item 626). The box's words are its
-    // draft, which the reload keeps.
-    problem: (words, offer) =>
+    // draft, which the reload keeps. A refusal of macOS in Dot.app has the Mac show System Settings where Dot is allowed,
+    // and one toast says what came of it (item 636), the words of the refusal only when the Mac could not.
+    problem: (words, offer) => {
+      if (offer?.allow) {
+        showSettings(offer.allow, words);
+        return;
+      }
       toast(
         "error",
         offer?.reload ? deafWords(words, macVoice()) : words,
         offer?.reload ? { label: "Reload", run: () => window.location.reload() } : null,
-      ),
+      );
+    },
     began() {
       beganAt = performance.now();
     },
