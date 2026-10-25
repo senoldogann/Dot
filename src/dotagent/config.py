@@ -731,7 +731,10 @@ class McpServerConfig(FrozenModel):
     Values of ``env`` and ``headers`` may refer to secrets as ``${NAME}``; they are looked up like API keys
     (environment, ``.env``, Keychain). ``allow`` lists the server's tools to offer to the model (empty: all of them, up
     to a limit). ``oauth`` says that a server at a URL is signed in to as MCP's authorization asks, on Customize ›
-    Plugins (item 279): Dot then sends the access token it keeps for the server and renews it.
+    Plugins (item 279): Dot then sends the access token it keeps for the server and renews it. ``cwd`` is the folder a
+    server Dot starts (a ``command``) starts in, a whole path; the workspace when it names none (item 637). The
+    web-research server that comes with Dot starts in its own data folder, where a run cannot write, so that no file
+    a run leaves in the workspace runs in it or in a program it starts.
     """
 
     name: str = Field(pattern=MCP_NAME_PATTERN)
@@ -746,6 +749,7 @@ class McpServerConfig(FrozenModel):
     enabled: bool = True
     startup_timeout_s: float = Field(default=60.0, gt=0)
     call_timeout_s: float = Field(default=120.0, gt=0)
+    cwd: str | None = Field(default=None, min_length=1)
 
     def transport_kind(self) -> McpTransport:
         """The transport in use: the one written down, else stdio for a command and streamable HTTP for a URL."""
@@ -768,6 +772,10 @@ class McpServerConfig(FrozenModel):
             raise ValueError("headers belong to a url; a command takes args and env")
         if self.url is None and self.oauth:
             raise ValueError("oauth belongs to a url; a command signs in by its own environment")
+        if self.cwd is not None and self.command is None:
+            raise ValueError("cwd belongs to a command; a server at a url has no folder of Dot's")
+        if self.cwd is not None and not Path(self.cwd).is_absolute():
+            raise ValueError("cwd is a whole path, from / on")
         return self
 
 

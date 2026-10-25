@@ -33,7 +33,7 @@ from dotagent.mcp.builtin import (
     search_arguments,
     switch_of,
 )
-from dotagent.mcp.hub import ServerReport
+from dotagent.mcp.hub import ServerReport, server_folder
 from dotagent.mcp.naming import exposed_name
 from dotagent.mcp.types import McpTool, ToolHints
 from dotagent.runtime import _dot_paths
@@ -561,3 +561,39 @@ def test_the_installed_server_reads_the_switches_dot_sets(
     assert settings.search_resolve_dates == "off" and settings.scrape_recover == "off"
     assert settings.soft_404_check is False
     assert settings.browser_stealth_fetch is False
+
+
+def test_the_server_starts_in_its_own_folder_and_a_file_a_run_leaves_in_the_workspace_is_not_on_its_path(
+    web_research_comes: None, home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 637, the security review: Camoufox's fetch is ``python -m camoufox fetch`` with no ``-P``, so it found its
+    module in the folder it started in, which was the run's workspace: a ``camoufox.py`` a run wrote there ran as the
+    fetch, outside the sandbox. The server starts in its data folder now, one of Dot's own, which a run cannot write,
+    and which Dot makes when it is not there yet."""
+    workspace: Path = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("DOT_WORKSPACE", str(workspace))
+    server: McpServerConfig = builtin_servers(load_default_config())[0]
+    assert server.cwd == str(web_research_dir())
+    assert not web_research_dir().exists()
+    folder: Path = server_folder(server)
+    assert folder == web_research_dir() and folder.is_dir() and folder.is_relative_to(home)
+    assert not folder.is_relative_to(workspace)
+    # The module a run plants there is found from the workspace and not from the server's folder.
+    (workspace / "camoufox.py").write_text("raise SystemExit('planted')\n", encoding="utf-8")
+    found = os.popen(
+        f"cd {folder} && {sys.executable} -c 'import importlib.util as u; print(u.find_spec(\"camoufox\").origin)'"
+    ).read()
+    assert str(workspace) not in found
+
+
+def test_a_server_names_a_whole_folder_of_its_own_and_only_a_command_has_one(home: Path, tmp_path: Path) -> None:
+    """Item 637: ``cwd`` is a whole path, for a server Dot starts; a folder outside Dot's home is not made by Dot."""
+    elsewhere: Path = tmp_path / "not-there"
+    server: McpServerConfig = McpServerConfig(name="mine", command="mine-server", cwd=str(elsewhere))
+    assert server_folder(server) == elsewhere and not elsewhere.exists()
+    assert server_folder(McpServerConfig(name="mine", command="mine-server")).name != "not-there"
+    with pytest.raises(ValidationError, match="whole path"):
+        McpServerConfig(name="mine", command="mine-server", cwd="relative/folder")
+    with pytest.raises(ValidationError, match="cwd belongs to a command"):
+        McpServerConfig(name="mine", url="https://mcp.example/sse", cwd="/tmp")

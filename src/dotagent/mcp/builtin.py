@@ -65,7 +65,10 @@ def _web_research(enabled: bool, bound: bool) -> McpServerConfig:
     host of its own accord: no dates from the heads of a search's results, no other copy of a walled page, since 1.4.0
     no address of a page's host that cannot exist, which tells a missing page from a real one (item 630), and since
     1.4.5 no download of Camoufox's browser from GitHub and Mozilla (item 637): a page walled to Chrome is then read in
-    Camoufox only if its browser is on the Mac already."""
+    Camoufox only if its browser and its fingerprint model are on the Mac already. It starts in its own data folder,
+    not the workspace (item 637, the security review): a program it starts with ``-m`` and no ``-P`` (Camoufox's
+    fetch) would otherwise run a file of that name a run left in the workspace, outside the sandbox; the data folder is
+    one of Dot's own, which a run cannot write."""
     env: dict[str, str] = {"WEB_TOOLS_DATA_DIR": str(web_research_dir()), "PYTHON_DOTENV_DISABLED": "1"}
     if bound:
         env |= {
@@ -80,6 +83,7 @@ def _web_research(enabled: bool, bound: bool) -> McpServerConfig:
         args=["-P", "-m", _WEB_RESEARCH_MODULE],
         env=env,
         enabled=enabled,
+        cwd=str(web_research_dir()),
     )
 
 

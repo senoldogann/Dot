@@ -197,9 +197,11 @@ async def test_a_file_of_the_workspace_named_like_a_module_the_server_imports_is
 
 async def test_the_data_folder_of_the_server_is_in_dots_home(home: Path) -> None:
     """``WEB_TOOLS_DATA_DIR`` reaches the server: its first look at a crawl job makes the store there. The job asked
-    for does not exist, so no site is reached."""
+    for does not exist, so no site is reached. The folder itself is there from the start: the server starts in it
+    (item 637), and Dot makes it."""
     async with _runtime(home) as runtime:
-        assert not await asyncio.to_thread(_exists, home / "web-research")
+        assert await asyncio.to_thread(_exists, home / "web-research")
+        assert not await asyncio.to_thread(_exists, home / "web-research" / "crawl-jobs.sqlite3")
         answer = await runtime.mcp.call(_tool(runtime, "web_crawl_status"), {"job_id": "no-such-job"})
         assert answer.is_error is True
         assert await asyncio.to_thread(_exists, home / "web-research" / "crawl-jobs.sqlite3")

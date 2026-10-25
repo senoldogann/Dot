@@ -327,6 +327,7 @@ allow = ["search", "read_note"]             # offer only these tools; empty = al
 enabled = true
 startup_timeout_s = 60.0
 call_timeout_s = 120.0
+# cwd = "/Users/me/notes"                   # the folder it starts in, a whole path; the workspace when left out
 
 [[mcp]]
 name = "docs"
