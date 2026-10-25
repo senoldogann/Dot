@@ -1353,7 +1353,7 @@ class Store:
         # The connection is closed whatever happens to that (cancelled at shutdown, or a store closed twice): its
         # worker thread is not a daemon, and left running it keeps the process alive (item 556).
         try:
-            # A store closed already has no connection to make them on: its second close does nothing, as before.
+            # A store closed already (``_closed``) returns: its second close does nothing, as before.
             if self._closed:
                 return
             self._closed = True

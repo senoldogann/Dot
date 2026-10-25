@@ -4297,6 +4297,7 @@
 .websearch-key .input {
   flex: 1;
   min-width: 0;
+}
 
 /* ---------- Settings › Vault (item 621): the logins, cards and contacts Dot may type for the owner. The tabs and the search
    are the Memory page's (`note-tools`); each item is a row of a card; the forms are dialogs (item 615). ---------- */
@@ -4506,8 +4507,16 @@
     padding: var(--space-3) var(--space-4);
   }
 
-  /* The four tabs with their counts fit a phone's width. */
+  /* The four tabs with their counts fit a phone's width; on the narrowest (320 px) the strip scrolls inside itself
+     rather than the page sideways. */
+  .note-tools .segmented.vault-tabs {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
   .note-tools .segmented.vault-tabs button {
+    flex: none;
     padding-inline: var(--space-2);
   }
 }
