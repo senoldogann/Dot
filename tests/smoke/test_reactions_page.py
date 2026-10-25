@@ -596,6 +596,13 @@ async def test_settings_change_what_each_reaction_does_after_a_run_and_whether_i
     page: Page = await _open(browsers, served, look, "/settings/general")
     card: Locator = _settings_card(page)
     await expect(card).to_be_visible()
+    # The card folds, shut until it is opened, its head saying what a reaction on a task that ended does.
+    fold: Locator = card.get_by_role("button", name=re.compile(r"^Reactions"))
+    await expect(fold).to_have_attribute("aria-expanded", "false")
+    await expect(fold).to_contain_text("Follow-up tasks on")
+    await expect(card.get_by_role("switch", name="Start a task for a reaction")).to_be_hidden()
+    await fold.click()
+    await expect(fold).to_have_attribute("aria-expanded", "true")
     switch: Locator = card.get_by_role("switch", name="Start a task for a reaction")
     await expect(switch).to_have_attribute("aria-checked", "true")
     names: object = await card.get_by_role("combobox").evaluate_all(
@@ -612,13 +619,15 @@ async def test_settings_change_what_each_reaction_does_after_a_run_and_whether_i
     await until(lambda: _saved(served).get("wrong") == "feedback")
     assert served.reactions.config.wrong == "feedback"
     await _fits(page, f"{look} settings")
-    # The page asks the daemon again when it is opened: what was chosen is what it shows.
+    # The page asks the daemon again when it is opened: what was chosen is what it shows, in the card as it was left.
     await page.reload()
+    await expect(fold).to_have_attribute("aria-expanded", "true")
     await expect(wrong).to_have_value("feedback")
     # The switch turns every follow-up off, and its choices wait, as they were, for it to be turned on again.
     await switch.click()
     await expect(switch).to_have_attribute("aria-checked", "false")
     await expect(wrong).to_be_disabled()
+    await expect(fold).to_contain_text("Only feedback")
     await until(lambda: _saved(served).get("follow_ups") is False)
     assert served.reactions.config.follow_ups is False
     await switch.click()

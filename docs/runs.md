@@ -390,7 +390,9 @@ secret Dot holds, is not kept, as the memory tools refuse such a note: the 📌 
 Taking the 📌 back forgets the note when it is as it was made; a note that was there before, or that you changed
 since, stays.
 
-**Settings.** Settings › General › Reactions has the switch **Start a task for a reaction** (`[reactions]
+**Settings.** Settings › General › Reactions folds: it is shut until it is opened, its head says what a reaction on a
+task that ended does (**Follow-up tasks on** or **Only feedback**), and it stays as you left it, in that browser. It has
+the switch **Start a task for a reaction** (`[reactions]
 follow_ups`; off, every reaction is only kept as feedback and a 📌 still makes its note) and, for each of the six
 other reactions, what it does after the run it is on has ended: **Start a follow-up task** or **Only feedback**
 (`good`, `love`, `wrong`, `again`, `explain` and `hold` of `[reactions]`). A change holds at once and is kept in
