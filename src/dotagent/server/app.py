@@ -69,6 +69,7 @@ from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
 from dotagent.server.routes_vault import vault_router
 from dotagent.server.routes_voice import voice_router
+from dotagent.server.routes_websearch import websearch_router
 from dotagent.server.views import ErrorView
 
 log = get_logger(__name__)
@@ -183,6 +184,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(mcp_router(ctx))
     app.include_router(gallery_router(ctx))
     app.include_router(keys_router(ctx))
+    app.include_router(websearch_router(ctx))
     app.include_router(themes_router())
     app.include_router(pages_router(ctx))
     looks: QuickLook = open_quick_look(looks_dir())

@@ -690,7 +690,9 @@ what the services hold in the page's head with the button **Check again**; a pro
 was refused (HTTP 401), says so and links to AI services, and one that refused access (HTTP 403) says that, with its
 words), **AI services** (the AI services Dot signs in to, one card: each on its tile with the tail of its key and a dot
 that says whether it is signed in, and the one chosen with its key, the page where it is made and the models it brings
-behind a filter; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses with
+behind a filter; see [Models and providers](models.md#models-and-providers)), **Web search** (item 657: the engines
+`web_search` asks in turn, moved up or down, turned off or added, a search API's key saved, and each tried with one
+search; see [Runs](runs.md)), **Browser** (which Chrome Dot browses with
 and what Chrome has to allow first; see [Browser
 use](browser-and-computer-use.md#browser-use)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
 what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, the
@@ -1008,6 +1010,9 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /threads/{id}/reactions`                                                   | the reactions that stand on the messages of a chat's runs (404 for no chat) |
 | `GET\|POST /reactions/settings` (`{"key": "wrong", "value": "feedback"}`)        | the switch of the follow-ups and what each reaction does after a run, as they stand; change one, live and kept in `config.toml` under `[reactions]` (`follow_ups` takes true or false, the others `follow_up` or `feedback`: 422 for a pair that does not fit) |
 | `GET /runs/{id}/recap`, `POST /runs/{id}/recap` (`{"force": …}`)                | the run's recap and whether one is due; one written when it is due, or whether or not with `force` (item 536) |
+| `GET /web/search`, `PUT /web/search/order` (`{"order": ["tavily", …]}`)         | the engines of `web_search` in their order, each ready or what it lacks; a new order, kept as `[web] search_order` (item 657) |
+| `POST\|DELETE /web/search/keys/{engine}` (`{"value": …}`)                       | save or remove a search API's key in Dot's `.env`; the page sees its last characters only (item 657) |
+| `POST /web/search/try/{engine}`                                                 | ask one engine one search, and say a few titles or why it failed (item 657) |
 | `GET /runs/{id}/chat-context`                                                   | the tool calls of the chat's turns before the run that succeeded, for the Run tab's context (item 650) |
 | `POST /teach`, `GET\|DELETE /teach/{thread_id}`, `POST /teach/{thread_id}/stop`, `/draft`, `/save`, `GET /teach/{thread_id}/screencast` | a task the owner shows Dot once: start the recording of the chat's tab, the steps as they come, stop it, the review model's draft of the skill, the saving of it (`{"skill": …}`), the discarding, and the tab's frames while it goes on (item 423) |
 | `POST /runs/{id}/loop` (`{"every": "30m", "text": …}`)                         | a loop of the run's chat (item 281): a schedule of the chat, returned |
