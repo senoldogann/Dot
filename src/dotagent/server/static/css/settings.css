@@ -4507,16 +4507,8 @@
     padding: var(--space-3) var(--space-4);
   }
 
-  /* The four tabs with their counts fit a phone's width; on the narrowest (320 px) the strip scrolls inside itself
-     rather than the page sideways. */
-  .note-tools .segmented.vault-tabs {
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-  }
-
+  /* The four tabs with their counts fit a phone's width. */
   .note-tools .segmented.vault-tabs button {
-    flex: none;
     padding-inline: var(--space-2);
   }
 }
