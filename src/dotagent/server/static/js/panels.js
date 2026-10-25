@@ -125,27 +125,13 @@ export function loadingPanel() {
   return el("div", { class: "card" }, inlineLoading());
 }
 
-/** What stands in a chat's place while its run is read (item 502): the shape of the conversation to come, a message of
- * yours and the answer under it, under Dot's mark and the line that say the chat is opening. The page draws the
- * conversation over it as soon as the run is read; with reduced motion it stands still. */
+/** What stands in a chat's place while its run is read (items 502 and 643): three dots of Dot's yellow that rise in turn,
+ * shown only once the read has taken a moment (run.css). A screen reader is told the chat is opening. */
 export function chatLoading() {
   return el(
     "div",
     { class: "chat-loading", role: "status", "aria-label": "Opening this chat" },
-    el(
-      "div",
-      { class: "chat-loading-head", "aria-hidden": "true" },
-      el("span", { class: "chat-loading-mark" }, el("span", { class: "chat-loading-ring" }), el("span", { class: "chat-loading-core" })),
-      el("span", { class: "chat-loading-label" }, "Opening this chat"),
-    ),
-    el(
-      "div",
-      { class: "chat-loading-lines", "aria-hidden": "true" },
-      el("span", { class: "chat-loading-block owner" }),
-      el("span", { class: "chat-loading-block" }),
-      el("span", { class: "chat-loading-block" }),
-      el("span", { class: "chat-loading-block" }),
-    ),
+    el("span", { class: "chat-loading-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span")),
   );
 }
 
