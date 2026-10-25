@@ -22,9 +22,9 @@ work under it. A very long conversation keeps its last forty turns on the page a
 reads the latest 200 runs of a chat, the most the daemon lists at once, so a chat of more says that its earlier runs are
 not shown, with no count (item 559). A chat opened when its run is over reads its record, its bill and its Changes once,
 as it opens: the events it then puts in, its end among them, read none of them again (item 646; the Changes of a
-long chat take half a second to make). While a chat is read, its page shows the shape of the conversation to come — a
-message of yours and the answer under it, under Dot's mark and the line that say the chat is opening — so an empty page
-never stands in its place (item 502); with reduced motion it stands still.
+long chat take half a second to make). While a chat is read, its page shows three dots of Dot's yellow that rise in turn
+in the middle of the room (items 502 and 643), and only once the read has taken 300 ms, so a chat that opens at once
+flashes nothing; a screen reader is told the chat is opening, and with reduced motion the dots stand still.
 
 `finish` takes the `answer` and a `success` flag. The `answer` is the complete message the user reads (the findings, the
 figures or the text that was asked for, with the links to the sources), and it is the result of the run: the web UI

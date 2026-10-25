@@ -79,8 +79,8 @@ _ENDLESS: re.Pattern[str] = re.compile(r"animation:([^;]*\binfinite\b[^;]*);")
 _COMPOSITED: frozenset[str] = frozenset({"opacity", "transform"})
 # The endless animations that still change what the page draws, each only while something is at work in front of the
 # owner: the ring of the microphone while it listens and of the plan's step at work (``pulse``, a growing shadow), and
-# the light that runs over the words of a thought being written and of a chat being opened (``shimmer`` and
-# ``sunshine``, a text's background).
+# the light that runs over the words of a thought being written (``shimmer`` and ``sunshine``, a text's background).
+# A chat being opened has three dots, which only rise and fade (item 643).
 _REDRAWN_WHILE_AT_WORK: frozenset[str] = frozenset({"pulse", "shimmer", "sunshine"})
 
 
