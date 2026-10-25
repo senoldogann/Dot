@@ -64,7 +64,7 @@ let through keeps what decided it, a question answered or not (item 468, see [Sa
 the chat says why it ran when you open it, unless a yolo run did it without asking (item 500); a step refused or handed
 to you has its `policy` event instead. The home's
 **While you were away** counts those automatic answers for the runs of your schedules and campaigns since you last
-looked (item 466; see [The daemon](daemon.md)).
+looked (item 466), when a new chat shows the day (Settings › General › Chat, item 640; see [The daemon](daemon.md)).
 
 **What only yolo waives.** Every question and every hand-off (item 443): the untrusted content's, Dot's own files', the
 preset's and your `ask` rules', money and credentials', a message or a post in your name, a pre-approved spend, and the
@@ -356,10 +356,11 @@ gate for learned texts refuses (a link, which a site named by its domain is, an 
 character that does not print, the mark `(you said)`) is dropped and logged, and a night in which every line is refused
 keeps the lines of the nights before (see Memory). A night the Mac slept through is caught up once when it wakes. A
 daemon that was off at that time, or whose stop cut the reflection (a stop does not wait for one, and it records nothing
-until its end), reflects at the next `reflection_time` on everything since the last reflection. The home's Today strip
-lists the reflection among what ended today; `dotx reflect` runs one now. A reflection that fails is kept: the strip
-shows "The nightly review failed" with why until one after it is done, and `dotx stats` says when the reflection was
-last done and the failure since. Learning does not stop unseen at a run's end either: lessons that could not be drawn
+until its end), reflects at the next `reflection_time` on everything since the last reflection. The home's Today strip,
+when a new chat shows the day (Settings › General › Chat, item 640), lists the reflection among what ended today;
+`dotx reflect` runs one now. A reflection that fails is kept: the strip shows "The nightly review failed" with why until
+one after it is done, and `dotx stats` says when the reflection was last done and the failure since; with the day not
+shown, `dotx stats` is where to look. Learning does not stop unseen at a run's end either: lessons that could not be drawn
 leave `lessons_failed` with why on the run's page, skill work that failed `playbook_failed`, and `dotx stats` counts the
 runs of each. The card of a run's lessons arrives folded (item 374); its head says "could not be drawn" in red, or how
 many lessons wait for your decision in amber, else how many there are, and opened it shows why, or the lessons.

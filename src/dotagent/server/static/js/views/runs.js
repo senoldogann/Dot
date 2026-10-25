@@ -1,6 +1,7 @@
-// The home page: Dot's presence (presence.js: the face in its state, a greeting, one line of now) and one composer in
-// the middle of the window, the Today strip under them. The recent runs live in the sidebar; a run that waits for an
-// answer is listed under Waits for you, and its card stays in its own chat (item 434).
+// The home page: Dot's presence (presence.js: the face in its state, a greeting) and one composer in the middle of the
+// window. With Settings › General › Chat › Show the day in a new chat (item 640), one line of now over the composer and
+// the Today strip under them. The recent runs live in the sidebar; a run that waits for an answer is listed under Waits
+// for you, and its card stays in its own chat (item 434).
 
 import { actorFace, DOT_ID } from "../actors.js";
 import { api } from "../api.js";

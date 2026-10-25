@@ -1,6 +1,8 @@
-// Dot's presence on the home (item 72): the face in its state, a greeting by the hour with your name, one line of now
-// and the Today strip (what waits, what works, what is due, what was learned, what ended), read from `GET /activity`
-// and kept fresh by the lifecycle stream. The words are pure functions of the activity, so they can be read alone.
+// Dot's presence on the home (item 72): the face in its state and a greeting by the hour with your name, from the
+// snapshot; and, when a new chat shows the day (item 640, Settings › General › Chat), one line of now and the Today strip
+// (what waits, what works, what is due, what was learned, what ended), read from `GET /activity` and kept fresh by the
+// lifecycle stream. Without the day `/activity` is not read at all. The words are pure functions of the activity, so
+// they can be read alone.
 
 import { activityRow, LIFECYCLE_KINDS } from "./activityrow.js";
 import { api } from "./api.js";
@@ -230,13 +232,19 @@ export function buildPresence({ day = true } = {}) {
       load();
     }
   });
-  const stopLifecycle = onLifecycle((event) => {
-    if (LIFECYCLE_KINDS.has(event.kind)) {
-      load();
-    }
-  });
-  const stopBack = onStreamBack(load);
-  load();
+  // Without the day (item 640) nothing on the page shows what /activity says: it is not read, nor read again, so a read
+  // that fails tells the owner nothing about what they cannot see. The greeting and the face go by the snapshot.
+  const stopLifecycle = day
+    ? onLifecycle((event) => {
+        if (LIFECYCLE_KINDS.has(event.kind)) {
+          load();
+        }
+      })
+    : () => undefined;
+  const stopBack = day ? onStreamBack(load) : () => undefined;
+  if (day) {
+    load();
+  }
   return {
     element,
     strip,
