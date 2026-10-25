@@ -1,6 +1,8 @@
 // One requestAnimationFrame loop for every moving character on the page. It runs only while something is
-// subscribed and the tab is visible, and hands each subscriber the seconds since the last frame, clamped at 64 ms
-// so a tab shown again resumes without jumping ahead.
+// subscribed and the page is not away (its window in front and in sight, item 662), and hands each subscriber the
+// seconds since the last frame, clamped at 64 ms so a page that comes back resumes without jumping ahead.
+
+import { isAway, onAway } from "../infront.js";
 
 const subscribers = new Set();
 let handle = 0;
@@ -11,11 +13,11 @@ function frame(ms) {
   const dt = last ? Math.min((ms - last) / 1000, 0.064) : 0;
   last = ms;
   for (const tick of subscribers) tick(dt);
-  if (subscribers.size && !document.hidden) handle = requestAnimationFrame(frame);
+  if (subscribers.size && !isAway()) handle = requestAnimationFrame(frame);
 }
 
 function start() {
-  if (handle || !subscribers.size || document.hidden) return;
+  if (handle || !subscribers.size || isAway()) return;
   last = 0;
   handle = requestAnimationFrame(frame);
 }
@@ -25,8 +27,8 @@ function stop() {
   handle = 0;
 }
 
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) stop();
+onAway((away) => {
+  if (away) stop();
   else start();
 });
 

@@ -146,6 +146,7 @@
   border-radius: var(--radius-pill);
   background: var(--brand);
   animation: chat-dot var(--motion-dots) ease-in-out infinite;
+  animation-play-state: var(--endless);
 }
 
 .chat-loading-dots > span:nth-child(2) {
@@ -2043,6 +2044,7 @@ dialog.modal.file-dialog .file-picture img {
 
 .computer-empty[data-state="waiting"] .computer-empty-mark {
   animation: breathe var(--motion-breath) ease-in-out infinite;
+  animation-play-state: var(--endless);
 }
 
 @media (prefers-reduced-motion: reduce) {

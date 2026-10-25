@@ -1,5 +1,6 @@
 // The entry point: sign-in, the frame with its sidebar and live indicators, and routing between the pages.
 
+import { isAway, onAway } from "./infront.js";
 import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken } from "./api.js";
 import { loadOwnThemes } from "./appearance/own.js";
@@ -626,6 +627,11 @@ function beginSession() {
   const stopAttention = watchAttention();
   window.addEventListener("hashchange", show);
   document.addEventListener("visibilitychange", reloadOutOfSight);
+  // What repeats without end stands still while the page is away (item 662): the style sheets pause those animations
+  // while it is marked so (`--endless`).
+  const markAway = (away) => document.documentElement.toggleAttribute("data-away", away);
+  markAway(isAway());
+  onAway(markAway);
   // Opened at no page, or as a home-screen app added before item 286: the last chat screen, in the address too.
   if (location.hash === "" || location.hash === "#" || (standalone() && location.hash === OLD_START)) {
     history.replaceState(null, "", `${location.pathname}${location.search}#${startPath()}`);

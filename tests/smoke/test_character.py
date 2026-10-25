@@ -294,6 +294,41 @@ async def test_a_hidden_tab_stops_the_loop_and_a_shown_one_resumes_it(
     await page.close()
 
 
+async def test_a_window_not_in_front_stops_the_loop_and_one_in_front_resumes_it(
+    browser: Browser, client: httpx.AsyncClient
+) -> None:
+    """Item 662: Dot.app at rest, visible but not the app in front, kept drawing its faces at the screen's rate. The
+    loop stops while the page is away, and the page is marked so for the style sheets. A test's browser is always in
+    front, so the page is told it is not."""
+    page: Page = await _open(browser, client, False, "light")
+    assert await page.evaluate(_TICKER) is True
+    await page.evaluate("() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); }")
+    await expect(page.locator("html")).to_have_attribute("data-away", "")
+    assert await page.evaluate(_TICKER) is False
+    assert not await _path_moves(page, _ORBIT)
+    await page.evaluate("() => { document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); }")
+    await expect(page.locator("html")).not_to_have_attribute("data-away", "")
+    assert await page.evaluate(_TICKER) is True
+    assert await _path_moves(page, _ORBIT)
+    await page.close()
+
+
+async def test_focus_in_a_frame_still_tells_whether_the_page_is_away(
+    browser: Browser, client: httpx.AsyncClient
+) -> None:
+    """Item 662: with the focus in a frame of the page (a page Dot shows, a preview), going to another app and coming
+    back to the frame fire nothing on the page's window. The page still finds out, both ways, by looking again."""
+    page: Page = await _open(browser, client, False, "light")
+    assert await page.evaluate(_TICKER) is True
+    await page.evaluate("() => { document.hasFocus = () => false; }")
+    await expect(page.locator("html")).to_have_attribute("data-away", "")
+    assert await page.evaluate(_TICKER) is False
+    await page.evaluate("() => { document.hasFocus = () => true; }")
+    await expect(page.locator("html")).not_to_have_attribute("data-away", "")
+    assert await page.evaluate(_TICKER) is True
+    await page.close()
+
+
 async def test_a_face_shown_for_an_hour_still_blinks(browser: Browser, client: httpx.AsyncClient) -> None:
     """Item 351: the calendar of blinks covers about a quarter of an hour and starts again; after it, the eyes stayed
     open for good."""

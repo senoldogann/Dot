@@ -848,6 +848,7 @@
   opacity: 0;
   pointer-events: none;
   animation: loop-glow var(--motion-breath) var(--ease) infinite;
+  animation-play-state: var(--endless);
 }
 
 .side-run[aria-current="page"] .side-loop {
@@ -863,6 +864,7 @@
   width: 10px;
   height: 10px;
   animation: spin var(--motion-turn) linear infinite;
+  animation-play-state: var(--endless);
 }
 
 @keyframes loop-glow {

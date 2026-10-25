@@ -30,6 +30,10 @@
 
 :root {
   color-scheme: light dark;
+  /* Whether what repeats without end moves (item 662): it stands still while Dot's window is not the one in front or
+     is out of sight (main.js marks the page ``data-away``), as nobody watches it and it was drawn at the screen's rate
+     all the same. Every endless animation takes its play state from here (tests/unit/test_css_tokens.py). */
+  --endless: running;
   /* The stage bar's height, measured by layout.js once the page is up; this is the bar's height without a banner. */
   --stagebar-h: 56px;
   /* Type (item 77): Inter for the interface and the prose, a serif voice where a look asks for it, Geist Mono for
@@ -140,6 +144,10 @@
   --ease-fall: cubic-bezier(0.55, 0, 1, 0.45);
   /* The reading width of the home and the conversation. */
   --lane-w: 768px;
+}
+
+:root[data-away] {
+  --endless: paused;
 }
 
 /* The chat's width (Settings › Appearance, item 127): the home and the conversation read at 768 px,
@@ -584,10 +592,12 @@ textarea {
 
 .avatar[data-state="idle"] {
   animation: breathe-face var(--motion-breath) ease-in-out infinite;
+  animation-play-state: var(--endless);
 }
 
 .avatar[data-state="working"] {
   animation: pulse-face var(--motion-pulse) ease-in-out infinite;
+  animation-play-state: var(--endless);
 }
 
 /* A face whose run just ended blinks once, then rests. */
@@ -595,6 +605,8 @@ textarea {
   animation:
     blink var(--motion-blink) ease-in-out 1,
     breathe-face var(--motion-breath) ease-in-out var(--motion-blink) infinite;
+  /* The blink, once, plays whatever; the breath after it is endless. */
+  animation-play-state: running, var(--endless);
 }
 
 /* The faces in the rows and the sidebar: 24 px; in a list's row 28. */
@@ -657,6 +669,7 @@ a.pill:hover {
 .live-dot.reconnecting {
   background: var(--warn);
   animation: blink var(--motion-blink) ease-in-out infinite;
+  animation-play-state: var(--endless);
 }
 
 /* A page comes in with a fade and a rise of 4 px (item 85); the router replaces the old one at once. */
@@ -1548,6 +1561,7 @@ a.pill:hover {
   background: color-mix(in srgb, var(--accent) 45%, transparent);
   pointer-events: none;
   animation: pulse-ring var(--motion-pulse) ease-out infinite;
+  animation-play-state: var(--endless);
 }
 
 /* Under reduced motion the dot stands still, as the page's other marks of work do. */
@@ -1569,6 +1583,7 @@ a.pill:hover {
 .status-dot.s-blocked {
   background: var(--warn);
   animation: blink var(--motion-blink) ease-in-out infinite;
+  animation-play-state: var(--endless);
 }
 
 .chip {
@@ -3674,6 +3689,7 @@ dialog.modal.versions-dialog {
   background: var(--accent-weak);
   color: var(--accent-strong);
   animation: pulse var(--motion-pulse) ease-out infinite;
+  animation-play-state: var(--endless);
 }
 
 ::highlight(md-interim) {
@@ -4858,6 +4874,7 @@ dialog.modal.versions-dialog {
 .plan-step.in_progress .mark {
   border-color: var(--accent);
   animation: pulse var(--motion-pulse) ease-out infinite;
+  animation-play-state: var(--endless);
 }
 
 .plan-step.done .mark {
@@ -5036,6 +5053,7 @@ dialog.modal.versions-dialog {
   height: 14px;
   background: var(--accent);
   animation: blink var(--motion-blink) steps(2) infinite;
+  animation-play-state: var(--endless);
 }
 
 .prose {
@@ -5626,6 +5644,7 @@ a.memory-line:hover .memory-change {
   background-clip: text;
   color: transparent;
   animation: shimmer var(--motion-shimmer) linear infinite;
+  animation-play-state: var(--endless);
 }
 
 /* The start of the thought reads as the thinking itself (item 506): set in italics, quiet under the label. */
@@ -5678,6 +5697,7 @@ a.memory-line:hover .memory-change {
   background-clip: text;
   color: transparent;
   animation: sunshine var(--motion-moment) linear infinite;
+  animation-play-state: var(--endless);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6400,11 +6420,13 @@ a.memory-line:hover .memory-change {
 .status-ring.s-queued {
   border-top-color: var(--text);
   animation: spin var(--motion-spin) linear infinite;
+  animation-play-state: var(--endless);
 }
 
 .status-ring.s-blocked {
   border-color: var(--warn);
   animation: blink var(--motion-blink) ease-in-out infinite;
+  animation-play-state: var(--endless);
 }
 
 .status-ring.s-done {
@@ -7866,6 +7888,7 @@ dialog.lightbox img {
   border: 2px solid var(--border-strong);
   border-top-color: var(--accent);
   animation: spin var(--motion-spin) linear infinite;
+  animation-play-state: var(--endless);
 }
 
 @keyframes spin {
@@ -9830,6 +9853,7 @@ button.attach-chip:hover {
 
 .capsule-work[data-state="working"] .capsule-mark .icon {
   animation: spin var(--motion-spin) linear infinite;
+  animation-play-state: var(--endless);
 }
 
 .capsule-work[data-state="waiting"],
