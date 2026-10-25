@@ -2910,6 +2910,14 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def tool_events(self, run_id: str) -> list[EventRecord]:
+        """The tool calls of the run ``run_id`` and their results, oldest first, read through the run's own events
+        (item 650: what the earlier turns of a chat used and read)."""
+        rows = await self._all(
+            "SELECT * FROM events WHERE run_id = ? AND kind IN ('tool_call', 'tool_result') ORDER BY id", (run_id,)
+        )
+        return [_event(row) for row in rows]
+
     async def flagged_events(self, kind: str, flag: str, from_ts: float, to_ts: float) -> list[EventRecord]:
         """The stored events of ``kind`` that came between two times (seconds since the epoch) and name ``flag`` among
         their ``flags``, of any run, oldest first (item 572: which runs had a step that sends a message, and when). A

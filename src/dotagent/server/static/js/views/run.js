@@ -276,12 +276,26 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
 
   // ------------------------------------------------------------------------------------ details and plan
   // The recap heads the Run tab (item 536): what the run did, does and waits for, in a few lines.
-  const recap = recapSection({ runId, signal });
+  // A turn that has no recap of its own yet shows the one of the chat's turn before it (item 650), so a new message
+  // does not leave the panel empty.
+  const recap = recapSection({ runId, earlierRunId: run.parent_run_id === null ? (history.earlier.at(-1)?.id ?? null) : null, signal });
   // What the run is made of (item 539), under the recap: the skills and MCP servers it can use, the files its chat
   // wrote, the pages and searches it read and the notes it saved. A row of Artifacts opens the Changes tab, which the
   // inspector holds after the panel.
   let showChanges = () => undefined;
   const context = createContextPanel({ onOpenChanges: () => showChanges() });
+  // What the chat's turns before this one used, read and remembered (item 650): the panel holds the whole chat's
+  // context, from its start, under this run's own.
+  if (run.parent_run_id === null && history.earlier.length > 0) {
+    api
+      .get(`/runs/${runId}/chat-context`)
+      .then((view) => {
+        if (!signal.aborted) {
+          context.onEarlier(view.steps);
+        }
+      })
+      .catch((error) => console.warn("the context of the chat's earlier turns could not be read", error));
+  }
   const details = createDetails(run, agent, detail.campaign, detail.keep_going, team);
   const planBody = el("div", { class: "plan-list" }, el("div", { class: "hint" }, NO_PLAN));
   const plan = panelSection({ id: "run-plan", title: "Plan", actions: null, body: planBody });

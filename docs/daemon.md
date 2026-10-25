@@ -508,7 +508,11 @@ times it used each, opening Customize; a skill is the `skill` tool's name, a ser
 the section stays out of sight until the run uses one, item 546), **Files made** (the files the chat wrote with their
 added and removed lines, each opening the Changes tab where the diff is), **Web reading** (the pages it fetched and
 the searches it made, a page opening in a new tab; a fetch that failed is not a page it read) and **Memory updated**
-(the notes it saved, corrected or forgot, each opening its note in Settings › Memory). Each row wears its mark on a
+(the notes it saved, corrected or forgot, each opening its note in Settings › Memory). These sections are the chat's,
+from its start (item 650): a new message opens a new run, whose page shows what the chat's earlier turns used, read and
+remembered (`GET /runs/{id}/chat-context`) under what this run does, and, until this run has a recap of its own, the
+recap of the turn before, saying it is that turn's ("From the task before"). Web reading keeps up to a hundred readings
+and Memory updated forty notes, and each scrolls inside itself past about eight rows. Each row wears its mark on a
 tile: a skill or a server its icon, a file its language's own logo (Simple Icons, version 16.35.0, CC0, under
 `icons/languages/`, item 547), or the letters of its kind where the language has no mark. In a tab of
 several sections each scrolls on its own once it holds more than two fifths of the screen, its head staying over it,

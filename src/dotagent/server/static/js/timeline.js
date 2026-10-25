@@ -8,6 +8,7 @@
 import { AUTO_LINES, settingValue } from "./appearance/settings.js";
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles, sentPictures } from "./attachments.js";
+import { memoryChange } from "./contextpanel.js";
 import { clip, clock, compact, dateTime, duration, el, plural, repeatsAnswer, setText } from "./dom.js";
 import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
@@ -45,9 +46,7 @@ const RING_LABELS = { blocked: "waiting" };
 // keeps for its last line.
 const FLOCK_FACES = 3;
 const PREVIEW_CHARS = 240;
-// The memory tools' results that changed the memory, "Saved: [mem_x] …", and what their line in the conversation says
-// (item 313); a note saved again ("Already saved: …") changed nothing. The line shows this much of the note.
-const MEMORY_RESULT = /^(Saved|Updated|Forgot): \[([^\]\s]+)\]/;
+// What a line of the conversation says of a change of the memory (item 313); it shows this much of the note.
 const MEMORY_CHANGES = { Saved: "Saved to memory", Updated: "Updated memory", Forgot: "Removed from memory" };
 const MEMORY_WORDS_CHARS = 120;
 // How the helpers of a group stand, in the order a reader scans them: those under way first, then how
@@ -246,21 +245,6 @@ function compactionLine(data) {
   const sized = typeof data.tokens_before === "number" && typeof data.tokens_after === "number";
   const text = sized ? `Older part of the chat summed up: ${compact(data.tokens_before)} → ${compact(data.tokens_after)}` : "Older part of the chat summed up";
   return el("div", { class: "compaction-line" }, icon("minimize"), el("span", null, text));
-}
-
-/**
- * The note a result of a memory tool changed, as `{ id, change, words }`: for a save and a change from the call's
- * arguments, for a removal from the action's summary, which holds the words the note had. Null for a result that changed
- * nothing: a failed call, a note saved again.
- */
-function memoryChange(data, args) {
-  const found = data.kind === "memory_write" && data.ok ? MEMORY_RESULT.exec(data.text) : null;
-  if (found === null) {
-    return null;
-  }
-  const [, change, id] = found;
-  const words = change === "Forgot" ? data.summary.replace(/^Forget: /, "") : typeof args.content === "string" ? args.content : "";
-  return { id, change, words };
 }
 
 /**

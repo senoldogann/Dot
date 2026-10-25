@@ -16,9 +16,11 @@ const STEP_KINDS = new Set(["tool_result", "run_finished"]);
 
 /**
  * The Recap section of the run `runId`: `onEvent(record)` takes the run's events from its stream (a `recap` event is
- * painted, a step makes the section look again whether one is due); it stops when `signal` aborts.
+ * painted, a step makes the section look again whether one is due); it stops when `signal` aborts. While the run has no
+ * recap of its own, the recap of `earlierRunId`, the chat's turn before it, stands in its place, said to be that turn's
+ * (item 650); it is only read, never written.
  */
-export function recapSection({ runId, signal }) {
+export function recapSection({ runId, earlierRunId = null, signal }) {
   const text = el("div", { class: "recap-text" });
   const meta = el("div", { class: "small muted recap-meta" });
   const again = el(
@@ -29,6 +31,8 @@ export function recapSection({ runId, signal }) {
   const body = el("div", { class: "recap", "aria-live": "polite" }, text, meta);
   const section = panelSection({ id: "run-recap", title: "Recap", actions: again, body });
   let inSight = false;
+  // Whether this run's own recap is painted: the turn before's stands in only until then.
+  let shown = false;
   let writing = false;
   // A write that failed: the section asks for none of its own again until its button is pressed or a recap arrives,
   // as each try would ask the models again for as long as the run takes steps.
@@ -36,14 +40,43 @@ export function recapSection({ runId, signal }) {
   let lastLook = 0;
   let timer = 0;
 
-  /** The recap as the view gives it, or what stands in for one: none yet, or recaps turned off. */
+  // The recap of the chat's turn before, read once (undefined until then, null when it has none).
+  let earlier;
+
+  /** The earlier turn's recap, read the first time it is wanted. */
+  async function earlierRecap() {
+    if (earlierRunId === null) {
+      return null;
+    }
+    if (earlier === undefined) {
+      try {
+        earlier = (await api.get(`/runs/${earlierRunId}/recap`)).recap;
+      } catch (error) {
+        console.warn("the recap of the chat's turn before could not be read", error);
+        earlier = null;
+      }
+    }
+    return earlier;
+  }
+
+  /** The recap as the view gives it, or what stands in for one: none yet (the turn before's, when it has one), or
+   * recaps turned off. */
   function paint(view) {
     section.element.hidden = !view.enabled;
     if (view.recap === null) {
       text.replaceChildren(el("p", { class: "muted" }, "A recap comes once the task has taken a few steps."));
       meta.textContent = "";
+      earlierRecap().then((before) => {
+        // Only while this run still has none: its own, once written, has painted over this.
+        if (before === null || before === undefined || signal.aborted || shown) {
+          return;
+        }
+        text.replaceChildren(...before.text.split("\n").map((line) => el("p", null, line)));
+        meta.textContent = `From the task before · ${modelName(before.model)} · Updated ${hourMinute(before.written_at)}. This task's own comes once it has taken a few steps.`;
+      });
       return;
     }
+    shown = true;
     text.replaceChildren(...view.recap.text.split("\n").map((line) => el("p", null, line)));
     const behind = view.steps > view.recap.steps ? ` of ${view.steps}` : "";
     meta.textContent = `As of step ${view.recap.steps}${behind} · ${modelName(view.recap.model)} · Updated ${hourMinute(view.recap.written_at)}`;
