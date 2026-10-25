@@ -109,17 +109,20 @@ const AT_THE_COMPOSER = { yaw: 0, pitch: -34, mix: 1, spin: 0, wander: 0.2 };
 const TYPING_MS = 1500;
 const SENDING_MS = 1500;
 
-/** Build the presence: `element` (the face, the greeting and the now line), `strip` (the Today strip, placed where the
- * page wants it), `listen` (`{ focus(on), typing(), sending() }`: the face looks down at the composer while it has the
- * focus, goes attentive as the owner types and excited for a moment on send), and `dispose()`. */
-export function buildPresence() {
+/** Build the presence: `element` (the face, the greeting and, with `day`, the now line), `strip` (the Today strip, placed
+ * where the page wants it), `listen` (`{ focus(on), typing(), sending() }`: the face looks down at the composer while it
+ * has the focus, goes attentive as the owner types and excited for a moment on send), and `dispose()`. Without `day` (a
+ * new chat that does not show the day, Settings › General › Chat) the now line is left out with the strip: it is the
+ * day in one line.
+ * @param {{ day?: boolean }} [options] */
+export function buildPresence({ day = true } = {}) {
   // Dot's face moves here (item 103), with a wink now and then at rest.
   const live = liveFace("dot", overallState(getSnapshot()), null, 96);
   const face = live.element;
   const name = el("div", { class: "home-name" }, dotName());
   const hello = el("p", { class: "home-greeting" });
   const now = el("p", { class: "home-now", "aria-live": "polite" }, "Looking around…");
-  const element = el("div", { class: "home-who" }, face, name, hello, now);
+  const element = el("div", { class: "home-who" }, face, name, hello, day ? now : null);
   const strip = el("section", { class: "home-today", "aria-label": "Today", hidden: true });
   let activity = null;
   let disposed = false;

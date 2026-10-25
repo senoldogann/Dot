@@ -237,6 +237,8 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
                     page: Page = await browser.new_page(
                         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                     )
+                    # A new chat shows the day under its composer only when asked to (Settings › General › Chat).
+                    await page.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{base}/#/runs")
                     await expect(page.locator(".home-who .avatar")).to_have_attribute("data-state", "waiting")
@@ -247,6 +249,7 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
                 page = await browser.new_page(
                     viewport={"width": 1280, "height": 900}, color_scheme="light", reduced_motion="reduce"
                 )
+                await page.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{base}/#/settings/general")
                 owner = page.get_by_label("Your name")

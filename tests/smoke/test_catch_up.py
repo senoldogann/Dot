@@ -146,6 +146,8 @@ async def _page(server: _Server, route: str) -> AsyncIterator[Page]:
         browser: Browser = await playwright.chromium.launch(channel=_CHANNEL, headless=True)
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
+            # A new chat shows the day under its composer only when asked to (Settings › General › Chat).
+            await page.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
             await page.goto(ui_url(HOST, server.port, TOKEN))
             await page.goto(f"{server.address}/#/{route}")
             await expect(_connection(page)).to_have_class("live-dot live")

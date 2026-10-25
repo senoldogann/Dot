@@ -119,6 +119,8 @@ async def _phone(browser: Browser, playwright: Playwright, device: str) -> Brows
         **playwright.devices[device], color_scheme="light", reduced_motion="reduce"
     )
     await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    # A new chat shows the day under its composer only when asked to (Settings › General › Chat).
+    await context.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
     return context
 
 

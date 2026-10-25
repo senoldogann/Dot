@@ -215,6 +215,8 @@ async def test_the_home_shows_the_news_once_then_mark_as_read_puts_it_away(
                     has_touch=phone,
                     reduced_motion="reduce",
                 )
+                # A new chat shows the day under its composer only when asked to (Settings › General › Chat).
+                await page.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 card: Locator = page.locator(".home-away")
                 # The first visit marks the moment: what came before it is not news here.

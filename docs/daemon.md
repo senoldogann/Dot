@@ -78,7 +78,8 @@ opened again or the page comes back into view, and **Mark read** clears it. The 
 seen, so the phone and the desktop agree; the chats there when Dot learnt this are taken as seen, and a run that ends
 while nobody watches, a scheduled one too, leaves its chat unread.
 
-Over the home's **Today** strip, **While you were away** (item 466, `GET /api/away?since=`) says what your schedules and
+Over the home's **Today** strip, when a new chat shows the day (below), **While you were away** (item 466, `GET
+/api/away?since=`) says what your schedules and
 campaigns did since this browser last marked it read: how many of their runs ended done, failed or stopped, how many
 work and how many were campaign sessions; their newest runs, two then **Show N more**, each with its schedule's or
 campaign's name, how it ended, when, and the first line of its answer with its secrets masked; the approvals the review
@@ -124,7 +125,11 @@ morning, Ada. What should I work on?"; "Something waits for you." when it does).
 Settings › General, and the daemon keeps them for every browser and phone (`[assistant] name` and `owner`, `GET` and
 `PUT /api/assistant`, item 420); your name is the first name of your account on this Mac until you give one, and the
 model is told both. An open home takes a new name as soon as it is saved, also one saved on another page. One line says what is going on ("Working on 2 runs · 1 waits for
-you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so). Under the composer, the **Today** strip
+you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so), when the day is shown: a new chat is Dot's
+face, its greeting and the composer alone until Settings › General › Chat › **Show the day in a new chat** is on (kept
+in that browser; off as it starts, since the owner asked for a new chat to be its composer alone on 2026-10-25, and
+then While you were away is not even read); the sidebar still lists the chats that wait and work. With it on, under
+the composer, the **Today** strip
 lists it: what waits for you, what works, what is due later today (the schedules that fire and the campaigns whose next
 session starts), what was learned today (the lessons and the day's journal) and what ended, each row opening what it is
 about; two rows a section (a run without the runs it delegated), then **Show N more**, which shows the section's others
