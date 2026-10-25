@@ -159,10 +159,18 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     @router.get("/agents")
     async def list_agents() -> list[AgentSummary]:
         """Dot first, then the agents the owner made, oldest first, each with its newest run and the title of the chat
-        that run is in."""
+        that run is in: Dot's in a chat of its own (item 633), which its card said none of while the owner chatted
+        with it every day."""
         latest: dict[str, RunRecord] = await store.latest_agent_runs()
-        titles: dict[str, str] = await store.thread_titles([run.thread_id for run in latest.values()])
-        dot: AgentSummary = AgentSummary(record=await dot_record(store), latest=None, latest_title=None)
+        dots: RunRecord | None = await store.latest_dot_run()
+        titles: dict[str, str] = await store.thread_titles(
+            [run.thread_id for run in latest.values()] + ([] if dots is None else [dots.thread_id])
+        )
+        dot: AgentSummary = AgentSummary(
+            record=await dot_record(store),
+            latest=dots,
+            latest_title=None if dots is None else titles.get(dots.thread_id),
+        )
         return [dot] + [
             AgentSummary(
                 record=agent,

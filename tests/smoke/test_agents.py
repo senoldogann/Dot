@@ -6,6 +6,7 @@ the scripted model answers.
 """
 
 import asyncio
+import re
 import secrets
 import time
 from collections.abc import AsyncIterator
@@ -361,11 +362,26 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await page_ui.wait_for_timeout(_SETTLE_MS)
             rows_text: list[str] = await page_ui.locator(".agent-card").all_inner_texts()
             assert len(rows_text) == 2 and "Scout" in rows_text[1] and "Find two sources" in rows_text[1], rows_text
+            # Dot's card names its own newest chat, as an agent's does (item 633): it said "No chats yet" always.
+            assert "Find two sources" in rows_text[0] and "No chats yet" not in rows_text[0], rows_text
             # The templates under them say nothing of a tool list that loaded, and no empty part is written as "null".
             templates = page_ui.locator("section[aria-label='Templates']")
             await expect(templates).to_contain_text("Single agents")
             await expect(templates).not_to_contain_text("null")
             await page_ui.screenshot(path=str(out / "agents.png"))
+            # Left open, the cards' ages keep up with the clock (item 633): they were written once, when read.
+            clocked: Page = await context.new_page()
+            await clocked.clock.install()
+            await clocked.goto(f"http://{host}:{port}/#/agents")
+            when: Locator = clocked.locator(".agent-card[data-agent='dot'] .agent-when")
+            await expect(when).to_have_text(re.compile(r"^(just now|\d+m ago)$"))
+            before: str = await when.inner_text()
+            # The list read again would write them anew: it is read no more, so that only the clock moves them.
+            await clocked.route("**/api/agents", lambda route: None)
+            await clocked.clock.fast_forward("10:00")
+            await expect(when).not_to_have_text(before)
+            await expect(when).to_have_text(re.compile(r"^\d+m ago$"))
+            await clocked.close()
             await page_ui.goto(f"http://{host}:{port}/#/agents/{agent_id}")
             await page_ui.wait_for_timeout(_SETTLE_MS)
             assert await page_ui.locator(".agent-who .home-name").inner_text() == "Scout"

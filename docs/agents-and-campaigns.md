@@ -42,8 +42,10 @@ them **Add ready-made agents**, which shows the teams or the single agents, one 
 the one chosen last while the app is open). Your agents are a grid of compact cards, as many across as the page has
 room for, two to four, and one on a phone: the face, the name over the role, each on one line, and under them the title
 of the agent's newest chat (the chat's own, as you may have renamed it) with how long ago it began, or that it has
-none. The card is the way to the agent's page, and says "Paused" and "Made by Dot" as the page does; Dot's opens the
-chats.
+none. Dot's card names Dot's newest chat of its own (item 633): one that is not an agent's, a campaign's or a team's,
+which their own cards name. How long ago keeps up with the clock while the page stays open, and the list is read again
+when a run starts or ends. The card is the way to the agent's page, and says "Paused" and "Made by Dot" as the page
+does; Dot's opens the chats.
 
 An agent can start from a template (item 315). **Single agents** shows fourteen: Sales Outbound, Talent Scout, Paid
 Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of Staff, Reviewer, Research Desk,
@@ -136,9 +138,9 @@ its run is the latest, the row wearing its face. The Task tab's Details name the
 newest chat), `GET /api/teams/{id}` (with its chats), `POST /api/teams` (201; `name`, `purpose` and `agents`, the ids of
 your agents in order; 422 for an id that is not one of your agents, one named twice, or none), `PUT /api/teams/{id}`
 (the same, whole), `DELETE /api/teams/{id}` (204), and 404 for a team that is not there. `GET /api/agents` gives each
-agent the title of the chat of its newest run (`latest_title`); a chat of `GET /api/threads` and the run of `GET
-/api/runs/{id}` name the team they are with (`team`: its id, name and agents; the chat's `actor_id` is the team's id,
-which no agent's or campaign's is).
+agent the title of the chat of its newest run (`latest_title`), and Dot the latest run of its newest chat (item 633); a
+chat of `GET /api/threads` and the run of `GET /api/runs/{id}` name the team they are with (`team`: its id, name and
+agents; the chat's `actor_id` is the team's id, which no agent's or campaign's is).
 
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
@@ -180,7 +182,7 @@ part of the run the next step sends unchanged, before the newest tool results, a
 only 20 blocks back from a mark, so the step after a shortening still reads the run before it from the provider's
 cache), `context_summarise_share` (0.85 of the configured budget, past which the older part of the run is summarised)
 and `plan_each_turn` (on: the open plan is appended to the system message of every step). The API: `GET /api/agents`
-(Dot first, each agent with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither
+(Dot first, each with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither
 changed nor deleted; `tools` names the tools the agent may use, or is empty with `every_tool: true` for all of them, and
 a request with neither is refused, so a tool list that did not load never lifts an agent's bounds; the editor's Save
 waits for the list, and a level the form cannot show is kept as saved), `GET /api/tools` (the names an agent may be

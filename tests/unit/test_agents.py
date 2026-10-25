@@ -148,6 +148,63 @@ async def test_the_store_keeps_agents_and_their_runs_and_a_deleted_agents_runs_b
         await store.close()
 
 
+async def test_dots_newest_run_is_its_own_chats_and_not_an_agents_a_helpers_a_teams_or_a_campaigns(
+    tmp_path: Path,
+) -> None:
+    """Item 633: Dot's card on the Agents page said "No chats yet" while the owner chatted with it every day."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+
+    async def run(thread: ThreadRecord, parent: str | None, campaign: str | None, agent: str | None) -> RunRecord:
+        return await store.create_run(
+            thread.id,
+            "goal",
+            "task",
+            "ollama:m",
+            parent,
+            "ui",
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            campaign,
+            agent,
+            None,
+        )
+
+    try:
+        assert await store.latest_dot_run() is None
+        chat: ThreadRecord = await store.create_thread("With Dot", "ui")
+        dots: RunRecord = await run(chat, None, None, None)
+        assert await store.latest_dot_run() == dots
+        # Runs after it that are not Dot's in a chat of its own leave it the newest.
+        agent: AgentRecord = await store.create_agent("Scout", "", "", "", None, None, [], None, None)
+        await run(await store.create_thread("With Scout", "ui"), None, None, agent.id)
+        await run(chat, dots.id, None, None)
+        team = await store.create_team("Crew", "", [agent.id], None)
+        await run(await store.create_thread("With the crew", "ui", team.id), None, None, None)
+        campaign = await store.create_campaign(
+            "Long", "goal", chat.id, "ollama:m", "medium", "standard", None, "ask", [], None
+        )
+        await run(await store.create_thread("A session", "campaign"), None, campaign.id, None)
+        assert await store.latest_dot_run() == dots
+        # A newer one is the newest until a rewind takes it out of its chat.
+        later: RunRecord = await run(await store.create_thread("Again", "ui"), None, None, None)
+        assert await store.latest_dot_run() == later
+        await store._db.execute("UPDATE runs SET rewound_at = ? WHERE id = ?", (later.created_at + 1.0, later.id))
+        await store._db.commit()
+        assert await store.latest_dot_run() == dots
+        # A chat is whose its latest run is, as the chat list says: an agent's run after Dot's in the same chat makes it
+        # the agent's, and Dot's card names the chat before it.
+        mixed: ThreadRecord = await store.create_thread("Handed over", "ui")
+        handed: RunRecord = await run(mixed, None, None, None)
+        assert await store.latest_dot_run() == handed
+        await run(mixed, None, None, agent.id)
+        assert await store.latest_dot_run() == dots
+    finally:
+        await store.close()
+
+
 def test_a_request_with_a_look_outside_the_catalogue_is_refused() -> None:
     body: dict[str, object] = {
         "name": "Scout",

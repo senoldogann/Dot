@@ -5258,6 +5258,25 @@ class Store:
         )
         return {row["agent_id"]: _run(row) for row in rows}
 
+    async def latest_dot_run(self) -> RunRecord | None:
+        """The latest run of Dot's newest chat (item 633), the one the Agents page names on Dot's card; ``None`` before
+        Dot had one. The chats and their latest runs are those :meth:`list_thread_summaries` lists (no delegated run,
+        none a rewind took out, no campaign session after the first), and a chat is Dot's as that list says whose a
+        chat is, by its latest run: not an agent's, not a campaign's, not one with a team, which their own cards
+        name."""
+        row: aiosqlite.Row | None = await self._one(
+            "WITH ranked AS ("
+            " SELECT id, thread_id, agent_id, campaign_id, created_at,"
+            "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place"
+            " FROM runs WHERE parent_run_id IS NULL AND rewound_at IS NULL"
+            " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns)))"
+            " SELECT runs.* FROM ranked JOIN runs ON runs.id = ranked.id JOIN threads ON threads.id = ranked.thread_id"
+            " WHERE ranked.place = 1 AND ranked.agent_id IS NULL AND ranked.campaign_id IS NULL"
+            " AND threads.team_id IS NULL ORDER BY ranked.created_at DESC, runs.rowid DESC LIMIT 1",
+            (),
+        )
+        return None if row is None else _run(row)
+
     async def thread_titles(self, thread_ids: Sequence[str]) -> dict[str, str]:
         """The titles of the chats ``thread_ids``, by id; a thread that is not there has none."""
         if not thread_ids:
