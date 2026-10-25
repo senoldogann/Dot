@@ -56,9 +56,12 @@
   /* The owner's messages and Dot's face: one warm accent, with dark ink on it in light and dark alike. */
   --bubble: light-dark(#ffcd3c, #e9b93a);
   --on-bubble: #1c1b19;
-  /* Dot's mark (item 114): the yellow of its disc and the ink of its eyes, the same in every look and scheme, as in
-     the favicon and the app's icon (desktop/icons/render.py). */
+  /* Dot's yellow: its face's (the character's amber) and its accents', the same in every look and scheme (it was the
+     disc of the mark until item 642). The hairline of gold round the mark, as desktop/icons/render.py draws it, and
+     the ball's own obsidian, which a copy of the mark without its gradients would still be drawn in. */
   --brand: #ffcd3c;
+  --mark-rim: #e6c26b;
+  --mark-ball: #1c1c1f;
   /* The border of a composer with a choice for one message armed (item 259): green, orange and purple, the same in
      every look and scheme. */
   --boost-start: #35b27a;

@@ -166,11 +166,16 @@ async def test_a_request_that_does_not_ask_for_gzip_gets_the_file_as_it_is(
     assert headers["content-length"] == str(len(body))
 
 
+# A file well under the 1024 bytes gzip starts at (the favicon was one until the mark of item 642 grew it).
+_SMALL: bytes = (STATIC_DIR / "icons" / "chevron.svg").read_bytes()
+
+
 async def test_an_answer_smaller_than_gzip_is_worth_goes_as_it_is(served: tuple[FastAPI, ServerContext]) -> None:
-    status, headers, body = await _whole_answer(served[0], "/favicon.svg")
+    assert len(_SMALL) < 1024
+    status, headers, body = await _whole_answer(served[0], "/icons/chevron.svg")
     assert status == 200
     assert "content-encoding" not in headers
-    assert body == (STATIC_DIR / "favicon.svg").read_bytes()
+    assert body == _SMALL
 
 
 async def test_a_font_and_an_image_go_as_they_are(served: tuple[FastAPI, ServerContext]) -> None:

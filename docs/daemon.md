@@ -827,15 +827,16 @@ compositor draws, opacity and transform, so a page at rest costs next to nothing
 shadow that changed, was drawn again on every frame and kept a third of a core at work in Dot.app with three loops in
 the sidebar. A unit test holds every endless animation to it, and names the few that still redraw while something works
 in front of you: the ring of the microphone while it listens and of the plan's step at work, and the light over the
-words of a thought being written or a chat being opened. Dot's mark is a yellow dot with the character's eyes, the o of
-the wordmark "dot" between a d and a t drawn in one line (`static/index.html`); the favicon, the app's icon, the menu
-bar's and the web app's icons are drawn from it (`desktop/icons/render.py`), and the wordmark heads the sign-in card. A
-window that opens the UI plays the opening once: the d and the t hop up, the dot drops in with its eyes shut, bounces
-twice, opens its eyes and blinks, and the page shows through, 1.3 s in all; a click or a key cuts it short, it takes no
-pointer, and it plays neither on a reload nor under reduced motion. The look, the scheme and the density you chose are
-put on the page by a small script in the document's head before the first paint, so a held dark scheme never flashes
-light on the way in; a screenshot tour (`tests/smoke/test_tour.py`) photographs every page in both schemes at 1280 and
-390 for reading by eye.
+words of a thought being written or a chat being opened. Dot's mark is a ball of obsidian lit at its upper left, with
+the character's eyes in champagne gold and a hairline of gold round it (item 642, "Obsidian", the owner's choice of five
+drawn for them), the o of the wordmark "dot" between a d and a t drawn in one line (`static/index.html`); the favicon,
+the app's icon, the menu bar's and the web app's icons are drawn from it (`desktop/icons/render.py`), and the wordmark
+heads the sign-in card. A window that opens the UI plays the opening once: the d and the t hop up, the dot drops in with
+its eyes shut, bounces twice, opens its eyes and blinks, and the page shows through, 1.3 s in all; a click or a key cuts
+it short, it takes no pointer, and it plays neither on a reload nor under reduced motion. The look, the scheme and the
+density you chose are put on the page by a small script in the document's head before the first paint, so a held dark
+scheme never flashes light on the way in; a screenshot tour (`tests/smoke/test_tour.py`) photographs every page in both
+schemes at 1280 and 390 for reading by eye.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds
@@ -1257,6 +1258,8 @@ of Dot.app, which `desktop/fetch-tools.sh` puts in `desktop/src-tauri/resources/
 and shows what it always showed. The app other Macs install, signed with a Developer ID, notarized and
 updating itself, with those tools in its Resources, signed too, is a release's, which `desktop/release.sh` builds (see
 [Releasing](development.md#releasing)). The
-icons come from Dot's mark: `uv run python desktop/icons/render.py` draws the favicon, the app icon (the mark lit as a
-ball on a dark tile), the three menu bar icons and the web app's icons, and `npm run icons` makes the bundle's set from
-the app icon.
+icons come from Dot's mark: `uv run python desktop/icons/render.py` draws the favicon, the app icon (the mark on a tile
+of night), the three menu bar icons (their hairline of gold wider, so the ball holds on a dark bar), the web app's
+icons and its maskable one (the mark inside the circle a phone may cut it to), and `npm run icons` makes the bundle's
+set from the app icon. A phone that had Dot on its Home Screen keeps the icon it took then: remove Dot from the Home
+Screen and add it again for the new one. The app's own icon changes with the next build of Dot.app.

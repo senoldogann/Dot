@@ -312,9 +312,10 @@ textarea {
 
 /* ---------- shell (the frame itself is in shell.css) ---------- */
 
-/* Dot's wordmark (item 114): "dot" with the mark as its o, a yellow disc with the character's eyes, between a d and a
-   t drawn in one line with round ends, in ink. index.html holds its one drawing, in the opening; the sign-in card
-   shows a copy (icons.js wordmark). */
+/* Dot's wordmark (item 114): "dot" with the mark as its o, between a d and a t drawn in one line with round ends, in
+   ink. The mark is a ball of obsidian lit at its upper left with the character's eyes in champagne gold and a hairline
+   of gold round it (item 642; its gradients are the page's .mark-defs, as desktop/icons/render.py draws them).
+   index.html holds its one drawing, in the opening; the sign-in card shows a copy (icons.js wordmark). */
 .wordmark {
   display: block;
   overflow: visible;
@@ -328,12 +329,31 @@ textarea {
   stroke-linejoin: round;
 }
 
+.mark-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* A copy of the mark without the gradients still draws the ball and the eyes, in their plain colours. */
 .mark-disc {
-  fill: var(--brand);
+  fill: url(#mark-obsidian) var(--mark-ball);
 }
 
 .mark-eye {
-  fill: var(--on-brand);
+  fill: url(#mark-gold) var(--mark-rim);
+}
+
+.mark-shine {
+  fill: url(#mark-shine);
+}
+
+.mark-rim {
+  fill: none;
+  stroke: var(--mark-rim);
+  stroke-opacity: 0.55;
+  stroke-width: 2;
 }
 
 /* The opening (item 114): the wordmark in the middle of the window, over the page's ground, while the app comes up
