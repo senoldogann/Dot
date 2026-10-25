@@ -182,7 +182,7 @@ publishes the app (the order is below, and `desktop/release.sh` ends with it).
 ### The package, and what it depends on that PyPI must have first
 
 Dot's package depends on `dotagent-web-research` (item 583), the MCP server that comes with Dot, at one version
-(`==1.4.6` in `pyproject.toml`). It is published on PyPI from its own repository (`senoldogann/web-research-stack`): a
+(`==1.4.7` in `pyproject.toml`). It is published on PyPI from its own repository (`senoldogann/web-research-stack`): a
 tag `v<version>` there publishes it through trusted publishing under the owner's account, as `release.yml` does Dot's. A
 new version of it goes in Dot by raising that pin and running `uv lock`, in a commit of Dot's own, once PyPI lists the
 version: the wheel and the sdist ask PyPI for the pinned version (`Requires-Dist` in their metadata, which `unzip -p
