@@ -128,3 +128,13 @@ def test_the_shortcuts_open_a_new_chat_and_the_settings() -> None:
     assert shortcuts["New chat"]["url"] == "/#/runs"
     assert shortcuts["Settings"]["short_name"] == "Settings"
     assert shortcuts["Settings"]["url"] == "/#/settings"
+
+
+def test_every_icon_of_the_manifest_is_a_picture_a_phone_draws() -> None:
+    """Item 661: iOS 26 opens what is added to the Home Screen as a web app and takes its icon from the manifest, where
+    an SVG of "any" size outranks every picture and is not drawn: the owner's iPhone added Dot with the letter D. Only
+    PNGs are named, the 180 px of the touch icons among them."""
+    icons: list[dict[str, Any]] = icons_of(manifest())
+    assert {entry["type"] for entry in icons} == {"image/png"}, icons
+    assert all(entry["sizes"] != "any" for entry in icons), icons
+    assert any(entry["sizes"] == "180x180" for entry in icons), icons
