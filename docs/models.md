@@ -67,17 +67,22 @@ the run's own model is never its helper.
 `standby` lists the models a run moves to when its own model answers with a quota, rate-limit or key error (HTTP 401),
 refuses access to it (HTTP 403: a model, a region or a plan the key may not use; or OpenRouter's 404 for a model the
 account's privacy settings leave no provider of, item 361), its provider has no key, or its service's content filter
-stops the reply (item 437; that pauses the model for no other run): the run
-goes on from the same step, with the tools that step had, on the first standby model that can take it over, the model is
-told, and the timeline shows the switch, which the model chip follows. The run's reasoning level becomes the nearest one
-the new model offers. A run takes each model once at most, in the order of the list, and never goes back to one it left.
-A standby model that cannot call tools while the run offers them, whose window cannot hold the instructions and the
-tools, or whose details cannot be read is passed over; when every one is, the run fails and says why for each. Without a
-standby model that can answer, the error ends the run, and its message is the run's result (what the timeline, a
-notification and `dotx run` show); its context, the request and the answer of the provider, is kept with the run's
-`run_finished` event and in the log. A transport error or a timeout moves nothing (the run waits for its own model
-instead, see below), and neither does a failure of the `review` or `vision` model: the review model has no standby, so
-with `review` on the same provider as `main` a goal check or an `auto` approval fails while that provider cannot answer.
+stops the reply (item 437; that pauses the model for no other run): the run goes on from the same step, with the tools
+that step had, on the first standby model that can take it over, the model is told, and the timeline shows the switch,
+which the model chip follows. The run's reasoning level becomes the nearest one the new model offers. A run takes each
+model once at most, in the order of the list, and never goes back to one it left. A standby model that cannot call tools
+while the run offers them, whose window cannot hold the instructions and the tools, or whose details cannot be read is
+passed over; when every one is, the run fails and says why for each. Without a standby model that can answer, the error
+ends the run, and its message is the run's result (what the timeline, a notification and `dotx run` show); its context,
+the request and the answer of the provider, is kept with the run's `run_finished` event and in the log. A transport
+error or a timeout moves nothing (the run waits for its own model instead, see below), and neither does a failure of the
+`review` or `vision` model in a check: a goal check and an `auto` approval are not passed to another model, as the run's
+own model would be judging itself, so with `review` on the same provider as `main` they fail while that provider cannot
+answer. Dot's own learning is passed on (item 649): the lessons of a run and their vetting, the upkeep of the notes
+and the skills, and the playbooks go, when the review model declines them (item 249) or answers with a quota, rate-limit
+or key error, to the run's own model and then to the standby models, in turn. A review model the router has paused for
+that is not asked again while another can be, and when none can, the run's lessons say who was asked and why. With one
+provider, or a model on this Mac alone, the run's own model is the one that writes them.
 
 A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or a

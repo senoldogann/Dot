@@ -44,7 +44,7 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ["DOT_KEYCHAIN"] = MISSING_KEYCHAIN
 
 
-KEYCHAIN_PASSWORD: str = "dot-test"
+KEYCHAI649WORD: str = "dot-test"
 _SECURITY: str = "/usr/bin/security"
 # Held while a test's keychain is made or removed, so that the workers put the owner's search list back one at a time.
 _KEYCHAINS_LOCK: Path = Path(tempfile.gettempdir()) / "dot-tests-keychains.lock"
@@ -77,8 +77,8 @@ def _keeping_search_list(arguments: list[str]) -> None:
 def keychain_file(tmp_path: Path) -> Iterator[str]:
     """A keychain file of the test's own, unlocked, removed at the end; the owner's search list is left as it was."""
     file: str = str(tmp_path / "test.keychain-db")
-    _keeping_search_list(["create-keychain", "-p", KEYCHAIN_PASSWORD, file])
-    subprocess.run([_SECURITY, "unlock-keychain", "-p", KEYCHAIN_PASSWORD, file], check=True, capture_output=True)
+    _keeping_search_list(["create-keychain", "-p", KEYCHAI649WORD, file])
+    subprocess.run([_SECURITY, "unlock-keychain", "-p", KEYCHAI649WORD, file], check=True, capture_output=True)
     try:
         yield file
     finally:

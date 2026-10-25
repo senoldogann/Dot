@@ -559,13 +559,21 @@ async def propose_merges(runtime: "Runtime", now: float) -> int:
     if not pairs:
         return 0
     judge: OverlapJudge = overlap_judge_for(
-        runtime.router, runtime.roles.review(), (), config.model_call_timeout_s, f"reflection:{int(now)}:skills"
+        runtime.router,
+        runtime.roles.review(),
+        runtime.roles.after_review(),
+        config.model_call_timeout_s,
+        f"reflection:{int(now)}:skills",
     )
     judgement: OverlapJudgement = await judge(
         OverlapRequest(pairs=tuple((brief_of(first), brief_of(second)) for first, second in pairs))
     )
     reviser: SkillReviser = skill_reviser_for(
-        runtime.router, runtime.roles.review(), (), config.model_call_timeout_s, f"reflection:{int(now)}:skills"
+        runtime.router,
+        runtime.roles.review(),
+        runtime.roles.after_review(),
+        config.model_call_timeout_s,
+        f"reflection:{int(now)}:skills",
     )
     secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
     made: int = 0
@@ -623,7 +631,7 @@ async def propose_rewrite(runtime: "Runtime", name: str, words: str, now: float)
     reviser: SkillReviser = skill_reviser_for(
         runtime.router,
         runtime.roles.review(),
-        (),
+        runtime.roles.after_review(),
         runtime.config.agent.model_call_timeout_s,
         f"reflection:{int(now)}:skills",
     )

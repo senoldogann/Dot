@@ -129,7 +129,7 @@ async def _home(
         store=store,
         memory=index,
         router=object(),
-        roles=SimpleNamespace(review=lambda: "scripted:any"),
+        roles=SimpleNamespace(review=lambda: "scripted:any", after_review=lambda own=(): tuple(own)),
         schedule_zone=ZoneInfo("UTC"),
     )
     try:

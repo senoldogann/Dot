@@ -18,6 +18,7 @@ import asyncio
 import json
 import re
 import secrets
+import time
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Annotated, Literal
@@ -25,6 +26,7 @@ from typing import Annotated, Literal
 from pydantic import Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from dotagent.core.errors import (
+    DotError,
     InvalidValueError,
     JsonParseError,
     ProviderProtocolError,
@@ -37,7 +39,7 @@ from dotagent.core.text import redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.harness.components import component_problem, description_problem, names_a_task, normalized
 from dotagent.llm.calls import CallOrigin
-from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
+from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref, unavailable_reason
 from dotagent.llm.types import (
     ChatRequest,
     Effort,
@@ -1465,9 +1467,11 @@ async def _decide[V: FrozenModel](question: _Question[V]) -> V:
 
 
 async def _decide_passing_on[V: FrozenModel](question: _Question[V], others: tuple[str, ...]) -> V:
-    """Ask as :func:`_decide` does; a question the review model declines (item 225) goes to each of ``others`` that is
-    another model, in turn, until one answers (item 249). Any other failure is raised as it comes; a question that
-    every model declines raises a refusal that names them all."""
+    """Ask as :func:`_decide` does; a question the review model declines (item 225), or that it cannot answer for a
+    while (its quota or rate spent, its key refused or missing: item 649), goes to each of ``others`` that is another
+    model, in turn, until one answers (item 249). A model the router holds paused is not asked while another can be. Any
+    other failure is raised as it comes; a question no model takes raises the first model's error, naming them all.
+    Only Dot's own learning asks this way: the review of a run's actions never passes to another model."""
     return await _decide_checked_passing_on(question, others, _as_is)
 
 
@@ -1487,30 +1491,47 @@ async def _decide_checked_passing_on[V: FrozenModel, R](
     question: _Question[V], others: tuple[str, ...], check: Callable[[V], R]
 ) -> R:
     """:func:`_decide_passing_on` with a ``check`` of the verdict, as :func:`_decide_checked` has."""
-    try:
-        return await _decide_checked(question, check)
-    except ProviderRefusedError as refused:
-        first: ProviderRefusedError = refused
-    declined: list[str] = [question.review_model]
-    for other in others:
-        if other in declined:
-            continue
-        log.warning(
-            "review_declined_passed_on",
-            purpose=question.origin.purpose,
-            run_id=question.origin.run_id,
-            declined=declined[-1],
-            to=other,
-        )
+    models: list[str] = list(dict.fromkeys((question.review_model, *others)))
+    paused: set[str] = set(question.router.paused(time.time()))
+    # A model paused already is left for last, and out when another can be asked: a call to it would spend the
+    # connector's retries on an answer its provider has refused already (item 240).
+    ready: list[str] = [model for model in models if parse_model_ref(model).label not in paused]
+    asked: list[str] = ready or models[:1]
+    skipped: list[str] = [model for model in models if model not in asked]
+    first: DotError | None = None
+    passed: list[str] = [f"{model} (paused)" for model in skipped]
+    for model in asked:
+        if first is not None:
+            log.warning(
+                "review_passed_on",
+                purpose=question.origin.purpose,
+                run_id=question.origin.run_id,
+                passed=passed[-1],
+                to=model,
+            )
         try:
-            return await _decide_checked(replace(question, review_model=other), check)
-        except ProviderRefusedError:
-            declined.append(other)
-    if len(declined) == 1:
-        raise first
-    raise ProviderRefusedError(
-        f"{first.message}; {', '.join(declined[1:])} declined it too", {**first.context, "declined": list(declined)}
-    ) from first
+            return await _decide_checked(replace(question, review_model=model), check)
+        except ProviderRefusedError as refused:
+            first = first or refused
+            passed.append(f"{model} (declined)")
+        except DotError as error:
+            reason: str | None = unavailable_reason(error)
+            if reason is None:
+                raise
+            first = first or error
+            passed.append(f"{model} ({reason})")
+    assert first is not None
+    if all(entry.endswith("(declined)") for entry in passed):
+        if len(passed) == 1:
+            raise first
+        raise ProviderRefusedError(
+            f"{first.message}; {', '.join(entry.removesuffix(' (declined)') for entry in passed[1:])} declined it too",
+            {**first.context, "declined": [entry.removesuffix(" (declined)") for entry in passed]},
+        ) from first
+    # The first model's own error, of its own kind (a spent quota stays a quota error), saying who else was asked.
+    first.message = f"{first.message}; no model could take it: {', '.join(passed)}"
+    first.context["asked"] = list(passed)
+    raise first
 
 
 async def _decide_checked[V: FrozenModel, R](question: _Question[V], check: Callable[[V], R]) -> R:

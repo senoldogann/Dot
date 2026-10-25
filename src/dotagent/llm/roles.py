@@ -40,6 +40,11 @@ class ModelRoles:
         """The models a run moves to, in their order, when its own model cannot answer (``[models] standby``)."""
         return self._standby
 
+    def after_review(self, own: Sequence[ModelReference] = ()) -> tuple[ModelReference, ...]:
+        """The models a question of Dot's own learning goes to, in turn, when the review model declines it or cannot
+        answer (item 649): ``own``, the model of the run it is about, then the standby models; each once."""
+        return tuple(dict.fromkeys((*own, *self._standby)))
+
     def choose(self, role: ModelRole, model: ModelReference) -> None:
         """Have ``model`` do the work of ``role`` from the next call on; the calls under way keep theirs."""
         self._models[role] = model

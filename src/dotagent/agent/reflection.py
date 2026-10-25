@@ -587,7 +587,7 @@ async def _put_aside_outdated(
     judge: OutdatedJudge = outdated_judge_for(
         runtime.router,
         runtime.roles.review(),
-        (),
+        runtime.roles.after_review(),
         runtime.config.agent.model_call_timeout_s,
         f"reflection:{int(now)}:outdated",
     )
@@ -626,7 +626,7 @@ async def _describe_owner(runtime: Runtime, runs: Sequence[RunRecord], now: floa
     writer: OwnerWriter = owner_writer_for(
         runtime.router,
         runtime.roles.review(),
-        (latest.model,),
+        runtime.roles.after_review((latest.model,)),
         runtime.config.agent.model_call_timeout_s,
         f"reflection:{int(now)}:owner",
     )

@@ -76,7 +76,7 @@ async def _home(
         store=store,
         memory=MemoryIndex(store=store, embedder=embedder, config=config.memory),
         router=object(),
-        roles=SimpleNamespace(review=lambda: "scripted:any"),
+        roles=SimpleNamespace(review=lambda: "scripted:any", after_review=lambda own=(): tuple(own)),
     )
     thread = await store.create_thread("t", "test")
     run = await store.create_run(
