@@ -837,8 +837,9 @@
   background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
+/* As a tool's mark (app.css .tool-state, item 656): centred on a face's column, the words 36 px in. */
 .steps-state {
-  width: 18px;
+  width: 20px;
   display: grid;
   place-items: center;
   flex: none;
