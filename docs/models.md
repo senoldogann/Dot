@@ -78,11 +78,13 @@ the request and the answer of the provider, is kept with the run's `run_finished
 error or a timeout moves nothing (the run waits for its own model instead, see below), and neither does a failure of the
 `review` or `vision` model in a check: a goal check and an `auto` approval are not passed to another model, as the run's
 own model would be judging itself, so with `review` on the same provider as `main` they fail while that provider cannot
-answer. Dot's own learning is passed on (item 649): the lessons of a run and their vetting, the upkeep of the notes
-and the skills, and the playbooks go, when the review model declines them (item 249) or answers with a quota, rate-limit
-or key error, to the run's own model and then to the standby models, in turn. A review model the router has paused for
-that is not asked again while another can be, and when none can, the run's lessons say who was asked and why. With one
-provider, or a model on this Mac alone, the run's own model is the one that writes them.
+answer. Dot's own learning is passed on (item 649): the lessons of a run and their vetting, the upkeep of the notes and
+the skills, and the playbooks go, when the review model declines them (item 249) or answers with a quota, rate-limit or
+key error, to the run's own model and then to the standby models, in turn. A review model the router has paused for that
+is not asked again while another can be, and when none can, the run's lessons say who was asked and why. With one
+provider, or a model on this Mac alone, the run's own model is the one that writes them. What these questions carry (a
+run's digest, the notes, the owner's section, a skill), its secrets masked, then goes to that model's provider too, a
+standby's among them.
 
 A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or a

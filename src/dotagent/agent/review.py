@@ -26,6 +26,7 @@ from typing import Annotated, Literal
 from pydantic import Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from dotagent.core.errors import (
+    ConfigError,
     DotError,
     InvalidValueError,
     JsonParseError,
@@ -1487,6 +1488,15 @@ def _numbers_checked(numbers: Sequence[int], count: int, what: str) -> None:
         )
 
 
+def _label(model: str) -> str:
+    """``model``'s label as the router pauses it, or the reference itself when it cannot be read (an old run's model
+    of a provider Dot no longer knows): such a model is then asked, and its own error says why, as before."""
+    try:
+        return parse_model_ref(model).label
+    except ConfigError:
+        return model
+
+
 async def _decide_checked_passing_on[V: FrozenModel, R](
     question: _Question[V], others: tuple[str, ...], check: Callable[[V], R]
 ) -> R:
@@ -1495,7 +1505,7 @@ async def _decide_checked_passing_on[V: FrozenModel, R](
     paused: set[str] = set(question.router.paused(time.time()))
     # A model paused already is left for last, and out when another can be asked: a call to it would spend the
     # connector's retries on an answer its provider has refused already (item 240).
-    ready: list[str] = [model for model in models if parse_model_ref(model).label not in paused]
+    ready: list[str] = [model for model in models if _label(model) not in paused]
     asked: list[str] = ready or models[:1]
     skipped: list[str] = [model for model in models if model not in asked]
     first: DotError | None = None
