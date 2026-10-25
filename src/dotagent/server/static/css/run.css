@@ -2409,3 +2409,11 @@ dialog.computer-full::backdrop {
   gap: 4px;
   color: var(--warn);
 }
+
+/* A list of the chat's context that grows long (item 650: Web reading and Memory updated keep the whole chat's)
+   scrolls inside itself past about eight rows, so the sections under it stay in reach. */
+.context-list.context-scroll {
+  max-height: calc(8 * 34px + 7 * var(--space-half));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

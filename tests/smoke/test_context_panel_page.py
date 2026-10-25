@@ -7,7 +7,7 @@ sheet, the panel no wider than the screen."""
 
 import asyncio
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -37,6 +37,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 TOKEN: str = "context-panel-token"
 RECAP: str = "Wrote the four notes and saved the owner's preference.\nNothing waits for you."
 ANSWER: str = "The four notes are written and the note saved."
+# The pages the first turn of a chat reads (item 650): more than the eight rows Web reading shows before it scrolls.
+PAGES_READ: int = 10
 KEPT: str = "The user prefers short answers."
 WAIT_S: float = 60.0
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
@@ -95,6 +97,12 @@ def site() -> Iterator[str]:
             body="<!doctype html><title>About</title><p>About the notes.</p>",
             location=None,
         ),
+        *(
+            SitePage(
+                path=f"/page-{n}/", status=200, body=f"<!doctype html><title>Page {n}</title><p>{n}</p>", location=None
+            )
+            for n in range(PAGES_READ)
+        ),
     )
     with serve_site(pages) as address:
         yield address
@@ -120,14 +128,22 @@ def _config() -> AppConfig:
 
 
 @asynccontextmanager
-async def _daemon(login_env: dict[str, str], site: str) -> AsyncIterator[tuple[RunManager, str]]:
-    """The daemon in a throw-away home, served at the address it yields."""
+async def _daemon(
+    login_env: dict[str, str], site: str, turns: Callable[[Path], list[ScriptedTurn]] | None = None
+) -> AsyncIterator[tuple[RunManager, str]]:
+    """The daemon in a throw-away home, served at the address it yields; the scripted model takes ``turns`` of the
+    workspace, else the four notes of each size."""
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(_config(), login_env)
         try:
             await runtime.router.register(
                 _PROVIDER,
-                ScriptedProvider(_PROVIDER, _turns(runtime.workspace, [str(width) for width, _ in _SIZES], site)),
+                ScriptedProvider(
+                    _PROVIDER,
+                    turns(runtime.workspace)
+                    if turns is not None
+                    else _turns(runtime.workspace, [str(width) for width, _ in _SIZES], site),
+                ),
             )
             manager: RunManager = RunManager(runtime)
             stopping: asyncio.Event = asyncio.Event()
@@ -260,4 +276,115 @@ async def test_the_run_tab_shows_what_the_run_wrote_read_and_remembered_under_it
             for width, scheme in _SIZES:
                 await _one_size(browser, manager, address, site, width, scheme, tmp_path)
         finally:
+            await browser.close()
+
+
+def _two_turns(site: str) -> Callable[[Path], list[ScriptedTurn]]:
+    """A chat of two turns (item 650): the first saves a note, reads ten pages and gets its recap; the second only
+    answers, too short a turn for a recap of its own."""
+
+    def turns(_workspace: Path) -> list[ScriptedTurn]:
+        reads: list[ScriptedTurn] = [
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="web_fetch", arguments={"url": f"{site}/page-{n}/"}),))
+            for n in range(PAGES_READ)
+        ]
+        # The note is saved before the pages are read: a note saved after reading outside content asks the owner.
+        return [
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool="memory_save", arguments={"content": f"{KEPT} (chat)", "tags": []}),)
+            ),
+            *reads,
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": ANSWER, "success": True}),)
+            ),
+            ScriptedTurn(text=RECAP, calls=()),
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done again.", "success": True}),)
+            ),
+        ]
+
+    return turns
+
+
+async def _task_tab(page: Page) -> Locator:
+    layout: Locator = page.locator(".run-layout")
+    await expect(page.locator(".answer").last).to_be_visible()
+    if await layout.get_attribute("data-inspector") != "on":
+        await page.get_by_role("button", name="Task details", exact=True).click()
+    details: Locator = page.locator(".inspector")
+    await details.get_by_role("tab", name="Task").click()
+    return details
+
+
+async def test_a_new_message_keeps_the_chats_context_and_web_reading_scrolls_past_eight_rows(
+    login_env: dict[str, str], site: str, tmp_path: Path
+) -> None:
+    """Item 650: the panel of a chat's second turn shows what its first read and saved, under this turn's own, and
+    the first turn's recap until this one has its own; ten pages read scroll inside Web reading."""
+    async with _daemon(login_env, site, _two_turns(site)) as (manager, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(
+            channel=load_default_config().browser.channel, headless=True
+        )
+        page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+        try:
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            first: RunRecord = await manager.start(
+                "Read the ten pages",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                "test",
+                None,
+                None,
+                "standard",
+                None,
+                "ask",
+                False,
+                (),
+            )
+            async with asyncio.timeout(WAIT_S):
+                assert (await manager.wait(first.id)).status == "done"
+            # The first turn's page writes its recap.
+            await page.goto(f"{address}/#/runs/{first.id}")
+            details: Locator = await _task_tab(page)
+            await expect(details.locator("#panel-run-recap .recap-text p")).to_have_text(RECAP.split("\n"))
+            second: RunRecord = await manager.start(
+                "Once more",
+                "task",
+                SCRIPTED_MODEL,
+                first.thread_id,
+                "test",
+                None,
+                None,
+                "standard",
+                None,
+                "ask",
+                False,
+                (),
+            )
+            async with asyncio.timeout(WAIT_S):
+                assert (await manager.wait(second.id)).status == "done"
+            await page.goto(f"{address}/#/runs/{second.id}")
+            details = await _task_tab(page)
+            recap: Locator = details.locator("#panel-run-recap")
+            await expect(recap.locator(".recap-text p")).to_have_text(RECAP.split("\n"))
+            await expect(recap.locator(".recap-meta")).to_contain_text("From the task before")
+            reading: Locator = details.locator("#panel-run-reading")
+            await expect(reading.locator(".context-row")).to_have_count(PAGES_READ)
+            await expect(
+                details.locator(".panel-section", has=page.locator("#panel-run-reading")).locator(".panel-summary")
+            ).to_have_text(f"{PAGES_READ} pages")
+            # The newest the first turn read stands first.
+            await expect(reading.locator(".context-name").first).to_have_text(
+                f"{site.removeprefix('http://')}/page-{PAGES_READ - 1}/"
+            )
+            box: dict[str, int] = await reading.locator(".context-scroll").evaluate(
+                "(list) => ({ shown: list.clientHeight, whole: list.scrollHeight })"
+            )
+            assert box["shown"] < box["whole"], box
+            memory: Locator = details.locator("#panel-run-memory")
+            await expect(memory.locator(".context-note")).to_contain_text(f"{KEPT} (chat)")
+            await page.screenshot(path=str(tmp_path / "chat-context.png"))
+        finally:
+            await page.close()
             await browser.close()

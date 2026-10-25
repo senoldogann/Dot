@@ -39,6 +39,7 @@ from dotagent.server.actions import action_steps, file_edits
 from dotagent.server.activity import current_activity
 from dotagent.server.away import read_away
 from dotagent.server.changes import ChangesView, chat_changes, chat_runs
+from dotagent.server.chatcontext import ChatContext, chat_context
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import local_hosts
 from dotagent.server.sending import send_once
@@ -381,6 +382,11 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def ask_aside(run_id: str, request: AsideRequest) -> AsideAnswer:
         """A side question about the run, answered without the run seeing it (see ``agent.aside``)."""
         return await answer_aside(ctx.runtime, run_id, request.text)
+
+    @router.get("/runs/{run_id}/chat-context")
+    async def get_chat_context(run_id: str) -> ChatContext:
+        """What the turns of the run's chat before it used, read and remembered, for the Run tab (item 650)."""
+        return await chat_context(store, await store.get_run(run_id))
 
     @router.get("/runs/{run_id}/recap")
     async def get_recap(run_id: str) -> RecapView:

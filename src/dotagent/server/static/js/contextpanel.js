@@ -2,9 +2,10 @@
 // used, the pages and searches it read and the notes it saved, each once. The DOM sections that show them are
 // contextpanelview.js's; this module keeps that state plain, so it is read without a page.
 
-// The most readings and notes a run's context keeps, newest first.
-const READING_LIMIT = 8;
-const MEMORY_LIMIT = 6;
+// The most readings and notes a chat's context keeps, newest first (item 650: the whole chat's, in a list that
+// scrolls inside itself, where a run's kept its last 8 and 6).
+const READING_LIMIT = 100;
+const MEMORY_LIMIT = 40;
 const PAGE_TOOLS = new Set(["web_fetch", "web_crawl", "browser_open", "browser_new_tab"]);
 const SEARCH_TOOLS = new Set(["web_search"]);
 const SKILL_TOOL = "skill";
@@ -233,4 +234,48 @@ export function addMemory(list, change, limit = MEMORY_LIMIT) {
     }
   }
   return kept;
+}
+
+/** The usage of a chat (item 650): what its earlier turns used, `before`, and what the open run used, `own`, each
+ * skill or server once in the order the chat first used it, its calls counted together. */
+export function chatUsage(before, own) {
+  const list = before.map((item) => ({ ...item }));
+  for (const usage of own) {
+    const found = list.find((item) => item.kind === usage.kind && item.name === usage.name);
+    if (found === undefined) {
+      list.push({ ...usage });
+    } else {
+      found.count += usage.count;
+    }
+  }
+  return list;
+}
+
+/** The memory changes of a chat: the open run's, newest first, then its earlier turns', a note told once as it stands
+ * now, at most `limit` of them. */
+export function chatMemory(before, own, limit = MEMORY_LIMIT) {
+  let list = [];
+  for (const change of [...own, ...before].reverse()) {
+    list = addMemory(list, change, limit);
+  }
+  return list;
+}
+
+// The memory tools' results that changed the memory, "Saved: [mem_x] …" (item 313); a note saved again ("Already saved:
+// …") changed nothing.
+const MEMORY_RESULT = /^(Saved|Updated|Forgot): \[([^\]\s]+)\]/;
+
+/**
+ * The note a result of a memory tool changed, as `{ id, change, words }`: for a save and a change from the call's
+ * arguments, for a removal from the action's summary, which holds the words the note had. Null for a result that changed
+ * nothing: a failed call, a note saved again.
+ */
+export function memoryChange(data, args) {
+  const found = data.kind === "memory_write" && data.ok ? MEMORY_RESULT.exec(data.text) : null;
+  if (found === null) {
+    return null;
+  }
+  const [, change, id] = found;
+  const words = change === "Forgot" ? data.summary.replace(/^Forget: /, "") : typeof args.content === "string" ? args.content : "";
+  return { id, change, words };
 }

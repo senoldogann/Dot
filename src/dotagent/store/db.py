@@ -87,6 +87,7 @@ from dotagent.store.models import (
     TeamRecord,
     ThreadRecord,
     ThreadSummary,
+    ToolStep,
     TrashedMemory,
     UnattendedCount,
     UnattendedRun,
@@ -745,6 +746,11 @@ def _flags_of(data: JsonObject) -> list[str]:
     """The flags the ``flags`` list of an event or of an approval's step names; none when it has no such list."""
     flags: object = data.get("flags")
     return [flag for flag in flags if isinstance(flag, str)] if isinstance(flags, list) else []
+
+
+def _object(text: object) -> JsonObject:
+    """A JSON object SQLite gave as text (``json_extract`` of one), or an empty one where there is none."""
+    return parse_json_object(text, "tool call arguments") if isinstance(text, str) else {}
 
 
 def _event(row: aiosqlite.Row) -> EventRecord:
@@ -2909,6 +2915,38 @@ class Store:
             "SELECT * FROM events WHERE run_id = ? AND id > ? ORDER BY id LIMIT ?", (run_id, after_id, limit)
         )
         return [_event(row) for row in rows]
+
+    async def turn_tool_steps(self, run_ids: Sequence[str]) -> list[ToolStep]:
+        """The tool calls of the runs ``run_ids`` and their results, in the order they were stored, in one read through
+        each run's own events (item 650: what the earlier turns of a chat used and read). Only what the Run tab reads
+        is taken out of them: a call's tool and arguments, a result's tool, outcome and kind, and the text and summary
+        of a change of the memory alone, so a fetched page's text is not read."""
+        if not run_ids:
+            return []
+        marks: str = ", ".join("?" for _ in run_ids)
+        rows = await self._all(
+            "SELECT run_id, kind, json_extract(data, '$.call_id') AS call_id, json_extract(data, '$.tool') AS tool,"
+            " CASE kind WHEN 'tool_call' THEN json_extract(data, '$.args') END AS args,"
+            " json_extract(data, '$.ok') AS ok, json_extract(data, '$.kind') AS result_kind,"
+            " CASE json_extract(data, '$.kind') WHEN 'memory_write' THEN json_extract(data, '$.text') END AS text,"
+            " CASE json_extract(data, '$.kind') WHEN 'memory_write' THEN json_extract(data, '$.summary') END AS summary"
+            f" FROM events WHERE run_id IN ({marks}) AND kind IN ('tool_call', 'tool_result') ORDER BY id",
+            tuple(run_ids),
+        )
+        return [
+            ToolStep(
+                run_id=str(row["run_id"]),
+                kind=str(row["kind"]),
+                call_id=row["call_id"] if isinstance(row["call_id"], str) else "",
+                tool=row["tool"] if isinstance(row["tool"], str) else "",
+                args=_object(row["args"]),
+                ok=row["ok"] == 1,
+                result_kind=row["result_kind"] if isinstance(row["result_kind"], str) else "",
+                text=row["text"] if isinstance(row["text"], str) else "",
+                summary=row["summary"] if isinstance(row["summary"], str) else "",
+            )
+            for row in rows
+        ]
 
     async def flagged_events(self, kind: str, flag: str, from_ts: float, to_ts: float) -> list[EventRecord]:
         """The stored events of ``kind`` that came between two times (seconds since the epoch) and name ``flag`` among

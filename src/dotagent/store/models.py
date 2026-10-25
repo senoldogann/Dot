@@ -289,6 +289,22 @@ class EventRecord(FrozenModel):
     data: JsonObject
 
 
+class ToolStep(FrozenModel):
+    """A tool call or its result as the Run tab reads it (item 650): ``kind`` is ``tool_call`` or ``tool_result``;
+    a call has its ``args``, a result its ``ok`` and ``result_kind``, and a change of the memory its ``text`` and
+    ``summary`` (empty otherwise)."""
+
+    run_id: str
+    kind: str
+    call_id: str
+    tool: str
+    args: JsonObject
+    ok: bool
+    result_kind: str
+    text: str
+    summary: str
+
+
 class SentMessage(FrozenModel):
     """A message the pages sent with a key of their own, kept so that the same message sent again (after an answer
     that was lost) is not done twice: ``target`` is the run it started or steered, or the queued message it became;

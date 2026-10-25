@@ -4,7 +4,7 @@
 // (contextpanel.js); nothing is shown of what the run did not do. Each row wears the theme's own colours (run.css), so
 // the panel reads in every theme.
 
-import { addMemory, addReadings, addUsage, languageOf, readingsOf, usageOf } from "./contextpanel.js";
+import { addMemory, addReadings, addUsage, chatMemory, chatUsage, languageOf, memoryChange, readingsOf, usageOf } from "./contextpanel.js";
 import { clip, el, plural } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
@@ -46,9 +46,12 @@ function skillsSection() {
   const body = el("div", { class: "context-list" });
   const section = panelSection({ id: "run-skills", title: "Skills & connected apps", actions: null, body });
   section.element.hidden = true;
-  let usages = [];
+  // What the open run used, and what the chat's earlier turns did (item 650).
+  let own = [];
+  let before = [];
 
   function paint() {
+    const usages = chatUsage(before, own);
     body.replaceChildren(
       ...usages.map((usage) =>
         el(
@@ -81,10 +84,14 @@ function skillsSection() {
 
   return {
     element: section.element,
-    add(call) {
+    add(call, earlier = false) {
       const usage = usageOf(call.tool, call.args ?? {});
       if (usage !== null) {
-        usages = addUsage(usages, usage);
+        if (earlier) {
+          before = addUsage(before, usage);
+        } else {
+          own = addUsage(own, usage);
+        }
         paint();
       }
     },
@@ -131,12 +138,16 @@ function artifactsSection(onOpen) {
 
 /** The searches and pages the run read; `add(readings)` takes those of one call, newest first. */
 function readingSection() {
-  const body = el("div", { class: "context-list" });
+  // A list of its own that scrolls past eight rows (item 650), as a chat reads many pages.
+  const body = el("div", { class: "context-list context-scroll" });
   const section = panelSection({ id: "run-reading", title: "Web reading", actions: null, body });
   section.element.hidden = true;
-  let readings = [];
+  let own = [];
+  let before = [];
 
   function paint() {
+    // The open run's readings first, then the earlier turns' (item 650).
+    const readings = addReadings(before, own);
     body.replaceChildren(
       ...readings.map((reading) =>
         reading.kind === "page"
@@ -162,8 +173,12 @@ function readingSection() {
 
   return {
     element: section.element,
-    add(more) {
-      readings = addReadings(readings, more);
+    add(more, earlier = false) {
+      if (earlier) {
+        before = addReadings(before, more);
+      } else {
+        own = addReadings(own, more);
+      }
       paint();
     },
   };
@@ -172,12 +187,14 @@ function readingSection() {
 /** The notes the run saved, corrected or forgot, each opening its note in Settings › Memory; `add(change)` takes one
  * `{ id, change, words }`. */
 function memorySection() {
-  const body = el("div", { class: "context-list" });
+  const body = el("div", { class: "context-list context-scroll" });
   const section = panelSection({ id: "run-memory", title: "Memory updated", actions: null, body });
   section.element.hidden = true;
-  let notes = [];
+  let own = [];
+  let before = [];
 
   function paint() {
+    const notes = chatMemory(before, own);
     body.replaceChildren(
       ...notes.map((note) => {
         const parts = row(
@@ -196,8 +213,12 @@ function memorySection() {
 
   return {
     element: section.element,
-    add(change) {
-      notes = addMemory(notes, change);
+    add(change, earlier = false) {
+      if (earlier) {
+        before = addMemory(before, change);
+      } else {
+        own = addMemory(own, change);
+      }
       paint();
     },
   };
@@ -225,5 +246,20 @@ export function createContextPanel({ onOpenChanges }) {
     },
     onMemory: (change) => memory.add(change),
     onFiles: (files) => artifacts.set(files),
+    // What the chat's turns before the open run used, read and remembered (item 650, `GET /runs/{id}/chat-context`),
+    // oldest first: it stands under the open run's in each section, so a new message starts from the chat's context.
+    onEarlier: (steps) => {
+      for (const step of steps) {
+        skills.add(step, true);
+        const readings = readingsOf(step.tool, step.args ?? {});
+        if (readings.length > 0) {
+          reading.add(readings, true);
+        }
+        const change = memoryChange({ kind: step.kind, ok: true, text: step.text, summary: step.summary }, step.args ?? {});
+        if (change !== null) {
+          memory.add(change, true);
+        }
+      }
+    },
   };
 }

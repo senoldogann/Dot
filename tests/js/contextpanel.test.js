@@ -8,7 +8,10 @@ import {
   addMemory,
   addReadings,
   addUsage,
+  chatMemory,
+  chatUsage,
   languageOf,
+  memoryChange,
   readingsOf,
   usageOf,
 } from "../../src/dotagent/server/static/js/contextpanel.js";
@@ -131,4 +134,63 @@ test("a note changed again is told once, as it stands now, newest first", () => 
   assert.equal(addMemory([], many[0], 6).length, 1);
   assert.equal(addMemory(many, { id: "mem_new", change: "Saved", words: "new" }, 6).length, 6);
   assert.equal(addMemory(many, { id: "mem_new", change: "Saved", words: "new" }, 6)[0].id, "mem_new");
+});
+
+// Item 650: the panel keeps the whole chat's context, the open run's over its earlier turns'.
+
+test("a chat's usage counts a skill its earlier turns and the open run used together, in the order first used", () => {
+  const before = [
+    { kind: "skill", name: "pdf", count: 2 },
+    { kind: "server", name: "linear", count: 1 },
+  ];
+  const own = [
+    { kind: "server", name: "github", count: 1 },
+    { kind: "skill", name: "pdf", count: 1 },
+  ];
+  assert.deepEqual(chatUsage(before, own), [
+    { kind: "skill", name: "pdf", count: 3 },
+    { kind: "server", name: "linear", count: 1 },
+    { kind: "server", name: "github", count: 1 },
+  ]);
+  // Neither list is changed.
+  assert.equal(before[0].count, 2);
+});
+
+test("a chat's readings put the open run's first, then its earlier turns', each once, and keep a long chat's", () => {
+  const page = (n) => ({ kind: "page", text: `example.org/${n}`, url: `https://example.org/${n}` });
+  const before = addReadings([], [page(1), page(2)]);
+  const own = addReadings([], [page(3), page(1)]);
+  assert.deepEqual(
+    addReadings(before, own).map((reading) => reading.text),
+    ["example.org/3", "example.org/1", "example.org/2"],
+  );
+  const many = Array.from({ length: 30 }, (_, n) => page(n));
+  assert.equal(addReadings([], many).length, 30);
+});
+
+test("a chat's memory changes put the open run's first and tell a note once, as it stands now", () => {
+  const before = [
+    { id: "mem_a", change: "Saved", words: "a" },
+    { id: "mem_b", change: "Saved", words: "b" },
+  ];
+  const own = [{ id: "mem_a", change: "Updated", words: "a2" }];
+  assert.deepEqual(chatMemory(before, own), [
+    { id: "mem_a", change: "Updated", words: "a2" },
+    { id: "mem_b", change: "Saved", words: "b" },
+  ]);
+});
+
+test("a memory tool's result says which note it changed, and one that changed nothing says none", () => {
+  assert.deepEqual(memoryChange({ kind: "memory_write", ok: true, text: "Saved: [mem_x] the note", summary: "" }, { content: "the note" }), {
+    id: "mem_x",
+    change: "Saved",
+    words: "the note",
+  });
+  assert.deepEqual(memoryChange({ kind: "memory_write", ok: true, text: "Forgot: [mem_y]", summary: "Forget: old words" }, {}), {
+    id: "mem_y",
+    change: "Forgot",
+    words: "old words",
+  });
+  assert.equal(memoryChange({ kind: "memory_write", ok: true, text: "Already saved: [mem_x]", summary: "" }, {}), null);
+  assert.equal(memoryChange({ kind: "file_write", ok: true, text: "Saved: [mem_x]", summary: "" }, {}), null);
 });
