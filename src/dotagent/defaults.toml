@@ -27,9 +27,9 @@ mcp = []
 # Customize › Connectors has the same switches and writes them here. The table is not [mcp], which TOML cannot have
 # beside the [[mcp]] tables. A server of the same name from any other place (a [[mcp]] table, a plugin, another agent,
 # Customize › Connectors) replaces the built-in.
-# web_research: the server web-research (the package dotagent-web-research), whose tools mcp__web-research__web_search,
-# web_scrape, web_map, web_extract, web_health and web_crawl_* search the web (DuckDuckGo, Yahoo, and Google when those
-# refuse), read the pages a run asks for and crawl in the background; while no list of sites is set ([browser]
+# web_research: the server web-research (the package dotagent-web-research), whose search is a rung of web_search
+# (DuckDuckGo, Yahoo, and Google when those refuse; [web] search_order, item 655) and whose tools mcp__web-research__
+# web_scrape, web_map, web_extract and web_crawl_* read the pages a run asks for and crawl in the background; while no list of sites is set ([browser]
 # allowed_hosts, or blocked_hosts beyond these defaults) they also read pages of their own choosing: the heads of a news
 # search's results for their dates, and another copy of a page behind a wall. Its crawl jobs are kept in
 # <home>/web-research.
@@ -569,6 +569,11 @@ sandbox = true
 # engine that answered and the rungs skipped. A named engine ("searxng", "duckduckgo", "brave", "ollama") is that engine
 # alone. dotx doctor shows the ladder.
 search_backend = "auto"
+# The engines web_search asks, in turn, as Settings › Web search orders them (item 655): "searxng", "ollama",
+# "anthropic", "brave_api", "tavily", "exa", "serper" (the APIs with a key of their own, saved on that page),
+# "web_research" (the search of the server that comes with Dot), "duckduckgo", "brave", "browser". Empty: the ladder of
+# search_backend.
+search_order = []
 # A SearXNG instance of the owner's own (https://docs.searxng.org): its JSON API must be enabled (search.formats holds
 # "json"). Empty: no SearXNG rung. The usual case is a loopback instance such as http://127.0.0.1:8888; it is trusted
 # configuration, so allow_private_hosts does not apply to it.

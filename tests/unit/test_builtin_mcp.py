@@ -25,6 +25,7 @@ from dotagent.doctor import mcp_checks
 from dotagent.evals.runner import eval_config
 from dotagent.mcp import builtin
 from dotagent.mcp.builtin import (
+    OFFERED_TOOLS,
     WEB_RESEARCH,
     address_arguments,
     builtin_servers,
@@ -88,7 +89,8 @@ def test_the_server_comes_when_its_package_is_installed_and_no_other_server_has_
     assert (server.name, server.enabled) == (WEB_RESEARCH, True)
     assert server.transport_kind() == "stdio"
     assert (server.startup_timeout_s, server.call_timeout_s) == (60.0, 120.0)
-    assert server.allow == []
+    # A run is offered its tools but its search and its health check (item 655).
+    assert server.allow == list(OFFERED_TOOLS)
 
 
 def test_the_command_is_the_python_the_daemon_runs_on_and_its_data_is_kept_in_dots_home(

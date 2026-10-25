@@ -269,6 +269,16 @@ class WebClient:
             raise WebError("the API answered with a redirect", {"url": _shown(url), "status": exchange.status})
         return _document(url, exchange, ())
 
+    async def get_json(self, url: str, headers: Mapping[str, str], max_bytes: int) -> FetchedDocument:
+        """GET an API's JSON answer with ``headers`` (a key in one of them); redirects are not followed, and the request
+        is tried again as a GET is (item 655: Brave's search API)."""
+        exchange: _Exchange = await self._exchange(
+            "GET", url, {**headers, "Accept": "application/json"}, None, max_bytes
+        )
+        if exchange.location is not None:
+            raise WebError("the API answered with a redirect", {"url": _shown(url), "status": exchange.status})
+        return _document(url, exchange, ())
+
     async def _exchange(
         self, method: str, url: str, headers: Mapping[str, str], content: bytes | None, max_bytes: int
     ) -> _Exchange:

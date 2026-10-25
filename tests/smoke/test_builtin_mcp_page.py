@@ -29,8 +29,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module"), pyt
 
 TOKEN: str = "builtin-mcp-page-token"
 SERVER: str = "web-research"
-# The tools the tile names first, and how many the server lists.
-SHOWN: str = "9 actions: web_search, web_scrape, web_map, web_extract, web_health, web_crawl_start, …"
+# The tools the tile names first, and how many a run is offered (its search is web_search's rung, item 655).
+SHOWN: str = "7 actions: web_scrape, web_extract, web_map, web_crawl_start, web_crawl_status, web_crawl_results, …"
 _SCREENS: tuple[tuple[int, str], ...] = ((1280, "light"), (390, "dark"), (320, "dark"))
 
 
@@ -145,7 +145,7 @@ async def test_the_tile_of_the_server_that_comes_with_dot_has_its_switch(
                 await expect(tile.get_by_text("tools:")).to_have_count(0)
                 assert runtime.mcp.connected() == ()
                 assert "[builtin_mcp]\nweb_research = false\n" in await asyncio.to_thread(_config_text)
-                assert f"mcp__{SERVER}__web_search" not in runtime.registry.tools
+                assert f"mcp__{SERVER}__web_scrape" not in runtime.registry.tools
                 await page.screenshot(path=str(tmp_path / f"builtin-{width}-{scheme}-off.png"))
                 # It stays off when the page is read again.
                 await page.reload()
@@ -158,7 +158,7 @@ async def test_the_tile_of_the_server_that_comes_with_dot_has_its_switch(
                 await expect(switch).to_have_attribute("aria-checked", "true")
                 await expect(tile.get_by_text(SHOWN)).to_have_count(1)
                 assert runtime.mcp.connected() == (SERVER,)
-                assert f"mcp__{SERVER}__web_search" in runtime.registry.tools
+                assert f"mcp__{SERVER}__web_scrape" in runtime.registry.tools
                 assert "web_research = true" in await asyncio.to_thread(_config_text)
                 await page.close()
         finally:

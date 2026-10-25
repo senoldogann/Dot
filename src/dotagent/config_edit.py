@@ -48,6 +48,7 @@ type ConfigTable = Literal[
     "server",
     "shell",
     "snapshots",
+    "web",
 ]
 type AgentSetting = Literal["resume"]
 type AssistantSetting = Literal["name", "owner", "introduced"]
@@ -73,6 +74,7 @@ type ReactionsSetting = Literal["follow_ups", "good", "love", "wrong", "again", 
 type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
 type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
+type WebSetting = Literal["search_order"]
 type SettingKey = (
     AgentSetting
     | AssistantSetting
@@ -86,8 +88,9 @@ type SettingKey = (
     | ServerSetting
     | ShellSetting
     | SnapshotsSetting
+    | WebSetting
 )
-# A list of names is ``[server] reach`` (item 271) or ``[models] standby`` (item 478).
+# A list of names is ``[server] reach`` (item 271), ``[models] standby`` (item 478) or ``[web] search_order``.
 type SettingValue = str | bool | int | list[str]
 
 
@@ -319,6 +322,12 @@ def set_standby_models(path: Path, models: list[str]) -> None:
     """Write ``[models] standby``, the models a run moves to in their order when its own model cannot answer (item
     478), into the config file at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "models", "standby", models)
+
+
+def set_search_order(path: Path, order: list[str]) -> None:
+    """Write ``[web] search_order``, the engines web_search asks in turn (item 655), into the config file at ``path``
+    (see :func:`set_setting`); an empty list leaves the ladder to ``search_backend``."""
+    set_setting(path, "web", "search_order", order)
 
 
 def set_embeddings(path: Path, on: bool) -> None:

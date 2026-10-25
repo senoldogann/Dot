@@ -58,7 +58,7 @@ from dotagent.llm.openrouter import KeyStatus, OpenRouterProvider, listed_id
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import ChatProvider, ModelInfo
 from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
-from dotagent.mcp.builtin import builtin_servers, switch_of
+from dotagent.mcp.builtin import builtin_servers, switch_of, web_research_installed
 from dotagent.mcp.launch import referenced_secrets
 from dotagent.memory.embedder import OpenAIEmbedder, build_openai_embedder
 from dotagent.plugins.catalog import load_plugins
@@ -77,6 +77,8 @@ from dotagent.skills.types import SkillCatalog, SkillProblem
 from dotagent.store.backup import backup_state
 from dotagent.tools.shell import read_login_env
 from dotagent.web.client import WebClient
+from dotagent.web.keyed import SEARCH_KEYS, keyed_engines
+from dotagent.web.ladder import SearchEngine
 from dotagent.web.search import AnthropicRung, SearchChoice, search_ladder, search_ollama
 from dotagent.web.types import SearchHit
 
@@ -263,16 +265,40 @@ def _check_key(provider: str, variable: str, present: bool, needed: bool) -> Che
     return _result(name, False, False, f"not set; add it to use {provider} models: dotx auth set {variable}")
 
 
-def _search_row(config: AppConfig, ollama_key_present: bool, anthropic_key_present: bool) -> CheckResult:
-    """The engines web_search climbs: what [web] search_backend says, and what auto resolves to on this Mac (the
-    Anthropic rung joins when its key is set, the browser rung when the run's browser is Dot's own Chrome with a visible
+def _search_row(
+    config: AppConfig,
+    ollama_key_present: bool,
+    anthropic_key_present: bool,
+    keyed: frozenset[SearchEngine] = frozenset(),
+    web_research: bool = False,
+) -> CheckResult:
+    """The engines web_search climbs, as a run does (item 655): the order Settings › Web search keeps, else what [web]
+    search_backend says and what auto resolves to on this Mac (the Anthropic rung joins when its key is set, the search
+    APIs whose keys are set (``keyed``) and the web-research server's search (``web_research``, when it is on and
+    installed: a run climbs it once the server has started, which the server's own row says) before the scraped
+    engines, the browser rung when the run's browser is Dot's own Chrome with a visible
     window)."""
     choice: SearchChoice = config.web.search_backend
     visible_own: bool = config.browser.mode == "own" and not config.browser.headless
     anthropic: AnthropicRung | None = config.web.anthropic_search if anthropic_key_present else None
     ladder: str = " -> ".join(
-        search_ladder(choice, ollama_key_present, anthropic, visible_own, bool(config.web.searxng_url))
+        search_ladder(
+            choice,
+            ollama_key_present,
+            anthropic,
+            visible_own,
+            bool(config.web.searxng_url),
+            tuple(config.web.search_order),
+            keyed,
+            web_research,
+        )
     )
+    if config.web.search_order:
+        missing: list[str] = [
+            engine for engine in config.web.search_order if engine in SEARCH_KEYS and engine not in keyed
+        ]
+        note: str = f"; no key for {', '.join(missing)}, passed over" if missing else ""
+        return _result("web search", True, False, f"{ladder} ([web] search_order, Settings › Web search{note})")
     if choice != "auto":
         return _result("web search", True, False, f"{ladder} ([web] search_backend)")
     keys: str = ", ".join(
@@ -830,7 +856,13 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         _check_key("opencode go", config.providers.opencode_go.api_key_env, go_present, "opencode_go" in used),
         _check_key("anthropic", config.providers.anthropic.api_key_env, anthropic_present, "anthropic" in used),
         _check_key("openrouter", config.providers.openrouter.api_key_env, openrouter_present, "openrouter" in used),
-        _search_row(config, ollama_present, anthropic_present),
+        _search_row(
+            config,
+            ollama_present,
+            anthropic_present,
+            await keyed_engines(),
+            config.builtin_mcp.web_research and web_research_installed(),
+        ),
     ]
     try:
         # The connectors of OpenAI, OpenCode Go and OpenRouter know a model by its name alone until it is called, so the

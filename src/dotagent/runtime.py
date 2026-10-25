@@ -104,6 +104,8 @@ from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.vault.onepassword import OnePassword
 from dotagent.web.client import WebClient
+from dotagent.web.keyed import keyed_engines
+from dotagent.web.ladder import SearchEngine
 
 log = get_logger(__name__)
 
@@ -114,9 +116,24 @@ class SearchKeys:
     Providers saves or removes one of them, which retires the provider's connector (:meth:`ModelRouter.on_retire`), so
     that a key works from the next search and a removed one is no longer climbed to (item 558)."""
 
-    def __init__(self, ollama: bool, anthropic: bool) -> None:
+    def __init__(
+        self,
+        ollama: bool,
+        anthropic: bool,
+        keyed: frozenset[SearchEngine] = frozenset(),
+        order: tuple[SearchEngine, ...] = (),
+    ) -> None:
         self.ollama: bool = ollama
         self.anthropic: bool = anthropic
+        # The search APIs whose keys are set (item 655), read again when Settings › Web search saves or removes one.
+        self.keyed: frozenset[SearchEngine] = keyed
+        # The order of web_search's engines that Settings › Web search keeps, as ``[web] search_order`` (empty: the
+        # ladder of ``search_backend``); a new order holds from the next search, with no restart.
+        self.order: tuple[SearchEngine, ...] = order
+
+    async def read_keyed(self) -> None:
+        """Read again which of the search APIs' keys are set."""
+        self.keyed = await keyed_engines()
 
 
 async def _refresh_search_key(config: AppConfig, keys: SearchKeys, provider: str) -> None:
@@ -465,7 +482,12 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
         peers: Peers = Peers()
         browsers: BrowserPool = BrowserPool(config.browser, config.server, downloads_dir(), peers.threads)
         router: ModelRouter = ModelRouter(config, _call_recorder(store, bus), login_env)
-        search_keys: SearchKeys = SearchKeys(ollama=ollama_key is not None, anthropic=anthropic_key is not None)
+        search_keys: SearchKeys = SearchKeys(
+            ollama=ollama_key is not None,
+            anthropic=anthropic_key is not None,
+            keyed=await keyed_engines(),
+            order=tuple(config.web.search_order),
+        )
         router.on_retire(partial(_refresh_search_key, config, search_keys))
         runtime: Runtime = Runtime(
             config=config,

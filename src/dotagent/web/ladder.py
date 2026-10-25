@@ -2,13 +2,28 @@
 holds one of each; the search module reads and writes them."""
 
 from collections.abc import Mapping
-from typing import Literal
+from typing import Literal, get_args
 
 from dotagent.core.types import FrozenModel
 from dotagent.web.types import SearchHit
 
-# The engines a search can go to.
-SearchEngine = Literal["searxng", "ollama", "anthropic", "duckduckgo", "brave", "browser"]
+# The engines a search can go to: those of item 233 and after, and since item 655 the search APIs that take a key of
+# their own (Brave's API, Tavily, Exa, Serper) and the search of the web-research server that comes with Dot.
+SearchEngine = Literal[
+    "searxng",
+    "ollama",
+    "anthropic",
+    "brave_api",
+    "tavily",
+    "exa",
+    "serper",
+    "web_research",
+    "duckduckgo",
+    "brave",
+    "browser",
+]
+# Every engine, in the order the auto ladder would ask them.
+SEARCH_ENGINES: tuple[SearchEngine, ...] = get_args(SearchEngine)
 
 # How long an engine that limited this machine sits out; the searches of that time go to the next rung at once.
 # DuckDuckGo's bot check, once met, stays for a while; Brave's is a rate limit of a minute or so; the browser rung
@@ -17,6 +32,13 @@ BENCH_S: Mapping[SearchEngine, float] = {
     "searxng": 120.0,
     "ollama": 60.0,
     "anthropic": 120.0,
+    # A key's allowance or rate, spent: a minute, as Ollama's.
+    "brave_api": 60.0,
+    "tavily": 60.0,
+    "exa": 60.0,
+    "serper": 60.0,
+    # The server rests its own providers; a limit it passes on is a long one.
+    "web_research": 300.0,
     "duckduckgo": 600.0,
     "brave": 90.0,
     "browser": 600.0,

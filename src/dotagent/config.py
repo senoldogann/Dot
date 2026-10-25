@@ -16,6 +16,7 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, split_model_ref
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
 from dotagent.store.models import BrowserMode, NotifyLevel
+from dotagent.web.ladder import SearchEngine
 
 
 def _service_address(value: str) -> str:
@@ -663,6 +664,9 @@ class CrawlConfig(FrozenModel):
 
 class WebConfig(FrozenModel):
     search_backend: Literal["auto", "searxng", "duckduckgo", "brave", "ollama", "anthropic"]
+    # The engines web_search asks, in turn, as Settings › Web search orders them (item 655); empty: the ladder of
+    # search_backend. An engine whose key is not set is passed over and said to be.
+    search_order: list[SearchEngine] = Field(default_factory=list)
     # The base address of the owner's SearXNG instance (https://docs.searxng.org), whose own engines answer a search
     # without a key; empty: no such rung.
     searxng_url: str
@@ -676,6 +680,13 @@ class WebConfig(FrozenModel):
     allow_private_hosts: bool
     user_agent: str
     crawl: CrawlConfig
+
+    @field_validator("search_order")
+    @classmethod
+    def _each_engine_once(cls, value: list[SearchEngine]) -> list[SearchEngine]:
+        if len(set(value)) != len(value):
+            raise ValueError("search_order names an engine twice")
+        return value
 
     @field_validator("searxng_url")
     @classmethod

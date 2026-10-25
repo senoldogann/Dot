@@ -185,6 +185,17 @@ class McpHub:
         # A tool the server declares read-only is called again once when its connection broke (item 513).
         return await connection.call_tool(tool.remote_name, arguments, tool.hints.read_only is True)
 
+    async def call_unoffered(self, server: str, remote_name: str, arguments: JsonObject) -> CallToolResult:
+        """Call the tool ``remote_name`` of the connected server ``server`` that its allow list keeps from the model
+        (item 655: the web-research server's search, which web_search asks); taken as read-only, so a broken
+        connection is tried again once. It judges neither the server, the tool nor the arguments: its one caller
+        (``tools.web.web_research_search``) names them as constants, after Dot's own rule judged the query; a new
+        caller must judge what it sends as a run's call is judged."""
+        connection: McpConnection | None = self._connections.get(server)
+        if connection is None:
+            raise McpError("the MCP server is not connected", {"server": server, "tool": remote_name})
+        return await connection.call_tool(remote_name, arguments, True)
+
     async def attempt(self, config: McpServerConfig, auth: httpx2.Auth | None) -> tuple[McpTool, ...]:
         """Connect to ``config`` once, signing in with ``auth``, and close the connection again: the tools the model
         would get from it. Raises when it cannot be used, as :func:`open_hub` would leave it out."""

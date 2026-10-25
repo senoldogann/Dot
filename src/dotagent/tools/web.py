@@ -11,8 +11,10 @@ import secrets
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit, urlunsplit
 
+from mcp.types import CallToolResult, TextContent
 from pydantic import Field
 
 from dotagent.agent.helpers import Unavailable, paused_model, unavailable_text
@@ -21,13 +23,14 @@ from dotagent.browser.session import RenderedDocument
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.browser.types import PageView
 from dotagent.config import AppConfig
-from dotagent.core.errors import BrowserError, ProviderError, ToolExecutionError, ToolInputError, WebError
+from dotagent.core.errors import BrowserError, McpError, ProviderError, ToolInputError, WebError
 from dotagent.core.text import text_window
 from dotagent.core.types import JsonObject
 from dotagent.llm.router import ModelRef, parse_model_ref
+from dotagent.mcp.builtin import SEARCH_TOOL, WEB_RESEARCH
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
-from dotagent.secrets import require_secret
+from dotagent.secrets import optional_secret
 from dotagent.tools.base import (
     ALL_MODES,
     RegisteredTool,
@@ -56,11 +59,15 @@ from dotagent.web.crawl import (
     scope_of,
 )
 from dotagent.web.extract import Extraction, FieldSpec, extract
+from dotagent.web.keyed import SEARCH_KEYS, WebResearchSearch
 from dotagent.web.ladder import SearchEngine, SearchOutcome
 from dotagent.web.pdf import pdf_to_text
 from dotagent.web.search import AnthropicSearch, ReadPage, engine_attempts, search, search_ladder
 from dotagent.web.text import DocumentKind, ReadablePage, decode_body, document_kind, html_to_text
 from dotagent.web.types import REFUSED_STATUS, FetchedDocument, SearchHit
+
+if TYPE_CHECKING:
+    from dotagent.runtime import Runtime
 
 _NONCE_BYTES: int = 8
 _HEADROOM_CHARS: int = 1200  # room next to the text for the header, the fence lines and the hints
@@ -530,6 +537,59 @@ def _page_reader(ctx: ToolContext) -> ReadPage | None:
     return read
 
 
+def web_research_runs(runtime: "Runtime") -> bool:
+    """Whether the web-research server that comes with Dot runs now, so its search is a rung (item 655); a server of
+    the owner's of that name is the owner's, whose tools the run has itself."""
+    return WEB_RESEARCH in runtime.builtin_names and WEB_RESEARCH in runtime.mcp.connected()
+
+
+def web_research_search(runtime: "Runtime") -> WebResearchSearch | None:
+    """The rung of the web-research server's search: the query web_search was given, and how many results, sent to the
+    server's own search, whose compact answer comes back (item 655)."""
+    if not web_research_runs(runtime):
+        return None
+
+    async def ask(query: str, max_results: int) -> JsonObject:
+        try:
+            result: CallToolResult = await runtime.mcp.call_unoffered(
+                WEB_RESEARCH, SEARCH_TOOL, {"query": query, "limit": max_results}
+            )
+        except McpError as error:
+            raise WebError(f"the web-research search failed: {error.message}", dict(error.context)) from error
+        return _search_answer(result, query)
+
+    return ask
+
+
+def _search_answer(result: CallToolResult, query: str) -> JsonObject:
+    """The web-research search's answer as an object: its structured content, or the JSON of its text; an answer the
+    server marks an error is the rung's failure, in the server's words."""
+    text: str = "".join(block.text for block in result.content if isinstance(block, TextContent))
+    if result.is_error:
+        raise WebError(f"the web-research search did not answer: {_clip(text, _SHOWN_URL_CHARS)}", {"query": query})
+    if isinstance(result.structured_content, dict):
+        return dict(result.structured_content)
+    try:
+        answer: object = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise WebError("the web-research search's answer is not JSON", {"query": query}) from exc
+    if not isinstance(answer, dict):
+        raise WebError("the web-research search's answer is not an object", {"query": query})
+    return answer
+
+
+async def _search_keys(ladder: tuple[SearchEngine, ...]) -> dict[SearchEngine, str]:
+    """The keys of the search APIs on ``ladder`` that are set, read now (item 655)."""
+    keys: dict[SearchEngine, str] = {}
+    for engine in ladder:
+        variable: str | None = SEARCH_KEYS.get(engine)
+        if variable is not None:
+            key: str | None = await asyncio.to_thread(optional_secret, variable)
+            if key is not None:
+                keys[engine] = key
+    return keys
+
+
 def _search_tool() -> RegisteredTool:
     def rungs(ctx: ToolContext) -> tuple[SearchEngine, ...]:
         config: AppConfig = ctx.runtime.config
@@ -539,20 +599,19 @@ def _search_tool() -> RegisteredTool:
             config.web.anthropic_search if ctx.runtime.anthropic_key_present else None,
             ctx.browser.human_like,
             bool(config.web.searxng_url),
+            ctx.runtime.search_keys.order,
+            ctx.runtime.search_keys.keyed,
+            web_research_runs(ctx.runtime),
         )
 
-    async def anthropic_relay(config: AppConfig) -> AnthropicSearch:
-        """The key and the model of the Anthropic rung; a [models] search that is not an Anthropic model is refused."""
+    async def anthropic_relay(config: AppConfig) -> AnthropicSearch | None:
+        """The key and the model of the Anthropic rung; none when its key is not set or [models] search is not an
+        Anthropic model, and the rung is then passed over saying so."""
         ref: ModelRef = parse_model_ref(config.models.search)
         if ref.provider != "anthropic":
-            raise ToolExecutionError(
-                "[models] search must name an Anthropic model for the anthropic search engine",
-                {"search": config.models.search},
-            )
-        key: str = await asyncio.to_thread(
-            require_secret, config.providers.anthropic.api_key_env, "web_search with the anthropic search engine"
-        )
-        return AnthropicSearch(api_key=key, model=ref.model)
+            return None
+        key: str | None = await asyncio.to_thread(optional_secret, config.providers.anthropic.api_key_env)
+        return None if key is None else AnthropicSearch(api_key=key, model=ref.model)
 
     def classify(args: SearchArgs, ctx: ToolContext) -> ActionInfo:
         return _action("web_search", f"Search the web for {args.query}", "/".join(rungs(ctx)), search_flags(args.query))
@@ -561,10 +620,9 @@ def _search_tool() -> RegisteredTool:
         config: AppConfig = ctx.runtime.config
         wanted, lowered = wanted_results(args.max_results)
         ladder: tuple[SearchEngine, ...] = rungs(ctx)
+        # A rung whose key is not set is passed over saying so (item 655), not the end of the search.
         key: str | None = (
-            await asyncio.to_thread(
-                require_secret, config.providers.ollama.api_key_env, "web_search with the ollama search engine"
-            )
+            await asyncio.to_thread(optional_secret, config.providers.ollama.api_key_env)
             if "ollama" in ladder
             else None
         )
@@ -572,7 +630,15 @@ def _search_tool() -> RegisteredTool:
         outcome: SearchOutcome = await search(
             ctx.runtime.web,
             ladder,
-            engine_attempts(ctx.runtime.web, key, relay, _page_reader(ctx), config.web.searxng_url or None),
+            engine_attempts(
+                ctx.runtime.web,
+                key,
+                relay,
+                _page_reader(ctx),
+                config.web.searxng_url or None,
+                await _search_keys(ladder),
+                web_research_search(ctx.runtime),
+            ),
             args.query,
             wanted,
         )
