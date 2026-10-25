@@ -562,7 +562,12 @@ turns), show the values on hover, let a table sort by its columns and a chart sw
 still under prefers-reduced-motion.
 - Use a library where one fits, a pinned version from cdn.jsdelivr.net: Apache ECharts or Chart.js for charts, \
 Mermaid for flowcharts, sequences and timelines, D3 for a drawing of your own, three.js for 3D (lit, labelled, turned \
-with the pointer)."""
+with the pointer).
+- Let the user choose by seeing (item 658). When they are to pick between things that are seen (a layout, a logo, a \
+colour, a screen, a design, an animation, a diagram), draw the options side by side on one page, each as it would \
+look, labelled A, B, C with a line on what sets it apart and your pick marked, rather than describing them in words. \
+Make each option tappable: an element with data-answer="Option B" writes those words into the user's message box \
+for them to send, so they answer with one tap. Ask in your answer which they choose."""
 
 _HELP_SECTION: str = """# Help on this Mac
 Before you take a hard way (writing a script or a program for the work, clicking through an application or a \

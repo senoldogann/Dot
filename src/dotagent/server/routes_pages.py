@@ -2,7 +2,7 @@
 
 The daemon serves a page as the run wrote it, after a bootstrap of its own, and the guard sandboxes it
 (``PAGE_HEADERS``): its origin is opaque, so its scripts reach nothing of Dot's. The bootstrap gives the page the CSS
-variables of :data:`THEME_VARIABLES`, and speaks three messages of the MCP Apps protocol (JSON-RPC 2.0 over
+variables of :data:`THEME_VARIABLES`, and speaks four messages of the MCP Apps protocol (JSON-RPC 2.0 over
 ``postMessage``) with the frame it is in:
 
 - ``ui/notifications/host-context-changed`` from the frame: the conversation's theme,
@@ -12,6 +12,9 @@ variables of :data:`THEME_VARIABLES`, and speaks three messages of the MCP Apps 
 - ``ui/notifications/size-changed`` to the frame: ``{"height": pixels}``, every time the page's height changes.
 - ``ui/open-link`` to the frame: ``{"url": address}``, for a link to another page that the user clicked; the frame
   opens it in the user's browser. A page opened full size follows its links itself.
+- ``ui/message`` to the frame: ``{"role": "user", "content": [{"type": "text", "text": words}]}``, for a choice the
+  page offers that the user tapped (item 658): an element with ``data-answer`` sends its words, and the page's own
+  scripts may send the same after a click. The frame writes the words into the message box, for the user to send.
 """
 
 import re
@@ -40,6 +43,7 @@ _BOOTSTRAP: str = """(() => {
   const CONTEXT_CHANGED = "ui/notifications/host-context-changed";
   const SIZE_CHANGED = "ui/notifications/size-changed";
   const OPEN_LINK = "ui/open-link";
+  const MESSAGE = "ui/message";
   const NAME = /^--[a-z0-9-]+$/;
   const theme = document.getElementById("dot-theme");
   const framed = window.parent !== window;
@@ -103,6 +107,30 @@ _BOOTSTRAP: str = """(() => {
     requests += 1;
     window.parent.postMessage(
       { jsonrpc: "2.0", id: `dot-link-${requests}`, method: OPEN_LINK, params: { url: url.href } },
+      "*",
+    );
+  });
+
+  // A choice the page offers (item 658): an element with data-answer that the user tapped gives its words to the
+  // frame, which writes them into the message box for the user to send.
+  window.addEventListener("click", (event) => {
+    if (!event.isTrusted || event.defaultPrevented) {
+      return;
+    }
+    const choice = event.composedPath().find((node) => node instanceof Element && node.hasAttribute("data-answer"));
+    const text = choice?.getAttribute("data-answer")?.trim() ?? "";
+    if (text === "") {
+      return;
+    }
+    event.preventDefault();
+    requests += 1;
+    window.parent.postMessage(
+      {
+        jsonrpc: "2.0",
+        id: `dot-answer-${requests}`,
+        method: MESSAGE,
+        params: { role: "user", content: [{ type: "text", text }] },
+      },
       "*",
     );
   });

@@ -58,6 +58,8 @@ LINK: str = "https://example.com/report"
 UNASKED: str = "https://example.com/unasked"
 ELSEWHERE: str = "https://example.com/elsewhere"
 OUT_OF_REACH: str = "out of reach"
+# The words of the choice the page offers (item 658), which a tap on it writes into the message box.
+CHOICE: str = "Option B, the quiet one"
 # A chart of three bars in the conversation's colours, which says what its scripts could reach: the API, the page
 # around it (the page that opened it, full size) and the UI's storage. Framed, it asks on load to open a link no
 # click asked for; a button of it loads another page in its place.
@@ -71,7 +73,9 @@ p {{ margin: 8px 0; }}
 <div class="bar" style="height: 100%"></div></div>
 <p>API: <span id="api">…</span>. Page around: <span id="around">…</span>. Storage: <span id="storage">…</span>.
 Unasked link: <span id="unasked">…</span>.</p>
-<p><a id="link" href="{LINK}">The report</a> <button id="away" type="button">Somewhere else</button></p>
+<p><a id="link" href="{LINK}">The report</a> <button id="away" type="button">Somewhere else</button>
+<button id="pick" type="button" data-answer="{CHOICE}">Option B</button></p>
+<p>Unasked answer: <span id="unanswered">…</span>.</p>
 <script>
 const say = (id, text) => {{ document.getElementById(id).textContent = text; }};
 fetch("/api/status").then(() => say("api", "reached"), () => say("api", "{OUT_OF_REACH}"));
@@ -81,13 +85,17 @@ catch {{ say("around", "{OUT_OF_REACH}"); }}
 try {{ localStorage.getItem("dot.scheme"); say("storage", "reached"); }} catch {{ say("storage", "{OUT_OF_REACH}"); }}
 window.addEventListener("message", (event) => {{
   if (event.data?.id === "unasked") say("unasked", event.data.error ? "refused" : "opened");
+  if (event.data?.id === "unanswered") say("unanswered", event.data.error ? "refused" : "written");
 }});
 document.getElementById("away").addEventListener("click", () => {{ location.href = "{ELSEWHERE}"; }});
 if (window.parent !== window) {{
   window.parent.postMessage(
     {{ jsonrpc: "2.0", id: "unasked", method: "ui/open-link", params: {{ url: "{UNASKED}" }} }}, "*");
+  window.parent.postMessage({{ jsonrpc: "2.0", id: "unanswered", method: "ui/message",
+    params: {{ role: "user", content: [{{ type: "text", text: "written by the page itself" }}] }} }}, "*");
 }} else {{
   say("unasked", "refused");
+  say("unanswered", "refused");
 }}
 </script></body></html>"""
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
@@ -203,6 +211,7 @@ async def _check_reach(page: FrameLocator | Page) -> None:
     for name in ("api", "around", "storage"):
         await expect(page.locator(f"#{name}")).to_have_text(OUT_OF_REACH)
     await expect(page.locator("#unasked")).to_have_text("refused")
+    await expect(page.locator("#unanswered")).to_have_text("refused")
 
 
 async def _fits(framing: Locator, frame: Frame) -> bool:
@@ -283,6 +292,15 @@ async def _one_size(
     await _check_reach(full)
     await _settles(partial(full.evaluate, _INK), other)
     await _settles(partial(_address_of, full), f"{address}/pages/{page_id}")
+
+    # A choice tapped in the page is written into the message box, for the owner to send (item 658); the one the page
+    # sent by itself was not.
+    box: Locator = page.locator(".dock .composer textarea")
+    await expect(box).to_have_value("")
+    await inside.locator("#pick").click()
+    await expect(box).to_have_value(CHOICE)
+    await expect(box).to_be_focused()
+    await box.fill("")
 
     # Full screen, in a dialog of the UI: the page in the theme on screen, reaching nothing; Escape closes it.
     await card.hover()
