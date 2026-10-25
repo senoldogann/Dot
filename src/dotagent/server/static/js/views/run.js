@@ -135,8 +135,9 @@ function planStep(step) {
 
 /**
  * Build the page of a loaded run and start following it. `history` is `loadHistory`'s `{ earlier, read }`, the runs of
- * the conversation before this one; `historyProblem` is the error that kept them from loading, or null. Returns the
- * function that stops everything the page started.
+ * the conversation before this one; `historyProblem` is the error that kept them from loading, or null. `readNow` says
+ * that `detail` was read from the daemon by this open, not kept from an earlier one. Returns the function that stops
+ * everything the page started.
  */
 // The runs opened last, kept while the page lives (`{ detail, history, messages }`, the stream's messages so far), so
 // that coming back to one (from a delegated run's page, say) draws it at once as it stood and follows its stream on
@@ -154,7 +155,7 @@ function keepRun(runId, kept) {
   }
 }
 
-function showRun({ root, ctx, signal, detail, history, historyProblem, reload, kept }) {
+function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, reload, kept }) {
   const runId = detail.run.id;
   let run = detail.run;
   let status = run.status;
@@ -183,6 +184,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   let resumable = detail.resumable;
   let cutOff = detail.cut_off;
   let finishedAt = run.finished_at;
+  // The end of the run as the page read it when it opened, if it was over then (item 646): the end its stored events
+  // replay is that one (a run's end event is never after its record's end), and the record, the bill and the changes
+  // read at the open stand for it; an end that comes later, of a run that went on again, reads them anew.
+  const endAtOpen = !active && TERMINAL.has(run.status) ? run.finished_at : null;
   // A chat opens at its foot, a live run and a finished one alike (item 440), and keeps there as it settles.
   let following = true;
   let ticker = null;
@@ -1162,27 +1167,32 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       if (signal.aborted || mine !== refreshes) {
         return;
       }
-      run = fresh.run;
-      resumable = fresh.resumable;
-      cutOff = fresh.cut_off;
-      // A chat renamed since the page opened shows its new title in a phone's bar (item 295).
-      if (parentId === null) {
-        headingTitle.textContent = clip(fresh.title, TITLE_CHARS);
-      }
-      status = run.status;
-      model = run.model;
-      finishedAt = run.finished_at;
-      paintStats();
-      paintWorking();
-      syncControls();
+      drawRecord(fresh);
       paintCost();
-      paintLessons(fresh.lessons);
-      paintQuestions(fresh.questions);
-      // The rows of the delegated runs follow the store where the run's events did not bring them (item 285).
-      timeline.settle(fresh.children, Date.now() / 1000);
     } catch (error) {
       readFailed("The task", error);
     }
+  }
+
+  /** Draw the run's record as read: its state, its lessons, its questions and the rows of its helpers. */
+  function drawRecord(fresh) {
+    run = fresh.run;
+    resumable = fresh.resumable;
+    cutOff = fresh.cut_off;
+    // A chat renamed since the page opened shows its new title in a phone's bar (item 295).
+    if (parentId === null) {
+      headingTitle.textContent = clip(fresh.title, TITLE_CHARS);
+    }
+    status = run.status;
+    model = run.model;
+    finishedAt = run.finished_at;
+    paintStats();
+    paintWorking();
+    syncControls();
+    paintLessons(fresh.lessons);
+    paintQuestions(fresh.questions);
+    // The rows of the delegated runs follow the store where the run's events did not bring them (item 285).
+    timeline.settle(fresh.children, Date.now() / 1000);
   }
 
   // ----------------------------------------------------------------------------------------------- goes on
@@ -1249,6 +1259,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       model = update.model;
     }
     if (terminal) {
+      // The replayed end of a run that was over at the open: the record read then stands for it, its end among it.
+      const replayed = endAtOpen !== null && update.endedAt !== null && update.endedAt <= endAtOpen;
+      const endedAt = replayed ? endAtOpen : update.endedAt;
       // The tick is for an end that happens under the reader's eyes; a replayed end of a run opened later rests.
       if (active) {
         setActorState(face, faceStateAtEnd(update.status));
@@ -1256,14 +1269,16 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       active = false;
       // The snapshot kept for a return to this page is of a run that is over: it draws at rest, and its replayed end
       // gives no tick.
-      kept.detail = { ...kept.detail, active: false, elsewhere: false, run: { ...kept.detail.run, status: update.status, finished_at: update.endedAt } };
+      kept.detail = { ...kept.detail, active: false, elsewhere: false, run: { ...kept.detail.run, status: update.status, finished_at: endedAt } };
       computer.setActive(false);
       messagesMissed();
-      finishedAt = update.endedAt;
+      finishedAt = endedAt;
       paintWorking();
       syncControls();
-      reconcile();
-      refreshChanges();
+      if (!replayed) {
+        reconcile();
+        refreshChanges();
+      }
     }
     paintStats();
     paintHeading();
@@ -1578,6 +1593,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   });
   catchUp();
 
+  // While the events read before the page was drawn are put in (`kept`): the changes the open read stand for theirs.
+  let replaying = false;
   const take = (message) => {
     if (message.data.kind === "steer" && message.data.run_id === runId) {
       // A queued follow-up of a reaction sent on with Steer (item 586) was read when the note around its words was.
@@ -1585,7 +1602,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     }
     timeline.push(message.data);
     recap.onEvent(message.data);
-    if (message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
+    if (!replaying && message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
       refreshChanges();
     }
     if (message.data.run_id !== runId && RUN_ENDS.has(message.data.kind)) {
@@ -1599,6 +1616,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   };
   // What was read of the stream (before the page left, or whole for a run that is over) goes in at once; the stream goes
   // on after its last message. An event the page fails to show is told, as on the stream, and the next one goes in.
+  replaying = true;
   for (const message of kept.messages) {
     try {
       take(message);
@@ -1606,10 +1624,21 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       eventNotShown(`/runs/${runId}/stream`, message, error);
     }
   }
+  replaying = false;
   keepRun(runId, kept);
   if (kept.messages.length > 0) {
-    // The lessons, the questions and the cost of a run drawn from what was kept are read again.
-    attempt(reconcile);
+    if (readNow) {
+      // What the replay drew of the run's state gives way to its record, which this open read just now (item 646: it
+      // was read a second time, with its bill), once the rest of the page is set up.
+      queueMicrotask(() => {
+        if (!signal.aborted) {
+          drawRecord(detail);
+        }
+      });
+    } else {
+      // A run drawn as it was kept, over when it was kept: its lessons, its questions and its title are read again.
+      attempt(reconcile);
+    }
   }
   const finished = (message) => message.data.kind === "run_finished" && message.data.run_id === runId;
   const ended = kept.messages.some(finished);
@@ -1725,7 +1754,7 @@ export function mount(root, ctx) {
     const kept = again ? undefined : keptRuns.get(runId);
     if (kept !== undefined && !kept.detail.active && !kept.detail.elsewhere) {
       // A run that was over when it was kept is drawn at once as it stood; its lessons and questions are read again below.
-      stopRun = showRun({ root, ctx, signal: controller.signal, detail: kept.detail, history: kept.history, historyProblem: null, reload: () => attempt(() => open(true)), kept });
+      stopRun = showRun({ root, ctx, signal: controller.signal, detail: kept.detail, readNow: false, history: kept.history, historyProblem: null, reload: () => attempt(() => open(true)), kept });
       shown();
       return;
     }
@@ -1765,7 +1794,7 @@ export function mount(root, ctx) {
       // A run that was at work when it was kept may have ended since: drawn from what was read of its stream, with its
       // state read again, an end the stream brings now came while the reader was on another page, and the chat opens at
       // its foot with its answer drawn at once (item 446), as it does for a run that was over when its page opened.
-      stopRun = showRun({ root, ctx, signal: controller.signal, detail, history: kept.history, historyProblem: null, reload: () => attempt(() => open(true)), kept: { ...kept, detail } });
+      stopRun = showRun({ root, ctx, signal: controller.signal, detail, readNow: true, history: kept.history, historyProblem: null, reload: () => attempt(() => open(true)), kept: { ...kept, detail } });
       shown();
       return;
     }
@@ -1781,7 +1810,7 @@ export function mount(root, ctx) {
       return;
     }
     const fresh = { detail, history, messages };
-    stopRun = showRun({ root, ctx, signal: controller.signal, detail, history, historyProblem, reload: () => attempt(() => open(true)), kept: fresh });
+    stopRun = showRun({ root, ctx, signal: controller.signal, detail, readNow: true, history, historyProblem, reload: () => attempt(() => open(true)), kept: fresh });
     shown();
   }
 

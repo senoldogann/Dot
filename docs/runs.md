@@ -20,10 +20,11 @@ those lines start folded (Neutral and the palettes fold them, Paper does not). T
 conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
 work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out; the page
 reads the latest 200 runs of a chat, the most the daemon lists at once, so a chat of more says that its earlier runs are
-not shown, with no count (item 559). While a
-chat is read, its page shows the shape of the conversation to come — a message of yours and the answer under it, under
-Dot's mark and the line that say the chat is opening — so an empty page never stands in its place (item 502); with
-reduced motion it stands still.
+not shown, with no count (item 559). A chat opened when its run is over reads its record, its bill and its Changes once,
+as it opens: the events it then puts in, its end among them, read none of them again (item 646; the Changes of a
+long chat take half a second to make). While a chat is read, its page shows the shape of the conversation to come — a
+message of yours and the answer under it, under Dot's mark and the line that say the chat is opening — so an empty page
+never stands in its place (item 502); with reduced motion it stands still.
 
 `finish` takes the `answer` and a `success` flag. The `answer` is the complete message the user reads (the findings, the
 figures or the text that was asked for, with the links to the sources), and it is the result of the run: the web UI
