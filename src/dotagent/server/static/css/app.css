@@ -6576,6 +6576,21 @@ a.memory-line:hover .memory-change {
   margin-left: -8px;
 }
 
+/* The button that adds a reaction shows on the message the pointer is on (item 652), with the keyboard on it, or while
+   its palette is open; the reactions that stand show always. A touch screen, with no pointer to rest, shows it always. */
+@media (hover: hover) and (pointer: fine) {
+  .react-button {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease);
+  }
+
+  :is(.answer, .say, .turn-say):hover .react-button,
+  .react-button:focus-visible,
+  .react-button[aria-expanded="true"] {
+    opacity: 1;
+  }
+}
+
 .reaction-chips {
   display: inline-flex;
   flex-wrap: wrap;
