@@ -15,9 +15,10 @@ tests. A new screen that brings a word of the list back fails here, so the list 
 the screen").
 
 No network and no model service is used: a scripted model plays the chats, the Mac's permission service and launchd
-answer as a Mac at rest, and Messages is a database the test makes. No step reaches the login keychain: ``HOME`` is a
-folder of the test's own, and the smoke tests' ``DOT_KEYCHAIN`` names a keychain file that is not there, which Dot
-refuses before ``security`` runs (item 628).
+answer as a Mac at rest, and Messages is a database the test makes. No step reaches the login keychain: the root
+conftest has the keys' Keychain lookup answer nothing (``secrets._from_keychain``, item 558), ``HOME`` is a folder of
+the test's own, and the smoke tests' ``DOT_KEYCHAIN`` names a keychain file that is not there, which Dot refuses
+before ``security`` runs for the sign-ins' tokens (item 628).
 """
 
 import asyncio
