@@ -348,8 +348,9 @@ function placeWork(rows, chats) {
   return { working, pinned };
 }
 
-/** A chat as a row to tick while chats are being chosen for deletion, with its creature (`face`), its name and its
- * last line: as tall as its row at rest, so the list keeps its place when the choosing ends. */
+/** A chat as a row to tick while chats are being chosen for deletion, with its creature (`face`) and the mark of its
+ * loop as at rest (item 635), its name and its last line: as tall as its row at rest, so the list keeps its place when
+ * the choosing ends. */
 function chatPick(chat, checked, onToggle, face) {
   const box = el("input", {
     class: "side-check",
@@ -362,7 +363,7 @@ function chatPick(chat, checked, onToggle, face) {
     "label",
     { class: "side-run side-pick", title: clip(chat.title, 240) },
     box,
-    face,
+    loopFace(face, loopWords(chat)),
     chatText(chat, []),
   );
 }
