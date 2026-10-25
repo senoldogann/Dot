@@ -250,3 +250,64 @@ async def _page_with_lessons(
     await page.goto(ui_url(host, port, TOKEN))
     await page.goto(f"{address}/#/runs/{run_id}")
     return page, errors
+
+
+async def test_the_follow_up_of_a_dislike_names_the_notes_the_disliked_run_was_handed_and_forgets_one(
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
+) -> None:
+    """Item 654: the page of a run that followed up the owner's 👎 names, in its lessons card, the notes the disliked
+    run was handed, each with Forget, which puts it in the trash; the card shows even with no lesson drawn."""
+    _, address = served
+    store = runtime.store
+    chat = await store.create_thread("Weekly report", "test")
+    made: list[RunRecord] = [
+        await store.create_run(
+            chat.id,
+            goal,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
+        )
+        for goal in ("Write the weekly report", "My reaction 👎 to your answer above: it is not right.")
+    ]
+    disliked, follow_up = made
+    for run in made:
+        await store.finish_run(run.id, "done", "Done.")
+    note = await store.add_memory("Write the weekly report as one long paragraph.", ["lesson"], None, None, None, False)
+    now: float = time.time()
+    await store.mark_memories_used(disliked.id, [note.id], now, "start")
+    await store.put_reaction(disliked.id, "answer", "wrong", chat.id, now)
+    await store.link_follow_up(disliked.id, "answer", "wrong", follow_up.id)
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            for width, scheme in _SHOTS:
+                page, errors = await _page(browser, address, follow_up.id, width, scheme)
+                card: Locator = page.get_by_role("region", name="Lessons from this task")
+                await expect(card).to_be_visible()
+                await expect(card.locator(".lessons-count")).to_have_text("1 to look at")
+                await card.locator("summary").click()
+                await expect(card).to_contain_text("The run you reacted 👎 to was handed these notes")
+                await expect(card.locator(".lesson.doubted .lesson-text")).to_have_text(note.content)
+                await page.screenshot(path=str(tmp_path / f"doubted-{width}-{scheme}.png"))
+                assert errors == []
+                await page.context.close()
+            page, errors = await _page(browser, address, follow_up.id, 1280, "light")
+            card = page.get_by_role("region", name="Lessons from this task")
+            await card.locator("summary").click()
+            await card.get_by_role("button", name="Forget").click()
+            await expect(card).to_contain_text("Forgotten: in the trash for 30 days")
+            assert await store.get_memories([note.id]) == []
+            assert errors == []
+            await page.context.close()
+        finally:
+            await browser.close()

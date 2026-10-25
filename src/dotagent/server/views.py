@@ -8,7 +8,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
 from dotagent.agent.authorization import StepDecision
 from dotagent.agent.learning_health import LearningHealth
-from dotagent.agent.lessons import RunLessons
+from dotagent.agent.lessons import Disliked, RunLessons
 from dotagent.agent.resume import CutOff
 from dotagent.agent.skill_history import VersionDetail
 from dotagent.agent.skill_proposals import ProposalView
@@ -1042,6 +1042,8 @@ class RunDetail(FrozenModel):
     resumable: bool
     cut_off: CutOff | None
     lessons: RunLessons | None
+    # The earlier run this one follows up after the owner's 👎 or 🔁, and the notes it was handed (item 654).
+    disliked: Disliked | None = None
     questions: list[ApprovalRecord]
     agent: AgentRecord | None
     campaign: CampaignChip | None
