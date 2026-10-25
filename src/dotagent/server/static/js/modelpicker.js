@@ -204,7 +204,7 @@ export function modelPicker({ onPick, onMakeDefault }) {
     });
     const rail = el(
       "div",
-      { class: "model-rail", role: "toolbar", "aria-orientation": "vertical", "aria-label": "Providers" },
+      { class: "model-rail", role: "toolbar", "aria-orientation": "vertical", "aria-label": "AI services" },
       railItems[0],
       el("div", { class: "model-rail-rule", "aria-hidden": "true" }),
       railItems.slice(1),

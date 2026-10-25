@@ -169,13 +169,13 @@ export function buildFirstChat({ startLook, onSkipped }) {
 
   function introduce() {
     const lines = [
-      "I keep working on this Mac while you're away: on a goal until it is done, on schedules and on campaigns.",
+      "I keep working on this Mac while you're away: on a goal until it is done, on schedules you set, and on campaigns, which are bigger goals I keep coming back to.",
       "I connect to your apps, such as mail and calendar, and use them as you would.",
     ];
     if (ASKED_MODES.includes(mode)) {
       lines.push("I ask you before what is yours to decide: money, passwords and messages sent in your name.");
     } else if (mode === "auto") {
-      lines.push("Money and passwords stay yours; a review model answers my other questions for you and asks you what it cannot decide.");
+      lines.push("Money and passwords stay yours. For my other questions, a second AI answers for you, and asks you only what it cannot decide.");
     }
     say(el("p", null, "A little about me:"), el("ul", { class: "first-list" }, lines.map((line) => el("li", null, line))));
   }
@@ -206,7 +206,7 @@ export function buildFirstChat({ startLook, onSkipped }) {
 
   function googleCard(google, name) {
     const hint = el("p", { class: "hint first-connect-hint", role: "status", hidden: true });
-    const connect = el("button", { class: "btn primary", type: "button" }, "Connect");
+    const connect = el("button", { class: "btn primary", type: "button" }, "Connect Google");
     const card = el(
       "section",
       { class: "card first-connect", "aria-label": "Gmail and Google Calendar" },
@@ -222,7 +222,10 @@ export function buildFirstChat({ startLook, onSkipped }) {
     if (google.step !== "sign_in") {
       connect.hidden = true;
       hint.hidden = false;
-      hint.textContent = "Dot's browser runs without a window, so there is none to sign in in: switch headless off in the config file.";
+      hint.textContent = "Dot's browser works without a window, so there is nowhere to sign in to Google. Choose My Chrome in Settings › Browser to use your own Chrome, where you are already signed in.";
+      // For whoever edits the settings file: the window comes back with the setting (item 625).
+      hint.title = "In the settings file: [browser] headless = false";
+      hint.dataset.expert = "";
       return card;
     }
     connect.addEventListener("click", () =>
@@ -234,7 +237,7 @@ export function buildFirstChat({ startLook, onSkipped }) {
           connect.disabled = false;
         }
         hint.hidden = false;
-        hint.textContent = "Sign in to Google in Dot's browser window. This card follows it.";
+        hint.textContent = "Sign in to Google in the browser window Dot opened. This card updates when you are done.";
         follow(card, connect, hint);
       }),
     );

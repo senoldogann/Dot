@@ -85,7 +85,7 @@ _TOOLS: tuple[_Tool, ...] = (
     ),
     _Tool(
         name="Node.js",
-        does="npx, which starts many MCP servers",
+        does="npx, which starts many connected apps",
         command="node",
         app=None,
         licence="MIT",

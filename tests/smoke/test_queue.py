@@ -787,9 +787,9 @@ async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_stee
 
                 # Settings › General: Enter sends and a message waits in the queue, until the owner chooses otherwise.
                 await page.goto(f"{address}/#/settings/general")
-                card: Locator = page.locator("section.card").filter(has=page.locator(".card-head", has_text="Composer"))
+                card: Locator = page.locator("section.card").filter(has=page.locator(".card-head", has_text="Messages"))
                 send_with: Locator = card.get_by_role("group", name="Send with")
-                busy: Locator = card.get_by_role("group", name="While a run works")
+                busy: Locator = card.get_by_role("group", name="While a task works")
                 await expect(send_with.get_by_role("button", name="Enter", exact=True)).to_have_attribute(
                     "aria-pressed", "true"
                 )
@@ -830,7 +830,7 @@ async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_stee
                     # A phone's line holds about thirty characters, so it has the short words (item 437).
                     await expect(box).to_have_attribute(
                         "placeholder",
-                        "Steer this run (or /btw)" if width < 720 else "Steer this run, or /btw to ask on the side",
+                        "Steer this task (or /btw)" if width < 720 else "Steer this task, or /btw to ask on the side",
                     )
 
                     # A message steers the run at work, sent with ⌘Enter.

@@ -221,7 +221,7 @@ async def test_the_notes_can_be_narrowed_to_lessons_preferences_and_outside_cont
         await expect(notes).to_have_count(2)
         await expect(notes.locator(".badge", has_text="From outside content")).to_have_count(2)
         await expect(notes.first.locator(".badge")).to_have_attribute(
-            "title", "The run that saved it had read content third parties can author."
+            "title", "The task that saved it had read content other people can write."
         )
         # A search narrows within the choice, and says when nothing in it matches.
         await _choice(page, "Lessons").click()
@@ -389,7 +389,7 @@ async def test_a_runs_core_note_no_one_pinned_says_it_stands_once_pinned(
         notes: Locator = page.locator("[data-memory]")
         await expect(notes).to_have_count(3)
         asking: Locator = page.locator(f'[data-memory="{asks.id}"]')
-        await expect(asking.locator(".note-asks")).to_have_text("Core once pinned")
+        await expect(asking.locator(".note-asks")).to_have_text("Always, once pinned")
         await expect(page.locator(".note-asks")).to_have_count(1)
     finally:
         await page.close()

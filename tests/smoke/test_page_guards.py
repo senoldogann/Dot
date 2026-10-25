@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, Request, Route, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Request, Route, async_playwright, expect
 from pydantic import JsonValue
 
 from dotagent.agent.manager import RunManager
@@ -35,6 +35,12 @@ _SETTLE_S: float = 0.5
 _PROOF: re.Pattern[str] = re.compile(r"/api/proof\?")
 # Long enough for the page to try a stream that is not answered twice (it waits 0.5 s, then 1 s).
 _RETRIES_MS: int = 1200
+
+
+async def _access_key_box(page: Page) -> Locator:
+    """The box for Dot's access key: the sign-in code comes first, and the key is one of the other ways under it."""
+    await page.get_by_text("Other ways to sign in").click()
+    return page.get_by_label("Access key", exact=True)
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -172,7 +178,7 @@ async def test_the_page_sends_its_token_only_to_a_daemon_that_proves_it_holds_it
             opened.on("request", keep_carried)
             await opened.route(_PROOF, stranger)
             await opened.goto(ui_url("127.0.0.1", port, TOKEN))
-            await expect(opened.get_by_label("Access token", exact=True)).to_be_visible()
+            await expect(opened.get_by_label("Sign-in code", exact=True)).to_be_visible()
             assert carried == []
             await opened.unroute(_PROOF, stranger)
             answered: JsonValue = await opened.evaluate(
@@ -252,9 +258,9 @@ async def test_a_daemon_that_answers_with_an_error_is_not_said_to_be_down(page: 
     await page.route("**/api/status", _answer_with_an_error)
     await page.reload()
     signin = page.locator(".signin")
-    await expect(signin).to_contain_text("The daemon is running but could not answer")
+    await expect(signin).to_contain_text("Dot is open, but it could not answer just now")
     await expect(signin).to_contain_text("PermissionError: [Errno 13] Permission denied")
-    await expect(signin).not_to_contain_text("Make sure the daemon is running")
+    await expect(signin).not_to_contain_text("Could not reach Dot")
 
 
 async def test_a_page_that_cannot_read_again_keeps_what_it_showed_and_says_so(runtime: Runtime, page: Page) -> None:
@@ -265,9 +271,8 @@ async def test_a_page_that_cannot_read_again_keeps_what_it_showed_and_says_so(ru
     shown: str = await now.inner_text()
     await page.route("**/api/activity", _answer_with_an_error)
     await runtime.bus.emit("run-178", "run_started", {}, False)
-    await expect(page.locator(".toast.error")).to_contain_text(
-        "could not be read again: Dot failed on an error it did not expect"
-    )
+    await expect(page.locator(".toast.error")).to_contain_text("What is going on could not be updated")
+    await expect(page.locator(".toast.error")).to_contain_text("Dot failed on an error it did not expect")
     await expect(now).to_have_text(shown)
 
 
@@ -283,7 +288,7 @@ async def test_a_status_that_cannot_be_read_again_is_told_and_does_not_keep_the_
     asked = await runtime.store.create_approval("run-559", "shell", "touch x", "write", {"command": "touch x"})
     try:
         await runtime.bus.emit("run-559", "run_started", {}, False)
-        await expect(page.locator(".toast.error", has_text="Dot's status could not be read again")).to_be_visible()
+        await expect(page.locator(".toast.error", has_text="Dot's status could not be updated")).to_be_visible()
         await page.wait_for_function("() => document.title.startsWith('(1) ')")
     finally:
         await runtime.store.decide_approval(asked.id, "denied", "test", "")
@@ -310,9 +315,9 @@ async def test_an_address_with_a_token_the_daemon_does_not_hold_signs_nobody_out
             linked: Page = await context.new_page()
             await linked.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await linked.goto(ui_url("127.0.0.1", port, "a-token-the-daemon-never-made"))
-            await expect(linked.locator(".toast.error", has_text="is not the daemon's")).to_be_visible()
+            await expect(linked.locator(".toast.error", has_text="is not the one Dot uses")).to_be_visible()
             await expect(linked.locator("main.page")).to_be_visible()
-            await expect(linked.get_by_label("Access token", exact=True)).to_have_count(0)
+            await expect(linked.get_by_label("Access key", exact=True)).to_have_count(0)
             assert "token" not in linked.url, linked.url
             assert await linked.evaluate("localStorage.getItem('dot.token')") == TOKEN
             await context.close()
@@ -320,7 +325,7 @@ async def test_an_address_with_a_token_the_daemon_does_not_hold_signs_nobody_out
             bare = await (await browser.new_context(service_workers="block")).new_page()
             await bare.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await bare.goto(ui_url("127.0.0.1", port, "a-token-the-daemon-never-made"))
-            await expect(bare.get_by_label("Access token", exact=True)).to_be_visible()
+            await expect(bare.get_by_label("Sign-in code", exact=True)).to_be_visible()
             assert await bare.evaluate("localStorage.getItem('dot.token')") is None
         finally:
             await browser.close()
@@ -435,11 +440,11 @@ async def test_the_listeners_a_session_adds_end_with_it(runtime: Runtime, addres
             # The daemon refuses the token once: the session ends, and the page asks for a token.
             await opened.route("**/api/status", _answer_refused)
             await runtime.bus.emit("run-559", "run_started", {}, False)
-            sign_in = opened.get_by_label("Access token", exact=True)
+            sign_in = await _access_key_box(opened)
             await expect(sign_in).to_be_visible()
             await opened.unroute("**/api/status", _answer_refused)
             await sign_in.fill(TOKEN)
-            await opened.get_by_role("button", name="Connect", exact=True).click()
+            await opened.get_by_role("button", name="Sign in with the key", exact=True).click()
             await expect(opened.locator("main.page")).to_be_visible()
             listeners: list[dict[str, JsonValue]] = await opened.evaluate(
                 """() => window.__listeners.map((one) => ({

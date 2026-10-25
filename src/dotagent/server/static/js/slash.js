@@ -50,8 +50,8 @@ export function paletteGroups(commands, palette) {
   if (palette !== null) {
     for (const server of palette.servers) {
       groups.push({
-        title: `MCP · ${server.name}`,
-        section: "MCP tools",
+        title: `Connected app · ${server.name}`,
+        section: "Actions of connected apps",
         kind: "plugin",
         items: server.tools.map((tool) => ({
           id: `tool-${tool.name}`,
@@ -82,12 +82,12 @@ export function pickGroups(palette) {
   const groups = [];
   if (palette.servers.length > 0) {
     groups.push({
-      title: "MCP servers",
+      title: "Connected apps",
       kind: "plugin",
       items: palette.servers.map((server) => ({
         id: `server-${server.name}`,
         label: server.name,
-        hint: `${server.tools.length} ${server.tools.length === 1 ? "tool" : "tools"}`,
+        hint: `${server.tools.length} ${server.tools.length === 1 ? "action" : "actions"}`,
         kind: "plugin",
         mark: server.mark ?? null,
         pick: { kind: "plugin", name: server.name },

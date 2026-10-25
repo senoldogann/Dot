@@ -489,7 +489,9 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
         """Start a run of the schedule now, by hand (item 455): 409 while the emergency stop is engaged, while one of
         its runs is at work, and in a daemon that runs no scheduler; its next time and its switch stay as they are."""
         if ctx.scheduler is None:
-            raise RunConflict("this daemon runs no scheduler", {"schedule_id": schedule_id})
+            raise RunConflict(
+                "Schedules are not running right now, so this one cannot start", {"schedule_id": schedule_id}
+            )
         return await ctx.scheduler.fire_by_hand(schedule_id, time.time())
 
     @router.get("/schedules/{schedule_id}/firings")

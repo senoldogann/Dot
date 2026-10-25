@@ -10,7 +10,7 @@ import { PHONE } from "../layout.js";
 import { errorPanel, loadingPanel, switchSetting } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
-import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, detailsFold, formDialog, toast } from "../ui.js";
 
 // What the key of each provider is for and where it is made. `needed`: the models of the provider work only with a key
 // (Ollama's run through the app on this Mac and need none; the typed judge is off unless the configuration names it).
@@ -40,23 +40,23 @@ const PROVIDERS = {
     needed: true,
   },
   ollama: {
-    use: "Optional: the hosted web search, and ollama.com without the Ollama app. The models the app runs need no key.",
+    use: "Optional: the online web search, and ollama.com without the Ollama app. The models the app runs need no key.",
     page: "https://ollama.com/settings/keys",
     site: "ollama.com",
     needed: false,
   },
   typesafe: {
     use:
-      "Optional: the typed judge, which reads click labels no rule knows and campaign claims; the switch here turns it on. " +
-      "The saved key alone gives runs the judge_items tool and a campaign's post checks, the switch on or off; remove the key to stop those. " +
-      "Check sends one small judgment.",
+      "Optional: an extra checker that reads button labels no rule knows and checks what a campaign claims; the switch here turns it on. " +
+      "The saved key alone gives tasks the extra checker and a campaign's post checks, with the switch on or off; remove the key to stop those. " +
+      "Check sends one small test.",
     page: "https://console.typesafe.ai",
     site: "console.typesafe.ai",
     needed: false,
   },
 };
 const SOURCES = {
-  environment: "from the daemon's environment",
+  environment: "set when Dot was started",
   env_file: "saved in Dot",
   keychain: "from the Keychain",
 };
@@ -65,6 +65,13 @@ const ROLES = [
   { id: "vision", label: "vision model" },
   { id: "review", label: "review model" },
 ];
+// Why a service lists no models, in words (item 625); the service's own message stands under Details.
+const MODELS_PROBLEM = {
+  no_key: "No key yet, so its models cannot be listed. Add a key.",
+  key_refused: "The service refused the key. Check it and add it again.",
+  access_refused: "The service does not let this account list its models.",
+  not_installed: "It is not installed on this Mac.",
+};
 // The models a provider's page lists before Show all.
 const MODELS_SHOWN = 8;
 // A key as the daemon takes one: printable characters without spaces.
@@ -135,7 +142,7 @@ function buildKeyFields(label) {
     autocapitalize: "off",
     spellcheck: "false",
     placeholder: "Paste the key",
-    "aria-label": `${label} API key`,
+    "aria-label": `${label} key`,
   });
   const reveal = el("button", { class: "btn ghost sm icon-only key-reveal", type: "button" });
   const element = el("div", { class: "key-entry" }, el("div", { class: "key-field" }, input, reveal));
@@ -160,7 +167,7 @@ function buildKeyFields(label) {
         return false;
       }
       if (!KEY_PATTERN.test(value)) {
-        throw new Error("A key has no spaces or line breaks inside it. Copy it again from the page of the provider.");
+        throw new Error("A key has no spaces or line breaks in it. Copy it again from the page of the service.");
       }
       await save(value);
       return true;
@@ -216,7 +223,7 @@ function buildProvider(initial, isDisposed, host) {
   const stateLine = el("p", { class: "provider-state" });
   const back = el(
     "button",
-    { class: "provider-back", type: "button", "aria-label": "Back to the providers", onclick: () => host.back() },
+    { class: "provider-back", type: "button", "aria-label": "Back to the AI services", onclick: () => host.back() },
     icon("chevronLeft"),
   );
   const check = el(
@@ -331,14 +338,14 @@ function buildProvider(initial, isDisposed, host) {
     view.provider !== JUDGE_SERVICE
       ? null
       : switchSetting({
-          label: "Typed judge (Jev)",
-          hint: "Asks TypeSafe what a click no rule knows does and whether a run's claim holds. Saved in the config file; no restart.",
+          label: "Extra checker (TypeSafe)",
+          hint: "Asks TypeSafe what a button no rule knows does, and whether a task's claim holds. Takes effect at once.",
           read: () => judge !== null && judge.provider === "typesafe",
           write: async (on) => {
             judge = await api.put("/judge", { provider: on ? "typesafe" : "none" });
             toast(
               "ok",
-              on ? "The typed judge answers from the next judgment on." : "The typed judge is off; the patterns and the goal checker decide alone.",
+              on ? "The extra checker answers from now on." : "The extra checker is off; Dot's safety rules and the goal check decide alone.",
             );
           },
           onToggled: () => judgeSwitch.paint(),
@@ -346,7 +353,7 @@ function buildProvider(initial, isDisposed, host) {
   const judgeSection =
     judgeSwitch === null
       ? null
-      : el("section", { class: "provider-section" }, el("h3", { class: "provider-section-title" }, "Typed judge"), judgeSwitch.element);
+      : el("section", { class: "provider-section" }, el("h3", { class: "provider-section-title" }, "Extra checker"), judgeSwitch.element);
 
   const panel = el("div", { class: "provider-panel" }, head, auth, modelsSection, judgeSection);
 
@@ -387,7 +394,12 @@ function buildProvider(initial, isDisposed, host) {
     modelCount.textContent = String(entry.models.length);
     if (entry.models.length === 0) {
       modelBox.replaceChildren(
-        el("div", { class: "note" }, icon("info"), el("span", null, entry.error ?? "This provider named no models.")),
+        el(
+          "div",
+          { class: "note" },
+          icon("info"),
+          el("span", null, MODELS_PROBLEM[entry.problem] ?? entry.error ?? "This service named no models.", MODELS_PROBLEM[entry.problem] === undefined ? null : detailsFold(entry.error ?? "")),
+        ),
       );
       filterModels();
       return;
@@ -399,7 +411,7 @@ function buildProvider(initial, isDisposed, host) {
         const chips = [
           roleOf(model.ref) === undefined ? null : el("span", { class: "chip b-accent" }, roleOf(model.ref).label),
           model.vision ? el("span", { class: "chip" }, "vision") : null,
-          model.tools ? null : el("span", { class: "chip" }, "no tools"),
+          model.tools ? null : el("span", { class: "chip" }, "no actions"),
           model.free ? el("span", { class: "chip" }, "free") : null,
           model.ref === main ? el("span", { class: "chip" }, "chosen") : null,
         ].filter((chip) => chip !== null);
@@ -439,8 +451,8 @@ function buildProvider(initial, isDisposed, host) {
     );
     shadow.hidden = view.source !== "environment";
     shadow.lastChild.textContent = view.saved
-      ? `The daemon was started with ${view.name} in its environment, which comes before the key saved in Dot: that one is not in use.`
-      : `The daemon was started with ${view.name} in its environment, which comes before a key saved here.`;
+      ? `Dot was started with ${view.name} already set, which comes before the key saved in Dot: that one is not in use.`
+      : `Dot was started with ${view.name} already set, which comes before a key saved here.`;
     check.hidden = !set;
     if (judgeSwitch !== null) {
       judgeSwitch.paint();
@@ -488,7 +500,7 @@ function buildProvider(initial, isDisposed, host) {
   async function removeKey() {
     const confirmed = await confirmDialog({
       title: `Remove the ${about.label} key?`,
-      message: `Dot deletes ${view.name} from its .env file. The key itself stays valid at ${about.site} until you revoke it there.`,
+      message: `Dot deletes the saved key from this Mac. The key itself stays valid at ${about.site} until you cancel it there.`,
       confirmLabel: "Remove",
       danger: true,
       focusCancel: true,
@@ -516,7 +528,7 @@ function buildProvider(initial, isDisposed, host) {
     const form = buildKeyFields(about.label);
     const opened = formDialog({
       title: `${set ? "Replace" : "Add"} the ${about.label} key`,
-      description: "Dot keeps it in its .env file on this Mac, and this page never shows it whole.",
+      description: "Dot keeps it on this Mac, in a file only you can read, and this page never shows it whole.",
       body: form.element,
       submitLabel: "Save",
       size: "narrow",
@@ -545,7 +557,7 @@ export function mount(root, ctx) {
   let chosen = null;
   const holder = el("div", null, loadingPanel());
   const kept = el("span");
-  const list = el("div", { class: "providers-list", role: "group", "aria-label": "Providers" });
+  const list = el("div", { class: "providers-list", role: "group", "aria-label": "AI services" });
   const detail = el("div", { class: "providers-detail" });
   const layout = el("div", { class: "providers-layout" }, list, detail);
   layout.dataset.open = "false";
@@ -593,7 +605,7 @@ export function mount(root, ctx) {
     }
     entries = found.keys.map((view) => buildProvider(view, () => disposed, { choose, back }));
     list.replaceChildren(...entries.map((entry) => entry.element));
-    kept.replaceChildren("Keys saved here go to ", el("code", { class: "mono" }, found.env_file), ", which only your user can read.");
+    kept.replaceChildren("Keys saved here are kept in ", el("code", { class: "mono" }, found.env_file), ", which only you can read.");
     holder.replaceChildren(layout);
     if (!PHONE.matches && entries.length > 0) {
       choose(entries[0].id);
@@ -612,7 +624,7 @@ export function mount(root, ctx) {
     await load();
   }
 
-  ctx.head.setLead("The keys Dot signs in to its models with. This page never shows a whole key.");
+  ctx.head.setLead("Where you add the keys that let Dot use AI services such as OpenAI and Anthropic. This page never shows a whole key.");
   root.append(
     holder,
     el(
@@ -626,9 +638,8 @@ export function mount(root, ctx) {
         el(
           "span",
           null,
-          "A new key is used from the next request on, without a restart. The memory search and MCP servers read their keys when the daemon starts: after changing a key they use, restart it with ",
-          el("code", { class: "mono" }, "dotx service restart"),
-          ".",
+          "A new key is used from the next message on. The memory search and the connected apps read their keys when Dot starts: after changing a key they use, restart Dot.",
+          el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, "In Terminal: ", el("code", { class: "mono" }, "dotx service restart"), ".")),
         ),
       ),
     ),

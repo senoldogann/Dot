@@ -262,7 +262,7 @@ async def test_the_default_model_chosen_in_settings_starts_the_runs_that_name_no
             async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
                 refused: httpx.Response = await http.post("/api/models/main", json={"model": TALKER})
                 assert refused.status_code == 422, refused.text
-                assert "can call tools" in refused.text
+                assert "can use actions" in refused.text
                 unknown: httpx.Response = await http.post("/api/models/main", json={"model": "nowhere:x"})
                 assert unknown.status_code == 422, unknown.text
                 status: httpx.Response = await http.get("/api/status")

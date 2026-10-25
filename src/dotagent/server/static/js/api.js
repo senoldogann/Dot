@@ -1,5 +1,6 @@
 // The client of the Dot daemon API: bearer token, JSON requests, server-sent events and images.
 
+import { UNREACHABLE } from "./errors.js";
 import { toast } from "./ui.js";
 
 const TOKEN_KEY = "dot.token";
@@ -22,9 +23,6 @@ const NOT_SHOWN_TOLD_EVERY_MS = 10000;
 // How long a stream may be down before the page says so: one that is followed again sooner, as a page back in view
 // does, says nothing (item 286).
 export const QUIET_BREAK_MS = 2000;
-// What a request says when no answer came at all: the daemon is down, or the network is not there yet.
-const UNREACHABLE = "Cannot reach the Dot daemon. Is it running?";
-
 let token = null;
 let authLostHandler = null;
 let proving = null;
@@ -95,10 +93,21 @@ function describeValidation(errors) {
     .join("; ");
 }
 
+/** The reason a rule of a form gave for refusing a value, as its author wrote it for a person, without the "Value error, "
+ * the validator puts before it; null for any other kind of complaint. */
+function ownReason(entry) {
+  return entry.type === "value_error" && typeof entry.msg === "string" ? entry.msg.replace(/^Value error, /, "") : null;
+}
+
 function messageOf(status, data, text) {
   if (data !== null && typeof data === "object" && typeof data.message === "string") {
     const errors = data.context && Array.isArray(data.context.errors) ? data.context.errors : null;
-    return errors !== null && errors.length > 0 ? `${data.message} (${describeValidation(errors)})` : data.message;
+    if (errors === null || errors.length === 0) {
+      return data.message;
+    }
+    // A value Dot's own rule refused says why in its own words; any other complaint is the validator's.
+    const reasons = errors.map(ownReason);
+    return reasons.every((reason) => reason !== null) ? reasons.join("; ") : `What you entered is not valid (${describeValidation(errors)})`;
   }
   return text !== "" ? `HTTP ${status}: ${text.slice(0, 200)}` : `HTTP ${status}`;
 }
@@ -142,7 +151,7 @@ async function proofOf(nonce) {
  */
 async function proveDaemon() {
   if (globalThis.crypto?.subtle === undefined) {
-    throw new ApiError(0, "This browser cannot check the Dot daemon at this address (it offers no Web Crypto here).", {
+    throw new ApiError(0, "This browser cannot check that this address is really your Dot, so it sent nothing. Use the address Settings › Phone gives.", {
       path: "/proof",
     });
   }
@@ -156,7 +165,7 @@ async function proveDaemon() {
   const text = await response.text();
   const data = response.ok ? parseJson(text) : null;
   if (data === null || typeof data !== "object" || typeof data.proof !== "string") {
-    throw new ApiError(0, "Something other than the Dot daemon answers at this address; it was sent no token.", {
+    throw new ApiError(0, "Something other than Dot answers at this address, so this browser sent it nothing. Check the address.", {
       path: "/proof",
       status: response.status,
       start: text.slice(0, 80),
@@ -166,7 +175,7 @@ async function proveDaemon() {
     if (authLostHandler !== null) {
       authLostHandler();
     }
-    throw new ApiError(401, "The daemon at this address does not hold this access token; it was sent nothing.", {
+    throw new ApiError(401, "This Dot does not use that access key, so this browser sent it nothing. Sign in again.", {
       path: "/proof",
     });
   }
@@ -228,7 +237,7 @@ export async function request(method, path, body) {
   try {
     return JSON.parse(text);
   } catch (cause) {
-    throw new ApiError(response.status, "The daemon answered with something that is not JSON.", {
+    throw new ApiError(response.status, "Dot answered in a way this page cannot read. Try again in a moment.", {
       path,
       start: text.slice(0, 80),
       cause: String(cause),
@@ -257,7 +266,7 @@ function canBePairingCode(text) {
 export async function pairWithCode(code) {
   const path = "/phone/pair";
   if (!canBePairingCode(code)) {
-    throw new Error("That is not a pairing code: a code is 8 letters and digits, as Settings › Phone shows it. An access token goes in the field below.");
+    throw new Error("That does not look like a sign-in code. A code has 8 letters and digits, as Settings › Phone shows it.");
   }
   let response;
   try {
@@ -275,7 +284,7 @@ export async function pairWithCode(code) {
   }
   const data = parseJson(await response.text());
   if (data === null || typeof data !== "object" || typeof data.token !== "string") {
-    throw new ApiError(response.status, "Something other than the Dot daemon answered the pairing code.", { path });
+    throw new ApiError(response.status, "Something other than Dot answered, so the code was not used. Check the address.", { path });
   }
   return data.token;
 }
@@ -341,11 +350,11 @@ export async function* sse(path, signal, onOpen) {
   const watch = () => {
     heardAt = Date.now();
     clearTimeout(silence);
-    silence = setTimeout(() => cut.abort(new ApiError(0, "The stream went silent.", { path })), STALL_MS);
+    silence = setTimeout(() => cut.abort(new ApiError(0, "Dot stopped sending updates.", { path })), STALL_MS);
   };
   const back = () => {
     if (document.visibilityState === "visible" && Date.now() - heardAt >= BACK_SILENCE_MS) {
-      cut.abort(new ApiError(0, "The stream went silent while the page was away.", { path }));
+      cut.abort(new ApiError(0, "Dot stopped sending updates while this page was away.", { path }));
     }
   };
   document.addEventListener("visibilitychange", back);
@@ -446,15 +455,15 @@ function withAfter(path, after) {
 export function eventNotShown(path, message, error) {
   console.error("an event could not be shown", { path, id: message.id, event: message.event, error });
   const why = error instanceof Error ? error.message : String(error);
-  tellOutOfDate(`Part of the page could not be updated (${message.event}): ${why}. Reload the page to see it.`);
+  tellOutOfDate("Part of this page could not be updated. Reload the page to see it.", `${message.event}: ${why}`);
 }
 
 /** Tell in a toast that part of the page is out of date, at most every few seconds. */
-export function tellOutOfDate(text) {
+export function tellOutOfDate(text, details = "") {
   const now = Date.now();
   if (now - notShownToldAt >= NOT_SHOWN_TOLD_EVERY_MS) {
     notShownToldAt = now;
-    toast("error", text);
+    toast("error", text, null, details);
   }
 }
 

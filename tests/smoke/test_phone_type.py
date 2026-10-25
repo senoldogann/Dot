@@ -364,9 +364,9 @@ async def test_a_steps_duration_shows_and_a_settings_row_turns_its_switch_on_a_p
 
             # A tap on the row's words turns the switch, and a tap on the switch turns it back.
             await page.goto(f"{address}/#/settings/appearance")
-            toggle: Locator = page.get_by_role("switch", name="Fold tool steps")
+            toggle: Locator = page.get_by_role("switch", name="Fold steps")
             was: str | None = await toggle.get_attribute("aria-checked")
-            await page.locator(".setting .row", has=toggle).get_by_text("Fold tool steps", exact=True).tap()
+            await page.locator(".setting .row", has=toggle).get_by_text("Fold steps", exact=True).tap()
             await expect(toggle).not_to_have_attribute("aria-checked", str(was))
             await toggle.tap()
             await expect(toggle).to_have_attribute("aria-checked", str(was))
@@ -389,7 +389,7 @@ async def test_a_macs_window_keeps_its_sizes(own_home: Path) -> None:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             await page.goto(f"{address}/#/settings/appearance")
-            await expect(page.get_by_role("switch", name="Fold tool steps")).to_be_visible()
+            await expect(page.get_by_role("switch", name="Fold steps")).to_be_visible()
             assert await page.evaluate(_SIZES) == {"sizes": _MAC_SIZES, "body": _MAC_BODY, "toggle": _MAC_SWITCH}
         finally:
             await browser.close()

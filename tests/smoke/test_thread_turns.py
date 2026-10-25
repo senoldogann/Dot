@@ -1,5 +1,5 @@
 """A chat's turns on one page (item 374): every earlier run shows what it did, one line that says what it ran ("Ran 1
-command"), folded as the run's own steps are and open with Fold tool steps off, no "Open run" to hop through, and the
+command"), folded as the run's own steps are and open with Fold steps off, no "Open task" to hop through, and the
 marks at the left go to any message, the last one to the newest prompt and the work under it. A real server on a
 scripted model, wide and dark."""
 
@@ -142,7 +142,7 @@ async def test_a_chat_shows_every_turn_open_and_the_marks_go_anywhere(
             assert await page.locator(".turn-ops details.steps[open]").count() == 0
             await expect(page.locator(".timeline .steps-title").first).to_have_text("Ran 1 command")
             await page.screenshot(path=str(tmp_path / "chat-folded.png"))
-            # Open, with Fold tool steps off: every call reads without a click.
+            # Open, with Fold steps off: every call reads without a click.
             await page.evaluate("localStorage.setItem('dot.foldSteps', 'off')")
             await page.reload()
             await page.wait_for_selector(".turn-ops .tool", timeout=15000)
@@ -151,8 +151,8 @@ async def test_a_chat_shows_every_turn_open_and_the_marks_go_anywhere(
             assert await page.locator(".history .turn").count() == _TURNS - 1
             assert await page.locator(".turn-ops .tool").count() == _TURNS - 1, "every earlier turn shows what it did"
             assert await page.locator(".turn-ops .tool").first.is_visible()
-            assert await page.locator(".answer-foot a", has_text="Open run").count() == 0, "no hop to a run's page"
-            assert await page.get_by_text("Open run").count() == 0
+            assert await page.locator(".answer-foot a", has_text="Open task").count() == 0, "no hop to a run's page"
+            assert await page.get_by_text("Open task").count() == 0
             # The run's own steps are open, so its calls read without a click.
             assert await page.locator("details.steps[open]").count() >= 1
             assert await page.locator(".timeline .tool").first.is_visible()
@@ -451,9 +451,9 @@ async def test_a_chat_of_more_runs_than_the_page_reads_says_so_instead_of_counti
                 await page.goto(f"{address}/#/runs/{opened.id}")
                 await expect(page.locator(".bubble.user", has_text=opened.goal)).to_be_visible(timeout=15000)
                 await expect(note).to_have_text(
-                    "Earlier runs of this chat are not shown: the page reads its latest 200."
+                    "Earlier tasks of this chat are not shown: the page reads its latest 200."
                 )
-                await expect(page.locator(".history a", has_text="Open the first run")).to_have_count(0)
+                await expect(page.locator(".history a", has_text="Open the first task")).to_have_count(0)
             await page.screenshot(path=str(tmp_path / "chat-cut.png"))
             # A chat of fewer runs says nothing of the kind.
             await page.goto(f"{address}/#/runs/{short[-1].id}")

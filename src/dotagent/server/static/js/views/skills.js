@@ -30,7 +30,7 @@ import { attempt, confirmDialog, toast } from "../ui.js";
 async function dropSkill(skill) {
   const confirmed = await confirmDialog({
     title: `Drop ${skill.name}?`,
-    message: "The skill is removed; a later run of its kind may learn it again.",
+    message: "The skill is removed; a later task of its kind may learn it again.",
     confirmLabel: "Drop",
     danger: true,
     focusCancel: true,
@@ -46,7 +46,7 @@ async function dropSkill(skill) {
 /** Offer an agent's skill to every run, or to the agent's alone again; resolves to the list after it. */
 async function shareSkill(skill, shared) {
   const page = await api.put(`/skills/learned/${encodeURIComponent(skill.name)}`, { shared });
-  toast("ok", shared ? `${skill.name} is offered to every run.` : `${skill.name} is ${skill.agentName}'s alone again.`);
+  toast("ok", shared ? `${skill.name} is offered to every task.` : `${skill.name} is ${skill.agentName}'s alone again.`);
   return page.items;
 }
 
@@ -60,7 +60,7 @@ async function pinSkill(skill, pinned) {
 /** Wake a learned skill that rests, for disuse, by hand or for a merge; resolves to the list after it. */
 async function wakeSkill(skill) {
   const page = await api.post(`/skills/learned/${encodeURIComponent(skill.name)}/wake`, {});
-  toast("ok", `${skill.name} is awake: runs are offered it again.`);
+  toast("ok", `${skill.name} is awake: tasks are offered it again.`);
   return page.items;
 }
 
@@ -69,7 +69,7 @@ function restWords(skill, restDays) {
   if (skill.rest_reason === "merged") {
     return `Merged into ${skill.merged_into}`;
   }
-  return skill.rest_reason === "owner" ? "Put to rest by you" : `No run read it for ${plural(restDays, "day", "days")}`;
+  return skill.rest_reason === "owner" ? "Put to rest by you" : `No task read it for ${plural(restDays, "day", "days")}`;
 }
 
 /**
@@ -88,8 +88,8 @@ export function skillRow(skill, onChanged) {
   }
   const record =
     skill.uses + skill.failures === 0
-      ? "Not read by a run yet"
-      : `${plural(skill.uses, "run", "runs")} done after reading it, ${skill.failures} failed`;
+      ? "Not read by a task yet"
+      : `${plural(skill.uses, "task", "tasks")} done after reading it, ${skill.failures} failed`;
   const whose =
     skill.agent_id === null
       ? null
@@ -115,7 +115,7 @@ export function skillRow(skill, onChanged) {
         skill.resting ? el("span", { class: "chip" }, "Resting") : null,
         skill.pinned ? el("span", { class: "chip" }, "Pinned") : null,
         el("span", null, skill.host),
-        el("span", null, `Learned from ${plural(skill.runs.length, "run", "runs")}, last ${ago(skill.updated_at)}`),
+        el("span", null, `Learned from ${plural(skill.runs.length, "task", "tasks")}, last ${ago(skill.updated_at)}`),
         el("span", null, record),
       ),
     ),
@@ -135,7 +135,7 @@ function foundDialog(kind, item, added) {
     return added
       ? {
           title: `Add ${item.name} to Dot?`,
-          message: `Dot copies this skill of ${item.agent} into its own skills folder and offers it to every run. The copy stays as it is now: later changes in ${item.agent}'s folder are not copied.`,
+          message: `Dot copies this skill of ${item.agent} into its own skills folder and offers it to every task. The copy stays as it is now: later changes in ${item.agent}'s folder are not copied.`,
           confirmLabel: "Add",
         }
       : {
@@ -147,12 +147,12 @@ function foundDialog(kind, item, added) {
   }
   return added
     ? {
-        title: `Add the MCP server ${item.name} to Dot?`,
-        message: `From its next start, Dot starts it as ${item.agent} does, with the command, arguments and environment written there, and offers its tools to runs as their mode allows.`,
+        title: `Add the connected app ${item.name} to Dot?`,
+        message: `From its next start, Dot starts it as ${item.agent} does, with the command written there, and offers what it can do to tasks as their mode allows.`,
         confirmLabel: "Add",
       }
     : {
-        title: `Remove the MCP server ${item.name} from Dot?`,
+        title: `Remove the connected app ${item.name} from Dot?`,
         message: `Dot no longer starts it, from its next start. It stays set up in ${item.agent}.`,
         confirmLabel: "Remove",
         focusCancel: true,
@@ -169,8 +169,8 @@ function goneDialog(item) {
         focusCancel: true,
       }
     : {
-        title: `Remove the MCP server ${item.name} from Dot?`,
-        message: `${item.agent} no longer has this server, and Dot leaves it out when it starts. Dot forgets it.`,
+        title: `Remove the connected app ${item.name} from Dot?`,
+        message: `${item.agent} no longer has this connected app, and Dot leaves it out when it starts. Dot forgets it.`,
         confirmLabel: "Remove",
         focusCancel: true,
       };
@@ -194,7 +194,7 @@ async function askAndChange(dialog, body, done) {
  * found after it, or null when the owner said no.
  */
 function changeFound(kind, item, added) {
-  const done = !added ? `Removed ${item.name}.` : kind === "skill" ? `Added ${item.name}; runs are offered it.` : `Added ${item.name}; Dot starts it the next time it starts.`;
+  const done = !added ? `Removed ${item.name}.` : kind === "skill" ? `Added ${item.name}; tasks are offered it.` : `Added ${item.name}; Dot starts it the next time it starts.`;
   return askAndChange(foundDialog(kind, item, added), { kind, agent: item.agent, name: item.name, added }, done);
 }
 
@@ -205,7 +205,7 @@ function addable(item) {
 
 /** What a found MCP server starts or reaches, in a few words. */
 function reachOf(server) {
-  return server.transport === "stdio" ? `Starts ${server.reaches}` : `${server.transport.toUpperCase()} to ${server.reaches}`;
+  return server.transport === "stdio" ? `Starts ${server.reaches}` : `Connects to ${server.reaches}`;
 }
 
 /**
@@ -259,7 +259,7 @@ function importDialog(found) {
         el(
           "div",
           { class: "import-group" },
-          el("div", { class: "import-group-head" }, "MCP servers", el("span", { class: "hint" }, "start with Dot's next start")),
+          el("div", { class: "import-group-head" }, "Connected apps", el("span", { class: "hint" }, "start with Dot's next start")),
           servers.map((server) => tick("server", server, false, `${server.agent} · ${reachOf(server)}`)),
         ),
       );
@@ -279,7 +279,7 @@ function importDialog(found) {
         el(
           "p",
           { class: "muted" },
-          "What Claude Code, Codex and the Mac's other agents set up. A skill is copied into Dot and offered to runs at once; an MCP server starts with Dot's next start, as its app starts it.",
+          "What Claude Code, Codex and the Mac's other agents set up. A skill is copied into Dot and offered to tasks at once; a connected app starts with Dot's next start, as its app starts it.",
         ),
         el("label", { class: "import-all" }, all, el("span", null, "Choose all")),
         el("div", { class: "import-list" }, groups),
@@ -386,7 +386,7 @@ function goneRow(item, onFound) {
   const remove = el("button", { class: "btn ghost sm", type: "button" }, "Remove");
   const body = { kind: item.kind, agent: item.agent, name: item.name, added: false };
   remove.addEventListener("click", () => attempt(async () => onFound(await askAndChange(goneDialog(item), body, `Removed ${item.name}.`))));
-  const what = item.kind === "skill" ? "Skill: Dot keeps its copy" : "MCP server: Dot leaves it out when it starts";
+  const what = item.kind === "skill" ? "Skill: Dot keeps its copy" : "Connected app: Dot leaves it out when it starts";
   return el(
     "div",
     { class: "list-row" },
@@ -427,7 +427,7 @@ function foundSection(found, onFound) {
     return foundGroup(`found-skills-${slug}`, agent, plural(skills.length, "skill", "skills"), extra, skills.map((skill) => foundSkillRow(skill, onFound)));
   });
   if (found.servers.length > 0) {
-    groups.push(foundGroup("found-servers", "MCP servers", plural(found.servers.length, "server", "servers"), null, found.servers.map((server) => foundServerRow(server, onFound))));
+    groups.push(foundGroup("found-servers", "Connected apps", plural(found.servers.length, "connected app", "connected apps"), null, found.servers.map((server) => foundServerRow(server, onFound))));
   }
   if (found.gone.length > 0) {
     groups.push(foundGroup("found-gone", "Added, no longer set up", plural(found.gone.length, "item", "items"), null, found.gone.map((item) => goneRow(item, onFound))));
@@ -440,12 +440,12 @@ function foundSection(found, onFound) {
   }
   const head = foundHead();
   if (groups.length === 0) {
-    return [head, emptyPanel("search", "Nothing found", "No other agent of this Mac (Claude Code, Claude Desktop, Cursor, VS Code, Codex) has skills or MCP servers set up.")];
+    return [head, emptyPanel("search", "Nothing found", "No other agent of this Mac (Claude Code, Claude Desktop, Cursor, VS Code, Codex) has skills or connected apps set up.")];
   }
   const hint = el(
     "div",
     { class: "hint" },
-    "Skills and MCP servers that other agents of this Mac set up. Dot uses one only once you add it: a skill is copied and offered to runs at once, a server starts with Dot's next start.",
+    "Skills and connected apps that other agents of this Mac set up. Dot uses one only once you add it: a skill is copied and offered to tasks at once, a connected app starts with Dot's next start.",
   );
   return [head, hint, el("div", { class: "card list-box" }, groups)];
 }
@@ -526,7 +526,7 @@ function learnedCard(skill, onChanged, restDays) {
   }
   const wake =
     skill.resting && !skill.retired
-      ? el("button", { class: "btn ghost sm", type: "button", title: "Offer this skill to runs again" }, "Wake")
+      ? el("button", { class: "btn ghost sm", type: "button", title: "Offer this skill to tasks again" }, "Wake")
       : null;
   if (wake !== null) {
     wake.addEventListener("click", () => attempt(async () => onChanged(await wakeSkill(skill))));
@@ -547,14 +547,14 @@ function learnedCard(skill, onChanged, restDays) {
   if (pin !== null) {
     pin.addEventListener("click", () => attempt(async () => onChanged(await pinSkill(skill, !skill.pinned))));
   }
-  const record = skill.uses + skill.failures === 0 ? "Not read by a run yet" : `${plural(skill.uses, "run", "runs")} done after reading it, ${skill.failures} failed`;
+  const record = skill.uses + skill.failures === 0 ? "Not read by a task yet" : `${plural(skill.uses, "task", "tasks")} done after reading it, ${skill.failures} failed`;
   const chips = [
     el("span", { class: "chip" }, skill.kind),
     skill.agent_id === null ? null : el("span", { class: "chip" }, skill.shared ? `${skill.agentName ?? "An agent"}, shared` : (skill.agentName ?? "An agent")),
   ].filter((chip) => chip !== null);
   const facts = factsOf(chips, [
     skill.host,
-    `Learned from ${plural(skill.runs.length, "run", "runs")}, last ${ago(skill.updated_at)}`,
+    `Learned from ${plural(skill.runs.length, "task", "tasks")}, last ${ago(skill.updated_at)}`,
     record,
     skill.last_read_at === null ? null : `Last read ${ago(skill.last_read_at)}`,
     skill.version > 1 ? `Version ${skill.version}` : null,
@@ -623,7 +623,7 @@ function chatDialog(runs, save) {
         "div",
         { class: "modal-body" },
         el("h3", { id: "chat-skill-title" }, "Save a skill from a chat"),
-        el("p", { class: "muted" }, "Dot's review model writes how the chat's work was done as a skill, offered to the runs of its kind after it."),
+        el("p", { class: "muted" }, "Dot's reviewer writes how the chat's work was done as a skill, offered to the tasks of its kind after it."),
         rows.length === 0 ? el("p", { class: "hint" }, "No chat has ended done yet.") : el("div", { class: "chat-skill-list" }, rows),
         problem,
       ),
@@ -685,7 +685,7 @@ export function mount(root) {
   // Out of what paints again, so that the search keeps the focus while the cards are drawn anew.
   const head = customizeHead({
     title: "Skills",
-    line: "What Dot knows how to do: the skills it learned from your chats, those you wrote or imported, and those of its plugins. A run reads the ones its task needs.",
+    line: "What Dot knows how to do: the skills it learned from your chats, those you wrote or imported, and those of its plugins. A task reads the ones it needs.",
     search,
     controls: [tabs.element, saveButton, importButton],
   });
@@ -778,7 +778,7 @@ export function mount(root) {
     const copies = imported();
     const own = palette.skills.filter((skill) => OWN_SOURCES.has(skill.source) && !copies.has(skill.name) && matches(skill.name, skill.description));
     const ownCards = own.map((skill) =>
-      skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([], [skill.source === "home" ? "In Dot's skills folder" : "In a folder of the config"]), actions: [], have: "Installed" }),
+      skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([], [skill.source === "home" ? "In Dot's skills folder" : "In a folder in Dot's settings"]), actions: [], have: "Installed" }),
     );
     const importedCards = [...copies.values()]
       .filter((skill) => matches(skill.name, skill.description))
@@ -844,7 +844,7 @@ export function mount(root) {
     if (parts.every((part) => part === null)) {
       parts.push(
         words === ""
-          ? emptyPanel("sparkles", "Neither Dot nor a plugin brings a skill", "[skills] builtin is off and no plugin has one.")
+          ? emptyPanel("sparkles", "Neither Dot nor a plugin brings a skill", "Dot's built-in skills are switched off in its settings file, and no plugin has one.")
           : emptyPanel("search", "No skill matches the search", ""),
       );
     }

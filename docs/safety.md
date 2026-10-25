@@ -711,9 +711,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a
 label they do not know (Mastodon's "Boost", the German "Teilen") passes as an ordinary click. With `[judge] provider =
-"typesafe"` (the switch "Typed judge (Jev)" on the page of TypeSafe in Settings › Providers writes it and switches the
+"typesafe"` (the switch "Extra checker (TypeSafe)" on the page of TypeSafe in Settings › AI services writes it and switches the
 judge from the next judgment on, with no restart; item 255) and `TYPESAFE_API_KEY` saved (made at console.typesafe.ai;
-Settings › Providers, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in
+Settings › AI services, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in
 four yes/no questions (does it publish, send, pay or delete?) over the label, the role and the page's address (without
 its query and fragment). A probability of at least `public_action_threshold` (0.45: below each yes measured; a wrong
 flag only asks) gives the click that flag, so the policy treats it as a click on "Post" or "Delete", and the action's
@@ -746,7 +746,7 @@ what the last step brought back, the failures so far and the failures in a row: 
 a hard one to the first available helper of `[models] helpers`, and the run's own model takes a step unless another
 model's probability reaches `step_router_threshold` (0.6). A model that cannot take the run's tools, its window or its
 images is not offered; a routed model that cannot answer has the step asked again on the run's model. Each step another
-model takes is a `step_routed` line under Set up in the side panel's Run tab (item 365). It stays off until a comparison
+model takes is a `step_routed` line under Set up in the side panel's Task tab (item 365). It stays off until a comparison
 on your runs shows less time per task at the same success: a change of model loses the prompt cache the hosted providers
 keep, and a weaker model can add steps.
 
@@ -838,7 +838,7 @@ now and then, which is told and sent again. With one Apple ID Messages may keep 
 with the same words and dated at most ten seconds apart, they are one command, and the second is let go. Pairing someone
 else's number or address gives them Dot: the code you type back shows only that it reached whoever holds the number, so
 with someone else's every message they send you, and every message you send them, would be read as your command.
-Settings › Channels shows what the channel sees of Messages' database (the newest row, the cursor, the two files, the
+Settings › Channels shows, under **Advanced**, what the channel sees of Messages' database (the newest row, the cursor, the two files, the
 last command and error) and warns when its log changed and nothing Dot reads did; it informs and decides nothing.
 Approvals and questions are never answered on a channel: a line says one waits and where to answer, in Dot's UI or the
 phone app, so that a channel's account, if taken, could not approve anything. While the emergency stop is engaged a

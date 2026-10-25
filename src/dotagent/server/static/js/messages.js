@@ -11,9 +11,9 @@ import { prose } from "./prose.js";
 import { readAloudButton } from "./readaloud.js";
 
 const OUTCOMES = {
-  done: { label: "Finished", empty: "The run finished without a written answer." },
-  failed: { label: "Failed", empty: "The run failed without saying why." },
-  cancelled: { label: "Cancelled", empty: "The run was cancelled before it wrote an answer." },
+  done: { label: "Finished", empty: "The task finished without a written answer." },
+  failed: { label: "Failed", empty: "The task failed without saying why." },
+  cancelled: { label: "Cancelled", empty: "The task was stopped before it wrote an answer." },
 };
 
 /** When a message was sent or an answer came, in sight; `title` says more where the pointer rests. */
@@ -104,7 +104,7 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href,
     "article",
     { class: `answer ${status}`, "aria-label": "Answer" },
     el("span", { class: "turn-face" }, actorFace(actorId, faceStateAtEnd(status), null)),
-    status === "failed" ? el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, "The run failed")) : null,
+    status === "failed" ? el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, "The task failed")) : null,
     written ? prose(text) : el("div", { class: "muted" }, outcome.empty),
     el(
       "div",
@@ -113,7 +113,7 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href,
       written ? readAloudButton(text, readNow && status === "done") : null,
       written && reactions !== null && runId !== null ? reactions.controls(runId, "answer") : null,
       el("span", { class: "answer-facts meta-facts" }, ...facts),
-      href === null ? null : el("a", { class: "small", href }, "Open run"),
+      href === null ? null : el("a", { class: "small", href }, "Open task"),
     ),
   );
 }

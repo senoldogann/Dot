@@ -570,7 +570,7 @@ async def test_a_schedule_whose_running_status_was_not_written_is_free_once_its_
     finally:
         await scheduler.drain()
     assert manager.goals == [GOAL, GOAL]
-    assert (await runtime.store.get_schedule(recurring.id)).last_status != "skipped: the previous run was still going"
+    assert (await runtime.store.get_schedule(recurring.id)).last_status != "skipped: the previous task was still going"
 
 
 class _FailsThenStarts(_StartsAndEnds):
@@ -856,7 +856,7 @@ async def test_missed_firings_collapse_and_a_running_schedule_skips(runtime: Run
 
     await scheduler.tick(_planned(fired))
     skipped: ScheduleRecord = await runtime.store.get_schedule(created.id)
-    assert skipped.last_status == "skipped: the previous run was still going"
+    assert skipped.last_status == "skipped: the previous task was still going"
     assert skipped.next_run_at == next_firing("*/5 * * * *", _planned(fired), runtime.schedule_zone)
     assert len(await _runs_in(runtime, skipped)) == 1
 

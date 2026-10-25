@@ -9,15 +9,15 @@ import { panelSection } from "./panels.js";
 
 const HINTS = {
   model: "The seconds the model took to answer: its steps and its side calls together",
-  summaries: "The model calls that compacted the context, and their share of the run",
-  tools: "The seconds the tool calls took, the gate included",
-  gate: "The part of the tool seconds spent waiting for your approval or your answer",
-  steps: "The model turns of the run",
-  input: "The tokens sent to the model in all its calls, and the share the provider served from its cache",
-  output: "The tokens the model wrote",
-  compactions: "How often the context was summarised to fit the budget",
-  searches: "The web searches that came back, by the engine that answered (the anthropic rung costs one cent a search)",
-  delegated: "The runs this run delegated and how long it waited for them",
+  summaries: "The time spent summing up the older part of the chat, and its share of the task",
+  tools: "The seconds the actions took, with the time spent waiting for your answer",
+  gate: "The part of that time spent waiting for your approval or your answer",
+  steps: "How many times Dot went back to the model",
+  input: "What was sent to the model in all its calls, and the share its service had ready from before",
+  output: "What the model wrote",
+  compactions: "How often the older part of the chat was summed up to make room",
+  searches: "The web searches that came back, by the search service that answered (the Anthropic one costs one cent a search)",
+  delegated: "The tasks this task handed to helpers and how long it waited for them",
 };
 
 function cell(label, value, hint) {
@@ -39,7 +39,7 @@ export function createCostCard() {
   const body = el("div", null, el("div", { class: "hint" }, "Counting…"));
   const card = panelSection({ id: "run-cost", title: "Cost", actions: null, body });
   card.element.classList.add("cost-card");
-  card.element.setAttribute("aria-label", "Cost of this run");
+  card.element.setAttribute("aria-label", "Cost of this task");
   // The figures the grid was drawn from.
   let drawn = null;
 
@@ -56,13 +56,13 @@ export function createCostCard() {
     const facts = [
       ["Model", spent(time.model_seconds, total), HINTS.model],
       ["Summaries", spent(time.compaction_seconds, total), HINTS.summaries],
-      ["Tools", spent(costs.tool_seconds, total), HINTS.tools],
+      ["Actions", spent(costs.tool_seconds, total), HINTS.tools],
       ["Waiting for you", spent(costs.waited_s, total), HINTS.gate],
       ["Steps", String(stats.steps), HINTS.steps],
-      ["Input tokens", `${compact(stats.input_tokens)}${cached}`, HINTS.input],
-      ["Output tokens", compact(stats.output_tokens), HINTS.output],
-      ["Compactions", compactions, HINTS.compactions],
-      ["Delegated runs", delegated, HINTS.delegated],
+      ["Usage in", `${compact(stats.input_tokens)}${cached}`, HINTS.input],
+      ["Usage out", compact(stats.output_tokens), HINTS.output],
+      ["Chat summaries", compactions, HINTS.compactions],
+      ["Tasks given to helpers", delegated, HINTS.delegated],
       ["Searches", searches, HINTS.searches],
     ].filter(([, value]) => value !== "None");
     // Read every ten seconds while the run works; drawn again only when a figure changed (item 310).

@@ -10,6 +10,7 @@ import { setPageTitle, watchAttention } from "./attention.js";
 import { loadMacVoice } from "./macvoice.js";
 import { wireConversationCopy } from "./clipboard.js";
 import { el, OPEN_FILE_EVENT } from "./dom.js";
+import { explain } from "./errors.js";
 import { fileDialog } from "./filepanel.js";
 import { icon, wordmark } from "./icons.js";
 import { buildShell } from "./shell.js";
@@ -19,7 +20,7 @@ import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
 import { applyStoredDensity, PHONE } from "./layout.js";
 import { readPref, writePref } from "./prefs.js";
 import { applyStoredScheme, applyStoredTheme, followBarColour } from "./theme.js";
-import { attempt, toast } from "./ui.js";
+import { attempt, detailsFold, toast, toastError } from "./ui.js";
 import { openingCurtain, PAGE_READY_EVENT } from "./waiting.js";
 import * as run from "./views/run.js";
 import * as runs from "./views/runs.js";
@@ -52,7 +53,7 @@ const MOVED = new Map([
 // for a page whose way back is the list of chats.
 const ROUTES = [
   { tab: "runs", layout: "home", title: "New chat", pattern: /^\/runs$/, view: runs, parent: () => null },
-  { tab: "runs", layout: "run", title: "Run", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run, parent: () => null },
+  { tab: "runs", layout: "run", title: "Task", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run, parent: () => null },
   {
     tab: "campaigns",
     layout: "page",
@@ -210,17 +211,22 @@ function onEnter(input, action) {
   });
 }
 
-function renderSignIn(message) {
-  // A pairing code from Settings › Phone (item 267): the way in for an app on a phone's home screen, whose storage is
-  // its own, so that it has none of the token Safari was given.
+/**
+ * The sign-in screen (item 625): a person who has not signed in yet gets one thing to do, type the code that Settings ›
+ * Phone shows; the access key and the commands of Terminal are the other ways in, in a fold that is shut unless the key
+ * is what failed (`keyFailed`).
+ */
+function renderSignIn(message, keyFailed = false) {
+  // A sign-in code from Settings › Phone (item 267): the way in for an app on a phone's home screen, whose storage is
+  // its own, so that it has none of the key Safari was given.
   const code = el("input", {
     class: "input mono",
     type: "text",
     autocomplete: "one-time-code",
     autocapitalize: "characters",
     spellcheck: "false",
-    placeholder: "Pairing code",
-    "aria-label": "Pairing code",
+    placeholder: "Sign-in code",
+    "aria-label": "Sign-in code",
   });
   const input = el("input", {
     class: "input mono",
@@ -228,10 +234,10 @@ function renderSignIn(message) {
     autocomplete: "off",
     autocapitalize: "off",
     spellcheck: "false",
-    placeholder: "Access token",
-    "aria-label": "Access token",
+    placeholder: "Access key",
+    "aria-label": "Access key",
   });
-  const pairButton = el("button", { class: "btn primary", type: "button" }, "Pair");
+  const pairButton = el("button", { class: "btn primary", type: "button" }, "Sign in");
   const pair = async () => {
     const value = code.value.trim();
     if (value === "") {
@@ -243,7 +249,7 @@ function renderSignIn(message) {
     try {
       token = await pairWithCode(value);
     } catch (error) {
-      renderSignIn(error.message);
+      renderSignIn(explain(error).text);
       return;
     }
     setToken(token);
@@ -262,22 +268,38 @@ function renderSignIn(message) {
   onEnter(code, () => attempt(pair));
   onEnter(input, submit);
   screen(
-    el("p", { class: "muted" }, "Type a pairing code: in Dot on your Mac, or in Safari where Dot is open, go to Settings › Phone and press Show code."),
+    el("p", { class: "muted" }, "Open Dot on your Mac, go to Settings › Phone and choose Show code. Then type the code here."),
     message === "" ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, message)),
     code,
     pairButton,
-    el("div", { class: "hint" }, "Or paste the access token of your Dot daemon:"),
-    input,
-    el("button", { class: "btn", type: "button", onclick: submit }, "Connect"),
     el(
-      "div",
-      { class: "stack tight" },
-      el("div", { class: "hint" }, "The easy way in: this command opens the page already signed in."),
-      el("code", { class: "code-line" }, "dotx open"),
-      el("div", { class: "hint" }, "Or print the address, token included:"),
-      el("code", { class: "code-line" }, "dotx url"),
-      el("div", { class: "hint" }, "If your shell does not find dotx, run it from the project folder:"),
-      el("code", { class: "code-line" }, ".venv/bin/dotx open"),
+      "details",
+      { class: "signin-other", open: keyFailed },
+      el("summary", null, "Other ways to sign in"),
+      el(
+        "div",
+        { class: "stack tight" },
+        el("div", { class: "hint" }, "If you have Dot's access key, paste it here:"),
+        input,
+        el("button", { class: "btn", type: "button", onclick: submit }, "Sign in with the key"),
+        // The commands are the expert's: one fold further in, so that they stay out of sight when a key that was typed
+        // and refused has opened the other ways.
+        el(
+          "details",
+          { class: "error-details" },
+          el("summary", null, "Sign in from Terminal"),
+          el(
+            "div",
+            { class: "stack tight" },
+            el("div", { class: "hint" }, "On your Mac, this command in Terminal opens this page already signed in:"),
+            el("code", { class: "code-line" }, "dotx open"),
+            el("div", { class: "hint" }, "Or it prints the address, with the key in it:"),
+            el("code", { class: "code-line" }, "dotx url"),
+            el("div", { class: "hint" }, "If Terminal does not find dotx, run this from the project folder:"),
+            el("code", { class: "code-line" }, ".venv/bin/dotx open"),
+          ),
+        ),
+      ),
     ),
   );
   code.focus();
@@ -299,9 +321,15 @@ function renderUnreachable(message) {
   const when = el("span", null, "");
   screen(
     el("div", { class: "note bad" }, icon("alert"), el("span", null, message)),
-    el("p", { class: "muted" }, "Make sure the daemon is running (", el("code", { class: "mono" }, "dotx daemon"), "); this page tries again by itself."),
+    el("p", { class: "muted" }, "This page tries again by itself."),
     el("p", { class: "muted" }, when),
     el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: retryNow }, icon("refresh"), "Try again")),
+    el(
+      "details",
+      { class: "error-details" },
+      el("summary", null, "More help"),
+      el("p", { class: "small muted" }, "If you started Dot from Terminal, start it again there with ", el("code", { class: "mono" }, "dotx daemon"), "."),
+    ),
   );
   const due = Date.now() + retryPause;
   retryPause = Math.min(retryPause * 2, RETRY_MAX_MS);
@@ -331,11 +359,17 @@ function renderUnreachable(message) {
 function renderFailed(error) {
   const cause = error.context && typeof error.context.error === "string" ? error.context.error : null;
   screen(
-    el("div", { class: "note bad" }, icon("alert"), el("span", null, `The daemon is running but could not answer: ${error.message}`)),
-    cause === null ? null : el("p", { class: "muted mono" }, cause),
-    // The log's folder is where the daemon was told to keep it (DOT_LOG_DIR), which this page cannot know.
-    el("p", { class: "muted" }, "Its log has the details: ", el("code", { class: "mono" }, "dotx service status"), " names its folder."),
+    el("div", { class: "note bad" }, icon("alert"), el("span", null, "Dot is open, but it could not answer just now. Try again in a moment.")),
     el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: () => attempt(connect) }, icon("refresh"), "Try again")),
+    el(
+      "details",
+      { class: "error-details" },
+      el("summary", null, "Details"),
+      el("p", { class: "small muted mono" }, `${error.status}: ${error.message}`),
+      cause === null ? null : el("p", { class: "small muted mono" }, cause),
+      // The log's folder is where the daemon was told to keep it (DOT_LOG_DIR), which this page cannot know.
+      el("p", { class: "small muted" }, "Dot's log has more. In Terminal, ", el("code", { class: "mono" }, "dotx service status"), " names its folder."),
+    ),
   );
 }
 
@@ -553,7 +587,10 @@ function beginSession() {
       if (ticket !== asked) {
         return;
       }
-      shell.main.replaceChildren(el("div", { class: "card empty" }, icon("alert"), el("div", null, `This page failed to open: ${error.message}`)));
+      const { text, details } = explain(error);
+      shell.main.replaceChildren(
+        el("div", { class: "card empty" }, icon("alert"), el("div", null, `This page could not open. ${text}`), detailsFold(details === "" ? error.message : details)),
+      );
       liftCurtain();
     }
     liftWhenShown(found.route.layout);
@@ -598,7 +635,7 @@ function beginSession() {
 
   runLifecycle(controller.signal, () => handleAuthLost()).catch((error) => {
     console.error("the event stream ended", error);
-    toast("error", `The live connection ended: ${error.message}`);
+    toast("error", "Dot stopped sending updates. Reload the page to get them again.", null, error.message);
   });
 
   session = {
@@ -622,7 +659,7 @@ function handleAuthLost() {
   }
   endSession();
   clearToken();
-  renderSignIn("The daemon did not accept the saved access token. Pair again with a new code, paste the current token, or open this page with dotx open.");
+  renderSignIn("Dot did not accept the access key this browser had saved. Get a new sign-in code in Settings › Phone and type it here.");
 }
 
 async function connect() {
@@ -640,12 +677,12 @@ async function connect() {
       keepTrying(null);
       if (before !== null) {
         setToken(before, false);
-        toast("error", "The access token in the address is not the daemon's: this browser goes on with its own.");
+        toast("error", "The access key in this address is not the one Dot uses, so this browser keeps the key it already had.");
         await connect();
         return;
       }
       clearToken();
-      renderSignIn("The daemon did not accept that access token.");
+      renderSignIn("Dot did not accept that access key. Check it and try again.", true);
       return;
     }
     // A status is the daemon's answer; without one (0, or no ApiError) nothing that is the daemon answered.
@@ -653,7 +690,7 @@ async function connect() {
       renderFailed(error);
       return;
     }
-    renderUnreachable(error.message);
+    renderUnreachable(explain(error).text);
     return;
   }
   if (untried !== null) {
@@ -721,7 +758,7 @@ window.addEventListener("unhandledrejection", (event) => {
     return;
   }
   console.error("unhandled rejection", reason);
-  toast("error", reason instanceof Error ? reason.message : String(reason));
+  toastError(reason);
 });
 
 attempt(boot);

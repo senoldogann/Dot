@@ -345,9 +345,11 @@ async def test_the_sign_in_screen_of_a_daemon_that_could_not_answer_names_its_lo
                     lambda route: route.fulfill(status=500, content_type="application/json", body=body),
                 )
                 await page.goto(ui_url(host, port, TOKEN))
-                await expect(page.get_by_text("The daemon is running but could not answer")).to_be_visible()
-                hint: Locator = page.locator("p").filter(has_text="Its log has the details")
-                await expect(hint).to_have_text("Its log has the details: dotx service status names its folder.")
+                await expect(page.get_by_text("Dot is open, but it could not answer just now")).to_be_visible()
+                hint: Locator = page.locator("p").filter(has_text="Dot's log has more")
+                await expect(hint).to_have_text(
+                    "Dot's log has more. In Terminal, dotx service status names its folder."
+                )
                 assert "Library/Logs" not in await page.locator("body").inner_text()
                 await _shot(page, tmp_path / f"sign-in-failed-{width}-{scheme}.png")
                 await page.close()

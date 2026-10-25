@@ -131,7 +131,7 @@ async def _sizes(page: Page, address: str, run: str) -> list[float]:
     await page.get_by_role("button", name="Show sidebar").click()
     row: float = await page.locator(".sidebar .side-run-goal").first.evaluate(_SIZE)
     await page.goto(f"{address}/#/settings/appearance")
-    toggle: Locator = page.get_by_role("switch", name="Fold tool steps")
+    toggle: Locator = page.get_by_role("switch", name="Fold steps")
     label: float = await page.locator(".setting .row", has=toggle).locator(".grow").evaluate(_SIZE)
     return [answer, row, label]
 

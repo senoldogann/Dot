@@ -187,7 +187,7 @@ def test_tools_left_out_or_null_are_every_tool_and_an_empty_list_keeps_an_agents
         AgentRequest.model_validate({**body, "tools": [], "every_tool": True})
     assert new_agent_tools(None) == ()
     assert new_agent_tools(["shell"]) == ("shell",)
-    with pytest.raises(InvalidValueError, match="no tools to keep"):
+    with pytest.raises(InvalidValueError, match="no actions to keep"):
         new_agent_tools([])
     bounded: tuple[str, ...] = ("shell", "skill")
     assert changed_agent_tools([], bounded) == bounded

@@ -318,7 +318,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                 await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
                 await page.goto(f"http://{host}:{port}/#/runs/{working.id}")
                 if width < 960:
-                    await page.locator("button[aria-label='Run details']").click()
+                    await page.locator("button[aria-label='Task details']").click()
                 # Under the Run tab's More (item 452), which this browser opens once and keeps open.
                 more = page.locator(".inspector").get_by_role("button", name="More")
                 if await more.get_attribute("aria-expanded") == "false":
@@ -326,7 +326,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                 card = page.locator(".cost-card")
                 await expect(card).to_be_visible()
                 await expect(card).to_contain_text("Steps")
-                await expect(card).to_contain_text("Input tokens")
+                await expect(card).to_contain_text("Usage in")
                 await page.screenshot(path=str(tmp_path / f"run-cost-{width}-{scheme}.png"))
                 # What ended, on the home's Today strip: two runs, and the third of the four (the delegated run stands
                 # under its parent) a press away.
@@ -338,7 +338,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                 await expect(rows).to_have_count(2)
                 await ended.locator(".home-today-more").click()
                 await expect(rows).to_have_count(3)
-                await expect(rows.first).to_contain_text("tokens")
+                await expect(rows.first).to_contain_text("usage")
                 await page.close()
         finally:
             await browser.close()

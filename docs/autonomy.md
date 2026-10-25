@@ -9,7 +9,7 @@ other, so every mix works. Each has a default in the configuration, and a single
 | Goal mode | on, off                             | off     | `[agent] goal_mode`, `goal_patience` | `--goal-mode`, `--no-goal-mode`; `goal_mode` of `POST /api/runs`; the composer           |
 
 `GET /api/status` reports the configured defaults. A run keeps the values it was started with; the run page and the
-facts under More on its side panel's Run tab show them. The composer of the web UI sends nothing for a picker you did
+facts under More on its side panel's Task tab show them. The composer of the web UI sends nothing for a picker you did
 not touch, so the daemon applies its current default. The YOLO choice is remembered by the browser, and the run page
 carries a chip for it.
 
@@ -55,7 +55,7 @@ the review model never answers it, and a rule of yours can only hand it to you.
 
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, the summary is the action
 and the note holds the reason) and an `approval_auto` event, so you can see afterwards what went through and why. A chat
-draws a line in the timeline for the review model's decisions ("Reviewer approved: click 'Reply' — untrusted content is
+draws a line in the timeline for the review model's decisions ("The reviewer approved: click 'Reply' — untrusted content is
 in context and this action reaches outside the Mac"), and none for a step yolo waived: the mode says nothing of what it
 let through, and the record and the event keep it (item 500). A chat leaves the review model's lines out unless Settings
 › General › Chat › "Show what ran without asking" is on (items 346 and 362); the records and the events stay, and a
@@ -255,7 +255,7 @@ an alert bring the ladder one rung down again, so a long run is not stopped for 
 alert shows in the timeline with what was seen and what was done. The ladder is off by default until evals show that it
 helps; without it, a run that keeps changing its steps without getting anywhere goes on using the model until you stop
 it. Give such a run a goal that can be checked, and keep an eye on the token count of a long one (`--verbose`, or the
-facts under More on the side panel's Run tab).
+facts under More on the side panel's Task tab).
 
 **Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off, or a run of
 `dotx run` whose terminal was closed (or that got SIGTERM) or whose command died, can go on where it stopped: Continue
@@ -276,12 +276,12 @@ question to you counts: it is asked again). A run of `dotx run`, of a schedule o
 another (so a run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have
 changed something (a command, a write, a click, an agent it made, a notification or a page it showed (item 552), or a
 delegation, whose run may have done anything) wait for you. `resume
-= "off"` leaves every such run to you; **Go on after a restart** in Settings › System › Daemon writes the choice into
+= "off"` leaves every such run to you; **Go on after a restart** in Settings › System › Details writes the choice into
 the config file (item 231), and the daemon's next start reads it. The new run's turn opens with a line with a bolt
 (item 299): "Dot restarted and resumed this turn" when the daemon went on with it by itself, else
 "Resumed this turn after" what cut it off; opened, it says how that run was cut off, how each call of the step it was in
 ended, and links to it. A run that waits for you wears the same bolt over its composer, with what cut it off ("Dot
-restarted while this run worked.") and Continue.
+restarted while this task worked.") and Continue.
 
 **Lessons.** With `lessons = "auto"` (the default) or `"propose"` in `[agent]`, a task or research run of its own that
 reached its goal after something went wrong on the way (a call failed, whether the run found its way around it or not;
@@ -305,7 +305,7 @@ content or to skip a check, or that holds private data; when in doubt it leaves 
 others can write (web pages, mail, downloads), a lesson with an address to go to (a scheme, a path, `//host`, `data:`,
 `javascript:`; a site named bare is know-how and stays) or an account name in it, which such content may have planted,
 is left out before it is asked. The kept lessons are saved as notes tagged `lesson` whose source is the
-run, and "Lessons from this run" on the run's page says "Saved on its own" with Undo, which forgets the note (a note
+run, and "Lessons from this task" on the run's page says "Saved on its own" with Undo, which forgets the note (a note
 that was there before, or that was rewritten since, stays); a lesson left out says why, with Save anyway. With `propose`
 the lessons wait on that card: Save to memory keeps one, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save`,
 `/dismiss` and `/undo`). A lesson is what its last decision made it, and

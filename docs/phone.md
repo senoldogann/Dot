@@ -31,10 +31,10 @@ has its number marked (item 527).
 **Tailscale on this Mac**: while it is not installed, **Get Tailscale** opens its
 page in the Mac App Store, where a click installs it; while it is installed but not running signed in, **Open
 Tailscale** opens its app, which shows its sign-in (`POST /api/phone/tailscale`); when Tailscale cannot be asked, its
-app closed or a call that failed, the step says what it said. **Dot on your tailnet**: **Set up** has `tailscale serve
+app closed or a call that failed, the step says what it said. **Dot on your Tailscale network**: **Set up** has `tailscale serve
 --bg <port>` present Dot over HTTPS and writes the Mac's name into `[server] reach` (`POST /api/phone/tailnet`, 422 with
 why when Tailscale is missing or not signed in); when the tailnet has HTTPS off, Tailscale names the page that turns it
-on, and the step offers it as **Turn on HTTPS for your tailnet**, then Set up again. **Dot answers to the name**: the
+on, and the step offers it as **Turn on secure connections**, then Set up again. **Dot answers to the name**: the
 daemon answers to it from its next start, and **Restart Dot** starts it again once you say yes, and says when runs
 going on would stop with it (`GET /api/phone` reads the state). The card's switch **Keep this Mac awake while it
 charges** (`[server] keep_awake`, `POST /api/phone/awake`) has the daemon hold macOS's `/usr/bin/caffeinate -s`, which
@@ -165,7 +165,7 @@ the chats, and the browser's Back skips the run it went on from (item 345). The 
 window only.
 
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
-that the signed-in address gave Safari, and its sign-in screen asks for a pairing code instead (item 267): Settings ›
+that the signed-in address gave Safari, and its sign-in screen asks for a sign-in code instead (item 267): Settings ›
 Phone, on the Mac or in Safari where Dot is open, shows one with **Show code**, eight characters in two groups
 (Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a new code
 takes the place of the one before, and five wrong tries use a code up. The app trades it for the token (`POST

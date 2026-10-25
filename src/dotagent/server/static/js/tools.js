@@ -55,7 +55,7 @@ const FLOW_WORDS = {
   desktop: (count) => `used the desktop ${count === 1 ? "once" : `${count} times`}`,
   schedule: (count) => `changed ${plural(count, "schedule", "schedules")}`,
   memory: (count) => `kept ${plural(count, "note", "notes")}`,
-  other: (count) => `used ${plural(count, "tool", "tools")}`,
+  other: (count, alone) => `took ${plural(count, alone ? "step" : "other step", alone ? "steps" : "other steps")}`,
 };
 // The order the parts are said in, whatever order the calls came in.
 const FLOW_ORDER = ["command", "read", "write", "search", "page", "browser", "desktop", "schedule", "memory", "other"];
@@ -83,7 +83,8 @@ export function flowIcon(kinds) {
 
 /** The summary of a group of calls — "Ran 2 commands and read 1 file" — or "" when it holds no call. */
 export function flowWords(kinds) {
-  const parts = FLOW_ORDER.filter((kind) => (kinds[kind] ?? 0) > 0).map((kind) => FLOW_WORDS[kind](kinds[kind]));
+  const present = FLOW_ORDER.filter((kind) => (kinds[kind] ?? 0) > 0);
+  const parts = present.map((kind) => FLOW_WORDS[kind](kinds[kind], present.length === 1));
   if (parts.length === 0) {
     return "";
   }
@@ -220,7 +221,7 @@ const TOOL_WORDS = {
   desktop_act: "Act in app",
   desktop_clipboard_read: "Read clipboard",
   desktop_clipboard_write: "Copy to clipboard",
-  apple_script: "AppleScript",
+  apple_script: "Control an app",
   mail_read: "Read mail",
   mail_search: "Search mail",
   calendar_events: "Calendar",
@@ -241,7 +242,7 @@ const TOOL_WORDS = {
   draft_message: "Draft message",
   ask_user: "Ask you",
   finish: "Finish",
-  use_tools: "Turn on tools",
+  use_tools: "Turn on more actions",
   schedule_create: "Add schedule",
   schedule_list: "List schedules",
   schedule_delete: "Delete schedule",
@@ -332,9 +333,9 @@ export function toolRow({ tool, args }) {
     const argsText = JSON.stringify(args, null, 2);
     // replaceChildren writes a null as the word "null": a section that is not there is left out before (item 472).
     const parts = [
-      plain === null ? stepBlock("Arguments", argsText, false) : stepBlock("Command", plain, false),
+      plain === null ? stepBlock("What Dot sent", argsText, false) : stepBlock("Command", plain, false),
       result === null
-        ? el("div", { class: "small muted" }, cut ? "Cut off: the run ended before this call reported back." : "Still running…")
+        ? el("div", { class: "small muted" }, cut ? "Cut off: the task ended before this step reported back." : "Still running…")
         : result.text === ""
           ? section(result.ok ? "Result" : "Error", el("div", { class: "small muted" }, "(no text)"))
           : textBlock(result.text, !result.ok),

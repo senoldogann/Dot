@@ -120,7 +120,7 @@ def phone_router(ctx: ServerContext) -> APIRouter:
         if not outcome.matched:
             log.warning("phone_pairing_refused", code_left=outcome.left is not None)
             raise PairingRefused(
-                "the pairing code is wrong, used or out of date; ask for a new one in Settings › Phone on your Mac",
+                "that sign-in code is wrong, used or out of date; ask for a new one in Settings › Phone on your Mac",
                 {"tries_left": 0 if outcome.left is None else outcome.left.tries_left},
             )
         log.info("phone_paired")

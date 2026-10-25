@@ -88,7 +88,7 @@ export function proposalCard(view, { onAccepted, onDismissed }) {
       el("div", { class: "skill-does" }, proposal.kind === "merge" ? `Why: ${clip(proposal.reason, REASON_CHARS)}` : `You asked: ${clip(proposal.words ?? proposal.reason, REASON_CHARS)}`),
       marked === null
         ? null
-        : el("div", { class: "row-meta" }, el("span", { class: "badge b-warn", title: "Runs are offered the new steps with addresses, commands and paths withheld." }, icon("alert"), marked)),
+        : el("div", { class: "row-meta" }, el("span", { class: "badge b-warn", title: "Tasks are offered the new steps with addresses, commands and file names withheld." }, icon("alert"), marked)),
       view.stale === null ? fieldsDiff(view) : el("p", { class: "hint proposal-stale", role: "note" }, `It cannot be applied now: ${view.stale}.`),
       view.stale === null ? el("ul", { class: "proposal-effects" }, proposalEffects(proposal).map((line) => el("li", null, line))) : null,
       el("div", { class: "skill-actions" }, view.stale === null ? yes : null, no),

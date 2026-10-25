@@ -231,6 +231,8 @@ async def test_settings_shows_the_port_and_sets_it(own_home: Path, tmp_path: Pat
                 )
                 await page.goto(ui_url(host, served_port, TOKEN))
                 await page.goto(f"{address}/#/settings/browser")
+                # The port is the expert's: it stands under Advanced, shut until it is opened (item 625).
+                await page.locator("details.rule-advanced > summary").click()
                 field: Locator = page.get_by_role("textbox", name="DevTools port")
                 await field.wait_for()
                 await page.wait_for_function(

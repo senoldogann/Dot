@@ -184,10 +184,12 @@ async def test_a_compaction_is_a_quiet_line_in_the_conversation_and_is_counted_i
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{served}/#/runs/{run.id}")
                 details = page.locator("#panel-run-details")
-                await expect(details).to_contain_text("Compacted 2 times")
-                await expect(details).to_contain_text("1 check flagged")
+                await expect(details).to_contain_text("Summed up 2 times")
+                await expect(details).to_contain_text("1 summary had a problem")
                 lines = page.locator(".timeline .compaction-line")
-                await expect(lines).to_have_text(["Context compacted 401k → 17k tokens", "Context compacted"])
+                await expect(lines).to_have_text(
+                    ["Older part of the chat summed up: 401k → 17k", "Older part of the chat summed up"]
+                )
                 await expect(lines.first).to_be_visible()
                 await expect(page.locator(".timeline .note", has_text="compacted")).to_have_count(0)
                 await expect(page.locator(".timeline .note", has_text="summarised")).to_have_count(0)

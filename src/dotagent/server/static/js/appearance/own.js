@@ -87,7 +87,7 @@ function checkedVariants(value, appearance) {
  */
 function themeFileOf(value) {
   if (!isRecord(value)) {
-    throw new ThemeFileError("A theme file holds one JSON object.");
+    throw new ThemeFileError("A theme file holds one theme, written in the theme file form.");
   }
   const stranger = Object.keys(value).find((key) => !FILE_KEYS.includes(key));
   if (stranger !== undefined) {
@@ -238,11 +238,11 @@ function described(id, file) {
 
 function checkedFolder(value) {
   if (!isRecord(value) || typeof value.folder !== "string" || !Array.isArray(value.themes) || !Array.isArray(value.skipped)) {
-    throw new Error("the daemon's list of themes is not one this page reads");
+    throw new Error("Dot's list of themes is not one this page reads");
   }
   const themes = value.themes.map((entry) => {
     if (!isRecord(entry) || typeof entry.id !== "string" || !THEME_ID.test(entry.id)) {
-      throw new Error("the daemon listed a theme without an id this page reads");
+      throw new Error("Dot listed a theme without an id this page reads");
     }
     return described(entry.id, themeFileOf(entry.file));
   });
@@ -330,7 +330,7 @@ export function importedFile(text) {
   try {
     value = JSON.parse(text);
   } catch (error) {
-    throw new ThemeFileError(`The file is not JSON: ${error.message}`);
+    throw new ThemeFileError(`This file cannot be read as a theme: ${error.message}`);
   }
   if (isVsCodeTheme(value)) {
     const made = vsCodeThemeFile(value);

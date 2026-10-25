@@ -117,7 +117,7 @@ async def test_the_judge_is_switched_through_the_api_and_shown_on_the_keys_page(
                         await page.goto(f"{address}/#/settings/keys")
                         row: Locator = page.locator(".provider-item").filter(has_text="TypeSafe")
                         await row.click()
-                        switch: Locator = page.get_by_role("switch", name="Typed judge (Jev)")
+                        switch: Locator = page.get_by_role("switch", name="Extra checker (TypeSafe)")
                         await switch.wait_for()
                         assert await switch.get_attribute("aria-checked") == "false"
                         assert await switch.is_disabled()

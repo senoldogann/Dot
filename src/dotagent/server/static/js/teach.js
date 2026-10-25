@@ -56,7 +56,7 @@ export function openTeachPanel({ threadId, onSaved }) {
         "p",
         { class: "teach-hint" },
         "Show me the task once in Dot's browser: open the page you start from, then do it. Stop when it is done, and I ",
-        "will write it down as a skill for later runs.",
+        "will write it down as a skill for later tasks.",
       ),
       live,
       steps,
@@ -217,7 +217,7 @@ export function openTeachPanel({ threadId, onSaved }) {
     try {
       const written = await api.post(`/teach/${encodeURIComponent(threadId)}/save`, { thread_id: threadId, skill });
       saved = written.name;
-      toast("info", `Saved “${saved}”: a later run will be offered it like a learned skill.`);
+      toast("info", `Saved “${saved}”: a later task will be offered it like a learned skill.`);
       onSaved?.(saved);
       paint();
     } catch (error) {
@@ -234,7 +234,7 @@ export function openTeachPanel({ threadId, onSaved }) {
       await api.post("/runs", { thread_id: threadId, goal: skill.description, skills: [saved] });
       finish();
     } catch (error) {
-      toast("error", `The run did not start: ${error.message}`);
+      toast("error", `The task did not start: ${error.message}`);
     } finally {
       go.disabled = false;
     }

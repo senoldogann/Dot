@@ -3,9 +3,10 @@
 
 import { setStageTitle } from "./stage.js";
 import { el, switchRow } from "./dom.js";
+import { explain } from "./errors.js";
 import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
-import { attempt } from "./ui.js";
+import { attempt, detailsFold } from "./ui.js";
 
 const STATUS_LABEL = { blocked: "waiting" };
 const FOLD_KEY_PREFIX = "dot.fold.";
@@ -108,12 +109,14 @@ export function inlineLoading() {
 
 /** A failed load, with the reason and, when `retry` is given, a way to try again, to sit inside a card. */
 export function inlineError(error, retry) {
+  const { text, details } = explain(error);
   return el(
     "div",
     { class: "empty" },
     icon("alert"),
     el("div", { class: "row-title" }, "This could not be loaded"),
-    el("div", null, error.message),
+    el("div", null, text),
+    detailsFold(details),
     typeof retry === "function" ? el("div", { class: "cluster" }, el("button", { class: "btn", type: "button", onclick: retry }, icon("refresh"), "Try again")) : null,
   );
 }
@@ -330,6 +333,31 @@ export function foldGroup({ id, head, body, openByDefault }) {
   });
   paint();
   return element;
+}
+
+/**
+ * A fold at the foot of a settings tab, shut until it is opened (item 625), for what only someone who knows the program
+ * needs: `title`, a `lead` line that says what is in it, and `body`, rows of a card. It is drawn as the Rules page draws
+ * its Advanced (item 622) and takes its styles. A tab that draws itself again keeps the fold as the reader left it by
+ * giving `open` and taking `onToggle(open)`.
+ */
+export function advancedFold({ title = "Advanced", lead, body, open = false, onToggle = null }) {
+  const fold = el(
+    "details",
+    { class: "set-card rule-advanced", open },
+    el(
+      "summary",
+      { class: "rule-advanced-head" },
+      el("span", { class: "chev" }, icon("chevron")),
+      el("span", { class: "rule-advanced-title" }, title),
+      el("span", { class: "rule-advanced-lead" }, lead),
+    ),
+    el("div", { class: "rule-advanced-body" }, body),
+  );
+  if (onToggle !== null) {
+    fold.addEventListener("toggle", () => onToggle(fold.open));
+  }
+  return fold;
 }
 
 /** A labelled form field: the label, the control and an optional hint underneath. */

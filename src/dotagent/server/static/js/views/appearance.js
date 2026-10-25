@@ -605,8 +605,8 @@ function interfaceCard() {
     label: "Chat width",
     hint: "How wide the home and a conversation read.",
     options: [
-      { id: "comfortable", label: "Comfortable", hint: "768 px, Dot's own." },
-      { id: "wide", label: "Wide", hint: "1152 px." },
+      { id: "comfortable", label: "Comfortable", hint: "Dot's own width." },
+      { id: "wide", label: "Wide", hint: "Wider than usual." },
       { id: "full", label: "Full", hint: "As wide as the window." },
     ],
     selected: settingValue(CHAT_WIDTH),
@@ -621,15 +621,15 @@ function interfaceCard() {
   });
   const layoutNote = el("div", { class: "hint grow" });
   const fold = switchSetting({
-    label: "Fold tool steps",
-    hint: "The tool calls of a stretch of work fold into one line that says what they did, “Ran 2 commands and read 1 file”; open it to see every step.",
+    label: "Fold steps",
+    hint: "The steps of a stretch of work fold into one line that says what they did, “Ran 2 commands and read 1 file”; open it to see every step.",
     read: foldSteps,
     write: setFoldSteps,
     onToggled: paint,
   });
   const inspector = switchSetting({
-    label: "Details panel",
-    hint: "On wide windows the run page shows its details, plan and screenshots in a panel beside the conversation.",
+    label: "Side panel",
+    hint: "On wide windows a chat shows its details, plan and screenshots in a panel beside the conversation.",
     read: showInspector,
     write: setShowInspector,
     onToggled: paint,
@@ -677,7 +677,7 @@ function interfaceCard() {
 function motionCard() {
   const panels = rangeOf({
     label: "Panel animation",
-    hint: "How long the sidebar and the details panel take to slide in and out; at 0 they are there at once.",
+    hint: "How long the sidebar and the side panel take to slide in and out; at 0 they are there at once.",
     setting: PANEL_MOTION,
     min: 0,
     max: 400,
@@ -711,7 +711,7 @@ function motionCard() {
 function textCard() {
   const size = rangeOf({
     label: "Text size",
-    hint: "Messages, labels and headings grow and shrink with it. 16 px is a phone's own and 14 px a Mac's; each device keeps its own.",
+    hint: "Messages, labels and headings grow and shrink with it. A phone starts larger than a Mac; each device keeps its own.",
     setting: INTERFACE_SIZE,
     min: INTERFACE_SIZE.least,
     max: INTERFACE_SIZE.most,
@@ -748,7 +748,7 @@ function typeCard() {
     onSelect: (id) => setValue(ANSWER_FONT, id),
   });
   const composerFont = familySetting({
-    label: "Composer font",
+    label: "Message box font",
     hint: "What you type for Dot.",
     setting: COMPOSER_FONT,
     stacks: [
@@ -758,7 +758,7 @@ function typeCard() {
     ],
   });
   const composerSize = rangeOf({
-    label: "Composer size",
+    label: "Message box size",
     hint: "15 px is Dot's own.",
     setting: COMPOSER_SIZE,
     min: 12,

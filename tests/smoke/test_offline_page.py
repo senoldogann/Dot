@@ -26,8 +26,8 @@ TOKEN: str = "offline-page-token"
 # The route opened while the browser is offline, which no page of Dot was opened at before.
 ROUTE: str = "#/settings/system"
 # What the page says happened, and what it says to do about it.
-HEADLINE: str = "Dot cannot reach the Mac right now"
-ADVICE: str = "Check that the Mac is on and that Dot runs on it, then try again."
+HEADLINE: str = "Dot cannot reach your Mac right now"
+ADVICE: str = "Check that your Mac is on and awake and that Dot is open on it, then try again."
 # The longest the worker may take to keep the page it answers with.
 _UNTIL_S: float = 15.0
 # Long enough for the worker to answer an opening with the page it keeps, as it asks the network first.

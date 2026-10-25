@@ -20,9 +20,9 @@ test("nothing that happened says nothing", () => {
 });
 
 test("one run is one, several are several, and only what happened is said", () => {
-  assert.equal(awayLine({ ...NOTHING, done: 1 }), "1 scheduled run: 1 done");
-  assert.equal(awayLine({ ...NOTHING, done: 5, failed: 1 }), "6 scheduled runs: 5 done, 1 failed");
-  assert.equal(awayLine({ ...NOTHING, cancelled: 1, working: 2 }), "3 scheduled runs: 1 stopped, 2 working");
+  assert.equal(awayLine({ ...NOTHING, done: 1 }), "1 scheduled task: 1 done");
+  assert.equal(awayLine({ ...NOTHING, done: 5, failed: 1 }), "6 scheduled tasks: 5 done, 1 failed");
+  assert.equal(awayLine({ ...NOTHING, cancelled: 1, working: 2 }), "3 scheduled tasks: 1 stopped, 2 working");
 });
 
 test("campaign sessions, decisions made for the owner and drafts join the line", () => {
@@ -35,7 +35,7 @@ test("campaign sessions, decisions made for the owner and drafts join the line",
   };
   assert.equal(
     awayLine(view),
-    "2 scheduled runs: 2 done · 1 campaign session · 14 decisions made for you (9 by YOLO, 5 by the review model; 1 denied) · 2 drafts wait for you",
+    "2 scheduled tasks: 2 done · 1 campaign session · 14 decisions made for you (9 by YOLO, 5 by the reviewer; 1 denied) · 2 drafts wait for you",
   );
   assert.equal(
     awayLine({ ...NOTHING, decisions: { ...NOTHING.decisions, yolo_approved: 1 }, drafts: 1 }),
@@ -44,6 +44,6 @@ test("campaign sessions, decisions made for the owner and drafts join the line",
 });
 
 test("who decided says only who did", () => {
-  assert.equal(decidedBy(0, 3, 0), "3 by the review model");
+  assert.equal(decidedBy(0, 3, 0), "3 by the reviewer");
   assert.equal(decidedBy(2, 0, 2), "2 by YOLO; 2 denied");
 });

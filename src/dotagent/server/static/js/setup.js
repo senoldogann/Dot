@@ -6,6 +6,7 @@
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
+import { detailsFold } from "./ui.js";
 
 // The kinds of line a long run gives again and again, said once with how many there are: each time the goal was
 // repeated to the model, each step sent to another model, and each such step asked again on the run's model. The
@@ -13,7 +14,7 @@ import { panelSection } from "./panels.js";
 const REPEATED = {
   reminder: (count) => `goal repeated ${count} times`,
   route: (count) => `${count} steps on another model`,
-  "route-back": (count) => `${count} steps back on the run's model`,
+  "route-back": (count) => `${count} steps back on the task's own model`,
 };
 
 /**
@@ -49,7 +50,7 @@ export function setupSummary(lines) {
 
 /**
  * The Set up section of the Run tab, hidden until the run's first line of how it was set up. `add(line)` lists one
- * more: `{ kind, short, iconName, text, tone }`, `tone` "" or "warn" or "bad"; `warnings()` counts the lines that warn.
+ * more: `{ kind, short, iconName, text, tone, details }`, `tone` "" or "warn" or "bad", `details` the program's own words for a failure (a closed fold under the text); `warnings()` counts the lines that warn.
  */
 export function setupSection() {
   const body = el("div", { class: "setup-lines" });
@@ -59,7 +60,7 @@ export function setupSection() {
 
   function add(line) {
     lines.push(line);
-    body.append(el("div", { class: line.tone === "" ? "note" : `note ${line.tone}` }, icon(line.iconName), el("span", null, line.text)));
+    body.append(el("div", { class: line.tone === "" ? "note" : `note ${line.tone}` }, icon(line.iconName), el("span", null, line.text, detailsFold(line.details ?? ""))));
     section.setSummary(el("span", { class: "setup-summary" }, setupSummary(lines)));
     section.element.hidden = false;
   }

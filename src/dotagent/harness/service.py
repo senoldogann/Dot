@@ -32,6 +32,9 @@ SUMMARY_CHARS: int = 200
 # Who made a version: the owner, through the command line or the API.
 OWNER: str = "owner"
 
+# The parts of a version's text as the page names them, for a refusal that says which part (item 625).
+_TEXT_NAMES: dict[str, str] = {"habits": "habits", "tool_guidance": "tips"}
+
 
 def _strings(value: JsonValue) -> Iterator[str]:
     """Every text in a JSON value, at any depth."""
@@ -122,7 +125,8 @@ async def create_version(
     found: dict[str, str] = problems(clean, config, secrets)
     if found:
         details: dict[str, JsonValue] = {name: problem for name, problem in found.items()}
-        raise InvalidValueError("the text cannot be a component of the harness", {"problems": details})
+        said: str = "; ".join(f"{_TEXT_NAMES.get(name, name)}: {problem}" for name, problem in found.items())
+        raise InvalidValueError(f"this text cannot be kept ({said})", {"problems": details})
     line: str = summary.strip()
     if line == "" or len(line) > SUMMARY_CHARS or "\n" in line or "\t" in line:
         raise InvalidValueError(f"the summary is one line of 1 to {SUMMARY_CHARS} characters", {"length": len(line)})

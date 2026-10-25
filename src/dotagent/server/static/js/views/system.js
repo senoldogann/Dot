@@ -32,6 +32,7 @@ import { icon } from "../icons.js";
 import { lookPicker } from "../lookpicker.js";
 import {
   choiceRowSetting,
+  advancedFold,
   choiceSetting,
   field,
   foldCard,
@@ -51,7 +52,7 @@ import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
 import { scrollCue } from "../scrollcue.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
-import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, formDialog, settingFold, toast } from "../ui.js";
 import { canRecord } from "../capture.js";
 import { macVoice, onMacVoice } from "../macvoice.js";
 import { appleTouch, canListen, canSpeak, listeningWay, macOffer, sayOnce, stopReading } from "../voice.js";
@@ -89,7 +90,7 @@ function desktopText(status) {
 function leftOutServers(failures) {
   return [
     ...failures.map((failure) => el("div", null, el("span", { class: "badge b-warn" }, failure.server), ` ${failure.error}`)),
-    el("div", { class: "muted" }, "dotx mcp list shows more; Dot starts them again when it restarts."),
+    el("div", { class: "muted" }, "In Terminal, dotx mcp list shows more. Dot tries them again when it starts."),
   ];
 }
 
@@ -112,7 +113,7 @@ function statusGroups(status) {
     {
       title: "How it acts",
       rows: [
-        entry("Safety preset", status.preset),
+        entry("Safety level", status.preset),
         entry("Approvals", approvalLabel(status.approvals)),
         entry("Goal mode", status.goal_mode ? "on" : "off"),
       ],
@@ -122,8 +123,8 @@ function statusGroups(status) {
       rows: [
         entry("Scheduler", status.scheduler_running ? "running" : "stopped"),
         entry("Desktop control", desktopText(status)),
-        entry("MCP tools", String(status.mcp_tools)),
-        entry("Active runs", String(status.active_runs.length)),
+        entry("Actions from connected apps", String(status.mcp_tools)),
+        entry("Tasks working", String(status.active_runs.length)),
         entry("Waiting for you", plural(status.pending_approvals, "approval", "approvals")),
       ],
     },
@@ -153,7 +154,7 @@ function statusFacts(status) {
   if (status.mcp_failures.length === 0) {
     return [groups];
   }
-  return [groups, el("dl", { class: "kv kv-wide-rows" }, wideEntry("MCP servers left out", leftOutServers(status.mcp_failures)))];
+  return [groups, el("dl", { class: "kv kv-wide-rows" }, wideEntry("Connected apps left out", leftOutServers(status.mcp_failures)))];
 }
 
 /** Notifications, on the desktop and on the phone: the one setting that also depends on what the browser allows. */
@@ -169,7 +170,7 @@ function buildNotifications() {
   // Item 75: a run on the page you are looking at stays quiet unless you ask otherwise.
   const always = switchSetting({
     label: "Tell me even when I am looking",
-    hint: "Otherwise a run that ends or asks on the page you are looking at stays quiet (the tab visible, the window active, the run's page open); the tab title counts either way.",
+    hint: "Otherwise a task that ends or asks on the page you are looking at stays quiet (the tab visible, the window active, that task's page open); the tab title counts either way.",
     read: tellEvenWhenLooking,
     write: async (on) => setTellEvenWhenLooking(on),
     onToggled: paint,
@@ -184,14 +185,14 @@ function buildNotifications() {
     always.toggle.disabled = !notificationsOn();
     if (!available && homeScreenNeeded()) {
       setting.note.textContent =
-        "On an iPhone or an iPad, notifications come to Dot added to the Home Screen: in Safari, Share › Add to Home Screen, open Dot from there and switch this on. It is then told when a run ends or Dot needs you, also when Dot is closed.";
+        "On an iPhone or an iPad, notifications come to Dot added to the Home Screen: in Safari, Share › Add to Home Screen, open Dot from there and switch this on. You are then told when a task ends or Dot needs you, also when Dot is closed.";
     } else if (!available) {
       setting.note.textContent = "This browser cannot show notifications.";
     } else if (blocked) {
       setting.note.textContent = "The browser blocks notifications for this address. Allow them in its site settings, then reload this page.";
     } else {
       setting.note.textContent =
-        "Tell me when Dot needs an answer or a run ends and I am not looking at that run: the tab hidden, the window inactive or another page open. On a phone, Dot tells it also when it is closed. The tab title always counts the approvals that wait.";
+        "Tell me when Dot needs an answer or a task ends and I am not looking at that task: the tab hidden, the window inactive or another page open. On a phone, Dot tells you also when it is closed. The tab title always counts the approvals that wait.";
     }
   }
 
@@ -213,16 +214,16 @@ function buildComposerCard() {
     onSelect: (id) => setValue(SEND_KEY, id),
   });
   const busy = choiceSetting({
-    label: "While a run works",
-    hint: "A message waits in the chat's queue and starts the next run once this one has ended, or steers the run at once; ⌘⇧Enter sends it the other way. A campaign's session is always steered.",
+    label: "While a task works",
+    hint: "A message waits in the chat's queue and starts the next task once this one has ended, or steers the task at once; ⌘⇧Enter sends it the other way. A campaign's session is always steered.",
     options: [
       { id: "queue", label: "Queue", hint: "The message waits in the chat's queue." },
-      { id: "steer", label: "Steer", hint: "The message goes to the run at work at once." },
+      { id: "steer", label: "Steer", hint: "The message goes to the task at work at once." },
     ],
     selected: settingValue(BUSY_SEND),
     onSelect: (id) => setValue(BUSY_SEND, id),
   });
-  return section("Composer", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
+  return section("Messages", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
 }
 
 /** What the Voice card says of how the microphone listens and where the voice goes (items 574 and 626), for the way the
@@ -315,15 +316,15 @@ function buildVoiceCard() {
 // What each reaction on one of Dot's messages does while its run works, for the six that have a setting for what they do
 // once it ended (item 586, `[reactions]` in the config file); a pin has none: it always keeps the message as a note.
 const REACTION_SETTINGS = [
-  { key: "good", symbol: "👍", label: "Good", works: "While a run works, it reads it and keeps going." },
-  { key: "love", symbol: "❤️", label: "Love it", works: "While a run works, it reads it and keeps going." },
-  { key: "wrong", symbol: "👎", label: "Not right", works: "While a run works, it reconsiders and changes course." },
-  { key: "again", symbol: "🔁", label: "Do it again", works: "While a run works, it redoes the last part another way." },
-  { key: "explain", symbol: "❓", label: "Explain", works: "While a run works, it explains in the conversation." },
-  { key: "hold", symbol: "✋", label: "Hold on", works: "While a run works, it holds before its next step until you write." },
+  { key: "good", symbol: "👍", label: "Good", works: "While a task works, it reads it and keeps going." },
+  { key: "love", symbol: "❤️", label: "Love it", works: "While a task works, it reads it and keeps going." },
+  { key: "wrong", symbol: "👎", label: "Not right", works: "While a task works, it reconsiders and changes course." },
+  { key: "again", symbol: "🔁", label: "Do it again", works: "While a task works, it redoes the last part another way." },
+  { key: "explain", symbol: "❓", label: "Explain", works: "While a task works, it explains in the conversation." },
+  { key: "hold", symbol: "✋", label: "Hold on", works: "While a task works, it holds before its next step until you write." },
 ];
 const AFTER_RUN = [
-  { id: "follow_up", label: "Start a follow-up run" },
+  { id: "follow_up", label: "Start a follow-up task" },
   { id: "feedback", label: "Only feedback" },
 ];
 
@@ -341,8 +342,8 @@ function buildReactionsCard() {
   }
 
   const follow = switchSetting({
-    label: "Start a run for a reaction",
-    hint: "On, a reaction on a message of a run that ended does what is chosen below: a follow-up run in the same chat, as a message of yours would start one, queued behind the run at work. Off, every reaction is only kept as feedback. A pin still keeps its message as a note.",
+    label: "Start a task for a reaction",
+    hint: "On, a reaction on a message of a task that ended does what is chosen below: a follow-up task in the same chat, as a message of yours would start one, queued behind the task at work. Off, every reaction is only kept as feedback. A pin still keeps its message as a note.",
     read: () => settings !== null && settings.follow_ups === true,
     write: (on) => change("follow_ups", on),
     onToggled: () => paint(),
@@ -350,7 +351,7 @@ function buildReactionsCard() {
   const rows = REACTION_SETTINGS.map((row) => {
     const select = el(
       "select",
-      { class: "select reaction-after", "aria-label": `${row.label}, after the run has ended` },
+      { class: "select reaction-after", "aria-label": `${row.label}, after the task has ended` },
       AFTER_RUN.map((choice) => el("option", { value: choice.id }, choice.label)),
     );
     select.addEventListener("change", () =>
@@ -397,7 +398,7 @@ function buildReactionsCard() {
     body.replaceChildren(
       follow.element,
       ...rows.map((row) => row.element),
-      el("div", { class: "hint" }, "📌 Remember this has no setting: it keeps the message as a note, while a run works and after it, and a second press takes the note back."),
+      el("div", { class: "hint" }, "📌 Remember this has no setting: it keeps the message as a note, while a task works and after it, and a second press takes the note back."),
     );
     paint();
   }
@@ -410,7 +411,7 @@ function buildReactionsCard() {
 function buildChatCard() {
   const lines = switchSetting({
     label: "Show what ran without asking",
-    hint: "A line under the step for each action the reviewer approved. Off, as it starts, the chat leaves them out; a refusal still shows, and a step YOLO let through draws no line. Kept in this browser.",
+    hint: "A line under a step for each action the reviewer approved. Off, as it starts, the chat leaves them out; a refusal still shows, and a step YOLO let through shows no line. Kept in this browser.",
     read: () => settingValue(AUTO_LINES) === "shown",
     write: async (on) => setValue(AUTO_LINES, on ? "shown" : "hidden"),
     onToggled: () => lines.paint(),
@@ -430,8 +431,8 @@ function buildAbout() {
     body: el(
       "div",
       { class: "list" },
-      row("#/diagnostics", "Diagnostics", "Dot's processes and what they take, the room its files take, and its logs."),
-      row("#/licences", "Open source licences", "The notices of the packages, the assets and the tools Dot uses."),
+      row("#/diagnostics", "Diagnostics", "Which programs Dot runs, how much space its files take, and its logs. For finding out what went wrong."),
+      row("#/licences", "Open source licences", "The notices of the open source software Dot is built from."),
     ),
     openByDefault: true,
   }).element;
@@ -447,7 +448,7 @@ function buildDaemon() {
     read: () => resume !== null && resume.resume === "safe",
     write: async (on) => {
       resume = await api.put("/agent/resume", { resume: on ? "safe" : "off" });
-      toast("ok", on ? "From the daemon's next start, the runs it cut off go on by themselves." : "From the daemon's next start, the runs it cut off wait for you.");
+      toast("ok", on ? "The next time Dot starts, the tasks it cut off go on by themselves." : "The next time Dot starts, the tasks it cut off wait for you.");
       await refresh();
     },
     onToggled: () => paintResume(),
@@ -458,23 +459,23 @@ function buildDaemon() {
     goOn.paint();
     if (resume !== null) {
       const minutes = Math.round(resume.resume_within_s / 60);
-      goOn.note.textContent = `When the daemon starts again, a run you started here that its stop or a crash cut off in the last ${minutes} min goes on by itself, as long as every call it cut off only reads; any other run waits for you to continue it. Kept in the config file as [agent] resume.`;
+      goOn.note.replaceChildren(`When Dot starts again, a task you started here that a stop or a crash cut off in the last ${minutes} min goes on by itself, as long as every step it cut off only reads; any other task waits for you to continue it.`, settingFold("[agent] resume"));
     }
   }
 
   // Each section of the page folds (item 411), and stays as the reader left it, in this browser.
   const card = foldCard({
     id: "system-daemon",
-    title: "Daemon",
+    title: "Details",
     actions: null,
     body: el("div", null, body, el("div", { class: "card-pad daemon-resume" }, goOn.element)),
-    openByDefault: true,
+    openByDefault: false,
   });
   return {
     element: card.element,
     paint(snapshot) {
       if (snapshot.status !== null) {
-        card.setSummary(el("span", { class: "muted" }, `up ${duration(Math.max(0, Date.now() / 1000 - snapshot.status.started_at))}`));
+        card.setSummary(el("span", { class: "muted" }, `running for ${duration(Math.max(0, Date.now() / 1000 - snapshot.status.started_at))}`));
         body.replaceChildren(...statusFacts(snapshot.status));
         resume = snapshot.status.resume;
         goOn.element.hidden = false;
@@ -538,7 +539,7 @@ function buildPermissions(onView) {
     }
     arm(false);
     await api.post("/system/restart", null);
-    toast("ok", "Dot stops and the service starts it again; this page answers again in a moment.");
+    toast("ok", "Dot is closing and will start again by itself; this page works again in a moment.");
   }
 
   function row(label, granted) {
@@ -551,9 +552,9 @@ function buildPermissions(onView) {
     }
     const missing = view.panes.length > 0;
     const steps = missing
-      ? `Switch Dot on in the pane (Touch ID or password). If it is not in the list, press +, then Cmd+Shift+G, paste the program's path and choose Open. ${view.service ? "Then press Restart Dot:" : "Then start Dot again:"} a running process keeps what it had when it started.`
+      ? `Turn Dot on in the list that opened (Touch ID or password). If it is not in the list, press +, then Cmd+Shift+G, paste the program's location and choose Open. ${view.service ? "Then press Restart Dot:" : "Then start Dot again:"} a program that is running keeps the permissions it had when it started.`
       : "macOS granted everything the desktop needs.";
-    const serviceNote = view.service_problem === null ? null : el("p", { class: "hint" }, icon("alert"), ` launchd could not be asked whether its service runs this Dot: ${view.service_problem}`);
+    const serviceNote = view.service_problem === null ? null : el("p", { class: "hint" }, icon("alert"), ` macOS could not be asked whether Dot starts by itself: ${view.service_problem}`);
     const askButton = el("button", { class: "btn sm", type: "button", onclick: () => attempt(ask) }, icon("hand"), "Ask macOS");
     const panes = view.panes.map((pane) =>
       el("button", { class: "btn sm", type: "button", onclick: () => attempt(() => open(pane)) }, icon("external"), `Open ${view.titles[pane] ?? pane}`),
@@ -620,7 +621,7 @@ function buildFailsafe() {
       state.className = engaged ? "badge b-bad" : "badge b-muted";
       state.textContent = engaged ? "Engaged" : "Standby";
       text.textContent = engaged
-        ? "The emergency stop is engaged: every run was cancelled and desktop control is blocked."
+        ? "The emergency stop is on: every task was stopped and desktop control is blocked."
         : "Cancels every running task and blocks desktop control until you release it.";
       element.dataset.engaged = String(engaged);
       engage.hidden = engaged;
@@ -634,9 +635,9 @@ function buildFailsafe() {
 const HEALTH_GROUPS = [
   { key: "setup", title: "Setup", takes: /^(home directory|env file|ripgrep|google chrome|chrome|xcode tools|backups)\b/, open: true },
   { key: "desktop", title: "Desktop control", takes: /^desktop\b/, open: true },
-  { key: "models", title: "Providers and models", takes: /( api| key$|^ollama|^web search|^judge|^model\b|^review model)/, open: false },
+  { key: "models", title: "AI services and models", takes: /( api| key$|^ollama|^web search|^judge|^model\b|^review model)/, open: false },
   { key: "browser", title: "Browser", takes: /^browser\b/, open: false },
-  { key: "tools", title: "Memory, tools and plugins", takes: /^(memory|mcp|skills|plugins|office apps|one-time codes|onedrive)\b/, open: false },
+  { key: "tools", title: "Memory, skills and plugins", takes: /^(memory|mcp|skills|plugins|office apps|one-time codes|onedrive)\b/, open: false },
   { key: "other", title: "Other", takes: /./, open: false },
 ];
 
@@ -710,7 +711,7 @@ function buildDoctor(isDisposed, onChecks) {
     title: "Health checks",
     actions: el("div", { class: "set-actions" }, filterHolder, again),
     body: card,
-    openByDefault: true,
+    openByDefault: false,
   });
   const element = fold.element;
   let checks = null;
@@ -803,11 +804,11 @@ function capabilities(model) {
     "div",
     { class: "cluster" },
     model.vision ? el("span", { class: "chip" }, "vision") : null,
-    model.tools ? el("span", { class: "chip" }, "tools") : null,
+    model.tools ? el("span", { class: "chip", title: "It can use apps, files and the web for Dot" }, "actions") : null,
     model.thinking ? el("span", { class: "chip" }, "thinking") : null,
     model.free ? el("span", { class: "chip" }, "free") : null,
-    model.learns ? el("span", { class: "chip", title: "Its provider may use what it is sent to improve its models" }, "may train on your data") : null,
-    model.fast_mode ? el("span", { class: "chip", title: "Fast mode, chosen in the composer's Reasoning menu" }, "fast mode") : null,
+    model.learns ? el("span", { class: "chip", title: "Its service may use what it is sent to improve its models" }, "may train on your data") : null,
+    model.fast_mode ? el("span", { class: "chip", title: "Fast mode, chosen in the Reasoning menu of the message box" }, "fast mode") : null,
   );
 }
 
@@ -827,7 +828,7 @@ const WINDOW_SOURCES = {
   published: (provider) => `${providerLabel(provider)} publishes it; Dot keeps it in its table of models.`,
   assumed: (provider) => `${providerLabel(provider)} does not say it, so Dot assumes it.`,
   asked: () =>
-    "It is the window Dot asks Ollama to give the model: [providers.ollama] num_ctx, or num_ctx_cloud for a cloud model, or the window the context size chosen here needs, up to the model's own (item 520).",
+    "It is the size Dot asks Ollama to give the model (settings file: [providers.ollama] num_ctx, or num_ctx_cloud for a cloud model), or the size the chat size chosen here needs, up to the model's own.",
 };
 
 function tokens(count) {
@@ -846,13 +847,13 @@ function sizeOptions(context) {
  * context_tokens sets one number for every model. */
 function defaultFacts(context) {
   if (context.configured !== null) {
-    const cut = context.default < context.configured ? `; three quarters of this model's window cut it to ${tokens(context.default)}` : "";
+    const cut = context.default < context.configured ? `; three quarters of what this model can take in cut it to ${tokens(context.default)}` : "";
     return `${tokens(context.configured)} tokens, set for every model without a size of its own${cut}. `;
   }
   if (context.ceiling === null) {
-    return `${tokens(context.default)} tokens, as the model's provider does not say its window. `;
+    return `${tokens(context.default)} tokens, as the model's service does not say how much it can take in. `;
   }
-  return `The most this model's window allows, ${tokens(context.default)} tokens, as for every model without a size of its own. `;
+  return `The most this model can take in, ${tokens(context.default)} tokens, as for every model without a size of its own. `;
 }
 
 /** What a model's context size does and where its numbers come from (item 250). */
@@ -862,29 +863,29 @@ function contextFacts(model) {
   const own =
     model.own_context_length === null
       ? ""
-      : ` The model's own window is ${tokens(model.own_context_length)} tokens: a larger context size here asks Ollama for the window it needs, up to that (item 520), and a larger window takes more of this Mac's memory.`;
+      : ` The model itself can take in ${tokens(model.own_context_length)} tokens: a larger chat size here asks Ollama for the size it needs, up to that, and a larger size takes more of this Mac's memory.`;
   return [
     el(
       "p",
       null,
-      "Each step sends the model the whole run again: its instructions, its tools, the request and all that was done since. ",
-      `Once a step sends more than ${tokens(context.summarise_at)} tokens, Dot summarizes the run's older part, so the run stays within its ${tokens(context.tokens)}.`,
+      "Each step sends the model the whole task again: its instructions, its actions, the request and all that was done since. ",
+      `Once a step sends more than ${tokens(context.summarise_at)} tokens, Dot sums up the older part of the task, so it stays within ${tokens(context.tokens)}.`,
     ),
     el(
       "p",
       null,
-      "A larger size means fewer summaries, and each summary drops detail of the older part and takes a call of the fast model. ",
-      "But every step then sends more, so it is answered more slowly and costs more on a key that is billed by the token. A smaller size works the other way round.",
+      "A larger size means fewer summaries, and each summary drops detail of the older part and takes a call to the fast model. ",
+      "But every step then sends more, so it is answered more slowly and costs more where you pay by the amount sent. A smaller size works the other way round.",
     ),
     el(
       "dl",
       { class: "context-facts" },
-      el("dt", null, "Window"),
+      el("dt", null, "What the model can take in"),
       el(
         "dd",
         null,
         model.context_length === null
-          ? `${providerLabel(provider)} does not say how many tokens the model holds, so no size can be chosen for it.`
+          ? `${providerLabel(provider)} does not say how much the model can take in, so no size can be chosen for it.`
           : `${tokens(model.context_length)} tokens. ${WINDOW_SOURCES[model.window_source](provider)}${own}`,
       ),
       el("dt", null, "Largest size"),
@@ -893,16 +894,16 @@ function contextFacts(model) {
         null,
         context.ceiling === null
           ? NOT_SET
-          : `${tokens(context.ceiling)} tokens, three quarters of the window: the rest is room for the reply and for the error of Dot's count of the tokens.`,
+          : `${tokens(context.ceiling)} tokens, three quarters of what the model can take in: the rest is room for the reply and for the small error in Dot's count.`,
       ),
       el("dt", null, "Dot's default"),
-      el("dd", null, defaultFacts(context), el("span", { class: "faint" }, 'In the config file: [agent] context_tokens, "most" or one number for every model.')),
+      el("dd", null, defaultFacts(context), el("span", { class: "faint" }, 'In the settings file: [agent] context_tokens, "most" or one number for every model.')),
       el("dt", null, "Smallest size"),
-      el("dd", null, `${tokens(context.floor)} tokens: a run's first step alone sends its instructions, its tools and the request.`),
+      el("dd", null, `${tokens(context.floor)} tokens: a task's first step alone sends its instructions, its actions and the request.`),
     ),
     // The native replaceChildren writes a null as text: the note of a window too small for any size is left out instead.
     ...(context.sizes.length === 0 && context.ceiling !== null
-      ? [el("p", { class: "hint" }, "Three quarters of this window are below the smallest size, so its runs keep Dot's default.")]
+      ? [el("p", { class: "hint" }, "Three quarters of what this model can take in are below the smallest size, so its tasks keep Dot's default.")]
       : []),
   ];
 }
@@ -927,14 +928,14 @@ function evidenceFacts(evidence) {
     return [el("p", { class: "hint" }, `Nothing is measured yet: no step of this model answered in the last ${EVIDENCE_DAYS} days.`)];
   }
   const sent = `A step sent ${tokens(evidence.input_median)} tokens at the median, ${tokens(evidence.input_p95)} or fewer in 95% of steps and ${tokens(evidence.input_max)} at most.`;
-  const cached = evidence.cached_share === null ? "" : ` ${Math.round(evidence.cached_share * 100)}% of it the provider served from its cache.`;
-  const first = evidence.first_step_median === null ? "" : ` A run's first step sent ${tokens(evidence.first_step_median)} at the median.`;
+  const cached = evidence.cached_share === null ? "" : ` ${Math.round(evidence.cached_share * 100)}% of it the service had ready from before.`;
+  const first = evidence.first_step_median === null ? "" : ` A task's first step sent ${tokens(evidence.first_step_median)} at the median.`;
   const summaries =
     evidence.compactions === 0
-      ? "No run was summarized."
-      : `${plural(evidence.compactions, "summary", "summaries")} in ${plural(evidence.compacted_runs, "run", "runs")}.`;
+      ? "No task was summed up."
+      : `${plural(evidence.compactions, "summary", "summaries")} in ${plural(evidence.compacted_runs, "task", "tasks")}.`;
   return [
-    el("p", null, `${plural(evidence.steps, "step", "steps")} in ${plural(evidence.runs, "run", "runs")}. ${sent}${cached}${first}`),
+    el("p", null, `${plural(evidence.steps, "step", "steps")} in ${plural(evidence.runs, "task", "tasks")}. ${sent}${cached}${first}`),
     el("p", null, summaries),
     bucketTable(evidence.buckets),
   ];
@@ -951,11 +952,11 @@ function contextControl(initial, remember) {
   const name = modelName(model.ref);
   // Every other character spelled out by its code, so that two references never share an id.
   const whyId = `context-why-${[...model.ref].map((char) => (/[A-Za-z0-9-]/.test(char) ? char : `_${char.codePointAt(0).toString(16)}_`)).join("")}`;
-  const select = el("select", { class: "select sm", "aria-label": `Context size of ${model.ref}` });
-  const why = el("button", { class: "btn ghost sm", type: "button", "aria-expanded": "false", "aria-controls": whyId, "aria-label": `Why: the context size of ${model.ref}` }, "Why");
+  const select = el("select", { class: "select sm", "aria-label": `Chat size of ${model.ref}` });
+  const why = el("button", { class: "btn ghost sm", type: "button", "aria-expanded": "false", "aria-controls": whyId, "aria-label": `Why: the chat size of ${model.ref}` }, "Why");
   const evidence = el("div", { class: "context-evidence" });
   const facts = el("div", { class: "context-why-facts" });
-  const body = el("div", { class: "context-why-body" }, el("h4", null, `Context size of ${name}`), facts, el("h4", null, `This model's runs, last ${EVIDENCE_DAYS} days`), evidence);
+  const body = el("div", { class: "context-why-body" }, el("h4", null, `Chat size of ${name}`), facts, el("h4", null, `This model's tasks, last ${EVIDENCE_DAYS} days`), evidence);
   const row = el("tr", { class: "context-why", id: whyId, hidden: true }, el("td", { colspan: "4" }, body));
   const text = el("span", null);
   const windowText = el("span", { class: "muted" });
@@ -975,7 +976,7 @@ function contextControl(initial, remember) {
     const own = model.context_length === null || model.own_context_length === null ? null : model.own_context_length;
     windowText.textContent = model.context_length === null ? "" : own === null ? `of ${compact(model.context_length)}` : `of ${compact(model.context_length)} (own ${compact(own)})`;
     windowText.title =
-      own === null ? "" : `Dot asks for ${tokens(model.context_length)} tokens by default ([providers.ollama] num_ctx or num_ctx_cloud), more for a larger context size, up to the model's own ${tokens(own)}.`;
+      own === null ? "" : `Dot asks for ${tokens(model.context_length)} tokens by default (settings file: [providers.ollama] num_ctx or num_ctx_cloud), more for a larger chat size, up to the model's own ${tokens(own)}.`;
     facts.replaceChildren(...contextFacts(model));
   }
 
@@ -1008,7 +1009,7 @@ function contextControl(initial, remember) {
           model = await api.put("/models/context", { model: model.ref, tokens: size });
           remember(model);
           forgetModels();
-          toast("ok", size === null ? `${name} gets Dot's default context size from its next run.` : `${name} gets a context size of ${tokens(size)} tokens from its next run.`);
+          toast("ok", size === null ? `${name} gets Dot's default chat size from its next task.` : `${name} gets a chat size of ${tokens(size)} from its next task.`);
         } finally {
           paint();
         }
@@ -1052,7 +1053,7 @@ function modelTable(provider, mainModel, remember) {
     el(
       "table",
       { class: "table wide" },
-      el("thead", null, el("tr", null, el("th", null, "Model"), el("th", null, "Can"), el("th", null, "Reasoning"), el("th", null, "Context"))),
+      el("thead", null, el("tr", null, el("th", null, "Model"), el("th", null, "Can"), el("th", null, "Reasoning"), el("th", null, "Chat size"))),
       el("tbody", null, provider.models.map((model) => modelRows(model, mainModel, remember))),
     ),
   );
@@ -1108,7 +1109,7 @@ function providerBody(provider, mainModel, inUse, remember) {
     return problemNote(provider, inUse);
   }
   if (provider.models.length === 0) {
-    return el("div", { class: "hint" }, "This provider lists no models.");
+    return el("div", { class: "hint" }, "This service lists no models.");
   }
   return modelTable(provider, mainModel, remember);
 }
@@ -1152,7 +1153,7 @@ function modelsSummary(providers, inUse) {
   const failing = providers.filter((provider) => isFailing(provider, inUse.includes(provider.provider))).length;
   const keyless = providers.filter((provider) => provider.problem === "no_key" && !inUse.includes(provider.provider)).length;
   return [
-    el("span", null, `${plural(providers.length, "provider", "providers")} · ${plural(total, "model", "models")}`),
+    el("span", null, `${plural(providers.length, "service", "services")} · ${plural(total, "model", "models")}`),
     failing > 0 ? el("span", { class: "badge b-bad" }, `${failing} unavailable`) : null,
     keyless > 0 ? el("span", { class: "badge b-muted" }, `${keyless} without a key`) : null,
   ];
@@ -1164,13 +1165,13 @@ const ROLE_SETTINGS = [
   {
     role: "fast",
     label: "Fast model",
-    hint: "Writes the summary of a long run first (the run's own model does when it cannot) and reads pages for the facts asked of them.",
+    hint: "Writes the summary of a long task first (the task's own model does when it cannot) and reads web pages for the facts asked of them.",
     fits: (model) => model.tools,
   },
   {
     role: "review",
     label: "Review model",
-    hint: "Checks runs (their goal and a second opinion), draws their lessons and skills, and drafts rules from your words.",
+    hint: "A second AI that double-checks Dot's work: it checks tasks against their goal, gives a second opinion, writes lessons and skills from them, and turns your words into rules.",
     fits: (model) => model.tools,
   },
   {
@@ -1242,7 +1243,7 @@ function modelSetting({ label, hint, className, fits, choose }) {
 // The provider of Zen's free models, which answer only as OpenCode's own agent: none can be a standby model.
 const OPENCODE_PROVIDER = "opencode";
 const STANDBY_HINT =
-  "When a run's model cannot answer (its quota, its rate limit, its key or its access, or its content filter stopped the reply), the run goes on with the first of these that can, each once at most.";
+  "When a task's model cannot answer (its allowance is used up, it is too busy, its key or access was refused, or its safety filter stopped the reply), the task goes on with the first of these that can, each once at most.";
 
 /**
  * The fallback models (item 478, the standby models; drawn as the Fallbacks section, item 563): the models a run moves to,
@@ -1256,7 +1257,7 @@ function standbySetting({ choose }) {
   // The select lies over the row's words, clear, so that a press anywhere on the row opens its menu.
   const add = el("select", { class: "standby-add-select", "aria-label": "Add a fallback model" });
   const list = el("ol", { class: "standby-list", "aria-label": "Fallback models, in their order" });
-  const none = el("div", { class: "set-row standby-none" }, "None: a run whose model cannot answer ends with the error.");
+  const none = el("div", { class: "set-row standby-none" }, "None: a task whose model cannot answer ends with the error.");
   const adder = el("div", { class: "set-row standby-add" }, el("span", { class: "standby-add-label" }, icon("plus"), "Add a fallback model"), add);
   const element = setSection({ title: "Fallbacks", lead: STANDBY_HINT, body: setCard(list, none, adder) });
   element.classList.add("models-standby");
@@ -1301,7 +1302,7 @@ function standbySetting({ choose }) {
       {
         class: "btn ghost sm icon-only standby-move",
         type: "button",
-        title: up ? "Move up: a run tries it earlier" : "Move down: a run tries it later",
+        title: up ? "Move up: a task tries it earlier" : "Move down: a task tries it later",
         "aria-label": `Move ${modelName(ref)} ${up ? "up" : "down"}`,
         disabled: up ? at === 0 : at === shown.length - 1,
         onclick: () => send((list) => moved(list, ref, by)),
@@ -1319,8 +1320,8 @@ function standbySetting({ choose }) {
       { class: "set-row standby-row", dataset: { model: ref } },
       el("span", { class: "standby-order" }, String(at + 1)),
       el("span", { class: "grow standby-name" }, el("span", { class: "mono" }, modelName(ref)), el("span", { class: "muted" }, providerLabel(providerOf(ref)))),
-      keyless ? el("span", { class: "badge b-muted", title: "A run passes it over until its provider has a key" }, "no key") : null,
-      !listed && !keyless ? el("span", { class: "badge b-muted", title: "Its provider does not list it now" }, "not listed now") : null,
+      keyless ? el("span", { class: "badge b-muted", title: "A task skips it until its service has a key" }, "no key") : null,
+      !listed && !keyless ? el("span", { class: "badge b-muted", title: "Its service does not list it now" }, "not listed now") : null,
       arrow(ref, at, -1),
       arrow(ref, at, 1),
       el("button", { class: "btn ghost sm icon-only", type: "button", title: "Take it off the list", "aria-label": `Remove ${modelName(ref)}`, onclick: () => send((list) => list.filter((model) => model !== ref)) }, icon("x")),
@@ -1362,7 +1363,7 @@ function buildModels(isDisposed, asked, head) {
   const list = el("div", { class: "models-providers" }, inlineLoading());
   const main = modelSetting({
     label: "Default model",
-    hint: "New chats start on it, and so does any run that names no model. A chat keeps the model it has; Default in its composer follows this one.",
+    hint: "New chats start on it, and so does any task that names no model. A chat keeps the model it has; Default in its message box follows this one.",
     className: "models-default",
     fits: (model) => model.tools,
     choose: async (ref) => {
@@ -1386,7 +1387,7 @@ function buildModels(isDisposed, asked, head) {
   const standby = standbySetting({
     choose: async (refs) => {
       const answered = await api.put("/models/standby", { models: refs });
-      toast("ok", refs.length === 0 ? "A run whose model cannot answer ends with the error now." : `A run whose model cannot answer moves to ${refs.map(modelName).join(", then ")}.`);
+      toast("ok", refs.length === 0 ? "A task whose model cannot answer ends with the error now." : `A task whose model cannot answer moves to ${refs.map(modelName).join(", then ")}.`);
       return answered;
     },
   });
@@ -1398,14 +1399,14 @@ function buildModels(isDisposed, asked, head) {
     { class: "set-sections" },
     setSection({ title: "Roles", body: setCard(main.element, ...roles.map(({ control }) => control.element)) }),
     standby.element,
-    setSection({ title: "Every model, by provider", body: setCard(el("div", { class: "set-row models-search" }, el("span", { class: "models-search-box" }, icon("search"), search)), list, noMatch) }),
+    setSection({ title: "Every model, by service", body: setCard(el("div", { class: "set-row models-search" }, el("span", { class: "models-search-box" }, icon("search"), search)), list, noMatch) }),
   );
   let providers = null;
   const reload = el(
     "button",
-    { class: "btn", type: "button", title: "Ask the providers for their models again", onclick: () => attempt(load) },
+    { class: "btn", type: "button", title: "Ask the services for their models again", onclick: () => attempt(load) },
     icon("refresh"),
-    "Ask providers again",
+    "Check again",
   );
   head.setActions(reload);
   let painted = null;
@@ -1552,9 +1553,9 @@ function buildModels(isDisposed, asked, head) {
 function buildTokenCard() {
   async function forgetToken() {
     const confirmed = await confirmDialog({
-      title: "Forget the access token?",
-      message: "This browser signs out of Dot. Open the page again with dotx open to sign back in.",
-      confirmLabel: "Forget it",
+      title: "Sign this browser out?",
+      message: "This browser will be signed out of Dot. To sign back in, you need a sign-in code: Settings › Phone on your Mac shows one.",
+      confirmLabel: "Sign out",
       danger: true,
       focusCancel: false,
     });
@@ -1567,8 +1568,8 @@ function buildTokenCard() {
   return el(
     "section",
     { class: "card card-pad row" },
-    el("div", { class: "grow" }, "This browser keeps the access token in its local storage, so you stay signed in."),
-    el("button", { class: "btn", type: "button", onclick: () => attempt(forgetToken) }, "Forget the token here"),
+    el("div", { class: "grow" }, "This browser is signed in to Dot, so you do not have to sign in again."),
+    el("button", { class: "btn", type: "button", onclick: () => attempt(forgetToken) }, "Sign out of this browser"),
   );
 }
 
@@ -1613,7 +1614,7 @@ function attachStanding(view) {
     return null;
   }
   if (view.connected) {
-    return { word: "connected", line: "Dot is connected to your Chrome; later runs connect with no click.", tone: "ok" };
+    return { word: "connected", line: "Dot is connected to your Chrome; later tasks connect with no click.", tone: "ok" };
   }
   if (view.waiting_allow) {
     return { word: "waiting for Allow", line: "Chrome asks whether Dot may connect: choose Allow in Chrome.", tone: "warn" };
@@ -1649,7 +1650,7 @@ function buildBrowser(isDisposed, head) {
   const raise = switchRowSetting({
     label: "Bring Chrome to the front while working",
     hint:
-      "Off, Dot's Chrome stays where it is while a run works and the app you were in keeps the focus; the run's page shows the page under Dot's computer either way, and Take over always brings the tab to the front.",
+      "Off, Dot's Chrome stays where it is while a task works and the app you were in keeps the focus; the task's page shows the page under Dot's computer either way, and Take over always brings the tab to the front.",
     read: () => view?.raise_window === true,
     // The words follow the change once it is made (item 559): a switch that failed says so alone.
     write: async (on) => {
@@ -1664,12 +1665,12 @@ function buildBrowser(isDisposed, head) {
   });
   // Whether the owner may use the page of a run they hold from the screen that shows it, a phone's too (item 470).
   const screenInput = switchRowSetting({
-    label: "Use the page from the screen while I hold the run",
-    hint: "On, a run you took over can be used from the screen that shows its page: your taps, scrolls and keys go to the page while the run waits. Nothing you type is kept.",
+    label: "Use the page from the screen while I hold the task",
+    hint: "On, a task you took over can be used from the screen that shows its page: your taps, scrolls and keys go to the page while the task waits. Nothing you type is kept.",
     read: () => view?.remote_input === true,
     write: async (on) => {
       view = await api.post("/browser/remote-input", { remote_input: on });
-      toast("ok", view.remote_input ? "A run you hold can be used from the screen." : "A run you hold is used only on the Mac.");
+      toast("ok", view.remote_input ? "A task you hold can be used from the screen." : "A task you hold is used only on the Mac.");
     },
     onToggled: () => {
       if (!isDisposed()) {
@@ -1680,12 +1681,12 @@ function buildBrowser(isDisposed, head) {
   // Settings › Browser (item 354): whether runs may use the browser, how its pages look, and whether a run's page shows
   // by itself.
   const enabled = switchRowSetting({
-    label: "Runs may use the browser",
-    hint: "Off, no run is offered the browser tools, an agent's neither, from the next run on; computer use still sees the screen.",
+    label: "Tasks may use the browser",
+    hint: "Off, no task is offered the browser, an agent's neither, from the next task on; computer use still sees the screen.",
     read: () => view?.enabled === true,
     write: async (on) => {
       view = await api.post("/browser/enabled", { enabled: on });
-      toast("ok", view.enabled ? "Runs may use the browser." : "Runs do not use the browser.");
+      toast("ok", view.enabled ? "Tasks may use the browser." : "Tasks do not use the browser.");
     },
     onToggled: () => {
       if (!isDisposed()) {
@@ -1697,7 +1698,7 @@ function buildBrowser(isDisposed, head) {
   sizes.addEventListener("change", () => attempt(() => chooseSize(sizes.value)));
   const sizeSetting = setRow({
     title: "Size of a page",
-    lead: "The page a run sees in Dot's own Chrome: as large as its window, or a screen's size. Your Chrome keeps the size of its window.",
+    lead: "The page a task sees in Dot's own Chrome: as large as its window, or a screen's size. Your Chrome keeps the size of its window.",
     control: sizes,
   });
   const appearance = choiceRowSetting({
@@ -1720,8 +1721,8 @@ function buildBrowser(isDisposed, head) {
     control: modes.element,
   });
   const autoComputer = switchRowSetting({
-    label: "Show Dot's computer when a run opens the browser",
-    hint: "On a wide window the details panel opens on the page the run works in, beside the chat; a phone keeps its button. Kept in this browser.",
+    label: "Show Dot's computer when a task opens the browser",
+    hint: "On a wide window the side panel opens on the page the task works in, beside the chat; a phone keeps its button. Kept in this browser.",
     read: () => settingValue(AUTO_COMPUTER) === "shown",
     write: async (on) => setValue(AUTO_COMPUTER, on ? "shown" : "hidden"),
     onToggled: () => autoComputer.paint(),
@@ -1745,7 +1746,7 @@ function buildBrowser(isDisposed, head) {
   );
   const profileSetting = setSection({
     title: "Profiles",
-    lead: "Each profile of Dot's own Chrome keeps its own cookies and sign-ins, and runs work on the one in use.",
+    lead: "Each profile of Dot's own Chrome keeps its own sign-ins and saved site data, and tasks work on the one in use.",
     actions: addButton,
     body: setCard(profileList),
   });
@@ -1784,7 +1785,7 @@ function buildBrowser(isDisposed, head) {
   );
   const signInSetting = setRow({
     title: "Sign in to sites in Dot's Chrome",
-    lead: "Opens Dot's own profile in a plain Chrome window: sign in there to the sites Dot should use, then quit that Chrome (⌘Q). Dot keeps the cookies and never sees your passwords.",
+    lead: "Opens Dot's own profile in a plain Chrome window: sign in there to the sites Dot should use, then quit that Chrome (⌘Q). Dot keeps the sign-in data and never sees your passwords.",
     control: signIn,
   });
   signInSetting.hidden = true;
@@ -1792,7 +1793,7 @@ function buildBrowser(isDisposed, head) {
     "div",
     { class: "note signing-in", "aria-live": "polite", hidden: true },
     icon("key"),
-    el("span", null, "Chrome is open on Dot's profile: sign in there, then quit that Chrome (⌘Q). Until then runs cannot use Dot's Chrome."),
+    el("span", null, "Chrome is open on Dot's profile: sign in there, then quit that Chrome (⌘Q). Until then tasks cannot use Dot's Chrome."),
   );
   const reload = el(
     "button",
@@ -1840,16 +1841,16 @@ function buildBrowser(isDisposed, head) {
     port.disabled = false;
     if (view.devtools_address !== null) {
       portHint.replaceChildren(
-        "A run's scripts drive Dot's Chrome at ",
+        "A task's scripts drive Dot's Chrome at ",
         el("code", { class: "mono" }, view.devtools_address),
-        " with the Chrome DevTools Protocol, and the run is told so. 0 turns it off.",
+        " with the Chrome DevTools Protocol, and the task is told so. 0 turns it off.",
       );
     } else if (view.debug_port !== 0) {
       portHint.textContent =
-        "Runs that work in Dot's own Chrome, such as a campaign's, are told this port; with My Chrome, scripts reach your Chrome through its own remote debugging. 0 turns it off.";
+        "Tasks that work in Dot's own Chrome, such as a campaign's, are told this port; with My Chrome, scripts reach your Chrome through its own remote debugging. 0 turns it off.";
     } else {
       portHint.textContent =
-        "A port of this Mac, from 1024 up, on which Dot's own Chrome also takes DevTools connections, so a run's scripts can drive it (Playwright, Puppeteer). It asks for no token: any program on this Mac can use it while Dot's Chrome runs. Dot's Chrome does not start while another program holds the port.";
+        "A port of this Mac, from 1024 up, on which Dot's own Chrome also takes DevTools connections, so a task's scripts can drive it (Playwright, Puppeteer). It asks for no token: any program on this Mac can use it while Dot's Chrome runs. Dot's Chrome does not start while another program holds the port.";
     }
   }
 
@@ -1910,7 +1911,7 @@ function buildBrowser(isDisposed, head) {
             inUse ? el("span", { class: "badge b-accent" }, "In use") : null,
             profile.kind === "incognito" ? el("span", { class: "profile-note" }, "Keeps nothing once Dot's Chrome closes") : null,
           ),
-          inUse ? null : profileAction("Use", `Use ${label} for runs`, () => changeProfiles(api.post("/browser/profile", { name: profile.name }), `Runs use ${label} from Chrome's next start.`), true),
+          inUse ? null : profileAction("Use", `Use ${label} for tasks`, () => changeProfiles(api.post("/browser/profile", { name: profile.name }), `Tasks use ${label} from Chrome's next start.`), true),
           profile.kind === "incognito" ? null : profileAction("Clear", `Clear the sign-ins and site data of ${label}`, () => clearProfile(profile, label)),
           profile.kind !== "added" || inUse ? null : profileAction("Delete", `Delete ${label}`, () => deleteProfile(profile, label)),
         );
@@ -1948,7 +1949,7 @@ function buildBrowser(isDisposed, head) {
     });
     formDialog({
       title: "Add a profile",
-      description: "Each profile of Dot's own Chrome keeps its own cookies and sign-ins, and runs work on the one in use.",
+      description: "Each profile of Dot's own Chrome keeps its own sign-ins and saved site data, and tasks work on the one in use.",
       body: field("Name", name, ""),
       submitLabel: "Add",
       size: "narrow",
@@ -1960,7 +1961,7 @@ function buildBrowser(isDisposed, head) {
           name.focus();
           return false;
         }
-        await changeProfiles(api.post("/browser/profiles", { name: typed }), `${typed} is added; Use makes runs work on it.`);
+        await changeProfiles(api.post("/browser/profiles", { name: typed }), `${typed} is added; Use makes tasks work on it.`);
         return true;
       },
     });
@@ -1969,7 +1970,7 @@ function buildBrowser(isDisposed, head) {
   async function clearProfile(profile, label) {
     const sure = await confirmDialog({
       title: `Clear ${label}?`,
-      message: "Its cookies, the data its sites stored, the logins and autofill Chrome saved, and its cache are deleted, so every site it was signed in to signs it out. Its history, settings and extensions stay.",
+      message: "Its sign-ins, the data its sites stored, the logins and autofill Chrome saved, and its saved copies of pages are deleted, so every site it was signed in to signs it out. Its history, settings and extensions stay.",
       confirmLabel: "Clear",
       danger: true,
       focusCancel: true,
@@ -2061,8 +2062,8 @@ function buildBrowser(isDisposed, head) {
     facts.replaceChildren(
       entry("Chrome", view.chrome_running ? "running" : "not running"),
       entry("Remote debugging", view.remote_debugging ? `on${port}` : "off"),
-      entry("Agent connection", stands === null ? (view.connected ? "connected" : "not connected") : stands.word),
-      entry("Attach timeout", `${view.attach_timeout_s} s`),
+      entry("Dot's connection", stands === null ? (view.connected ? "connected" : "not connected") : stands.word),
+      entry("Connect timeout", `${view.attach_timeout_s} s`),
     );
     standing.hidden = stands === null;
     if (stands !== null) {
@@ -2072,7 +2073,17 @@ function buildBrowser(isDisposed, head) {
     steps.replaceChildren(
       copyStep(),
       el("li", null, "Chrome asks once whether Dot may connect; choose Allow."),
-      el("li", null, "Choose My Chrome above (Dot opens Chrome when it is closed), or run ", el("code", { class: "mono" }, "dotx browser attach"), " in a terminal while Chrome is open."),
+      el(
+        "li",
+        null,
+        "Choose My Chrome above (Dot opens Chrome when it is closed).",
+        el(
+          "details",
+          { class: "error-details" },
+          el("summary", null, "Another way"),
+          el("p", { class: "small muted" }, "With Chrome open, run ", el("code", { class: "mono" }, "dotx browser attach"), " in Terminal."),
+        ),
+      ),
     );
   }
 
@@ -2186,11 +2197,14 @@ function buildBrowser(isDisposed, head) {
     el("div", { class: "set-notices" }, standing, signingIn, waiting, problem),
     setSection({ title: "Where it browses", body: setCard(enabled.element, browseWith, signInSetting) }),
     profileSetting,
-    setSection({ title: "The page it opens", body: setCard(sizeSetting, appearance.element, zoomSetting) }),
-    setSection({ title: "While a run works", body: setCard(raise.element, autoComputer.element, screenInput.element) }),
-    setSection({ title: "Developer", body: setCard(portSetting) }),
-    setSection({ title: "How Chrome stands", body: el("div", { class: "set-card card-pad" }, facts) }),
+    setSection({ title: "How pages look", body: setCard(sizeSetting, appearance.element, zoomSetting) }),
+    setSection({ title: "While a task works", body: setCard(raise.element, autoComputer.element, screenInput.element) }),
     setSection({ title: "Let Dot join your Chrome", body: el("div", { class: "set-card card-pad" }, steps) }),
+    advancedFold({
+      title: "Advanced",
+      lead: "For troubleshooting: how Chrome stands, and a connection for programs",
+      body: [el("div", { class: "card-pad" }, facts), portSetting],
+    }),
   );
   return { element, load };
 }
@@ -2253,13 +2267,13 @@ function buildNameCard() {
         "div",
         { class: "setting" },
         el("div", { class: "row" }, el("span", { class: "grow" }, "What Dot is called"), input),
-        el("div", { class: "hint" }, "In the greeting, at the head of a run and in what the model is told: the daemon keeps it for every browser and phone."),
+        el("div", { class: "hint" }, "Used in the greeting and at the top of a chat, and Dot's AI answers to it. Dot keeps it for every browser and phone."),
       ),
       el(
         "div",
         { class: "setting" },
         el("div", { class: "row" }, el("span", { class: "grow" }, "What Dot calls you"), owner),
-        el("div", { class: "hint" }, "In the greeting (“Good morning, Ada.”) and in what the model is told. Blank: the first name of your account on this Mac."),
+        el("div", { class: "hint" }, "Used in the greeting (“Good morning, Ada.”) and when Dot talks to its AI. Blank: the first name of your account on this Mac."),
       ),
     ),
   );
@@ -2293,7 +2307,7 @@ function buildDotLookCard() {
 export function mountGeneral(root, ctx) {
   const look = buildDotLookCard();
   const voice = buildVoiceCard();
-  ctx.head.setLead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, the voice (the microphone and answers read aloud), what a chat shows of what ran without asking, what a reaction on Dot's message does once its run has ended, and the token this browser is signed in with.");
+  ctx.head.setLead("What Dot is called and what it calls you, how it looks, how it tells you things, how you send messages, and what a chat shows.");
   root.append(
     buildNameCard(),
     look.element,
@@ -2310,12 +2324,12 @@ export function mountGeneral(root, ctx) {
   };
 }
 
-/** The providers Dot can reach and the models each of them offers; `?model=<ref>` in the address shows that model. */
+/** The AI services Dot can reach and the models each of them offers; `?model=<ref>` in the address shows that model. */
 export function mountModels(root, ctx) {
   let disposed = false;
   const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("model") ?? "";
   const models = buildModels(() => disposed, asked, ctx.head);
-  ctx.head.setLead("Which model does each job, and what a run falls back on when its model can't answer.");
+  ctx.head.setLead("Which AI model does each job, and which one takes over when a model cannot answer.");
   root.append(models.element);
   const stop = onChange(() => models.paint());
   models.paint();
@@ -2332,7 +2346,7 @@ export function mountModels(root, ctx) {
 export function mountBrowser(root, ctx) {
   let disposed = false;
   const browser = buildBrowser(() => disposed, ctx.head);
-  ctx.head.setLead("Which Chrome Dot browses with, the pages it opens, and how it behaves while a run works.");
+  ctx.head.setLead("Which Chrome Dot uses to browse the web, how its pages look, and what happens while a task works.");
   root.append(browser.element);
   attempt(browser.load);
   return () => {
@@ -2369,10 +2383,10 @@ export function mountSystem(root, ctx) {
   let disposed = false;
   const refreshButton = el(
     "button",
-    { class: "icon-btn set-tile-action", type: "button", title: "Read the daemon again", "aria-label": "Read the daemon again", onclick: () => attempt(refresh) },
+    { class: "icon-btn set-tile-action", type: "button", title: "Read Dot's state again", "aria-label": "Read Dot's state again", onclick: () => attempt(refresh) },
     icon("refresh"),
   );
-  const tiles = { daemon: systemTile("Daemon", refreshButton), permissions: systemTile("Permissions", null), health: systemTile("Health", null) };
+  const tiles = { daemon: systemTile("Dot", refreshButton), permissions: systemTile("Permissions", null), health: systemTile("Health", null) };
   tiles.daemon.set("", "Reading", "");
   tiles.permissions.set("", "Reading", "");
   tiles.health.set("", "Checking", "");
@@ -2404,11 +2418,11 @@ export function mountSystem(root, ctx) {
     if (status === null || snapshot.stream !== "live") {
       tiles.daemon.set("warn", snapshot.stream === "live" ? "Reading" : "Not answering", "");
     } else {
-      tiles.daemon.set("ok", "Running", `Up ${duration(Math.max(0, Date.now() / 1000 - status.started_at))}`);
+      tiles.daemon.set("ok", "Running", `For ${duration(Math.max(0, Date.now() / 1000 - status.started_at))}`);
     }
   }
 
-  ctx.head.setLead("The daemon, its permissions, its emergency stop and its health checks.");
+  ctx.head.setLead("Whether Dot is running well, what your Mac lets it do, and a button that stops everything at once.");
   root.append(
     el(
       "div",

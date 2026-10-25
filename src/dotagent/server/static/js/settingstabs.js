@@ -7,7 +7,7 @@ export const TABS = [
   { id: "general", label: "General", icon: "sliders" },
   { id: "appearance", label: "Appearance", icon: "palette" },
   { id: "models", label: "Models", icon: "layers" },
-  { id: "keys", label: "Providers", icon: "key" },
+  { id: "keys", label: "AI services", icon: "key" },
   { id: "browser", label: "Browser", icon: "globe" },
   { id: "rules", label: "Rules", icon: "shield" },
   { id: "memory", label: "Memory", icon: "database" },

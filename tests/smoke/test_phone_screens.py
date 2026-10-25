@@ -277,7 +277,7 @@ async def test_a_sentence_with_a_button_beside_it_keeps_the_width_of_the_page(
     address, _ = served
     page: Page = await _phone(browser, address, "/settings/general")
     try:
-        card: Locator = page.locator(".card-pad.row", has_text="This browser keeps the access token")
+        card: Locator = page.locator(".card-pad.row", has_text="This browser is signed in to Dot")
         await expect(card).to_be_visible()
         words, button = await _box(card.locator(".grow")), await _box(card.get_by_role("button"))
         card_box: FloatRect = await _box(card)
@@ -315,7 +315,7 @@ async def test_what_is_tapped_on_a_phone_is_a_fingers_size(browser: Browser, ser
     try:
         await expect(page.locator(".run-changes-file")).to_be_visible(timeout=15_000)
         small += await _too_small(page, ".run-changes-file")
-        await page.get_by_role("button", name="Run details").click()
+        await page.get_by_role("button", name="Task details").click()
         await expect(page.locator(".inspector[data-mode='drawer']")).to_have_attribute("data-open", "true")
         small += await _too_small(page, ".inspector-tab")
     finally:

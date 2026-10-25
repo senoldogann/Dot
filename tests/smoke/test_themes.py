@@ -271,7 +271,7 @@ async def test_a_theme_for_light_and_another_for_dark_are_on_the_page_before_its
     # The pair rides on the page element; Paper's voice and its layout are the light scheme's.
     assert (await page.evaluate("document.documentElement.style.getPropertyValue('--bg')")).startswith("light-dark(")
     await expect(html).to_have_attribute("data-theme", "paper")
-    await expect(page.get_by_role("switch", name="Fold tool steps")).to_have_attribute("aria-checked", "false")
+    await expect(page.get_by_role("switch", name="Fold steps")).to_have_attribute("aria-checked", "false")
     await expect(page.get_by_text("These two follow Paper, the theme picked for light")).to_be_visible()
     light: dict[str, str] = await _painted(page)
     assert _short("paper/ember", "light", light) == []
@@ -304,7 +304,7 @@ async def test_a_theme_for_light_and_another_for_dark_are_on_the_page_before_its
         None,
         None,
     ]
-    await expect(page.get_by_role("switch", name="Fold tool steps")).to_have_attribute("aria-checked", "true")
+    await expect(page.get_by_role("switch", name="Fold steps")).to_have_attribute("aria-checked", "true")
     await page.close()
 
 

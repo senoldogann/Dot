@@ -70,7 +70,7 @@ function nowLine(activity) {
   // Every row of the working section is a run at work (item 608).
   const runs = activity.working.length;
   if (runs > 0) {
-    parts.push(`Working on ${count(runs, "run", "runs")}`);
+    parts.push(`Working on ${count(runs, "task", "tasks")}`);
   }
   if (activity.waiting.length > 0) {
     parts.push(activity.waiting.length === 1 ? "1 waits for you" : `${activity.waiting.length} wait for you`);

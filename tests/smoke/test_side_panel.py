@@ -38,7 +38,7 @@ _STEPS: tuple[str, ...] = ("Read the brief", "Draft the outline", "Write the sum
 _WAIT_COMMAND: str = "sleep 300"
 _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
-_TABS: list[str] = ["Run", "Changes", "Plan 1/3", "Agents", "Screen"]
+_TABS: list[str] = ["Task", "Changes", "Plan 1/3", "Agents", "Screen"]
 # Whether the panel is leaving, whether it is hidden, and whether the conversation keeps room for it.
 _PANEL_STATE: str = (
     "() => [document.querySelector('.inspector').dataset.leaving ?? '', document.querySelector('.inspector').hidden,"
@@ -157,7 +157,7 @@ async def _open_panel(
     await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
     await page.goto(f"{address}/#/runs/{run_id}")
     if width < 960:
-        await page.get_by_role("button", name="Run details").click()
+        await page.get_by_role("button", name="Task details").click()
     await expect(page.locator(".inspector")).to_be_visible()
     return page
 
@@ -182,10 +182,10 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
             for index, (width, scheme) in enumerate(_SHOTS):
                 page: Page = await _open_panel(browser, address, run.id, width, scheme)
                 panel: Locator = page.locator(".inspector")
-                tabs: Locator = panel.get_by_role("tablist", name="Run details").get_by_role("tab")
+                tabs: Locator = panel.get_by_role("tablist", name="Task details").get_by_role("tab")
                 # The four tabs, the plan's steps done beside Plan; Run first, its sections open.
                 await expect(tabs).to_have_text(_TABS)
-                run_tab: Locator = panel.get_by_role("tab", name="Run")
+                run_tab: Locator = panel.get_by_role("tab", name="Task")
                 await expect(run_tab).to_have_attribute("aria-selected", "true")
                 shown: Locator = panel.get_by_role("tabpanel")
                 await expect(shown).to_have_count(1)
@@ -209,10 +209,10 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                     await more.click()
                 # The facts under More: the run's state, its id among them.
                 await expect(shown.get_by_label("Details")).to_contain_text("running")
-                await expect(shown.get_by_label("Details")).to_contain_text("Run id")
-                bill: Locator = shown.get_by_label("Cost of this run")
+                await expect(shown.get_by_label("Details")).to_contain_text("Task ID")
+                bill: Locator = shown.get_by_label("Cost of this task")
                 await expect(bill).to_be_visible()
-                await expect(bill).to_contain_text("Input tokens")
+                await expect(bill).to_contain_text("Usage in")
                 # More says nothing over itself when no set-up warns.
                 await expect(top.locator(":scope > .panel-section-head .panel-summary")).to_have_text(["", ""])
                 # The drawer has its own way out; beside the conversation, the header's button closes the panel.
@@ -234,7 +234,7 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                 if index == 2:
                     # On a phone too, the drawer opens on the tab chosen last.
                     await page.reload()
-                    await page.get_by_role("button", name="Run details").click()
+                    await page.get_by_role("button", name="Task details").click()
                     await expect(page.locator(".inspector").get_by_role("tab", name="Plan")).to_have_attribute(
                         "aria-selected", "true"
                     )
@@ -344,7 +344,7 @@ async def test_the_screenshots_section_folds_away_from_its_title_and_stays_folde
                 # Folded, it stays folded on the next page; the section above it (Dot's computer) never folds.
                 await page.reload()
                 if width < 960:
-                    await page.get_by_role("button", name="Run details").click()
+                    await page.get_by_role("button", name="Task details").click()
                 await panel.get_by_role("tab", name="Screen").click()
                 await expect(fold).to_have_attribute("aria-expanded", "false")
                 await expect(body).to_be_hidden()
@@ -378,7 +378,7 @@ async def test_the_side_panel_slides_in_and_out_beside_the_conversation(
                 # page's policy turns away a style element.
                 await page.evaluate("document.documentElement.style.setProperty('--motion-panel', '2s')")
                 panel: Locator = page.locator(".inspector")
-                toggle: Locator = page.get_by_role("button", name="Run details")
+                toggle: Locator = page.get_by_role("button", name="Task details")
                 await expect(panel).to_be_visible()
                 await expect(page.locator(".run-layout")).to_have_attribute("data-inspector", "on")
                 await toggle.click()

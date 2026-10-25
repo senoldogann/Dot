@@ -212,7 +212,7 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
 
                         await page.route("**/api/palette", slow)
                         await shared.get_by_role("button", name="Share").click()
-                        await expect(page.locator(".toast.ok", has_text="is offered to every run")).to_be_visible()
+                        await expect(page.locator(".toast.ok", has_text="is offered to every task")).to_be_visible()
                         await expect(shared.get_by_role("button", name="Keep to the agent")).to_be_visible(
                             timeout=_AT_ONCE_MS
                         )
@@ -306,12 +306,14 @@ async def test_a_skills_page_that_could_not_be_read_offers_try_again_as_the_othe
                     await page.goto(f"{served}/#/customize/skills")
                     # The skills could not be read: the page says so, and reads them again on Try again.
                     again: Locator = page.get_by_role("button", name="Try again")
-                    await expect(page.get_by_text("the store is busy")).to_be_visible()
+                    await expect(page.get_by_text("Dot ran into a problem and could not finish.").first).to_be_visible()
+                    await expect(page.locator(".error-details").first).to_contain_text("the store is busy")
                     await expect(again).to_have_count(1)
                     await again.click()
                     await expect(_card(page, "own-skill-1")).to_be_visible()
                     # What other apps set up could not be read either: its part says so, and reads it again.
-                    await expect(page.get_by_text("the store is busy")).to_be_visible()
+                    await expect(page.get_by_text("Dot ran into a problem and could not finish.").first).to_be_visible()
+                    await expect(page.locator(".error-details").first).to_contain_text("the store is busy")
                     await expect(again).to_have_count(1)
                     await again.click()
                     await expect(page.get_by_text("the store is busy")).to_have_count(0)

@@ -44,7 +44,7 @@ export function undoQuestion(ready, shown) {
   const restored = ready.length - deleted;
   const parts = [];
   if (restored > 0) {
-    parts.push(`${restored === 1 ? "A file goes" : `${restored} files go`} back as it was before the run`);
+    parts.push(`${restored === 1 ? "A file goes" : `${restored} files go`} back as it was before the task`);
   }
   if (deleted > 0) {
     parts.push(`${deleted === 1 ? "the file it created is" : `the ${deleted} files it created are`} deleted`);
@@ -71,7 +71,7 @@ function baseName(path) {
  * run's undo plan and draws the card, which stays empty and hidden for a run that changed no file.
  */
 export function runChangesCard({ runId, onReview, onUndone }) {
-  const element = el("section", { class: "run-changes", "aria-label": "What the run changed", hidden: true });
+  const element = el("section", { class: "run-changes", "aria-label": "What the task changed", hidden: true });
   // Whether this card's Undo took files back: only then does an empty plan say the changes were taken back. A file the
   // run changed and changed back, or one the owner put back by hand, leaves nothing to say.
   let undone = false;
@@ -102,7 +102,7 @@ export function runChangesCard({ runId, onReview, onUndone }) {
       el("span", null, "Undo"),
     );
     if (ready.length === 0) {
-      undo.title = "No file can go back as the run left it";
+      undo.title = "No file can go back as the task left it";
     }
     element.replaceChildren(
       icon("fileDiff"),
@@ -140,12 +140,12 @@ export function runChangesCard({ runId, onReview, onUndone }) {
     if (ready.length === 0 || !now.ended) {
       draw(now);
       if (!now.ended) {
-        toast("error", "Undo waits for the run and its helpers to end.");
+        toast("error", "Undo waits for the task and its helpers to end.");
       }
       return;
     }
     const confirmed = await confirmDialog({
-      title: "Take back what this run changed?",
+      title: "Take back what this task changed?",
       message: undoQuestion(ready, shown),
       confirmLabel: "Undo",
       danger: true,

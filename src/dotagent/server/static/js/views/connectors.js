@@ -35,7 +35,7 @@ const SECTIONS = [
   { id: "mac", title: "This Mac" },
 ];
 const MCP_ORIGIN_WORDS = {
-  config: "Set up in Dot's config: take its [[mcp]] block out of config.toml to remove it.",
+  config: "Set up in Dot's settings file; remove it there.",
   plugin: "Comes with one of Dot's plugins; Remove plugin takes the plugin out.",
   elsewhere: "Added from another agent of this Mac (Customize › Skills › Found on this Mac).",
   builtin: "Comes with Dot: it searches the web and reads pages.",
@@ -46,7 +46,7 @@ const SHOWN_TOOLS = 6;
 /** The tools a server offers to runs, the first few by name. */
 function toolLine(tools) {
   const shown = tools.slice(0, SHOWN_TOOLS).join(", ");
-  return `${plural(tools.length, "tool", "tools")}: ${shown}${tools.length > SHOWN_TOOLS ? ", …" : ""}`;
+  return `${plural(tools.length, "action", "actions")}: ${shown}${tools.length > SHOWN_TOOLS ? ", …" : ""}`;
 }
 
 /** How to sign in to the applications of the web, the same for each of them: it depends on Dot's browser alone. */
@@ -55,7 +55,7 @@ function webNote(listing) {
     return "Dot works in your own Chrome (Settings › Browser › My Chrome), where you are signed in as you always are.";
   }
   return listing.headless
-    ? "Dot's browser runs without a window, so there is none to sign in in: switch headless off in the config."
+    ? "Dot's browser works without a window, so there is nowhere to sign in. Choose My Chrome in Settings › Browser to use your own Chrome, where you are already signed in."
     : "Sign in opens the page in Dot's browser on the Mac; check again once you are in.";
 }
 
@@ -87,7 +87,7 @@ function serverGuide(server) {
     case "left_out":
       return server.error;
     case "disabled":
-      return server.origin === "builtin" ? "Switched off. Its switch starts it." : "Switched off in Dot's config.";
+      return server.origin === "builtin" ? "Switched off. Its switch starts it." : "Switched off in Dot's settings file.";
     default:
       return null;
   }
@@ -112,7 +112,7 @@ function serverActions(catalogue, server, service) {
   if (server.picks_tools && server.origin === "connected" && !working) {
     // The way back in for a server left out with its allow list; for one that runs, a way to cut its tools down.
     const kind = server.state === "left_out" ? "btn sm primary" : "btn sm";
-    actions.push(el("button", { class: kind, type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose tools"));
+    actions.push(el("button", { class: kind, type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose actions"));
   }
   if (server.origin === "connected" || server.origin === "elsewhere") {
     actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.remove(server, service)) }, "Remove"));
@@ -137,7 +137,7 @@ function serverActions(catalogue, server, service) {
 function vaultGuide(vault) {
   if (!vault.connected) {
     return vault.cli === null
-      ? "1Password's command line, op, is not installed: brew install 1password-cli, then check again."
+      ? el("span", null, "The 1Password command-line tool is not installed on this Mac. Install it, then check again.", el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, "In Terminal: ", el("code", { class: "mono" }, "brew install 1password-cli"))))
       : "Connect makes the vault Shared with Dot and a service account that only reads it, through the 1Password app, which asks you first: turn on its Settings › Developer › Integrate with 1Password CLI.";
   }
   if (vault.error !== null) {
@@ -145,7 +145,7 @@ function vaultGuide(vault) {
   }
   const names = vault.vaults.map((one) => one.name).join(", ");
   const logins = vault.vaults.reduce((sum, one) => sum + one.logins, 0);
-  return `Reads ${plural(logins, "login", "logins")} in ${names}: the logins you move there are the ones runs may fill.`;
+  return `Reads ${plural(logins, "login", "logins")} in ${names}: the logins you move there are the ones tasks may fill in.`;
 }
 
 /** The buttons of 1Password's way (item 493): Connect 1Password and a token instead while it is not connected, the token
@@ -171,7 +171,7 @@ function vaultActions(catalogue, vault) {
       disabled: acting || vault.cli === null,
       onclick: () => attempt(() => catalogue.askVault(() => document.querySelector("[data-vault-token]"))),
     },
-    "Use a service account token instead",
+    "Use a service account key instead",
   );
   return el("div", { class: "plugin-actions" }, connect, token);
 }
@@ -181,11 +181,13 @@ function wayRow(catalogue, way) {
   const now = catalogue.wayNow(way);
   let badge = null;
   let guideLine = null;
+  // For whoever edits the settings file, beside the note of a browser without a window (item 625).
+  let guideTitle = null;
   let actions = null;
   if (way.kind === "mcp") {
     if (now.server === null && now.service !== null && now.service.added) {
       badge = el("span", { class: "badge b-muted" }, "Name taken");
-      guideLine = `A server of Dot's config or of a plugin is named ${way.ref} already: Connected lists it.`;
+      guideLine = `A connection set up in Dot's settings file or by a plugin is named ${way.ref} already: Connected lists it.`;
     } else if (now.server === null) {
       const service = now.service;
       const keyed = service !== null && service !== undefined && service.secrets.length > 0;
@@ -214,6 +216,9 @@ function wayRow(catalogue, way) {
     const listing = catalogue.listing;
     badge = el("span", { class: `badge ${CONNECTED_STATES.has(app.state) ? "b-ok" : app.state === "refused" ? "b-bad" : "b-muted"}` }, STATE_WORDS[app.state] ?? app.state);
     guideLine = appGuide(app, listing.runner) ?? (way.kind === "web" && !CONNECTED_STATES.has(app.state) ? webNote(listing) : null);
+    if (guideLine !== null && guideLine === webNote(listing) && listing.headless && listing.browser_mode !== "attach") {
+      guideTitle = "In the settings file: [browser] headless = false";
+    }
     if (app.step !== null) {
       // While macOS asks, the button says so, as Connect apps' did.
       const asking = catalogue.busy(`app:${app.id}`);
@@ -231,7 +236,7 @@ function wayRow(catalogue, way) {
       { class: "row-main" },
       el("div", { class: "row" }, el("span", { class: "row-title" }, WAY_NAMES[way.kind]), badge),
       el("div", { class: "row-text muted" }, way.how),
-      guideLine === null ? null : el("div", { class: "row-text plugin-guide" }, guideLine),
+      guideLine === null ? null : el("div", { class: "row-text plugin-guide", ...(guideTitle === null ? {} : { title: guideTitle, "data-expert": "" }) }, guideLine),
       way.kind === "mcp" && now.server !== null ? el("div", { class: "row-text muted mono plugin-address" }, now.server.address) : null,
     ),
     actions,
@@ -263,7 +268,7 @@ function serviceParts(catalogue, plugin) {
     ),
     does.length < 2 ? null : card("does", "What Dot does with it", "sparkle", el("ul", { class: "plugin-list" }, does.map((line) => el("li", null, line)))),
     card("ways", "How it connects", "link", plugin.ways.map((way) => wayRow(catalogue, way))),
-    tools.length === 0 ? null : card("tools", "Tools", "bolt", el("ul", { class: "plugin-list plugin-tools mono" }, tools.map((name) => el("li", null, name)))),
+    tools.length === 0 ? null : card("tools", "Actions", "bolt", el("ul", { class: "plugin-list plugin-tools mono" }, tools.map((name) => el("li", null, name)))),
     data.length === 0 ? null : card("data", "Where its data goes", "shield", el("ul", { class: "plugin-list" }, data.map((way) => el("li", null, named(way, way.data))))),
   ];
   return parts.filter((part) => part !== null);
@@ -348,11 +353,13 @@ export function mount(root, ctx) {
         el("span", { class: "plugin-name" }, server.name),
         el("div", { class: "mono plugin-address" }, server.address),
         server.tools.length === 0 ? null : el("div", { class: "plugin-does" }, toolLine(server.tools)),
-        server.origin in MCP_ORIGIN_WORDS ? el("div", { class: "plugin-does" }, MCP_ORIGIN_WORDS[server.origin]) : null,
+        server.origin in MCP_ORIGIN_WORDS
+          ? el("div", { class: "plugin-does", title: server.origin === "config" ? "It is set up in your settings file: to remove it, take its [[mcp]] block out of config.toml." : null }, MCP_ORIGIN_WORDS[server.origin])
+          : null,
         el(
           "div",
           { class: "plugin-meta" },
-          el("span", { class: "chip" }, "MCP"),
+          el("span", { class: "chip" }, "Connected app"),
           server.origin === "builtin" ? el("span", { class: "chip" }, "Built in") : null,
           el("span", { class: `badge ${MCP_STATE_TONES[server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[server.state] ?? server.state),
         ),
@@ -365,20 +372,20 @@ export function mount(root, ctx) {
   /** The form that adds an MCP server of one's own by its name and address, in a dialog (item 615): Dot tries the server
    * before it keeps it. */
   function addServer() {
-    const name = el("input", { class: "input", type: "text", maxlength: "24", autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "my-server", "aria-label": "Server name" });
+    const name = el("input", { class: "input", type: "text", maxlength: "24", autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "my-app", "aria-label": "Name of the connected app" });
     const address = el("input", {
       class: "input mono",
       type: "text",
       autocomplete: "off",
       autocapitalize: "off",
       spellcheck: "false",
-      placeholder: "https://example.com/mcp",
-      "aria-label": "Server address or command",
+      placeholder: "https://example.com/your-app",
+      "aria-label": "Address or command",
     });
     formDialog({
-      title: "Add your own MCP server",
-      description: "Dot tries the server before it keeps it, signs in to it in this browser when it asks, and offers its tools to the runs that start after.",
-      body: [field("Name", name, "Lowercase letters, digits and dashes."), field("Address", address, "Its URL, or the command that starts it on this Mac.")],
+      title: "Add your own connected app",
+      description: "Dot tries the connection before it keeps it, signs in to it in this browser when it asks, and offers what it can do to the tasks that start after.",
+      body: [field("Name", name, "Lowercase letters, digits and dashes."), field("Address", address, "Its web address, or the command that starts it on this Mac.")],
       submitLabel: "Add",
       size: "narrow",
       returnFocus: () => document.querySelector("[data-add-server]"),
@@ -413,7 +420,7 @@ export function mount(root, ctx) {
   // none of it.
   const head = customizeHead({
     title: "Connect your apps",
-    line: "Dot works in the apps and services you use. Connect one once, and every run can read it and act there, asking you first for what matters.",
+    line: "Dot works in the apps and services you use. Connect one once, and every task can read it and act there, asking you first for what matters.",
     search,
     controls: [tabs.element, recheck],
   });
@@ -479,7 +486,7 @@ export function mount(root, ctx) {
         el(
           "section",
           { class: "plugin-section", dataset: { section: "servers" } },
-          el("h2", { class: "section-label plugin-section-title" }, "Other MCP servers"),
+          el("h2", { class: "section-label plugin-section-title" }, "Other connected apps"),
           el("div", { class: "plugin-grid" }, others.map(serverTile)),
         ),
       );
@@ -501,13 +508,13 @@ export function mount(root, ctx) {
           "div",
           { class: "card-head" },
           icon("plug"),
-          el("span", { class: "grow" }, "Your own MCP server"),
-          el("button", { class: "btn sm", type: "button", "aria-haspopup": "dialog", dataset: { addServer: "" }, onclick: addServer }, icon("plus"), "Add server"),
+          el("span", { class: "grow" }, "Your own connected app"),
+          el("button", { class: "btn sm", type: "button", "aria-haspopup": "dialog", dataset: { addServer: "" }, onclick: addServer }, icon("plus"), "Add connected app"),
         ),
         el(
           "div",
           null,
-          el("p", { class: "hint connect-hint" }, "MCP servers hand their tools to Dot. Dot tries one before it keeps it, signs in to it in this browser when it asks, and offers its tools to the runs that start after."),
+          el("p", { class: "hint connect-hint" }, "A connected app gives Dot more things it can do. Dot tries one before it keeps it, signs in to it in this browser when it asks, and offers what it can do to the tasks that start after."),
           shown === "all" && words === "" ? others.map(serverTile) : null,
         ),
       ),

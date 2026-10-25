@@ -23,7 +23,7 @@ def channels_router(ctx: ServerContext) -> APIRouter:
 
     def channels() -> Channels:
         if ctx.channels is None:
-            raise ConfigError("this daemon runs without channels", {})
+            raise ConfigError("Dot is running without channels", {})
         return ctx.channels
 
     @router.get("/channels")

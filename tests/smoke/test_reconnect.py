@@ -303,7 +303,7 @@ async def test_a_page_loaded_while_the_daemon_is_down_tries_again_by_itself(
             await daemon.stop()
             await expect(page.locator(".live-dot.reconnecting")).to_be_visible()
             await page.reload()
-            await expect(page.get_by_text("Cannot reach the Dot daemon")).to_be_visible()
+            await expect(page.get_by_text("Could not reach Dot")).to_be_visible()
             await expect(page.get_by_text("this page tries again by itself")).to_be_visible()
             await expect(page.get_by_text("Trying again in")).to_be_visible()
             await page.screenshot(path=str(tmp_path / f"unreachable-{width}-{scheme}.png"), animations="disabled")

@@ -392,7 +392,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             # What it learned: the lesson with its score, the skill with Share.
             assert await page_ui.locator(".agent-learned [data-lesson]").count() == 1
             learned_text: str = await page_ui.locator(".agent-learned").inner_text()
-            assert LESSON in learned_text and SKILL_NAME in learned_text and "Handed to 1 run, 1 done" in learned_text
+            assert LESSON in learned_text and SKILL_NAME in learned_text and "Handed to 1 task, 1 done" in learned_text
             await page_ui.screenshot(path=str(out / "agent.png"))
             # The run's page wears the agent's face and name in the bar.
             await page_ui.goto(f"http://{host}:{port}/#/runs/{run_id}")
@@ -504,7 +504,7 @@ async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_lev
             await page.route("**/api/tools", failed)
             await page.reload()
             await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
-            await expect(page.get_by_text("The tools could not be listed")).to_be_visible()
+            await expect(page.get_by_text("The actions could not be listed")).to_be_visible()
             await expect(page.get_by_role("button", name="Save changes")).to_be_disabled()
             await context.close()
         finally:
@@ -535,7 +535,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"http://{host}:{port}/#/agents/{agent_id}")
             await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
-            every: Locator = page.get_by_role("checkbox", name="All tools")
+            every: Locator = page.get_by_role("checkbox", name="All actions")
             boxes: Locator = page.locator(".tool-picks input")
             await expect(every).not_to_be_checked()
             assert await every.evaluate("(box) => box.indeterminate")
@@ -550,7 +550,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             await expect(every).to_be_checked()
             await every.uncheck()
             await page.get_by_role("button", name="Save changes").click()
-            await expect(page.get_by_text("Pick the tools it may use, or All tools for every one.")).to_be_visible()
+            await expect(page.get_by_text("Pick the actions it may use, or All actions for every one.")).to_be_visible()
             assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == []
             listed: list[str] = (await client.get("/api/tools")).json()
             named = await client.put(f"/api/agents/{agent_id}", json=_agent(listed))
@@ -567,7 +567,7 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
             await every.uncheck()
             await every.check()
-            await expect(page.locator(".tool-picks-count")).to_have_text("every tool, and any added later")
+            await expect(page.locator(".tool-picks-count")).to_have_text("every action, and any added later")
             await page.get_by_role("button", name="Save changes").click()
             await expect(page.get_by_text("Agent saved.")).to_be_visible()
             assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == []

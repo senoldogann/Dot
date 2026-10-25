@@ -284,14 +284,14 @@ async def test_while_a_run_works_the_pills_wait_for_the_next_follow_up(
             await page.goto(f"{address}/#/runs/{held.id}")
             for name in ("mode", "model", "options"):
                 await expect(_pill(page, name)).to_have_attribute("data-waiting", "")
-                await expect(_pill(page, name)).to_have_attribute("title", re.compile("For the next follow-up"))
+                await expect(_pill(page, name)).to_have_attribute("title", re.compile("For your next message"))
             await page.screenshot(path=str(tmp_path / "dock-waiting-1280-light.png"), animations="disabled")
             models.release.set()
             async with asyncio.timeout(_RUN_WAIT_S):
                 ended: RunRecord = await manager.wait(held.id)
             assert ended.status == "done", ended
             await expect(_pill(page, "model")).not_to_have_attribute("data-waiting", re.compile(".*"))
-            await expect(_pill(page, "model")).not_to_have_attribute("title", re.compile("For the next follow-up"))
+            await expect(_pill(page, "model")).not_to_have_attribute("title", re.compile("For your next message"))
             assert errors == []
         finally:
             await browser.close()

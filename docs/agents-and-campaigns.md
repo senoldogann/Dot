@@ -3,10 +3,10 @@
 ## Agents
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
-model, a reasoning level, approvals, the tools it may use; each left out takes the configured one, and **All tools**,
-over the tools' boxes, means every tool, any added later too: an agent with every tool opens with every box ticked,
+model, a reasoning level, approvals, the actions it may use (its tools); each left out takes the configured one, and **All actions**,
+over the actions' boxes, means every tool, any added later too: an agent with every tool opens with every box ticked,
 every box ticked saves as every tool, an agent that names each tool there is keeps them named through a save until you
-tick All tools yourself, and none ticked is refused, item 512) and a look: a shape, a rest expression and a colour of
+tick All actions yourself, and none ticked is refused, item 512) and a look: a shape, a rest expression and a colour of
 the character (see the design system), picked in the editor's Look field with a moving preview, worn as a still face
 wherever the agent shows, and until you choose one the shape and colour its id's hue gives it (`PUT
 /api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look" card of Settings › General, kept by the daemon
@@ -50,7 +50,7 @@ Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, C
 Competitor Watch, Release QA, Copy Editor and Design Critic, each with its face, its role, what it needs of the Mac and
 the schedule it suggests. **Use template** makes the agent in one click and opens its page; it is then an agent like any
 other, to change in the editor. Every template names the tools its agent may use (item 425), and its card counts them
-under **Tools** (a 40 px row to tap on a phone) and lists the names a click below it: no template starts an agent with
+under **Actions** (a 40 px row to tap on a phone) and lists the names a click below it: no template starts an agent with
 every tool, and a tool this home does not have (its group off in the configuration, or its app not here) is struck
 through with the reason, since such a template is refused on use. Every template's instructions also say that what
 leaves the Mac for a person is a draft for you to send (`draft_message`, see [Drafts](runs.md#drafts)). Sales Outbound,
@@ -131,7 +131,7 @@ the team leaves its chats as chats with Dot, whose later messages are told no te
 The chat wears the team: the sidebar's row shows the faces of two of its agents and the team's name ahead of its last
 words while the chat's latest run is Dot's, which leads the team, and the bar of a run of Dot's there (a phone's, under
 the chat's title) the name and the same faces; an agent you put in the chat answers as itself, its run's bar and, while
-its run is the latest, the row wearing its face. The Run tab's Details name the team, a link to its page. The API: `GET
+its run is the latest, the row wearing its face. The Task tab's Details name the team, a link to its page. The API: `GET
 /api/teams` (each team with its agents as they are now and its
 newest chat), `GET /api/teams/{id}` (with its chats), `POST /api/teams` (201; `name`, `purpose` and `agents`, the ids of
 your agents in order; 422 for an id that is not one of your agents, one named twice, or none), `PUT /api/teams/{id}`
@@ -197,7 +197,7 @@ dotx campaign stop|resume|achieved ID
 ```
 
 A campaign is a task that Dot keeps working on until its outcome is verified or you stop it. Switch on **Keep going** in
-the Execution group of the composer's **Options** menu (it is there for a task of Dot's), or pass `--standing` to `dotx
+the **How Dot works** group of the message box's **Options** menu (it is there for a task of Dot's), or pass `--standing` to `dotx
 run`. The run you start is its first session, in your conversation; the daemon runs the sessions after it, each a run in
 a thread of its own, through restarts and days. A campaign whose first session cannot start is not kept.
 

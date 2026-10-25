@@ -30,7 +30,7 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module"), pyt
 TOKEN: str = "builtin-mcp-page-token"
 SERVER: str = "web-research"
 # The tools the tile names first, and how many the server lists.
-SHOWN: str = "9 tools: web_search, web_scrape, web_map, web_extract, web_health, web_crawl_start, …"
+SHOWN: str = "9 actions: web_search, web_scrape, web_map, web_extract, web_health, web_crawl_start, …"
 _SCREENS: tuple[tuple[int, str], ...] = ((1280, "light"), (390, "dark"), (320, "dark"))
 
 
@@ -120,7 +120,7 @@ async def test_the_tile_of_the_server_that_comes_with_dot_has_its_switch(
                 tile: Locator = page.locator(f".plugin-server[data-server='{SERVER}']")
                 await expect(tile).to_have_count(1)
                 await expect(tile.locator(".plugin-name")).to_have_text(SERVER)
-                await expect(tile.locator(".plugin-meta .chip")).to_have_text(["MCP", "Built in"])
+                await expect(tile.locator(".plugin-meta .chip")).to_have_text(["Connected app", "Built in"])
                 await expect(tile.locator(".plugin-meta .badge")).to_have_text("Ready")
                 await expect(tile).to_contain_text("Comes with Dot")
                 await expect(tile.locator(".plugin-address")).to_have_text("python -P -m web_scraper.mcp_server")

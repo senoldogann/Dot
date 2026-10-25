@@ -152,11 +152,11 @@ async def test_a_turn_that_goes_on_after_a_restart_says_so_with_a_bolt(own_home:
                 await expect(row.locator(".restart-mark")).to_be_visible()
                 await row.locator("summary").click()
                 await expect(row.locator(".restart-body p")).to_have_text(
-                    "The daemon was shut down while the run before this one worked. Dot went on with it on its own "
+                    "Dot was shut down while the task before this one worked. Dot went on with it on its own "
                     "when it started again."
                 )
-                await expect(row.locator(".restart-calls li")).to_have_text([f"{ASK_USER_TOOL} cut off"])
-                await expect(row.get_by_role("link", name="Open the run it resumes")).to_have_attribute(
+                await expect(row.locator(".restart-calls li")).to_have_text(["Ask you: cut off"])
+                await expect(row.get_by_role("link", name="Open the task it continues")).to_have_attribute(
                     "href", f"#/runs/{by_itself.id}"
                 )
                 await page.screenshot(path=str(tmp_path / "resumed-by-itself.png"))
@@ -164,7 +164,7 @@ async def test_a_turn_that_goes_on_after_a_restart_says_so_with_a_bolt(own_home:
                 # The chat that waits for the owner: the line over its composer, and its Continue.
                 await page.goto(f"{address}/#/runs/{by_hand.id}")
                 line: Locator = page.locator(".resume-line")
-                await expect(line).to_contain_text("Dot was shut down while this run worked.")
+                await expect(line).to_contain_text("Dot was shut down while this task worked.")
                 await expect(line).to_have_class(re.compile(r"\brestart-note\b"))
                 await page.screenshot(path=str(tmp_path / "cut-off.png"))
                 await line.get_by_role("button", name="Continue").click()

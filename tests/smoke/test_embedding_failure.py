@@ -147,7 +147,7 @@ async def _setup_warnings(page: Page, width: int) -> list[str]:
     """The warning lines of how the run was set up, in the side panel's Run tab (item 365): the panel turned on beside
     a wide conversation, opened as a drawer on a phone."""
     if width < 960:
-        await page.locator("button[aria-label='Run details']").click()
+        await page.locator("button[aria-label='Task details']").click()
     else:
         await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
         await page.reload()
@@ -216,9 +216,9 @@ async def test_a_run_whose_embeddings_fail_finds_its_notes_and_skills_by_their_w
                             # of its Set up says them once (item 365).
                             await expect(page.locator(".timeline")).not_to_contain_text("by their words alone")
                             lines: list[str] = await _setup_warnings(page, width)
-                            assert [line.split(" — ")[0] for line in lines] == [
-                                "Notes recalled by their words alone: the embedding service failed",
-                                "Skills listed by their words alone: the embedding service failed",
+                            assert [line.partition("Details")[0].strip() for line in lines] == [
+                                "Notes were recalled by their words alone: the search by meaning did not work.",
+                                "Skills were listed by their words alone: the search by meaning did not work.",
                             ], lines
                             await expect(page.locator(".setup-summary")).to_contain_text(
                                 "notes and skills found by their words alone"

@@ -21,7 +21,8 @@ import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
-import { callKind, describeArguments, flowIcon, flowWords, toolRow } from "./tools.js";
+import { callKind, describeArguments, flowIcon, flowWords, toolRow, toolWords } from "./tools.js";
+import { detailsFold } from "./ui.js";
 
 const GOAL_CHARS = 160;
 const LATEST_CHARS = 140;
@@ -32,7 +33,7 @@ const REVEAL_MOST_FRAMES = 120;
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 // The tool that ends a run. Its answer is shown as the answer, so the call itself stays out of the steps unless it failed.
 const FINISH_TOOL = "finish";
-const VERDICT_TEXT = { ask: "Needs approval", handoff: "Handed to you", deny: "Blocked by policy" };
+const VERDICT_TEXT = { ask: "Needs approval", handoff: "Handed to you", deny: "Blocked by Dot's safety rules" };
 // The ways a model turn ends that need no word of their own.
 const ORDINARY_ENDS = new Set(["stop", "tool_calls", ""]);
 // The open state of each group of steps the reader chose on this page, by the group's element (see buildGroup): a later
@@ -205,15 +206,15 @@ const CALL_ENDS = { succeeded: "finished", failed: "failed", cut_off: "cut off",
 // What cut off the run that a resumed run goes on from (agent/resume.py `CutOff`): as the resumed run's line says it
 // after "Resumed this turn after", and in full.
 const CUT_OFFS = {
-  daemon_restarted: { after: "Dot restarted", how: "The daemon stopped while the run before this one worked: a crash, or a restart that did not wait for it." },
-  daemon_shutdown: { after: "Dot was shut down", how: "The daemon was shut down while the run before this one worked." },
-  process_ended: { after: "its dotx command was told to end", how: "The dotx command that drove the run before this one was told to end while it worked." },
-  process_died: { after: "its dotx command died", how: "The dotx command that drove the run before this one died while it worked." },
+  daemon_restarted: { after: "Dot restarted", how: "Dot stopped while the task before this one worked: a crash, or a restart that did not wait for it." },
+  daemon_shutdown: { after: "Dot was shut down", how: "Dot was shut down while the task before this one worked." },
+  process_ended: { after: "its Terminal command was told to end", how: "The Terminal command that drove the task before this one was told to end while it worked." },
+  process_died: { after: "its Terminal command stopped suddenly", how: "The Terminal command that drove the task before this one stopped suddenly while it worked." },
 };
 
-/** One call of the step a resumed run was in, as "tool how it ended". */
+/** One call of the step a resumed run was in, as "what it did: how it ended". */
 function callEnd(call) {
-  const end = `${call.tool} ${CALL_ENDS[call.end] ?? call.end}`;
+  const end = `${toolWords(call.tool)}: ${CALL_ENDS[call.end] ?? call.end}`;
   return call.end === "cut_off" && !call.repeatable ? `${end} (it may have changed something)` : end;
 }
 
@@ -224,7 +225,7 @@ function limitSpent(data) {
     parts.push(`${(data.seconds / 60).toFixed(1)} of ${data.max_minutes} minutes`);
   }
   if (data.max_tokens > 0) {
-    parts.push(`${compact(data.tokens)} of ${compact(data.max_tokens)} tokens`);
+    parts.push(`${compact(data.tokens)} of ${compact(data.max_tokens)} usage`);
   }
   return parts.join(" and ");
 }
@@ -234,16 +235,16 @@ function limitSpent(data) {
 function describeCall(tool, args) {
   const detail = describeArguments(args);
   if (detail === "") {
-    return clip(tool, LATEST_CHARS);
+    return clip(toolWords(tool), LATEST_CHARS);
   }
-  return clip(callKind(tool) === "command" ? detail : `${tool} · ${detail}`, LATEST_CHARS);
+  return clip(callKind(tool) === "command" ? detail : `${toolWords(tool)} · ${detail}`, LATEST_CHARS);
 }
 
 /** The line a compaction leaves in the conversation (item 312): "Context compacted", and the size of the context
  * before and after it where the event says them (an event of before item 312 does not). */
 function compactionLine(data) {
   const sized = typeof data.tokens_before === "number" && typeof data.tokens_after === "number";
-  const text = sized ? `Context compacted ${compact(data.tokens_before)} → ${compact(data.tokens_after)} tokens` : "Context compacted";
+  const text = sized ? `Older part of the chat summed up: ${compact(data.tokens_before)} → ${compact(data.tokens_after)}` : "Older part of the chat summed up";
   return el("div", { class: "compaction-line" }, icon("minimize"), el("span", null, text));
 }
 
@@ -584,8 +585,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   const compactions = { count: 0, flagged: 0 };
 
   /** Put a line at the end of the scope, as `place` does, and return it. */
-  function note(scope, ts, iconName, text, tone) {
-    const line = el("div", { class: tone === "" ? "note" : `note ${tone}` }, icon(iconName), el("span", null, text));
+  function note(scope, ts, iconName, text, tone, details = "") {
+    const line = el("div", { class: tone === "" ? "note" : `note ${tone}` }, icon(iconName), el("span", null, text, detailsFold(details)));
     place(scope, line, ts);
     return line;
   }
@@ -596,9 +597,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
    * adds to that section's head ("words" for a notes' or skills' search by words alone, whose parts are said once).
    * A delegated run's lines are on its own page.
    */
-  function setupLine(scope, kind, short, iconName, text, tone) {
+  function setupLine(scope, kind, short, iconName, text, tone, details = "") {
     if (scope.runId === rootRunId) {
-      onSetup({ kind, short, iconName, text, tone });
+      onSetup({ kind, short, iconName, text, tone, details });
     }
   }
 
@@ -615,7 +616,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     const time = el("span", { class: "child-time" });
     const open = el(
       "a",
-      { class: "child-open", href: `#/runs/${runId}`, title: "Open the delegated run's own page", "aria-label": "Open the delegated run" },
+      { class: "child-open", href: `#/runs/${runId}`, title: "Open the helper's own page", "aria-label": "Open the helper's task" },
       icon("external"),
     );
     open.addEventListener("click", (event) => event.stopPropagation());
@@ -626,7 +627,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       "summary",
       { class: "child-row" },
       el("span", { class: "child-face" }, face, status),
-      el("span", { class: "visually-hidden" }, "Delegated run:"),
+      el("span", { class: "visually-hidden" }, "Helper:"),
       el("span", { class: "child-main" }, el("span", { class: "child-title" }, clip(data.goal ?? "", GOAL_CHARS)), progress),
       meta,
       time,
@@ -1148,7 +1149,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       if (!denied && settingValue(AUTO_LINES) === "hidden") {
         return;
       }
-      const verdict = permit ? "You allowed it earlier" : denied ? "Reviewer denied" : "Reviewer approved";
+      const verdict = permit ? "You allowed it earlier" : denied ? "The reviewer said no" : "The reviewer approved";
       const said = data.note === "" || data.summary.endsWith(data.note);
       const reason = said ? "" : ` — ${clip(data.note, 240)}`;
       const text = `${verdict}: ${clip(data.summary, 200)}${reason}`;
@@ -1162,8 +1163,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const { decision, reason, check, patience, final, limit } = record.data;
       const because = reason === "" ? "" : ` — ${clip(reason, 300)}`;
       const stops = limit === true
-        ? ["bad", "Goal check: not reached, and the run is at its limit, so it stops"]
-        : ["bad", `Goal check: still not reached after ${patience} rounds of further work, so the run stops`];
+        ? ["bad", "Goal check: not reached, and the task is at its limit, so it stops"]
+        : ["bad", `Goal check: still not reached after ${patience} rounds of further work, so the task stops`];
       const lines = {
         achieved: ["ok", "Goal check: the goal is reached"],
         continue: final ? stops : ["warn", `Goal check ${check} of ${patience}: not reached yet, back to work`],
@@ -1244,8 +1245,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // The run called finish in the same reply as a call that did not work, so its answer was written before it saw the
     // result: it was sent back once to read it and finish again (item 552).
     finish_after_failure(scope, record) {
-      const calls = record.data.calls.join(", ");
-      note(scope, record.ts, "list", `Dot wanted to finish in the same reply as a call that did not work (${calls}) and was asked to read its result first`, "warn");
+      const calls = record.data.calls.map(toolWords).join(", ");
+      note(scope, record.ts, "list", `Dot wanted to finish in the same reply as a step that did not work (${calls}) and was asked to read its result first`, "warn");
     },
 
     // A session of a campaign wanted to end while the campaign had no targets: it was sent back once to record them.
@@ -1255,14 +1256,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
     // The run reached a limit of [agent] run_max_minutes or run_max_tokens: it was told to finish, and its next reply ends it.
     limit_reached(scope, record) {
-      note(scope, record.ts, "clock", `The run reached its limit (${limitSpent(record.data)}) and was told to finish now`, "warn");
+      note(scope, record.ts, "clock", `The task reached its limit (${limitSpent(record.data)}) and was told to finish now`, "warn");
     },
 
     // The final answer named paths that do not exist and that the run never touched ([agent] verify_answer_paths): the
     // run was sent back once to create them or to correct the answer.
     answer_paths(scope, record) {
       const missing = record.data.missing;
-      const noun = missing.length === 1 ? "a path" : `${missing.length} paths`;
+      const noun = missing.length === 1 ? "a file or folder" : `${missing.length} files or folders`;
       const listed = clip(missing.join(", "), 300);
       note(scope, record.ts, "file", `Dot's answer named ${noun} that do not exist (${listed}) and was asked to correct it`, "warn");
     },
@@ -1290,7 +1291,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         { class: "tool-body restart-body" },
         el("p", null, `${cutOff.how} ${data.automatic ? "Dot went on with it on its own when it started again." : "It was resumed by hand."}`),
         calls,
-        el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, "Open the run it resumes"),
+        el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, "Open the task it continues"),
       );
       place(scope, el("details", { class: "restart" }, head, body), record.ts);
     },
@@ -1311,14 +1312,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
           summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null,
         });
       }
-      const output = `tool output up to ${compact(data.tool_output_chars)} characters`;
-      const budget = `budget ${compact(data.context_tokens)}`;
+      const output = `step results up to ${compact(data.tool_output_chars)} characters`;
+      const budget = `limit ${compact(data.context_tokens)}`;
       if (data.cut_to_window && chosen !== null) {
-        setupLine(scope, "budget", budget, "sliders", `Context budget ${compact(data.context_tokens)} tokens, the ${compact(chosen)} chosen for the model in Settings cut to fit its window of ${compact(data.window)}, ${output}`, "");
+        setupLine(scope, "budget", budget, "sliders", `Chat size limit ${compact(data.context_tokens)}: the ${compact(chosen)} chosen for the model in Settings, cut to fit the ${compact(data.window)} the model can take in; ${output}`, "");
       } else if (data.cut_to_window) {
-        setupLine(scope, "budget", budget, "sliders", `Context budget ${compact(data.context_tokens)} tokens to fit the model's window of ${compact(data.window)}, ${output}`, "");
+        setupLine(scope, "budget", budget, "sliders", `Chat size limit ${compact(data.context_tokens)}, to fit the ${compact(data.window)} the model can take in; ${output}`, "");
       } else if (chosen !== null) {
-        setupLine(scope, "budget", budget, "sliders", `Context budget ${compact(data.context_tokens)} tokens, the size chosen for the model in Settings, ${output}`, "");
+        setupLine(scope, "budget", budget, "sliders", `Chat size limit ${compact(data.context_tokens)}, the size chosen for the model in Settings; ${output}`, "");
       }
       if (data.reminder_every !== null) {
         setupLine(scope, "cadence", `goal every ${data.reminder_every} steps`, "target", `The goal is repeated every ${data.reminder_every} steps: ${data.reason}`, "");
@@ -1334,11 +1335,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     tool_groups(scope, record) {
       const data = record.data;
       if (data.step === 0) {
-        const off = data.off.length === 0 ? "" : `; ${data.off.join(", ")} off until the run needs them`;
-        setupLine(scope, "tools", "tools by group", "layers", `Tools offered by group: ${data.on.join(", ")} on${off} (${data.reason})`, "");
+        const off = data.off.length === 0 ? "" : `; ${data.off.join(", ")} off until the task needs them`;
+        setupLine(scope, "tools", "actions by group", "layers", `Actions offered in groups: ${data.on.join(", ")} on${off} (${data.reason})`, "");
       } else {
         const noun = data.turned_on.length === 1 ? "group" : "groups";
-        setupLine(scope, "tools", `${data.turned_on.join(", ")} on`, "layers", `Turned on the tool ${noun} ${data.turned_on.join(", ")} at step ${data.step}`, "");
+        setupLine(scope, "tools", `${data.turned_on.join(", ")} on`, "layers", `Turned on the action ${noun} ${data.turned_on.join(", ")} at step ${data.step}`, "");
       }
     },
 
@@ -1351,12 +1352,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         return;
       }
       const count = plural(data.ids.length, "memory", "memories");
-      const tokens = typeof data.tokens === "number" ? `, ${plural(data.tokens, "token", "tokens")}` : "";
+      const tokens = typeof data.tokens === "number" ? `, about ${plural(Math.round(data.tokens * 0.75), "word", "words")}` : "";
       const newer = fresh < data.ids.length ? ` (${fresh} new)` : "";
       // Item 308: the lessons of a site the run just reached say where they were learned.
       const text =
         data.live === true
-          ? `Picked up ${count} saved while the run worked`
+          ? `Picked up ${count} saved while the task worked`
           : typeof data.site === "string"
             ? `Recalled ${count} learned on ${data.site}`
             : `Recalled ${count}${newer}${tokens}`;
@@ -1367,8 +1368,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // The run's start found its notes or its skills by their words alone: the embedding service failed (item 256).
     embedding_failed(scope, record) {
       const skills = record.data.purpose === "skills";
-      const what = skills ? "Skills listed" : "Notes recalled";
-      setupLine(scope, "words", skills ? "skills" : "notes", "database", `${what} by their words alone: the embedding service failed — ${clip(record.data.error, 240)}`, "warn");
+      const what = skills ? "Skills were listed" : "Notes were recalled";
+      setupLine(scope, "words", skills ? "skills" : "notes", "database", `${what} by their words alone: the search by meaning did not work.`, "warn", clip(record.data.error, 240));
     },
 
     // A compaction is a quiet line across the conversation where it happened, with the size of the context before and
@@ -1409,12 +1410,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     },
 
     aside_answer(scope, record) {
-      const head = el("div", { class: "aside-head" }, icon("help"), el("span", null, `Side answer by ${record.data.model}; the run did not see this`));
+      const head = el("div", { class: "aside-head" }, icon("help"), el("span", null, `Side answer by ${record.data.model}. The task did not see it`));
       place(scope, el("div", { class: "aside-answer" }, head, prose(record.data.text)), record.ts);
     },
 
     aside_failed(scope, record) {
-      note(scope, record.ts, "alert", `The side question got no answer from ${record.data.model}: ${record.data.error}`, "bad");
+      note(scope, record.ts, "alert", `The side question got no answer from ${record.data.model}.`, "bad", String(record.data.error));
     },
 
     // The run's model could not answer (`reason`: a spent quota or rate, a refused or missing key, a refused access),
@@ -1422,7 +1423,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // of a delegated run, names the new model.
     model_switched(scope, record) {
       const data = record.data;
-      note(scope, record.ts, "refresh", `${data.from} cannot answer (${data.reason}); the run goes on with ${data.to}`, "warn");
+      note(scope, record.ts, "refresh", `${data.from} cannot answer (${data.reason}); Dot goes on with ${data.to}`, "warn");
       if (scope.runId === rootRunId) {
         onRunStatus({ status: "running", model: data.to, endedAt: null });
         return;
@@ -1445,12 +1446,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const wait = scope.unreachable;
       wait.tries += 1;
       const tried = wait.tries === 1 ? "" : `tried ${wait.tries} times; `;
-      wait.text.textContent = `${data.model} cannot be reached (${data.error}); ${tried}the run asks again in ${duration(data.retry_in_s)} and keeps asking until ${clock(data.until)}`;
+      wait.text.replaceChildren(
+        ...[`${data.model} cannot be reached; ${tried}Dot asks again in ${duration(data.retry_in_s)} and keeps asking until ${clock(data.until)}.`, detailsFold(String(data.error))].filter((part) => part !== null),
+      );
     },
     model_back(scope, record) {
       const data = record.data;
       scope.unreachable = null;
-      note(scope, record.ts, "refresh", `${data.model} answered again after ${duration(data.waited_s)}; the run goes on`, "");
+      note(scope, record.ts, "refresh", `${data.model} answered again after ${duration(data.waited_s)}; Dot goes on`, "");
     },
 
     // A helper model ([models] helpers) could not answer a question of the run; `until` (seconds) is when it may be
@@ -1465,41 +1468,41 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // the policy's patterns and the goal checker decide alone.
     judge_unavailable(scope, record) {
       const data = record.data;
-      const text = `The typed judge cannot answer (${data.reason}) until ${dateTime(data.until)}; the policy's patterns and the goal checker decide alone: ${data.error}`;
-      note(scope, record.ts, "key", text, "warn");
+      const text = `The extra checker (TypeSafe) cannot answer (${data.reason}) until ${dateTime(data.until)}. Until then Dot's safety rules and the goal check decide alone.`;
+      note(scope, record.ts, "key", text, "warn", String(data.error));
     },
 
     // TypeSafe rejected a request of the typed judge or of judge_items, or answered outside its reference (`error`): an
     // error of the code or the model, logged with the request; nothing is paused.
     judge_error(scope, record) {
-      note(scope, record.ts, "key", `TypeSafe rejected a request (the log has it): ${record.data.error}`, "warn");
+      note(scope, record.ts, "key", "The extra checker (TypeSafe) rejected a request. Dot's log has it.", "warn", String(record.data.error));
     },
 
     // The user took the browser over (`url`: the tab they got) and the run waits at its next tool call; and gave it
     // back after `held_s` seconds, with a note to the model that the page may have changed.
     takeover(scope, record) {
       const where = record.data.url ? ` at ${record.data.url}` : "";
-      note(scope, record.ts, "hand", `You took the browser over${where}; the run waits until you return control.`, "");
+      note(scope, record.ts, "hand", `You took the browser over${where}; Dot waits until you return control.`, "");
       onHeld(true);
     },
     handback(scope, record) {
-      note(scope, record.ts, "hand", `You returned control after ${Math.round(record.data.held_s)} s; the run goes on.`, "");
+      note(scope, record.ts, "hand", `You returned control after ${Math.round(record.data.held_s)} s; Dot goes on.`, "");
       onHeld(false);
     },
 
     // The owner held the run with a ✋ (item 586): it waits at its next step for what they write next, or for the ✋ to be
     // taken back, and stops when nobody writes for as long as a hold may last (`[reactions] hold_minutes`).
     reaction_hold(scope, record) {
-      note(scope, record.ts, "hand", "You held the run (✋): it waits for your next message.", "");
+      note(scope, record.ts, "hand", "You held the task (✋): it waits for your next message.", "");
       if (scope.runId === rootRunId) {
         onReactionHold(true);
       }
     },
     reaction_hold_ended(scope, record) {
       const words = {
-        message: "You wrote to the run, and it goes on.",
-        released: "You took the ✋ back, and the run goes on.",
-        lapsed: `Nobody wrote for ${duration(record.data.held_s)}, so the run stopped.`,
+        message: "You wrote to the task, and it goes on.",
+        released: "You took the ✋ back, and the task goes on.",
+        lapsed: `Nobody wrote for ${duration(record.data.held_s)}, so the task stopped.`,
       };
       note(scope, record.ts, "hand", words[record.data.reason] ?? "The hold is over.", "");
       if (scope.runId === rootRunId) {
@@ -1516,7 +1519,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     },
     step_route_failed(scope, record) {
       const data = record.data;
-      setupLine(scope, "route-back", `step ${data.step} back on the run's model`, "refresh", `${data.model} could not answer step ${data.step}; asked again on the run's model: ${data.error}`, "warn");
+      setupLine(scope, "route-back", `step ${data.step} back on the task's own model`, "refresh", `${data.model} could not answer step ${data.step}; asked again on the task's own model.`, "warn", String(data.error));
     },
 
     // A session of a campaign ranked the posts it could answer (`topic`, `weights`, `posts` with their scores, the
@@ -1539,13 +1542,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const answers = {
         nudge: "Dot was told to change its approach.",
         replan: "Its next step may only plan again or finish.",
-        consult: "The review model was asked for a second opinion.",
+        consult: "The reviewer was asked for a second opinion.",
         ask: "Its next step may only ask you a question or finish.",
-        stop: "The run stops; its result says what it tried.",
+        stop: "The task stops; its result says what it tried.",
       };
       const parts = [`Not getting anywhere: ${clip(data.detail, 300)}`, answers[data.action]];
       if (data.error !== undefined) {
-        parts.push(`It could not answer (${clip(data.error, 300)}), so the run stops.`);
+        parts.push(`It could not answer (${clip(data.error, 300)}), so the task stops.`);
       }
       if (data.diagnosis !== undefined) {
         parts.push(clip(data.diagnosis, 400));

@@ -221,7 +221,7 @@ async def _bar_and_composer(
 
     # On a run's page the side panel's switch, and on a phone the drawer's close, are the sidebar's size.
     await page.goto(f"{address}/#/runs/{run.id}")
-    details: Locator = bar.get_by_role("button", name="Run details")
+    details: Locator = bar.get_by_role("button", name="Task details")
     await expect(details).to_be_visible()
     assert await _size(details) == _SWITCH_PX
     if phone:

@@ -161,8 +161,8 @@ async def test_a_yolo_step_draws_no_line_and_a_reviewed_one_says_the_reason_once
                     await page.goto(f"{address}/#/runs/{run.id}")
                     texts: list[str] = await _lines(page, 2)
                     assert texts == [
-                        f"Reviewer approved: {OLD_SUMMARY} — {OLD_REASON}",
-                        f"Reviewer approved: {REVIEW_SUMMARY} — {REVIEW_REASON}",
+                        f"The reviewer approved: {OLD_SUMMARY} — {OLD_REASON}",
+                        f"The reviewer approved: {REVIEW_SUMMARY} — {REVIEW_REASON}",
                     ]
                     # The step the run did without asking has its record, and no line of the chat says so (item 500).
                     waivers = [

@@ -80,7 +80,7 @@ export function mount(root, ctx) {
   });
   const head = customizeHead({
     title: "Discover plugins",
-    line: "Skills from the makers of the tools you use and from the community, each pinned to a commit Dot checks. Install one and the runs that start after can use it.",
+    line: "Skills from the makers of the apps you use and from the community, each one checked by Dot before it is used. Install one and the tasks that start after can use it.",
     search,
     controls: [],
   });
@@ -99,8 +99,8 @@ export function mount(root, ctx) {
   filters.element.setAttribute("aria-label", "Plugins to show");
   const orders = segmented(
     [
-      { id: "popular", label: "Popular", hint: "The most starred repositories first" },
-      { id: "newest", label: "Newest", hint: "The plugins the gallery took last first" },
+      { id: "popular", label: "Popular", hint: "The most liked on GitHub first" },
+      { id: "newest", label: "Newest", hint: "The plugins added to the gallery most recently first" },
     ],
     order,
     (id) => {
@@ -134,7 +134,7 @@ export function mount(root, ctx) {
       busy.delete(plugin.id);
       paint();
     }
-    toast("ok", `${plugin.name} is installed: the runs that start now are offered its ${plural(plugin.skills.length, "skill", "skills")}.`);
+    toast("ok", `${plugin.name} is installed: the tasks that start now are offered its ${plural(plugin.skills.length, "skill", "skills")}.`);
   }
 
   /** Take the plugin `name` out of Dot after a confirmation: its folder goes to the Trash (item 497). `title` is how
@@ -144,8 +144,8 @@ export function mount(root, ctx) {
       title: `Remove ${title} from Dot?`,
       message:
         servers > 0
-          ? "Its MCP servers stop now and its skills leave the runs that start after. Its folder goes to the Trash, where you can put it back."
-          : "Its skills leave the runs that start after. Its folder goes to the Trash, where you can put it back.",
+          ? "Its connected apps stop now and its skills leave the tasks that start after. Its folder goes to the Trash, where you can put it back."
+          : "Its skills leave the tasks that start after. Its folder goes to the Trash, where you can put it back.",
       confirmLabel: "Remove",
       focusCancel: true,
     });
@@ -183,7 +183,7 @@ export function mount(root, ctx) {
         plugin.state === "outdated"
           ? el(
               "span",
-              { class: "badge b-warn gallery-installed gallery-outdated", title: `Installed from ${plugin.installed_commit.slice(0, 7)}; the gallery pins ${plugin.commit.slice(0, 7)} now. Remove it and Install it again to take the new one.` },
+              { class: "badge b-warn gallery-installed gallery-outdated", title: `Installed from ${plugin.installed_commit.slice(0, 7)}; the gallery now has ${plugin.commit.slice(0, 7)}. Remove it and Install it again to get the new one.` },
               "Older version",
             )
           : el("span", { class: "badge b-ok gallery-installed" }, icon("check"), "Installed");
@@ -246,7 +246,7 @@ export function mount(root, ctx) {
         el(
           "div",
           { class: "gallery-card-by" },
-          ...joined([other.own ? "In Dot's plugins folder" : "From a folder of Dot's config", other.servers > 0 ? plural(other.servers, "MCP server", "MCP servers") : null]),
+          ...joined([other.own ? "In Dot's plugins folder" : "From a folder in Dot's settings", other.servers > 0 ? plural(other.servers, "connected app", "connected apps") : null]),
         ),
         other.description === null ? null : el("p", { class: "gallery-card-does" }, other.description),
       ),
@@ -302,7 +302,7 @@ export function mount(root, ctx) {
       parts.push(
         words !== ""
           ? emptyPanel("search", "No plugin matches the search", "")
-          : emptyPanel("puzzle", "No plugin installed yet", "Install one from All, and the runs that start after can use its skills."),
+          : emptyPanel("puzzle", "No plugin installed yet", "Install one from All, and the tasks that start after can use its skills."),
       );
     }
     allGrid.replaceChildren(...parts);
@@ -314,8 +314,8 @@ export function mount(root, ctx) {
     ctx.setTitle(`${plugin.name} · Plugins`);
     const kind = CATEGORIES[plugin.category]?.label ?? null;
     const facts = [
-      ["Repository", el("a", { href: plugin.homepage, target: "_blank", rel: "noopener noreferrer" }, `github.com/${plugin.repository}`, icon("external"))],
-      ["Pinned to", el("span", { class: "mono" }, plugin.commit.slice(0, 7))],
+      ["Source", el("a", { href: plugin.homepage, target: "_blank", rel: "noopener noreferrer" }, `github.com/${plugin.repository}`, icon("external"))],
+      ["Version checked", el("span", { class: "mono" }, plugin.commit.slice(0, 7))],
       ...(plugin.state === "outdated" ? [["Installed from", el("span", { class: "mono" }, plugin.installed_commit.slice(0, 7))]] : []),
       ["Licence", plugin.licence],
       ["Stars", `${compact(plugin.stars)} on GitHub`],
@@ -357,7 +357,7 @@ export function mount(root, ctx) {
           el(
             "p",
             { class: "hint connect-hint" },
-            "Install downloads this commit from GitHub and checks its files against the hash Dot keeps before it puts them in its plugins folder; the runs that start after are offered its skills, with no restart. Remove moves the folder to the Trash.",
+            "Install downloads this version from GitHub and checks its files against the fingerprint Dot keeps before it puts them in its plugins folder; the tasks that start after are offered its skills, with no restart. Remove moves the folder to the Trash.",
           ),
         ),
       ),

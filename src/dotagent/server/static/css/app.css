@@ -7697,6 +7697,45 @@ dialog.lightbox img {
   user-select: all;
 }
 
+/* The program's own words for a failure, and the other ways in on the sign-in screen, under a fold that is shut until it
+   is opened (item 625): a small muted summary, and under it the text at the hint's size. In a toast the text keeps the
+   toast's colour. */
+.error-details,
+.signin-other {
+  margin-top: var(--space-2);
+}
+
+.error-details summary,
+.signin-other summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--muted);
+}
+
+.error-details > :not(summary),
+.signin-other > .stack {
+  margin-top: var(--space-1);
+}
+
+.toast .error-details summary,
+.toast .error-details p {
+  color: inherit;
+}
+
+/* A note has no padding of its own below it: the fold under its sentence keeps off the edge of the box it stands in. */
+.note .error-details {
+  margin-bottom: var(--space-1);
+}
+
+/* On a touch screen the summary of a fold is a finger's size (its marker stays: the summary is still a list item). */
+@media (pointer: coarse) {
+  .error-details summary,
+  .signin-other summary {
+    padding-block: var(--space-2);
+  }
+}
+
 /* ---------- motion ---------- */
 
 .spinner {

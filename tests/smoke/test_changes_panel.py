@@ -145,7 +145,7 @@ async def test_the_changes_tab_counts_the_files_and_opens_each_on_its_diff(
                 await page.goto(f"{address}/#/runs/{run.id}")
                 await expect(page.locator(".answer").last).to_be_visible()
                 if width < 960:
-                    await page.locator("button[aria-label='Run details']").click()
+                    await page.locator("button[aria-label='Task details']").click()
                 tab: Locator = page.get_by_role("tab", name="Changes")
                 await expect(tab).to_contain_text("1")
                 await tab.click()

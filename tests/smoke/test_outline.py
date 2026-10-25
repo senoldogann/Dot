@@ -275,7 +275,7 @@ async def test_the_conversation_leaves_the_column_its_room_beside_the_side_panel
 
             # Beside the side panel the conversation gives the column its room at the left: the column stays, clear of
             # the conversation, which stays clear of the panel's handle.
-            details: Locator = page.get_by_role("button", name="Run details")
+            details: Locator = page.get_by_role("button", name="Task details")
             await details.click()
             await expect(page.locator(".run-layout")).to_have_attribute("data-inspector", "on")
             await expect(page.locator(".outline")).to_be_visible()
@@ -290,7 +290,7 @@ async def test_the_conversation_leaves_the_column_its_room_beside_the_side_panel
 
             # So does a wider window, where the conversation had the room already.
             wide, wide_errors = await _run_page(browser, address, last.id, 1512, "dark")
-            await wide.get_by_role("button", name="Run details").click()
+            await wide.get_by_role("button", name="Task details").click()
             await expect(wide.locator(".run-layout")).to_have_attribute("data-inspector", "on")
             await expect(wide.locator(".outline")).to_be_visible()
             await _clear_of_the_conversation(wide)

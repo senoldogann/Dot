@@ -221,7 +221,7 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
             notes: list[dict[str, str]] = await _told(page, 1)
             # Item 151: the end tells the first line of what the run answered.
             assert [(note["title"], note["body"], note["tag"]) for note in notes] == [
-                ("A run is done", "Two.", f"run-{elsewhere.id}")
+                ("A task is done", "Two.", f"run-{elsewhere.id}")
             ]
 
             # The run's page open but the tab hidden: told.
@@ -284,7 +284,7 @@ async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
             notes: list[dict[str, str]] = await _told(page, 2)
             assert [(note["title"], note["body"], note["tag"]) for note in notes] == [
                 ("Dot has a question", "Which colour?", f"approval-{left[0].id}"),
-                ("A run is done", "Blue.", f"run-{asking.id}"),
+                ("A task is done", "Blue.", f"run-{asking.id}"),
             ]
 
             stopped: CampaignEnded = CampaignEnded(
@@ -297,7 +297,7 @@ async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
             missed: ScheduleMissed = ScheduleMissed(
                 schedule_id="sch-1",
                 name="Morning digest",
-                status="skipped: 125 minutes overdue (the daemon was off or the Mac slept)",
+                status="skipped: 125 minutes overdue (Dot was off or the Mac slept)",
             )
             await runtime.bus.emit(SYSTEM_RUN_ID, SCHEDULE_MISSED_EVENT, missed.model_dump(), False)
             notes = await _told(page, 4)
@@ -309,7 +309,7 @@ async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
                 ),
                 (
                     "A schedule did not run",
-                    "Morning digest: skipped: 125 minutes overdue (the daemon was off or the Mac slept)",
+                    "Morning digest: skipped: 125 minutes overdue (Dot was off or the Mac slept)",
                     "schedule-sch-1",
                 ),
             ]

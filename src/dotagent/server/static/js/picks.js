@@ -19,7 +19,7 @@ const PLAN_FIRST = "Plan first";
 const PLAN_FIRST_HINT = "Dot writes its plan and asks you before it changes anything.";
 
 const KINDS = {
-  plugin: { icon: "plug", noun: "MCP server", many: "MCP servers", most: MAX_PLUGINS },
+  plugin: { icon: "plug", noun: "connected app", many: "connected apps", most: MAX_PLUGINS },
   account: { icon: "mail", noun: "account", many: "accounts", most: MAX_ACCOUNTS },
   skill: { icon: "puzzle", noun: "skill", many: "skills", most: MAX_SKILLS },
 };

@@ -77,9 +77,9 @@ export function countChanges(changes) {
 export function describeVersion(note) {
   switch (note.change) {
     case "learned":
-      return "Learned from a run";
+      return "Learned from a task";
     case "relearned":
-      return "Rewritten by a later run";
+      return "Rewritten by a later task";
     case "taught":
       return "Taught by you";
     case "restored":

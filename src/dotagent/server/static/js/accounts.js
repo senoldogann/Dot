@@ -4,7 +4,8 @@
 
 import { api } from "./api.js";
 import { el } from "./dom.js";
-import { attempt, toast } from "./ui.js";
+import { explain } from "./errors.js";
+import { attempt, detailsFold, toast } from "./ui.js";
 
 // How often the card reads the accounts again after a sign-in starts, and for how long.
 const FOLLOW_MS = 3000;
@@ -75,15 +76,18 @@ export function accountsCard() {
       ),
     );
     const status = !provider.configured
-      ? `Needs the client you registered with ${provider.name}: save ${provider.client_names.join(" and ")} in the Keychain (docs/extending.md says how).`
+      ? [
+          `Not set up yet. It needs a sign-in app that you make at ${provider.name} first; docs/extending.md says how.`,
+          detailsFold(`Save ${provider.client_names.join(" and ")} in the Keychain.`),
+        ]
       : provider.accounts.length === 0
-        ? "Not signed in."
+        ? ["Not signed in."]
         : null;
     return el(
       "div",
       { class: "account-provider" },
       el("div", { class: "row" }, mark(provider), el("span", { class: "grow account-name" }, provider.name), signIn),
-      status === null ? null : el("p", { class: "hint" }, status),
+      status === null ? null : el("div", { class: "hint" }, ...status),
       ...accounts,
     );
   }
@@ -102,7 +106,8 @@ export function accountsCard() {
       providers = await api.get("/accounts");
     } catch (error) {
       shown = "";
-      list.replaceChildren(el("p", { class: "hint" }, `The accounts could not be read: ${error.message}`));
+      const { text, details } = explain(error);
+      list.replaceChildren(el("div", { class: "hint" }, `The accounts could not be read. ${text}`, detailsFold(details)));
       throw error;
     }
     if (!disposed) {

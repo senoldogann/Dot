@@ -201,7 +201,7 @@ async def test_a_repeating_schedule_failing_its_limit_in_a_row_is_switched_off_a
                 after: ScheduleRecord = await _ran(runtime, manager, scheduler, client, created.id, False)
                 assert after.runs_failed_in_row == expected
             assert (after.enabled, after.next_run_at) == (False, None)
-            assert after.last_status == "switched off: its last 3 runs failed"
+            assert after.last_status == "switched off: its last 3 tasks failed"
             await asyncio.sleep(0.2)
         finally:
             listening.cancel()
@@ -272,7 +272,7 @@ async def test_the_row_says_how_many_runs_failed_in_a_row_and_the_form_offers_th
                 row: Locator = page.locator(f'[data-schedule="{created.id}"]')
                 badge: Locator = row.locator(".badge", has_text="2 failed in a row")
                 await expect(badge).to_be_visible()
-                await expect(badge).to_have_attribute("title", "It switches itself off at 5 failed runs in a row")
+                await expect(badge).to_have_attribute("title", "It switches itself off at 5 failed tasks in a row")
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"stop-{width}-{scheme}.png"), full_page=True)
                 await page.get_by_role("button", name="Edit watched").click()

@@ -122,6 +122,11 @@ async def test_the_switch_writes_whether_the_next_start_resumes_the_runs_it_cut_
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{served}/#/settings/system")
+                # The switch stands in Details, shut until it is opened (item 625).
+                details: Locator = page.locator(
+                    "section.card.fold", has=page.locator(".fold-title", has_text="Details")
+                )
+                await details.locator(".fold-toggle").click()
                 switch: Locator = page.get_by_role("switch", name="Go on after a restart")
                 setting: Locator = page.locator(".setting").filter(has=switch)
                 await expect(switch).to_have_attribute("aria-checked", "true")

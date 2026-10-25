@@ -16,14 +16,14 @@ const PALETTE = {
   ],
 };
 
-test("a menu is drawn in sections: the commands, the skills and one of the MCP tools of every server", () => {
+test("a menu is drawn in sections: the commands, the skills and one of the actions of every connected app", () => {
   const sections = menuSections(paletteGroups(COMMANDS, PALETTE));
   assert.deepEqual(
     sections.map((section) => [section.title, section.items.length]),
     [
       ["Commands", 1],
       ["Skills", 1],
-      ["MCP tools", 3],
+      ["Actions of connected apps", 3],
     ],
   );
 });
@@ -42,10 +42,10 @@ test("a tool is named in words, its server's first, and found by those words or 
   assert.deepEqual(labels("mcp__context7"), ["Context7 · Resolve library id"]);
 });
 
-test("the at menu keeps its groups as they are: the servers, the accounts", () => {
+test("the at menu keeps its groups as they are: the connected apps, the accounts", () => {
   const sections = menuSections([
-    { title: "MCP servers", kind: "plugin", items: [{ label: "tavily" }] },
+    { title: "Connected apps", kind: "plugin", items: [{ label: "tavily" }] },
     { title: "Accounts", kind: "account", items: [{ label: "a@b.c" }] },
   ]);
-  assert.deepEqual(sections.map((section) => section.title), ["MCP servers", "Accounts"]);
+  assert.deepEqual(sections.map((section) => section.title), ["Connected apps", "Accounts"]);
 });

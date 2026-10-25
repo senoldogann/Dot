@@ -41,7 +41,7 @@ export function createContextMeter({ frame }) {
   );
   const element = el("button", { class: "context-meter", type: "button", hidden: true }, ring);
   // The popover opens and closes on the button's click itself.
-  const popover = anchoredPopover({ anchor: element, frame, label: "Context", build });
+  const popover = anchoredPopover({ anchor: element, frame, label: "Chat size", build });
 
   function percent() {
     return Math.round((used / budget) * 100);
@@ -52,35 +52,43 @@ export function createContextMeter({ frame }) {
       el(
         "div",
         { class: "context-meter-head" },
-        el("span", { class: "context-meter-title" }, "Context window"),
+        el("span", { class: "context-meter-title" }, "Chat size"),
         el("span", { class: "context-meter-figure" }, `${percent()}% · ${compact(used)} / ${compact(budget)}`),
       ),
       el(
         "p",
         { class: "context-meter-text" },
         summariseAt === null
-          ? `The run's last step sent the model ${used.toLocaleString("en-GB")} tokens. Past ${budget.toLocaleString("en-GB")}, the run's budget, Dot summarizes its older part.`
-          : `The run's last step sent the model ${used.toLocaleString("en-GB")} tokens. Past ${summariseAt.toLocaleString("en-GB")}, Dot summarizes its older part, so the run stays within its budget of ${budget.toLocaleString("en-GB")}.`,
+          ? `The last step used ${used.toLocaleString("en-GB")}. Past ${budget.toLocaleString("en-GB")}, Dot sums up the older part of the chat to make room.`
+          : `The last step used ${used.toLocaleString("en-GB")}. Past ${summariseAt.toLocaleString("en-GB")}, Dot sums up the older part of the chat, so the chat stays within its limit of ${budget.toLocaleString("en-GB")}.`,
       ),
-      modelWindow === null ? null : el("p", { class: "context-meter-text" }, `The model holds ${modelWindow.toLocaleString("en-GB")} tokens.`),
+      modelWindow === null ? null : el("p", { class: "context-meter-text" }, `The model can take in ${modelWindow.toLocaleString("en-GB")} at once.`),
       // Why the budget is smaller than the window, and where it is set (items 239, 250 and 396).
       chosen === null
         ? el(
             "p",
             { class: "context-meter-text" },
-            "Each step sends the model the whole run again, so a run kept within its budget is answered sooner and costs less. ",
-            "Dot's default size sets the budget: the most the model's window allows, three quarters of it, unless [agent] context_tokens sets one number. Settings › Models gives a model a size of its own.",
+            "Each step makes the model read the whole chat again, so a shorter chat is answered sooner and costs less. ",
+            "The limit is three quarters of the most the model can take in. Settings › Models lets you set a size for a model.",
           )
         : el(
             "p",
             { class: "context-meter-text" },
-            "Each step sends the model the whole run again, so a run kept within its budget is answered sooner and costs less. ",
-            `The context size chosen for this model in Settings › Models, ${chosen.toLocaleString("en-GB")} tokens, sets the budget, up to three quarters of its window.`,
+            "Each step makes the model read the whole chat again, so a shorter chat is answered sooner and costs less. ",
+            `The size you chose for this model in Settings › Models, ${chosen.toLocaleString("en-GB")}, sets the limit, up to three quarters of what the model can take in.`,
           ),
+      chosen === null
+        ? el(
+            "details",
+            { class: "error-details" },
+            el("summary", null, "Details"),
+            el("p", { class: "small muted" }, "In the settings file, ", el("code", { class: "mono" }, "[agent] context_tokens"), " sets one number for every model."),
+          )
+        : null,
       // OpenCode's agent keeps its own window (item 283), and a window its provider does not say takes no size.
       model === null || modelWindow === null || providerOf(model) === "opencode"
         ? null
-        : el("a", { class: "context-meter-link", href: sizeSetting(model) }, icon("sliders"), "Change context size"),
+        : el("a", { class: "context-meter-link", href: sizeSetting(model) }, icon("sliders"), "Change the chat size"),
     ];
   }
 
@@ -93,7 +101,7 @@ export function createContextMeter({ frame }) {
     element.hidden = false;
     fill.setAttribute("stroke-dasharray", `${Math.min(100, Math.round(share * 100))} 100`);
     element.dataset.level = share >= 1 ? "full" : share >= NEAR_SHARE ? "near" : "room";
-    const words = `Context: ${percent()}% of the run's budget, ${compact(used)} of ${compact(budget)} tokens`;
+    const words = `Chat size: ${percent()}% used, ${compact(used)} of ${compact(budget)}`;
     element.setAttribute("aria-label", words);
     element.title = words;
     if (popover.isOpen()) {

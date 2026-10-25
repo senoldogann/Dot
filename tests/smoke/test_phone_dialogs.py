@@ -128,7 +128,7 @@ _FORMS: tuple[tuple[str, Callable[[Page], Awaitable[None]], str, str], ...] = (
     ("#/settings/harness", _nothing, "Write your own", "Write your own version"),
     ("#/settings/keys", _key_panel, "Add key", "Add the OpenAI key"),
     ("#/settings/memory", _nothing, "Edit this note", "Edit note"),
-    ("#/customize/connectors", _nothing, "Add server", "Add your own MCP server"),
+    ("#/customize/connectors", _nothing, "Add connected app", "Add your own connected app"),
 )
 
 

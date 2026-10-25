@@ -57,7 +57,7 @@ _FIRST: str = "Start the notes."
 _SECOND: str = "Add a line, as beds.txt says."
 _THIRD: str = "Add another line, and a list."
 _TIME_LIMIT_S: float = 60.0
-_DIALOG_LINE: str = "Rewind chat to before this message. Your prompt and attachments return to the composer."
+_DIALOG_LINE: str = "Take this chat back to before this message. Your message and its files go back in the message box."
 _EDGE_PX: float = 1.0
 
 
@@ -214,7 +214,7 @@ async def test_a_chat_rewound_to_its_second_message_takes_its_files_back_and_giv
             await expect(dialog.get_by_role("heading", name="Edit from here?")).to_be_visible()
             await expect(dialog).to_contain_text(_DIALOG_LINE)
             labels: list[str] = await dialog.locator(".modal-actions button").all_inner_texts()
-            assert labels == ["Cancel", "Revert files too", "Revert and keep changes"], labels
+            assert labels == ["Cancel", "Also undo the file changes", "Keep the file changes"], labels
             # Wide, they stand side by side, inside the dialog.
             row: list[FloatRect] = [
                 await _box(button) for button in await dialog.locator(".modal-actions button").all()
@@ -235,7 +235,7 @@ async def test_a_chat_rewound_to_its_second_message_takes_its_files_back_and_giv
             # Revert files too: the page of the first turn, alone in the chat, with the second message and its file in
             # the box; the files as the first turn left them, and the chat's OpenCode session let go.
             await earlier.nth(1).get_by_role("button", name="Edit from here").click()
-            await dialog.get_by_role("button", name="Revert files too").click()
+            await dialog.get_by_role("button", name="Also undo the file changes").click()
             await expect(page).to_have_url(f"{address}/#/runs/{first.id}")
             await expect(page.locator(".toast.ok").last).to_contain_text(
                 "The chat went back to before your message, and 2 files are as they were."
@@ -286,8 +286,8 @@ async def test_a_chat_rewound_to_its_second_message_takes_its_files_back_and_giv
             await phone.locator(".run-thread > .user-message").get_by_role("button", name="Edit from here").click()
             actions: Locator = phone.locator("dialog.modal .modal-actions")
             await expect(actions).to_be_visible()
-            keep_box: FloatRect = await _box(actions.get_by_role("button", name="Revert and keep changes"))
-            revert_box: FloatRect = await _box(actions.get_by_role("button", name="Revert files too"))
+            keep_box: FloatRect = await _box(actions.get_by_role("button", name="Keep the file changes"))
+            revert_box: FloatRect = await _box(actions.get_by_role("button", name="Also undo the file changes"))
             cancel_box: FloatRect = await _box(actions.get_by_role("button", name="Cancel"))
             assert keep_box["y"] < revert_box["y"] < cancel_box["y"], (keep_box, revert_box, cancel_box)
             for box in (revert_box, cancel_box):
@@ -298,7 +298,7 @@ async def test_a_chat_rewound_to_its_second_message_takes_its_files_back_and_giv
 
             # Rewound to its first message, the chat holds no turn: New chat opens with the message in its box, and the
             # page of a run taken out still answers.
-            await actions.get_by_role("button", name="Revert and keep changes").click()
+            await actions.get_by_role("button", name="Keep the file changes").click()
             await expect(phone).to_have_url(f"{address}/#/runs")
             await expect(phone.locator(".composer textarea")).to_have_value(_FIRST)
             assert await runtime.store.list_runs(10, first.thread_id) == []

@@ -39,7 +39,7 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (12
 _FAVOURITES_KEY: str = "dot.models.favourites"
 _MENU: str = ".composer .composer-popover[aria-label='Model']"
 # The rail of the menu: Favourites, then one mark for each provider that serves models.
-_RAIL_ITEMS: str = "[role=toolbar][aria-label='Providers'] button"
+_RAIL_ITEMS: str = "[role=toolbar][aria-label='AI services'] button"
 
 
 def _model(name: str, tools: bool, free: bool) -> ModelInfo:
@@ -456,7 +456,10 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             async def refused(route: Route) -> None:
                 await route.fulfill(
                     status=422,
-                    json={"message": "a run needs a model that can call tools", "context": {"model": "openai:gpt-5.5"}},
+                    json={
+                        "message": "a task needs a model that can use actions",
+                        "context": {"model": "openai:gpt-5.5"},
+                    },
                 )
 
             await page.route("**/api/models/main", refused)
@@ -464,7 +467,7 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             await change.click()
             await menu.get_by_role("button", name="OpenAI").click()
             await menu.get_by_role("option", name="gpt-5.5", exact=True).click()
-            await expect(page.locator(".toast.error")).to_contain_text("a run needs a model that can call tools")
+            await expect(page.locator(".toast.error")).to_contain_text("A task needs a model that can use actions")
             await expect(choosing.locator(".model-choosing-text")).to_have_text("Choose the default model")
             await page.unroute("**/api/models/main")
             await menu.get_by_role("button", name="Cancel").click()

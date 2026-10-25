@@ -80,6 +80,17 @@ uvx zizmor@1.31.1 --min-severity low .
   way.
 - The web UI is plain JavaScript modules and CSS under `src/dotagent/server/static/`, with no build step.
 
+## Words on the screen
+
+- A screen is in words that someone who knows no software reads at once: "Dot" and not "daemon", "task" and not "run",
+  "key" and not "token". The words of a program (MCP, API, config, tool, preset...) stay out of plain sight: they stand
+  under a closed **Details** or **Advanced** fold, with a setting's key, a command or a code, or in the tooltip of an
+  element marked `data-expert` (a schedule's cron beside its rhythm in words).
+- A button says what it does, an empty state what will be there and how to get it, an error what happened and what to
+  do next; a page's first line says what it is for; one name stands for a thing on every screen, toasts included.
+- `tests/smoke/test_plain_words.py` opens each screen, and each menu and dialog of it, on a daemon with something to
+  show, and fails on the words of its list: add a new screen to it, and a word to its list when one comes back.
+
 ## Pull requests
 
 - A pull request carries one change or a batch of related ones, each its own commit with its own roadmap and changes

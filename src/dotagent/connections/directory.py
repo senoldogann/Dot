@@ -1686,39 +1686,38 @@ PLUGINS: tuple[PluginListing, ...] = (
 )
 
 _MCP_SIGNS_IN: str = (
-    "Its own MCP server: you sign in on the service's page with your account, and Dot keeps the sign-in."
+    "A connected app of its own: you sign in on the service's page with your account, and Dot keeps the sign-in."
 )
-_MCP_OPEN: str = "Its own MCP server, open to all: there is nothing to sign in to."
+_MCP_OPEN: str = "A connected app of its own, open to all: there is nothing to sign in to."
 _MCP_KEY: str = (
-    "Its own MCP server, with a key of yours: Dot asks for it once, keeps it in its own .env (mode 0600) and sends it"
-    " with every request; no record holds it, and Remove takes it out."
+    "A connected app of its own, with a key of yours: Dot asks for it once, keeps it on this Mac in a file only you can"
+    " read and sends it with every request; no record holds it, and Remove takes it out."
 )
-_MCP_LOCAL: str = (
-    "A server Dot starts on this Mac with {command} and talks to over standard input and output; it runs while Dot"
-    " does."
+_MCP_LOCAL: str = "A small program Dot starts on this Mac with {command}; it runs while Dot does."
+_MCP_LOCAL_KEY: str = (
+    " It takes a key of yours, which Dot asks for once and keeps on this Mac in a file only you can read."
 )
-_MCP_LOCAL_KEY: str = " It takes a key of yours, which Dot asks for once and keeps in its own .env (mode 0600)."
-_MAC_HOW: str = "Dot drives it with AppleScript once macOS lets it (Privacy & Security › Automation)."
+_MAC_HOW: str = "Dot controls it once macOS lets it (Privacy & Security › Automation)."
 _MAC_DATA: str = (
-    "Dot reads and acts in it through macOS on this Mac; what a run reads there goes to the run's model, as every "
-    "tool's result does."
+    "Dot reads and acts in it through macOS on this Mac; what a task reads there goes to the task's model, as every "
+    "step's result does."
 )
 # Said of every way's data: a tool's result is part of what the model of the run is sent (docs/safety.md).
-_TO_MODEL: str = "what a run reads there goes to the run's model."
+_TO_MODEL: str = "what a task reads there goes to the task's model."
 _WEB_HOW: str = "Dot works in it in its own browser, once you have signed in there."
 # 1Password (item 493): how it connects, where a login's values go, and what Dot does with it.
 _VAULT_HOW: str = (
-    "A vault of yours, Shared with Dot, and a service account that only reads it: Connect makes both with your op, "
-    "1Password's command line, through the 1Password app, which asks you first; or paste a service account token you "
-    "made."
+    "A vault of yours, Shared with Dot, and a service account that only reads it: Connect makes both with the "
+    "1Password command-line program, through the 1Password app, which asks you first; or paste a service account key "
+    "you made."
 )
 _VAULT_DATA: str = (
-    "Between Dot and 1Password, through op on this Mac. A login's values go only into the page Dot fills, on the "
-    "login's own site; the run's model sees the logins' titles and websites, never a password or a code. A username "
-    "is no secret: it shows where a site shows it."
+    "Between Dot and 1Password, through its command-line program on this Mac. A login's values go only into the page "
+    "Dot fills, on the login's own site; the task's model sees the logins' titles and websites, never a password or a "
+    "code. A username is no secret: it shows where a site shows it."
 )
 _VAULT_DOES: str = (
-    "Fills your logins into pages on their own sites, with the run's model never seeing a password or a code."
+    "Fills your logins into pages on their own sites, with the task's model never seeing a password or a code."
 )
 _FOLDER_HOW: str = "Dot reads and writes the files it keeps in sync in a folder of this Mac."
 
@@ -1732,14 +1731,14 @@ def _way_view(way: PluginWay) -> PluginWayView:
             raise LookupError(f"the MCP catalogue has no service {way.ref}")
         if service.url is not None:
             host: str = urlsplit(service.url).hostname or service.url
-            data: str = f"Between Dot and {host}, the service's own server; {_TO_MODEL}"
+            data: str = f"Between Dot and {host}, the service's own computer; {_TO_MODEL}"
         else:
             # A local service (item 408): a server Dot starts on this Mac, which reaches what its own docs say.
-            data = f"On this Mac, a server Dot starts with {service.command}; {_TO_MODEL}"
+            data = f"On this Mac, a small program Dot starts with {service.command}; {_TO_MODEL}"
         if service.signs_in:
-            data += " Dot keeps your sign-in in its home."
+            data += " Dot keeps your sign-in in its own folder."
         if service.secrets:
-            data += " Your key is kept in Dot's .env and goes to the service alone."
+            data += " Your key is kept on this Mac and goes to the service alone."
         how: str
         if service.command is not None:
             how = _MCP_LOCAL.format(command=service.command) + (_MCP_LOCAL_KEY if service.secrets else "")

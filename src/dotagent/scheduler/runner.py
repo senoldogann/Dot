@@ -421,12 +421,12 @@ class Scheduler:
                 # due, and fires once that run has ended, as it waits for the release of the emergency stop.
                 return
             log.warning("schedule_skipped_running", schedule_id=record.id, run_id=self._in_flight.get(record.id))
-            await store.record_schedule_skip(record.id, following, "skipped: the previous run was still going")
+            await store.record_schedule_skip(record.id, following, "skipped: the previous task was still going")
             return
         if late and not one_time:
             log.warning("schedule_skipped_overdue", schedule_id=record.id, overdue_s=round(overdue_s))
             # The daemon was off or the Mac slept past the grace: the clock cannot tell which (item 553).
-            overdue: str = f"skipped: {round(overdue_s / 60)} minutes overdue (the daemon was off or the Mac slept)"
+            overdue: str = f"skipped: {round(overdue_s / 60)} minutes overdue (Dot was off or the Mac slept)"
             await store.record_schedule_skip(record.id, following, overdue)
             await self._tell_missed(record, overdue)
             return
@@ -780,7 +780,7 @@ class Scheduler:
         limit: int = stop_limit(record.options.stop_after_failures, self._runtime.config.scheduler.stop_after_failures)
         if not switches_off(record.cron is not None, record.enabled, failed_in_row, limit):
             return
-        status: str = f"switched off: its last {failed_in_row} runs failed"
+        status: str = f"switched off: its last {failed_in_row} tasks failed"
         if not await store.switch_off_schedule(schedule_id, status):
             return
         log.warning("schedule_switched_off", schedule_id=schedule_id, failures=failed_in_row, limit=limit)

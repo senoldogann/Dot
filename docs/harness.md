@@ -18,7 +18,7 @@ the evidence behind it. Every run's system prompt takes the texts of the one ado
 | Component | Where it goes in the prompt | What it is for |
 |---|---|---|
 | **Habits** | After how to work, before the tools | Ways of working that earlier runs taught: planning, when to delegate, how to handle a long output. Always on. |
-| **Tool guidance** | After the tools and the rules of communication | What earlier runs learned of the tools on this Mac: a flag a command wants, a site that needs a slower pace. Always on. |
+| **Tool guidance** (**Tips** on the page) | After the tools and the rules of communication | What earlier runs learned of the tools on this Mac: a flag a command wants, a site that needs a slower pace. Always on. |
 
 Both are plain text you can read on one screen, at most `[harness] habits_chars` and `tool_guidance_chars` characters
 (1,200 and 1,500) in at most `component_lines` lines (16), no line past 300 characters; a line ends at a newline, a
@@ -386,9 +386,9 @@ step and lesson, past the newest the lists below show. On a phone the tiles go t
 is wider than the screen, the narrowest iPhone's too.
 
 *What Dot follows now* is a card with the adopted version's summary, an *In use* pill and **Set aside** at its head, and
-its texts side by side under it where the page is wide enough (*Habits · how to work*, *Tool guidance · what this Mac
-wants*), or that Dot's built-in instructions alone are in use. **Write your own**, at the head of *Versions* (item 566),
-opens the form in a dialog (item 615), so that the page keeps its size; it takes habits and tool guidance (prefilled
+its texts side by side under it where the page is wide enough (*Habits · how to work*, *Tips · what this Mac and its
+apps want*), or that Dot's built-in instructions alone are in use. **Write your own**, at the head of *Versions* (item 566),
+opens the form in a dialog (item 615), so that the page keeps its size; it takes habits and tips (the tool guidance; prefilled
 from the adopted version) and a summary, and says what each takes (item 412): that writing one is optional since the
 nightly learning proposes
 versions, what a habit and a line of tool guidance are, the limits a version keeps and what each button does, with
@@ -396,7 +396,7 @@ examples in the empty fields and **Start from an example**, which puts them in; 
 candidate and **Save and use** adopts it at once; what cannot be a component is refused with why. *Versions* lists the
 versions, fifty at a time (a button under them shows the older ones), the one in use first and the others the newest
 first, with its state, who made it (you, or Dot's proposer or composer) and when, its texts and notes (what a proposal
-is about and the moments of the run it answers, the trial's contrast, the decisions of a composition) under *Texts and
+is about and the moments of the run it answers, the trial's contrast, the decisions of a composition) under *Full text and
 notes*, **Use** on each version not in use (it asks first for one from outside content) and **Set aside** on a new or
 tried one; the version in use is set aside from *What Dot follows now*, and setting a version aside asks first. *Nightly
 learning*, under *Versions*, opens with when the step runs (every night at its time, with the next one, or that it is

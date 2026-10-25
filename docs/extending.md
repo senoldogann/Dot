@@ -68,11 +68,11 @@ its head, the accounts under it, and the sections as chips (item 545), one showi
 managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item
 492), each titled with its count. Popular stands up as Plugins' New & noteworthy does, four cards a row (two on a
 narrower window); on a phone its cards are rows as the other sections' are, the mark beside the words (item 604). Each
-card has the service's mark, what Dot does with it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP ·
-On this Mac, MCP · On this Mac · Key, AppleScript, Dot's browser or Synced folder), where it stands, and its first step
+card has the service's mark, what Dot does with it, how it connects (Sign in, Key, Open to all, On this Mac, On this Mac · Key; and by Connected app,
+Mac app, Dot's browser, Synced folder or 1Password), where it stands, and its first step
 in words on the line of its name (**Add**, **Allow**, **Sign in**, **Connect**), and lifts under the pointer; a card
-opens the service's own page: each way it connects, with where it stands and its step, the tools of its MCP server once
-it is ready, and where its data goes. **Check again** reads them all anew. `GET /api/plugins` returns the listings
+opens the service's own page: each way it connects, with where it stands and its step, the **Actions** of its connected
+app once it is ready, and **Where its data goes**. **Check again** reads them all anew. `GET /api/plugins` returns the listings
 (`connections/directory.py`).
 
 Each tile's mark is the service's own logo, in its own colours, on a tile that is white in both colour schemes (a dark
@@ -136,7 +136,7 @@ work:
 
 - **Connect 1Password** makes the vault "Shared with Dot" and a service account that only reads it, with your own
   `op` signed in through the 1Password app (Settings › Developer › Integrate with 1Password CLI), which asks you first.
-- **Use a service account token instead** takes one you made at 1password.com, asked for in a dialog (item 615).
+- **Use a service account key instead** takes one you made at 1password.com, asked for in a dialog (item 615).
 
 Either way Dot keeps the token in its `.env` (`DOT_ONEPASSWORD_TOKEN`), and the page says how many logins the vaults
 hold. Move the logins a run may use into the vault; your other vaults stay out of its reach. **Disconnect** forgets the
@@ -156,7 +156,7 @@ their MCP servers sign in only clients registered by hand. Any MCP server can st
 
 The ways a service connects:
 
-- **AppleScript** (This Mac): Mail, Calendar, Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint and Outlook.
+- **Mac app** (This Mac): Mail, Calendar, Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint and Outlook.
   macOS lets an app send Apple events to another only once you have said yes to its question (Privacy & Security ›
   Automation), so a tile says **Allowed**, **Not asked yet**, **Refused**, **Not checked** or **Not installed**. macOS
   tells about an application only while it runs: while one is closed, its tile keeps the last answer macOS gave about
@@ -175,17 +175,17 @@ The ways a service connects:
   signed in as you always are; a browser without a window (`headless = true` under `[browser]`) has none to sign in
   in, which the service's page says. A sign-in is told by its cookie alone: a session the site ended stays **Signed
   in** until its cookie expires.
-- **MCP server** (item 279): Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account,
+- **Connected app** (item 279): Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account,
   Supabase and monday.com too (item 408), and GitLab, PostHog, Zapier, Webflow, ClickUp, Postman, Netlify, Apify, Miro,
   Heroku and Atlassian (item 413: Dot's own client registered with each and each opened its sign-in page to it on
   2026-10-19), Mobbin, Semrush, Parallel Task, Plain, MailerLite, Airtable, Klaviyo, Calendly, Amplitude, Mixpanel, New
   Relic and PayPal (item 505: each one's metadata, read on 2026-10-21, offers a client that registers itself without a
   secret), DeepWiki, Microsoft Learn, Context7, Exa, Cloudflare Docs, Jina and Parallel Search, open to all, and the
-  services that take a key (**MCP · Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix,
-  Firecrawl and Tavily; a few run on this Mac (**MCP · On this Mac**), started by Dot with `npx` or `uvx` and talked to
+  services that take a key (**Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix,
+  Firecrawl and Tavily; a few run on this Mac (**On this Mac**), started by Dot with `npx` or `uvx` and talked to
   over standard input and output: Memory, Sequential Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation,
-  and with a key (**MCP · On this Mac · Key**) Brave Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana
-  and Atlassian (API token); a value the owner knows, such as a site's address, is asked for with the keys, without a
+  and with a key (**On this Mac · Key**) Brave Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana
+  and Atlassian (with a key); a value the owner knows, such as a site's address, is asked for with the keys, without a
   link. A service that takes a key asks for it in a dialog (item 615) that its tile's **Add** and its page's open, with
   where to get one; a key typed and then dropped is gone when the dialog opens again (item 559), and the daemon's
   refusal is said inside it, with the key still typed;
@@ -228,22 +228,22 @@ The ways a service connects:
   server offers by default, are that page's words and code, and stay out of a run's tools; a server added before keeps
   the arguments it was added with.
 
-**Choose tools** (items 426 and 524): a server offers a run every tool it lists, however many. With the default `[agent]
+**Choose actions** (items 426 and 524): a server offers a run every tool it lists, however many. With the default `[agent]
 tool_surface = "full"` each step of a run carries the definition of every one of them, so a server of many tools makes
 every request longer; `tool_surface = "grouped"` keeps a server's tools out of a run until it turns the server's group
 on. A run of more than 128 tools starts grouped whatever the setting, as some providers refuse more in one request
 ([runs](runs.md)). The groups a grouped run has on (those its chat used before, the servers picked for its message, and
 those it turns on) may still bring a request past what its provider takes, and the request then fails with the
-provider's error, so cut a big server down here. **Choose tools**, on the row of a server added here that runs, opens
-the list of every tool it offers with what each says it does, all of them ticked until you choose, and **All tools**
+provider's error, so cut a big server down here. **Choose actions**, on the row of a server added here that runs, opens
+the list of every tool it offers with what each says it does, all of them ticked until you choose, and **All actions**
 ticks or unticks them at once. **Save** connects the server with the ticked ones and keeps the choice with it, so a
 restart offers the same ones; with every one ticked it keeps no list, and the tools the server adds later are offered
 too. A server left out with a list of tools keeps the button, to choose the list again (it may name a tool the server no
 longer offers). A server that does not answer leaves the choice unwritten and the button stays. A server you signed in
 to (Linear, Postman) lists and connects its tools with that sign-in, so the choice asks for none again (item 499).
 
-**Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
-command that starts it on this Mac, added as the services are, from the card's **Add server** button, which asks the
+**Your own connected app**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
+command that starts it on this Mac, added as the services are, from the card's **Add connected app** button, which asks the
 name and the address in a dialog (item 615; a name the daemon refuses is said inside it, with what you typed still
 there). Connected lists, besides the services, every server Dot
 has from its config, a plugin or another agent (Customize › Skills › Found on this Mac), with **Ready** and its tools,
@@ -422,8 +422,8 @@ whose connection broke is not repeated, as the tool may have done part of its wo
 tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,
 or the input schema of one of its tools cannot be handed to a model: a reference that leads nowhere, or a tree whose
-nodes hold nodes, which `allow` can leave out) is left out, and Dot starts without its tools: Settings › System names it
-with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin, and `dotx doctor` warns of a
+nodes hold nodes, which `allow` can leave out) is left out, and Dot starts without its tools: Settings › System, under **Details**,
+names it with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin, and `dotx doctor` warns of a
 missing command or secret. It is tried again when Dot starts again; `enabled = false` stops trying it. Plugins add their
 servers too (see [Skills and plugins](#skills-and-plugins)); their names become `<plugin>-<server>`. MCP results are
 untrusted content, and so is an error that a server answers a call with: the model reads its words inside the fence as

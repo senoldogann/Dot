@@ -189,9 +189,9 @@ async def _one_size(
         layout: Locator = page.locator(".run-layout")
         await expect(page.locator(".answer")).to_contain_text(ANSWER)
         if width < 960 or await layout.get_attribute("data-inspector") != "on":
-            await page.get_by_role("button", name="Run details", exact=True).click()
+            await page.get_by_role("button", name="Task details", exact=True).click()
         details: Locator = page.locator(".inspector")
-        await details.get_by_role("tab", name="Run").click()
+        await details.get_by_role("tab", name="Task").click()
         # The recap still heads the tab, and says when it was written.
         recap: Locator = details.locator("#panel-run-recap")
         await expect(recap.locator(".recap-text p")).to_have_text(RECAP.split("\n"))
@@ -237,7 +237,7 @@ async def _one_size(
         # The recap is first; Artifacts, Web reading and Memory updated come after it.
         titles: list[str] = await details.locator(".panel-section-title").all_inner_texts()
         assert titles[0] == "Recap", titles
-        assert titles.index("Artifacts") < titles.index("Web reading") < titles.index("Memory updated"), titles
+        assert titles.index("Files made") < titles.index("Web reading") < titles.index("Memory updated"), titles
         await page.screenshot(path=str(shots / f"context-{width}-{scheme}.png"))
         # A row of Artifacts opens the Changes tab, where the diff is.
         await artifacts.locator(".context-row").first.click()

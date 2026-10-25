@@ -51,8 +51,8 @@ export function messageRow(message) {
         "div",
         { class: "row-meta" },
         el("span", null, ago(message.ts)),
-        el("a", { href: `#/runs/${message.parent_run_id}` }, "The sender's run"),
-        el("a", { href: `#/runs/${message.run_id}` }, "The reply's run"),
+        el("a", { href: `#/runs/${message.parent_run_id}` }, "The sender's task"),
+        el("a", { href: `#/runs/${message.run_id}` }, "The reply's task"),
       ),
     ),
   );

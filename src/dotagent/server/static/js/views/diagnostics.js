@@ -39,7 +39,7 @@ function processRow(process, daemonPid) {
   return el(
     "tr",
     { dataset: { pid: String(process.pid) } },
-    el("td", null, el("span", { class: "process-name", dataset: { depth: String(Math.min(process.depth, 4)) } }, process.pid === daemonPid ? `${process.name} (Dot's daemon)` : process.name)),
+    el("td", null, el("span", { class: "process-name", dataset: { depth: String(Math.min(process.depth, 4)) } }, process.pid === daemonPid ? `${process.name} (Dot itself)` : process.name)),
     el("td", { class: "mono" }, String(process.pid)),
     el("td", null, `${process.cpu_percent.toFixed(1)} %`),
     el("td", null, sizeLabel(process.memory_bytes)),
@@ -160,7 +160,7 @@ export function mount(root) {
 
   root.append(
     el("a", { class: "back", href: "#/settings/system" }, icon("arrowLeft"), "System"),
-    pageHead("Diagnostics", "Dot's processes and what they take, the room its files take, and its logs, read on this Mac.", null),
+    pageHead("Diagnostics", "For finding out what went wrong: the programs Dot runs and how much of the Mac they use, the room its files take, and its logs, read on this Mac.", null),
     card("Processes", totals, processesBody),
     card("Disk", refreshButton("Measure the folders again", () => attempt(loadDisk)), diskBody),
     card("Logs", refreshButton("Read the log again", () => attempt(loadLogs)), logsBody),

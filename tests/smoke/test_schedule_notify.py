@@ -317,7 +317,7 @@ async def test_the_row_says_its_notifications_and_a_one_time_schedule_no_switch_
                 await expect(
                     row.locator(".chip", has_text="Notifications: only when it fails or needs me")
                 ).to_be_visible()
-                await expect(row.locator(".chip", has_text="Switch off: after 3 failed runs in a row")).to_be_visible()
+                await expect(row.locator(".chip", has_text="Switch off: after 3 failed tasks in a row")).to_be_visible()
                 # A one-time schedule is never switched off by its failures (item 458), so its row says no limit.
                 single: Locator = page.locator(f'[data-schedule="{once.id}"]')
                 await expect(single).to_be_visible()

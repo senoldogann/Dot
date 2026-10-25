@@ -15,7 +15,7 @@ const ALWAYS_KEY = "dot.notify.always";
 // Whether this browser is subscribed to the daemon's web push: then the pushes tell, and the page itself stays quiet.
 const PUSH_KEY = "dot.push";
 const BODY_CHARS = 140;
-const FINISHED_TITLE = { done: "A run is done", failed: "A run failed", cancelled: "A run was stopped" };
+const FINISHED_TITLE = { done: "A task is done", failed: "A task failed", cancelled: "A task was stopped" };
 const ASKING_TITLE = { question: "Dot has a question", handoff: "Dot needs your help" };
 const DRAFT_TITLE = { mail: "Dot drafted an email", message: "Dot drafted a message" };
 
@@ -176,7 +176,7 @@ function firstLine(text) {
 /** The notification of a run's end: how it ended and the first line of its answer. */
 function endNote(runId, status, result) {
   return {
-    title: FINISHED_TITLE[status] ?? "A run has ended",
+    title: FINISHED_TITLE[status] ?? "A task has ended",
     body: shorten(firstLine(typeof result === "string" ? result : "")),
     tag: `run-${runId}`,
     route: `#/runs/${runId}`,
@@ -237,7 +237,7 @@ function tellAboutStoppedSchedule(event) {
   const { schedule_id: id, name, failures } = event.data;
   tell({
     title: "A schedule was switched off",
-    body: shorten(`${name}: its last ${failures} runs failed`),
+    body: shorten(`${name}: its last ${failures} tasks failed`),
     tag: `schedule-${id}`,
     route: "#/schedules",
     state: "failed",

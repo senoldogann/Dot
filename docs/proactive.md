@@ -68,7 +68,7 @@ characters, which the push shows with the title "Your morning brief" and which o
 iMessage on, the same line goes into your conversation with yourself too, see [Telling you](#telling-you)); then a few
 lines for each part that has something. Every brief is a new run in one chat, **Morning brief**, kept for all of them:
 the run reads the conversation of the runs before it, as a schedule that goes on in its chat does, and starts untrusted
-when one of them ended so. A brief that failed is told as any schedule's failure ("A run failed", at the level its row
+when one of them ended so. A brief that failed is told as any schedule's failure ("A task failed", at the level its row
 says: always).
 
 What goes out of the Mac is what any run's goes (see [What leaves this Mac](safety.md#what-leaves-this-mac)): the record
@@ -91,7 +91,7 @@ watcher has:
   is told);
 - **minutes**: how often a mail or GitHub watcher looks (5 by default), how many minutes before an event a calendar
   watcher tells (15 by default);
-- **what it does**: **Tell me** (the default), or **Tell me and start a run** with your goal text ("draft a reply in my
+- **what it does**: **Tell me** (the default), or **Tell me and start a task** with your goal text ("draft a reply in my
   voice and keep it as a draft").
 
 **It looks; nothing reaches the daemon.** The daemon looks for each watcher at its own interval, in a loop of its own
@@ -149,7 +149,7 @@ watcher and what kind, its result is the tell), kept by `RunManager.keep_notice`
 party wrote is in its result only, never in its goal, which a later run in that chat would take as yours. A tell that
 could not be kept (a run of yours is at work in that chat) goes out all the same and opens Schedules.
 
-**The run a watcher starts.** With **Tell me and start a run**, each item told starts a run, in a chat of its own named
+**The run a watcher starts.** With **Tell me and start a task**, each item told starts a run, in a chat of its own named
 for the watcher and the item, at most `[watchers] runs_per_hour` (5) an hour from one watcher: a tell past that goes out
 with "no run", and a run that cannot start is said in the tell, not lost. The run's goal is your goal text and nothing
 else. Its first message holds the item in the fence of the mail tools, with where it came from and how to read more of

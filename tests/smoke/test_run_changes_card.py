@@ -148,7 +148,7 @@ async def test_a_run_that_changed_files_says_so_and_undo_asks_from_the_plan_of_t
         browser: Browser = await playwright.chromium.launch()
         try:
             page, errors = await _open(browser, address, changed.id, 1280, "light")
-            card: Locator = page.locator(".answer").last.get_by_role("region", name="What the run changed")
+            card: Locator = page.locator(".answer").last.get_by_role("region", name="What the task changed")
             await expect(card.locator(".run-changes-words")).to_have_text("Created a file and changed 1")
             # In the plan's order, the file changed last first.
             await expect(card.locator(".run-changes-file")).to_have_text([_PLAN, "index.html"])
@@ -174,7 +174,7 @@ async def test_a_run_that_changed_files_says_so_and_undo_asks_from_the_plan_of_t
             await page.context.close()
             # On a phone the line holds the plan the run cannot take back.
             phone, phone_errors = await _open(browser, address, changed.id, 390, "dark")
-            line: Locator = phone.locator(".answer").last.get_by_role("region", name="What the run changed")
+            line: Locator = phone.locator(".answer").last.get_by_role("region", name="What the task changed")
             await expect(line.locator(".run-changes-words")).to_have_text("Changed a file")
             await phone.screenshot(path=str(tmp_path / "changes-card-390-dark.png"))
             assert phone_errors == []
@@ -192,7 +192,7 @@ async def test_undo_takes_the_run_back_and_the_line_says_so(
         browser: Browser = await playwright.chromium.launch()
         try:
             page, errors = await _open(browser, address, drafted.id, 1280, "light")
-            card: Locator = page.locator(".answer").last.get_by_role("region", name="What the run changed")
+            card: Locator = page.locator(".answer").last.get_by_role("region", name="What the task changed")
             await expect(card.locator(".run-changes-words")).to_have_text("Created a file")
             # A double click asks once (the review, round 4): the second press comes while the first reads the plan.
             await card.get_by_role("button", name="Undo").dblclick()
@@ -239,7 +239,7 @@ async def test_an_undo_whose_plan_cannot_be_read_says_so(
         browser: Browser = await playwright.chromium.launch()
         try:
             page, _ = await _open(browser, address, kept.id, 1280, "light")
-            card: Locator = page.locator(".answer").last.get_by_role("region", name="What the run changed")
+            card: Locator = page.locator(".answer").last.get_by_role("region", name="What the task changed")
             await expect(card.locator(".run-changes-words")).to_have_text("Created a file")
             await page.route(f"**/api/runs/{kept.id}/actions", lambda route: route.fulfill(status=500, body="down"))
             await card.get_by_role("button", name="Undo").click()

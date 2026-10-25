@@ -266,13 +266,13 @@ async def test_the_plugins_page_lists_the_tools_all_ticked_and_connects_the_chos
                 await page.goto(f"{world.dot}/#/customize/connectors")
                 row: Locator = _row(page, "many")
                 await expect(row.locator(".badge")).to_have_text("Ready")
-                await expect(row).to_contain_text(f"{_TOOLS} tools: tool_00")
+                await expect(row).to_contain_text(f"{_TOOLS} actions: tool_00")
                 # Only a server the page added offers the choice.
-                await expect(_row(page, "fixture").get_by_role("button", name="Choose tools")).to_have_count(0)
-                await row.get_by_role("button", name="Choose tools").click()
+                await expect(_row(page, "fixture").get_by_role("button", name="Choose actions")).to_have_count(0)
+                await row.get_by_role("button", name="Choose actions").click()
                 dialog: Locator = page.locator("dialog[open]")
-                await expect(dialog.get_by_role("heading")).to_have_text("Choose the tools of many")
-                every: Locator = dialog.get_by_role("checkbox", name="All tools")
+                await expect(dialog.get_by_role("heading")).to_have_text("Choose the actions of many")
+                every: Locator = dialog.get_by_role("checkbox", name="All actions")
                 boxes: Locator = dialog.locator(".import-list").get_by_role("checkbox")
                 await expect(boxes).to_have_count(_TOOLS)
                 # With no list yet, every tool is ticked, and so is All tools.
@@ -294,19 +294,19 @@ async def test_the_plugins_page_lists_the_tools_all_ticked_and_connects_the_chos
                 # Cancelled, nothing is kept; saved, the server comes back with the two.
                 await dialog.get_by_role("button", name="Cancel").click()
                 await expect(page.locator("dialog[open]")).to_have_count(0)
-                await expect(row).to_contain_text(f"{_TOOLS} tools: tool_00")
+                await expect(row).to_contain_text(f"{_TOOLS} actions: tool_00")
                 if width == 390:
                     await page.close()
                     continue
-                await row.get_by_role("button", name="Choose tools").click()
+                await row.get_by_role("button", name="Choose actions").click()
                 await every.uncheck()
                 await boxes.nth(5).check()
                 await boxes.nth(_TOOLS - 1).check()
                 await dialog.get_by_role("button", name="Save 2").click()
-                await expect(row).to_contain_text("2 tools: tool_05, tool_31", timeout=READY_WITHIN_S * 1000)
+                await expect(row).to_contain_text("2 actions: tool_05, tool_31", timeout=READY_WITHIN_S * 1000)
                 await expect(row.locator(".badge")).to_have_text("Ready")
                 # A server that runs keeps the choice, to cut its tools down or take them all again.
-                await expect(row.get_by_role("button", name="Choose tools")).to_have_count(1)
+                await expect(row.get_by_role("button", name="Choose actions")).to_have_count(1)
                 await page.close()
         finally:
             await browser.close()
