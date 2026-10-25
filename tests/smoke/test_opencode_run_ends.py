@@ -16,7 +16,7 @@ import pytest_asyncio
 from dotagent.agent.limits import LIMIT_EVENT, RunLimits
 from dotagent.agent.loop import AgentRun, RunOutcome
 from dotagent.events import EventBus
-from dotagent.opencode.events import StepEnded
+from dotagent.opencode.events import PartSeen, Piece, StepEnded, StepStarted
 from dotagent.opencode.run import _Follow, _outcome, _Step
 from dotagent.opencode.server import OpenCodeServer, PromptFile
 from dotagent.store.db import Store
@@ -165,3 +165,28 @@ async def test_a_run_that_stopped_of_its_own_accord_is_done_with_its_answer_or_a
     assert _outcome(follow, "All done.", GOAL) == RunOutcome(status="done", result="All done.", needs="")
     empty: RunOutcome = _outcome(follow, "", GOAL)
     assert (empty.status, empty.result) == ("done", "OpenCode's agent finished without a closing message.")
+
+
+async def test_a_step_s_streamed_words_and_their_held_tail_come_under_the_step_that_wrote_them(
+    room: Room, tmp_path: Path
+) -> None:
+    """Item 660: the stream holds back the word being written until the step ends (item 551), and the end of a step
+    let it go after counting the step, so the tail came under the next step's number: the page opened a second live
+    message with it, the first never took the step's ``assistant`` and kept its caret, and the answer came under both.
+    A one-line answer is the case the owner met on a Zen free model."""
+    follow: _Follow = _follow(room, _Server(), None, 0.0, tmp_path)
+    shown: list[tuple[str, dict[str, object]]] = []
+
+    async def emit(kind: str, data: dict[str, object], persisted: bool) -> None:
+        shown.append((kind, data))
+
+    follow.emit = emit  # type: ignore[method-assign]
+    words: str = "Merhaba! Size nasıl yardımcı olabilirim?"
+    await follow.seen(StepStarted(message_id="m1"))
+    await follow.seen(PartSeen(part_id="p1", message_id="m1", kind="text", text=""))
+    await follow.seen(Piece(part_id="p1", message_id="m1", text=words))
+    await follow.seen(_step("stop"))
+    deltas: list[dict[str, object]] = [data for kind, data in shown if kind == "delta"]
+    (said,) = [data for kind, data in shown if kind == "assistant"]
+    assert deltas and {data["step"] for data in deltas} == {said["step"]} == {1}, shown
+    assert "".join(str(data["text"]) for data in deltas) == words == said["text"], shown

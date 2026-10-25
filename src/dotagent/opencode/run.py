@@ -585,6 +585,10 @@ class _Follow:
         step: _Step | None = self.step_of(event.message_id)
         if step is None:
             return
+        # What the stream still holds of the step (the word being written, item 551) goes out under the step's own
+        # number: let go after the step was counted, it came under the next one, and the page drew it as a message of
+        # its own and left the step's message streaming, the answer under both (item 660).
+        await self.stream.flush()
         self.steps += 1
         self.finish = event.reason
         run_id: str = self.agent.run.id
@@ -594,7 +598,6 @@ class _Follow:
         text: str = step.text("text")
         if text.strip():
             self.answer = text.strip()
-        await self.stream.flush()
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         await self.emit(
             "assistant",

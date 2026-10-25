@@ -421,7 +421,12 @@ thought: up to 12,000 characters of it, of a longer one its start and its end, i
 page is loaded again. A thought and a message are masked as they stream too (item 551): a secret split between two
 pieces of the stream is not shown, so the text trails a few words behind and is whole when the step ends. A step asked again from its start drops what its failed try streamed. A message streams as it will
 stay (item 274): formatted as it comes, drawn at most once a frame with the parts already written left as they are, its
-caret at the end of its text, so that its end moves nothing. An answer that ends a run while its page is open is written
+caret at the end of its text, so that its end moves nothing. The word a step still holds goes out
+under the step's own number when it ends (item 660; OpenCode's run let it go under the next one, which drew it as a
+message of its own). A message that loses its place still streaming (another step's words come, a
+step's end comes for another step, or the run ends) ends as it stands, drawn whole without its caret; the next step's
+words that end the step's own text are its tail and go, the step's end draws its message where it stands, and an answer that
+repeats it leaves it out. An answer that ends a run while its page is open is written
 in the same way (item 366), a few words a frame for two seconds at most, into the room it will take, so the page lands
 on it as it will stand and the words come in sight, its foot once it is all in; a run opened after it ended, a reply
 that streamed already and reduced motion show it at once. A chat whose run is over opens drawn whole (item 454): its
