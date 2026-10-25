@@ -28,6 +28,7 @@ import { recapSection } from "../recap.js";
 import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
+import { planBubble, planStep, planTargets } from "../planbubble.js";
 import { createReactions, REACTION_EVENTS } from "../reactions.js";
 import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
@@ -108,30 +109,6 @@ function backLink() {
 
 // What the Plan tab says of a run without a plan (item 203).
 const NO_PLAN = "This task has no plan: Dot writes one for work of several steps.";
-const STEP_MARKS = { done: "check", failed: "x", skipped: "arrowRight" };
-const STEP_LABELS = { pending: "Not started", in_progress: "In progress", done: "Done", failed: "Failed", skipped: "Skipped" };
-
-/** The targets of an open-ended goal, the first line of the plan: what the run works toward and how it measures it. */
-function planTargets(targets) {
-  return el("div", { class: "plan-targets", title: "Targets" }, icon("target"), el("span", { class: "text" }, targets));
-}
-
-/** One step of the plan: its mark, its text, the steps it waits for and, under a closed step, the evidence the run
- * recorded for it. Plans stored before evidence existed have none. */
-function planStep(step) {
-  const markIcon = STEP_MARKS[step.status];
-  const mark = el("span", { class: "mark" }, markIcon === undefined ? null : icon(markIcon));
-  const evidence = step.evidence ?? "";
-  // Plans stored before dependencies existed have none.
-  const dependsOn = step.depends_on ?? [];
-  const line = el("span", { class: "line" }, el("span", { class: "text" }, step.text));
-  if (dependsOn.length > 0) {
-    line.append(el("span", { class: "after", title: "Waits for these steps" }, `after ${dependsOn.join(", ")}`));
-  }
-  const body = el("span", { class: "body" }, line);
-  if (evidence !== "") body.append(el("span", { class: "evidence", title: "Evidence" }, evidence));
-  return el("div", { class: `plan-step ${step.status}`, title: STEP_LABELS[step.status] ?? step.status }, mark, body);
-}
 
 /**
  * Build the page of a loaded run and start following it. `history` is `loadHistory`'s `{ earlier, read }`, the runs of
@@ -309,9 +286,18 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const planBody = el("div", { class: "plan-list" }, el("div", { class: "hint" }, NO_PLAN));
   const plan = panelSection({ id: "run-plan", title: "Plan", actions: null, body: planBody });
 
+  // The plan as it stands, with how many of its steps are done: the Plan tab, the capsule's part over the composer and
+  // its popover (item 644) draw it.
+  let planNow = { steps: [], targets: "", done: 0 };
+  /** @type {ReturnType<typeof planBubble> | null} */
+  let bubble = null;
+
   // The Plan tab says how far the plan has come (item 203); a run without a plan says why there is none.
   function paintPlan(steps, targets) {
     const done = steps.filter((step) => step.status === "done").length;
+    planNow = { steps, targets, done };
+    paintCapsule();
+    bubble?.paint(steps, targets);
     inspector.setCount("plan", steps.length === 0 ? "" : `${done}/${steps.length}`);
     if (steps.length === 0) {
       planBody.replaceChildren(el("div", { class: "hint" }, NO_PLAN));
@@ -700,6 +686,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   });
   const statusBar = el("div", { class: "status-bar", hidden: true }, capsule.element);
   const dock = el("div", { class: "dock" }, statusBar, resumeLine, queue.element, loops.element, background.element, frame.element, foot);
+  // The plan over the composer (item 644): its part in the capsule opens it as a bubble above the dock.
+  bubble = planBubble({ anchor: capsule.plan, frame: dock, onOpenTab: () => inspector.openTab("plan") });
+  bubble.paint(planNow.steps, planNow.targets);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it, at once while its
   // model is at a step, after the tool at work otherwise (item 509).
@@ -1012,13 +1001,19 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   }
 
   function paintCapsule() {
+    const { steps, done } = planNow;
     capsule.paint({
       status: active ? status : null,
       since: run.created_at,
       now: Date.now() / 1000,
+      plan: steps.length === 0 ? null : { done, total: steps.length },
       helpers: timeline.helperStatuses(),
       queued: queue.count(),
     });
+    // The plan's bubble goes with its part: once the run no longer works, it is not left open over nothing (item 644).
+    if (capsule.plan.hidden) {
+      bubble?.close();
+    }
     paintBar();
   }
 
@@ -1703,6 +1698,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     background.dispose();
     loops.dispose();
     meter.dispose();
+    bubble.dispose();
     frame.dispose();
     // An answer being read aloud is not read on over the page the reader went to: the speaker that stops it is on this
     // page, and goes with it (item 612).

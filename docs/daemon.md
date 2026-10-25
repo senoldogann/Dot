@@ -534,9 +534,13 @@ picture and each file with its ×, its name the tooltip, and the files the box h
 queue, or with the queue's next message when the box is empty. Settings › General › Messages can have a message steer
 the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the queue. A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
-box (items 352 and 360) says in a few quiet words how long the run has worked, or that it waits for you, how its helpers
-stand and how many messages are queued; each part opens what it tells of, and the line comes while one of its parts has
-something to say and goes when none has. It does not say what the run does now, which the conversation shows, nor count
+box (items 352 and 360) says in a few quiet words how long the run has worked, or that it waits for you,
+how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
+and how many messages are queued; each part opens what it tells of, and the line comes while one of its
+parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the
+composer: how far it has come, its targets, its steps as the Plan tab draws them and **Open in the side
+panel**; it follows the plan while it is open, and Escape, a click outside it or a second click on the
+part closes it. It does not say what the run does now, which the conversation shows, nor count
 the commands at work in the chat, which stand right under it. When the run ends done, the next message starts and the
 page follows it; every open page shows the queue as it changes, and only your messages wait in it: the end of a command
 in the background is never queued (see [Runs and tools](runs.md#tools)). A message sent to the chat on another screen
