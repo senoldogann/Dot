@@ -9,13 +9,15 @@ controls.
 What a closed fold holds (a ``details`` that is not open: "Details", "Advanced") is not on the screen, and is not read:
 the expert's words, the name of a setting's key, a command, a code, stand there. So does the tooltip of an element
 marked ``data-expert`` (a schedule's cron beside its rhythm in words, a setting's key beside a note): it shows only to
-whoever holds the pointer on it, and its text is read. Diagnostics, which is for finding what
-went wrong, keeps its technical words, and so does the list of the licences; Settings › Rules and Settings › Vault are
-read by their own tests. A new screen that brings a word of the list back fails here, so the list is the rule
-(CONTRIBUTING.md, "Words on the screen").
+whoever holds the pointer on it, and it is not read. Diagnostics, which is for finding what went wrong, keeps its
+technical words, and so does the list of the licences; Settings › Rules and Settings › Vault are read by their own
+tests. A new screen that brings a word of the list back fails here, so the list is the rule (CONTRIBUTING.md, "Words on
+the screen").
 
-No network and no model service is used: a scripted model plays the chats, the Mac's permission service, launchd and
-the Keychain answer as a Mac at rest, and Messages is a database the test makes.
+No network and no model service is used: a scripted model plays the chats, the Mac's permission service and launchd
+answer as a Mac at rest, and Messages is a database the test makes. No step reaches the login keychain: ``HOME`` is a
+folder of the test's own, and the smoke tests' ``DOT_KEYCHAIN`` names a keychain file that is not there, which Dot
+refuses before ``security`` runs (item 628).
 """
 
 import asyncio
