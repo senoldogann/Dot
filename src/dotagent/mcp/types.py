@@ -24,6 +24,16 @@ class McpTool(FrozenModel):
     call_timeout_s: float
 
 
+class McpPurpose(FrozenModel):
+    """What the line of a server's tool group in a run's instructions says the server is for (item 659): ``text``, one
+    plain line. ``claimed`` is whether it is what the server says of itself, third-party words that stand in quotes as
+    its claim; otherwise they are the owner's (the ``description`` of its ``[[mcp]]`` table) or Dot's, for a server that
+    comes with it, and stand as Dot's own text does."""
+
+    text: str
+    claimed: bool
+
+
 class McpFailure(FrozenModel):
     """An enabled server that Dot left out because it could not start: why, the error's context, and the file its
     stderr goes to. Its tools are not offered until Dot starts again."""

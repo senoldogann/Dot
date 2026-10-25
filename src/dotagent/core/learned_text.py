@@ -261,20 +261,24 @@ def _ignorable(code: int) -> bool:
     return index >= 0 and code <= _IGNORABLE[index][1]
 
 
+def _prints_nothing(char: str) -> bool:
+    """Whether ``char`` is one that prints nothing: a control, a format character, a surrogate, a private-use or an
+    unassigned code point, a line or paragraph separator, a default-ignorable code point or the Braille blank."""
+    return unicodedata.category(char) in _UNPRINTABLE or _ignorable(ord(char)) or ord(char) in _BLANKS
+
+
 def hidden_character(text: str) -> str | None:
     """The first character of ``text`` that prints nothing, as ``U+XXXX``, or ``None``: a control (a newline and a tab
     apart), a format character (zero-width, bidi, tag), a surrogate, a private-use or an unassigned code point, a line
     or paragraph separator, a default-ignorable code point (a variation selector, a filler, the combining grapheme
     joiner) or the Braille blank. Any of them could hide text from the owner who reads it."""
-    return next(
-        (
-            f"U+{ord(char):04X}"
-            for char in text
-            if char not in "\n\t"
-            and (unicodedata.category(char) in _UNPRINTABLE or _ignorable(ord(char)) or ord(char) in _BLANKS)
-        ),
-        None,
-    )
+    return next((f"U+{ord(char):04X}" for char in text if char not in "\n\t" and _prints_nothing(char)), None)
+
+
+def without_hidden(text: str) -> str:
+    """``text`` as a reader sees it: without the characters :func:`hidden_character` finds, a newline and a tab apart.
+    For a text that is shown and not refused (the words a third party wrote of itself, item 659)."""
+    return "".join(char for char in text if char in "\n\t" or not _prints_nothing(char))
 
 
 # The characters that are not ASCII, in runs: what a reading changes is among them, so the rest is never looked at one

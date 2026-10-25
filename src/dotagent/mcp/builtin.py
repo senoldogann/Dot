@@ -40,6 +40,13 @@ OFFERED_TOOLS: tuple[str, ...] = (
 )
 # The server's search, which web_search's rung calls.
 SEARCH_TOOL: str = "web_search"
+# What Dot says the server is for (item 659): the line of its tool group in a run's instructions, as the owner's
+# ``description`` of an ``[[mcp]]`` table would be. Dot's own words, so they stand as they are and are not quoted as a
+# server's claim.
+WEB_RESEARCH_PURPOSE: str = (
+    "Reads pages as Markdown, also those behind a wall or drawn by scripts, maps a site and crawls it in the "
+    "background; its search is one of web_search's engines."
+)
 
 
 def web_research_installed() -> bool:
@@ -100,6 +107,7 @@ def _web_research(enabled: bool, bound: bool) -> McpServerConfig:
         enabled=enabled,
         cwd=str(web_research_dir()),
         allow=list(OFFERED_TOOLS),
+        description=WEB_RESEARCH_PURPOSE,
     )
 
 

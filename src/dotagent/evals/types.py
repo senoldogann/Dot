@@ -15,7 +15,7 @@ from dotagent.store.models import RunMode
 
 type ExpectedEnding = Literal["done", "failed"]
 type TaskCategory = Literal[
-    "files", "shell", "coding", "recovery", "multi_step", "research", "honesty", "safety", "browser", "help"
+    "files", "shell", "coding", "recovery", "multi_step", "research", "honesty", "safety", "browser", "help", "choice"
 ]
 
 
@@ -135,6 +135,45 @@ class NoFileNamed(FrozenModel):
     pattern: str
 
 
+class SkillRead(FrozenModel):
+    """The run read the skill ``name`` with the skill tool, and the call ran and did not fail (item 659: a check of the
+    run's events, as the choice tasks judge what it picked)."""
+
+    kind: Literal["skill_read"]
+    name: str
+
+
+class SkillUnread(FrozenModel):
+    """The run made no call of the skill tool for the skill ``name``, whether or not it would have run: a skill of the
+    task that does not fit its goal."""
+
+    kind: Literal["skill_unread"]
+    name: str
+
+
+class ToolRan(FrozenModel):
+    """The run called the tool ``tool`` (an MCP tool, as the model names it) and the call ran and did not fail: a call
+    whose tool group was off does not count."""
+
+    kind: Literal["tool_ran"]
+    tool: str
+
+
+class GroupStaysOff(FrozenModel):
+    """The tool group ``group`` was never on in the run: not turned on with ``use_tools``, nor by a call of one of its
+    tools. Only a task whose tools are grouped (``grouped``) can say so."""
+
+    kind: Literal["group_stays_off"]
+    group: str
+
+
+class NoPicks(FrozenModel):
+    """The message of the run carried none of what the owner picks in the composer (a skill, an MCP server, an
+    account, Plan first): the choices of the run were its own."""
+
+    kind: Literal["no_picks"]
+
+
 type Check = Annotated[
     FileExists
     | FileAbsent
@@ -146,7 +185,12 @@ type Check = Annotated[
     | AnswerMatches
     | AnswerLacks
     | AnswerLacksPattern
-    | NoFileNamed,
+    | NoFileNamed
+    | SkillRead
+    | SkillUnread
+    | ToolRan
+    | GroupStaysOff
+    | NoPicks,
     Field(discriminator="kind"),
 ]
 
@@ -179,7 +223,8 @@ class EvalTask(FrozenModel):
     reference name its address as ``{site}``. ``goal_mode`` runs the task in goal mode, where the review model checks
     the end against the goal. ``skills`` are the skills the attempt's home holds and ``servers`` the MCP servers its run
     is given, help that makes the task short; ``easy_way`` names the tool of that help (item 167), ``None`` for a task
-    without one.
+    without one. ``grouped`` plays the task with its tools in groups, as a run of more than 128 tools has them, so that
+    the groups of its MCP servers start off and the run has to turn on the one it needs (item 659, the choice tasks).
     """
 
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,39}$")
@@ -198,3 +243,4 @@ class EvalTask(FrozenModel):
     skills: tuple[SkillSeed, ...]
     servers: tuple[McpServerConfig, ...]
     easy_way: EasyWay | None
+    grouped: bool

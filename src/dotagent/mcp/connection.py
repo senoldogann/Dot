@@ -397,6 +397,12 @@ class McpConnection:
             {**self._context(), "code": error.code, "error": error.message, **await self._tail_since(0)},
         )
 
+    def instructions(self) -> str | None:
+        """What the server said of itself when it connected: the ``instructions`` of its initialize result, ``None``
+        when it sent none or is not connected. Third-party words (item 659)."""
+        live: _Live | None = self._live
+        return None if live is None else live.client.instructions
+
     async def list_tools(self) -> tuple[McpTool, ...]:
         """Every tool the server offers, following its pagination."""
         live: _Live = await self._ensure_live()

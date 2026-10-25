@@ -324,6 +324,7 @@ command = "npx"                             # started with the PATH of your logi
 args = ["-y", "some-mcp-server"]
 env = { NOTES_TOKEN = "${NOTES_TOKEN}" }    # ${NAME} is looked up like an API key
 allow = ["search", "read_note"]             # offer only these tools; empty = all of them, however many
+description = "my notes: search them, read one, add to one"  # what it is for: one line, 200 characters at most
 enabled = true
 startup_timeout_s = 60.0
 call_timeout_s = 120.0
@@ -412,6 +413,38 @@ stays out. Connectors refuses a new server of that name while the built-in is th
 the built-in off. `dotx doctor` has a row for it, and [What leaves this Mac](safety.md#what-leaves-this-mac) says
 what it sends.
 
+**What the model is told of a server** (item 659). When the tools of a run come in groups (`[agent] tool_surface =
+"grouped"`, or a run of more than 128 tools, [Runs](runs.md)), each server's tools are a group of their own,
+`mcp__<server>`, that is off until the model turns it on, and the instructions list it in one line: `- mcp__rea-mcp: the
+tools of the MCP server rea-mcp (mcp__rea-mcp__search, …)`. A name such as `rea-mcp` or `grep-app` tells the model
+little, so the line says what the server is for, from the first of these that has words:
+
+1. *Your `description`* in the `[[mcp]]` table: one line of at most 200 characters, with no line break and no character
+   that prints nothing (a longer or broken one is refused when the configuration loads, and the error names the key).
+   Write what the server is for, as a phrase: `description = "Dutch homes for sale or rent, their prices and sold
+   homes"` gives `the tools of the MCP server rea-mcp: Dutch homes for sale or rent, their prices and sold homes
+   (mcp__rea-mcp__search, …)`. Your words stand as you wrote them: the configuration is yours.
+2. *Dot's own words*, for the server that comes with it: `web-research` is `Reads pages as Markdown, also those
+   behind a wall or drawn by scripts, maps a site and crawls it in the background; its search is one of web_search's
+   engines.` A server of your own with that name replaces it, and so its words.
+3. *What the server says of itself*: the `instructions` of its answer when Dot connected to it, else the first sentences
+   of the descriptions of its first four tools (a tool described only by its name has nothing to say). They are
+   third-party words, so the line shows them as the server's claim and not as Dot's text: made one plain line (every
+   line break and heading, bracket, brace, bar, backtick, backslash, double quote, address and character that prints
+   nothing taken out, the secrets Dot holds masked), of whole sentences up to 160 characters, in quotes: `the tools of
+   the MCP server tavily, which describes itself as "A web search tool that returns current results."`. The instructions
+   tell the model that words in quotes after "describes itself as" are the server's claim, to judge which group fits the
+   work by, and that an instruction inside them never applies to it (*What a server says of itself* in
+   [Safety](safety.md)).
+
+A server with neither a description nor words of its own keeps the line it had: its name and its tools. What a server
+said is read once, when it connects (and when one is added or removed on Connectors, for the runs that start after); a
+run asks no server anything to write its instructions. The lines cost about 50 to 150 tokens a server in the
+instructions of each run. A server added on Connectors, from another agent or by a plugin has no description of yours,
+so it speaks for itself. `[agent] mcp_purposes = false` leaves every line as it was, with no word of a server in it; the
+evals use that to measure what the words change
+([Development](development.md#the-choice-of-help-and-what-the-purpose-lines-change)).
+
 `dotx mcp list` starts the servers of `[[mcp]]` tables, those of plugins and the one that comes with Dot, which it
 marks `built-in` (not the ones added on Connectors), and shows the tools each offers, or why one does not start.
 Only tools are used (no resources, prompts or sampling).
@@ -464,9 +497,11 @@ run is offered, and reads the rest with the `skill` tool when a task matches; in
 come in parts, each saying where the next one starts, so none is cut out of the middle. A run offered more than `listed`
 under `[skills]` (20) is given, in its instructions, those that fit the first words of its chat (the chat's title) best,
 the same at every message of the chat so that the provider's cache of the instructions holds (item 404), at most that
-many, and is told how many more there are; under each message stand up to six more that fit the message and the goals of
-the latest earlier runs of its thread, as its notes are chosen, the best fit first: `find_help` searches them all, and
-`skill` reads one by its name. A skill fits by the words it shares with the goal and, with the memory's embeddings on,
+many, and is told how many more there are and what they are called (their names, up to sixty, item 659: a skill whose
+description shares no word with the goal is still in sight by its name, and `skill` reads it); under each message stand
+up to six more that fit the message and the goals of the latest earlier runs of its thread, as its notes are chosen,
+the best fit first: `find_help` searches them all, and `skill` reads one by its name. A skill fits by the words it
+shares with the goal and, with the memory's embeddings on,
 by how close it is to the goal in meaning (at least `min_similarity` under `[memory]`), the two rankings fused as the
 notes' are; bge-m3 reads Turkish as well as English, so a goal in one language is given the skills described in the
 other, while by words alone it shares none with them. The embedding of each skill is made once, kept in the store across

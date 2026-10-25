@@ -545,6 +545,12 @@ def build_parser() -> argparse.ArgumentParser:
     eval_run.add_argument(
         "--repeat", type=int, default=1, help="play every task this many times: one attempt says little about a model"
     )
+    eval_run.add_argument(
+        "--no-mcp-purposes",
+        action="store_true",
+        help="leave the line of each MCP server's tool group as it was before it said what the server is for "
+        "([agent] mcp_purposes = false for this run), to measure what those words change",
+    )
     eval_report = eval_commands.add_parser(
         "report", help="show the score of saved eval runs and compare them (all saved runs if no file is given)"
     )

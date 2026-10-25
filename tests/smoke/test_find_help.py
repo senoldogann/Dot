@@ -190,14 +190,15 @@ async def test_a_run_offered_more_skills_than_its_instructions_list_is_listed_th
             await close_runtime(runtime)
     assert done.status == "done", done.result
     skills: str = model.requests[0].messages[0].content.split("\n# Skills\n", 1)[1]
-    # Two of the seven skills are listed; the two others offered and the three that come with Dot (item 196) are not.
+    # Two of the seven skills are listed; the two others offered and the three that come with Dot (item 196) are not,
+    # but they are named (item 659), and their descriptions are not there.
     assert (
         "- weekly-report: Write the weekly report from the week's notes, in the owner's format.\n"
         "- mail-merge: Send one email to each contact of a list.\n"
         "- 5 more installed skills fit your goal less well and are not listed here: find_help searches them all by "
-        "your need, and skill reads one by its name."
+        "your need, and skill reads one by its name. They are: invoice-pdf, release-notes, excel, onedrive, word."
     ) in skills, skills
-    assert "release-notes" not in skills and "invoice-pdf" not in skills, skills
+    assert "Draft the release notes" not in skills and "Fill in the invoice PDF form" not in skills, skills
 
 
 async def test_calendar_is_found_scriptable_by_its_own_dictionary_for_adding_an_event() -> None:
@@ -260,7 +261,9 @@ async def test_with_the_embeddings_a_goal_and_a_need_in_turkish_find_the_skills_
     listed: list[str] = [line.split(":", 1)[0] for line in skills.splitlines() if line.startswith("- ")]
     assert listed[0] == "- weekly-report", skills
     assert "more installed skills fit your goal less well" in skills, skills
-    assert "release-notes" not in skills and "invoice-pdf" not in skills, skills
+    assert "Draft the release notes" not in skills and "Fill in the invoice PDF form" not in skills, skills
+    named: str = skills.split("They are: ", 1)[1]
+    assert "release-notes" in named and "invoice-pdf" in named, skills
     # The need in Turkish finds the report's skill first, with how to use it.
     answers: list[str] = [message.content for message in messages if message.role == "tool"]
     lines: list[str] = answers[0].splitlines()

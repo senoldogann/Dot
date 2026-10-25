@@ -282,7 +282,8 @@ def render_scorecard(card: Scorecard) -> list[str]:
         f"{context}, preset {settings.preset}, "
         f"stall escalation {'on' if settings.stall_escalation else 'off'}, tier {settings.tier}, "
         f"tool surface {settings.tool_surface}, prompt {settings.prompt}, "
-        f"answer path check {'on' if settings.verify_answer_paths else 'off'}",
+        f"answer path check {'on' if settings.verify_answer_paths else 'off'}, "
+        f"server purposes {'on' if settings.mcp_purposes else 'off'}",
         f"  passed {card.passed} of {card.attempts} attempts ({_percent(card.passed, card.attempts)}), "
         f"{card.seconds:.0f} s in all",
         "  by kind: " + ", ".join(f"{score.category} {score.passed}/{score.attempts}" for score in card.categories),

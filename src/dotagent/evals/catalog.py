@@ -7,7 +7,9 @@ the shell and, for the two site tasks, a local site served for the attempt, so t
 network, on a signed-in account or on the Mac's desktop. The three help tasks bring their own help, skills and the
 evals' MCP server, and ask whether a run takes the easy way it offers. The two tasks on Office files (item 196) start
 from a workbook and a Word document and ask whether a run reads the skill that comes with Dot for them; they are done
-with Python's libraries, without Excel or Word.
+with Python's libraries, without Excel or Word. The five choice tasks (item 659) ask what a run picks when nobody picks
+for it: two read the skill that fits among decoys, three turn on the MCP server that fits among decoys, each of which
+passes only by what the run's events show.
 """
 
 import base64
@@ -21,7 +23,7 @@ from pydantic import JsonValue
 from dotagent.config import McpServerConfig
 from dotagent.core.errors import EvalError
 from dotagent.evals.office_tasks import AUGUST, NEW_NAME, OLD_NAME, letter_document, sales_workbook
-from dotagent.evals.tool_server import HOLIDAYS, SERVER_NAME, WORKING_DAYS
+from dotagent.evals.tool_server import HOLIDAYS, SERVER_NAME, WORKING_DAYS, StandIn, stand_in
 from dotagent.evals.types import (
     AnswerContains,
     AnswerLacks,
@@ -37,18 +39,23 @@ from dotagent.evals.types import (
     FileEquals,
     FileExists,
     FileSeed,
+    GroupStaysOff,
     JsonEquals,
     NoFileNamed,
+    NoPicks,
     ScriptedCall,
     ScriptedTurn,
     SitePage,
+    SkillRead,
     SkillSeed,
+    SkillUnread,
     TaskCategory,
+    ToolRan,
 )
-from dotagent.mcp.naming import exposed_name
+from dotagent.mcp.naming import PREFIX, exposed_name
 from dotagent.skills.types import SKILL_TOOL
 from dotagent.store.models import RunMode
-from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
+from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL, USE_TOOLS_TOOL
 
 # What every task is allowed to use before the run is cut: wall-clock time and tokens (input and output of every step).
 TIME_LIMIT_S: float = 300.0
@@ -181,6 +188,7 @@ def _task(
         skills=(),
         servers=(),
         easy_way=None,
+        grouped=False,
     )
 
 
@@ -1602,10 +1610,318 @@ def _office_tasks() -> tuple[EvalTask, ...]:
     )
 
 
+# ----------------------------------------------------------------------------------------------- the choice of help
+# What a run picks when nobody picks for it (item 659). Each task brings help that fits its goal and help that does not
+# (a decoy), and passes only when the run's events show the right pick: the skill it read, the MCP server it turned on
+# and the tool of it that ran, with the decoys left alone and no pick made in the composer. The skill tasks read the
+# list of skills in the run's instructions; the server tasks run with their tools in groups, so that each group starts
+# off and what the line of the groups says of a server is all the run has to go by.
+
+
+def _choice_task(
+    task_id: str,
+    goal: str,
+    files: Sequence[FileSeed],
+    checks: Sequence[Check],
+    reference: Sequence[ScriptedTurn],
+    skills: Sequence[SkillSeed],
+    servers: Sequence[McpServerConfig],
+) -> EvalTask:
+    """A task of the choice of help: the skills its attempt's home holds, the MCP servers its run is given, its tools in
+    groups when it brings servers, and a limit of time and tokens fit for a short run."""
+    return _task(task_id, "choice", goal, "task", "done", files, checks, reference).model_copy(
+        update={
+            "skills": tuple(skills),
+            "servers": tuple(servers),
+            "grouped": bool(servers),
+            "time_limit_s": CHOICE_TIME_LIMIT_S,
+            "token_budget": CHOICE_TOKEN_BUDGET,
+        }
+    )
+
+
+def _grep(pattern: str, path: str) -> CommandSucceeds:
+    """A check that the file holds ``pattern``, whatever its case."""
+    return _runs("grep", "-qi", pattern, path)
+
+
+# How much a choice task may use before it is cut: a run that picks right does it in three to six steps.
+CHOICE_TIME_LIMIT_S: float = 180.0
+CHOICE_TOKEN_BUDGET: int = 250_000
+
+# The house form of a changelog entry, which only its skill states (the file starts with a title and no entry, so there
+# is none to copy), beside two skills of the same shop for the mail and the documentation that a goal about a release
+# fits by its words.
+_SHOP_CHANGELOG: SkillSeed = SkillSeed(
+    name="shop-changelog",
+    description=(
+        "How the shop writes the changelog entry of a release: the heading with the day and the version, and the lines "
+        "that say what is new and what is fixed."
+    ),
+    body=_lines(
+        "# Changelog entries",
+        "",
+        "Every release has one entry at the top of CHANGELOG.md, under its title, laid out like this:",
+        "",
+        "    ### 2026-03-02 / 2.4.0",
+        "    NEW: dark mode",
+        "    FIXED: login loop",
+        "",
+        "The heading is `### `, the day of the release as YYYY-MM-DD, ` / ` and the version. A change is one line that "
+        "starts with `NEW: ` or `FIXED: ` and goes on in lower case, with no full stop at its end. A kind of change "
+        "that has none gets no line.",
+    ),
+)
+_RELEASE_MAIL: SkillSeed = SkillSeed(
+    name="release-mail",
+    description=(
+        "How the shop tells its customers about a release by email: the subject line, the tone and the sign-off."
+    ),
+    body=_lines(
+        "# Release emails",
+        "",
+        "The subject is `The Shop: version X is out`. The mail is two short, friendly paragraphs in the first person "
+        "plural, and ends with `Cheers, the Shop team`.",
+    ),
+)
+_DOCS_VOICE: SkillSeed = SkillSeed(
+    name="docs-voice",
+    description="How the shop writes its documentation pages: the headings, the examples and the voice.",
+    body=_lines(
+        "# Documentation pages",
+        "",
+        "A page starts with one `#` heading that names the task, each step is a numbered line, and every command is "
+        "shown in a code block with its output.",
+    ),
+)
+# The skill the tweet task needs, among twenty-two: its description shares no word with the goal ("tweet" is not "post
+# for X"), so the list of the run's instructions, which keeps those that share a word, does not hold it, and says its
+# name; the one that does share words (a launch, a post) is a decoy.
+_X_POST_WRITER: SkillSeed = SkillSeed(
+    name="x-post-writer",
+    description="Writes posts for X in the owner's voice: short, one idea, no hashtags.",
+    body=_lines(
+        "# Posts for X",
+        "",
+        "A post is one sentence of at most 200 characters, in lower case, with no hashtag. It ends with the signature "
+        "` ~ the shop`, a space, a tilde, a space and the words, and nothing comes after it.",
+    ),
+)
+_LINKEDIN_POST: SkillSeed = SkillSeed(
+    name="linkedin-post",
+    description=(
+        "Writes a LinkedIn post for a launch or an article: a hook, three short paragraphs and a question at the end."
+    ),
+    body=_lines(
+        "# LinkedIn posts",
+        "",
+        "Open with a hook of one line, then three short paragraphs, then a question for the readers. Add three "
+        "hashtags at the end.",
+    ),
+)
+# Twenty skills of other kinds of work, none of whose words is in the tweet task's goal.
+_OTHER_SKILLS: tuple[tuple[str, str], ...] = (
+    ("ig-caption", "Captions for the owner's pictures on Instagram: the tone, the length and the call to action."),
+    ("cold-email", "Cold outreach emails: a subject line, a first sentence, one ask and a follow-up after four days."),
+    ("meeting-notes", "Turns the transcript of a meeting into notes with the decisions and who owns each."),
+    ("travel-plan", "Plans a trip: flights, a hotel and a list of what to see on each day."),
+    ("expense-report", "Collects receipts and fills in the expense report of the month."),
+    ("pdf-tools", "Merges, splits and compresses PDF files."),
+    ("image-resize", "Resizes and converts pictures for the web."),
+    ("youtube-summary", "Summarises a YouTube video from its transcript."),
+    ("newsletter", "The owner's monthly newsletter: the sections, the length and the sign-off."),
+    ("tax-papers", "Gathers the papers for the yearly tax return."),
+    ("gym-plan", "Plans the week's workouts from the owner's goals."),
+    ("recipe-scaler", "Scales a recipe to a number of people and lists what to buy."),
+    ("code-review", "Reviews a diff for bugs, tests and style, and lists the findings."),
+    ("blog-seo", "Blog articles with keywords, headings and a meta description."),
+    ("podcast-notes", "Show notes for an episode of the owner's podcast, with the timestamps."),
+    ("invoice-pdf", "Fills in the invoice form of a client."),
+    ("mail-merge", "Sends one email to each contact of a list."),
+    ("book-notes", "Notes on a book the owner read: the argument, the quotes and what to try."),
+    ("home-budget", "The monthly budget of the home, by category."),
+    ("shopping-list", "The weekly shopping list from the meals planned."),
+)
+
+
+def _other_skills() -> tuple[SkillSeed, ...]:
+    return tuple(
+        SkillSeed(name=name, description=description, body=_lines(f"# {name}", "", "Not needed for this task."))
+        for name, description in _OTHER_SKILLS
+    )
+
+
+def _stand_in_server(name: str, stand_in_name: str, description: str) -> McpServerConfig:
+    """A server of a choice task: the stand-in called ``stand_in_name`` under the (cryptic) ``name`` the task gives it,
+    with the owner's ``description`` of it when the task has one ("" for none)."""
+    stand_in(stand_in_name)
+    return McpServerConfig(
+        name=name,
+        command=sys.executable,
+        args=["-m", "dotagent.evals.tool_server", stand_in_name],
+        description=description,
+    )
+
+
+def _tool_of(name: str, one: StandIn) -> str:
+    """The name the model calls the tool of the stand-in ``one`` by, when the task gives the server ``name``."""
+    return exposed_name(name, one.tool)
+
+
+def _group_of(name: str) -> str:
+    return f"{PREFIX}{name}"
+
+
+def _use(server: str) -> ScriptedTurn:
+    return _turn(_call(USE_TOOLS_TOOL, group=_group_of(server)))
+
+
+def _no_picks() -> NoPicks:
+    return NoPicks(kind="no_picks")
+
+
+def _reads(skill: SkillSeed) -> SkillRead:
+    return SkillRead(kind="skill_read", name=skill.name)
+
+
+def _leaves(skill: SkillSeed) -> SkillUnread:
+    return SkillUnread(kind="skill_unread", name=skill.name)
+
+
+def _ran(tool: str) -> ToolRan:
+    return ToolRan(kind="tool_ran", tool=tool)
+
+
+def _stays_off(server: str) -> GroupStaysOff:
+    return GroupStaysOff(kind="group_stays_off", group=_group_of(server))
+
+
+def _choice_tasks() -> tuple[EvalTask, ...]:
+    """The five tasks of the choice of help (item 659). The two skill tasks ask for a changelog entry and a post in a
+    form that only a skill states; the three server tasks ask a question only a server can answer, beside a decoy whose
+    tool is named alike or after what the question fits, and differ in where a run learns what a server is for: what
+    the server says of itself, what its owner wrote in the ``[[mcp]]`` table, and the descriptions of its tools."""
+    rates, timetable, forecast = stand_in("rates"), stand_in("timetable"), stand_in("forecast")
+    return (
+        _choice_task(
+            "changelog-skill-among-decoys",
+            "Add the entry for version 2.4.0, released on 2026-03-02, to CHANGELOG.md. It adds dark mode and fixes the "
+            "login loop. Write it the way the shop always writes them.",
+            (_seed("CHANGELOG.md", _lines("# Changelog")),),
+            (
+                _contains("CHANGELOG.md", "### 2026-03-02 / 2.4.0"),
+                _contains("CHANGELOG.md", "NEW: "),
+                _contains("CHANGELOG.md", "FIXED: "),
+                _grep("dark mode", "CHANGELOG.md"),
+                _grep("login loop", "CHANGELOG.md"),
+                _reads(_SHOP_CHANGELOG),
+                _leaves(_RELEASE_MAIL),
+                _leaves(_DOCS_VOICE),
+                _no_picks(),
+            ),
+            (
+                _turn(_call(SKILL_TOOL, name=_SHOP_CHANGELOG.name)),
+                _turn(
+                    _write(
+                        "CHANGELOG.md",
+                        _lines("# Changelog", "", "### 2026-03-02 / 2.4.0", "NEW: dark mode", "FIXED: login loop"),
+                    )
+                ),
+                _finish("I added the entry for 2.4.0 to CHANGELOG.md in the shop's form.", True),
+            ),
+            (_RELEASE_MAIL, _SHOP_CHANGELOG, _DOCS_VOICE),
+            (),
+        ),
+        _choice_task(
+            "tweet-skill-among-many",
+            "Tweet about our launch tomorrow: dark mode ships at 10:00. Write the post into tweet.txt.",
+            (),
+            (
+                _contains("tweet.txt", "10:00"),
+                _grep("dark mode", "tweet.txt"),
+                _contains("tweet.txt", " ~ the shop"),
+                _reads(_X_POST_WRITER),
+                _leaves(_LINKEDIN_POST),
+                _no_picks(),
+            ),
+            (
+                _turn(_call(SKILL_TOOL, name=_X_POST_WRITER.name)),
+                _turn(_write("tweet.txt", _lines("dark mode ships tomorrow at 10:00 ~ the shop"))),
+                _finish("I wrote the post into tweet.txt.", True),
+            ),
+            (_X_POST_WRITER, _LINKEDIN_POST, *_other_skills()),
+            (),
+        ),
+        _choice_task(
+            "rates-server-by-its-words",
+            "At the bank's rate of 2 March 2026, how many Turkish lira are 250 euros? Answer with the amount.",
+            (),
+            (
+                _matches(r"9[.,\s]?653"),
+                _ran(_tool_of("ab-tools", rates)),
+                _stays_off("zq-kit"),
+                _no_picks(),
+            ),
+            (
+                _use("ab-tools"),
+                _turn(_call(_tool_of("ab-tools", rates), key="2026-03-02 EUR/TRY")),
+                _finish("At the bank's rate of 38.6125, 250 euros are 9,653.13 Turkish lira.", True),
+            ),
+            (),
+            (_stand_in_server("ab-tools", "rates", ""), _stand_in_server("zq-kit", "units", "")),
+        ),
+        _choice_task(
+            "timetable-server-by-owners-words",
+            "In which room does class 7B have physics on Wednesday? Answer with the room.",
+            (),
+            (
+                _matches(r"\b214\b"),
+                _ran(_tool_of("kb-desk", timetable)),
+                _stays_off("mv-lab"),
+                _no_picks(),
+            ),
+            (
+                _use("kb-desk"),
+                _turn(_call(_tool_of("kb-desk", timetable), key="7B wed physics")),
+                _finish("Class 7B has physics on Wednesday in room 214.", True),
+            ),
+            (),
+            (
+                _stand_in_server(
+                    "kb-desk",
+                    "timetable",
+                    "the school's timetable, which class has which subject in which room on each weekday",
+                ),
+                _stand_in_server(
+                    "mv-lab", "freezers", "the physics lab's freezers, their temperature and door openings by day"
+                ),
+            ),
+        ),
+        _choice_task(
+            "forecast-server-by-its-tools",
+            "What did the weather service forecast for Izmir on 5 March 2026? Answer with the temperatures.",
+            (),
+            (
+                _matches(r"\b11\b[^0-9]+\b16\b"),
+                _ran(_tool_of("ml-pack", forecast)),
+                _stays_off("pq-dev"),
+                _no_picks(),
+            ),
+            (
+                _use("ml-pack"),
+                _turn(_call(_tool_of("ml-pack", forecast), key="Izmir 2026-03-05")),
+                _finish("The weather service forecast rain for Izmir on 5 March 2026, 11 to 16 C.", True),
+            ),
+            (),
+            (_stand_in_server("ml-pack", "forecast", ""), _stand_in_server("pq-dev", "pipelines", "")),
+        ),
+    )
+
+
 def all_tasks() -> tuple[EvalTask, ...]:
     """Every task of the catalog, in a fixed order: the small tasks, the long ones, the two on a site, the three that
-    help makes short, then the two on Office files."""
-    return (*_catalog(), *_long_tasks(), *_site_tasks(), *_help_tasks(), *_office_tasks())
+    help makes short, the two on Office files, then the five of the choice of help."""
+    return (*_catalog(), *_long_tasks(), *_site_tasks(), *_help_tasks(), *_office_tasks(), *_choice_tasks())
 
 
 def select_tasks(task_ids: Sequence[str]) -> tuple[EvalTask, ...]:

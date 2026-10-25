@@ -350,6 +350,7 @@ class EvalRunCommand(FrozenModel):
     model: str | None
     tasks: tuple[str, ...]
     repeat: int = Field(ge=1)
+    no_mcp_purposes: bool
 
 
 class EvalReportCommand(FrozenModel):

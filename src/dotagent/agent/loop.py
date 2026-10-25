@@ -220,6 +220,7 @@ from dotagent.llm.types import (
     user_message,
 )
 from dotagent.llm.typesafe import ChoiceAnswer
+from dotagent.mcp.types import McpPurpose
 from dotagent.memory.lifecycle import Gone, notes_gone
 from dotagent.memory.render import render_note
 from dotagent.memory.service import (
@@ -261,6 +262,7 @@ from dotagent.tools.groups import (
     ACCOUNTS_GROUP,
     BROWSER_GROUP,
     CORE_GROUP,
+    GROUPS_EVENT,
     group_of,
     groups_event,
     groups_of,
@@ -1899,6 +1901,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     fitting: SkillListing = listed_skills(skills.skills, query, close, runtime.config.skills.listed)
     browser: BrowserSession = await browser_of(runtime, run)
     names: AssistantView = runtime.assistant.view()
+    # What each MCP server's group is for, from what the hub learned when it connected (item 659): nothing is asked of a
+    # server now. ``[agent] mcp_purposes = false`` leaves the lines as they were, the evals' other arm.
+    purposes: dict[str, McpPurpose] = runtime.mcp.purposes(held_at_start) if config.mcp_purposes else {}
     system: Message = system_message(
         build_system_prompt(
             collect_prompt_inputs(
@@ -1948,6 +1953,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 config.prompt,
                 harness_text,
                 lead,
+                skills_left_names=listing.left_names,
+                group_purposes=purposes,
             )
         )
     )
@@ -1966,7 +1973,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else frozenset(groups)
     )
     if grouped:
-        await runtime.bus.emit(run.id, "tool_groups", groups_event(0, groups, on, (), surface_reason), True)
+        await runtime.bus.emit(run.id, GROUPS_EVENT, groups_event(0, groups, on, (), surface_reason), True)
     goal: Message = await message_with_attachments(
         runtime,
         run.thread_id,
@@ -2400,7 +2407,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             turned_on: tuple[str, ...] = _turned_on(outcomes, hidden, on)
             if turned_on:
                 on = on | frozenset(turned_on)
-                await runtime.bus.emit(run.id, "tool_groups", groups_event(steps, groups, on, turned_on, ""), True)
+                await runtime.bus.emit(run.id, GROUPS_EVENT, groups_event(steps, groups, on, turned_on, ""), True)
             results: list[Message] = await _tool_messages(agent, outcomes, info.vision)
             ledger = with_actions(
                 ledger, [(outcome.call, not outcome.result.is_error, outcome.result.text) for outcome in outcomes]

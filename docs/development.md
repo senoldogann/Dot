@@ -403,13 +403,14 @@ browser, whose end the review model checks against the goal on the confirmation 
 them short, and ask whether a run takes it: a skill that states the house style a memo has to follow (the only way to
 pass), a skill whose one command totals a quarter's paid orders, and a tool of a small MCP server the evals ship
 (`python -m dotagent.evals.tool_server`) that counts working days; the last two can also be done the hard way, by
-reading the files and working it out.
+reading the files and working it out. Five choice tasks follow (item 659, below): what a run picks when nobody picks for
+it.
 
 | Command                                                  | What it does                                                                                                                                                                                                       |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `dotx eval list`                                         | The tasks, with their kind, mode and number of checks.                                                                                                                                                             |
 | `dotx eval check`                                        | Needs no model and costs nothing. Replays the reference solution of every task through the real loop, tools and policy, and proves that a run that touches nothing and says "done" fails every task and that the reference of a task with an easy way takes it. Run it after changing a tool, the policy or the loop. |
-| `dotx eval run [--model REF] [--task ID]... [--repeat N]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens, and the notice before it starts states the ceiling. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. |
+| `dotx eval run [--model REF] [--task ID]... [--repeat N] [--no-mcp-purposes]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens (180 s or 250000 for a choice task), and the notice before it starts states the ceiling. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. `--no-mcp-purposes` plays them with `[agent] mcp_purposes` false (below). |
 | `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims, unproven steps, the share of the easy ways taken); without a file, every run saved under `<home>/evals/`. |
 
 Every attempt runs unattended in a throw-away Dot home (its own database and workspace, removed afterwards), with the
@@ -446,10 +447,75 @@ its report after every attempt, so an interrupted run keeps what it measured.
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with (their text, or the bytes of an
 Office file in Base64), the goal, checks (a file exists, holds or equals something, a JSON file equals a value, a
 command exits with 0, the answer contains, matches or does not contain something, no file or folder anywhere in the
-workspace is named like a glob), the checks that hold unless the run followed an instruction hidden in a file (`dotx
-eval check` reports one that an answer quoting the files the goal names would fail), the skills and MCP servers it
-brings and the easy way they offer (or a skill that comes with Dot), and a
-reference solution as a script of tool calls. The two tasks on Office files start from a workbook whose formulas hold
-the results Excel saved and from a Word document whose company name is bold in one place and split over two runs in
-another; their easy way is the skill that comes with Dot for them, and their checks read the files with Dot's own Python
-(`python -I -m dotagent.evals.office_tasks`). To add one, write it there and run `dotx eval check`.
+workspace is named like a glob), the checks that read the run's events (item 659: the skill it read or left unread, the
+tool of an MCP server that ran, a tool group that stayed off, no pick made in the composer), the checks that hold unless
+the run followed an instruction hidden in a file (`dotx eval check` reports one that an answer quoting the files the
+goal names would fail), the skills and MCP servers it brings and the easy way they offer (or a skill that comes with
+Dot), whether its tools are grouped, and a reference solution as a script of tool calls. The two tasks on Office files
+start from a workbook whose formulas hold the results Excel saved and from a Word document whose company name is bold in
+one place and split over two runs in another; their easy way is the skill that comes with Dot for them, and their checks
+read the files with Dot's own Python (`python -I -m dotagent.evals.office_tasks`). To add one, write it there and run
+`dotx eval check`.
+
+### The choice of help, and what the purpose lines change
+
+A run is told which skill or MCP server to use only when its message carries a pick (a tag in the composer). Otherwise
+it chooses from what its instructions say of them: a skill's name and description, and the line of each MCP server's
+tool group, which says what the server is for ([MCP servers](extending.md#mcp-servers), item 659). Five tasks of the
+kind `choice` measure that choice. Each has help that fits its goal beside a decoy that does not, and passes only when
+the events of the run show the right pick and no pick was made for it.
+
+| Task                               | The right pick                           | The decoy                                 | What tells them apart                                                                 |
+| ---------------------------------- | ---------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| `changelog-skill-among-decoys`     | the skill `shop-changelog`               | the skills `release-mail`, `docs-voice`   | the skills' descriptions; the form of the entry is in the right skill alone           |
+| `tweet-skill-among-many`           | the skill `x-post-writer`                | the skill `linkedin-post`                 | 25 skills are offered, more than the 20 listed: the right one shares no word with the goal, so only its name is said |
+| `rates-server-by-its-words`        | the server `ab-tools`, the bank's rates  | `zq-kit`, a unit converter with `convert` | each server's own instructions                                                        |
+| `timetable-server-by-owners-words` | the server `kb-desk`, the school's timetable | `mv-lab`, a lab's freezers, which shares a word | the `description` of each `[[mcp]]` table; the servers say nothing           |
+| `forecast-server-by-its-tools`     | the server `ml-pack`, a weather forecast | `pq-dev`, the status of a build           | the first sentence of each server's tool; the servers say nothing else                |
+
+The tasks that bring servers run with their tools in groups, as a run of more than 128 tools has them, so each server's
+group starts off and the lines are all the run has to go by. The servers are stand-ins (`python -m
+dotagent.evals.tool_server NAME`): one tool, answering from a fixed table, named alike (`get`) or after what the decoy's
+name fits better. A task passes when its file or answer is right and the events show it: the right skill read
+(`skill_read`) and the decoys' not (`skill_unread`), the right server's tool ran (`tool_ran`: a call of a tool whose
+group is off does not run, it turns the group on, and the call made again counts), the decoy's group never on
+(`group_stays_off`: turned on by `use_tools` or by a call of its tool), and no pick (`no_picks`). `dotx eval check`
+proves that each can be passed and that none is passed by doing nothing. `tests/smoke/test_choice_tasks.py` plays the
+wrong picks too (the decoy's group, the decoy's skill, no skill, an answer from memory): they prove that the tasks can
+be failed, not what a model does.
+
+**To measure what the purpose lines change**, play the same five tasks twice with the same model, once as Dot runs (the
+lines say what each server is for) and once with `--no-mcp-purposes` (`[agent] mcp_purposes = false` for that run: each
+line is the server's name and its tools' names, as before item 659), then compare the two reports. It needs the key of
+the model under measure, found the way the daemon finds it, and calls it: no test does, and it is for the owner to run.
+Leave out `--model` for `[models] main`.
+
+```bash
+# A: as Dot runs.
+dotx eval run --repeat 5 --task changelog-skill-among-decoys --task tweet-skill-among-many \
+  --task rates-server-by-its-words --task timetable-server-by-owners-words --task forecast-server-by-its-tools
+
+# B: the same tasks and model, with the lines of the groups as they were.
+dotx eval run --repeat 5 --no-mcp-purposes --task changelog-skill-among-decoys --task tweet-skill-among-many \
+  --task rates-server-by-its-words --task timetable-server-by-owners-words --task forecast-server-by-its-tools
+
+# The two, side by side, with a line for the second against the first.
+dotx eval report
+```
+
+**What it costs.** An attempt is cut after 180 s or 250000 tokens, so the notice before each run states a ceiling of
+6,250,000 tokens for five repeats of the five tasks, which only a run that loops reaches. A step of these tasks sends
+13,500 to 19,500 tokens (the loop's own estimate, measured on the scripted runs of the tasks; the lines add 50 to 150),
+and a run that picks right takes three to six steps (the references take three), so an attempt is about 40,000 to
+120,000 input tokens, one arm at five repeats about two million and both arms about four million, the most of it the
+same instructions sent again, which a provider that caches them bills for less. The output is a few thousand tokens an
+attempt. A model on your own Mac costs time and no money.
+
+**Reading it.** The by-kind line of each report has `choice` passes out of 25, and the settings line says `server
+purposes on` or `off`. The three server tasks are what the lines change; the two skill tasks are the control, since the
+switch does not touch them: if their pass rates differ between the arms, that is the noise of the model on these tasks,
+and a difference of the server tasks no bigger than it is not one. Under `did not pass`, a failure says which pick was
+wrong: `the tool group mcp__zq-kit stayed off` is a decoy opened, `the run called mcp__ab-tools__lookup and the call
+ran` a server never used, `the run read the skill x-post-writer` a skill missed (the run that found it by its name, or
+by `find_help`, passes). One attempt says little; five show the tasks a model passes only now and then. No live run of
+these has been made yet.
