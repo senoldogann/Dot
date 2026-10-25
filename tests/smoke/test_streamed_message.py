@@ -301,3 +301,93 @@ async def test_a_streamed_message_is_drawn_as_it_will_stay(own_home: Path, tmp_p
             await _whole(browser, address, manager, model, tmp_path)
         finally:
             await browser.close()
+
+
+async def test_a_message_still_streaming_when_its_run_ends_is_not_shown_twice(own_home: Path, tmp_path: Path) -> None:
+    """Item 660: OpenCode's agent can end a step before Dot has seen it begin, and Dot then sends no ``assistant`` for
+    it: the message streamed, the run ended with the same words as its answer, and the page showed the message twice,
+    the first still with its caret. Here the scripted model streams a message that is its answer (a reply with no
+    call), and the test leaves the run's ``assistant`` event out: the message ends with the run, and the answer that
+    repeats it leaves it out."""
+    model: Streamer = Streamer(ScriptedProvider(_PROVIDER, [ScriptedTurn(text=MESSAGE, calls=())]))
+    async with _served(own_home, model) as (manager, address), async_playwright() as playwright:
+        bus = manager._runtime.bus
+        emit = bus.emit
+
+        async def without_assistant(run_id: str, kind: str, data: object, persisted: bool) -> object:
+            if kind == "assistant":
+                return None
+            return await emit(run_id, kind, data, persisted)  # type: ignore[arg-type]
+
+        bus.emit = without_assistant  # type: ignore[method-assign]
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 390, "height": 844})
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            run: RunRecord = await manager.start(
+                "Write ten parts", "chat", STREAMER, None, "test", None, None, "standard", None, "ask", False, ()
+            )
+            await page.goto(f"{address}/#/runs/{run.id}")
+            await _opened(page)
+            model.go.set()
+            await expect(page.locator(".bubble.live")).to_have_count(1, timeout=20_000)
+            await expect(page.locator(".answer")).to_have_count(1, timeout=30_000)
+            await page.wait_for_timeout(500)
+            await page.screenshot(path=str(tmp_path / "ended-with-the-run.png"))
+            await expect(page.locator(".bubble.live")).to_have_count(0)
+            await expect(page.locator(".stream-caret")).to_have_count(0)
+            copies: int = await page.evaluate("(words) => document.body.innerText.split(words).length - 1", "Part 10.")
+            assert copies == 1, copies
+        finally:
+            await browser.close()
+
+
+async def test_a_tail_that_comes_under_the_next_step_leaves_no_message_streaming(
+    own_home: Path, tmp_path: Path
+) -> None:
+    """Item 660, as the owner met it: OpenCode's run let a step's held tail go under the next step's number, just before
+    the step's ``assistant``. The tail opened a live message of its own, the step's own lost its place, and both kept a
+    caret under the answer. Here the test sends such a tail before the step's ``assistant``: no live message and no
+    caret are left, and the message's words come once, its tail not as a message of its own."""
+    model: Streamer = Streamer(ScriptedProvider(_PROVIDER, [ScriptedTurn(text=MESSAGE, calls=())]))
+    async with _served(own_home, model) as (manager, address), async_playwright() as playwright:
+        bus = manager._runtime.bus
+        emit = bus.emit
+
+        held: list[dict[str, object]] = []
+
+        async def tail_first(run_id: str, kind: str, data: dict[str, object], persisted: bool) -> object:
+            # The stream's last piece of text is held back, as the stream holds the word being written, and goes under
+            # the next step's number just before the step's end, whose text is the whole message: OpenCode's old order.
+            if kind == "delta" and data.get("kind") == "text":
+                if held:
+                    await emit(run_id, kind, held.pop(), persisted)
+                held.append(data)
+                return None
+            if kind == "assistant" and held:
+                tail: dict[str, object] = held.pop()
+                await emit(run_id, "delta", {**tail, "step": int(str(data["step"])) + 1}, False)
+            return await emit(run_id, kind, data, persisted)
+
+        bus.emit = tail_first  # type: ignore[assignment]
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 390, "height": 844})
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            run: RunRecord = await manager.start(
+                "Write ten parts", "chat", STREAMER, None, "test", None, None, "standard", None, "ask", False, ()
+            )
+            await page.goto(f"{address}/#/runs/{run.id}")
+            await _opened(page)
+            model.go.set()
+            await expect(page.locator(".answer")).to_have_count(1, timeout=30_000)
+            await page.wait_for_timeout(500)
+            await page.screenshot(path=str(tmp_path / "tail-under-the-next-step.png"))
+            await expect(page.locator(".bubble.live")).to_have_count(0)
+            await expect(page.locator(".stream-caret")).to_have_count(0)
+            # The message once, and its tail not as a message of its own: it is the end of the step's words.
+            count = "(words) => document.body.innerText.split(words).length - 1"
+            assert [await page.evaluate(count, words) for words in ("Part 1.", "Part 10.")] == [1, 1]
+            await expect(page.locator(".bubble.say")).to_have_count(0)
+        finally:
+            await browser.close()

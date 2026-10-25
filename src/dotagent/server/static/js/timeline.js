@@ -476,6 +476,35 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   }
 
   /**
+   * A live message that loses its place before its step's end reaches it (item 660): another step's words open a
+   * message of their own, a step's end comes for another step, or the run ends. It ends as a step's end ends it: drawn
+   * whole without its caret and counted among the replies (an empty one goes), so it never keeps a caret on the page
+   * and an answer that repeats it leaves it out. OpenCode's run once sent a step's held tail under the next step's
+   * number, which did all of this; item 660 fixed that there, and this is the net behind it.
+   */
+  function settleLive(scope, live) {
+    live.ended = true;
+    if (live.text.trim() === "") {
+      live.node.remove();
+      return;
+    }
+    live.node.className = "bubble say";
+    const body = prose(live.text);
+    live.body.replaceWith(body);
+    // Its step's end may still come for it: it is drawn there again (the assistant handler), not in a second message.
+    scope.replies.push({ node: live.node, text: live.text, step: live.step, body });
+  }
+
+  /** The run is over: the message it still holds open ends with it (settleLive). */
+  function closeLive(scope) {
+    const live = scope.live;
+    scope.live = null;
+    if (live !== null) {
+      settleLive(scope, live);
+    }
+  }
+
+  /**
    * A turn that ends with a plain reply has that text twice: as its last message and as the result of the run. The result
    * is shown as the answer, so every message that repeats it goes, as an earlier turn leaves them out (history.js), also
    * when a step came after it: a task run told to finish (the loop's note on a reply without a tool) thinks once more and
@@ -875,6 +904,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const needs = typeof record.data.needs === "string" ? record.data.needs.trim() : "";
       const isRoot = scope.runId === rootRunId;
       settleGroups(scope, record.ts);
+      closeLive(scope);
       // A reply that streamed the same words was read as they came: its answer does not write them in again.
       const readAlready = dropRepeatedReply(scope, result, record.data.restated ?? []);
       const answer = answerMessage({
@@ -922,7 +952,25 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         }
       }
       const bubble = scope.live !== null && scope.live.step === data.step ? scope.live : null;
+      const stray = bubble === null ? scope.live : null;
       scope.live = null;
+      if (stray !== null) {
+        // A live message of another step is not this step's to end. Words of the next step that end this step's own are
+        // this step's tail, come under the next step's number (OpenCode's old order, item 660): they go. Any other ends
+        // as it stands rather than stay streaming.
+        if (stray.step === data.step + 1 && data.text.trimEnd().endsWith(stray.text.trim())) {
+          stray.ended = true;
+          stray.node.remove();
+        } else {
+          settleLive(scope, stray);
+        }
+      }
+      // This step's message, ended when another step's words took its place, is drawn again where it stands.
+      const settled =
+        bubble === null ? scope.replies.find((reply) => reply.step === data.step && reply.body !== undefined && reply.node.isConnected) : undefined;
+      if (settled !== undefined) {
+        scope.replies = scope.replies.filter((reply) => reply !== settled);
+      }
       if (bubble !== null) {
         bubble.ended = true;
       }
@@ -930,6 +978,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       if (!hasText) {
         if (bubble !== null) {
           bubble.node.remove();
+        }
+        if (settled !== undefined) {
+          scope.replies.push(settled);
         }
         if (scope.runId === rootRunId) {
           onStats({ step: data.step, input: data.input_tokens, output: data.output_tokens });
@@ -940,7 +991,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       endGroup(scope, record.ts);
       scope.turnGroup = null;
       scope.boundary = record.ts;
-      const target = bubble ?? newBubble(scope, data.step, false);
+      const target = bubble ?? (settled !== undefined ? { node: settled.node, body: settled.body } : newBubble(scope, data.step, false));
       target.node.className = "bubble say";
       target.body.replaceWith(prose(data.text));
       scope.replies.push({ node: target.node, text: data.text, step: data.step });
@@ -982,6 +1033,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       }
       endThought(scope);
       if (scope.live === null || scope.live.step !== data.step) {
+        // Another step's live message gives way to this one's, ended as it stands rather than left streaming.
+        if (scope.live !== null) {
+          settleLive(scope, scope.live);
+        }
         // The step writes: its thought comes out of the group before its message, as on a page loaded later.
         liftThought(scope);
         scope.live = newBubble(scope, data.step, true);
