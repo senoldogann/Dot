@@ -336,6 +336,9 @@ const AFTER_RUN = [
 function buildReactionsCard() {
   let settings = null;
   const body = el("div", { class: "card-pad stack" }, inlineLoading());
+  // The card folds (its seven rows are long for a page read for its other cards), shut until it is opened, and stays as
+  // the reader left it, in this browser; its head says what a reaction on a task that ended does.
+  const card = foldCard({ id: "general-reactions", title: "Reactions", actions: null, body, openByDefault: false });
 
   async function change(key, value) {
     settings = await api.post("/reactions/settings", { key, value });
@@ -381,6 +384,7 @@ function buildReactionsCard() {
       row.select.value = String(settings[row.key]);
       row.select.disabled = settings.follow_ups !== true;
     }
+    card.setSummary(settings.follow_ups === true ? "Follow-up tasks on" : "Only feedback");
   }
 
   async function load() {
@@ -404,7 +408,7 @@ function buildReactionsCard() {
   }
 
   load();
-  return section("Reactions", null, body);
+  return card.element;
 }
 
 /** What a chat shows of the actions the review model approved (items 346 and 362), kept in this browser. */
