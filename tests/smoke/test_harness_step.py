@@ -900,6 +900,7 @@ async def test_the_tokens_of_the_runs_a_candidate_delegates_are_the_attempts_own
         skills=(),
         servers=(),
         easy_way=None,
+        grouped=False,
     )
     config: AppConfig = _config({})
     outcomes = [outcome async for outcome in play(config, login_env, {}, SCRIPTED_MODEL, (task,), 1, NO_HARNESS, True)]

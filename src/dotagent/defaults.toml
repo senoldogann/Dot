@@ -9,6 +9,7 @@
 #   args = ["-y", "some-mcp-server"]
 #   env = { NOTES_TOKEN = "${NOTES_TOKEN}" }   # ${NAME} is looked up like an API key (environment, .env, Keychain)
 #   allow = ["search", "read_note"]     # offer only these tools; empty = all of them, however many
+#   description = "my notes: search them, read one, add to one"   # what it is for, one line of 200 characters at most
 #   enabled = true
 #   startup_timeout_s = 60.0
 #   call_timeout_s = 120.0
@@ -314,6 +315,13 @@ tool_surface = "full"
 # tool in a few lines. With tool_surface = "grouped" as well, a run starts lean: the shortest prompt and the core tools.
 # "full" stays the default: the evals of item 280 (ROADMAP.md) did not show the lean start doing as well.
 prompt = "full"
+# Whether the line of an MCP server's tool group in the prompt says what the server is for (item 659): the description
+# you wrote in its [[mcp]] table, Dot's words for a server that comes with it, or else what the server says of itself
+# (the instructions it sent when Dot connected, else the first sentences of its tools' descriptions), made one plain line
+# of 160 characters at most and put in quotes as the server's own claim. false leaves the line as it was before: the
+# server's name and its tools' names, which tell little when a server is called rea-mcp. `dotx eval run
+# --no-mcp-purposes` plays the evals' choice tasks with it false, to measure what the lines change.
+mcp_purposes = true
 # A task or research run that ends with success but whose answer names paths that do not exist, and that no successful
 # call of the run named, is sent back once with the list: to create what is missing, to correct the answer or to finish
 # again with the same answer. The paths looked at are ~ paths and absolute paths under /Users, /tmp, /private, /var,

@@ -20,9 +20,10 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.mcp.connection import McpConnection
 from dotagent.mcp.launch import resolve_server_secrets, server_environment, server_headers
 from dotagent.mcp.masking import masked_context
-from dotagent.mcp.naming import require_distinct_names
+from dotagent.mcp.naming import PREFIX, require_distinct_names
+from dotagent.mcp.purpose import READ_CHARS, purpose_of
 from dotagent.mcp.signin import kept_sign_in
-from dotagent.mcp.types import McpFailure, McpTool
+from dotagent.mcp.types import McpFailure, McpPurpose, McpTool
 from dotagent.secrets import known_secrets
 from dotagent.tools.schema import flatten_json_schema
 
@@ -33,11 +34,13 @@ _SHOWN_TOOL_NAMES: int = 60
 
 @dataclass(frozen=True)
 class _Connected:
-    """A server that answered with its tools: the connection, how many tools it listed, and those the model gets."""
+    """A server that answered with its tools: the connection, how many tools it listed, those the model gets, and what
+    it said of itself when it connected (its ``instructions``, the start of them; empty when it said nothing)."""
 
     connection: McpConnection
     listed: int
     tools: tuple[McpTool, ...]
+    instructions: str
 
 
 class ServerReport(FrozenModel):
@@ -121,9 +124,10 @@ async def _connect_server(
         # A tool that cannot be handed to a model leaves its server out, as a server that cannot start is left out.
         for tool in tools:
             tool_parameters(tool)
+        instructions: str = (connection.instructions() or "")[:READ_CHARS]
         cleanup.pop_all()
     log.info("mcp_server_ready", server=config.name, tools=len(tools), offered=len(listed))
-    return _Connected(connection=connection, listed=len(listed), tools=tools)
+    return _Connected(connection=connection, listed=len(listed), tools=tools, instructions=instructions)
 
 
 async def _connect_kept(config: McpServerConfig, login_env: Mapping[str, str]) -> _Connected:
@@ -150,7 +154,9 @@ async def _offered_tools(config: McpServerConfig, login_env: Mapping[str, str]) 
 class McpHub:
     """The connected servers and the tools they offer to the model, and the enabled servers left out at the start. A
     server connected or removed while Dot runs (:meth:`connect`, :meth:`disconnect`) changes the tools of the runs
-    that start after; a run keeps those it started with."""
+    that start after; a run keeps those it started with. What each server said of itself when it connected is kept
+    (``instructions``), so that the instructions of a run can say what a server is for without reaching it
+    (:meth:`purposes`, item 659)."""
 
     def __init__(
         self,
@@ -159,12 +165,14 @@ class McpHub:
         failures: tuple[McpFailure, ...],
         configs: Mapping[str, McpServerConfig],
         login_env: Mapping[str, str],
+        instructions: Mapping[str, str],
     ) -> None:
         self._connections: dict[str, McpConnection] = dict(connections)
         self.tools: tuple[McpTool, ...] = tools
         self.failures: tuple[McpFailure, ...] = failures
         self._configs: dict[str, McpServerConfig] = dict(configs)
         self._login_env: dict[str, str] = dict(login_env)
+        self._instructions: dict[str, str] = dict(instructions)
         self._changing: asyncio.Lock = asyncio.Lock()
 
     def connected(self) -> tuple[str, ...]:
@@ -174,6 +182,19 @@ class McpHub:
     def configs(self) -> dict[str, McpServerConfig]:
         """Every enabled server the hub has, connected or left out, by name."""
         return dict(self._configs)
+
+    def purposes(self, held: Sequence[str]) -> dict[str, McpPurpose]:
+        """What the line of each connected server's tool group says it is for (item 659), by the group's name: its
+        ``description`` (the owner's, or Dot's for a server that comes with it), else what it said of itself when it
+        connected (:func:`dotagent.mcp.purpose.purpose_of`) with the secrets ``held`` masked. A server with neither has
+        none. It reads what the hub holds and reaches no server, so a run's start waits for none."""
+        found: dict[str, McpPurpose] = {}
+        for server in self._connections:
+            tools: tuple[McpTool, ...] = tuple(tool for tool in self.tools if tool.server == server)
+            purpose: McpPurpose | None = purpose_of(self._configs[server], self._instructions.get(server), tools, held)
+            if purpose is not None:
+                found[PREFIX + server] = purpose
+        return found
 
     async def call(self, tool: McpTool, arguments: JsonObject) -> CallToolResult:
         connection: McpConnection | None = self._connections.get(tool.server)
@@ -215,6 +236,7 @@ class McpHub:
             previous: McpConnection | None = self._connections.pop(config.name, None)
             self._connections[config.name] = done.connection
             self._configs[config.name] = config
+            self._instructions[config.name] = done.instructions
             self.tools = (*(tool for tool in self.tools if tool.server != config.name), *done.tools)
             self.failures = tuple(failure for failure in self.failures if failure.server != config.name)
         if previous is not None:
@@ -226,6 +248,7 @@ class McpHub:
         async with self._changing:
             connection: McpConnection | None = self._connections.pop(server, None)
             self._configs.pop(server, None)
+            self._instructions.pop(server, None)
             self.tools = tuple(tool for tool in self.tools if tool.server != server)
             self.failures = tuple(failure for failure in self.failures if failure.server != server)
         if connection is not None:
@@ -280,6 +303,7 @@ async def open_hub(configs: Sequence[McpServerConfig], login_env: Mapping[str, s
         failures,
         {config.name: config for config in enabled},
         login_env,
+        {name: done.instructions for name, done in connected.items()},
     )
 
 

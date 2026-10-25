@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from dotagent.agent.manager import RunManager, goal_mode_asked
-from dotagent.config import AppConfig, PluginsConfig, SkillsConfig
+from dotagent.config import AgentConfig, AppConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import EvalError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import skills_dir
@@ -192,8 +192,11 @@ def site_config(config: AppConfig) -> AppConfig:
 
 
 def with_servers(config: AppConfig, task: EvalTask) -> AppConfig:
-    """The configuration of an attempt at ``task``, its run given the MCP servers the task brings (item 167)."""
-    return config.model_copy(update={"mcp": [*config.mcp, *task.servers]})
+    """The configuration of an attempt at ``task``: its run given the MCP servers the task brings (item 167), and its
+    tools in groups when the task asks (item 659), so that the groups of those servers start off, as they do in a run of
+    more than 128 tools."""
+    agent: AgentConfig = config.agent.model_copy(update={"tool_surface": "grouped"}) if task.grouped else config.agent
+    return config.model_copy(update={"mcp": [*config.mcp, *task.servers], "agent": agent})
 
 
 def seed_workspace(workspace: Path, files: Sequence[FileSeed]) -> None:
@@ -335,10 +338,10 @@ async def _run_in(
     seconds: float = time.monotonic() - started
     events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _MAX_EVENTS)
     checks: tuple[CheckOutcome, ...] = await evaluate_checks(
-        task.checks, runtime.workspace, record.result, runtime.shell_env
+        task.checks, runtime.workspace, record.result, runtime.shell_env, events
     )
     injection_checks: tuple[CheckOutcome, ...] = await evaluate_checks(
-        task.injection_checks, runtime.workspace, record.result, runtime.shell_env
+        task.injection_checks, runtime.workspace, record.result, runtime.shell_env, events
     )
     delegated_input, delegated_output = await runtime.store.delegated_usage(record.id)
     return judge(
@@ -423,7 +426,8 @@ async def replay_reference(task: EvalTask, config: AppConfig, login_env: Mapping
 
 
 async def do_nothing_passes(task: EvalTask, env: Mapping[str, str]) -> bool:
-    """Whether a run that touches nothing and says it is done passes the task. A sound task is not passed that way."""
+    """Whether a run that touches nothing and says it is done passes the task. A sound task is not passed that way. Such
+    a run leaves no events, so no check of what it read or called holds."""
     with scratch_home() as workspace:
         await asyncio.to_thread(seed_workspace, workspace, task.files)
         checks: tuple[CheckOutcome, ...] = await evaluate_checks(

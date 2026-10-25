@@ -11,6 +11,7 @@ import httpx
 from pydantic import AfterValidator, Field, JsonValue, ValidationError, field_validator, model_validator
 
 from dotagent.core.errors import ConfigError
+from dotagent.core.learned_text import LINE_BREAKS, hidden_character
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, split_model_ref
@@ -302,6 +303,9 @@ class AgentConfig(FrozenModel):
     tool_surface: ToolSurface
     # How much the system prompt says (item 280): "lean" keeps its rules and gives the tools' habits in a line each.
     prompt: PromptStyle
+    # Whether the line of an MCP server's tool group in the prompt says what the server is for (item 659); false leaves
+    # the line as it was, the server's name and its tools' names.
+    mcp_purposes: bool
     verify_answer_paths: bool
     resume: ResumeMode
     resume_within_s: int
@@ -732,6 +736,26 @@ type McpTransport = Literal["stdio", "http", "sse"]
 
 # A lower-case letter, then lower-case letters, digits and hyphens; at most 24 characters. Plugin servers follow it too.
 MCP_NAME_PATTERN: str = r"^[a-z][a-z0-9-]{0,23}$"
+# The longest ``description`` an ``[[mcp]]`` table may carry (item 659): one line beside the server's group in the
+# instructions of every run, among the names of its tools.
+MCP_DESCRIPTION_CHARS: int = 200
+
+
+def _a_line_of_words(value: str) -> str:
+    """What a server is for, as the owner wrote it in ``description`` (item 659): one line of printable characters, at
+    most :data:`MCP_DESCRIPTION_CHARS` of them once the spaces at its ends are taken off. Refused rather than
+    mended, as the owner wrote it and can write it again."""
+    words: str = value.strip()
+    if LINE_BREAKS.search(words) is not None:
+        raise ValueError("a description is one line: it has a line break in it")
+    if "\t" in words:
+        raise ValueError("a description is plain words: it has a tab in it")
+    hidden: str | None = hidden_character(words)
+    if hidden is not None:
+        raise ValueError(f"a description is plain words: it has a character that prints nothing in it ({hidden})")
+    if len(words) > MCP_DESCRIPTION_CHARS:
+        raise ValueError(f"a description is at most {MCP_DESCRIPTION_CHARS} characters; this one has {len(words)}")
+    return words
 
 
 class McpServerConfig(FrozenModel):
@@ -745,7 +769,9 @@ class McpServerConfig(FrozenModel):
     Plugins (item 279): Dot then sends the access token it keeps for the server and renews it. ``cwd`` is the folder a
     server Dot starts (a ``command``) starts in, a whole path; the workspace when it names none (item 637). The
     web-research server that comes with Dot starts in its own data folder, where a run cannot write, so that no file
-    a run leaves in the workspace runs in it or in a program it starts.
+    a run leaves in the workspace runs in it or in a program it starts. ``description`` is what
+    the server is for, in the owner's own words (item 659): the line of its tool group in a run's instructions says it,
+    and nothing the server says of itself, which stands there only for a server with no description.
     """
 
     name: str = Field(pattern=MCP_NAME_PATTERN)
@@ -761,6 +787,7 @@ class McpServerConfig(FrozenModel):
     startup_timeout_s: float = Field(default=60.0, gt=0)
     call_timeout_s: float = Field(default=120.0, gt=0)
     cwd: str | None = Field(default=None, min_length=1)
+    description: Annotated[str, AfterValidator(_a_line_of_words)] = ""
 
     def transport_kind(self) -> McpTransport:
         """The transport in use: the one written down, else stdio for a command and streamable HTTP for a URL."""

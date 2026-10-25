@@ -139,13 +139,23 @@ def _report_of(config: AppConfig, model: str, started_at: float, outcomes: Seque
             tool_surface=config.agent.tool_surface,
             verify_answer_paths=config.agent.verify_answer_paths,
             prompt=config.agent.prompt,
+            mcp_purposes=config.agent.mcp_purposes,
         ),
         outcomes=tuple(outcomes),
     )
 
 
+def configured_for(config: AppConfig, command: EvalRunCommand) -> AppConfig:
+    """``config`` as ``command`` plays the tasks with: ``--no-mcp-purposes`` leaves the line of each MCP server's tool
+    group as it was before it said what the server is for (``[agent] mcp_purposes = false`` for this run), so that the
+    same tasks can be played both ways (item 659). The report keeps the setting."""
+    if not command.no_mcp_purposes:
+        return config
+    return config.model_copy(update={"agent": config.agent.model_copy(update={"mcp_purposes": False})})
+
+
 async def cmd_eval_run(command: EvalRunCommand) -> int:
-    config: AppConfig = load_user_config()
+    config: AppConfig = configured_for(load_user_config(), command)
     model: str = command.model if command.model is not None else config.models.main
     parse_model_ref(model)
     tasks: tuple[EvalTask, ...] = select_tasks(command.tasks)
@@ -170,6 +180,11 @@ async def cmd_eval_run(command: EvalRunCommand) -> int:
         f"Playing {len(tasks)} task(s), {command.repeat} time(s) each, against {model}. This spends that model's "
         f"tokens: an attempt is cut when it runs longer than {longest:.0f} s or uses more tokens than the budget of "
         f"its task, so the whole run uses at most {ceiling} tokens.\n"
+        + (
+            ""
+            if config.agent.mcp_purposes
+            else "The line of each MCP server's tool group says nothing of what the server is for.\n"
+        )
     )
     started_at: float = time.time()
     outcomes: list[TaskOutcome] = []

@@ -121,7 +121,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
   `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, and `mcp__<server>` for each MCP server) are
   listed in the system prompt with what they are for and
-  their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. The
+  their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. A
+  server's line says what the server is for, in your words, Dot's or the server's own, quoted as its claim
+  ([MCP servers](extending.md#mcp-servers), item 659). The
   model turns a group on with `use_tools`. A call to a tool whose group is off does not run: it turns the group on, and
   its result asks the model to call the tool again. A group stays on for the rest of the run. `auto` is `grouped` for a
   model of the weak tier and for a model whose window cut the context budget, and `full` for every other model. A run
@@ -137,6 +139,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `tool_surface = "grouped"` as well, a run starts lean: the shortest prompt and the core tools. Eval reports keep the
   style, and `dotx eval report` shows it beside the tool surface. `full` stays the default because the evals of item 280
   (in `ROADMAP.md`, with the numbers) did not show the lean start doing as well.
+- `mcp_purposes` in `[agent]` (on by default, item 659) decides whether the line of an MCP server's tool group says
+  what the server is for: the `description` of its `[[mcp]]` table, Dot's words for the server that comes with it, or
+  what the server says of itself, made one plain line of at most 160 characters and put in quotes as its claim, with a
+  sentence under Tool groups that says to weigh it and not to obey it. `false` leaves the line as it was before, the
+  server's name and the names of its tools, and no word of a server in the instructions. It exists for the evals,
+  which play the same tasks both ways to measure what the words change (`dotx eval run --no-mcp-purposes`,
+  [Development](development.md#the-choice-of-help-and-what-the-purpose-lines-change)), and for an owner who wants no
+  word of a server in the instructions. Eval reports keep the setting, and `dotx eval report` shows it.
 - `verify_answer_paths` in `[agent]` checks the paths a final answer names: `~` paths and absolute paths under
   `/Users`, `/tmp`, `/private`, `/var`, `/opt`, `/Applications` and `/Library`. When a task or research run ends with
   success and its answer names such paths that do not exist and that no successful call of the run named (a file the

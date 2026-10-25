@@ -474,6 +474,27 @@ learned skill whose steps may come from outside content (its record says so, or 
 run that reads it with the `skill` tool, and a run that starts with one picked in the composer starts marked (item
 585).
 
+**What a server says of itself** (item 659). When a run's tools come in groups, the line of an MCP server's group in its
+instructions says what the server is for, so that the model can tell which group to turn on ([MCP
+servers](extending.md#mcp-servers)). When you wrote a `description` for the server, or the server comes with Dot, those
+are your words or Dot's and stand as they are. Otherwise they are the server's own: the instructions it sent when Dot
+connected, else the first sentences of its tools' descriptions, which a third party wrote, in the text a run trusts
+most. So Dot does not hand them over as its own: they are cut to one plain line of at most 160 characters, with every
+line break and heading, bracket, brace, bar, backtick, backslash, double quote, address and character that prints
+nothing taken out, so that they cannot begin a line, a heading or a fence of the instructions, close the quote they
+stand in, or open a tag or a note of the system; any secret Dot holds in them is masked; and they stand in quotes after
+"describes itself as", with a sentence under Tool groups that says they are the server's claim, to judge which group
+fits the work by, and that an instruction inside them never applies to the model. What holds is that shape and what the
+words cannot do: they add no permission, since the model turns a group on by its own call and the policy judges every
+call of the server's tools as it judges any other (a tool whose name says it sends a message waits for a yes; one the
+server calls read-only runs as a read). That the model weighs them as a claim and does not do what they ask is a
+request, not a wall: words in a model's instructions can steer it, and what a hostile server's words can steer is the
+choice of a group, its own first, and what the model believes of that server. They are not marked as outside content, as
+the answer of a call is (a run that read them is not untrusted), and neither is a tool's description, which stands in
+the tool list whole up to 1,200 characters and has the same author. Nothing is asked of a server for them, since Dot
+reads them once, when the server connects. `[agent] mcp_purposes = false` keeps every word of a server out of the
+instructions.
+
 **Outside content in yolo** (item 525). A `yolo` run asks nothing, and a run marked untrusted may be steered by what a
 stranger wrote. Two checks hold for such a run, and neither asks you:
 

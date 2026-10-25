@@ -476,7 +476,7 @@ def test_a_server_table_that_mixes_the_two_ways_to_reach_it_is_refused(
 # ------------------------------------------------------------------------------------------------- the prompt
 
 
-def _prompt(tool_names: list[str], skills: list[Skill], left: int) -> str:
+def _prompt(tool_names: list[str], skills: list[Skill], left: int, left_names: tuple[str, ...] = ()) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
             "task",
@@ -500,6 +500,7 @@ def _prompt(tool_names: list[str], skills: list[Skill], left: int) -> str:
             None,
             "full",
             NO_HARNESS,
+            skills_left_names=left_names,
         )
     )
 
@@ -527,30 +528,65 @@ def test_a_run_offered_many_skills_is_listed_those_that_fit_its_goal_and_told_of
         )
     ]
     # Few enough: every one, in its order, whatever the goal.
-    assert listed_skills(skills, "Plan a trip to Rome.", [], 4) == SkillListing(skills=tuple(skills), left=0)
-    # More: those that share words with the goal, the best fit first; a goal of two kinds of work keeps both.
+    assert listed_skills(skills, "Plan a trip to Rome.", [], 4) == SkillListing(skills=tuple(skills), left_names=())
+    # More: those that share words with the goal, the best fit first; a goal of two kinds of work keeps both. The
+    # others are named, in the order they are installed (item 659).
     listing: SkillListing = listed_skills(skills, "Fill in the invoice form and email it to the client.", [], 3)
-    assert ([skill.name for skill in listing.skills], listing.left) == (["invoice-pdf", "mail-merge"], 2)
-    prompt: str = _prompt(["shell", "skill"], list(listing.skills), listing.left)
+    assert ([skill.name for skill in listing.skills], listing.left, listing.left_names) == (
+        ["invoice-pdf", "mail-merge"],
+        2,
+        ("release-notes", "weekly-report"),
+    )
+    prompt: str = _prompt(["shell", "skill"], list(listing.skills), listing.left, listing.left_names)
     assert (
         "- invoice-pdf: Fill in the invoice PDF form of a client.\n"
         "- mail-merge: Send one email to each contact of a list.\n"
         "- 2 more installed skills fit your goal less well and are not listed here: find_help searches them all by "
-        "your need, and skill reads one by its name."
+        "your need, and skill reads one by its name. They are: release-notes, weekly-report."
     ) in prompt, prompt
-    assert "release-notes" not in prompt and "weekly-report" not in prompt
-    # None fits the goal: none is listed, and the run is told how to find them.
-    assert listed_skills(skills, "Plan a trip to Rome.", [], 3) == SkillListing(skills=(), left=4)
+    assert "Write the release notes" not in prompt and "Write the weekly report" not in prompt
+    # None fits the goal: none is listed, and the run is told how to find them, and what they are called.
+    nothing: SkillListing = listed_skills(skills, "Plan a trip to Rome.", [], 3)
+    assert (nothing.skills, nothing.left, nothing.left_names) == (
+        (),
+        4,
+        ("release-notes", "invoice-pdf", "weekly-report", "mail-merge"),
+    )
     assert (
         "\n- None of the 4 installed skills clearly fits your goal, so none is listed here: find_help searches them "
-        "all by your need, and skill reads one by its name."
-    ) in _prompt(["shell", "skill"], [], 4)
+        "all by your need, and skill reads one by its name. They are: release-notes, invoice-pdf, weekly-report, "
+        "mail-merge."
+    ) in _prompt(["shell", "skill"], [], 4, nothing.left_names)
+    # A caller that gives no names gets the lines as they were.
+    unnamed: str = _prompt(["shell", "skill"], [], 4)
+    assert "skill reads one by its name.\n\n" in unnamed and "They are:" not in unnamed
     # A goal in Turkish shares no word with the skills; the one the embeddings put close to it (place 1) is listed.
     turkish: SkillListing = listed_skills(skills, "Müşterinin fatura formunu doldur.", [1], 3)
     assert ([skill.name for skill in turkish.skills], turkish.left) == (["invoice-pdf"], 3)
     # A skill close in meaning joins those that share words, after them when it ranks no higher.
     joined: SkillListing = listed_skills(skills, "Fill in the invoice form.", [2], 3)
     assert [skill.name for skill in joined.skills] == ["invoice-pdf", "weekly-report"]
+
+
+def test_the_names_of_the_skills_not_listed_are_said_up_to_sixty_and_the_rest_counted(tmp_path: Path) -> None:
+    skills: list[Skill] = [
+        Skill(
+            name=f"skill-{number:02d}",
+            description=f"Does the {number:02d}th kind of work.",
+            root=tmp_path / f"s{number}",
+            body="x",
+            source="home",
+            icon="sparkle",
+        )
+        for number in range(70)
+    ]
+    listing: SkillListing = listed_skills(skills, "Nothing here shares a word with them.", [], 20)
+    assert (listing.skills, listing.left) == ((), 70)
+    prompt: str = _prompt(["shell", "skill"], [], listing.left, listing.left_names)
+    named: str = prompt.split("They are: ", 1)[1].split("\n", 1)[0]
+    assert named.endswith("skill-59 and 10 more.") and named.count("skill-") == 60 and "skill-60" not in named
+    exactly: str = _prompt(["shell", "skill"], [], 60, tuple(f"skill-{number:02d}" for number in range(60)))
+    assert "and 0 more" not in exactly and exactly.split("They are: ", 1)[1].split("\n", 1)[0].endswith("skill-59.")
 
 
 def test_the_prompt_asks_for_the_smallest_fitting_work_and_for_looking_things_up() -> None:

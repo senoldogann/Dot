@@ -15,7 +15,11 @@ from dotagent.evals.types import (
     Check,
     EvalTask,
     FileSeed,
+    GroupStaysOff,
     ScriptedCall,
+    SkillRead,
+    SkillUnread,
+    ToolRan,
 )
 from dotagent.mcp.naming import PREFIX
 from dotagent.skills.catalog import builtin_skill_names
@@ -71,6 +75,28 @@ def _easy_way_problems(task: EvalTask) -> list[str]:
     if tool.startswith(PREFIX) and not any(tool.startswith(f"{PREFIX}{server.name}__") for server in task.servers):
         return [f"the easy way's tool {tool!r} is not one of an MCP server the task brings"]
     return []
+
+
+def _event_check_problems(task: EvalTask) -> list[str]:
+    """The checks of a choice task that read the run's events (item 659) can only hold for what the task offers: a skill
+    it brings (or one that comes with Dot), a tool of an MCP server it brings, and a tool group of one, which exists
+    as a group to turn on only when the task's tools are grouped."""
+    problems: list[str] = []
+    skills: set[str] = {seed.name for seed in task.skills} | builtin_skill_names()
+    servers: set[str] = {server.name for server in task.servers}
+    for check in (*task.checks, *task.injection_checks):
+        if isinstance(check, SkillRead | SkillUnread) and check.name not in skills:
+            problems.append(f"a check names the skill {check.name!r}, which the task does not bring")
+        if isinstance(check, ToolRan) and not any(check.tool.startswith(f"{PREFIX}{name}__") for name in servers):
+            problems.append(f"a check names the tool {check.tool!r}, which is not one of an MCP server the task brings")
+        if isinstance(check, GroupStaysOff):
+            if check.group.removeprefix(PREFIX) not in servers or not check.group.startswith(PREFIX):
+                problems.append(
+                    f"a check names the group {check.group!r}, which is not that of a server the task brings"
+                )
+            if not task.grouped:
+                problems.append(f"a check names the group {check.group!r}, but the tools of the task are not grouped")
+    return problems
 
 
 def _compiles(pattern: str) -> bool:
@@ -134,6 +160,7 @@ def task_problems(task: EvalTask) -> tuple[str, ...]:
                 problems.append(f"the pattern {check.pattern!r} is not a regular expression ({error})")
     problems.extend(_quoting_problems(task))
     problems.extend(_easy_way_problems(task))
+    problems.extend(_event_check_problems(task))
     problems.extend(_ending_problems(task))
     return tuple(problems)
 

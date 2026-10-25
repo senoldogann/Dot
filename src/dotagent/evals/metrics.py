@@ -138,20 +138,31 @@ def _skill_asked(event: EventRecord) -> JsonValue:
     return arguments.get("name") if isinstance(arguments, dict) else None
 
 
-def took_easy_way(easy_way: EasyWay | None, events: Sequence[EventRecord]) -> bool | None:
-    """Whether the run that left ``events`` took ``easy_way`` (item 167): a call of its tool, for its skill when it
-    names one, that ran and did not fail. A call that did not run (its tool's group was off, the policy refused it)
-    does not count. ``None`` for a task without an easy way."""
-    if easy_way is None:
-        return None
-    calls: set[str] = {
+def calls_of(tool: str, skill: str | None, events: Sequence[EventRecord]) -> set[str]:
+    """The ids of the calls of ``tool`` in ``events``, for the skill ``skill`` when it is given (the skill tool's
+    calls), whether or not they ran."""
+    return {
         str(event.data.get("call_id"))
         for event in events
         if event.kind == "tool_call"
-        and event.data.get("tool") == easy_way.tool
-        and (easy_way.skill is None or _skill_asked(event) == easy_way.skill)
+        and event.data.get("tool") == tool
+        and (skill is None or _skill_asked(event) == skill)
     }
+
+
+def ran(tool: str, skill: str | None, events: Sequence[EventRecord]) -> bool:
+    """Whether a call of ``tool`` (for ``skill``, when given) ran and did not fail. A call that did not run (its tool's
+    group was off, the policy refused it) does not count."""
+    calls: set[str] = calls_of(tool, skill, events)
     return any(
         event.kind == "tool_result" and event.data.get("ok") is True and str(event.data.get("call_id")) in calls
         for event in events
     )
+
+
+def took_easy_way(easy_way: EasyWay | None, events: Sequence[EventRecord]) -> bool | None:
+    """Whether the run that left ``events`` took ``easy_way`` (item 167): a call of its tool, for its skill when it
+    names one, that ran and did not fail (:func:`ran`). ``None`` for a task without an easy way."""
+    if easy_way is None:
+        return None
+    return ran(easy_way.tool, easy_way.skill, events)

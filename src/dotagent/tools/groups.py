@@ -9,11 +9,12 @@ one group per MCP server, ``mcp__<server>``. Which groups are on is up to
 the loop; everything here is pure.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import Message, ToolSpec
 from dotagent.mcp.naming import PREFIX
+from dotagent.mcp.types import McpPurpose
 
 CORE_GROUP: str = "core"
 # The browser tools, which Settings › Browser can keep from every run (item 354).
@@ -78,9 +79,18 @@ def tools_in(tools: Sequence[str], group: str) -> tuple[str, ...]:
     return tuple(tool for tool in tools if group_of(tool) == group)
 
 
-def _purpose(group: str) -> str:
+def _purpose(group: str, purposes: Mapping[str, McpPurpose]) -> str:
+    """What a group is for. An MCP server's group names the server, and says what it is for when it has a purpose
+    (item 659): the owner's or Dot's words stand as they are, the server's own words stand in quotes as its claim, which
+    the instructions say to weigh and not to obey."""
     if group.startswith(PREFIX):
-        return f"the tools of the MCP server {group.removeprefix(PREFIX)}"
+        named: str = f"the tools of the MCP server {group.removeprefix(PREFIX)}"
+        purpose: McpPurpose | None = purposes.get(group)
+        if purpose is None:
+            return named
+        if purpose.claimed:
+            return f'{named}, which describes itself as "{purpose.text}"'
+        return f"{named}: {purpose.text.rstrip('. ')}"
     return _PURPOSES[group]
 
 
@@ -90,11 +100,21 @@ def _listed(tools: Sequence[str]) -> str:
     return shown if more <= 0 else f"{shown} and {more} more"
 
 
-def group_lines(tools: Sequence[str]) -> tuple[str, ...]:
+def group_lines(tools: Sequence[str], purposes: Mapping[str, McpPurpose] | None = None) -> tuple[str, ...]:
     """One line for each group of ``tools`` other than core: its name, what it is for and its tools, the first
     LISTED_TOOLS of them in the order of ``tools`` (:func:`dotagent.help.listed.tools_in_order` puts first those of a
-    bigger group that fit the run's goal)."""
-    return tuple(f"- {group}: {_purpose(group)} ({_listed(tools_in(tools, group))})" for group in groups_of(tools))
+    bigger group that fit the run's goal). ``purposes`` say what the MCP servers' groups are for, by group (item
+    659)."""
+    said: Mapping[str, McpPurpose] = purposes or {}
+    return tuple(
+        f"- {group}: {_purpose(group, said)} ({_listed(tools_in(tools, group))})" for group in groups_of(tools)
+    )
+
+
+def quotes_a_server(tools: Sequence[str], purposes: Mapping[str, McpPurpose] | None) -> bool:
+    """Whether a line of :func:`group_lines` for ``tools`` quotes what an MCP server says of itself."""
+    said: Mapping[str, McpPurpose] = purposes or {}
+    return any(group in said and said[group].claimed for group in groups_of(tools))
 
 
 def used_groups(history: Sequence[Message]) -> frozenset[str]:
@@ -110,6 +130,10 @@ def offered_specs(specs: Sequence[ToolSpec], on: frozenset[str]) -> tuple[ToolSp
 def hidden_tools(specs: Sequence[ToolSpec], on: frozenset[str]) -> dict[str, str]:
     """The tools of ``specs`` whose group is off, each with its group."""
     return {spec.name: group_of(spec.name) for spec in specs if group_of(spec.name) not in on}
+
+
+# The event that says which tool groups a run has on: at step 0, and at each step that turned one on.
+GROUPS_EVENT: str = "tool_groups"
 
 
 def groups_event(

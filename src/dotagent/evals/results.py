@@ -91,7 +91,8 @@ class EvalSettings(FrozenModel):
     ``stall_escalation`` counts as run without it, one that does not record ``tier`` as run with the standard tier, one
     that does not record ``tool_surface`` as run with every tool offered at every step, one that does not record
     ``verify_answer_paths`` as run without the check of the paths a final answer names, one that does not record
-    ``prompt`` as run with the full system prompt."""
+    ``prompt`` as run with the full system prompt, one that does not record ``mcp_purposes`` as run without the words
+    that say what each MCP server is for in the line of its tool group (item 659)."""
 
     effort: str
     goal_mode: bool
@@ -102,6 +103,7 @@ class EvalSettings(FrozenModel):
     tool_surface: ToolSurface = "full"
     verify_answer_paths: bool = False
     prompt: PromptStyle = "full"
+    mcp_purposes: bool = False
 
 
 class EvalReport(FrozenModel):

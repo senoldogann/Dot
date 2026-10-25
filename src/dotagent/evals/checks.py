@@ -10,8 +10,10 @@ from pathlib import Path
 
 from pydantic import JsonValue
 
+from dotagent.agent.picks import PICKS_EVENT
 from dotagent.core.errors import EvalError
 from dotagent.core.text import fold_search, truncate_middle
+from dotagent.evals.metrics import calls_of, ran
 from dotagent.evals.results import CheckOutcome
 from dotagent.evals.types import (
     AnswerContains,
@@ -24,9 +26,17 @@ from dotagent.evals.types import (
     FileContains,
     FileEquals,
     FileExists,
+    GroupStaysOff,
     JsonEquals,
     NoFileNamed,
+    NoPicks,
+    SkillRead,
+    SkillUnread,
+    ToolRan,
 )
+from dotagent.skills.types import SKILL_TOOL
+from dotagent.store.models import EventRecord
+from dotagent.tools.groups import GROUPS_EVENT
 
 # How much of what was found is kept in the outcome of a check that did not hold.
 _SHOWN_CHARS: int = 300
@@ -66,6 +76,16 @@ def describe_check(check: Check) -> str:
             return f"the answer does not match /{check.pattern}/"
         case NoFileNamed():
             return f"no file or folder is named like {check.pattern!r}"
+        case SkillRead():
+            return f"the run read the skill {check.name}"
+        case SkillUnread():
+            return f"the run did not read the skill {check.name}"
+        case ToolRan():
+            return f"the run called {check.tool} and the call ran"
+        case GroupStaysOff():
+            return f"the tool group {check.group} stayed off"
+        case NoPicks():
+            return "the message of the run had no picks from the composer"
 
 
 def _dump(value: JsonValue) -> str:
@@ -169,9 +189,55 @@ async def _judge_command(check: CommandSucceeds, workspace: Path, env: Mapping[s
     return _outcome(check, process.returncode == 0, f"exit code {process.returncode}, output ends: {printed!r}")
 
 
-async def evaluate_check(check: Check, workspace: Path, answer: str, env: Mapping[str, str]) -> CheckOutcome:
-    """Whether one check holds for the workspace a run left and the answer it gave. ``env`` is the environment of the
-    commands of the checks."""
+def _skills_called(events: Sequence[EventRecord]) -> str:
+    """The skills the run called the skill tool for, in a phrase, for the detail of a check that did not hold."""
+    names: list[str] = []
+    for event in events:
+        if event.kind == "tool_call" and event.data.get("tool") == SKILL_TOOL:
+            args: JsonValue = event.data.get("args")
+            asked: JsonValue = args.get("name") if isinstance(args, dict) else None
+            names.append(str(asked))
+    return ", ".join(dict.fromkeys(names)) or "none"
+
+
+def _groups_on(events: Sequence[EventRecord]) -> set[str]:
+    """The tool groups the run had on at any time: those its ``tool_groups`` events list as on."""
+    on: set[str] = set()
+    for event in events:
+        listed: JsonValue = event.data.get("on")
+        if event.kind == GROUPS_EVENT and isinstance(listed, list):
+            on.update(group for group in listed if isinstance(group, str))
+    return on
+
+
+def _judge_events(
+    check: SkillRead | SkillUnread | ToolRan | GroupStaysOff | NoPicks, events: Sequence[EventRecord]
+) -> CheckOutcome:
+    """Whether the run's events show what a choice task asks for (item 659): what it read, what it called, what it
+    turned on, and that nobody picked for it."""
+    match check:
+        case SkillRead():
+            return _outcome(
+                check,
+                ran(SKILL_TOOL, check.name, events),
+                f"the skills it called the skill tool for: {_skills_called(events)}",
+            )
+        case SkillUnread():
+            return _outcome(check, not calls_of(SKILL_TOOL, check.name, events), "it called the skill tool for it")
+        case ToolRan():
+            made: int = len(calls_of(check.tool, None, events))
+            return _outcome(check, ran(check.tool, None, events), f"{made} calls of it, none of them ran")
+        case GroupStaysOff():
+            return _outcome(check, check.group not in _groups_on(events), "the group was on")
+        case NoPicks():
+            return _outcome(check, not any(event.kind == PICKS_EVENT for event in events), "the message had picks")
+
+
+async def evaluate_check(
+    check: Check, workspace: Path, answer: str, env: Mapping[str, str], events: Sequence[EventRecord] = ()
+) -> CheckOutcome:
+    """Whether one check holds for the workspace a run left, the answer it gave and the ``events`` it left. ``env`` is
+    the environment of the commands of the checks."""
     match check:
         case CommandSucceeds():
             return await _judge_command(check, workspace, env)
@@ -181,11 +247,13 @@ async def evaluate_check(check: Check, workspace: Path, answer: str, env: Mappin
             return await asyncio.to_thread(_judge_names, check, workspace)
         case FileExists() | FileAbsent() | FileContains() | FileEquals() | JsonEquals():
             return await asyncio.to_thread(_judge_file, check, workspace)
+        case SkillRead() | SkillUnread() | ToolRan() | GroupStaysOff() | NoPicks():
+            return _judge_events(check, events)
 
 
 async def evaluate_checks(
-    checks: Sequence[Check], workspace: Path, answer: str, env: Mapping[str, str]
+    checks: Sequence[Check], workspace: Path, answer: str, env: Mapping[str, str], events: Sequence[EventRecord] = ()
 ) -> tuple[CheckOutcome, ...]:
     """Every check of a task, in order. None is skipped when an earlier one fails, so a report shows all that is
     wrong."""
-    return tuple([await evaluate_check(check, workspace, answer, env) for check in checks])
+    return tuple([await evaluate_check(check, workspace, answer, env, events) for check in checks])
