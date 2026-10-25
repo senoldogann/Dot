@@ -10,6 +10,7 @@ import io
 
 import httpx
 import pytest
+from ollama_live import live_with
 from PIL import Image
 
 from dotagent.agent.review import VET_TOOL, LessonVetting, _verdict_from
@@ -693,7 +694,8 @@ def ollama_is_up() -> bool:
         return False
 
 
-requires_ollama = pytest.mark.skipif(not ollama_is_up(), reason="needs a running local Ollama server")
+# Live (item 632): the cloud models answer from off this Mac.
+requires_ollama = live_with(ollama_is_up(), "needs a running local Ollama server")
 
 
 FIRST_ROUND_ATTEMPTS: int = 3

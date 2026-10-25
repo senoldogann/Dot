@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 import pytest_asyncio
+from ollama_live import live_with
 from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
@@ -79,9 +80,10 @@ def model_is_listed(name: str) -> bool:
     return answer.status_code == 200 and any(model["name"] == name for model in answer.json()["models"])
 
 
-requires_model = pytest.mark.skipif(not model_is_listed(MODEL), reason=f"needs the local Ollama server with {MODEL}")
-requires_chosen = pytest.mark.skipif(
-    not model_is_listed(CHOSEN_REF.split(":", 1)[1]), reason=f"needs the local Ollama server with {CHOSEN_REF}"
+# Live (item 632): the cloud models answer from off this Mac.
+requires_model = live_with(model_is_listed(MODEL), f"needs the local Ollama server with {MODEL}")
+requires_chosen = live_with(
+    model_is_listed(CHOSEN_REF.split(":", 1)[1]), f"needs the local Ollama server with {CHOSEN_REF}"
 )
 
 

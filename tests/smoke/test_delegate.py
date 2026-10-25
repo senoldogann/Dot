@@ -14,6 +14,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from ollama_live import live_with
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -43,7 +44,8 @@ def model_is_listed() -> bool:
     return answer.status_code == 200 and any(model["name"] == MODEL for model in answer.json()["models"])
 
 
-requires_model = pytest.mark.skipif(not model_is_listed(), reason=f"needs the local Ollama server with {MODEL}")
+# Live (item 632): the cloud model answers from off this Mac.
+requires_model = live_with(model_is_listed(), f"needs the local Ollama server with {MODEL}")
 
 
 @pytest.fixture(scope="module")
