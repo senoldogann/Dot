@@ -1264,6 +1264,11 @@ def _writing[**P, R](
     return run
 
 
+# ``PRAGMA optimize`` at a connection's open, as SQLite advises for one that lives long: 0x10000 looks at every table,
+# not only those the connection used, and 0x0002 makes the statistics of those that need them.
+_OPTIMIZE_AT_OPEN: int = 0x10002
+
+
 class Store:
     """Connector to the SQLite database."""
 
@@ -1286,6 +1291,10 @@ class Store:
             await connection.executescript(_SCHEMA)
             await _add_missing_columns(connection)
             await _refresh_memory_index(connection)
+            # The planner's statistics (item 647), made for the tables that have none or have grown since: without
+            # them SQLite read a run's events of one kind (its bill, its steps) through every run's events of that kind,
+            # so they grew slower with the history (32 ms for a run of 600 events, 3 ms with them). A few milliseconds.
+            await connection.execute(f"PRAGMA optimize={_OPTIMIZE_AT_OPEN}")
         except BaseException as error:
             # The connection's worker thread is not a daemon: left running, it keeps the process alive after the error
             # (item 556), and a daemon that never exits is never started again by launchd.
@@ -1302,7 +1311,17 @@ class Store:
         return cls(connection, path, image_dir)
 
     async def close(self) -> None:
-        await self._db.close()
+        # The statistics are made again for the tables this connection changed much, as SQLite advises at a close. One
+        # that fails (another process holding the database past the busy timeout) is logged and the store closes: the
+        # next open makes them.
+        # The connection is closed whatever happens to that (cancelled at shutdown, or a store closed twice): its
+        # worker thread is not a daemon, and left running it keeps the process alive (item 556).
+        try:
+            await self._db.execute("PRAGMA optimize")
+        except sqlite3.Error as error:
+            log.warning("store_optimize_failed", path=str(self._database), error=str(error))
+        finally:
+            await self._db.close()
 
     async def _one(self, sql: str, params: Sequence[object]) -> aiosqlite.Row | None:
         async with self._db.execute(sql, params) as cursor:
