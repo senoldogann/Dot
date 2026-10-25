@@ -2,15 +2,17 @@
 value is scoped to; which tools of the vaults a run has; how the logins of 1Password and of the vault are one list; how
 a contact and the billing address of a card are listed."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from dotagent.core.errors import ToolInputError
 from dotagent.store.models import VaultRecord
-from dotagent.tools.browser import LOGIN_TOOLS, VAULT_TOOLS, withheld_vault_tools
+from dotagent.tools.browser import LOGIN_TOOLS, VAULT_TOOLS, _login, build_browser_tools, withheld_vault_tools
 from dotagent.tools.contacts import CONTACTS_TOOL, _line
 from dotagent.vault.choices import find_login, login_choices
 from dotagent.vault.hosts import USERINFO_PROBLEM, SameOrigin, fills_on, site_label, website_hosts, website_problem
-from dotagent.vault.onepassword import Login
+from dotagent.vault.onepassword import Login, VaultError
 
 UNREADABLE: str = "This does not look like the address of a site: write it like github.com."
 
@@ -163,6 +165,44 @@ def test_the_logins_of_1password_and_of_the_vault_are_one_list_found_by_id_or_ti
     )
     with pytest.raises(ToolInputError, match=r"2 logins are called 'a\.example': name one by its id"):
         find_login(twins, "a.example")
+
+
+class _Items:
+    """Dot's own vault, holding a login of one site."""
+
+    async def of_kind(self, kind: str) -> list[VaultRecord]:
+        return [_record("login", website="github.com", username="ada@example.com")]
+
+
+class _BrokenOnePassword:
+    """1Password connected, whose command line fails."""
+
+    async def logins(self, token: str) -> tuple[Login, ...]:
+        raise VaultError("1Password's op could not be run", {"what": "item list"})
+
+
+async def test_the_logins_of_the_vault_are_listed_and_filled_when_1password_is_connected_and_cannot_be_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With 1Password connected and `op` failing, the vault's own logins could be neither listed nor filled: the error
+    of `op` ended both. They need none of it: the list says what failed and lists the vault's, and a login of 1Password
+    that is asked for is refused with the reason."""
+    monkeypatch.setattr("dotagent.tools.browser.kept_token", lambda: "not-a-real-token")
+    page = SimpleNamespace(current_url=lambda thread_id: None, held_back=lambda thread_id, text: text)
+    ctx = SimpleNamespace(
+        runtime=SimpleNamespace(vault=_BrokenOnePassword(), vault_items=_Items()), browser=page, thread_id="thr_1"
+    )
+    tools = {tool.spec.name: tool for tool in build_browser_tools()}
+    listed = await tools["browser_logins"].prepare({}, ctx)  # type: ignore[arg-type]
+    said = (await listed.run(ctx)).text  # type: ignore[arg-type]
+    assert "- vlt_login: login · ada@example.com (github.com), in Dot's vault" in said
+    assert (
+        "1Password's logins could not be read (1Password's op could not be run)" in said
+        and "only those of Dot's" in said
+    )
+    assert (await _login(ctx, "vlt_login")).source == "dot"  # type: ignore[arg-type]
+    with pytest.raises(ToolInputError, match=r"no login 'op1'.*1Password's logins could not be read"):
+        await _login(ctx, "op1")  # type: ignore[arg-type]
 
 
 def test_a_contact_and_the_billing_address_of_a_card_are_listed_by_id_with_their_details_in_the_owners_words() -> None:

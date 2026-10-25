@@ -148,7 +148,8 @@ class SameOrigin:
     of another document. A secret filled into a field is scoped to the origin of the document that holds the field
     (:class:`dotagent.browser.types.HeldValue`), not to every site the login names: what Dot does by what the secret
     is (keeping it out of the addresses a page sends, marking a field again) is done to the documents of that origin
-    and to no other, and two fills of the same value into the same origin are equal, so that it is kept once."""
+    in the tab it was typed into and to no other, and two fills of the same value into the same origin are equal, so
+    that it is kept once."""
 
     scheme: str
     host: str

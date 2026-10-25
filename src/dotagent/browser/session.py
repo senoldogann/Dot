@@ -376,12 +376,24 @@ def sending_document(request: Request) -> str | None:
     """The address of the document that sent ``request``: the one its frame shows now (:func:`document_of`). ``None``
     when none can be named: a request of no frame (a service worker's), the first request of a popup, whose frame
     Playwright does not know yet, a blank main frame. What the guard does by a value filled into a page it does to the
-    requests of the documents of the sites the value was filled for, and to no other (:meth:`BrowserSession._judge`)."""
+    requests of the documents of the origin the value was typed into, in the tab it was typed into, and to no other
+    (:meth:`BrowserSession._judge`)."""
     try:
         frame: PlaywrightFrame = request.frame
     except PlaywrightError:
         return None
     return document_of(frame)
+
+
+def sending_tab(request: Request) -> Page | None:
+    """The page whose frame sent ``request``; ``None`` when no frame can be named (:func:`sending_document`). The guard
+    holds a request to a value only when the page it comes from is a tab the value was typed into
+    (:meth:`BrowserSession._kept_out_of`)."""
+    try:
+        frame: PlaywrightFrame = request.frame
+    except PlaywrightError:
+        return None
+    return frame.page
 
 
 def threads_in_use(threads: Mapping[str, ThreadTabs], kept: frozenset[str]) -> list[str]:
@@ -540,13 +552,22 @@ class BrowserSession:
         # The cookie values of the sites a thread's scripts ran in (item 533), which no result of the browser tools
         # shows either, kept as long as the daemon runs.
         self._cookie_values: dict[str, set[str]] = {}
-        # The passwords and one-time codes among them, which no request a document of the origin they were typed into
-        # sends carries in its address (:meth:`_judge`), with the moment each stops being kept out (a password's never
-        # comes while the daemon runs).
-        self._vault_secrets: dict[HeldValue, float] = {}
-        # A login was filled into a page of Dot's own Chrome since its session files were last deleted (item 621): a
-        # form it sent by POST has its body in them, until Chrome has exited and they are deleted.
-        self._filled_in_chrome: bool = False
+        # The passwords and one-time codes among them, with the moment each stops being named in a refusal or a log line
+        # (a password's never comes while the daemon runs): the words Dot writes of an address are made without them
+        # (:meth:`_shown`), whatever tab they went into. Nothing is decided by this list.
+        self._vault_secrets: dict[str, float] = {}
+        # The same values by the tab each was typed into, with the moment each stops being kept out of addresses: no
+        # request of a document of that tab's page, of the origin the value was typed into, carries one in its address
+        # (:meth:`_judge`). Only these tabs are held to a value: no script of a run runs in one while it is open, so no
+        # run can try addresses there and read which were refused. A tab that was never filled, in any chat and of any
+        # origin, is judged by the rules on addresses alone (item 621, F3).
+        self._kept_out: dict[Page, dict[HeldValue, float]] = {}
+        # The profiles of Dot's own Chrome that a login was filled into since their session files were last deleted
+        # (item 621): a form it sent by POST has its body in them, until Chrome has exited and they are deleted. By
+        # profile, not a flag of the session: a switch to another profile, made while the Chrome of the one that was
+        # filled had not yet exited, leaves that one to be cleaned when Chrome next starts on it, and the profile it
+        # went to is not cleaned for it.
+        self._filled_profiles: set[Path] = set()
         self._initial_pages: list[Page] = []
         self._adopting: set[asyncio.Task[None]] = set()
         # The answers under way to requests Chrome holds (:meth:`_guard_hops`), and by page the navigation of its main
@@ -648,9 +669,9 @@ class BrowserSession:
         if config.debug_port and await asyncio.to_thread(port_is_taken, config.debug_port):
             raise port_taken(config.debug_port)
         # No Chrome holds the profile: what a Chrome that ended on its own left of a form it sent goes (item 621).
-        if self._filled_in_chrome:
+        if self._profile in self._filled_profiles:
             await asyncio.to_thread(clear_session_files, self._profile)
-            self._filled_in_chrome = False
+            self._filled_profiles.discard(self._profile)
         # Incognito starts with nothing, however its last Chrome ended (item 355).
         if config.profile == INCOGNITO_PROFILE:
             await asyncio.to_thread(empty_incognito)
@@ -835,6 +856,7 @@ class BrowserSession:
         self._chrome_pid = None
         self._refusals.clear()
         self._guarded.clear()
+        self._kept_out.clear()
         for thread in self._threads.values():
             thread.tabs.clear()
             thread.active = 0
@@ -1026,13 +1048,14 @@ class BrowserSession:
                 await self._empty_incognito()
             await self._clear_session_files()
             self._threads.clear()
+            self._kept_out.clear()
             self._initial_pages = []
 
     async def _clear_session_files(self) -> None:
         """Once Dot's own Chrome has exited, delete the session files it left in the profile, if a login was filled
         into one of its pages (item 621): Chrome keeps the body of a form it sent by POST in them, which can be a
         password. A Chrome that has not exited by then leaves them for the next start."""
-        if not self._filled_in_chrome or self._config.mode != "own":
+        if self._profile not in self._filled_profiles or self._config.mode != "own":
             return
         for _ in range(int(_CHROME_EXIT_WAIT_S / _CHROME_EXIT_POLL_S)):
             try:
@@ -1042,7 +1065,7 @@ class BrowserSession:
                 return
             if holder is None:
                 await asyncio.to_thread(clear_session_files, self._profile)
-                self._filled_in_chrome = False
+                self._filled_profiles.discard(self._profile)
                 return
             await asyncio.sleep(_CHROME_EXIT_POLL_S)
         _log.warning("browser_sessions_not_cleared", error="a Chrome still holds the profile")
@@ -1233,7 +1256,7 @@ class BrowserSession:
         try:
             await self._enforce_landing(tab)
         except ForbiddenUrlError as refused:
-            address: str = truncate_middle(self._shown(refused.url), _SHOWN_URL_CHARS)
+            address: str = truncate_middle(self._shown_to(opener.page, refused.url), _SHOWN_URL_CHARS)
             add_note(
                 opener,
                 f"the new tab went to a URL that may not be opened ({address}: {refused.reason}); it was reset to a "
@@ -1306,6 +1329,8 @@ class BrowserSession:
 
     def _on_page_closed(self, tab: Tab, _page: Page) -> None:
         self._refusals.pop(tab.page, None)
+        # What was kept out of addresses for this tab goes with it: another tab at the same origin is held to nothing.
+        self._kept_out.pop(tab.page, None)
         self._teach_armed.discard(tab.page)
         if self._teaching is not None and self._teaching.page is tab.page:
             # The tab the owner showed the task in is gone: there is nothing more to record.
@@ -1542,21 +1567,30 @@ class BrowserSession:
     # ------------------------------------------------------------------ the rules on what Chrome sends
 
     def _judge(
-        self, url: str, navigation: bool, resource_type: str, page: Page | None, sender: str | None
+        self,
+        url: str,
+        navigation: bool,
+        resource_type: str,
+        page: Page | None,
+        sender: str | None,
+        tab: Page | None = None,
     ) -> UrlVerdict:
         """The rules on one request Chrome is about to send; ``page`` the page whose main frame it navigates, when it
-        is one, so that the error page it then shows can be told from a page that failed to load, and ``sender`` the
-        address of the document that sent it, when it can be named (:func:`sending_document`). A rule that fails on an
-        address refuses it: the request must be answered either way, or Chrome holds it for good.
+        is one, so that the error page it then shows can be told from a page that failed to load, ``sender`` the
+        address of the document that sent it, when it can be named (:func:`sending_document`), and ``tab`` the page
+        that document is in (:func:`sending_tab`). A rule that fails on an address refuses it: the request must be
+        answered either way, or Chrome holds it for good.
 
         What no request may carry in its address (:meth:`_kept_out_of`) is looked for in the requests a page sends, and
-        only in those of the documents of the origin it was typed into: a rule that acts differently by what a secret
-        is tells whoever can watch it act, so a page of another origin, in any tab of the browser, would find a code or
-        a weak password by which of its requests were refused. A navigation of a tab's main frame is not a request a
-        page sends but the run's own, however it came about (the run opened the address, clicked the link, typed into
-        the form the page then sends): it is judged by the rules on addresses and by no value filled, since a run
-        cannot carry a value it never saw, and a refusal by a value would tell it whether a guess is the value."""
-        kept: tuple[str, ...] = () if page is not None else self._kept_out_of(sender)
+        only in those of the documents of the origin it was typed into, in the tab it was typed into: a rule that acts
+        differently by what a secret is tells whoever can watch it act, and in every other tab the one who can is the
+        run, whose own script (``browser_eval``) tries addresses and reads which were refused (a list of 1,640 words
+        gave a weak password up in twelve requests). In the tab the value was typed into no script of a run runs while
+        it is open. A navigation of a tab's main frame is not a request a page sends but the run's own, however it came
+        about (the run opened the address, clicked the link, typed into the form the page then sends): it is judged by
+        the rules on addresses and by no value filled, since a run cannot carry a value it never saw, and a refusal by
+        a value would tell it whether a guess is the value."""
+        kept: tuple[str, ...] = () if page is not None else self._kept_out_of(sender, tab)
         if kept and in_address(url, kept):
             verdict: UrlVerdict = UrlVerdict(allowed=False, reason=_CARRIES_SECRET)
         else:
@@ -1568,42 +1602,57 @@ class BrowserSession:
                 _log.exception("browser_request_unjudged", url=truncate_middle(url, _LAUNCH_ERROR_CHARS))
                 verdict = UrlVerdict(allowed=False, reason="the URL rules could not read this address")
         if not verdict.allowed:
-            shown: str = self._shown(url)
             if page is not None:
-                self._refusals[page] = _Refusal(url=shown, reason=verdict.reason)
+                # What the run reads of it: made from the values of its own chat (:meth:`_shown_to`).
+                self._refusals[page] = _Refusal(url=self._shown_to(page, url), reason=verdict.reason)
             _log.info(
                 "browser_request_refused",
-                url=truncate_middle(shown, _LAUNCH_ERROR_CHARS),
+                url=truncate_middle(self._shown(url), _LAUNCH_ERROR_CHARS),
                 resource_type=resource_type,
                 reason=verdict.reason,
             )
         return verdict
 
-    def _kept_out_of(self, document: str | None) -> tuple[str, ...]:
-        """The passwords and one-time codes that no request of the document at ``document`` may carry in its address now
-        (items 493 and 621): those typed into a document of its origin. None for a document that cannot be named
-        (:func:`sending_document`), and for one of any other origin."""
-        if document is None:
+    def _kept_out_of(self, document: str | None, tab: Page | None) -> tuple[str, ...]:
+        """The passwords and one-time codes that no request of the document at ``document``, in the page ``tab``, may
+        carry in its address now (items 493 and 621): those typed into a document of its origin in that very tab. None
+        for a document or a tab that cannot be named (:func:`sending_document`, :func:`sending_tab`), for a tab no value
+        was typed into, and for a document of any other origin."""
+        if document is None or tab is None:
             return ()
         now: float = time.monotonic()
-        return tuple(held.value for held, until in self._vault_secrets.items() if until > now and held.covers(document))
+        return tuple(
+            held.value for held, until in self._kept_out.get(tab, {}).items() if until > now and held.covers(document)
+        )
 
     def _shown(self, url: str) -> str:
-        """``url`` as Dot shows it in a refusal and writes it in its log (item 493): :meth:`_named` with every
-        password and code kept out of addresses now, of whatever site. That is the words of a refusal and of a log
-        line, which a page cannot read; no request is judged by them."""
+        """``url`` as Dot writes it in its log (item 493): :meth:`_named` with every password and code kept out of
+        addresses now, of whatever site and tab, and without the cookies any chat's scripts ran with (item 533). That
+        is the words of a log line, which no page and no run reads; no request is judged by them."""
         now: float = time.monotonic()
-        live: tuple[str, ...] = tuple(held.value for held, until in self._vault_secrets.items() if until > now)
-        return self._shown_with(url, live, bool(live) and in_address(url, live))
+        live: tuple[str, ...] = tuple(value for value, until in self._vault_secrets.items() if until > now)
+        return self._words_of(url, live, tuple(value for values in self._cookie_values.values() for value in values))
 
-    def _shown_with(self, url: str, live: tuple[str, ...], carries: bool) -> str:
-        """``url`` as :meth:`_named` names it, and without the cookies any chat's scripts ran with (item 533): a script
-        may have put one in the address it sends the tab to."""
-        return masked(
-            self._named(url, live, carries),
-            tuple(value for values in self._cookie_values.values() for value in values),
-            HIDDEN_VALUE,
+    def _shown_to(self, page: Page, url: str) -> str:
+        """``url`` as the chat that owns ``page`` reads it in a refusal or a note (item 621): :meth:`_named` with the
+        passwords and codes that chat filled and the cookies its scripts ran with, and no other chat's. Whatever sent
+        the page to the address chose it, a run among them, and the words change when it carries a value: made from
+        every chat's values, they would tell a run in a chat that filled nothing whether a word of its own is the
+        password another chat filled (a list of words in the address tells whether one is, and halving finds it)."""
+        thread_id: str | None = next(
+            (one for one, thread in self._threads.items() if any(tab.page is page for tab in thread.tabs)),
+            None,
         )
+        now: float = time.monotonic()
+        mine: tuple[str, ...] = () if thread_id is None else tuple(self._vault_values.get(thread_id, ()))
+        live: tuple[str, ...] = tuple(value for value in mine if self._vault_secrets.get(value, 0.0) > now)
+        cookies: tuple[str, ...] = () if thread_id is None else tuple(self._cookie_values.get(thread_id, ()))
+        return self._words_of(url, live, cookies)
+
+    def _words_of(self, url: str, live: tuple[str, ...], cookies: tuple[str, ...]) -> str:
+        """``url`` as :meth:`_named` names it when it carries one of ``live``, with ``cookies`` taken out: a script may
+        have put one in the address it sends the tab to."""
+        return masked(self._named(url, live, bool(live) and in_address(url, live)), cookies, HIDDEN_VALUE)
 
     @staticmethod
     def _named(url: str, live: tuple[str, ...], carries: bool) -> str:
@@ -1635,6 +1684,7 @@ class BrowserSession:
             request.resource_type,
             main_page_of(request),
             sending_document(request),
+            sending_tab(request),
         )
         try:
             if verdict.allowed:
@@ -1716,7 +1766,7 @@ class BrowserSession:
         in_main: bool = (main is None and paused.navigation) or main == paused.frame_id
         navigated: Page | None = page if paused.navigation and in_main else None
         sender: str | None = document_of(page.main_frame) if in_main else None
-        verdict: UrlVerdict = self._judge(paused.url, paused.navigation, paused.resource_type, navigated, sender)
+        verdict: UrlVerdict = self._judge(paused.url, paused.navigation, paused.resource_type, navigated, sender, page)
         await self._answer_hop(cdp, page, paused.request_id, paused.url, verdict.allowed)
 
     async def _answer_hop(self, cdp: CDPSession, page: Page, request_id: str, url: str, allowed: bool) -> None:
@@ -1847,11 +1897,11 @@ class BrowserSession:
                     "document",
                 ) from error
             left.append(frame)
-            shown: str = truncate_middle(self._shown(url), _SHOWN_URL_CHARS)
-            _log.info("browser_frame_left", url=shown)
+            _log.info("browser_frame_left", url=truncate_middle(self._shown(url), _SHOWN_URL_CHARS))
             add_note(
                 tab,
-                f"a frame of the page was on a URL that may not be opened ({shown}: {verdict.reason}); it was left "
+                "a frame of the page was on a URL that may not be opened "
+                f"({truncate_middle(self._shown_to(tab.page, url), _SHOWN_URL_CHARS)}: {verdict.reason}); it was left "
                 "for a blank page",
             )
             if refusal is None:
@@ -1970,7 +2020,7 @@ class BrowserSession:
             raise ForbiddenUrlError(
                 "the page is on a private or local network address; the web tools only reach the public internet "
                 "(web.allow_private_hosts)",
-                self._shown(landed),
+                landed,
                 f"it was served from {private}",
                 "document",
             )
@@ -2596,7 +2646,8 @@ class BrowserSession:
         field refused before anything went in leaves neither. What changed on the page is shown with its secret fields
         hidden, in every mode, and with the value of every field Dot filled. From the first value on, what Dot does by
         what a value is (keeping it out of the addresses a page sends, marking a field again) is done to the
-        documents of the origin of the field it was typed into alone (:class:`HeldValue`)."""
+        documents of the origin of the field it was typed into, in this tab, alone (:class:`HeldValue`): no script of
+        a run runs in the tab while it is open, and no other tab is held to the value."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             await self._enforce_landing(tab)
@@ -2626,8 +2677,9 @@ class BrowserSession:
                 def typing(document: str, typed: str = value, kind: VaultFieldKind = fill.kind) -> None:
                     # From here the value may be in the page: masked, no script runs while the tab is open, and no
                     # request a page sends carries a password or a code in its address. It is scoped to the origin of
-                    # the document that holds the field it goes into, not to every site the login names: what Dot
-                    # does by what it is, it does to the documents of that origin and to no other.
+                    # the document that holds the field it goes into, not to every site the login names, and to this
+                    # tab: what Dot does by what it is, it does to the documents of that origin in the tab where no
+                    # script of the run runs, and to no other (any other tab, of this chat or another, may run one).
                     scope: SameOrigin | None = SameOrigin.of(document)
                     if scope is None:
                         raise BrowserError("the field is in a document that is no site's", {"url": tab.page.url})
@@ -2637,11 +2689,19 @@ class BrowserSession:
                     if kind in _KEPT_OUT_OF_ADDRESSES:
                         now: float = time.monotonic()
                         until: float = now + _CODE_HELD_S if kind in _KEPT_OUT_FOR_A_WHILE else math.inf
+                        # Named in a refusal or a log line as a mask, whatever tab: nothing is decided by this list.
                         self._vault_secrets = {one: ends for one, ends in self._vault_secrets.items() if ends > now}
-                        self._vault_secrets[held] = max(until, self._vault_secrets.get(held, until))
+                        self._vault_secrets[typed] = max(until, self._vault_secrets.get(typed, until))
+                        # Judged in this tab alone.
+                        kept: dict[HeldValue, float] = {
+                            one: ends for one, ends in self._kept_out.get(tab.page, {}).items() if ends > now
+                        }
+                        kept[held] = max(until, kept.get(held, until))
+                        self._kept_out[tab.page] = kept
                     if kind in _REMARKED_PARTS:
                         tab.filled_values.add(held)
-                    self._filled_in_chrome = True
+                    if self._config.mode == "own":
+                        self._filled_profiles.add(self._profile)
                     tab.vault_held = True
 
                 await fill_login_field(

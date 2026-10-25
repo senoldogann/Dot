@@ -60,10 +60,16 @@ def text_room(output_chars: int, headroom: int) -> int:
 
 @dataclass(frozen=True)
 class PreparedCall:
-    """A call whose arguments validated: the classified action plus the coroutine that performs it."""
+    """A call whose arguments validated: the classified action plus the coroutine that performs it.
+
+    ``action`` is the step as everything that records or shows it reads it. ``weighed`` is the same step as the run and
+    the page wrote it, for a tool that masks ``action`` (the browser and web tools take the values a login filled out of
+    its summary and target, item 621): the owner's rules are matched against it, so that a rule fits a step alike
+    whether or not a word in it is the password. ``None`` for a tool whose action is as it was classified."""
 
     action: ActionInfo
     run: Callable[[ToolContext], Awaitable[ToolResult]]
+    weighed: ActionInfo | None = None
 
 
 @dataclass(frozen=True)

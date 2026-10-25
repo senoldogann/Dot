@@ -236,8 +236,10 @@ class HeldValue:
     """A value Dot filled into a page (item 621) and the documents it may be in: those whose address ``covers`` accepts,
     the origin of the document that holds the field it went into (:class:`dotagent.vault.hosts.SameOrigin`). Whatever
     Dot does to a document by what the value is (keeps it out of the addresses its requests ask for, marks its fields
-    again) it does to such documents alone, and it does not look into any other: a page that was never given the value
-    would otherwise learn it from how Dot acts. Two fills of the same value into the same origin are equal."""
+    again) it does to such documents alone, in the tab the value was typed into (the session holds it by tab), and it
+    does not look into any other: a page that was never given the value would otherwise learn it from how Dot acts,
+    and a page of the same origin in another tab is not given it when its script is the run's own (``browser_eval``,
+    which stays off in the tab the value is in). Two fills of the same value into the same origin are equal."""
 
     value: str
     covers: Callable[[str], bool]

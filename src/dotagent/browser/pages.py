@@ -58,7 +58,8 @@ class Tab:
     vault_held: bool = False
     # What was filled into the tab that is secret and can be told from other text (item 621): a field of a later
     # document of the tab that holds one of them is marked again, as the field it was filled into (``remark_held``),
-    # in the documents of the sites it was filled for and in no other.
+    # in the documents of the origin it was filled into and in no other. The same values are kept out of the addresses
+    # this tab's pages send by the session, which holds them by tab (``BrowserSession._kept_out``).
     filled_values: set[HeldValue] = field(default_factory=set)
 
 

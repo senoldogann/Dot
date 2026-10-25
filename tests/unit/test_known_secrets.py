@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from dotagent import secrets
 from dotagent.secrets import known_secrets, resolve_secret
 
 
@@ -13,6 +14,9 @@ def test_the_values_dot_looked_up_and_those_of_its_env_file_are_known_the_longes
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    # What a process has looked up is kept for as long as it runs: this test looks one up in a set of its own, which is
+    # put back when it ends, so that no other test of the process finds its value among the secrets Dot holds.
+    monkeypatch.setattr(secrets, "_resolved", set())
     looked_up: str = "MARKER-" + "e" * 12
     saved: str = "MARKER-" + "f" * 20
     monkeypatch.setenv("DOT_TEST_LOOKED_UP_KEY", looked_up)

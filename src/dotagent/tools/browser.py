@@ -95,7 +95,7 @@ from dotagent.tools.pages import PAGE_SUFFIXES, SHOW_PAGE_TOOL
 from dotagent.vault.choices import LoginChoice, find_login, login_choices
 from dotagent.vault.hosts import fills_on
 from dotagent.vault.items import LoginFill
-from dotagent.vault.onepassword import Login, LoginSecret, kept_token
+from dotagent.vault.onepassword import Login, LoginSecret, VaultError, kept_token
 
 _log = get_logger(__name__)
 
@@ -878,23 +878,42 @@ def withheld_vault_tools(saved: Sequence[VaultRecord], onepassword: bool) -> fro
     return frozenset(withheld)
 
 
-async def _login_choices(ctx: ToolContext) -> list[LoginChoice]:
-    """The logins a run may fill: those of 1Password while it is connected, and those of Dot's vault."""
+async def _login_choices(ctx: ToolContext) -> tuple[list[LoginChoice], str | None]:
+    """The logins a run may fill: those of 1Password while it is connected, and those of Dot's vault. 1Password that
+    cannot be read (its command line is missing, or fails) leaves the logins of the vault listed and filled, as they
+    need none of it; the second part says what failed, for the words of a list or of a refusal."""
     token: str | None = await asyncio.to_thread(kept_token)
-    connected: tuple[Login, ...] = () if token is None else await ctx.runtime.vault.logins(token)
-    return login_choices(connected, await ctx.runtime.vault_items.of_kind("login"))
+    connected: tuple[Login, ...] = ()
+    unreadable: str | None = None
+    if token is not None:
+        try:
+            connected = await ctx.runtime.vault.logins(token)
+        except VaultError as error:
+            unreadable = error.message
+    return login_choices(connected, await ctx.runtime.vault_items.of_kind("login")), unreadable
+
+
+def _unreadable_note(reason: str) -> str:
+    """What a list or a refusal adds when 1Password's logins could not be read, and why."""
+    return f"1Password's logins could not be read ({reason})"
 
 
 async def _login(ctx: ToolContext, wanted: str) -> LoginChoice:
     """The login ``wanted`` names, by its id or its title, among those of 1Password and of Dot's vault."""
-    choices: list[LoginChoice] = await _login_choices(ctx)
+    choices, unreadable = await _login_choices(ctx)
     if not choices:
         raise ToolInputError(
             "there is no login to fill: the owner keeps theirs in Settings › Vault, or connects 1Password on "
-            "Customize › Connectors, and until then the logins are theirs to type",
+            "Customize › Connectors, and until then the logins are theirs to type"
+            + ("" if unreadable is None else f" ({_unreadable_note(unreadable)})"),
             {},
         )
-    return find_login(choices, wanted)
+    try:
+        return find_login(choices, wanted)
+    except ToolInputError as missing:
+        if unreadable is None:
+            raise
+        raise ToolInputError(f"{missing.message}; {_unreadable_note(unreadable)}", missing.context) from None
 
 
 class LoginsArgs(ToolArgs):
@@ -909,17 +928,21 @@ def _logins_tool() -> RegisteredTool:
 
     async def run(args: LoginsArgs, ctx: ToolContext) -> ToolResult:
         wanted: str = (args.site or "").lower()
+        choices, unreadable = await _login_choices(ctx)
         logins: list[LoginChoice] = [
-            login for login in await _login_choices(ctx) if not wanted or any(wanted in host for host in login.hosts)
+            login for login in choices if not wanted or any(wanted in host for host in login.hosts)
         ]
+        note: str = (
+            "" if unreadable is None else f"\n{_unreadable_note(unreadable)}: only those of Dot's vault are listed."
+        )
         if not logins:
-            return ok("No login that Dot may fill" + (f" is for {args.site}." if args.site else "."))
+            return ok("No login that Dot may fill" + (f" is for {args.site}." if args.site else ".") + note)
         lines: list[str] = []
         for login in logins:
             hosts: str = ", ".join(login.hosts)
             shown: str = f" ({hosts})" if hosts and hosts not in login.title else ""
             lines.append(f"- {login.id}: {login.title}{shown}, in {login.source_name}")
-        return ok("The logins Dot may fill, by id:\n" + "\n".join(lines))
+        return ok("The logins Dot may fill, by id:\n" + "\n".join(lines) + note)
 
     return make_tool(
         name=LOGINS_TOOL,
@@ -1047,7 +1070,11 @@ def masked_tool(tool: RegisteredTool) -> RegisteredTool:
     its chat's pages from the password manager (item 493) and the cookies its scripts ran with (item 533) taken out of
     what it gives back and of what it tells the gate: its result's text, an error it raises (its words and its context),
     and the action's summary and target, which the approvals, the policy's events and the review model read. A page's
-    address holds them once a form sent by GET put them there, or a script wrote one into the address."""
+    address holds them once a form sent by GET put them there, or a script wrote one into the address.
+
+    The step is *shown* masked and *decided* as it is: the unmasked action goes along as ``weighed``, and the owner's
+    rules are matched against it (item 621). A rule that fits a word and not a mask would otherwise ask for a guess and
+    run the password, which tells the run whether a guess is right."""
 
     async def prepare(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
         try:
@@ -1058,6 +1085,7 @@ def masked_tool(tool: RegisteredTool) -> RegisteredTool:
         action: ActionInfo = call.action.model_copy(
             update={"summary": _held_back(call.action.summary, ctx), "target": _held_back(call.action.target, ctx)}
         )
+        weighed: ActionInfo = call.action if call.weighed is None else call.weighed
 
         async def run(context: ToolContext) -> ToolResult:
             try:
@@ -1076,7 +1104,7 @@ def masked_tool(tool: RegisteredTool) -> RegisteredTool:
                 ) from None
             return result.model_copy(update={"text": _held_back(result.text, context)})
 
-        return PreparedCall(action=action, run=run)
+        return PreparedCall(action=action, run=run, weighed=weighed)
 
     return replace(tool, prepare=prepare)
 

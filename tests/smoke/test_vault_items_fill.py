@@ -90,6 +90,9 @@ for (const input of document.querySelectorAll('input')) {
 }
 </script>"""
 _OTHER: str = """<!doctype html><title>Other</title><h1>Other</h1><a href="/signin">Back to sign in</a>"""
+# A page that sends the tab to the address its query names, as a redirector or a page of a stranger may.
+_BOUNCE: str = """<!doctype html><title>Bounce</title><script>
+location.href = new URLSearchParams(location.search).get('to');</script>"""
 # A password field in no form, and what a script of the page does with its value: it sends it in a fetch, or it sends
 # the tab to an address that holds it.
 _SCRIPTED: str = """<!doctype html><title>Scripted</title><h1>Scripted</h1>
@@ -259,6 +262,7 @@ class _Sites:
             "/labelled-bare": _LABELLED.format(method=""),
             "/labelled-post": _LABELLED.format(method='method="post"'),
             "/other": _OTHER,
+            "/bounce": _BOUNCE,
             "/attacker": _ATTACKER,
         }
         self.plain: _Site = _Site({"/login": _LOGIN.format(extra=""), "/attacker": _ATTACKER})
@@ -813,6 +817,116 @@ async def test_requests_a_page_of_another_origin_sends_are_judged_by_nothing_tha
     assert (await shop.evaluate("(list) => search(list)", dictionary))["found"] is None
 
 
+# The words a run tries in a script of its own (``browser_eval``): 1,640, the password among them.
+_CANDIDATES: list[str] = [
+    f"{season}{year}{sign}"
+    for season in ("Winter", "Spring", "Summer", "Autumn")
+    for year in range(1980, 2030)
+    for sign in ("", "!", "#")
+]
+_CANDIDATES += [f"word{number:04d}x" for number in range(1640 - len(_CANDIDATES))]
+# The script: one request with every word, then the half of the list that was refused, until one word is left.
+_HALVING: str = """(async (words) => {
+  let requests = 0;
+  const refused = async (list) => {
+    requests += 1;
+    try { await fetch('/probe?c=' + encodeURIComponent(list.join(';'))); return false; } catch (error) { return true; }
+  };
+  if (!(await refused(words))) return { found: null, requests };
+  let list = words;
+  while (list.length > 1) {
+    const half = list.slice(0, list.length >> 1);
+    list = (await refused(half)) ? half : list.slice(half.length);
+  }
+  return { found: list[0], requests };
+})(%s)"""
+
+
+async def _refused_in(page: Page, word: str) -> bool:
+    """Whether the browser refuses a request of ``page``'s own script that carries ``word`` in its address."""
+    script: str = "(word) => fetch('/probe?c=' + encodeURIComponent(word)).then(() => false, () => true)"
+    return bool(await page.evaluate(script, word))
+
+
+async def _halved(ctx: ToolContext, gate: RunGate) -> tuple[str | None, int]:
+    """What a script of the run's own finds out in the page its chat is at, by which of its requests the browser
+    refuses: the word it ends with (``None`` when the first request, which carries every word, was not refused) and how
+    many requests it sent."""
+    ran: ToolResult = await _call(
+        ctx, gate, "browser_eval", {"script": _HALVING % json.dumps(_CANDIDATES), "timeout_s": 30}
+    )
+    found: re.Match[str] | None = re.search(r'"found":\s*(null|"([^"\\]*)")', ran.text)
+    sent: re.Match[str] | None = re.search(r'"requests":\s*(\d+)', ran.text)
+    assert found is not None and sent is not None, ran.text
+    return found.group(2), int(sent.group(1))
+
+
+@pytest.mark.parametrize("approvals", ["yolo", "ask"])
+async def test_a_script_of_another_chat_in_a_page_of_the_same_origin_finds_no_password_by_the_requests_refused(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites, approvals: ApprovalMode
+) -> None:
+    """Chat A fills a login and keeps its tab. Chat B, which filled nothing, opens a page of the same origin that holds
+    no secret field and runs a script of its own: no request of it is refused, the one that carries the password and one
+    that carries another word alike (the guard judged every document of the origin in any tab by the value, and the
+    script had a weak password in twelve requests out of 1,640 words, with no typing and no mask). In the tab the
+    password was typed into, where scripts stay off, the guard still refuses it."""
+    runtime, _, _ = parts
+    assert WEAK in _CANDIDATES and len(_CANDIDATES) == 1640
+    chat, _, _, _ = await _signed(runtime, sites, "yolo", password=WEAK)
+    filled: Page = _page(runtime, chat.thread_id)
+    other, other_gate = await _context(runtime, approvals)
+    await _call(other, other_gate, "browser_open", {"url": f"https://127.0.0.1:{sites.shop.port}/other"})
+    # The control: where the password was typed a request that carries it is refused and one that carries a word of its
+    # shape is not, which is what the script of the other chat would read if it were held to the value.
+    assert await _refused_in(filled, WEAK) and not await _refused_in(filled, "Summer2025!")
+    assert await _halved(other, other_gate) == (None, 1)
+    assert await _refused_in(filled, WEAK), "the tab the password was typed into is still held to it"
+
+
+@pytest.mark.parametrize("approvals", ["yolo", "ask"])
+async def test_the_chat_that_filled_a_login_finds_no_password_by_the_requests_refused_once_its_tab_is_closed(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites, approvals: ApprovalMode
+) -> None:
+    """While the tab it filled is open the chat runs no script. Once that tab is closed, a new tab of the same chat at
+    the same origin is a tab nothing was typed into, and its script is held to no value."""
+    runtime, _, _ = parts
+    chat, gate, _, _ = await _signed(runtime, sites, approvals, password=WEAK)
+    with pytest.raises(BrowserError, match="scripts stay off"):
+        await _call(chat, gate, "browser_eval", {"script": "1 + 1"})
+    await _call(chat, gate, "browser_close_tab", {"index": 1})
+    await _call(chat, gate, "browser_open", {"url": f"https://127.0.0.1:{sites.shop.port}/other"})
+    assert await _halved(chat, gate) == (None, 1)
+
+
+async def _named_in_the_refusal(runtime: Runtime, ctx: ToolContext, gate: RunGate, sites: _Sites, word: str) -> str:
+    """The address a run reads in the refusal when a page sends its tab to Dot's own interface with ``word`` in the
+    query (which no run opens), as the page of a stranger may."""
+    inside: str = quote(f"http://127.0.0.1:{runtime.config.server.port}/x?c={quote(word, safe='')}", safe="")
+    address: str = f"https://127.0.0.1:{sites.shop.port}/bounce?to={inside}"
+    with pytest.raises(ForbiddenUrlError) as refused:
+        await _call(ctx, gate, "browser_open", {"url": address})
+    return str(refused.value)
+
+
+async def test_the_words_a_refusal_names_an_address_with_tell_a_chat_nothing_of_a_password_another_chat_filled(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
+) -> None:
+    """A page can send a tab to an address its sender chose, and the refusal names it in words that change when it
+    carries a password (its host alone). Made from every chat's passwords, those words told a run in a chat that filled
+    nothing whether a word of its own was the password of another chat, and a list of words in the address, halved,
+    found a weak one. A chat reads them made from what it filled itself."""
+    runtime, _, _ = parts
+    chat, gate, _, _ = await _signed(runtime, sites, "yolo", password=WEAK)
+    other, other_gate = await _context(runtime, "yolo")
+    right: str = await _named_in_the_refusal(runtime, other, other_gate, sites, WEAK)
+    wrong: str = await _named_in_the_refusal(runtime, other, other_gate, sites, "Summer2025!")
+    assert quote(WEAK, safe="") in right and quote("Summer2025!", safe="") in wrong
+    assert right.replace(quote(WEAK, safe=""), "<word>") == wrong.replace(quote("Summer2025!", safe=""), "<word>")
+    # The control: the chat that filled it reads its own password named by the host alone.
+    mine: str = await _named_in_the_refusal(runtime, chat, gate, sites, WEAK)
+    assert "[an address that carries a filled value]" in mine and quote(WEAK, safe="") not in mine
+
+
 async def test_the_run_finds_no_password_by_the_addresses_it_opens_or_the_forms_it_types_in(
     parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
 ) -> None:
@@ -974,8 +1088,11 @@ async def test_nothing_a_run_filled_is_left_in_chromes_profile_once_chrome_is_cl
             await _call(ctx, gate, "browser_open", {"url": f"{base}/other"})
         needles[f"password {index}"] = secret
     profile: Path = runtime.browser.profile_dir
+    assert runtime.browser._filled_profiles == {profile}, "the profile a login was filled in is the one to clean"
     await runtime.browser.let_go_of_chrome()
     assert await asyncio.to_thread(_in_profile, profile, needles) == []
+    assert not (profile / "Default" / "Sessions").exists(), "the session files of the run were deleted"
+    assert runtime.browser._filled_profiles == set()
     # The control: in a run of Chrome that was filled nothing, a value typed into a form without Dot's help, which is
     # sent, is in the profile when Chrome closes (Dot deletes the session files only after it filled something), so that
     # the search is one that finds.
@@ -987,6 +1104,7 @@ async def test_nothing_a_run_filled_is_left_in_chromes_profile_once_chrome_is_cl
     await runtime.browser.let_go_of_chrome()
     found: list[str] = await asyncio.to_thread(_in_profile, profile, {"control": "control-7r4v"})
     assert found, "the search finds a value that was sent without Dot"
+    assert (profile / "Default" / "Sessions").exists(), "a run that filled nothing keeps the session Chrome wrote"
 
 
 def _holding(home: Path, needles: Sequence[bytes]) -> list[str]:

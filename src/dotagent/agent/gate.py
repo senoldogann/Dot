@@ -285,13 +285,18 @@ class RunGate:
         """Let the action through or raise. Returns the note the user wrote when approving it, or an empty string."""
         return (await self.authorize_recorded(info)).note
 
-    async def authorize_recorded(self, info: ActionInfo, arguments: JsonObject | None = None) -> Authorization:
+    async def authorize_recorded(
+        self, info: ActionInfo, arguments: JsonObject | None = None, weighed: ActionInfo | None = None
+    ) -> Authorization:
         """Let the action through or raise, as :meth:`authorize`, with what decided it for the step's record (item
         468). A run marked untrusted first refuses a step that would send a secret out of the Mac, read in the call's
         ``arguments`` when the caller has them and in the step's target and summary (item 525), in every approval mode:
         every way a run acts comes through here. A public or social browser action keeps the pace of its site first,
         whatever the approval mode, and counts once it is let through (:mod:`dotagent.policy.pace`), all under the
-        site's pace lock."""
+        site's pace lock. ``weighed`` is the step as the run and the page wrote it, when ``info`` is the step with the
+        values a login filled masked (the browser and web tools, item 621): the owner's rules are matched against it,
+        so that what a rule decides never tells a run whether a word of its own is the password; everything the gate
+        records, shows or asks is of ``info``."""
         await self._refuse_carried_secret(info, {} if arguments is None else arguments)
         # Before the locks of a site's pace and spend: the review model may take a while, and the other runs' steps
         # on the same site would wait for it (item 525).
@@ -306,10 +311,10 @@ class RunGate:
             await self._check_taint(info)
         paced: PacedAction | None = paced_action(info)
         if paced is None:
-            return await self._decide(info)
+            return await self._decide(info, weighed)
         async with self._locks.pace(paced.host):
             await self._keep_pace(info, paced)
-            authorized: Authorization = await self._decide(info)
+            authorized: Authorization = await self._decide(info, weighed)
             await self._space(paced)
             await self._store.record_paced_action(paced.host, paced.pace, time.time(), self._run_id)
         return authorized
@@ -336,26 +341,26 @@ class RunGate:
             log.info("pace_wait", run_id=self._run_id, host=paced.host, seconds=round(wait, 1))
             await asyncio.sleep(wait)
 
-    async def _decide(self, info: ActionInfo) -> Authorization:
+    async def _decide(self, info: ActionInfo, weighed: ActionInfo | None) -> Authorization:
         """What the policy says and who answers its question: the action goes through, or the call raises. A payment
         on a site with caps is decided under the site's spend lock, from what was spent there until then."""
         site: str | None = self._capped_site(info)
         if site is None:
-            return await self._decide_spent(info, None)
+            return await self._decide_spent(info, None, weighed)
         async with self._locks.spend(site):
-            return await self._decide_spent(info, site)
+            return await self._decide_spent(info, site, weighed)
 
-    async def _decide_spent(self, info: ActionInfo, site: str | None) -> Authorization:
+    async def _decide_spent(self, info: ActionInfo, site: str | None, weighed: ActionInfo | None) -> Authorization:
         rules: list[RuleRecord] = await self._store.list_rules()
         state: SpendState | None = None if site is None else await self._spend_state(info, site)
         allowance: Decision | None = None if state is None else spend_allowance(state)
         # The taint the policy weighs, kept with the step's record (item 474).
         tainted: bool = self.tainted
-        decided: Decision = decide(info, self._mode, tainted, self._preset, rules, allowance)
+        decided: Decision = decide(info, self._mode, tainted, self._preset, rules, allowance, weighed)
         if self._approval_mode == "yolo" and decided.source == "auto_review":
             # What the always-on review refuses in every other mode, a yolo run does without asking: the layers
             # after the review still judge the step, and a refusal among them stands (item 443).
-            rest: Decision = decide_past_review(info, self._mode, tainted, self._preset, rules, allowance)
+            rest: Decision = decide_past_review(info, self._mode, tainted, self._preset, rules, allowance, weighed)
             review: Decision = waived_in_yolo(info)
             if rest.verdict == "allow":
                 decided = review

@@ -506,7 +506,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
 - The memory tools refuse a note that holds a key-like string or one of the keys Dot holds (`memory_save`,
   `memory_update`), and tell the model to record where the key lives, not the key. A password that a login of 1Password
   or of Dot's vault filled into a page is not one of the keys (see Dot's own vault, below): a note that holds it is
-  saved with it masked and not refused, so that no refusal tells a run whether a password it guesses is right. A note
+  saved with it masked and not refused, so that no refusal tells a run whether a password it guesses is right, and the
+  size of a note is judged as it was written, not after the mask (the mask is shorter than a password, so a note a
+  few characters over the limit would have been saved with the password in it and refused with a wrong word). A note
   you write yourself, with `dotx memory add` or on the Memory page, is yours and not refused (on the Memory page the
   daemon masks in it a password that it filled).
 - What a run records of a step holds none of the secrets Dot holds (item 551), nor a key of a known form (a token, a
@@ -540,9 +542,12 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   - The values are in no argument of the model. Every result of the browser and web tools of the chat masks them
     from then on, for as long as Dot runs, as typed and as an address or a JSON string writes them: an error's words
     and context, a script's value, and the step's summary and target, which the approvals, the policy's events and
-    the review model read (a form sent by GET puts them in the address). The judge of clicks and checks gets them
-    masked too, in a button's words and a page's address, title and text. A screenshot of the browser covers the
-    fields they were filled into, in every mode.
+    the review model read (a form sent by GET puts them in the address). Your rules are the exception: a rule is
+    matched against the step as the run and the page wrote it, so that a rule such as "ask before an address with a
+    long value in its query" asks alike for the password and for a word of its shape, and what it asks never tells a
+    run whether a word it tried is the password; the question, the record and the reason that quote the step show it
+    masked. The judge of clicks and checks gets them masked too, in a button's words and a page's address, title and
+    text. A screenshot of the browser covers the fields they were filled into, in every mode.
   - What is kept from the model is the password and the one-time code (your word of 2026-10-21). The username is no
     secret: a site shows it once you are signed in, and what the browser and web tools do not answer shows it as it
     is (the files a crawl writes, an MCP tool). The desktop tools are not wrapped: their screenshots show Dot's Chrome
@@ -627,7 +632,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     letters and digits alone, none shorter than three) is marked again before every view and every screenshot, so that
     the view hides it and the picture covers it; the values are compared in Dot and never sent into the page. That is
     done in the documents of the origin the value was typed into (its scheme, its host and its port, not every site the
-    login names; a host with a dot at its end, `example.com.`, is another host, as Chrome has it) and in no other, and
+    login names; a host with a dot at its end, `example.com.`, is another host, as Chrome has it), in the tab it was
+    typed into, and in no other, and
     Dot runs nothing in a frame of another origin, whatever it holds: a frame that planted fields with the values a
     login might have and read which of them Dot marked would learn a password it was never given. The script is told the
     address the frame had when Dot read it and touches no field of a document that is another by then, so that a frame
@@ -640,10 +646,15 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     into it, as into one that names GET. Dot's own Chrome refuses a request a page sends whose address carries the
     password (for as long as Dot runs) or a one-time code (for five minutes), as it is or once its escapes are read
     back: a fetch, a frame, a script's request, whatever the page builds from a field that is in no form. It refuses it
-    to the documents of the origin the value was typed into, as the browser knows the document that sent the request,
-    and to no other: a rule that acts by what a secret is tells a page of another origin (in another chat, another tab,
-    or a frame of the page itself) which of its requests it refused, and a dictionary of passwords would give a weak one
-    away in a dozen requests. The tab's own address is not a request a page sends but the run's: the address it opens,
+    to the documents of the origin the value was typed into, in the tab it was typed into, as the browser knows the
+    document that sent the request, and to nothing else. A rule that acts by what a secret is tells whoever can try
+    addresses and watch which are refused, and a dictionary of passwords would give a weak one away in a dozen
+    requests; and whoever can run a script of their own can try addresses: a page of another origin (in another chat,
+    another tab, or a frame of the page itself), and the run itself, whose `browser_eval` runs in a page of the very
+    same origin in another chat, or in this chat once it closed the tab it filled. That page is not the site's but the
+    run's, and the run was never given the password, so the page of the same origin is no longer taken for the site's.
+    In the tab the password was typed into no script of the run runs while it is open, so the guard holds it there
+    alone. The tab's own address is not a request a page sends but the run's: the address it opens,
     the link it clicks, the form it types in and the page then sends are judged by the rules on addresses and by no
     value filled, since a run cannot carry a value it never saw, and a refusal by a value would tell it whether a guess
     is the password (the review found one in 22 calls from a list of 1,640 words). So a page whose script sends the tab
@@ -663,6 +674,17 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     `memory_save` takes every word, and the note it is told it saved (`Saved: …`) and finds again with `memory_search`
     shows `***` in the place of the word if it is the password, as a lesson, a habit or a line of the owner section that
     reaches its prompt does. A weak password can be found so, a word at a time; a long one cannot.
+  - **The rule, and where Dot keeps to it.** A check that decides by a password a login filled is an oracle wherever
+    the run can act and watch. So Dot decides by that value in the documents of the tab it was typed into alone, where
+    no script of the run runs (the guard of requests, and the marking of a field again), and nowhere else: your rules,
+    the size of a note, the refusal of a note, a lesson, a habit, a line of the owner section or an exported agent, and
+    the check of a run that read outside content judge the text as it was written or look for the keys Dot holds, and
+    never for a password a login filled (roadmap 621 lists every place). The keys Dot holds, those of your `.env` and
+    of the Keychain, are still looked for by value in those refusals, which tells a run a key it guesses: a key a
+    provider issued is too long and random to guess, and one you chose yourself is as easy to find as you made it. How
+    often a site is acted on (the pace of public posts and the caps of a payment) counts by the site's name as the
+    step shows it, a name that holds the password included, which needs a site of that name and as many posts as
+    guesses.
   - **The eye and the screen.** A saved secret the eye shows is hidden again by the page after twenty seconds. Each time
     the eye shows one it asks Dot, which for the thirty seconds after leaves Dot's own windows (the desktop app's, and a
     window of any application that shows the web UI, known by the title the UI gives its page) out of a screenshot of

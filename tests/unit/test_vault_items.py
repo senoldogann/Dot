@@ -34,9 +34,11 @@ TODAY: date = date(2026, 10, 24)
 
 @pytest.fixture(autouse=True)
 def _own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The secrets Dot holds are read from the home folder: a throwaway one, with nothing filled yet."""
+    """The secrets Dot holds are read from the home folder: a throwaway one, with nothing filled yet and nothing looked
+    up by another test of the process."""
     monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(secrets, "_filled", frozenset())
+    monkeypatch.setattr(secrets, "_resolved", set())
 
 
 @pytest_asyncio.fixture

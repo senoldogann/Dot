@@ -120,16 +120,19 @@ def normalize_tags(tags: Sequence[str]) -> tuple[str, ...]:
 
 def _checked_text(content: str, max_chars: int) -> str:
     # Every write of a note comes here, a model's save, a lesson, a pin and the owner's own: a value filled into a page
-    # is never kept in one, nor sent to the embedding model (item 621). Nothing refuses a note for holding one.
-    text: str = normalize_text(mask_filled(content))
-    if len(text) < _MIN_NOTE_CHARS:
+    # is never kept in one, nor sent to the embedding model (item 621). Nothing refuses a note for holding one, and
+    # nothing about its size is judged after the mask: a mask is shorter or longer than the value, so a note of 608
+    # characters with the password in it would fit the limit and the same note with a word of its shape would not, and
+    # the refusal would tell a run whether the word is the password. The size is the note as it was written.
+    written: str = normalize_text(content)
+    if len(written) < _MIN_NOTE_CHARS:
         raise InvalidValueError("the note is empty", {"content": content})
-    if len(text) > max_chars:
+    if len(written) > max_chars:
         raise InvalidValueError(
-            f"the note is {len(text)} characters long; the limit is {max_chars}. Save one shorter, single fact.",
-            {"chars": len(text), "max_chars": max_chars},
+            f"the note is {len(written)} characters long; the limit is {max_chars}. Save one shorter, single fact.",
+            {"chars": len(written), "max_chars": max_chars},
         )
-    return text
+    return normalize_text(mask_filled(content))
 
 
 async def open_memory_index(store: Store, config: AppConfig) -> MemoryIndex:

@@ -168,3 +168,78 @@ def test_mask_filled_masks_the_values_a_page_was_given_and_nothing_else(monkeypa
         f"the password is *** and the key is {key}"
     ), "the key's form is the business of redact_secrets, not of this"
     assert mask_filled("a tiny word") == "a tiny word", "a value too short to mask is left"
+
+
+# Where the code compares text with a value a page was given (a password, a one-time code) and does something because
+# of the answer, by the function it stands in (item 621, round 7). An outcome that depends on whether a word is the
+# value tells whoever can try words and watch the outcome, and a run can wherever a script of its own runs
+# (``browser_eval``). So a request is refused for carrying a value in its address, and a field marked again for holding
+# one, in the tab the value was typed into alone, where scripts stay off (``_kept_out``, which the session holds by
+# tab, and ``Tab.filled_values``); the rest only puts the value's mask where the value stands. A new place, or one that
+# reads the values of every tab, is a line here, which a review reads against that rule.
+DECIDES_BY_A_VALUE: dict[str, tuple[str, ...]] = {
+    # A request is refused for carrying a value in its address: the values of the tab it comes from (``_kept_out_of``).
+    "browser/session.py:BrowserSession._judge": ("in_address",),
+    "browser/session.py:BrowserSession._kept_out_of": ("_kept_out", "covers"),
+    # A field is marked again for holding a value: the values of the tab, in a document of their origin.
+    "browser/driver.py:remark_held": ("covers",),
+    # The words of a log line are made without the values of every tab (``_shown``), and the words a run reads of a
+    # refused address without those of any chat but its own (``_shown_to``): a mask, nothing is decided by it.
+    "browser/session.py:BrowserSession._shown": ("_vault_secrets",),
+    "browser/session.py:BrowserSession._shown_to": ("_vault_secrets",),
+    "browser/session.py:BrowserSession._words_of": ("in_address",),
+    "browser/session.py:BrowserSession._named": ("in_address",),
+    # Where the values are kept and let go of.
+    "browser/session.py:BrowserSession.__init__": ("_kept_out", "_vault_secrets"),
+    "browser/session.py:BrowserSession._forget_tabs": ("_kept_out",),
+    "browser/session.py:BrowserSession._let_go": ("_kept_out",),
+    "browser/session.py:BrowserSession._on_page_closed": ("_kept_out",),
+    "browser/session.py:BrowserSession.fill_from_vault.typing": ("_kept_out", "_vault_secrets"),
+}
+
+
+def _places_of_a_value() -> dict[str, tuple[str, ...]]:
+    """The functions of the source that call ``in_address`` or ``covers``, or read ``_kept_out`` or ``_vault_secrets``,
+    with which of the four each does."""
+    found: dict[str, set[str]] = {}
+    wanted: frozenset[str] = frozenset({"in_address", "covers", "_kept_out", "_vault_secrets"})
+
+    class Reader(ast.NodeVisitor):
+        def __init__(self, module: str) -> None:
+            self.module: str = module
+            self.inside: list[str] = []
+
+        def _enter(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> None:
+            self.inside.append(node.name)
+            self.generic_visit(node)
+            self.inside.pop()
+
+        visit_FunctionDef = _enter
+        visit_AsyncFunctionDef = _enter
+        visit_ClassDef = _enter
+
+        def _note(self, name: str) -> None:
+            # ``covers`` means a held value's origin in the browser's code (a rule of the owner's covers a step).
+            if name == "covers" and not self.module.startswith("browser/"):
+                return
+            if name in wanted and self.inside:
+                found.setdefault(f"{self.module}:{'.'.join(self.inside)}", set()).add(name)
+
+        def visit_Call(self, node: ast.Call) -> None:
+            if isinstance(node.func, ast.Name):
+                self._note(node.func.id)
+            elif isinstance(node.func, ast.Attribute):
+                self._note(node.func.attr)
+            self.generic_visit(node)
+
+        def visit_Attribute(self, node: ast.Attribute) -> None:
+            self._note(node.attr)
+            self.generic_visit(node)
+
+    for path in sorted(SOURCE.rglob("*.py")):
+        Reader(str(path.relative_to(SOURCE))).visit(ast.parse(path.read_text(encoding="utf-8")))
+    return {where: tuple(sorted(names)) for where, names in found.items()}
+
+
+def test_a_request_is_refused_and_a_field_marked_for_a_value_only_where_it_is_held_to_its_tab() -> None:
+    assert _places_of_a_value() == {where: tuple(sorted(names)) for where, names in DECIDES_BY_A_VALUE.items()}

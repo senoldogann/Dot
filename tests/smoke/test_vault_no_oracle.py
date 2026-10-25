@@ -1,4 +1,4 @@
-"""No tool, route or pipeline tells a run whether a guess is the password a vault filled (item 621, round 5).
+"""No tool, route or pipeline tells a run whether a guess is the password a vault filled (item 621, rounds 5 and 7).
 
 A value filled into a page is a mask and no more: a run never saw it, and a refusal, a block or another outcome that
 depends on whether a guess is the value tells whoever can ask the run the value, one guess at a time (a tainted run
@@ -9,6 +9,12 @@ owner's env file ends as a refusal in each of them, so that the test finds what 
 
 What differs is the text, which has the value masked where it stands (a note, a prompt, a file): that is the limit the
 safety page states (what a run can still guess) and is tested here as a mask, not as an outcome.
+
+Round 7 adds the rule these tests keep: a check that decides by a filled value is an oracle wherever the run can act and
+watch, so Dot decides by a value only in the documents of the tab it was typed into, where no script of the run can run,
+and everywhere else by kind or not at all. The last tests are for the size of a note and the owner's rules, which were
+decided on the masked text; the request guard of the browser, which has the same rule, is tried against a script of the
+run's own in ``test_vault_items_fill.py``, where the sites and the Chrome are.
 """
 
 import asyncio
@@ -34,6 +40,7 @@ from test_vault_items_fill import _call, _context
 from vault_stand_ins import MemorySecretStore
 
 from dotagent import secrets
+from dotagent.agent.executor import execute_calls
 from dotagent.agent.lessons import propose_lesson, run_lessons
 from dotagent.agent.manager import RunManager
 from dotagent.agent.reactions import _holds_a_secret
@@ -43,15 +50,21 @@ from dotagent.agent.skill_proposals import propose_rewrite
 from dotagent.config import load_config, load_default_config
 from dotagent.core.errors import InvalidValueError, NotFoundError, PolicyDenied
 from dotagent.core.paths import env_file_path
+from dotagent.core.types import JsonObject
 from dotagent.evals.runner import eval_environment, scratch_home
 from dotagent.harness.propose import propose_from_run
 from dotagent.harness.service import given_text
+from dotagent.llm.types import ToolCall
 from dotagent.memory.service import OwnerSection, owner_prompt_lines, owner_section, save_memory, set_owner_section
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import known_secrets, write_env_value
+from dotagent.server import UI_SOURCE
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
+from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult, ok
+from dotagent.tools.context import ToolContext
+from dotagent.tools.registry import ToolRegistry
 from dotagent.tools.shell import read_login_env
 from dotagent.vault.items import LoginDraft, VaultItems
 
@@ -409,3 +422,110 @@ async def test_the_prompt_of_a_run_takes_a_harness_text_and_an_owner_line_alike_
     assert RIGHT not in said, "the model is never given the password"
     assert "the shop wants ***." in said and "Signs in with ***." in said
     assert (await _prompted(login_env, ENV_KEY))[0] == "refused"
+
+
+# ----- what is decided is of the text as it was written -------------------------------------------------------------
+#
+# A mask is a text, and a decision taken on the masked text differs from one taken on the written text exactly when a
+# word is the password. The size of a note and what the owner's rules ask were both decided after the mask (round 6).
+
+
+async def test_a_note_is_judged_by_its_size_as_written_alike_for_the_password_and_a_word_of_its_shape(
+    lab: _Lab,
+) -> None:
+    """A note one character over the limit is refused, whether the extra characters are the password or any other word:
+    the mask is shorter than the password, so judged after it the note with the password fitted and the note with a word
+    of its shape did not (608 characters were saved with the password and refused with a wrong word). A note at the
+    limit is saved either way, with the password masked."""
+    await _fill_a_login(lab)
+    ctx, gate = await _context(lab.runtime, "yolo")
+    limit: int = lab.runtime.memory.config.max_chars
+    kept = await save_memory(lab.runtime.memory, "The shop opens at nine.", (), None, None, None, False)
+
+    def written(guess: str, size: int) -> str:
+        return f"{guess} " + "x" * (size - len(guess) - 1)
+
+    for tool in ("memory_save", "memory_update"):
+        for size, saves in ((limit + 1, False), (limit, True)):
+            ended: dict[str, tuple[bool, str]] = {}
+            for guess in (RIGHT, WRONG):
+                arguments = {"content": written(guess, size), "tags": []}
+                if tool == "memory_update":
+                    arguments["memory_id"] = kept.record.id
+                try:
+                    ended[guess] = (True, (await _call(ctx, gate, tool, arguments)).text)
+                except InvalidValueError as refused:
+                    ended[guess] = (False, str(refused))
+            assert ended[RIGHT][0] is ended[WRONG][0] is saves, (tool, size, ended)
+            if not saves:
+                assert ended[RIGHT][1] == ended[WRONG][1], "the refusal says the same of both"
+            assert RIGHT not in ended[RIGHT][1]
+    assert not any(RIGHT in note.content for note in await lab.runtime.store.list_memories(50, 0))
+
+
+def _opens_nothing(registry: ToolRegistry) -> ToolRegistry:
+    """The registry with ``browser_open`` classified and masked as it is, and opening no page: the test is of what is
+    asked before a call runs, which is the executor's, the gate's and the policy's."""
+    real: RegisteredTool = registry.tools["browser_open"]
+
+    async def prepare(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
+        call: PreparedCall = await real.prepare(arguments, ctx)
+
+        async def run(context: ToolContext) -> ToolResult:
+            return ok("Opened.")
+
+        return dataclasses.replace(call, run=run)
+
+    return ToolRegistry({**registry.tools, "browser_open": dataclasses.replace(real, prepare=prepare)})
+
+
+async def _asked_about_opening(lab: _Lab, address: str, filled: bool) -> bool:
+    """Whether a chat whose approvals ask is asked before it opens ``address``, under the owner's rule, when the call
+    is made as the executor makes it; ``filled``: a login was filled into a page of the chat, so the browser tools take
+    the password out of the step they show."""
+    ctx, gate = await _context(lab.runtime, "ask")
+    if filled:
+        lab.runtime.browser._vault_values[ctx.thread_id] = {RIGHT}
+    call: ToolCall = ToolCall(id="call-1", name="browser_open", arguments={"url": address})
+    running = asyncio.create_task(
+        execute_calls([call], _opens_nothing(lab.runtime.registry), {}, ctx, gate, 1, lambda outcome: None)
+    )
+    async with asyncio.timeout(15):
+        while not running.done():
+            pending = [
+                one
+                for one in await lab.runtime.store.list_approvals(None, 50)
+                if one.run_id == ctx.run_id and one.status == "pending"
+            ]
+            if pending:
+                assert RIGHT not in pending[0].summary, "the question shows the step masked"
+                await lab.runtime.approvals.resolve(pending[0].id, True, UI_SOURCE, "")
+                (outcome,) = await running
+                assert not outcome.result.is_error, outcome.result.text
+                return True
+            await asyncio.sleep(0.02)
+    (outcome,) = await running
+    assert not outcome.result.is_error, outcome.result.text
+    return False
+
+
+async def test_an_owners_rule_asks_about_an_address_alike_for_the_password_and_a_word_of_its_shape(lab: _Lab) -> None:
+    """The browser tools show a step with the values a login filled masked, and the policy matched the owner's rules
+    against what was shown: a rule like `ask before an address with a long value in its query` asked for a wrong word
+    and let the password through, which told a run whether its guess was right. The rule is matched against the step as
+    it was written; the step is still shown, asked about and recorded masked."""
+    await _fill_a_login(lab)
+    address: str = "https://shop.example.com/probe?c={}"
+    rule = await lab.runtime.store.add_rule(
+        "ask", "browser_open", r"[?&]\w+=\S{12,}", "ask before an address with a long value in its query"
+    )
+    try:
+        # The control, in a chat that filled nothing: the rule fits both words, so the test finds what it looks for.
+        assert await _asked_about_opening(lab, address.format(RIGHT), filled=False)
+        assert await _asked_about_opening(lab, address.format(WRONG), filled=False)
+        # In a chat whose page was filled with the password the two are one decision, and the owner is asked in both.
+        assert await _asked_about_opening(lab, address.format(RIGHT), filled=True)
+        assert await _asked_about_opening(lab, address.format(WRONG), filled=True)
+    finally:
+        await lab.runtime.store.delete_rule(rule.id)
+    assert not await _asked_about_opening(lab, address.format(RIGHT), filled=True), "without the rule nothing asks"
