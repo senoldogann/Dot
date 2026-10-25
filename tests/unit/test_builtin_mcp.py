@@ -587,8 +587,12 @@ def test_the_server_starts_in_its_own_folder_and_a_file_a_run_leaves_in_the_work
         "-c",
         "import importlib.util as u; spec = u.find_spec('dot_planted_probe'); print(spec.origin if spec else 'none')",
     ]
-    from_workspace: str = subprocess.run(look, cwd=workspace, capture_output=True, text=True, check=True).stdout
-    from_folder: str = subprocess.run(look, cwd=folder, capture_output=True, text=True, check=True).stdout
+    # PYTHONSAFEPATH, where whoever runs the tests sets it, keeps the folder off the path as -P does: not this test's.
+    plain: dict[str, str] = {name: value for name, value in os.environ.items() if name != "PYTHONSAFEPATH"}
+    from_workspace: str = subprocess.run(
+        look, cwd=workspace, env=plain, capture_output=True, text=True, check=True
+    ).stdout
+    from_folder: str = subprocess.run(look, cwd=folder, env=plain, capture_output=True, text=True, check=True).stdout
     assert Path(from_workspace.strip()).resolve() == (workspace / "dot_planted_probe.py").resolve()
     assert from_folder.strip() == "none"
 
@@ -607,3 +611,9 @@ def test_a_server_names_a_whole_folder_of_its_own_and_only_a_command_has_one(hom
     outside: Path = home / ".." / "outside-dots-home"
     assert server_folder(McpServerConfig(name="mine", command="mine-server", cwd=str(outside))) == outside
     assert not outside.resolve().exists()
+    # And so is one behind a link in Dot's home that leads out of it.
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "link-out").symlink_to(tmp_path / "led-to", target_is_directory=True)
+    linked: Path = home / "link-out" / "folder"
+    assert server_folder(McpServerConfig(name="mine", command="mine-server", cwd=str(linked))) == linked
+    assert not (tmp_path / "led-to").exists()
