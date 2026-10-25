@@ -202,8 +202,18 @@ async def test_the_palette_puts_a_reaction_under_an_answer_and_a_second_press_of
     await expect(answer).to_contain_text(ANSWER)
     button: Locator = answer.get_by_role("button", name="React to this message")
     await expect(button).to_have_attribute("aria-expanded", "false")
+    # Item 652: with a pointer the button is seen only on the message it is on, and while its palette is open; a
+    # phone, with no pointer to rest, shows it always.
+    if look == "wide":
+        await page.mouse.move(0, 0)
+        await expect(button).to_have_css("opacity", "0")
+        await answer.hover()
+    await expect(button).to_have_css("opacity", "1")
     await button.click()
     await expect(button).to_have_attribute("aria-expanded", "true")
+    if look == "wide":
+        await page.mouse.move(0, 0)
+    await expect(button).to_have_css("opacity", "1")
     palette: Locator = _palette(page)
     await expect(palette).to_be_visible()
     labels: object = await palette.get_by_role("menuitemcheckbox").evaluate_all(
