@@ -53,6 +53,9 @@ def _steps(rows: list[ToolStep]) -> list[ContextStep]:
     calls: dict[tuple[str, str], ToolStep] = {}
     steps: list[ContextStep] = []
     for row in rows:
+        # A row with no call id pairs with nothing (every writer sets one).
+        if row.call_id == "":
+            continue
         key: tuple[str, str] = (row.run_id, row.call_id)
         if row.kind == "tool_call":
             calls[key] = row
