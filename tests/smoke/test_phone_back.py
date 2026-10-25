@@ -257,6 +257,8 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                         **playwright.devices["iPhone 17 Pro Max"], reduced_motion="reduce"
                     )
                     await phone_context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                    # The home lists the chats it opens here only with the day shown (Settings › General › Chat).
+                    await phone_context.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
                     phone: Page = await phone_context.new_page()
                     await phone.goto(ui_url("127.0.0.1", port, TOKEN))
                     await _phone_walk(phone, address, ended)
@@ -300,6 +302,7 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     # In a Mac's window a page keeps its own link back, and no Back shows.
                     wide: Page = await chrome.new_page(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
                     await wide.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                    await wide.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
                     await wide.goto(ui_url("127.0.0.1", port, TOKEN))
                     await wide.goto(f"{address}/#/customize/connectors/notion")
                     await expect(wide.locator(".plugin-hero")).to_be_visible()

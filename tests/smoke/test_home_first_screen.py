@@ -12,7 +12,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -209,6 +209,17 @@ async def test_the_greeting_and_the_composer_stand_in_the_middle_and_the_strip_i
             await browser.close()
 
 
+class _FailingActivity:
+    """`/api/activity` answering with an error, and how many times it was asked."""
+
+    def __init__(self) -> None:
+        self.asked = 0
+
+    async def answer(self, route: Route) -> None:
+        self.asked += 1
+        await route.fulfill(status=500, content_type="application/json", body='{"message": "The activity failed"}')
+
+
 async def test_a_new_chat_is_the_greeting_and_the_composer_alone_until_the_day_is_asked_for(
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
@@ -216,6 +227,8 @@ async def test_a_new_chat_is_the_greeting_and_the_composer_alone_until_the_day_i
     # While you were away under it, which Settings › General › Chat brings back, in that browser.
     _, address = served
     port: int = int(address.rpartition(":")[2])
+    # Dot has had its first conversation (item 420), which would stand in the greeting's place on a home with no chat.
+    runtime.assistant.mark_introduced(True)
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
@@ -244,6 +257,18 @@ async def test_a_new_chat_is_the_greeting_and_the_composer_alone_until_the_day_i
                 assert abs(down - (bar["y"] + bar["height"] + height) / 2) <= _TOLERANCE_PX, down
                 assert abs(across - (stage["x"] + stage["width"] / 2)) <= _TOLERANCE_PX, across
                 await page.screenshot(path=str(tmp_path / f"new-chat-{width}.png"))
+                if width == 1280:
+                    # Nothing on the page shows /activity without the day, so the home does not read it again: a read
+                    # that fails is told by the sidebar, which shows it, and not as "What is going on".
+                    failing: _FailingActivity = _FailingActivity()
+                    await page.route("**/api/activity", failing.answer)
+                    await runtime.bus.emit("run-640", "run_started", {}, False)
+                    await expect(page.locator(".toast.error", has_text="The sidebar")).to_be_visible()
+                    # Both reads of a page that read it twice go out on the same event: a second asked a moment after
+                    # the first is waited for, so the count does not hang on which answer came first.
+                    await page.wait_for_timeout(1500)
+                    assert failing.asked == 1, failing.asked
+                    await expect(page.locator(".toast.error", has_text="What is going on")).to_have_count(0)
                 await page.close()
             page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
