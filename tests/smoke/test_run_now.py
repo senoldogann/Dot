@@ -368,3 +368,74 @@ async def test_run_now_starts_the_run_its_page_opens_and_the_firings_list_it(
                 await page.close()
         finally:
             await browser.close()
+
+
+@pytest.mark.browser
+async def test_past_its_third_schedule_the_list_scrolls_inside_and_keeps_its_place_when_painted_again(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 634, the owner's word of 2026-10-25: Your schedules shows its first three rows and the top of the fourth,
+    which says that more lie under them, and scrolls inside past them, on a wide window and on a phone, where it is
+    never taller than most of the screen; three or fewer are not cut. A list painted again, as a switch or the end of a
+    run paints it, keeps where it was scrolled to."""
+    for listed in (await client.get("/api/schedules")).json():
+        assert (await client.delete(f"/api/schedules/{listed['record']['id']}")).status_code == 200
+    for number in range(1, 7):
+        await _schedule(client, {"name": f"list check {number}", "goal": "Look at the list.", "cron": "0 9 * * *"})
+    port: int | None = client.base_url.port
+    assert port is not None
+    address: str = f"http://127.0.0.1:{port}"
+    measure: str = (
+        "(list) => { const top = list.getBoundingClientRect().top;"
+        " const rows = [...list.children].map((row) => row.getBoundingClientRect());"
+        " return { shown: list.clientHeight, whole: list.scrollHeight, third: rows[2].bottom - top,"
+        " fourth: rows[3].top - top, fifth: rows[4].top - top, screen: window.innerHeight }; }"
+    )
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, height, scheme in ((1280, 900, "light"), (390, 844, "dark")):
+                phone: bool = width < 720
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height},
+                    color_scheme=scheme,
+                    is_mobile=phone,
+                    has_touch=phone,
+                    reduced_motion="reduce",
+                )
+                await page.goto(ui_url("127.0.0.1", port, TOKEN))
+                await page.goto(f"{address}/#/schedules")
+                schedules: Locator = page.locator(".schedule-list")
+                await expect(schedules.locator(":scope > .list-row")).to_have_count(6)
+                await expect(schedules).to_have_class(re.compile(r"\bcut\b"))
+                box: JsonObject = await schedules.evaluate(measure)
+                assert box["whole"] > box["shown"], box
+                if phone:
+                    assert box["shown"] <= 0.6 * box["screen"] + 1, box
+                else:
+                    # The three rows whole and the top of the fourth, not the fifth.
+                    assert abs(box["shown"] - (box["third"] + 32)) <= 2, box
+                    assert box["fourth"] < box["shown"] < box["fifth"], box
+                await page.screenshot(path=str(tmp_path / f"schedule-list-{width}-{scheme}.png"), full_page=True)
+                # Scrolled to its end, the list shows its last schedule; switched off there, it is painted again and
+                # stays where it was.
+                await schedules.evaluate("(list) => { list.scrollTop = list.scrollHeight; }")
+                scrolled: float = await schedules.evaluate("(list) => list.scrollTop")
+                assert scrolled > 0
+                await page.get_by_role("switch", name="Switch off list check 6").click()
+                await expect(page.get_by_role("switch", name="Switch on list check 6")).to_be_visible()
+                assert abs(await schedules.evaluate("(list) => list.scrollTop") - scrolled) <= 1
+                await page.get_by_role("switch", name="Switch on list check 6").click()
+                await expect(page.get_by_role("switch", name="Switch off list check 6")).to_be_visible()
+                await page.close()
+            # Three are not cut.
+            for listed in (await client.get("/api/schedules")).json()[3:]:
+                assert (await client.delete(f"/api/schedules/{listed['record']['id']}")).status_code == 200
+            page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"{address}/#/schedules")
+            await expect(page.locator(".schedule-list > .list-row")).to_have_count(3)
+            await expect(page.locator(".schedule-list")).not_to_have_class(re.compile(r"\bcut\b"))
+            await page.close()
+        finally:
+            await browser.close()

@@ -2851,6 +2851,16 @@
   padding-bottom: var(--space-2);
 }
 
+/* Past its third schedule the list scrolls inside (item 634): as tall as its first three rows and the top of the
+   fourth, which the page measures (`--shown-rows`, schedules.js), and never taller than most of the window, where a
+   phone's rows stand taller. */
+.schedule-list.cut {
+  max-height: min(var(--shown-rows), 60vh);
+  max-height: min(var(--shown-rows), 60dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .schedule-panel .row-title {
   font-size: var(--text-sm);
 }
