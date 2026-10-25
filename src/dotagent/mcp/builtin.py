@@ -46,8 +46,9 @@ def host_lists_set(config: AppConfig) -> bool:
     addresses a call of the web-research server holds (item 583), not the pages the server reaches on its own: a
     search's found pages that ``read`` asks for (``tools.mcp`` judges those), and since 1.3.0 the heads of a search's
     top results read for their dates and another copy of a walled page (the archive, another outlet's), and since 1.4.0
-    an address of a page's host that cannot exist, read to tell a missing page, which the server does not read while a
-    list is set (:func:`builtin_servers`, items 623 and 630)."""
+    an address of a page's host that cannot exist, read to tell a missing page, and since 1.4.5 the download of
+    Camoufox's browser, which the server does not do while a list is set (:func:`builtin_servers`, items 623, 630 and
+    637)."""
     own: set[str] = {host.lower() for host in config.browser.blocked_hosts} - _packaged_blocked_hosts()
     return bool(config.browser.allowed_hosts) or bool(own)
 
@@ -60,15 +61,21 @@ def _web_research(enabled: bool, bound: bool) -> McpServerConfig:
     above the package's folder, in the app's layout Dot's own key file, and a ``.env`` that a program left in the
     workspace, the working folder, is read still; what is in the environment reaches the headless browser's driver, and
     a ``NODE_OPTIONS`` there is a file run outside the sandbox. The package reads only the working folder's now (its
-    own change), and the variable closes that one too. With ``bound`` (:func:`host_lists_set`) the server reads no page
-    of its own accord: no dates from the heads of a search's results, no other copy of a walled page, and since 1.4.0
-    no address of a page's host that cannot exist, which tells a missing page from a real one (item 630)."""
+    own change), and the variable closes that one too. With ``bound`` (:func:`host_lists_set`) the server reaches no
+    host of its own accord: no dates from the heads of a search's results, no other copy of a walled page, since 1.4.0
+    no address of a page's host that cannot exist, which tells a missing page from a real one (item 630), and since
+    1.4.5 no download of Camoufox's browser from GitHub and Mozilla (item 637): a page walled to Chrome is then read in
+    Camoufox only if its browser and its fingerprint model are on the Mac already. It starts in its own data folder,
+    not the workspace (item 637, the security review): a program it starts with ``-m`` and no ``-P`` (Camoufox's
+    fetch) would otherwise run a file of that name a run left in the workspace, outside the sandbox; the data folder is
+    one of Dot's own, which a run cannot write."""
     env: dict[str, str] = {"WEB_TOOLS_DATA_DIR": str(web_research_dir()), "PYTHON_DOTENV_DISABLED": "1"}
     if bound:
         env |= {
             "WEB_TOOLS_SEARCH_RESOLVE_DATES": "off",
             "WEB_TOOLS_SCRAPE_RECOVER": "off",
             "WEB_TOOLS_SOFT_404_CHECK": "off",
+            "WEB_TOOLS_BROWSER_STEALTH_FETCH": "off",
         }
     return McpServerConfig(
         name=WEB_RESEARCH,
@@ -76,6 +83,7 @@ def _web_research(enabled: bool, bound: bool) -> McpServerConfig:
         args=["-P", "-m", _WEB_RESEARCH_MODULE],
         env=env,
         enabled=enabled,
+        cwd=str(web_research_dir()),
     )
 
 

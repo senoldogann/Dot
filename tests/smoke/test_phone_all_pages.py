@@ -281,6 +281,10 @@ async def test_the_popular_cards_are_rows_on_a_phone_and_keep_their_words_in_the
         try:
             for width in (390, 1280):
                 page: Page = await _page(browser, port, width, "dark", "/customize/connectors")
+                # The cards come with the catalogue, whose four lists include the MCP servers' state: a server slow to
+                # start (web-research with camoufox, on a runner whose new programs macOS checks at their first start,
+                # item 637) took it past the page's fixed wait, and the count was taken of none.
+                await page.wait_for_selector('.plugin-section[data-section="popular"] .plugin-tile', timeout=30_000)
                 tiles: list[dict[str, Any]] = await page.evaluate(_POPULAR_TILES)
                 assert len(tiles) >= 4
                 for tile in tiles:

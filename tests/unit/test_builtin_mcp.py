@@ -5,6 +5,7 @@ The suite looks for the server's package under a name nothing has (``tests/conft
 builds starts it; the tests here that need it ask for the real name back with ``web_research_comes``."""
 
 import os
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -18,7 +19,7 @@ from dotagent.cli_mcp import render_report
 from dotagent.config import AppConfig, McpServerConfig, load_config, load_default_config
 from dotagent.config_edit import set_builtin_server
 from dotagent.core.errors import ConfigError, ToolInputError
-from dotagent.core.paths import web_research_dir
+from dotagent.core.paths import web_research_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.doctor import mcp_checks
 from dotagent.evals.runner import eval_config
@@ -33,7 +34,7 @@ from dotagent.mcp.builtin import (
     search_arguments,
     switch_of,
 )
-from dotagent.mcp.hub import ServerReport
+from dotagent.mcp.hub import ServerReport, server_folder
 from dotagent.mcp.naming import exposed_name
 from dotagent.mcp.types import McpTool, ToolHints
 from dotagent.runtime import _dot_paths
@@ -499,16 +500,18 @@ def test_the_server_reads_no_page_of_its_own_while_the_owner_has_a_list_of_sites
 ) -> None:
     """Item 623: since 1.3.0 the server reads the heads of a search's results for their dates and looks for another copy
     of a walled page, which no list of the owner's binds; with a list set, both are off. Item 630: since 1.4.0 it asks a
-    page's host for an address that cannot exist, to tell a missing page; with a list set, that is off too."""
+    page's host for an address that cannot exist, to tell a missing page; with a list set, that is off too. Item 637:
+    since 1.4.5 it downloads Camoufox's browser from GitHub and Mozilla by itself; with a list set, it does not."""
     config: AppConfig = load_default_config()
     assert "WEB_TOOLS_SEARCH_RESOLVE_DATES" not in builtin_servers(config)[0].env
     assert "WEB_TOOLS_SOFT_404_CHECK" not in builtin_servers(config)[0].env
+    assert "WEB_TOOLS_BROWSER_STEALTH_FETCH" not in builtin_servers(config)[0].env
     allowed: AppConfig = config.model_copy(
         update={"browser": config.browser.model_copy(update={"allowed_hosts": ["example.org"]})}
     )
     env: dict[str, str] = dict(builtin_servers(allowed)[0].env)
     assert env["WEB_TOOLS_SEARCH_RESOLVE_DATES"] == "off" and env["WEB_TOOLS_SCRAPE_RECOVER"] == "off"
-    assert env["WEB_TOOLS_SOFT_404_CHECK"] == "off"
+    assert env["WEB_TOOLS_SOFT_404_CHECK"] == "off" and env["WEB_TOOLS_BROWSER_STEALTH_FETCH"] == "off"
     more: list[str] = [*config.browser.blocked_hosts, "news.example"]
     blocked: AppConfig = config.model_copy(
         update={"browser": config.browser.model_copy(update={"blocked_hosts": more})}
@@ -545,7 +548,8 @@ def test_the_installed_server_reads_the_switches_dot_sets(
     web_research_comes: None, home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Item 623, the review: the names Dot sets are the ones the installed server reads, so that a later version that
-    renamed one does not quietly let the lists stop binding (the missing-page check's too, item 630)."""
+    renamed one does not quietly let the lists stop binding (the missing-page check's too, item 630, and the download of
+    Camoufox's browser, item 637)."""
     from web_scraper.web_tools.settings import WebToolsSettings  # type: ignore[import-untyped]
 
     config: AppConfig = load_default_config()
@@ -557,3 +561,59 @@ def test_the_installed_server_reads_the_switches_dot_sets(
     settings = WebToolsSettings.from_env()
     assert settings.search_resolve_dates == "off" and settings.scrape_recover == "off"
     assert settings.soft_404_check is False
+    assert settings.browser_stealth_fetch is False
+
+
+def test_the_server_starts_in_its_own_folder_and_a_file_a_run_leaves_in_the_workspace_is_not_on_its_path(
+    web_research_comes: None, home: Path
+) -> None:
+    """Item 637, the security review: Camoufox's fetch is ``python -m camoufox fetch`` with no ``-P``, so it found its
+    module in the folder it started in, which was the run's workspace: a ``camoufox.py`` a run wrote there ran as the
+    fetch, outside the sandbox. The server starts in its data folder now, one of Dot's own, which a run cannot write,
+    and which Dot makes when it is not there yet."""
+    workspace: Path = workspace_dir()
+    workspace.mkdir(parents=True)
+    server: McpServerConfig = builtin_servers(load_default_config())[0]
+    assert server.cwd == str(web_research_dir())
+    assert not web_research_dir().exists()
+    folder: Path = server_folder(server)
+    assert folder == web_research_dir() and folder.is_dir() and folder.is_relative_to(home)
+    assert not folder.is_relative_to(workspace)
+    # A module a run plants in the workspace is what a program started there with -m or -c imports, and not what one
+    # started in the server's folder does (a name no installed package has, so that only the planted file can answer).
+    (workspace / "dot_planted_probe.py").write_text("raise SystemExit('planted')\n", encoding="utf-8")
+    look: list[str] = [
+        sys.executable,
+        "-c",
+        "import importlib.util as u; spec = u.find_spec('dot_planted_probe'); print(spec.origin if spec else 'none')",
+    ]
+    # PYTHONSAFEPATH, where whoever runs the tests sets it, keeps the folder off the path as -P does: not this test's.
+    plain: dict[str, str] = {name: value for name, value in os.environ.items() if name != "PYTHONSAFEPATH"}
+    from_workspace: str = subprocess.run(
+        look, cwd=workspace, env=plain, capture_output=True, text=True, check=True
+    ).stdout
+    from_folder: str = subprocess.run(look, cwd=folder, env=plain, capture_output=True, text=True, check=True).stdout
+    assert Path(from_workspace.strip()).resolve() == (workspace / "dot_planted_probe.py").resolve()
+    assert from_folder.strip() == "none"
+
+
+def test_a_server_names_a_whole_folder_of_its_own_and_only_a_command_has_one(home: Path, tmp_path: Path) -> None:
+    """Item 637: ``cwd`` is a whole path, for a server Dot starts; a folder outside Dot's home is not made by Dot."""
+    elsewhere: Path = tmp_path / "not-there"
+    server: McpServerConfig = McpServerConfig(name="mine", command="mine-server", cwd=str(elsewhere))
+    assert server_folder(server) == elsewhere and not elsewhere.exists()
+    assert server_folder(McpServerConfig(name="mine", command="mine-server")).name != "not-there"
+    with pytest.raises(ValidationError, match="whole path"):
+        McpServerConfig(name="mine", command="mine-server", cwd="relative/folder")
+    with pytest.raises(ValidationError, match="cwd belongs to a command"):
+        McpServerConfig(name="mine", url="https://mcp.example/sse", cwd="/tmp")
+    # A folder that only seems to be in Dot's home, by "..", is judged where it is, and not made.
+    outside: Path = home / ".." / "outside-dots-home"
+    assert server_folder(McpServerConfig(name="mine", command="mine-server", cwd=str(outside))) == outside
+    assert not outside.resolve().exists()
+    # And so is one behind a link in Dot's home that leads out of it.
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "link-out").symlink_to(tmp_path / "led-to", target_is_directory=True)
+    linked: Path = home / "link-out" / "folder"
+    assert server_folder(McpServerConfig(name="mine", command="mine-server", cwd=str(linked))) == linked
+    assert not (tmp_path / "led-to").exists()

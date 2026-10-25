@@ -111,41 +111,61 @@ run needs, sent where the configuration points:
 - **To GitHub, for a GitHub watcher: the request for your notifications.** `api.github.com/notifications` with your
   personal access token, every few minutes, as a conditional request; it carries nothing else of yours.
 - **To the search engines and the sites of web-research, the MCP server that comes with Dot: the queries and the pages
-  asked for.** Its `web_search` sends the query to DuckDuckGo (its HTML page, then its lite page) and Yahoo, and to
-  Google only when those refuse, by a plain request and then through a headless Chrome of its own with a temporary
-  profile, never your Chrome profile; to Brave's or Serper's search API first only when their key is in its environment
-  (1.3.0). For a search of news or of a span of dates it reads the head of each of the top results' pages for its date,
-  and when a page it is asked for answers with a wall (a captcha, a 401, 403 or 429), `web_scrape` looks for another
-  copy: the Internet Archive's (`web.archive.org`), the page's AMP or print version, the site's feed, and another
-  outlet's copy found by searching for its title, whose address the answer names (1.3.0). To tell a page that is not
-  there from one that is (a site that answers every address with its home page), it asks a page's host, once a session
-  (again after five minutes when the answer told nothing), for an address that cannot exist, and compares; it asks only
-  for a page that does not name itself by its canonical link, or whose title is its site's home page's (1.4.0). None of
-  the three is done while you have a list of sites set (`[browser] allowed_hosts`, or `blocked_hosts` beyond the
-  defaults): Dot then starts the server with all three off, as the lists bind the addresses a call holds and these would
-  be pages the server chose (items 623 and 630). A page that its own scripts draw is waited for until its text stops
-  growing, eight seconds at the most (1.4.0), and `web_map` may read one in its headless Chrome, which resolves names
-  itself, as a scraped page's does (below). Its `web_scrape`, `web_map`, `web_extract` and crawls request the pages they
-  are asked for, with the `robots.txt` and the sitemaps of their sites (a headless Chrome of its own reads a page that
-  needs JavaScript), and with `archive: true` the Internet Archive's copy; `web_health` asks nothing of anyone. It
-  refuses the addresses of this Mac, of private networks and of cloud metadata services, and since 1.3.1 it connects
-  only to an address it checked in the same step, on each redirect too, so that a name whose answer changes between the
-  check and the connection (DNS rebinding) cannot lead it to one (item 623; its headless Chrome resolves names itself,
-  and each of its requests is checked as it goes); it needs no key for the engines it asks by default, and sends nothing
-  to the people who make it; it keeps its crawl jobs in `<home>/web-research`. `[builtin_mcp] web_research = false`
-  leaves it out (see [MCP servers](extending.md#mcp-servers)). Its calls are judged by the rules of Dot's own tools that
-  do the same, in the same functions: the words of a search (the query, and the sites the server makes words of it) as
-  the query of `web_search` is, so that a key in them earns the flag `exfiltration`, which is refused in every mode but
-  yolo, and more than 400 characters are refused; the addresses as the address of `web_fetch` and `web_crawl` is, so
-  that `[browser] allowed_hosts` and `blocked_hosts` bind them and a long one, or one with a key in it, earns the same
-  flag; a search that reads the pages it found is refused while you have set a list, since those addresses are the
-  server's pick; and while you have set a list, a `web_scrape` with `archive: true` is refused where your lists leave
-  out `web.archive.org`, the site it reaches whatever address it names. These rules do not reach what they do not reach
-  in Dot's own tools (a secret that is not in the shape of a key, a key cut in pieces), nor a redirect the server
-  follows to another host (since 1.4.0 `web_map` and a crawl read the whole site that the address, its `robots.txt` or
-  its sitemap redirects to, its subdomains too with `include_subdomains`), the links a crawl follows on the site it
-  starts on, the search engines a search asks, or, while you have no list set, the Internet Archive that `archive: true`
-  asks; a crawl goes on after its run has stopped, up to its page limit.
+  asked for.** Its `web_search` sends the query to DuckDuckGo's HTML page and, when that refuses, to Google, then Yahoo,
+  then DuckDuckGo's lite page (1.4.4); to Brave's or Serper's search API first only when their key is in its environment
+  (1.3.0). Google is asked by a plain request first and then read in Camoufox, a Firefox made to look like a person's
+  browser, on this Mac, with a temporary profile, never your Chrome profile, and with two consent cookies the package
+  sets for `.google.com` (`CONSENT=YES+cb` and a fixed `SOCS`): the same for everyone, read from no browser, kept in
+  memory and sent to Google's hosts only, they tell Google that its consent question was answered, and when it is asked
+  all the same the search clicks Accept all. When a page meets a wall in its headless Chrome (a captcha, a page that
+  turns it away, a 401, 403 or 429, or a timeout), it reads the page once more in Camoufox (1.4.2). An Intel Mac has no
+  Camoufox (1.4.6: a package it needs cannot be installed there without Xcode's tools): there a walled page stays
+  walled, and Google is searched in the headless Chrome. Camoufox's browser (about 100 MB from GitHub, 2.3 GB on disk),
+  the model its fingerprints are drawn from (GitHub) and its ad blocker (the latest, from `addons.mozilla.org`, with no
+  checksum) are fetched once, in the background, the first time they are needed (1.4.5), and the browser fetches its ad
+  blocker's lists itself, whether or not a list of sites is set (below). For a search of news or of a span of dates it
+  reads the head of each of the top results' pages for its date, and when a page it is asked for answers with a wall (a
+  captcha, a 401, 403 or 429), `web_scrape` looks for another copy: the Internet Archive's (`web.archive.org`), the
+  page's AMP or print version, the site's feed, and another outlet's copy found by searching for its title, whose
+  address the answer names (1.3.0). To tell a page that is not there from one that is (a site that answers every address
+  with its home page), it asks a page's host, once a session (again after five minutes when the answer told nothing),
+  for an address that cannot exist, and compares; it asks only for a page that does not name itself by its canonical
+  link, or whose title is its site's home page's (1.4.0). None of the three, nor the fetch of Camoufox, is done while
+  you have a list of sites set (`[browser] allowed_hosts`, or `blocked_hosts` beyond the defaults): Dot then starts the
+  server with all four off, as the lists bind the addresses a call holds and these would be hosts the server chose
+  (items 623, 630 and 637); a page walled to Chrome is then read in Camoufox only if its browser (in
+  `~/Library/Caches/camoufox`) and its fingerprint model (in Dot's Python environment) are on the Mac already. A page
+  that its own scripts draw is waited for until its text stops growing, eight seconds at the most (1.4.0), and `web_map`
+  may read one in its headless Chrome, which resolves names itself, as a scraped page's does (below). Its `web_scrape`,
+  `web_map`, `web_extract` and crawls request the pages they are asked for, with the `robots.txt` and the sitemaps of
+  their sites (a headless Chrome of its own reads a page that needs JavaScript), and with `archive: true` the Internet
+  Archive's copy; `web_health` asks nothing of anyone. It refuses the addresses of this Mac, of private networks and of
+  cloud metadata services, and since 1.3.1 it connects only to an address it checked in the same step, on each redirect
+  too, so that a name whose answer changes between the check and the connection (DNS rebinding) cannot lead it to one
+  (item 623; its headless Chrome resolves names itself, and each of its requests is checked as it goes). Since 1.4.5
+  every browser it starts, Chrome or Camoufox, for a page or for a search, is held to that check before its first page:
+  a page's requests and the windows it opens, and in Chrome its web sockets; a page is returned only if it ended at an
+  address the check allows. Not held: a redirect the browser follows (the guard sees a request's first address), a
+  worker's requests, a web socket in Camoufox, the browser's own name resolution, and, until web-research 1.4.7, the
+  installed Chrome that Google's search falls back to when Camoufox cannot start (the security review of item 637). The
+  server starts in its own data folder, not the workspace (item 637), so that no file a run leaves in the workspace runs
+  in it or in a program it starts, such as Camoufox's fetch. The `camoufox` package deletes a Camoufox folder of an
+  older layout in `~/Library/Caches` when it looks for its browser (until web-research 1.4.7); it needs no key for the
+  engines it asks by default, and sends nothing to the people who make it; it keeps its crawl jobs in
+  `<home>/web-research`. `[builtin_mcp] web_research = false` leaves it out (see [MCP
+  servers](extending.md#mcp-servers)). Its calls are judged by the rules of Dot's own tools that do the same, in the
+  same functions: the words of a search (the query, and the sites the server makes words of it) as the query of
+  `web_search` is, so that a key in them earns the flag `exfiltration`, which is refused in every mode but yolo, and
+  more than 400 characters are refused; the addresses as the address of `web_fetch` and `web_crawl` is, so that
+  `[browser] allowed_hosts` and `blocked_hosts` bind them and a long one, or one with a key in it, earns the same flag;
+  a search that reads the pages it found is refused while you have set a list, since those addresses are the server's
+  pick; and while you have set a list, a `web_scrape` with `archive: true` is refused where your lists leave out
+  `web.archive.org`, the site it reaches whatever address it names. These rules do not reach what they do not reach in
+  Dot's own tools (a secret that is not in the shape of a key, a key cut in pieces), nor a redirect the server follows
+  to another host (since 1.4.5 a map or a crawl whose address, `robots.txt` or sitemap redirects to another site reads
+  only the one page it leads to, and says `redirected_to`), the links a crawl follows on the site it starts on, the
+  search engines a search asks, or, while you have no list set, the Internet Archive that `archive: true` asks; a crawl
+  goes on after its run has stopped, up to its page limit.
 - **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; the one
   set up by default is web-research, above (see [MCP servers](extending.md#mcp-servers)).
 - **To your Google and Microsoft accounts, once you sign one in: what the mail and calendar tools ask.** `mail_search`,

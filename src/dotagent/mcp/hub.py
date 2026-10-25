@@ -14,7 +14,7 @@ from pydantic import JsonValue
 from dotagent.config import McpServerConfig
 from dotagent.core.errors import DotError, McpError
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import log_dir, workspace_dir
+from dotagent.core.paths import dot_home, log_dir, workspace_dir
 from dotagent.core.text import redact_known
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.mcp.connection import McpConnection
@@ -89,6 +89,19 @@ def tool_parameters(tool: McpTool) -> JsonObject:
         ) from exc
 
 
+def server_folder(config: McpServerConfig) -> Path:
+    """The folder the server of ``config`` starts in: its own (``cwd``, item 637), else the workspace. A folder of Dot's
+    own home is made when it is not there yet (the web-research server's data folder, which the server makes only when
+    it first needs it); any other must be there already, or the server does not start, saying so."""
+    if config.cwd is None:
+        return workspace_dir()
+    folder: Path = Path(config.cwd)
+    # Judged where the folder really is: a ".." or a link out of Dot's home is not a folder of Dot's home.
+    if folder.resolve().is_relative_to(dot_home().resolve()):
+        folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
 async def _connect_server(
     config: McpServerConfig, login_env: Mapping[str, str], auth: httpx2.Auth | None
 ) -> _Connected:
@@ -97,7 +110,9 @@ async def _connect_server(
     secrets: dict[str, str] = await resolve_server_secrets(config)
     env: dict[str, str] = server_environment(config, login_env, secrets)
     headers: dict[str, str] = server_headers(config, secrets)
-    connection: McpConnection = McpConnection(config, env, headers, auth, workspace_dir(), server_log_path(config))
+    connection: McpConnection = McpConnection(
+        config, env, headers, auth, server_folder(config), server_log_path(config)
+    )
     async with AsyncExitStack() as cleanup:
         cleanup.push_async_callback(connection.close)
         listed: tuple[McpTool, ...] = await connection.list_tools()
@@ -123,7 +138,9 @@ async def _offered_tools(config: McpServerConfig, login_env: Mapping[str, str]) 
     secrets: dict[str, str] = await resolve_server_secrets(config)
     env: dict[str, str] = server_environment(config, login_env, secrets)
     headers: dict[str, str] = server_headers(config, secrets)
-    connection: McpConnection = McpConnection(config, env, headers, auth, workspace_dir(), server_log_path(config))
+    connection: McpConnection = McpConnection(
+        config, env, headers, auth, server_folder(config), server_log_path(config)
+    )
     try:
         return await connection.list_tools()
     finally:
