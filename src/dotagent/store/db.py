@@ -19,7 +19,7 @@ import tempfile
 import time
 from collections.abc import Awaitable, Callable, Coroutine, Iterable, Sequence
 from pathlib import Path
-from typing import Concatenate, Literal
+from typing import Concatenate, Literal, cast
 
 import aiosqlite
 from pydantic import JsonValue, TypeAdapter
@@ -3996,6 +3996,16 @@ class Store:
             (follow_up_run_id, run_id, message, reaction),
         )
         await self._db.commit()
+
+    async def followed_reactions(self, follow_up_run_id: str) -> list[tuple[str, str, ReactionName]]:
+        """The reactions that stand whose follow-up run is ``follow_up_run_id``: the run reacted to, the message and the
+        reaction, oldest first (a run follows up one reaction; a queued one carries it too, item 586)."""
+        rows = await self._all(
+            "SELECT run_id, message, reaction FROM reactions WHERE follow_up_run_id = ? AND removed_at IS NULL"
+            " ORDER BY created_at",
+            (follow_up_run_id,),
+        )
+        return [(str(row["run_id"]), str(row["message"]), cast(ReactionName, row["reaction"])) for row in rows]
 
     @_writing
     async def keep_reaction_note(self, run_id: str, message: str, reaction: ReactionName, note_id: str) -> None:

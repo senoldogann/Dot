@@ -484,10 +484,67 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     return el("div", { class: "lesson" }, body, el("div", { class: "lesson-foot" }, save, dismiss));
   }
 
-  /** `lessons` is what became of the lessons of the run, or null when none were drawn from it. */
-  function paintLessons(lessons) {
-    lessonsCard.hidden = lessons === null;
+  // The notes forgotten from this card, by id: the daemon no longer names them, and the card still says what became of
+  // them (item 654).
+  const forgottenNotes = new Map();
+
+  /** A note the disliked run was handed, with Forget: it goes to the trash, which keeps it 30 days. */
+  function doubtedRow(note) {
+    if (forgottenNotes.has(note.id)) {
+      return el("div", { class: "lesson dismissed" }, el("div", { class: "lesson-text" }, note.text), el("div", { class: "lesson-foot" }, el("span", { class: "lesson-state" }, icon("check"), "Forgotten: in the trash for 30 days")));
+    }
+    const forget = el("button", { class: "btn ghost sm", type: "button" }, "Forget");
+    forget.addEventListener("click", async () => {
+      forget.disabled = true;
+      try {
+        await attempt(async () => {
+          await api.del(`/memories/${encodeURIComponent(note.id)}`);
+          forgottenNotes.set(note.id, note);
+          toast("ok", "Forgotten: it waits in the trash for 30 days");
+        });
+        await reconcile();
+      } finally {
+        forget.disabled = false;
+      }
+    });
+    return el(
+      "div",
+      { class: "lesson doubted" },
+      el("div", { class: "lesson-text" }, note.text),
+      el("div", { class: "lesson-foot" }, note.pinned ? el("span", { class: "lesson-state" }, icon("pin"), "Pinned") : null, forget),
+    );
+  }
+
+  /** What the run you disliked was handed (item 654): one of these notes may be what led it astray. */
+  function doubtedNotes(disliked) {
+    if (disliked === null) {
+      return [];
+    }
+    const named = new Set(disliked.notes.map((note) => note.id));
+    const notes = [...disliked.notes, ...[...forgottenNotes.values()].filter((note) => !named.has(note.id))];
+    if (notes.length === 0) {
+      return [];
+    }
+    const said = disliked.reaction === "again" ? "asked to do again (🔁)" : "reacted 👎 to";
+    return [
+      el("div", { class: "lessons-doubted-head" }, `The run you ${said} was handed these notes. One may be what led it astray: forget the ones that should not guide Dot again.`),
+      ...notes.map(doubtedRow),
+    ];
+  }
+
+  /**
+   * `lessons` is what became of the lessons of the run, or null when none were drawn from it; `disliked` is the run
+   * this one follows up after your 👎 or 🔁, with the notes it was handed, or null.
+   */
+  function paintLessons(lessons, disliked = null) {
+    const doubted = doubtedNotes(disliked);
+    lessonsCard.hidden = lessons === null && doubted.length === 0;
     if (lessons === null) {
+      const left = disliked?.notes.length ?? 0;
+      lessonsCount.textContent = left > 0 ? `${left} to look at` : `${forgottenNotes.size} forgotten`;
+      lessonsCount.dataset.tone = "";
+      lessonCuts.disconnect();
+      lessonsBody.replaceChildren(...doubted);
       return;
     }
     const proposed = lessons.lessons.filter((lesson) => lesson.state === "proposed").length;
@@ -510,6 +567,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
           : null,
         lessons.error === null ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, lessons.error)),
       ].filter((node) => node !== null),
+      ...doubted,
     );
   }
 
@@ -1198,7 +1256,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     paintStats();
     paintWorking();
     syncControls();
-    paintLessons(fresh.lessons);
+    paintLessons(fresh.lessons, fresh.disliked ?? null);
     paintQuestions(fresh.questions);
     // The rows of the delegated runs follow the store where the run's events did not bring them (item 285).
     timeline.settle(fresh.children, Date.now() / 1000);
@@ -1567,7 +1625,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     settling.observe(earlier);
   }
   const settled = setTimeout(() => settling.disconnect(), SETTLE_OPEN_MS);
-  paintLessons(detail.lessons);
+  paintLessons(detail.lessons, detail.disliked ?? null);
   reactions.load().catch((error) => readFailed("The reactions", error));
   attempt(changes.refresh);
   paintQuestions(detail.questions);

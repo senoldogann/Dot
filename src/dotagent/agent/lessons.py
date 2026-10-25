@@ -1,15 +1,17 @@
 """Lessons: what a run that reached its goal the hard way can tell the runs after it.
 
-A run is asked about when ``[agent] lessons`` is on, it is a task or research run of its own (a delegated run's work is
-its parent's), it ended done, and something went wrong on the way (:func:`run_signals`): a call failed, whether a later
-call of the same tool and target worked or not, the progress watchdog raised an alert, the goal check sent it back or
-its answer named paths that did not exist. Once the run has ended, the review model reads a digest of it, what went
-wrong, its answer and the saved notes that fit its goal, and returns at most three lessons
-(:func:`dotagent.agent.review.lesson_writer_for`). :func:`kept_lessons` drops what is not one: more than one line, too
-short or too long, and what the one gate for learned texts refuses (:mod:`dotagent.core.learned_text`: a character that
-does not print, a secret, an e-mail address, a path in a home folder, a line that imitates the prompt), a repeat of the
-goal, of another lesson or of a saved note. A saved note that the memory search finds for a lesson and that says the
-same (by its words or, with embeddings, by its meaning) drops the lesson too.
+A run is asked about when ``[agent] lessons`` is on, it is a task or research run of its own (a delegated run's work
+is its parent's), it ended done, and something went wrong on the way (:func:`run_signals`): a call failed, whether a
+later call of the same tool and target worked or not, the progress watchdog raised an alert, the goal check sent it
+back, its answer named paths that did not exist, or it is the follow-up of the owner's 👎 or 🔁 on an earlier run of
+the chat (item 654: the owner disliked that run's work; :func:`disliked_of` names the notes it was handed, for its
+page). Once the run has ended, the review model reads a digest of it, what went wrong, its answer and the saved notes
+that fit its goal, and returns at most three lessons (:func:`dotagent.agent.review.lesson_writer_for`).
+:func:`kept_lessons` drops what is not one: more than one line, too short or too long, and what the one gate for
+learned texts refuses (:mod:`dotagent.core.learned_text`: a character that does not print, a secret, an e-mail
+address, a path in a home folder, a line that imitates the prompt), a repeat of the goal, of another lesson or of a
+saved note. A saved note that the memory search finds for a lesson and that says the same (by its words or, with
+embeddings, by its meaning) drops the lesson too.
 
 With ``propose`` the lessons stay on the run (a ``lessons_proposed`` event), and the run's page saves each to memory or
 dismisses it. With ``auto`` (the default, item 302) nobody is asked: each lesson gets a second look first
@@ -66,7 +68,7 @@ from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, RunMode, RunRecord, RunStatus
+from dotagent.store.models import EventRecord, MemoryRecord, ReactionName, RunMode, RunRecord, RunStatus
 
 log = get_logger(__name__)
 
@@ -115,6 +117,9 @@ class LessonCase(FrozenModel):
     answer: str
     tainted: bool
     reached_goal: bool
+    # A chat run is asked for lessons only when it follows up the owner's 👎 or 🔁 (item 654): what it did otherwise is
+    # theirs to keep, while a chat's other ends hold no lesson.
+    only_if_disliked: bool = False
 
 
 class LessonView(FrozenModel):
@@ -189,6 +194,12 @@ def may_learn(setting: LessonsMode, mode: RunMode, parent_run_id: str | None, st
     return setting != "off" and mode in ("task", "research") and parent_run_id is None and status == "done"
 
 
+def may_learn_from_dislike(setting: LessonsMode, mode: RunMode, parent_run_id: str | None, status: RunStatus) -> bool:
+    """Whether a chat run that ended may be asked for lessons if it follows up the owner's 👎 or 🔁 (item 654): lessons
+    are on, it is a chat of its own and it ended done. :func:`learn` asks it only when it does."""
+    return setting != "off" and mode == "chat" and parent_run_id is None and status == "done"
+
+
 def _one_line(text: str) -> str:
     flat: str = " ".join(text.split())
     return flat if len(flat) <= _SIGNAL_CHARS else f"{flat[: _SIGNAL_CHARS - 1]}…"
@@ -206,13 +217,32 @@ def _stall_line(event: EventRecord) -> str:
     return f"The progress watchdog raised an alert: {detail}{answer}"
 
 
+# What the owner's reaction to an earlier run of the chat says, when this run is its follow-up (item 654): the owner
+# disliked that run's work, so what this run did otherwise is a lesson, as much as a call that failed.
+_DISLIKED: dict[ReactionName, str] = {
+    "wrong": (
+        "The owner reacted 👎 (not right) to what the run before this one in the chat gave them, and this run did it "
+        "again: what this run did differently is the lesson, to be done that way from the start next time."
+    ),
+    "again": (
+        "The owner asked for the work of the run before this one in the chat again, another way (🔁), and this run "
+        "did it so: what the owner wanted instead is the lesson, to be done that way from the start next time."
+    ),
+}
+
+
 def run_signals(
-    case: LessonCase, stalls: Sequence[EventRecord], checks: Sequence[EventRecord], paths: Sequence[EventRecord]
+    case: LessonCase,
+    stalls: Sequence[EventRecord],
+    checks: Sequence[EventRecord],
+    paths: Sequence[EventRecord],
+    disliked: Sequence[ReactionName] = (),
 ) -> tuple[str, ...]:
     """What went wrong along a run, a line each with secrets masked: its failed calls (after which a call of the same
     tool and target worked, or none did), the alerts of the progress watchdog (``stall`` events), the times the goal
-    check sent it back (``goal_check`` events) and the paths its answer named that did not exist (``answer_paths``
-    events). Empty when nothing went wrong."""
+    check sent it back (``goal_check`` events), the paths its answer named that did not exist (``answer_paths``
+    events), and the owner's dislike of the earlier run this one follows up (``disliked``: the reactions that started
+    it, item 654). Empty when nothing went wrong."""
     sent_back: list[_GoalCheckData] = [
         data
         for data in (_GoalCheckData.model_validate(event.data) for event in checks)
@@ -234,6 +264,7 @@ def run_signals(
             f"{', '.join(_AnswerPathsData.model_validate(event.data).missing)}."
             for event in paths
         ),
+        *(_DISLIKED[reaction] for reaction in dict.fromkeys(disliked) if reaction in _DISLIKED),
     ]
     return tuple(_one_line(redact_secrets(line)) for line in lines)
 
@@ -507,6 +538,11 @@ async def learn(runtime: Runtime, deciding: asyncio.Lock, case: LessonCase) -> L
     ``deciding``, the lock of the owner's decisions. A run along which nothing went wrong is not asked about
     (``skipped``). An error on the way (a review model or an embedding service that fails, the review model's missing
     API key) ends it with a ``lessons_failed`` event and fails it; the run keeps its end either way."""
+    if case.only_if_disliked and not [
+        reaction for _, _, reaction in await runtime.store.followed_reactions(case.run_id) if reaction in _DISLIKED
+    ]:
+        log.info("lessons_skipped", run_id=case.run_id, reason="a chat that follows up no dislike")
+        return SKIPPED
     signals: tuple[str, ...] = await stored_signals(runtime.store, case)
     if not signals:
         log.info("lessons_skipped", run_id=case.run_id, reason="nothing went wrong on the way")
@@ -516,13 +552,55 @@ async def learn(runtime: Runtime, deciding: asyncio.Lock, case: LessonCase) -> L
 
 
 async def stored_signals(store: Store, case: LessonCase) -> tuple[str, ...]:
-    """:func:`run_signals` of a run from the events the store holds of it."""
+    """:func:`run_signals` of a run from the events the store holds of it, and the reactions that stand whose
+    follow-up it is."""
     return run_signals(
         case,
         await store.events_of_kind(case.run_id, "stall", _EVENTS_READ),
         await store.events_of_kind(case.run_id, "goal_check", _EVENTS_READ),
         await store.events_of_kind(case.run_id, "answer_paths", _EVENTS_READ),
+        [reaction for _, _, reaction in await store.followed_reactions(case.run_id)],
     )
+
+
+# The notes of a disliked run named on its follow-up's page, at most.
+_DOUBTED_NOTES: int = 10
+
+
+class DoubtedNote(FrozenModel):
+    """A note the disliked run was handed, as its follow-up's page names it: it may be what led that run astray."""
+
+    id: str
+    text: str
+    pinned: bool
+
+
+class Disliked(FrozenModel):
+    """The earlier run a run follows up after the owner's 👎 or 🔁 (item 654): that run, the reaction, and the notes it
+    was handed that are still kept, with Forget on the page."""
+
+    run_id: str
+    reaction: ReactionName
+    notes: list[DoubtedNote]
+
+
+async def disliked_of(store: Store, run_id: str) -> Disliked | None:
+    """The disliked run that ``run_id`` follows up and its notes (:class:`Disliked`), or None for a run that follows up
+    no 👎 or 🔁 that stands."""
+    for reacted, _, reaction in await store.followed_reactions(run_id):
+        if reaction not in _DISLIKED:
+            continue
+        handed: list[str] = sorted(await store.handed_memory_ids(reacted))
+        kept: list[MemoryRecord] = await store.get_memories(handed)
+        return Disliked(
+            run_id=reacted,
+            reaction=reaction,
+            notes=[
+                DoubtedNote(id=note.id, text=note.content, pinned=note.pinned_at is not None)
+                for note in sorted(kept, key=lambda note: -note.used_count)[:_DOUBTED_NOTES]
+            ],
+        )
+    return None
 
 
 class DrawnLessons(FrozenModel):

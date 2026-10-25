@@ -800,6 +800,14 @@
   font-size: var(--text-xs);
 }
 
+/* The notes the run you disliked was handed (item 654), under the lessons drawn from its correction: a quiet line that
+   says why they are there, then each note as a lesson row with Forget. */
+.lessons-doubted-head {
+  padding: var(--space-3) 0 var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
 /* ---------- groups of tool steps ---------- */
 
 .steps {

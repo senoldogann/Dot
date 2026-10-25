@@ -58,7 +58,7 @@ from dotagent.agent.helpers import (
 )
 from dotagent.agent.judge import ClaimJudgment, TypeSafeService, claim_refused, claim_state, describe_claim
 from dotagent.agent.keep_going import keep_going_ask
-from dotagent.agent.lessons import LessonCase, may_learn
+from dotagent.agent.lessons import LessonCase, may_learn, may_learn_from_dislike
 from dotagent.agent.limits import (
     LIMIT_EVENT,
     LIMIT_TOOLS,
@@ -1443,7 +1443,9 @@ def _run_end(
 ) -> RunEnd:
     """The end of a run, with what its lessons are drawn from when it may hold some."""
     run: RunRecord = agent.run
-    if not may_learn(agent.runtime.config.agent.lessons, run.mode, run.parent_run_id, outcome.status):
+    setting = agent.runtime.config.agent.lessons
+    chat: bool = may_learn_from_dislike(setting, run.mode, run.parent_run_id, outcome.status)
+    if not chat and not may_learn(setting, run.mode, run.parent_run_id, outcome.status):
         return RunEnd(outcome=outcome, lessons=None)
     case: LessonCase = LessonCase(
         run_id=run.id,
@@ -1456,6 +1458,7 @@ def _run_end(
         answer=outcome.result,
         tainted=agent.gate.ever_tainted,
         reached_goal=outcome.status == "done",
+        only_if_disliked=chat,
     )
     return RunEnd(outcome=outcome, lessons=case)
 

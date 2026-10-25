@@ -285,7 +285,9 @@ restarted while this task worked.") and Continue.
 
 **Lessons.** With `lessons = "auto"` (the default) or `"propose"` in `[agent]`, a task or research run of its own that
 reached its goal after something went wrong on the way (a call failed, whether the run found its way around it or not;
-the progress watchdog raised an alert; the goal check sent it back; its answer named paths that did not exist) is
+the progress watchdog raised an alert; the goal check sent it back; its answer named paths that did not exist; or
+it is the follow-up of your 👎 or 🔁 on an earlier run of the chat, whose work you disliked, item 654: such a
+follow-up is asked for its lessons even when it is a chat) is
 followed, once it has ended, by one call of the review model (`[models] review`). It reads a digest of the run, what
 went wrong, the
 answer and the saved notes that fit the goal, and writes at most three lessons of one sentence: know-how that a later

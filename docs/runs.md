@@ -375,6 +375,12 @@ later run, while the run reads a note that vouches for nothing.
   `step-1`: the daemon refuses it, item 612), and at most `[reactions] follow_ups_per_hour` (20) in an hour in all;
   past that the reaction is kept as feedback and the page says so. What a delegated run said and what a campaign's
   session said are kept as feedback and start nothing: the campaign plans its own sessions.
+- The follow-up of a 👎 or a 🔁 learns from it (item 654), a chat's too. Once it ends done, it is asked for its lessons
+  as a run that went wrong is ([Lessons](autonomy.md)), told that you disliked the earlier run's work and that what
+  it did otherwise is the lesson, to be done that way from the start next time: before, a 👎 fixed the answer and
+  taught the runs after it nothing. Its page's lessons card also names the notes the run you disliked was handed (up
+  to ten, those still kept), with Forget: one of them may be what led it astray, and a new lesson does not take its
+  place. Nothing is forgotten without your press. A reaction taken back teaches nothing and names nothing.
 - A 👍 and a ❤️ are kept as feedback, and so is anything a setting says is only feedback (below). The reaction is a
   row of the store (it stays until it is taken back, and goes with its chat), and an event of its run
   (`reaction_added`, `reaction_removed`: the chat, the message, the reaction, what it did and the run it started),

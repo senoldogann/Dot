@@ -14,7 +14,7 @@ from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_attachments, store_attachment
 from dotagent.agent.campaign import session_number
 from dotagent.agent.keep_going import keep_going_ask
-from dotagent.agent.lessons import run_lessons
+from dotagent.agent.lessons import disliked_of, run_lessons
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.playbooks import save_playbook
 from dotagent.agent.recap import RecapView, recap_view, write_recap
@@ -158,6 +158,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             resumable=await ctx.manager.resumable(run),
             cut_off=cut_off_by(run),
             lessons=await run_lessons(store, run_id),
+            disliked=await disliked_of(store, run_id),
             questions=await store.list_left_questions(run_id),
             campaign=await campaign_of(run),
             held=ctx.manager.held(run_id),
