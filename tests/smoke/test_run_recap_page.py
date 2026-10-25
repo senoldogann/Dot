@@ -142,9 +142,9 @@ async def _one_size(browser: Browser, manager: RunManager, address: str, width: 
         layout: Locator = page.locator(".run-layout")
         await expect(page.locator(".answer")).to_contain_text("The four notes are written.")
         if width < 960 or await layout.get_attribute("data-inspector") != "on":
-            await page.get_by_role("button", name="Run details", exact=True).click()
+            await page.get_by_role("button", name="Task details", exact=True).click()
         details: Locator = page.locator(".inspector")
-        await details.get_by_role("tab", name="Run").click()
+        await details.get_by_role("tab", name="Task").click()
         # The section in sight asks for the recap that is due, and shows it with the step it is as of.
         recap: Locator = details.locator(".panel-section", has=page.locator(".panel-section-title", has_text="Recap"))
         await expect(recap.locator(".recap-text p")).to_have_text(RECAP.split("\n"))

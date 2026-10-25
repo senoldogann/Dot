@@ -62,7 +62,7 @@ _WAITING: ScriptedTurn = ScriptedTurn(
     text="", calls=(ScriptedCall(tool="shell", arguments={"command": _WAIT_COMMAND}),)
 )
 ANSWER: str = "The nightly one."
-ELSEWHERE_HINT: str = "The run works in a dotx command, whose browser is not shown here."
+ELSEWHERE_HINT: str = "This task was started from Terminal, whose browser is not shown here."
 _ASKING: ScriptedTurn = ScriptedTurn(
     text="", calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": "Which build?"}),)
 )
@@ -488,7 +488,7 @@ async def test_the_page_of_a_command_run_shows_it_at_work_queues_a_message_and_s
                         )
                         await side.goto(ui_url(host, port, TOKEN))
                         await side.goto(f"{address}/#/runs/{run_id}")
-                        await side.get_by_role("button", name="Run details").click()
+                        await side.get_by_role("button", name="Task details").click()
                         await side.get_by_role("tab", name="Screen").click()
                         card: Locator = side.locator("section.computer")
                         await expect(card.locator(".computer-screen .hint")).to_have_text(ELSEWHERE_HINT)

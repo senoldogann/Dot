@@ -436,7 +436,7 @@ async def test_a_hold_from_the_palette_holds_the_run_until_the_owner_writes_and_
     foot: Locator = page.locator(".bubble.say").filter(has_text=SAID).locator(".say-foot")
     await _react(page, foot, "Hold on")
     await expect(
-        page.locator(".note", has_text="You held the run (✋): it waits for your next message.")
+        page.locator(".note", has_text="You held the task (✋): it waits for your next message.")
     ).to_be_visible()
     box: Locator = page.locator(MESSAGE)
     await expect(box).to_have_attribute("placeholder", re.compile("on hold"))
@@ -447,7 +447,7 @@ async def test_a_hold_from_the_palette_holds_the_run_until_the_owner_writes_and_
     # What the owner writes goes to the run at once, not into a queue behind a run that waits for it.
     await box.fill("Use the other folder.")
     await box.press("Enter")
-    await expect(page.locator(".note", has_text="You wrote to the run, and it goes on.")).to_be_visible()
+    await expect(page.locator(".note", has_text="You wrote to the task, and it goes on.")).to_be_visible()
     await expect(page.get_by_role("article", name="Answer")).to_contain_text("Forty shelves.")
     assert "Use the other folder." in model.told(3)
     assert await served.runtime.store.list_queued(run.thread_id) == []
@@ -462,9 +462,9 @@ async def test_a_hold_taken_back_by_its_chip_lets_the_run_go_on(
     page: Page = await _open(browsers, served, "wide", f"/runs/{run.id}")
     foot: Locator = page.locator(".bubble.say").filter(has_text=SAID).locator(".say-foot")
     await _react(page, foot, "Hold on")
-    await expect(page.locator(".note", has_text="You held the run")).to_be_visible()
+    await expect(page.locator(".note", has_text="You held the task")).to_be_visible()
     await foot.get_by_role("button", name="Hold on", pressed=True).click()
-    await expect(page.locator(".note", has_text="You took the ✋ back, and the run goes on.")).to_be_visible()
+    await expect(page.locator(".note", has_text="You took the ✋ back, and the task goes on.")).to_be_visible()
     await expect(page.get_by_role("article", name="Answer")).to_contain_text("Forty shelves.")
     assert "took back their ✋" in model.told(3)
     await expect(page.locator(MESSAGE)).not_to_have_attribute("placeholder", re.compile("on hold"))
@@ -596,18 +596,18 @@ async def test_settings_change_what_each_reaction_does_after_a_run_and_whether_i
     page: Page = await _open(browsers, served, look, "/settings/general")
     card: Locator = _settings_card(page)
     await expect(card).to_be_visible()
-    switch: Locator = card.get_by_role("switch", name="Start a run for a reaction")
+    switch: Locator = card.get_by_role("switch", name="Start a task for a reaction")
     await expect(switch).to_have_attribute("aria-checked", "true")
     names: object = await card.get_by_role("combobox").evaluate_all(
         "nodes => nodes.map((node) => node.getAttribute('aria-label'))"
     )
     assert names == [
-        f"{name}, after the run has ended"
+        f"{name}, after the task has ended"
         for name in ("Good", "Love it", "Not right", "Do it again", "Explain", "Hold on")
     ]
-    wrong: Locator = card.get_by_role("combobox", name="Not right, after the run has ended")
+    wrong: Locator = card.get_by_role("combobox", name="Not right, after the task has ended")
     await expect(wrong).to_have_value("follow_up")
-    await expect(card.get_by_role("combobox", name="Good, after the run has ended")).to_have_value("feedback")
+    await expect(card.get_by_role("combobox", name="Good, after the task has ended")).to_have_value("feedback")
     await wrong.select_option("feedback")
     await until(lambda: _saved(served).get("wrong") == "feedback")
     assert served.reactions.config.wrong == "feedback"

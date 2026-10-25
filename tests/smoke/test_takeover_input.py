@@ -710,8 +710,8 @@ async def _touch(cdp: CDPSession, kind: str, points: list[tuple[float, float]]) 
 
 
 async def _screen_of(page: Page) -> Locator:
-    """Dot's computer of the run page, through Run details and its Screen tab."""
-    await page.get_by_role("button", name="Run details").click()
+    """Dot's computer of the run page, through Task details and its Screen tab."""
+    await page.get_by_role("button", name="Task details").click()
     await page.get_by_role("tab", name="Screen").click()
     card: Locator = page.locator("section.computer")
     await expect(card).to_be_visible()

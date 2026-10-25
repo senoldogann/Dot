@@ -282,7 +282,7 @@ async def test_a_note_is_pinned_and_a_merged_note_says_what_it_was_made_of_and_i
         # Undo the merge: it asks, the notes it took in wake apart and the merged note goes to the trash.
         await row.get_by_role("button", name="Undo this merge").click()
         dialog: Locator = page.get_by_role("dialog")
-        await expect(dialog).to_contain_text("2 notes wake apart")
+        await expect(dialog).to_contain_text("2 notes come back on their own")
         await dialog.get_by_role("button", name="Undo the merge").click()
         await expect(_notes(page).locator(f"xpath=self::*[@data-memory='{merged.id}']")).to_have_count(0)
         await expect(page.locator(f"[data-memory='{one.id}']")).not_to_contain_text("Merged into another note")

@@ -19,7 +19,7 @@ export async function engageFailsafe() {
     return;
   }
   const result = await api.post("/failsafe", null);
-  toast("ok", `Emergency stop engaged; ${plural(result.cancelled_runs.length, "run", "runs")} cancelled.`);
+  toast("ok", `Emergency stop engaged; ${plural(result.cancelled_runs.length, "task", "tasks")} stopped.`);
   await refresh();
 }
 

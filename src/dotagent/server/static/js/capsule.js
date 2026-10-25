@@ -22,7 +22,7 @@ export function createCapsule({ onWork, onHelpers, onQueued }) {
   const queuedText = el("span");
   const queued = el("button", { class: "capsule-part capsule-queued", type: "button", onclick: onQueued }, icon("listOrdered"), queuedText);
   // A group, not a live region: its time changes every second, which a screen reader would read out each time.
-  const element = el("div", { class: "capsule", role: "group", "aria-label": "How the run stands", hidden: true }, work, helpers, queued);
+  const element = el("div", { class: "capsule", role: "group", "aria-label": "How the task stands", hidden: true }, work, helpers, queued);
   let markFor = null;
 
   function paint({ status, since, now, helpers: statuses, queued: waiting }) {

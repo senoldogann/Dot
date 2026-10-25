@@ -33,7 +33,7 @@ test("Undo asks what goes back, what is deleted and what stays as it is", () => 
   const restored = edit("plan.md", "restore");
   const created = edit("index.html", "delete");
   const since = edit("style.css", "restore", "conflict");
-  assert.equal(undoQuestion([restored, created], [restored, created]), "A file goes back as it was before the run, and the file it created is deleted.");
+  assert.equal(undoQuestion([restored, created], [restored, created]), "A file goes back as it was before the task, and the file it created is deleted.");
   assert.equal(
     undoQuestion([created, edit("b.html", "delete")], [created, edit("b.html", "delete"), since]),
     "The 2 files it created are deleted. A file changed since stays as it is.",

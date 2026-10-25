@@ -124,7 +124,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="cloudflare",
         name="Cloudflare",
-        does="Work with your Cloudflare account: Workers, DNS, logs and the rest of its API.",
+        does="Work with your Cloudflare account: Workers, DNS, logs and the rest of what it offers.",
         url="https://mcp.cloudflare.com/mcp",
         signs_in=True,
     ),
@@ -165,7 +165,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         secrets=(
             ServiceSecret(
                 name="GITHUB_PAT",
-                label="Personal access token",
+                label="Personal access key",
                 help="https://github.com/settings/personal-access-tokens",
             ),
         ),
@@ -192,7 +192,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         headers={"Authorization": "Bearer ${INTERCOM_TOKEN}"},
         secrets=(
             ServiceSecret(
-                name="INTERCOM_TOKEN", label="Access token", help="https://developers.intercom.com/docs/guides/mcp"
+                name="INTERCOM_TOKEN", label="Access key", help="https://developers.intercom.com/docs/guides/mcp"
             ),
         ),
     ),
@@ -203,7 +203,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         url="https://mcp.neon.tech/mcp",
         headers={"Authorization": "Bearer ${NEON_API_KEY}"},
         secrets=(
-            ServiceSecret(name="NEON_API_KEY", label="API key", help="https://console.neon.tech/app/settings/api-keys"),
+            ServiceSecret(name="NEON_API_KEY", label="Key", help="https://console.neon.tech/app/settings/api-keys"),
         ),
     ),
     McpService(
@@ -212,7 +212,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         does="Search models, datasets and Spaces on Hugging Face, and run its Spaces.",
         url="https://huggingface.co/mcp",
         headers={"Authorization": "Bearer ${HF_TOKEN}"},
-        secrets=(ServiceSecret(name="HF_TOKEN", label="Access token", help="https://huggingface.co/settings/tokens"),),
+        secrets=(ServiceSecret(name="HF_TOKEN", label="Access key", help="https://huggingface.co/settings/tokens"),),
     ),
     McpService(
         id="wix",
@@ -221,7 +221,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         url="https://mcp.wix.com/mcp",
         headers={"Authorization": "${WIX_API_KEY}", "wix-account-id": "${WIX_ACCOUNT_ID}"},
         secrets=(
-            ServiceSecret(name="WIX_API_KEY", label="API key", help="https://manage.wix.com/account/api-keys"),
+            ServiceSecret(name="WIX_API_KEY", label="Key", help="https://manage.wix.com/account/api-keys"),
             ServiceSecret(name="WIX_ACCOUNT_ID", label="Account id", help="https://manage.wix.com/account/api-keys"),
         ),
     ),
@@ -231,9 +231,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         does="Scrape, crawl and search the web as clean Markdown.",
         url="https://mcp.firecrawl.dev/v2/mcp",
         headers={"Authorization": "Bearer ${FIRECRAWL_API_KEY}"},
-        secrets=(
-            ServiceSecret(name="FIRECRAWL_API_KEY", label="API key", help="https://www.firecrawl.dev/app/api-keys"),
-        ),
+        secrets=(ServiceSecret(name="FIRECRAWL_API_KEY", label="Key", help="https://www.firecrawl.dev/app/api-keys"),),
     ),
     McpService(
         id="tavily",
@@ -241,7 +239,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         does="Search the web and extract pages, built for agents.",
         url="https://mcp.tavily.com/mcp/",
         headers={"Authorization": "Bearer ${TAVILY_API_KEY}"},
-        secrets=(ServiceSecret(name="TAVILY_API_KEY", label="API key", help="https://app.tavily.com/home"),),
+        secrets=(ServiceSecret(name="TAVILY_API_KEY", label="Key", help="https://app.tavily.com/home"),),
     ),
     McpService(
         id="context7",
@@ -262,12 +260,12 @@ MCP_SERVICES: tuple[McpService, ...] = (
         command="npx",
         args=("-y", "@brave/brave-search-mcp-server"),
         env={"BRAVE_API_KEY": "${BRAVE_API_KEY}"},
-        secrets=(ServiceSecret(name="BRAVE_API_KEY", label="API key", help="https://brave.com/search/api/"),),
+        secrets=(ServiceSecret(name="BRAVE_API_KEY", label="Key", help="https://brave.com/search/api/"),),
     ),
     McpService(
         id="memory",
         name="Memory",
-        does="A knowledge graph the model keeps across its runs, on this Mac.",
+        does="A web of facts the model keeps across its tasks, on this Mac.",
         command="npx",
         args=("-y", "@modelcontextprotocol/server-memory"),
     ),
@@ -332,7 +330,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="postman",
         name="Postman",
-        does="Work with your Postman workspaces, collections, requests and APIs.",
+        does="Work with your Postman workspaces, collections, requests and web services.",
         url="https://mcp.postman.com/mcp",
         signs_in=True,
     ),
@@ -388,24 +386,24 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="figma",
         name="Figma",
-        does="Read your Figma files: their frames, components, styles and layout, with your access token.",
+        does="Read your Figma files: their frames, components, styles and layout, with a key from your Figma account.",
         command="npx",
         args=("-y", "figma-developer-mcp", "--stdio"),
         env={"FIGMA_API_KEY": "${FIGMA_API_KEY}"},
         secrets=(
             ServiceSecret(
                 name="FIGMA_API_KEY",
-                label="Personal access token",
+                label="Personal access key",
                 help="https://help.figma.com/hc/en-us/articles/8085703771159-Manage-personal-access-tokens",
             ),
         ),
     ),
     McpService(
         id="atlassian-token",
-        name="Atlassian (API token)",
+        name="Atlassian (with a key)",
         does=(
-            "Find and update issues in Jira and pages in Confluence with an API token, where no admin let Atlassian's "
-            "own server in."
+            "Find and update issues in Jira and pages in Confluence with a key, where no admin let Atlassian's "
+            "own connection in."
         ),
         command="uvx",
         args=("mcp-atlassian",),
@@ -422,7 +420,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
             ServiceSecret(name="ATLASSIAN_EMAIL", label="E-mail of your Atlassian account", help=None),
             ServiceSecret(
                 name="ATLASSIAN_API_TOKEN",
-                label="API token",
+                label="Key",
                 help="https://id.atlassian.com/manage-profile/security/api-tokens",
             ),
         ),
@@ -441,9 +439,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         command="npx",
         args=("-y", "@perplexity-ai/mcp-server"),
         env={"PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}"},
-        secrets=(
-            ServiceSecret(name="PERPLEXITY_API_KEY", label="API key", help="https://www.perplexity.ai/settings/api"),
-        ),
+        secrets=(ServiceSecret(name="PERPLEXITY_API_KEY", label="Key", help="https://www.perplexity.ai/settings/api"),),
     ),
     McpService(
         id="elevenlabs",
@@ -453,9 +449,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         args=("elevenlabs-mcp",),
         env={"ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"},
         secrets=(
-            ServiceSecret(
-                name="ELEVENLABS_API_KEY", label="API key", help="https://elevenlabs.io/app/settings/api-keys"
-            ),
+            ServiceSecret(name="ELEVENLABS_API_KEY", label="Key", help="https://elevenlabs.io/app/settings/api-keys"),
         ),
     ),
     McpService(
@@ -467,7 +461,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         env={"MAPBOX_ACCESS_TOKEN": "${MAPBOX_ACCESS_TOKEN}"},
         secrets=(
             ServiceSecret(
-                name="MAPBOX_ACCESS_TOKEN", label="Access token", help="https://account.mapbox.com/access-tokens/"
+                name="MAPBOX_ACCESS_TOKEN", label="Access key", help="https://account.mapbox.com/access-tokens/"
             ),
         ),
     ),
@@ -489,7 +483,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
             ServiceSecret(name="GRAFANA_URL", label="Grafana's address", help=None),
             ServiceSecret(
                 name="GRAFANA_SERVICE_ACCOUNT_TOKEN",
-                label="Service account token",
+                label="Service account key",
                 help="https://grafana.com/docs/grafana/latest/administration/service-accounts/",
             ),
         ),
@@ -603,7 +597,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="prisma",
         name="Prisma",
-        does="Create and manage Prisma Postgres databases, their schemas and backups.",
+        does="Create and manage Prisma Postgres databases, their structure and backups.",
         url="https://mcp.prisma.io/mcp",
         signs_in=True,
     ),
@@ -722,14 +716,14 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="globalping",
         name="Globalping",
-        does="Ping, trace the route to and check the DNS and HTTP of a host from probes around the world.",
+        does="Check from many places in the world whether a website or computer can be reached, and how fast.",
         url="https://mcp.globalping.dev/mcp",
         signs_in=True,
     ),
     McpService(
         id="ref",
         name="Ref",
-        does="Search the documentation of APIs, services and libraries, made for coding agents.",
+        does="Search the documentation of web services and software libraries, made for coding agents.",
         url="https://api.ref.tools/mcp",
         signs_in=True,
     ),
@@ -750,7 +744,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="sanity",
         name="Sanity",
-        does="Read and change the content and schemas of your Sanity projects.",
+        does="Read and change the content and structure of your Sanity projects.",
         url="https://mcp.sanity.io",
         signs_in=True,
     ),
@@ -1001,13 +995,13 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="apollo",
         name="Apollo GraphOS",
-        does="Read and check your GraphOS graphs and schemas, and search Apollo's GraphQL docs.",
+        does="Read and check your GraphOS graphs, and search Apollo's GraphQL documentation.",
         url="https://mcp.apollographql.com",
         headers={"x-api-key": "${APOLLO_KEY}"},
         secrets=(
             ServiceSecret(
                 name="APOLLO_KEY",
-                label="Graph API key",
+                label="Graph key",
                 help="https://www.apollographql.com/docs/graphos/platform/access-management/api-keys",
             ),
         ),
@@ -1016,7 +1010,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="duckdb",
         name="DuckDB",
-        does="Query and write CSV, Parquet and JSON files of this Mac with SQL, in a DuckDB database of its own.",
+        does="Search and change data files of this Mac, such as CSV spreadsheets, with SQL, in a small database.",
         command="uvx",
         # A database in memory, which the server opens only to read and write (it refuses one in memory to read
         # alone). A query reads and writes the files it names (COPY ... TO overwrites one) and may ATTACH another
@@ -1062,7 +1056,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="shopify-dev",
         name="Shopify Dev",
-        does="Search Shopify's developer docs and its API schemas, and check the code written for them.",
+        does="Search Shopify's developer documentation, and check the code written for it.",
         command="npx",
         args=("-y", "@shopify/dev-mcp@latest"),
     ),
@@ -1076,7 +1070,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="xcodebuildmcp",
         name="XcodeBuildMCP",
-        does="Build, run and test iOS and macOS apps on simulators and devices with Xcode's command-line tools.",
+        does="Build, run and test iOS and macOS apps on simulators and devices with Xcode's own commands.",
         command="npx",
         args=("-y", "xcodebuildmcp@latest", "mcp"),
     ),
@@ -1097,7 +1091,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
     McpService(
         id="aws-api",
         name="AWS",
-        does="Run AWS command-line calls on your account, with the credentials of this Mac's AWS configuration.",
+        does="Run commands on your AWS account, signed in as this Mac's AWS settings say.",
         command="uvx",
         args=("awslabs.aws-api-mcp-server@latest",),
     ),
@@ -1145,7 +1139,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         command="npx",
         args=("-y", "@pinecone-database/mcp"),
         env={"PINECONE_API_KEY": "${PINECONE_API_KEY}"},
-        secrets=(ServiceSecret(name="PINECONE_API_KEY", label="API key", help="https://app.pinecone.io/"),),
+        secrets=(ServiceSecret(name="PINECONE_API_KEY", label="Key", help="https://app.pinecone.io/"),),
     ),
     McpService(
         id="pagerduty",
@@ -1157,7 +1151,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         secrets=(
             ServiceSecret(
                 name="PAGERDUTY_API_KEY",
-                label="User API token",
+                label="User key",
                 help="https://support.pagerduty.com/main/docs/api-access-keys",
             ),
         ),
@@ -1172,7 +1166,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         secrets=(
             ServiceSecret(
                 name="HUBSPOT_TOKEN",
-                label="Access token of a private app",
+                label="Key of a private app",
                 help="https://developers.hubspot.com/docs/api/private-apps",
             ),
         ),
@@ -1187,7 +1181,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         secrets=(
             ServiceSecret(
                 name="MAILGUN_API_KEY",
-                label="API key",
+                label="Key",
                 help="https://app.mailgun.com/settings/api_security",
             ),
         ),
@@ -1199,7 +1193,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         command="uvx",
         args=("kagimcp",),
         env={"KAGI_API_KEY": "${KAGI_API_KEY}"},
-        secrets=(ServiceSecret(name="KAGI_API_KEY", label="API key", help="https://kagi.com/settings?p=api"),),
+        secrets=(ServiceSecret(name="KAGI_API_KEY", label="Key", help="https://kagi.com/settings?p=api"),),
     ),
     McpService(
         id="alibaba-cloud",

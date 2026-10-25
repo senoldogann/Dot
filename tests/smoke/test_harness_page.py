@@ -139,7 +139,7 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
     try:
         # The page says what it is in plain words (item 503).
         await expect(
-            page.get_by_text("Dot learns from its own runs how to work better on this Mac.", exact=False)
+            page.get_by_text("Dot learns from its own tasks how to work better on this Mac.", exact=False)
         ).to_be_visible()
         await expect(page.get_by_text("Dot's built-in instructions alone: no version is in use.")).to_be_visible()
         await expect(page.get_by_text("No version yet")).to_be_visible()
@@ -197,7 +197,7 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
         await row.get_by_role("button", name="Use", exact=True).click()
         await expect(in_use.get_by_text(HABIT)).to_be_visible()
         await expect(page.get_by_text("every night at", exact=False)).to_have_count(0)
-        await expect(page.get_by_text("Set a time of day in the config file", exact=False)).to_be_visible()
+        await expect(page.get_by_text("Set a time of day in the settings file", exact=False)).to_be_visible()
         # The form is made from the version in use each time it opens: its habits are the one's, its summary is empty,
         # and nobody changed it, so Escape shuts it at once and the focus is back on the button.
         dialog = await open_form(page, opener, "Write your own version")
@@ -274,7 +274,7 @@ async def test_the_version_in_use_reads_as_two_lists_and_the_nights_as_a_card(
         columns: Locator = _section(page, "What Dot follows now").locator(".follow-column")
         await expect(columns).to_have_count(2)
         await expect(columns.nth(0).locator(".follow-label")).to_have_text("Habits · how to work")
-        await expect(columns.nth(1).locator(".follow-label")).to_have_text("Tool guidance · what this Mac wants")
+        await expect(columns.nth(1).locator(".follow-label")).to_have_text("Tips · what this Mac and its apps want")
         await expect(columns.nth(0).locator("li")).to_have_count(2)
         await expect(columns.nth(0).locator("li code")).to_have_text(["head", "tail"])
         await expect(columns.nth(1).locator("li code")).to_have_text(["rg"])
@@ -298,9 +298,9 @@ async def test_the_version_in_use_reads_as_two_lists_and_the_nights_as_a_card(
         await expect(page.locator("[data-version]").first).to_contain_text("Pipes and reads")
         details: Locator = row.locator(".version-details")
         await expect(details).to_be_hidden()
-        await row.get_by_role("button", name="Texts and notes").click()
+        await row.get_by_role("button", name="Full text and notes").click()
         await expect(details).to_contain_text("Pipe long output through `head` or `tail`.")
-        await row.get_by_role("button", name="Texts and notes").click()
+        await row.get_by_role("button", name="Full text and notes").click()
         await expect(details).to_be_hidden()
         # How it learns is folded until it is asked for.
         how: Locator = page.locator("section.fold", has_text="How it learns")
@@ -387,7 +387,7 @@ async def test_a_version_composed_before_the_taint_was_noted_and_one_the_gate_re
             await expect(row(page, stored.id).locator(".badge", has_text="Refused")).to_be_visible()
             await expect(row(page, stored.id).get_by_role("button", name="Use", exact=True)).to_have_count(0)
             await expect(row(page, stored.id).get_by_role("button", name="Set aside")).to_be_visible()
-            await row(page, stored.id).get_by_role("button", name="Texts and notes").click()
+            await row(page, stored.id).get_by_role("button", name="Full text and notes").click()
             await expect(row(page, stored.id)).to_contain_text(
                 "Refused: its habits hold a character that does not print"
             )
@@ -406,7 +406,7 @@ async def test_a_version_composed_before_the_taint_was_noted_and_one_the_gate_re
     try:
         follows: Locator = _section(page, "What Dot follows now")
         await expect(follows.locator(".badge", has_text="Refused")).to_be_visible()
-        await expect(follows).to_contain_text("left out of every run's instructions")
+        await expect(follows).to_contain_text("left out of every task's instructions")
         assert await page.evaluate(FITS)
         await page.screenshot(path=tmp_path / "harness-refused-in-use-390.png", full_page=True)
     finally:
@@ -445,7 +445,7 @@ async def test_the_form_of_a_version_saves_for_later_and_says_inside_the_dialog_
             await summary.fill(f"Reads the rules first at {width}")
             await habits.fill("- Read https://example.com/rules first.")
             await dialog.get_by_role("button", name="Save for later").click()
-            await shows_the_failure(dialog, "the text cannot be a component of the harness")
+            await shows_the_failure(dialog, "This text cannot be kept (habits: a link)")
             await page.screenshot(path=tmp_path / f"harness-refused-dialog-{width}.png")
             await expect(habits).to_have_value("- Read https://example.com/rules first.")
             await expect(summary).to_have_value(f"Reads the rules first at {width}")
@@ -498,7 +498,7 @@ async def test_the_versions_come_fifty_at_a_time_and_the_ones_in_use_and_older_s
             await expect(more).to_have_count(0)
             # The version in use is not listed twice, and the list stays whole when one of its rows is acted on.
             await expect(page.locator(f"[data-version='{oldest.id}']")).to_have_count(1)
-            await page.locator("[data-version]").nth(1).get_by_role("button", name="Texts and notes").click()
+            await page.locator("[data-version]").nth(1).get_by_role("button", name="Full text and notes").click()
             await expect(rows).to_have_count(total)
         finally:
             await page.close()

@@ -11,7 +11,7 @@ import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from 
 import { icon } from "../icons.js";
 import { orderControl, proposedSection, trashSection } from "../memorylife.js";
 import { emptyPanel, field, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
-import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, formDialog, settingFold, toast } from "../ui.js";
 
 const PAGE_SIZE = 30;
 // The most notes the route reads at once (MemoriesQuery in server/views.py).
@@ -31,9 +31,9 @@ const QUOTE_CHARS = 160;
 // example uses.
 const FILTERS = [
   { id: "all", label: "All", hint: "Every note" },
-  { id: "lessons", label: "Lessons", hint: "The notes tagged lesson: what a run learned" },
+  { id: "lessons", label: "Lessons", hint: "The notes tagged lesson: what a task taught Dot" },
   { id: "preferences", label: "Preferences", hint: "The notes tagged preference or preferences" },
-  { id: "outside", label: "From outside content", hint: "The notes saved while a run read content third parties can author" },
+  { id: "outside", label: "From outside content", hint: "The notes saved while a task read content other people can write" },
 ];
 const FILTER_TESTS = {
   all: () => true,
@@ -43,9 +43,9 @@ const FILTER_TESTS = {
 };
 // What an empty filter says about itself.
 const FILTER_EMPTY = {
-  lessons: "A note tagged lesson shows here: Dot writes one when a run taught it something.",
+  lessons: "A note tagged lesson shows here: Dot writes one when a task taught it something.",
   preferences: "Tag a note preference or preferences and it shows here.",
-  outside: "A note saved while a run read content third parties can author shows here.",
+  outside: "A note saved while a task read content other people can write shows here.",
 };
 
 /** "work, Mac ,work" becomes ["work", "Mac"]: trimmed, without blanks or repeats. */
@@ -90,7 +90,7 @@ export function scoreLine(score) {
   return el(
     "span",
     { title: `${score.done} ended done, ${score.failed} failed` },
-    `Handed to ${plural(score.handed, "run", "runs")}, ${score.done} done`,
+    `Handed to ${plural(score.handed, "task", "tasks")}, ${score.done} done`,
   );
 }
 
@@ -103,7 +103,7 @@ function savedLine(record) {
     record.source_run === "reflection"
       ? " by the nightly reflection"
       : record.source_run
-        ? [" by ", el("a", { href: `#/runs/${record.source_run}` }, "a run")]
+        ? [" by ", el("a", { href: `#/runs/${record.source_run}` }, "a task")]
         : " by you";
   return el("span", { title: dateTimeFull(record.created_at) }, "Saved ", ago(record.created_at), by);
 }
@@ -183,7 +183,7 @@ function memoryRow({ record, similarity, score, rested }, actions) {
           {
             class: "btn ghost sm icon-only",
             type: "button",
-            title: "Undo this merge: the notes it was made from wake apart, and this note goes to the trash",
+            title: "Undo this merge: the notes it was made from come back on their own, and this note goes to the trash",
             "aria-label": "Undo this merge",
             onclick: () => actions.unmerge(record),
           },
@@ -228,16 +228,16 @@ function memoryRow({ record, similarity, score, rested }, actions) {
                 "span",
                 {
                   class: "badge b-muted note-asks",
-                  title: "A run asked that this note go to every run. Pin it and it does; until then it goes to the runs it fits.",
+                  title: "A task asked that this note go to every task. Pin it and it does; until then it goes to the tasks it fits.",
                 },
-                "Core once pinned",
+                "Always, once pinned",
               )
             : null,
           mergedBadge(record),
           record.tainted
             ? el(
                 "span",
-                { class: "badge b-warn", title: "The run that saved it had read content third parties can author." },
+                { class: "badge b-warn", title: "The task that saved it had read content other people can write." },
                 icon("alert"),
                 "From outside content",
               )
@@ -351,7 +351,7 @@ export function mount(root, ctx) {
     el(
       "div",
       { class: "set-row-lead" },
-      "Runs no longer start with these: no run was handed them lately, they did not help, their time ran out, or another note replaced them. A search still finds the ones with no rest tag that have not run out.",
+      "Tasks no longer start with these: no task was handed them lately, they did not help, their time ran out, or another note replaced them. A search can still find the ones that have not run out.",
     ),
   );
   const restingRows = el("div", { class: "note-rows" });
@@ -409,7 +409,7 @@ export function mount(root, ctx) {
     } else if (filter !== "all") {
       holder.replaceChildren(emptyPanel("search", "No notes here", FILTER_EMPTY[filter]));
     } else {
-      holder.replaceChildren(emptyPanel("brain", "Nothing remembered yet", "Add a note above, or ask Dot to remember something during a run."));
+      holder.replaceChildren(emptyPanel("brain", "Nothing remembered yet", "Add a note above, or ask Dot to remember something during a task."));
     }
   }
 
@@ -584,7 +584,7 @@ export function mount(root, ctx) {
   async function unmergeNote(record) {
     const confirmed = await confirmDialog({
       title: "Undo this merge?",
-      message: `${plural(record.merged_from.length, "note", "notes")} ${record.merged_from.length === 1 ? "wakes" : "wake"} apart, and the reflection does not merge ${record.merged_from.length === 1 ? "it" : "them"} again. The merged note goes to the trash.`,
+      message: `${plural(record.merged_from.length, "note", "notes")} ${record.merged_from.length === 1 ? "comes" : "come"} back on ${record.merged_from.length === 1 ? "its" : "their"} own, and the nightly reflection does not merge ${record.merged_from.length === 1 ? "it" : "them"} again. The merged note goes to the trash.`,
       confirmLabel: "Undo the merge",
       focusCancel: true,
     });
@@ -739,7 +739,7 @@ export function mount(root, ctx) {
   function paintOwner(section) {
     dotLines.replaceChildren(
       ...(section.dot_lines.length === 0
-        ? [el("li", { class: "muted" }, "Nothing yet. The nightly reflection writes these lines from your notes and the day's runs.")]
+        ? [el("li", { class: "muted" }, "Nothing yet. The nightly reflection writes these lines from your notes and the day's tasks.")]
         : section.dot_lines.map((line) => el("li", null, line))),
     );
     ownLines.value = section.owner_lines.join("\n");
@@ -776,11 +776,11 @@ export function mount(root, ctx) {
   function paintLearning(view) {
     learningCard.replaceChildren(
       ...(view.health === null
-        ? [setRow({ title: "Nothing yet", lead: "The first reflection, or the lessons or skill of a run, start the record." })]
+        ? [setRow({ title: "Nothing yet", lead: "The first reflection, or the lessons or skill of a task, start the record." })]
         : [
             learningRow("The nightly reflection", view.health.reflection),
-            learningRow("Lessons from runs", view.health.lessons),
-            learningRow("Skills from runs", view.health.playbooks),
+            learningRow("Lessons from tasks", view.health.lessons),
+            learningRow("Skills from tasks", view.health.playbooks),
             // A step that [harness] step_time keeps from running is off, not failing, and says so though it once ran
             // (item 613: the page said it last went well days after it was switched off).
             !view.harness_on
@@ -790,7 +790,7 @@ export function mount(root, ctx) {
                     "span",
                     null,
                     view.health.harness.last_success === null ? "off. " : `off; it last went well ${ago(view.health.harness.last_success)}. `,
-                    el("span", { class: "faint" }, "In the config file: [harness] step_time."),
+                    settingFold("[harness] step_time"),
                   ),
                 })
               : learningRow("The nightly self-improvement", view.health.harness),
@@ -840,7 +840,7 @@ export function mount(root, ctx) {
   learningSection.dataset.learning = "";
   learningSection.classList.add("learning-section");
 
-  ctx.head.setLead("Notes Dot keeps between runs. It recalls the ones that fit the task at hand.");
+  ctx.head.setLead("Notes Dot keeps between tasks. It recalls the ones that fit the task at hand.");
   root.append(asked, el("div", { class: "set-sections" }, composer, proposed.element, notesSection, trash.element, ownerSection, learningSection));
   attempt(reload);
   attempt(refreshLife);

@@ -136,7 +136,11 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     )
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{address}/#/settings/system")
-                    # The daemon's facts in four groups, each a heading over its rows of a label and a value.
+                    # Dot's facts stand under Details, shut until it is opened (item 625), in four groups, each a
+                    # heading over its rows of a label and a value.
+                    await expect(_fold(page, "Details")).to_have_attribute("data-open", "false")
+                    await _fold(page, "Details").locator(".fold-toggle").click()
+                    await expect(_fold(page, "Details")).to_have_attribute("data-open", "true")
                     groups = page.locator(".kv-group")
                     await expect(groups.get_by_role("heading")).to_have_text(
                         ["This Dot", "How it acts", "What it works with", "Models"]
@@ -151,7 +155,7 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                         re.compile(r"^(all granted|missing: .+)$")
                     )
                     await expect(_fold(page, "Permissions").locator(".fold-body")).not_to_contain_text("null")
-                    for title in ("Daemon", "Permissions", "About this Dot", "Health checks"):
+                    for title in ("Details", "Permissions", "About this Dot", "Health checks"):
                         await expect(_fold(page, title)).to_have_count(1)
                     # The emergency stop is a card (item 564) and the health checks fold as the cards under them do,
                     # their head saying how they stand (item 576), with three tiles over them that say how the daemon,
@@ -162,7 +166,7 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     )
                     # A card that folds keeps its head on its ground, on a phone and wide (item 576): folded, it is a
                     # row with the card's ground, not a bare line of the page.
-                    for title in ("Daemon", "Permissions", "About this Dot", "Health checks"):
+                    for title in ("Details", "Permissions", "About this Dot", "Health checks"):
                         card = _fold(page, title)
                         ground: str = await card.evaluate("(card) => getComputedStyle(card).backgroundColor")
                         assert ground not in ("rgba(0, 0, 0, 0)", "transparent"), (title, ground)
@@ -170,18 +174,18 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                         head_box = await card.locator(".card-head").bounding_box()
                         assert card_box is not None and head_box is not None, title
                         assert head_box["y"] >= card_box["y"] and head_box["x"] >= card_box["x"], (title, card_box)
-                    await expect(page.get_by_role("group", name="Daemon")).to_contain_text("Running")
+                    await expect(page.get_by_role("group", name="Dot", exact=True)).to_contain_text("Running")
                     await expect(page.get_by_role("group", name="Health")).to_contain_text(re.compile(r"\d+ of \d+ ok"))
-                    await _fold(page, "Daemon").locator(".fold-toggle").click()
-                    await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "false")
+                    await _fold(page, "Details").locator(".fold-toggle").click()
+                    await expect(_fold(page, "Details")).to_have_attribute("data-open", "false")
                     await page.reload()
-                    await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "false")
-                    await _fold(page, "Daemon").locator(".fold-toggle").click()
-                    await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "true")
+                    await expect(_fold(page, "Details")).to_have_attribute("data-open", "false")
+                    await _fold(page, "Details").locator(".fold-toggle").click()
+                    await expect(_fold(page, "Details")).to_have_attribute("data-open", "true")
                     # On a phone a folded card reads as one row: its title and its facts stay on the same line, beside
                     # the actions, rather than the facts dropping onto a second line under the title (item 549).
                     if width < 960:
-                        for title in ("Daemon", "Permissions"):
+                        for title in ("Details", "Permissions"):
                             card = _fold(page, title)
                             title_box = await card.locator(".fold-title").bounding_box()
                             summary_box = await card.locator(".fold-summary").bounding_box()
@@ -201,11 +205,12 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     await expect(rows).to_have_count(2)
                     for row in await rows.all():
                         assert await row.locator(".icon").evaluate("(mark) => getComputedStyle(mark).rotate") == "none"
-                    await expect(rows.first).to_contain_text("the room its files take, and its logs")
+                    await expect(rows.first).to_contain_text("how much space its files take, and its logs")
                     await page.get_by_role("link", name=re.compile(r"^Diagnostics")).click()
                     await expect(page).to_have_url(f"{address}/#/diagnostics")
                     await expect(page.locator(".page-sub")).to_have_text(
-                        "Dot's processes and what they take, the room its files take, and its logs, read on this Mac."
+                        "For finding out what went wrong: the programs Dot runs and how much of the Mac they use, the "
+                        "room its files take, and its logs, read on this Mac."
                     )
                     # The processes are counted in the singular for one; the table scrolls sideways in its box on a
                     # phone, whose edge fades while more lies to the right.
@@ -219,7 +224,7 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     await expect(page.locator(".table-scroll").first).to_have_attribute(
                         "data-scroll", "more" if width < 720 else "end"
                     )
-                    await expect(page.locator("tr[data-pid]").first).to_contain_text("(Dot's daemon)")
+                    await expect(page.locator("tr[data-pid]").first).to_contain_text("(Dot itself)")
                     await expect(page.locator(".folder-row .row-title", has_text="Dot's home in all")).to_be_visible()
                     lines = page.locator(".log-lines")
                     await expect(lines).to_contain_text("the daemon started")
@@ -263,6 +268,9 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                 await wordy.goto(ui_url(host, port, TOKEN))
                 await wordy.route("**/api/doctor", with_long_skills)
                 await wordy.goto(f"{address}/#/settings/system")
+                # The checks stand in a fold that is shut until it is opened (item 625); the tiles say how they stand.
+                await _fold(wordy, "Health checks").locator(":scope > .card-head > .fold-toggle").click()
+                await expect(_fold(wordy, "Health checks")).to_have_attribute("data-open", "true")
                 skills: Locator = wordy.locator('.health-row[data-check="skills"]')
                 detail: Locator = skills.locator(".health-detail")
                 await expect(detail).to_have_class(re.compile(r"\bclipped\b"))

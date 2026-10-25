@@ -56,8 +56,8 @@ test("the changes are counted", () => {
 
 test("how a version came to be is said by its change, with what it took in or the words it was made at", () => {
   const note = (change, more = {}) => ({ change, from_version: null, merged: [], words: null, ...more });
-  assert.equal(describeVersion(note("learned")), "Learned from a run");
-  assert.equal(describeVersion(note("relearned")), "Rewritten by a later run");
+  assert.equal(describeVersion(note("learned")), "Learned from a task");
+  assert.equal(describeVersion(note("relearned")), "Rewritten by a later task");
   assert.equal(describeVersion(note("taught")), "Taught by you");
   assert.equal(describeVersion(note("restored", { from_version: 2 })), "Restored from version 2");
   assert.equal(describeVersion(note("merged", { merged: ["learned-a", "learned-b"] })), "Merged with learned-a, learned-b");

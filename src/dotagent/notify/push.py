@@ -55,7 +55,11 @@ _ASKED_AGAIN: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 _AGAIN_AFTER_S: float = 1.0
 _ASKED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
 _ASKING_TITLE: dict[str, str] = {"question": "Dot has a question", "handoff": "Dot needs your help"}
-_FINISHED_TITLE: dict[str, str] = {"done": "A run is done", "failed": "A run failed", "cancelled": "A run was stopped"}
+_FINISHED_TITLE: dict[str, str] = {
+    "done": "A task is done",
+    "failed": "A task failed",
+    "cancelled": "A task was stopped",
+}
 _DRAFT_TITLE: dict[str, str] = {"mail": "Dot drafted an email", "message": "Dot drafted a message"}
 type PushState = Literal["idle", "waiting", "done", "failed"]
 # What sending one message to one subscription came to: taken, refused or unreachable (kept), or deleted.
@@ -131,15 +135,15 @@ def _first_line(text: str) -> str:
 
 def _cut_off(runs: int) -> str:
     if runs == 0:
-        return "No run was cut off."
-    return "1 run was cut off." if runs == 1 else f"{runs} runs were cut off."
+        return "No task was cut off."
+    return "1 task was cut off." if runs == 1 else f"{runs} tasks were cut off."
 
 
 def finished_message(status: str, result: str, run_id: str) -> PushMessage:
     """The message of the end of a run: how it ended, and the first line of its answer. A schedule's run is told in
     these words too, when its level tells it (``dotagent.scheduler.notices``)."""
     return PushMessage(
-        title=_FINISHED_TITLE.get(status, "A run has ended"),
+        title=_FINISHED_TITLE.get(status, "A task has ended"),
         body=_shorten(_first_line(result)),
         route=f"#/runs/{run_id}",
         state=_FINISHED_STATE.get(status, "idle"),
@@ -216,7 +220,7 @@ def notice_message(event: EventRecord) -> PushMessage | None:
         stopped: ScheduleStopped = ScheduleStopped.model_validate(event.data)
         return PushMessage(
             title="A schedule was switched off",
-            body=_shorten(f"{stopped.name}: its last {stopped.failures} runs failed"),
+            body=_shorten(f"{stopped.name}: its last {stopped.failures} tasks failed"),
             route="#/schedules",
             state="failed",
         )

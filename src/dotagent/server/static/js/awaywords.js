@@ -3,7 +3,7 @@
 
 import { plural } from "./dom.js";
 
-/** How the schedules' runs went, the campaigns' sessions, the decisions made for the owner and the drafts that wait,
+/** How the schedules' tasks went, the campaigns' sessions, the decisions made for the owner and the drafts that wait,
  * in one line; empty when nothing happened. */
 export function awayLine(view) {
   const parts = [];
@@ -15,7 +15,7 @@ export function awayLine(view) {
       view.cancelled > 0 ? `${view.cancelled} stopped` : null,
       view.working > 0 ? `${view.working} working` : null,
     ].filter((part) => part !== null);
-    parts.push(`${plural(scheduled, "scheduled run", "scheduled runs")}: ${how.join(", ")}`);
+    parts.push(`${plural(scheduled, "scheduled task", "scheduled tasks")}: ${how.join(", ")}`);
   }
   if (view.campaign_sessions > 0) {
     parts.push(plural(view.campaign_sessions, "campaign session", "campaign sessions"));
@@ -30,9 +30,9 @@ export function awayLine(view) {
   return parts.join(" · ");
 }
 
-/** Who made the decisions, and how many of them said no: `9 by YOLO, 5 by the review model; 2 denied`. */
+/** Who made the decisions, and how many of them said no: `9 by YOLO, 5 by the reviewer; 2 denied`. */
 export function decidedBy(yolo, reviewer, denied) {
-  const who = [yolo > 0 ? `${yolo} by YOLO` : null, reviewer > 0 ? `${reviewer} by the review model` : null].filter((part) => part !== null);
+  const who = [yolo > 0 ? `${yolo} by YOLO` : null, reviewer > 0 ? `${reviewer} by the reviewer` : null].filter((part) => part !== null);
   return `${who.join(", ")}${denied > 0 ? `; ${denied} denied` : ""}`;
 }
 

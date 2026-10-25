@@ -763,7 +763,7 @@ async def test_the_permissions_are_read_without_a_prompt_a_pane_opens_and_a_daem
     unsure: PermissionsView = PermissionsView.model_validate((await client.get("/api/desktop/permissions")).json())
     assert (unsure.service, unsure.service_problem) == (False, "launchctl cannot describe the job")
     held: httpx.Response = await client.post("/api/system/restart")
-    assert held.status_code == 422 and "could not be told" in held.json()["message"]
+    assert held.status_code == 422 and "could not tell whether it starts again" in held.json()["message"]
 
 
 @pytest.mark.skipif(
@@ -1534,7 +1534,7 @@ async def test_the_web_ui_signs_in_from_the_address_dotx_open_builds_and_refuses
     port: int | None = live.base_url.port
     assert port is not None
     shell: str = ".shell"
-    field: str = "input[aria-label='Access token']"
+    field: str = "input[aria-label='Access key']"
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
@@ -1547,9 +1547,13 @@ async def test_the_web_ui_signs_in_from_the_address_dotx_open_builds_and_refuses
 
             by_hand: Page = await browser.new_page()
             await by_hand.goto(f"http://{live.base_url.host}:{port}/")
+            # The sign-in code comes first; the access key is one of the other ways, under a fold.
+            await by_hand.get_by_text("Other ways to sign in").click()
             await by_hand.fill(field, "not-the-token")
             await by_hand.press(field, "Enter")
-            await expect(by_hand.get_by_text("The daemon did not accept that access token.")).to_be_visible()
+            await expect(
+                by_hand.get_by_text("Dot did not accept that access key. Check it and try again.")
+            ).to_be_visible()
             await by_hand.fill(field, TOKEN)
             await by_hand.press(field, "Enter")
             await expect(by_hand.locator(shell)).to_be_visible()

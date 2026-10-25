@@ -21,7 +21,7 @@ a quiet line where it happened, what changed and the first words of the note: "S
 Memory with that note first, to read, correct or forget (`#/settings/memory?note=ID`, `GET /api/memories/{id}`); a note
 forgotten since is said to be gone. A note saved again, or a call that failed, changed nothing and leaves no line. The
 line names no agent: a note a run saves is Dot's, for every run (item 94). The notes a run is handed at its start leave
-a line too, "Recalled 3 memories", not in the conversation but under Set up in the side panel's Run tab (item 365), and
+a line too, "Recalled 3 memories", not in the conversation but under Set up in the side panel's Task tab (item 365), and
 only when its chat had not been handed one of them before: a follow-up handed the same notes says nothing, and one
 handed a new note says how many are new, "(1 new)" (item 335). The notes themselves go under the message that recalled
 them, in the note that gives the time ("[system note] It is now…", item 404), not into the instructions: the
@@ -73,7 +73,7 @@ dotx memory reindex      # embed every note again, for example after changing [m
 
 - A run starts with the standing notes (newest first): tagged `core` and yours, a note you wrote or one you pinned. A
   run may tag a note `core` to ask that it stand; it stands once you pin it on the Memory page, which marks such a note
-  **Core once pinned** until you do, and until then it is handed when it fits the goal, rests and may be proposed to be
+  **Always, once pinned** until you do, and until then it is handed when it fits the goal, rests and may be proposed to be
   forgotten as any of a run's (item 613: notes runs had marked core, of a thesis and a job search, went to every run of
   a week). Then the notes you wrote yourself (the ones
   closest to the goal first), then the agent's notes close enough to the goal and the earlier goals of the conversation
@@ -85,7 +85,7 @@ dotx memory reindex      # embed every note again, for example after changing [m
   of its run that it names (`site-amazon-com`, `site-notes`; item 308), and when a run first reaches a site or drives
   an application, its next step is handed the lessons tagged with it that it was not handed yet (at most five) and the
   learned skills written there that its instructions did not list (at most three), counted as handed like the notes
-  it started with; the side panel's Run tab says under Set up "Recalled 2 memories learned on www.amazon.com", as
+  it started with; the side panel's Task tab says under Set up "Recalled 2 memories learned on www.amazon.com", as
   it says there how many notes the run recalled and the tokens they took (item 365).
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
@@ -169,7 +169,7 @@ dotx memory reindex      # embed every note again, for example after changing [m
   lessons of an agent in the search of another run, take none of those places (item 557).
   `embed_enabled = false` searches by words only. An answer of Ollama that says its model runner broke off is asked
   again, as a broken connection is; when the embedding service still fails at the start of a run, the run recalls its
-  notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Run tab, under Set
+  notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Task tab, under Set
   up, say so in a warning line (`embedding_failed`, items 256 and 365). The word search does not mind case, accents or
   the Turkish dotted and dotless i (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the
   words that start with its first five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`). The
@@ -289,7 +289,7 @@ Nothing of when the schedule fires next nor of whether it is switched on changes
 its moment. It does not start while the emergency stop is engaged, nor while a run of the schedule is at work or being
 started (409), in a daemon that runs no scheduler either; a repeating schedule's firing whose time comes meanwhile is
 skipped as for a run still going, and a one-time schedule waits, still due, and fires once that run has ended. A start
-the daemon refuses leaves no chat behind and is no missed firing. **Firings** under a schedule lists its last runs, at
+the daemon refuses leaves no chat behind and is no missed firing. **History** under a schedule lists its last runs, at
 its time and by hand, newest first, one at work among them, each with how it went, when, its chat and the first line of
 its answer (`GET /api/schedules/<id>/firings?limit=`, up to 50); a later firing's digest counts a run by hand among its
 earlier runs.
@@ -310,7 +310,7 @@ earlier runs.
   20 failed ticks in a row (five minutes at the default `tick_s`) end the scheduler, and the daemon with it, with an
   error, so that schedules never stop firing unseen; the service that `dotx service install` sets up starts it again.
 - A repeating schedule whose runs end failed so many times in a row is switched off, says so as its status ("switched
-  off: its last 3 runs failed") and tells you once (item 458): **Switch off after** in its form (3, 5, 10, 20, never),
+  off: its last 3 tasks failed") and tells you once (item 458): **Switch off after** in its form (3, 5, 10, 20, never),
   else `[scheduler] stop_after_failures` (0, never, by default). Its row says how many failed in a row. A run done sets
   the row to 0, a run cancelled (stopped by you, the emergency stop or the daemon) counts neither way, a run started
   by hand counts as one at its time, and a firing that started no run counts not at all. A one-time schedule is never
@@ -318,7 +318,7 @@ earlier runs.
 - How the end of a schedule's run is told on your phone and desktop (item 461): **Notifications** in its form, else
   `[scheduler] notify` (`always`, every end, by default). **Only when it fails or needs me** (`problems`) tells a run
   that ends with something it needs from you, failed or not, and of the other failed runs the first of a row, not the
-  ones after it; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **Firings** and
+  ones after it; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **History** and
   the run's page still show. A run started with **Run now** is told at every level, as are a question, an approval, a
   draft and the schedule's switch-off; a schedule deleted while its run works tells that run's end at the level it had.
 - A schedule runs as Dot or as one of your agents (item 462): **Agent** in its form, Dot by default. Its runs carry the

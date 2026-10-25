@@ -55,7 +55,7 @@ function restoreQuestion(skill, detail, current) {
   const marked =
     detail.note.tainted === false
       ? ""
-      : " This version carries the mark of content third parties can author, so runs are offered it with the web addresses, commands and paths in its steps withheld.";
+      : " This version carries the mark of content other people can write, so tasks are offered it with the web addresses, commands and file names in its steps withheld.";
   return {
     title: `Put version ${detail.note.n} of ${skill.name} back?`,
     message: `Its steps become version ${made}. The steps the skill has now stay as version ${current.note.n}, so this can be taken back.${marked}`,
@@ -77,7 +77,7 @@ function versionBlock(detail, earlier, current, onRestore) {
   const by =
     note.run_id === null || note.run_id === ""
       ? null
-      : el("a", { href: `#/runs/${encodeURIComponent(note.run_id)}` }, "Open the run");
+      : el("a", { href: `#/runs/${encodeURIComponent(note.run_id)}` }, "Open the task");
   return el(
     "div",
     { class: "version-block", dataset: { version: String(note.n), current: String(detail.current) } },
@@ -86,7 +86,7 @@ function versionBlock(detail, earlier, current, onRestore) {
       { class: "version-head" },
       el("span", { class: "version-number" }, `Version ${note.n}`),
       detail.current ? el("span", { class: "badge b-ok" }, "Current") : null,
-      mark === null ? null : el("span", { class: "badge b-warn", title: "Runs are offered these steps with addresses, commands and paths withheld." }, icon("alert"), mark),
+      mark === null ? null : el("span", { class: "badge b-warn", title: "Tasks are offered these steps with addresses, commands and file names withheld." }, icon("alert"), mark),
       el("span", { class: "grow" }),
       restore,
     ),

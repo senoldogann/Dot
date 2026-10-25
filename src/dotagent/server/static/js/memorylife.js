@@ -162,7 +162,7 @@ export function proposedSection(hooks) {
       el(
         "p",
         { class: "set-section-lead" },
-        `These notes rested for ${plural(view.forget_after_days, "day", "days")}: no run was handed them. Nothing is forgotten until you press Forget; a forgotten note waits ${plural(view.trash_days, "day", "days")} in the trash.`,
+        `These notes rested for ${plural(view.forget_after_days, "day", "days")}: no task was handed them. Nothing is forgotten until you press Forget; a forgotten note waits ${plural(view.trash_days, "day", "days")} in the trash.`,
       ),
     );
     rows.replaceChildren(

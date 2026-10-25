@@ -352,7 +352,7 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
             page: Page = await _page(browser, address, 1280, "light", "/settings/memory")
             learning: Locator = page.locator("[data-learning]")
             await expect(learning).to_contain_text("How learning fares")
-            await expect(learning.locator(".set-row", has_text="Lessons from runs")).to_contain_text(
+            await expect(learning.locator(".set-row", has_text="Lessons from tasks")).to_contain_text(
                 "has not gone well yet; failed 1 time in a row since: the embedder is down"
             )
             # A work with neither a success nor a failure recorded has not failed: it says there is nothing yet.

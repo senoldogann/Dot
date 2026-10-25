@@ -60,7 +60,7 @@ const CHANNEL_SECTIONS = { imessage: { label: "iMessage", icon: "message" } };
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
 // The states of a run that is over: only such a chat can be marked unread (item 131).
 const ENDED = new Set(["done", "failed", "cancelled"]);
-const BUSY_MESSAGE = "A chat with a run under way cannot be deleted. Wait for the run to end, or cancel it, and try again.";
+const BUSY_MESSAGE = "A chat with a task under way cannot be deleted. Wait for the task to end, or stop it, and try again.";
 // How often the ages at the right of the chats are read again, so a "5m" does not stay while the page rests.
 const AGE_REFRESH_MS = 60_000;
 // The states of a run that works; one that waits for you is "blocked" and keeps its dot and its age.
@@ -1054,8 +1054,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       title: ids.length === 1 && !selecting ? "Delete this chat?" : `Delete ${plural(ids.length, "chat", "chats")}?`,
       message:
         ids.length === 1
-          ? "Its runs go with it, with every step, event and approval of those. This cannot be undone."
-          : "Their runs go with them, with every step, event and approval of those. This cannot be undone.",
+          ? "Its tasks go with it, with every step and approval of those. This cannot be undone."
+          : "Their tasks go with them, with every step and approval of those. This cannot be undone.",
       confirmLabel: "Delete",
       danger: true,
       focusCancel: true,
@@ -1139,7 +1139,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       if (activity === null) {
         console.warn("the activity of the sidebar could not be loaded", error);
       } else {
-        readFailed("The activity of the sidebar", error);
+        readFailed("The sidebar", error);
       }
       return;
     }

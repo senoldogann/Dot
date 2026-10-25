@@ -83,7 +83,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
     def refuse_while_runs(what: str) -> None:
         active: list[JsonValue] = list(ctx.manager.active_run_ids())
         if active:
-            raise RunConflict(f"{what} while runs are active", {"active_runs": active})
+            raise RunConflict(f"{what} while tasks are active", {"active_runs": active})
 
     async def refuse_while_open(name: str) -> None:
         """Refuse a change to the profile ``name`` while a Chrome window has it open (Sign in… opens one)."""
@@ -101,7 +101,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
     async def set_mode(request: BrowserModeRequest) -> BrowserView:
         active: list[JsonValue] = list(ctx.manager.active_run_ids())
         if active:
-            raise RunConflict("the browser cannot be switched while runs are active", {"active_runs": active})
+            raise RunConflict("the browser cannot be switched while tasks are active", {"active_runs": active})
         # A session a campaign made for the mode the main one is going to is closed first (item 554): the main session
         # works in it now, and the other would keep its Chrome on the same profile.
         await ctx.runtime.browsers.retire_other(request.mode)
@@ -119,7 +119,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
                 active: list[JsonValue] = list(ctx.manager.active_run_ids())
                 if active:
                     raise RunConflict(
-                        "Dot's Chrome cannot be closed for signing in while runs are active", {"active_runs": active}
+                        "Dot's Chrome cannot be closed for signing in while tasks are active", {"active_runs": active}
                     )
                 own: BrowserSession = ctx.runtime.browsers.session_for("own")
                 await own.let_go_of_chrome()
@@ -151,7 +151,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         the change is refused while runs are active."""
         active: list[JsonValue] = list(ctx.manager.active_run_ids())
         if active:
-            raise RunConflict("the DevTools port cannot be changed while runs are active", {"active_runs": active})
+            raise RunConflict("the DevTools port cannot be changed while tasks are active", {"active_runs": active})
         await ctx.runtime.browsers.set_debug_port(request.debug_port)
         await asyncio.to_thread(set_browser_setting, config_path(), "debug_port", request.debug_port)
         return await state()
@@ -170,7 +170,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         is refused while runs are active."""
         active: list[JsonValue] = list(ctx.manager.active_run_ids())
         if active:
-            raise RunConflict("how pages look cannot be changed while runs are active", {"active_runs": active})
+            raise RunConflict("how pages look cannot be changed while tasks are active", {"active_runs": active})
         await ctx.runtime.browsers.set_look(request)
         settings: tuple[tuple[BrowserSetting, SettingValue], ...] = (
             ("fit_window", request.fit_window),

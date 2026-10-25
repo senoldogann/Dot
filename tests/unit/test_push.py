@@ -118,14 +118,14 @@ def test_the_keys_are_made_once_private_and_reused(tmp_path: Path) -> None:
             "run_finished",
             {"status": "done", "result": "\n  \nTen leads are in leads.csv.\n\n| name | site |", "needs": ""},
             None,
-            PushMessage(title="A run is done", body="Ten leads are in leads.csv.", route="#/runs/run-1", state="done"),
+            PushMessage(title="A task is done", body="Ten leads are in leads.csv.", route="#/runs/run-1", state="done"),
         ),
         (
             "run_finished",
             {"status": "failed", "result": "The model provider failed: timed out", "needs": ""},
             None,
             PushMessage(
-                title="A run failed",
+                title="A task failed",
                 body="The model provider failed: timed out",
                 route="#/runs/run-1",
                 state="failed",
@@ -181,11 +181,11 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             {
                 "schedule_id": "sch-1",
                 "name": "Morning digest",
-                "status": "skipped: 125 minutes overdue (the daemon was off or the Mac slept)",
+                "status": "skipped: 125 minutes overdue (Dot was off or the Mac slept)",
             },
             PushMessage(
                 title="A schedule did not run",
-                body="Morning digest: skipped: 125 minutes overdue (the daemon was off or the Mac slept)",
+                body="Morning digest: skipped: 125 minutes overdue (Dot was off or the Mac slept)",
                 route="#/schedules",
                 state="failed",
             ),
@@ -195,7 +195,7 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             {"runs_cut_off": 0},
             PushMessage(
                 title="Dot restarted after an unexpected stop",
-                body="No run was cut off.",
+                body="No task was cut off.",
                 route="#/runs",
                 state="failed",
             ),
@@ -205,7 +205,7 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             {"runs_cut_off": 1},
             PushMessage(
                 title="Dot restarted after an unexpected stop",
-                body="1 run was cut off.",
+                body="1 task was cut off.",
                 route="#/runs",
                 state="failed",
             ),
@@ -215,7 +215,7 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             {"runs_cut_off": 3},
             PushMessage(
                 title="Dot restarted after an unexpected stop",
-                body="3 runs were cut off.",
+                body="3 tasks were cut off.",
                 route="#/runs",
                 state="failed",
             ),
@@ -228,14 +228,14 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
                 "status": "failed",
                 "result": "\nThe site moved.\nTried twice.",
             },
-            PushMessage(title="A run failed", body="The site moved.", route="#/runs/run_1", state="failed"),
+            PushMessage(title="A task failed", body="The site moved.", route="#/runs/run_1", state="failed"),
         ),
         (
             "schedule_stopped",
             {"schedule_id": "sch_1", "name": "weekly report", "failures": 3},
             PushMessage(
                 title="A schedule was switched off",
-                body="weekly report: its last 3 runs failed",
+                body="weekly report: its last 3 tasks failed",
                 route="#/schedules",
                 state="failed",
             ),
@@ -347,7 +347,7 @@ async def test_each_subscription_is_pushed_on_its_own_and_the_caller_gets_the_to
                 "https://push.example/good",
                 {
                     "title": "Dot restarted after an unexpected stop",
-                    "body": "No run was cut off.",
+                    "body": "No task was cut off.",
                     "route": "#/runs",
                     "state": "failed",
                 },
@@ -399,5 +399,5 @@ def test_the_end_of_a_schedules_run_is_its_schedules_to_tell_but_a_campaigns_ses
     assert push_message(ended, scheduled) is None
     session: RunRecord = scheduled.model_copy(update={"campaign_id": "cmp-1"})
     assert push_message(ended, session) == PushMessage(
-        title="A run failed", body="The site moved.", route="#/runs/run-1", state="failed"
+        title="A task failed", body="The site moved.", route="#/runs/run-1", state="failed"
     )

@@ -165,7 +165,7 @@ export function readFailed(what, error) {
   }
   if (snapshot.stream === "live") {
     const why = error instanceof Error ? error.message : String(error);
-    tellOutOfDate(`${what} could not be read again: ${why}. Reload the page to see it.`);
+    tellOutOfDate(`${what} could not be updated. Reload the page to see it.`, why);
   }
 }
 

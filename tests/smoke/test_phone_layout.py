@@ -191,7 +191,7 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await expect(helpers_button).to_have_text(str(len(_HELPERS)))
                     screen_button: Locator = bar.get_by_role("button", name="Show Dot's computer")
                     await expect(screen_button).to_be_visible()
-                    await expect(bar.get_by_role("button", name="Run details")).to_be_visible()
+                    await expect(bar.get_by_role("button", name="Task details")).to_be_visible()
                     # The line over the composer: the run's time, its helpers and what is queued (item 352).
                     capsule: Locator = page.locator(".capsule")
                     await expect(capsule).to_contain_text("Working")

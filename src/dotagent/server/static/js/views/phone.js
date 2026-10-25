@@ -9,7 +9,7 @@ import { copyText, el } from "../dom.js";
 import { icon } from "../icons.js";
 import { errorPanel, loadingPanel, segmented, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
 import { getSnapshot } from "../state.js";
-import { attempt, confirmDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, settingFold, toast } from "../ui.js";
 
 // How often the guide reads Tailscale again while a step is left, so that it follows an install or a sign-in.
 const FOLLOW_MS = 4000;
@@ -29,7 +29,7 @@ const PHONE_STEPS = [
 // What the one QR code can open: Tailscale's page, or Dot's address.
 const QR_CHOICES = [
   { id: "tailscale", label: "Tailscale app", hint: "The code opens Tailscale's page for the phone" },
-  { id: "dot", label: "Open Dot", hint: "The code opens Dot on your tailnet" },
+  { id: "dot", label: "Open Dot", hint: "The code opens Dot on your Tailscale network" },
 ];
 // A pairing code is two groups of four characters: the dots that stand for it until it is shown are too.
 const CODE_GROUPS = 2;
@@ -102,7 +102,7 @@ export function mount(root, ctx) {
   let codeShown = false;
   let repaintSetup = () => undefined;
   const holder = el("div", { class: "stack" }, loadingPanel());
-  const code = el("output", { class: "pair-code mono", "aria-label": "Pairing code", hidden: true });
+  const code = el("output", { class: "pair-code mono", "aria-label": "Sign-in code", hidden: true });
   const codeLead = el("span", { class: "phone-code-lead" }, CODE_HIDDEN);
   const dots = el(
     "span",
@@ -180,7 +180,7 @@ export function mount(root, ctx) {
     httpsLink = null;
     if (!disposed) {
       paint(phone);
-      toast("ok", "Set up for your tailnet.");
+      toast("ok", "Set up for your Tailscale network.");
     }
   }
 
@@ -190,13 +190,13 @@ export function mount(root, ctx) {
     const running = status === null ? null : status.active_runs.length;
     const stops =
       running === null
-        ? " Any run going on now stops too."
+        ? " Any task going on now stops too."
         : running === 0
           ? ""
-          : ` The ${running === 1 ? "run" : `${running} runs`} going on now stop too.`;
+          : ` The ${running === 1 ? "task" : `${running} tasks`} going on now ${running === 1 ? "stops" : "stop"} too.`;
     const confirmed = await confirmDialog({
       title: "Restart Dot?",
-      message: `Dot stops and the service starts it again, with the name of your tailnet.${stops}`,
+      message: `Dot closes and starts again by itself, with the name of your Tailscale network.${stops}`,
       confirmLabel: "Restart",
       danger: running !== 0,
       focusCancel: running !== 0,
@@ -205,7 +205,7 @@ export function mount(root, ctx) {
       return;
     }
     await api.post("/system/restart", null);
-    toast("ok", "Dot starts again and takes the name up; this page answers again in a moment.");
+    toast("ok", "Dot is starting again and takes the name up; this page works again in a moment.");
   }
 
   /** The card at the head: whether the phone reaches Dot (its tile, its name and, while a step is left, how many are
@@ -217,7 +217,7 @@ export function mount(root, ctx) {
     const said = tailnet.problem === null ? null : el("p", { class: "hint" }, `Tailscale said: ${tailnet.problem}`);
     const openTailscale = (done) => changed(api.post("/phone/tailscale", {}), done);
     const first = onMac
-      ? step(1, "Tailscale on this Mac", true, `This Mac is ${tailnet.name} on your tailnet.`)
+      ? step(1, "Tailscale on this Mac", true, `This Mac is ${tailnet.name} on your Tailscale network.`)
       : tailnet.installed
         ? step(
             1,
@@ -237,18 +237,18 @@ export function mount(root, ctx) {
     const https =
       httpsLink === null
         ? null
-        : el("a", { class: "btn sm primary", href: httpsLink, target: "_blank", rel: "noopener noreferrer" }, icon("external"), el("span", null, "Turn on HTTPS for your tailnet"));
+        : el("a", { class: "btn sm primary", href: httpsLink, target: "_blank", rel: "noopener noreferrer" }, icon("external"), el("span", null, "Turn on secure connections"));
     const second = served
-      ? step(2, "Dot on your tailnet", true, "Tailscale serves Dot to your tailnet over HTTPS, and Dot's config names this Mac.")
+      ? step(2, "Dot on your Tailscale network", true, "Tailscale makes Dot available on your private network, securely, and Dot remembers this Mac's name.")
       : step(
           2,
-          "Dot on your tailnet",
+          "Dot on your Tailscale network",
           false,
           !onMac
             ? "After step 1."
             : httpsLink === null
-              ? "Set up has Tailscale serve Dot to your tailnet over HTTPS, and writes this Mac's name into Dot's config."
-              : "Tailscale needs HTTPS on for your tailnet: turn it on, then Set up again.",
+              ? "Set up makes Dot available on your private network, securely, and saves this Mac's name."
+              : "Tailscale needs secure connections turned on for your network: turn them on, then choose Set up again.",
           onMac ? said : null,
           https,
           onMac ? offer("Set up", "plug", httpsLink === null, setUp) : null,
@@ -383,7 +383,7 @@ export function mount(root, ctx) {
             "div",
             { class: "note" },
             icon("info"),
-            el("span", null, "No address yet: the steps above give it. ", el("span", { class: "faint" }, "In the config file: [server] reach.")),
+            el("span", null, "No address yet: the steps above give it.", settingFold("[server] reach")),
           ),
         );
       } else {

@@ -11,7 +11,7 @@ import { api } from "./api.js";
 import { icon } from "./icons.js";
 import { field, inlineError, loadingPanel, markOpener, segmented } from "./panels.js";
 import { onLifecycle } from "./state.js";
-import { attempt, confirmDialog, formDialog, toast } from "./ui.js";
+import { attempt, confirmDialog, formDialog, settingFold, toast } from "./ui.js";
 
 const KINDS = [
   { id: "mail", label: "New mail", hint: "A new mail in a Google or Microsoft account you signed in", mark: "mail", what: "new mail" },
@@ -20,7 +20,7 @@ const KINDS = [
 ];
 const ACTIONS = [
   { id: "tell", label: "Tell me", hint: "A push to your phone, and a line kept in the chat Watchers" },
-  { id: "run", label: "Tell me and start a run", hint: "As that, and a run of your goal for what came in" },
+  { id: "run", label: "Tell me and start a task", hint: "As that, and a task of your goal for what came in" },
 ];
 // The panel reads again this often, so that "Looked 2m ago" and a failure that mended stay true, and when Dot tells you.
 const REFRESH_MS = 30_000;
@@ -101,7 +101,7 @@ function watcherRow(view, handlers, looking) {
         // An address longer than the row is cut with an ellipsis, so that it never runs past the row; the title has it whole.
         view.account === "" ? null : el("span", { class: "chip", title: `The account it looks in: ${view.account}` }, el("span", { class: "chip-text" }, view.account)),
         el("span", { class: "chip", title: view.kind === "calendar" ? "How long before an event it tells you" : "How often it looks" }, minutesText(view)),
-        el("span", { class: "chip", title: ACTIONS.find((action) => action.id === view.action)?.hint ?? "" }, view.action === "run" ? "Starts a run" : "Tells you"),
+        el("span", { class: "chip", title: ACTIONS.find((action) => action.id === view.action)?.hint ?? "" }, view.action === "run" ? "Starts a task" : "Tells you"),
       ),
       view.words === "" ? null : el("div", { class: "row-text muted", title: view.words }, clip(view.words, WORDS_PREVIEW_CHARS)),
       whenLine(view),
@@ -152,7 +152,7 @@ function watcherForm({ view, options }) {
   const account = el("select", { class: "select", "aria-label": "Account" });
   const words = el("textarea", { class: "textarea", rows: "2", "aria-label": "What you want to hear of" });
   const minutes = el("input", { class: "input", type: "number", min: "1", max: "1440", step: "1", inputmode: "numeric", "aria-label": "Minutes" });
-  const goal = el("textarea", { class: "textarea", rows: "3", placeholder: "Draft a reply in my voice and keep it as a draft.", "aria-label": "Goal of the run" });
+  const goal = el("textarea", { class: "textarea", rows: "3", placeholder: "Draft a reply in my voice and keep it as a draft.", "aria-label": "Goal of the task" });
   let touchedMinutes = editing;
   const kinds = segmented(KINDS, editing ? view.kind : "mail", () => paintKind());
   const actions = segmented(ACTIONS, editing ? view.action : "tell", () => paintAction());
@@ -162,14 +162,14 @@ function watcherForm({ view, options }) {
   // Their label and hint are the kind's, written by `paintKind`.
   const wordsField = field("What you want to hear of", words, "-");
   const minutesField = field("Minutes", minutes, "-");
-  const goalField = field("Goal of the run", goal, "");
+  const goalField = field("Goal of the task", goal, "");
   const noAccounts = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "No Google or Microsoft account is signed in. "), el("a", { href: "#/customize/connectors" }, "Add one"));
-  const noGithub = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "GitHub is not set up: add it on Customize › Connectors with a personal access token. GitHub's notifications need a classic token with the notifications scope; a fine-grained token cannot read them. "), el("a", { href: "#/customize/connectors" }, "Add it"));
+  const noGithub = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "GitHub is not connected: add it in Customize › Connectors with a key from GitHub. For notifications the key must be a classic one with the notifications permission; a fine-grained one cannot read them. "), el("a", { href: "#/customize/connectors" }, "Add it"));
   const runNote = el(
     "div",
     { class: "note", hidden: true },
     icon("shield"),
-    el("span", null, "What came in was written by someone else, so the run starts marked untrusted: what reaches other people or lasts asks first, in the approval mode you chose as the default. At most a few runs an hour."),
+    el("span", null, "What came in was written by someone else, so the task starts marked as untrusted: anything that reaches other people or lasts is asked about first, in the approval mode you chose as the default. At most a few tasks an hour."),
   );
   function paintKind() {
     const kind = kinds.value();
@@ -339,9 +339,11 @@ export function mountWatchers() {
       }
       views = fresh;
       options = offered;
-      lead.textContent = offered.looking
-        ? "Dot tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and in the chat Watchers."
-        : "The watchers are off in the configuration ([watchers] enabled): none of them looks.";
+      lead.replaceChildren(
+        ...(offered.looking
+          ? ["Dot tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and in the chat Watchers."]
+          : ["Watchers are switched off in Dot's settings file: none of them looks.", settingFold("[watchers] enabled")]),
+      );
       paint();
     } catch (error) {
       if (disposed || mine !== ticket) {

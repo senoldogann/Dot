@@ -128,11 +128,11 @@ export function mountBrief(ctx, onSaved) {
     const parts = [];
     if (view.custom) {
       customNote.hidden = false;
-      customNote.querySelector("span").textContent = `Its schedule fires at a time this card cannot show (${view.cron}). Saving here sets it to the time and days above.`;
+      customNote.querySelector("span").textContent = `Its schedule runs at a time this card cannot show (${view.cron}). Saving here sets it to the time and days above.`;
     } else {
       customNote.hidden = true;
     }
-    parts.push(view.enabled ? (view.next_local === null ? "No further run" : `Next ${view.next_local}`) : "Switched off");
+    parts.push(view.enabled ? (view.next_local === null ? "Will not run again" : `Next ${view.next_local}`) : "Switched off");
     if (view.last_local !== null) {
       parts.push(`Last ${view.last_local}${view.last_status === "" ? "" : `: ${clip(view.last_status, LAST_STATUS_CHARS)}`}`);
     }

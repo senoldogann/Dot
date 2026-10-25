@@ -359,7 +359,7 @@ async def test_run_now_starts_the_run_its_page_opens_and_the_firings_list_it(
                 run_id: str = page.url.rsplit("/", 1)[-1]
                 await _ended(manager, await runtime.store.get_run(run_id))
                 await page.goto(f"{address}/#/schedules")
-                toggle: Locator = page.get_by_role("button", name="Firings of page check")
+                toggle: Locator = page.get_by_role("button", name="History of page check")
                 await toggle.click()
                 await expect(toggle).to_have_attribute("aria-expanded", "true")
                 listed: Locator = page.locator(f'[data-firings="{created.id}"] .firing-title').first

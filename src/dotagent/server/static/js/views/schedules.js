@@ -13,6 +13,7 @@ import { mountWatchers } from "../watcherspanel.js";
 import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
+import { loopRhythm } from "../rhythm.js";
 import { emptyPanel, errorPanel, field, loadingPanel, markOpener, pageHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
 import { getSnapshot, loadModels, onLifecycle, onStreamBack, readFailed } from "../state.js";
@@ -25,8 +26,8 @@ const GOAL_PREVIEW_CHARS = 220;
 // A firing's answer is shown by its first line, cut to this.
 const FIRING_RESULT_CHARS = 120;
 const REPEATS = [
-  { id: "cron", label: "Repeats", hint: "Fires again and again on a schedule" },
-  { id: "once", label: "Once", hint: "Fires a single time" },
+  { id: "cron", label: "Repeats", hint: "Starts again and again on a schedule" },
+  { id: "once", label: "Once", hint: "Starts a single time" },
 ];
 const CRON_PRESETS = [
   { label: "Every hour", cron: "0 * * * *" },
@@ -35,8 +36,8 @@ const CRON_PRESETS = [
   { label: "Mondays at 09:00", cron: "0 9 * * 1" },
 ];
 const MODES = [
-  { id: "task", label: "Task — carry the goal out" },
-  { id: "research", label: "Research — read-only" },
+  { id: "task", label: "Task — do the job" },
+  { id: "research", label: "Research — look things up, change nothing" },
 ];
 const ZONE_LIST_ID = "schedule-zones";
 let formCount = 0;
@@ -90,7 +91,7 @@ function notifyLabel(level) {
 const STOP_COUNTS = [0, 3, 5, 10, 20];
 
 function stopLabel(count) {
-  return count === 0 ? "Never" : `After ${count} failed runs in a row`;
+  return count === 0 ? "Never" : `After ${count} failed tasks in a row`;
 }
 
 /** The row's note of runs that failed in a row, with when the schedule switches itself off, or null. */
@@ -102,13 +103,13 @@ function failedInRow(record) {
   // A schedule switched off, by you or by its failures, switches nothing off again.
   const title =
     record.enabled && record.cron !== null && limit !== null && limit > 0
-      ? `It switches itself off at ${limit} failed runs in a row`
-      : "Its last runs failed one after the other";
+      ? `It switches itself off at ${limit} failed tasks in a row`
+      : "Its last tasks failed one after the other";
   return el("span", { class: "badge b-bad", title }, `${record.runs_failed_in_row} failed in a row`);
 }
 
 function historyLabel(count) {
-  return count === 0 ? "None" : count === 1 ? "The last run" : `The last ${count} runs`;
+  return count === 0 ? "None" : count === 1 ? "The last task" : `The last ${count} tasks`;
 }
 
 function chatLabel(same) {
@@ -149,26 +150,26 @@ function optionChips(record, agent) {
   // defaults it takes are the ones every run takes, and saying them on every row buries what is its own (item 373).
   return [
     el("span", { class: "chip", title: "Mode" }, record.mode),
-    agent === null ? null : el("span", { class: "chip", title: "Its runs run as this agent, within its bounds" }, `As ${agent.name}`),
+    agent === null ? null : el("span", { class: "chip", title: "Its tasks run as this agent, within its limits" }, `As ${agent.name}`),
     // A paused agent's schedule fires nothing by itself until the agent is resumed (item 465).
     agent === null || agent.paused_at === null
       ? null
-      : el("span", { class: "badge b-warn", title: "It fires nothing by itself until you resume the agent" }, `${agent.name} is paused`),
+      : el("span", { class: "badge b-warn", title: "It starts nothing by itself until you resume the agent" }, `${agent.name} is paused`),
     approvals === null
       ? null
       : el(
           "span",
           {
             class: "chip",
-            title: options.approvals === null ? "Who answers the safety policy's questions: its agent's choice" : "Who answers the safety policy's questions",
+            title: options.approvals === null ? "Who answers Dot's safety questions: its agent's choice" : "Who answers Dot's safety questions",
           },
           `Approvals: ${approvalLabel(approvals)}`,
         ),
     options.goal_mode === null ? null : el("span", { class: "chip" }, `Goal mode ${goalMode ? "on" : "off"}`),
     options.model === null ? null : el("span", { class: "chip", title: model }, modelName(model)),
     options.effort === null ? null : el("span", { class: "chip" }, `Reasoning ${levelLabel(options.effort)}`),
-    options.speed === "fast" ? el("span", { class: "chip", title: "Its runs start in fast mode" }, "Fast") : null,
-    options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier runs it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
+    options.speed === "fast" ? el("span", { class: "chip", title: "Its tasks start in fast mode" }, "Fast") : null,
+    options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier tasks it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
     options.same_chat === null ? null : el("span", { class: "chip" }, chatLabel(options.same_chat)),
     // Only a repeating schedule is switched off by its failures (item 458).
     options.stop_after_failures === null || record.cron === null
@@ -176,7 +177,7 @@ function optionChips(record, agent) {
       : el("span", { class: "chip", title: "When it switches itself off" }, `Switch off: ${stopLabel(options.stop_after_failures).toLowerCase()}`),
     options.notify === null
       ? null
-      : el("span", { class: "chip", title: "How the end of its runs is told" }, `Notifications: ${notifyLabel(options.notify).toLowerCase()}`),
+      : el("span", { class: "chip", title: "How the end of its tasks is told" }, `Notifications: ${notifyLabel(options.notify).toLowerCase()}`),
   ];
 }
 
@@ -193,7 +194,7 @@ function runNowTitle(record, agent) {
 /** A schedule's last firings, newest first: how each went, when, its chat, and the first line of its answer. */
 function firingsList(firings) {
   if (firings.length === 0) {
-    return el("div", { class: "hint" }, "No firings yet");
+    return el("div", { class: "hint" }, "Not run yet");
   }
   return el(
     "ul",
@@ -236,10 +237,10 @@ function scheduleRow(view, handlers) {
       class: "btn ghost sm",
       type: "button",
       "aria-expanded": String(open),
-      "aria-label": `Firings of ${record.name}`,
+      "aria-label": `History of ${record.name}`,
       onclick: () => handlers.onFirings(record, firingsToggle, firings),
     },
-    "Firings",
+    "History",
   );
   const toggle = el("button", {
     class: "switch",
@@ -278,7 +279,7 @@ function scheduleRow(view, handlers) {
   } else if (view.next_local !== null) {
     next = el("span", null, `Next ${view.next_local}`);
   } else {
-    next = el("span", null, "No further runs");
+    next = el("span", null, "Will not run again");
   }
   const last =
     view.last_local === null
@@ -306,7 +307,7 @@ function scheduleRow(view, handlers) {
         "div",
         { class: "row-meta when-line" },
         ...joined([
-          el("span", { class: "mono", title: "When it runs" }, view.when),
+          whenWords(view.when),
           next,
           last,
           lastStatusBadge(record.last_status),
@@ -321,6 +322,15 @@ function scheduleRow(view, handlers) {
     ),
     el("div", { class: "row-actions" }, runNow, edit, remove),
   );
+}
+
+/** When a schedule runs, in words: "Every day at 08:00" for a repeating one the page can read, else what the daemon says
+ * ("cron 5 4 1 * *", "once, 25 Oct 08:00"), the cron form in the tooltip (item 625). */
+function whenWords(when) {
+  const cron = when.startsWith("cron ") ? when.slice("cron ".length) : null;
+  const said = cron === null ? null : loopRhythm(cron);
+  const text = said === null ? (cron === null ? `${when.charAt(0).toUpperCase()}${when.slice(1)}` : "On a repeating schedule") : `${said.charAt(0).toUpperCase()}${said.slice(1)}`;
+  return el("span", cron === null ? { title: "When it runs" } : { title: `cron ${cron}`, "data-expert": "" }, text);
 }
 
 /** This Mac's time zone, as the browser names it. */
@@ -375,7 +385,7 @@ function scheduleForm({ view }) {
   const goal = el("textarea", {
     class: "textarea",
     rows: record === null ? "3" : "6",
-    placeholder: "What should Dot do each time? Be as specific as for a normal run.",
+    placeholder: "What should Dot do each time? Be as specific as for a normal task.",
     "aria-label": "Goal",
   });
   const mode = select("Mode", MODES, record === null ? "task" : record.mode);
@@ -424,14 +434,14 @@ function scheduleForm({ view }) {
     "Goal mode",
     [
       { id: "", label: now.goalMode === null ? "Default" : `Default (${now.goalMode ? "on" : "off"})` },
-      { id: "on", label: "On — a checker sends the run back until the goal is reached" },
+      { id: "on", label: "On — Dot checks its answer and keeps working until the goal is reached" },
       { id: "off", label: "Off" },
     ],
     options.goal_mode === null ? "" : options.goal_mode ? "on" : "off",
   );
   const counts = [...new Set([...HISTORY_COUNTS, ...(options.history_runs === null ? [] : [options.history_runs])])].sort((a, b) => a - b);
   const history = select(
-    "Earlier runs it knows",
+    "Earlier tasks it knows",
     [
       { id: "", label: now.historyRuns === null ? "Default" : `Default (${historyLabel(now.historyRuns)})` },
       ...counts.map((count) => ({ id: String(count), label: historyLabel(count) })),
@@ -519,12 +529,12 @@ function scheduleForm({ view }) {
     autocomplete: "off",
     spellcheck: "false",
     list: ZONE_LIST_ID,
-    placeholder: "The configured zone",
+    placeholder: "Dot's own time zone",
     "aria-label": "Time zone",
   });
   zone.value = options.timezone ?? "";
 
-  const cron = el("input", { class: "input mono", type: "text", autocomplete: "off", spellcheck: "false", placeholder: "0 9 * * 1-5", "aria-label": "Cron expression" });
+  const cron = el("input", { class: "input mono", type: "text", autocomplete: "off", spellcheck: "false", placeholder: "0 9 * * 1-5", "aria-label": "Custom timing" });
   const presets = el(
     "div",
     { class: "cluster" },
@@ -546,7 +556,7 @@ function scheduleForm({ view }) {
   const cronField = el(
     "div",
     { class: "stack tight wide" },
-    field("Cron expression", cron, "Minute, hour, day of month, month, day of week. Very frequent schedules are refused."),
+    field("Custom timing", cron, "Five parts separated by spaces: minute, hour, day of the month, month, day of the week. Very frequent schedules are refused."),
     presets,
   );
   const at = el("input", { class: "input", type: "datetime-local", "aria-label": "Date and time" });
@@ -629,20 +639,20 @@ function scheduleForm({ view }) {
       "div",
       { class: "form-grid" },
       field("Name", name, ""),
-      field("Mode", mode, "Scheduled runs work unattended."),
-      field("Agent", agent, "Its runs run as this agent: with its instructions and its tools, and its model, reasoning and approvals where these are left on Default."),
+      field("Mode", mode, "Scheduled tasks work on their own."),
+      field("Agent", agent, "Its tasks run as this agent: with its instructions and abilities, and its model, reasoning and approvals where these are left on Default."),
       goalField,
-      field("Approvals", approvals, "Unattended runs cannot wait for you: with Ask, a question stops the run until you answer."),
+      field("Approvals", approvals, "Tasks that work by themselves cannot wait for you: with Ask, a question stops the task until you answer."),
       field("Goal mode", goalMode, ""),
-      field("Model", model, "The model every step and every compaction of the run uses, until it moves to a standby model."),
+      field("Model", model, "The model every step of the task uses, and the summaries of its older part, until it moves to a fallback model."),
       effortField,
-      field("Time zone", zone, "A name such as Europe/Istanbul; empty uses the configured zone."),
-      field("Earlier runs it knows", history, "Each run starts with the dated answers of the last runs, to build on them instead of doing the same work again."),
-      field("Chat", chat, "In the same chat each run reads the conversation of the runs before it instead."),
-      field("Switch off after", stopAfter, "A repeating schedule whose runs fail so many times in a row is switched off, and you are told; a run cancelled counts neither way."),
-      field("Notifications", notify, "How the end of its runs is told on your phone and desktop; a question, a draft and a switch-off are told always, and a run you start by hand too."),
+      field("Time zone", zone, "A name such as Europe/Istanbul; empty uses Dot's own time zone."),
+      field("Earlier tasks it knows", history, "Each task starts with the dated answers of the last tasks, to build on them instead of doing the same work again."),
+      field("Chat", chat, "In the same chat each task reads the conversation of the tasks before it instead."),
+      field("Switch off after", stopAfter, "A repeating schedule whose tasks fail so many times in a row is switched off, and you are told; a task you stop counts neither way."),
+      field("Notifications", notify, "How the end of its tasks is told on your phone and desktop; a question, a draft and a switch-off are told always, and a task you start by hand too."),
       record === null ? null : switchRow(el("div", { class: "field" }, el("span", { class: "field-label" }, "Switched on"), enabled), enabled),
-      el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Runs"), el("div", { class: "cluster" }, repeats.element)),
+      el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Repeat"), el("div", { class: "cluster" }, repeats.element)),
       cronField,
       atField,
     ),
@@ -663,7 +673,7 @@ export function mount(root, ctx) {
   const addButton = el("button", { class: "btn primary sm", type: "button" });
   markOpener(addButton, "New schedule");
   addButton.addEventListener("click", () => openForm(null));
-  const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "The scheduler is not running, so nothing fires until the daemon restarts."));
+  const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Schedules are paused, so nothing starts until Dot starts again."));
   // The brief's card reads again whenever the list does: a switch in the list, a run's end, a failure that switched it off.
   const brief = mountBrief(ctx, () => reload());
   // The watchers (item 571), under the brief: what Dot tells you of when it happens.
@@ -674,7 +684,7 @@ export function mount(root, ctx) {
       return;
     }
     if (views.length === 0) {
-      holder.replaceChildren(emptyPanel("calendar", "No schedules yet", "Add one with New schedule and Dot will run it by itself."));
+      holder.replaceChildren(emptyPanel("calendar", "No schedules yet", "Add one with New schedule and Dot will start it by itself."));
       return;
     }
     const handlers = {
@@ -762,8 +772,8 @@ export function mount(root, ctx) {
       title: record === null ? "New schedule" : "Edit schedule",
       description:
         record === null
-          ? "Dot carries out the goal by itself, once or on a repeating schedule, while the daemon runs."
-          : `Change “${clip(record.name, 60)}”. Its next run starts with the new choices.`,
+          ? "Dot works on the goal by itself, once or on a repeating schedule, while Dot is running."
+          : `Change “${clip(record.name, 60)}”. Its next task starts with the new choices.`,
       body: form.element,
       submitLabel: record === null ? "Add schedule" : "Save changes",
       size: "wide",
@@ -788,7 +798,7 @@ export function mount(root, ctx) {
   async function remove(record) {
     const confirmed = await confirmDialog({
       title: "Delete this schedule?",
-      message: `“${clip(record.name, 80)}” will not run again. Runs it started earlier stay in the history.`,
+      message: `“${clip(record.name, 80)}” will not run again. Tasks it started earlier stay in the history.`,
       confirmLabel: "Delete",
       danger: true,
       focusCancel: true,
@@ -811,12 +821,12 @@ export function mount(root, ctx) {
   schedulerNote.hidden = status === null || status.scheduler_running;
   ctx.setTitle("Schedules");
   root.append(
-    pageHead("Schedules", "Goals that Dot runs by itself, once or on a repeating schedule.", null),
+    pageHead("Schedules", "Goals that Dot works on by itself, once or on a repeating schedule.", null),
     el(
       "div",
       { class: "note" },
       icon("clock"),
-      el("span", null, "Schedules fire only while the daemon runs and this Mac is awake. A firing that was missed while the daemon was down is skipped, not replayed."),
+      el("span", null, "Schedules work only while Dot is running and this Mac is awake. A time that passes while Dot is off is skipped, not made up later."),
     ),
     schedulerNote,
     el(

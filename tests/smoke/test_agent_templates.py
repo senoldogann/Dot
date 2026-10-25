@@ -52,7 +52,7 @@ DRIVERS: frozenset[str] = frozenset({"shell", "terminal_open", "terminal_send", 
 _AGENT_URL: re.Pattern[str] = re.compile(r"#/agents/[^/]+$")
 # The titles of the Import and Export buttons, their names on a phone, where their labels hide.
 IMPORT_TITLE: str = "Make an agent from a file exported from Dot"
-EXPORT_TITLE: str = "Save the agent as a file, to import in another home"
+EXPORT_TITLE: str = "Save the agent as a file, to import into another Dot"
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -200,7 +200,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 # Every card names the tools its agent may use (item 425): the count on the card, the names a click
                 # below it, so that no click makes an agent with every tool by surprise.
                 await expect(cards.locator(".template-tools > summary")).to_have_text(
-                    [f"Tools ({len(template.tools)})" for template in TEMPLATES]
+                    [f"Actions ({len(template.tools)})" for template in TEMPLATES]
                 )
                 first: Locator = cards.first
                 await first.locator(".template-tools > summary").click()
@@ -354,7 +354,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await expect(_toast(phone, "error", "broken.json is not an agent file")).to_be_visible()
                 await _import(phone, stranger)
                 await expect(
-                    _toast(phone, "error", f"an agent names tools that do not exist here: {STRANGE_TOOL}")
+                    _toast(phone, "error", f"an agent names actions that do not exist here: {STRANGE_TOOL}")
                 ).to_be_visible()
                 assert list(await runtime.store.list_agents()) == []
                 # The file from the other home makes the same agent here, and opens its page.

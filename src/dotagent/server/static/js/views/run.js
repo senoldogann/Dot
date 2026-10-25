@@ -59,21 +59,21 @@ const TITLE_CHARS = 70;
 const QUOTE_CHARS = 160;
 // What cut a run off (agent/resume.py `CutOff`), as the line that offers to resume it says it (item 299).
 const CUT_OFF_LINES = {
-  daemon_restarted: "Dot restarted while this run worked.",
-  daemon_shutdown: "Dot was shut down while this run worked.",
-  process_ended: "Its dotx command was told to end while this run worked.",
-  process_died: "Its dotx command died while this run worked.",
+  daemon_restarted: "Dot restarted while this task worked.",
+  daemon_shutdown: "Dot was shut down while this task worked.",
+  process_ended: "Its Terminal command was told to end while this task worked.",
+  process_died: "Its Terminal command stopped suddenly while this task worked.",
 };
 // Edit from here (item 282): the dialog's line and the owner's two ways of rewinding.
-const REWIND_MESSAGE = "Rewind chat to before this message. Your prompt and attachments return to the composer.";
+const REWIND_MESSAGE = "Take this chat back to before this message. Your message and its files go back in the message box.";
 const REWIND_CHOICES = [
-  { value: "revert", label: "Revert files too", tone: "danger" },
-  { value: "keep", label: "Revert and keep changes", tone: "primary" },
+  { value: "revert", label: "Also undo the file changes", tone: "danger" },
+  { value: "keep", label: "Keep the file changes", tone: "primary" },
 ];
 // The events that change what became of the lessons of a run; they come on the lifecycle stream, after the run's end.
 const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismissed", "lessons_failed"]);
 // What a decision on a lesson says once it is made.
-const LESSON_DONE = { save: "Saved to memory: later runs find it like any note.", dismiss: "The lesson is dismissed.", undo: "Undone: the lesson is no longer in memory." };
+const LESSON_DONE = { save: "Saved to memory: later tasks find it like any note.", dismiss: "The lesson is dismissed.", undo: "Undone: the lesson is no longer in memory." };
 // A replayed run brings its question events in a burst: one refresh after it is enough.
 const QUESTIONS_SETTLE_MS = 120;
 // The tools whose results change a file the Changes tab lists (item 368), and how long its read waits for more.
@@ -103,11 +103,11 @@ function tellRewound(cut) {
 }
 
 function backLink() {
-  return el("a", { class: "back", href: "#/runs" }, icon("arrowLeft"), "All runs");
+  return el("a", { class: "back", href: "#/runs" }, icon("arrowLeft"), "All chats");
 }
 
 // What the Plan tab says of a run without a plan (item 203).
-const NO_PLAN = "This run has no plan: Dot writes one for work of several steps.";
+const NO_PLAN = "This task has no plan: Dot writes one for work of several steps.";
 const STEP_MARKS = { done: "check", failed: "x", skipped: "arrowRight" };
 const STEP_LABELS = { pending: "Not started", in_progress: "In progress", done: "Done", failed: "Failed", skipped: "Skipped" };
 
@@ -203,7 +203,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   function stopRun() {
     attempt(async () => {
       await api.post(`/runs/${runId}/cancel`, null);
-      toast("ok", "Cancelling the run…");
+      toast("ok", "Stopping the task…");
     });
   }
   const resumeButton = el(
@@ -211,11 +211,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     {
       class: "btn primary sm",
       type: "button",
-      title: "Start a run on this conversation that goes on from where this one was cut off",
+      title: "Start a task in this conversation that goes on from where this one was cut off",
       onclick: () =>
         attempt(async () => {
           const next = await api.post(`/runs/${runId}/resume`, null);
-          toast("ok", "Resuming the run…");
+          toast("ok", "Continuing the task…");
           goOn(`/runs/${next.id}`);
         }),
     },
@@ -233,16 +233,16 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // A phone's way back from a chat's page is the sidebar in place, never a page of chats to walk through; from a
   // delegated run it is the run that started it (item 401). The shell draws the button, the page says where it leads.
   window.dispatchEvent(new CustomEvent(RUN_BACK_EVENT, { detail: { to: parentId === null ? null : `#/runs/${parentId}` } }));
-  const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, "Parent run");
+  const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, "Main task");
   const crumbSep = parentId === null ? null : el("span", { class: "stage-sep", "aria-hidden": "true" }, "/");
   // Whose chat it is, named in the bar: the agent, the team (item 610) or Dot.
   const chatWith = agent !== null ? agent.name : team !== null ? team.name : dotName();
   const stageName = el("span", { class: "stage-name" }, parentId !== null ? clip(run.goal, CRUMB_CHARS) : chatWith);
   const footTime = el("span", null);
-  const footParent = el("span", null, "Part of another run");
+  const footParent = el("span", null, "Part of another task");
   const footStop = el(
     "button",
-    { class: "child-stop", type: "button", title: "Stop this run", hidden: true, onclick: stopRun },
+    { class: "child-stop", type: "button", title: "Stop this task", hidden: true, onclick: stopRun },
     icon("stop"),
     el("span", null, "Stop"),
   );
@@ -282,7 +282,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
         }
         crumb.textContent = clip(parent.run.goal, CRUMB_CHARS);
         crumb.title = parent.run.goal;
-        footParent.textContent = parent.active ? "Part of a working run" : "Runs on its own";
+        footParent.textContent = parent.active ? "Part of a task that is working" : "Works on its own";
       })
       .catch((error) => console.warn("the parent run could not be loaded", error));
   }
@@ -400,12 +400,12 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // its head says what waits inside (paintLessons).
   const lessonsCard = el(
     "details",
-    { class: "card lessons-card", hidden: true, role: "region", "aria-label": "Lessons from this run" },
+    { class: "card lessons-card", hidden: true, role: "region", "aria-label": "Lessons from this task" },
     el(
       "summary",
       { class: "lessons-head" },
       el("span", { class: "lessons-mark" }, icon("brain")),
-      el("span", { class: "lessons-title" }, "Lessons from this run"),
+      el("span", { class: "lessons-title" }, "Lessons from this task"),
       lessonsCount,
       el("span", { class: "lessons-chevron" }, icon("chevron")),
     ),
@@ -500,7 +500,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
               "div",
               { class: "note warn" },
               icon("alert"),
-              el("span", null, "This run read content that others can write (web pages, mail, downloads): read each lesson before you save it."),
+              el("span", null, "This task read things that other people can write (web pages, mail, downloads): read each lesson before you save it."),
             )
           : null,
         lessons.error === null ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, lessons.error)),
@@ -568,7 +568,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     placeholder: "",
     maxPx: CHAT_BOX_PX,
     commands: [
-      { label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " },
+      { label: "/btw", hint: "Ask on the side: the task never sees the question.", insert: "/btw " },
       // The dock shows no mode on Auto (item 495): a mode is named for the chat's next messages by its command.
       ...MESSAGE_MODES.map((option) => ({
         label: `/${option.id}`,
@@ -702,7 +702,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const waitingList = el("div", { class: "stack tight", hidden: true });
 
   function holdMessage(text) {
-    const label = el("span", null, `Sending to the run: “${clip(text, QUOTE_CHARS)}”`);
+    const label = el("span", null, `Sending to Dot: “${clip(text, QUOTE_CHARS)}”`);
     const node = el("div", { class: "note" }, icon("clock"), label);
     const entry = { text, node, label };
     waitingMessages.push(entry);
@@ -730,7 +730,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   function messagesMissed() {
     for (const entry of waitingMessages.splice(0)) {
       entry.node.className = "note warn";
-      entry.label.textContent = `The run ended before Dot read: “${clip(entry.text, QUOTE_CHARS)}”`;
+      entry.label.textContent = `The task ended before Dot read: “${clip(entry.text, QUOTE_CHARS)}”`;
     }
   }
 
@@ -899,10 +899,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       // A steer joins the run under way, which keeps its level and its tools: an armed choice for one message and the
       // picks (item 318) wait for a message that starts a run, and the person is told (item 259).
       if (choices.value().once !== null) {
-        toast("ok", "Steered: the run under way keeps its level. Ultrathink and Ultracode wait for a message that starts a run.");
+        toast("ok", "Steered: the task under way keeps its level. Ultrathink and Ultracode wait for a message that starts a new task.");
       }
       if (frame.picks.count() > 0) {
-        toast("ok", "Steered: the run under way keeps its tools. Plugins, skills and Plan first wait for a message that starts a run.");
+        toast("ok", "Steered: the task under way keeps what it has. Plugins, skills and Plan first wait for a message that starts a new task.");
       }
       const entry = holdMessage(text);
       const body = { text, attachments: files };
@@ -978,9 +978,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     footStop.hidden = !active;
     // Short enough for one line of a phone's composer, which holds about thirty characters (items 111 and 437).
     const working = holding
-      ? narrowOr("Write to let it go on", "The run is on hold: write to let it go on")
+      ? narrowOr("Write to let it go on", "The task is on hold: write to let it go on")
       : steers(false)
-        ? narrowOr("Steer this run (or /btw)", "Steer this run, or /btw to ask on the side")
+        ? narrowOr("Steer this task (or /btw)", "Steer this task, or /btw to ask on the side")
         : narrowOr("Queue a message (or /btw)", "Queue a message, or /btw to ask on the side");
     input.placeholder = active ? working : narrowOr("Follow up (@ or /)", "Follow up (@ for apps, / for skills and commands, or /btw to ask on the side)");
     keepLook();
@@ -1181,7 +1181,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       // The rows of the delegated runs follow the store where the run's events did not bring them (item 285).
       timeline.settle(fresh.children, Date.now() / 1000);
     } catch (error) {
-      readFailed("The run", error);
+      readFailed("The task", error);
     }
   }
 
@@ -1320,7 +1320,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const screenQuiet = emptyPanel(
     "monitor",
     "Dot's computer is quiet",
-    "The screenshots it takes while it works will appear here. Settings › Browser opens Dot's computer when a run starts its browser.",
+    "The screenshots it takes while it works will appear here. Settings › Browser opens Dot's computer when a task starts its browser.",
   );
   let screenContent = detail.held;
   function paintScreen() {
@@ -1337,7 +1337,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Run", icon: "info", sections: [recap.element, ...context.elements, more.element] },
+      { id: "run", label: "Task", icon: "info", sections: [recap.element, ...context.elements, more.element] },
       { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
@@ -1635,10 +1635,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     }
     console.error("the run stream ended", error);
     if (error.status === 404) {
-      root.replaceChildren(backLink(), emptyPanel("circleDashed", "Run not found", `No run has the id ${runId}.`));
+      root.replaceChildren(backLink(), emptyPanel("circleDashed", "Task not found", `No task has the ID ${runId}.`));
       return;
     }
-    toast("error", `Live updates stopped: ${error.message}`);
+    toast("error", "Live updates stopped. Reload the page to get them again.", null, error.message);
     root.prepend(
       el(
         "div",
@@ -1753,7 +1753,7 @@ export function mount(root, ctx) {
       if (controller.signal.aborted) {
         return;
       }
-      const problem = error.status === 404 ? emptyPanel("circleDashed", "Run not found", `No run has the id ${runId}.`) : errorPanel(error, () => attempt(open));
+      const problem = error.status === 404 ? emptyPanel("circleDashed", "Task not found", `No task has the ID ${runId}.`) : errorPanel(error, () => attempt(open));
       root.replaceChildren(backLink(), problem);
       shown();
       return;

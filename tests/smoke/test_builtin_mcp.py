@@ -241,7 +241,7 @@ async def test_connectors_refuses_a_new_server_of_that_name_while_the_built_in_i
             "/api/mcp/servers",
             json={"service": None, "name": SERVER, "address": f"{sys.executable} {FIXTURE}", "origin": ORIGIN},
         )
-        assert refused.status_code == 409 and "another MCP server has its name" in refused.text, refused.text
+        assert refused.status_code == 409 and "another connected app has its name" in refused.text, refused.text
         assert world.runtime.mcp.connected() == (SERVER,)
         assert tuple(tool.remote_name for tool in world.runtime.mcp.tools) == TOOLS
 

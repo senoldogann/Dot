@@ -166,7 +166,7 @@ and did not send is kept in this browser and is there again when you come back (
 the mode, the model, the agent, Keep going and a choice for one message picked for it (item 397), until a message goes:
 a new chat after that starts on Auto, the default model, Dot and Keep going off. Dot's face
 looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line, or
-⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Composer chooses for every composer of this
+⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Messages chooses for every composer of this
 browser (item 230); on a touch screen Return always adds a line and the round send button sends (item 440). The markdown
 in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
@@ -279,14 +279,14 @@ the composer (`/auto`, `/task`, `/chat`, `/research` and `/loop` here; `/btw`, t
 run), the skills by name with their description, and each MCP server with its tools, read from the daemon as a run reads
 them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape closes. The menu stands in
 sections with a hairline between them and no title on the page (a screen reader hears each by name: Commands, Skills,
-MCP tools): a row is a line icon, the name and under it its words, cut by an ellipsis rather than wrapped (item 537,
+Actions of connected apps): a row is a line icon, the name and under it its words, cut by an ellipsis rather than wrapped (item 537,
 after Qoder's menu: a terminal in a box for a command, the arrows of a loop for `/loop`, a puzzle piece for a skill),
 and under the list stands what the keys do (a touch screen has none, so it has no such line). An MCP tool is named in
 words, its server's first, as the row of a call to it is ("Web Research · Web crawl results", not `web-research /
 mcp__web-research__web_crawl_results`; item 581), and the letters find it by those words or by the names the model calls
 it by. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the slash
 word goes; a command does its work. `@` at the start of a word opens the menu of the servers and plugins alone (item
-367, and the owner's word of 2026-10-21, item 447) — the group the menu titles **MCP servers**, the plugins: each one by
+367, and the owner's word of 2026-10-21, item 447) — the group the menu titles **Connected apps**, the plugins: each one by
 its name and the number of its tools, filtered by the letters after it — the skills and the servers' tools, which the
 slash menu carries, are not there; a pick is a chip and the at word goes. In both menus a server, and each of its tools,
 wears the mark its service's Customize tile wears, on that tile's light ground: the service's logo, else its icon or its
@@ -309,7 +309,7 @@ colour of its name, which its × takes away; the chip of a server wears its serv
 logo, the icon or the letters, on the tile's light ground), Dot's own icon for a server of no service, and for any
 server until the daemon's palette has named it (a draft kept, a message sent; the plug before item 581); Plan first is a
 chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **Options** menu's
-Execution group, under the approvals (item 353). The picks go with the message (`plugins`, `skills`, `accounts` and
+**How Dot works** group, under the approvals (item 353). The picks go with the message (`plugins`, `skills`, `accounts` and
 `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is sent they stand under it as chips
 (the run's `picks` event); a message that steers the run under way leaves them for the next one, and the page says so,
 and a queued message with picks is not steered into the run at work: it stays queued to start a run of its own. A run
@@ -337,7 +337,7 @@ skill**, under a **More** button, until item 406.
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
 failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
-agent, model, approval mode, goal mode, campaign, work, time, mode, start and id) are under More on the panel's Run tab,
+agent, model, approval mode, goal mode, campaign, work, time, mode, start and id) are under More on the panel's Task tab,
 closed the first time (items 452 and 544). Your goal is the
 first message, in the bubble of your messages on the raised surface. What you write reads there as markdown, as an
 answer does: its headings, lists (nested as far as their items are indented, with a block of code or a quote under an
@@ -352,11 +352,11 @@ bubble, so its files stand where the run starts, pictures first). A picture that
 fault and why. A command or a script of a call's row shows as itself, cut in the middle past 4000 characters; only a
 blob without words, a picture's base64, is shown as its length, and so is a long text with next to no spaces (one line
 of minified code). Under a message that opened a turn stands **Edit from
-here** too (item 282), which asks whether to "rewind chat to before this message". **Revert and keep changes** takes
+here** too (item 282), which asks whether to "rewind chat to before this message". **Keep the file changes** takes
 that turn and the ones after it out of the chat (they still count in what Dot spent, and a question they left for you
 waits no more) and ends the history the model reads where it ended before the message, a summary made since included;
 the message comes back into the box of the turn before it with its files, to be changed and sent again, or into a new
-chat's box when it was the first. **Revert files too** also takes back what those turns, and their helpers, changed with
+chat's box when it was the first. **Also undo the file changes** also takes back what those turns, and their helpers, changed with
 the file tools, each file that is as they left it; a file changed since is left and named, and what a command changed
 stays. A message sent before Dot kept the place of each message in its chat has no Edit from here, nor has one that
 steered a turn at work, and a chat is not rewound while a run works on it or messages wait in its queue. A delegated run
@@ -372,7 +372,7 @@ with its reasoning level, how the run stands and for how long, counting on while
 last; the pointer leaving, a click or Escape puts it away, and on a touch screen a tap opens the row as before. Its own
 page names the parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and has a pill where the
 box would be, which stays at the window's foot as the conversation scrolls (item 244): the model, how long it took
-("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own" once not), "Open parent"
+("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Works on its own" once not), "Open parent"
 and, while it works, **Stop**. The tool calls of one stretch of work fold into a single line that says what they did,
 "Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it while it runs,
 "Worked for 12 s" for a stretch with no call; item 374). The line is one line at any width (item 512): what it did
@@ -392,8 +392,8 @@ over wears the mark of the kind its words start with (the terminal's for "Ran 2 
 a line of the same column with the brain. Approvals, questions and policy notes stay in the open. A click on that line
 opens or folds it while the run still works and after it ends, and the reader's choice stands for the life of the page;
 folded, it keeps the call under way in sight (on a phone, only the count). The lines of how a run was set up (the notes
-and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another model) are
-not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, in its More (item 452),
+and skills it was handed and how they were found, its chat size limit (the context budget), its action groups (the tool groups), a step sent to
+another model) are not in the conversation (item 365): the side panel's Task tab lists them under **Set up**, in its More (item 452),
 which counts a line that warns beside its title, the head of Set up naming them in short
 and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count, a line that warns
 in amber (the embedding service failed, so the notes were found by their words alone); a delegated run's lines are on
@@ -460,7 +460,7 @@ it was written in, a list as a list, a table as a table and code in its fence, w
 applications that read it; the line under a message or an answer stays out, and a copy within a block of code is its
 code. A block of code, in an answer, in a message of yours, in a step's row or on an approval card, is a dark rounded box with a head
 (item 537): at its left the language it was written for (the title its fence gave it, ` ```python title="x.py" `, in
-its place; `text` when it named none; a step's boxes say Command, Arguments, Result or Error, an approval's Command or Target), at its right a switch
+its place; `text` when it named none; a step's boxes say Command, What Dot sent, Result or Error, an approval's Command or Target), at its right a switch
 that wraps the long lines of this block (Settings › Appearance › Type › long lines of code wrapped says how every block
 begins; a step's boxes begin wrapped) and the copy of its text as it was written (item 439), which, for a step's result
 the page shows only the first part of, is all of it; Show all puts all of it in the box. A table has its head too, with
@@ -474,8 +474,8 @@ scroll up. At the left of the conversation a column of short marks stands for yo
 bottom (item 201): resting the pointer on it shows the message nearest to it and the start of its answer, a click goes
 to that message, and from the keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are
 darker. The column needs a pointer that rests, two messages or more, and a window wider than a phone's; there, the
-conversation leaves it its room at the left, beside the side panel too (item 228). In the side panel (Run details),
-the Run tab opens with the **Recap** (item 536): a few short lines on what the run has done, what it is doing now and
+conversation leaves it its room at the left, beside the side panel too (item 228). In the side panel (Task details),
+the Task tab opens with the **Recap** (item 536): a few short lines on what the run has done, what it is doing now and
 what waits for you, written by the fast model (`[models] fast`; the run's own model when the fast one fails) from the
 run's record (its task, status, plan, the questions that wait for you and its conversation), with no tools and the
 record taken for data, never for instructions. The run never sees it, the secrets Dot holds are masked in it, and it
@@ -486,18 +486,18 @@ after the last; a page asks for one only
 while the section is in sight, and as the run takes steps at most every 20 seconds, never two at once for one run, and
 after a write that failed it shows why and asks no more until its button is pressed or a recap arrives;
 `[recap] enabled = false` writes none and hides the section. Under the recap stand what the run is made of, each
-section only when it has a row (item 539): **Skills & MCP** (the skills and MCP servers the run used, with how many
+section only when it has a row (item 539): **Skills & connected apps** (the skills and MCP servers the run used, with how many
 times it used each, opening Customize; a skill is the `skill` tool's name, a server the one in `mcp__server__tool`;
-the section stays out of sight until the run uses one, item 546), **Artifacts** (the files the chat wrote with their
+the section stays out of sight until the run uses one, item 546), **Files made** (the files the chat wrote with their
 added and removed lines, each opening the Changes tab where the diff is), **Web reading** (the pages it fetched and
 the searches it made, a page opening in a new tab; a fetch that failed is not a page it read) and **Memory updated**
 (the notes it saved, corrected or forgot, each opening its note in Settings › Memory). Each row wears its mark on a
 tile: a skill or a server its icon, a file its language's own logo (Simple Icons, version 16.35.0, CC0, under
 `icons/languages/`, item 547), or the letters of its kind where the language has no mark. In a tab of
 several sections each scrolls on its own once it holds more than two fifths of the screen, its head staying over it,
-and a tab of one section has the panel to itself (item 544). The Run tab lists no files of the conversation and no
+and a tab of one section has the panel to itself (item 544). The Task tab lists no files of the conversation and no
 Details card since item 544: the files open from their chips and paths in the conversation, and the run's facts stand
-under More. In the side panel (Run details), under More on the Run tab, **Cost** lists the bill of the run, each value
+under More. In the side panel (Task details), under More on the Task tab, **Cost** lists the bill of the run, each value
 beside its label as the facts are: where the minutes went (the model, the summaries, the tools, the time spent waiting
 for you), the steps, the input tokens with the share the provider served from its cache, the output tokens, the
 compactions (with their rate per
@@ -514,7 +514,7 @@ its text on one line (all of it in the tooltip), a pencil that edits it in the b
 gives the box its draft back; item 376: the message's files come into the box with its text, small, a photo as its own
 picture and each file with its ×, its name the tooltip, and the files the box holds when it is saved are the message's),
 **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run with what the box holds, past the
-queue, or with the queue's next message when the box is empty. Settings › General › Composer can have a message steer
+queue, or with the queue's next message when the box is empty. Settings › General › Messages can have a message steer
 the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the queue. A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
 box (items 352 and 360) says in a few quiet words how long the run has worked, or that it waits for you, how its helpers
@@ -535,15 +535,15 @@ for every browser, so a reload, a restart of the daemon or a run moved to a stan
 chat from before has the open run's until its next run starts; a Task kept before Auto, item 495, reads as Auto, which
 settles a task unless a message's words ask only to look). They are not kept in the browser as the home's are, and
 Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
-next follow-up. Beside the send, a ring shows how much of the run's context budget its last step filled (item 222): the
+next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
 window, item 396); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows
 the figures, the point past which Dot summarizes the older part of the run, the model's window, and why the budget is
 smaller than the window (each step sends the model the whole run again, so a run kept within it is answered sooner and
 costs less) and where it is set (items 239 and 250): `[agent] context_tokens`, or the size chosen for the model in
-Settings › Models, which the timeline notes too; **Change context size** under them opens that setting at the run's
+Settings › Models, which the timeline notes too; **Change the chat size** under them opens that setting at the run's
 model (item 396). It reads the run's `scaffold` and `assistant` events and asks the model nothing. A run the daemon cut
-off offers **Continue** on a line above the box. The run's facts stand under More on the panel's Run tab (items 452
+off offers **Continue** on a line above the box. The run's facts stand under More on the panel's Task tab (items 452
 and 544), closed the first time and as the browser last left it after: the status, the agent of a chat with one, the
 model and its reasoning level, the approval mode, goal mode when it is on, the campaign of a session, the tool calls
 (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as compactions,
@@ -574,7 +574,7 @@ answer written in again (item 447).
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact under More, with no card for
 it at the head of the conversation. The panel is one surface on the composer's corner, in five tabs
-(item 203): **Run** (the Recap and the four sections under it (item 539), and under More the run's facts, how it was
+(item 203): **Task** (the Recap and the four sections under it (item 539), and under More the run's facts, how it was
 Set up and its Cost; items 452 and 544), **Changes** (the files the
 chat's runs wrote or created with `write_file` and `edit_file`, up to this run, which the tab counts: each with what
 became of it and the lines added and removed, opening on its unified diff from before the chat's first change to it;
@@ -650,39 +650,39 @@ since, cannot be taken back, as before the run). `POST /api/runs/{id}/undo` take
 left it, once the run has ended.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
-notifications, the composer's keys, the Chat card's "Show what ran without asking", which is off until turned on: off, a
-chat leaves out the lines of the decisions the review model made, while a refusal still shows; a step yolo let through
-draws no line either way (items 346, 362 and 500, kept in this browser), and the token this browser is signed in with),
+notifications, the **Messages** card's keys, the Chat card's "Show what ran without asking", which is off until turned on: off, a
+chat leaves out the lines of the decisions the reviewer made, while a refusal still shows; a step yolo let through
+draws no line either way (items 346, 362 and 500, kept in this browser), and **Sign out of this browser**),
 **Appearance** (the look
 of this browser, below), **Models** (the **Default model** first, a menu of the models that can call tools: the runs
 that name no model, a new chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models]
 main`, as when it is changed from the composer's model menu; the **Roles** card holds the fast, review and vision
 models too, each with its provider in its box, and **Fallbacks** the models a run moves to; then **Every model, by
-provider**, a search over one fold per provider, with the reasoning levels of each model and a menu to choose one, and
-what the providers hold in the page's head with a button that asks them again; a provider without a key, or whose key
-was refused (HTTP 401), says so and links to Providers, and one that refused access (HTTP 403) says that, with its
-words), **Providers** (the providers Dot signs in with, one card: each on its tile with the tail of its key and a dot
+service**, a search over one fold per service, with the reasoning levels of each model and a menu to choose one, and
+what the services hold in the page's head with the button **Check again**; a provider without a key, or whose key
+was refused (HTTP 401), says so and links to AI services, and one that refused access (HTTP 403) says that, with its
+words), **AI services** (the AI services Dot signs in to, one card: each on its tile with the tail of its key and a dot
 that says whether it is signed in, and the one chosen with its key, the page where it is made and the models it brings
 behind a filter; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses with
 and what Chrome has to allow first; see [Browser
 use](browser-and-computer-use.md#browser-use)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
 what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, the
 versions, fifty at a time, with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
-harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pairing code for its home-screen app; see
+harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a sign-in code for its home-screen app; see
 [Dot on the phone](phone.md#dot-on-the-phone)) and
-**System** (item 564: three tiles say how the daemon, the permissions and the health checks stand; the **Emergency
+**System** (item 564: three tiles say how Dot, the permissions and the health checks stand; the **Emergency
 stop** is a card with **Stop everything**, or **Release** once it is engaged; the **Health checks** are what needs a
 look first, then the checks that passed in their groups (setup, desktop control, providers and models, browser, memory,
-tools and plugins), with a filter and **Run again**, a card that folds and says how many checks passed at its head
-(item 576), a finding of more than 180 characters shown in its first two lines with **Show all**; below them the
-daemon's facts in four groups each named over its rows of a label and a value (item 378: this Dot, how it acts, what
-it works with and its models), the permissions and the ways to **Diagnostics** and **Open source licences**, pages of
+tools and plugins), with a filter and **Run again**, a card that folds, shut until it is opened (item 625), and says how many checks
+passed at its head (item 576), a finding of more than 180 characters shown in its first two lines with **Show all**; below them, in a fold named **Details**
+that is shut until it is opened (item 625), the facts of Dot in four groups each named over its rows of a label and a
+value (item 378: this Dot, how it acts, what it works with and its models), the permissions and the ways to **Diagnostics** and **Open source licences**, pages of
 their own). Which folds are open is kept in the browser. A card that folds keeps its head on its ground, so that
 folded it is a row of the page, as a group of the health checks is (item 576).
 In a Mac's window the sidebar is the settings' nav while they are open (item 562): **Back to chats** (to the chat last
 open; in the desktop app under the traffic lights, whose row holds the button that hides the sidebar where the chats'
 head holds it, item 577) and the tabs in four groups (Interface, Models, How Dot works, This Mac), each with what it
-holds at its right (the main model, how many providers have a key, how many notes Dot keeps, a green dot when a phone
+holds at its right (the main model, how many AI services have a key, how many notes Dot keeps, a green dot when a phone
 reaches Dot); whether the daemon answers and the emergency stop are the page's, as on every page. The page is the open
 tab alone, in a column of 920 px under its own name and the line that says what it is for, each section a name over a
 card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On a phone they are a list in
@@ -695,8 +695,8 @@ Command keys pressed together: see below.
 and there is no chat yet, New chat shows Dot's first conversation in the place of the greeting, over the composer, with
 no model called: Dot greets you by name and asks what to call it (a few names to pick, or one to type; "Name changed to
 Miro" notes a new one), says in a few lines what it does (and, in Ask and Supervised, what it asks you about; in Auto,
-that a review model answers for you and money and passwords stay yours), and offers to
-connect Gmail and Google Calendar: Connect takes the Google sign-in step in Dot's browser and the card follows it until
+that a second AI answers for you and money and passwords stay yours), and offers to
+connect Gmail and Google Calendar: **Connect Google** takes the Google sign-in step in Dot's browser and the card follows it until
 you are signed in (a browser without a window says so instead). Then it offers to look through your inbox for something
 to take off your hands: that look is a run of its own whose goal tells it to only read and to ask you which to do
 (the goal asks it, as a goal does; the approval mode decides what is asked of you on the way). The look, Not now, Skip
@@ -749,8 +749,8 @@ theme's own, by default): under 100 the text tiers and the lines fade toward the
 light and white in dark, the lines a quarter as far; **Chat width**, how wide the home and a conversation read
 (Comfortable, 768 px, the default; Wide, 1152 px; Full); **Density**, how close the rows, cards and lists sit
 (comfortable or compact); and two switches that follow the theme picked for light until you set them yourself: fold the
-tool steps (on in all but Paper) and the Details panel (off in all). **Motion**: **Panel animation**, how long the
-sidebar and the details panel take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never
+steps (on in all but Paper) and the side panel (off in all). **Motion**: **Panel animation**, how long the
+sidebar and the side panel take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never
 slide), and "Faces that move" (below). **Text** (item 331): one **Text size** under a line of an answer, the size of the
 body on this device, every text size scaled with it: on a phone 12 to 20 px around 16 (item 347), as iOS's own, and
 elsewhere 13 to 17 px around 14; each device keeps its own. **Type**: the interface's font (Inter, the system's, or
@@ -945,7 +945,8 @@ dotx service uninstall   # stop the daemon and remove the job
   launcher, the daemon's parent), **Restart Dot** (`POST /api/system/restart`): the daemon stops with an exit launchd
   does not count as clean, so the job starts it again, with what was granted meanwhile; a daemon run by hand is refused
   the restart, and so is one when launchd cannot be asked. The SnapShots page offers the Accessibility pane the same
-  way. Each section of Settings › System folds (item 411), as the reader leaves it in this browser; the Permissions fold
+  way. Each section of Settings › System folds (item 411), as the reader leaves it in this browser (the health checks and
+  **Details** start shut, item 625); the Permissions fold
   says what is missing beside its title. Measured through the service with all three granted: the model opened the
   fixture app, typed a name, pressed a button twice and ticked a checkbox in 4 steps and 13 seconds.
 - The job does not see the environment of your shell. Give it its API keys through `dotx auth set` or the Keychain.

@@ -228,9 +228,9 @@ def connections_router(ctx: ServerContext) -> APIRouter:
             )
         if session.config.headless:
             raise RunConflict(
-                "Dot's browser runs without a window, so there is none to sign in in: switch headless off in the "
-                "config",
-                {"app_id": app_id},
+                "Dot's browser works without a window, so there is nowhere to sign in. Choose My Chrome in Settings › "
+                "Browser to use your own Chrome, where you are already signed in",
+                {"app_id": app_id, "setting": "[browser] headless = false"},
             )
         # The owner signs in on the page; no model reads its view, which hides as a run's would.
         await session.open_url(_SIGN_IN_THREAD, found_web.sign_in, True)

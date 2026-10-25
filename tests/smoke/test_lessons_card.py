@@ -158,7 +158,7 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
         try:
             for width, scheme in _SHOTS:
                 page, errors = await _page(browser, address, run.id, width, scheme)
-                card: Locator = page.get_by_role("region", name="Lessons from this run")
+                card: Locator = page.get_by_role("region", name="Lessons from this task")
                 await expect(card).to_be_visible()
                 assert not await card.locator(".lesson").first.is_visible(), "the lessons arrive folded"
                 assert await card.get_attribute("open") is None
@@ -205,7 +205,7 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
                 (None, "could not be drawn"),
             ):
                 page, errors = await _page_with_lessons(browser, address, run.id, lessons)
-                count: Locator = page.get_by_role("region", name="Lessons from this run").locator(".lessons-count")
+                count: Locator = page.get_by_role("region", name="Lessons from this task").locator(".lessons-count")
                 await expect(count).to_have_text(said)
                 await expect(count).to_have_attribute("data-tone", "warn" if lessons is not None else "bad")
                 assert errors == []

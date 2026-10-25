@@ -339,7 +339,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         refused, and so is a config file that cannot be changed; nothing changes then."""
         info: ModelInfo = await ctx.runtime.router.model_info(parse_model_ref(request.model))
         if not info.tools:
-            raise ConfigError("a run needs a model that can call tools", {"model": request.model})
+            raise ConfigError("a task needs a model that can use actions", {"model": request.model})
         await asyncio.to_thread(set_default_model, config_path(), request.model)
         ctx.manager.set_main_model(request.model)
         return models_now()
@@ -417,7 +417,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         if request.role == "vision" and not info.vision:
             raise ConfigError("the vision model must be one that can see images", {"model": request.model})
         if request.role != "vision" and not info.tools:
-            raise ConfigError(f"the {request.role} model must be one that can call tools", {"model": request.model})
+            raise ConfigError(f"the {request.role} model must be one that can use actions", {"model": request.model})
         await asyncio.to_thread(set_role_model, config_path(), request.role, request.model)
         ctx.runtime.roles.choose(request.role, request.model)
         return models_now()
@@ -443,7 +443,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
                 )
             info: ModelInfo = await ctx.runtime.router.model_info(ref)
             if not info.tools:
-                raise ConfigError("a standby model must be one that can call tools", {"model": ref.label})
+                raise ConfigError("a standby model must be one that can use actions", {"model": ref.label})
         await asyncio.to_thread(set_standby_models, config_path(), labels)
         ctx.runtime.roles.choose_standby(labels)
         return models_now()
@@ -461,13 +461,13 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         ceiling: int | None = context_ceiling(most_window(info))
         if request.tokens is not None and ceiling is None:
             raise ConfigError(
-                "the model's provider does not say how many tokens it holds, so its context size cannot be chosen",
+                "the model's service does not say how much it can take in, so its chat size cannot be chosen",
                 {"model": ref.label},
             )
         if request.tokens is not None and ceiling is not None and not CONTEXT_FLOOR <= request.tokens <= ceiling:
             raise ConfigError(
-                f"the context size of {ref.label} must be from {CONTEXT_FLOOR:,} to {ceiling:,} tokens, three quarters "
-                "of its window",
+                f"the chat size of {ref.label} must be from {CONTEXT_FLOOR:,} to {ceiling:,}, three quarters of what "
+                "the model can take in",
                 {"model": ref.label, "tokens": request.tokens, "window": most_window(info)},
             )
         await asyncio.to_thread(set_context_size, config_path(), ref.label, request.tokens)
@@ -582,7 +582,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             (item for item in found.servers if (item.agent, item.name) == (wanted.agent, wanted.name)), None
         )
         if server is None:
-            raise ElsewhereError(f"no MCP server {wanted.name} of {wanted.agent} is found on this Mac", context)
+            raise ElsewhereError(f"no connected app {wanted.name} of {wanted.agent} is found on this Mac", context)
         await asyncio.to_thread(add_server, added_servers_path(), Path.home(), server)
 
     @router.get("/skills/elsewhere")
@@ -699,12 +699,12 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         service, problem = await _service()
         if problem is not None:
             raise ConfigError(
-                "whether the service runs this daemon could not be told, so it is not stopped", {"error": problem}
+                "Dot could not tell whether it starts again by itself, so it was not stopped", {"error": problem}
             )
         if not service:
             raise ConfigError(
-                "Dot was not started by its service, so it cannot start itself again: stop it and start it again by "
-                "hand, or install the service (dotx service install)",
+                "Dot was not started the way that lets it start itself again: close it and open it again yourself, or "
+                "set it up to start by itself (in Terminal: dotx service install)",
                 {},
             )
         ctx.restart()

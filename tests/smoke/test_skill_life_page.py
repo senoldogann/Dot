@@ -205,7 +205,7 @@ async def test_the_skills_page_shows_what_rests_and_what_waits_and_lists_the_ver
                 await waiting.screenshot(path=str(tmp_path / "skills-proposal-1280.png"))
                 # A skill no run read for 70 days rests, after the awake ones; the others are awake.
                 await expect(_card(page, DUSTY).locator(".skill-have")).to_have_text("Resting")
-                await expect(_card(page, DUSTY)).to_contain_text("No run read it for 60 days")
+                await expect(_card(page, DUSTY)).to_contain_text("No task read it for 60 days")
                 await expect(_card(page, STEADY).locator(".skill-have")).to_have_text("Learned")
                 learned: Locator = _section(page, "learned").locator(".skill-card")
                 names: list[str | None] = [await card.get_attribute("data-skill") for card in await learned.all()]
@@ -256,12 +256,12 @@ async def test_the_skills_page_shows_what_rests_and_what_waits_and_lists_the_ver
                 await expect(blocks.nth(0)).to_have_attribute("data-current", "true")
                 await expect(blocks.nth(0).locator(".badge.b-ok")).to_have_text("Current")
                 await expect(blocks.nth(0).locator(".badge.b-warn")).to_contain_text("From outside content")
-                await expect(blocks.nth(0)).to_contain_text("Rewritten by a later run")
+                await expect(blocks.nth(0)).to_contain_text("Rewritten by a later task")
                 await expect(blocks.nth(0).locator(".version-step.dropped")).to_have_text(
                     ["-Dropped: Send the first mail."]
                 )
                 await expect(blocks.nth(0).locator(".version-step.added")).to_have_text(["+Added: Send the mails."])
-                await expect(blocks.nth(1)).to_contain_text("Learned from a run")
+                await expect(blocks.nth(1)).to_contain_text("Learned from a task")
                 await expect(blocks.nth(1).locator(".badge.b-warn")).to_have_count(0)
                 await expect(blocks.nth(0).get_by_role("button", name="Restore")).to_have_count(0)
                 await dialog.screenshot(path=str(tmp_path / "skills-versions-1280.png"))

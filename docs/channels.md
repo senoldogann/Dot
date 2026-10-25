@@ -3,9 +3,9 @@
 Dot can be reached without Tailscale and without the web UI: from the messaging app of your phone. A *channel* receives
 your messages and sends Dot's, and what Dot tells you on its own. There is one, **iMessage**, through the conversation
 you have with yourself (item 572) or, when your iPhone uses another Apple ID than this Mac, the one between the two
-(item 595). Settings › Channels shows where it stands (what macOS has granted, which numbers and addresses are paired,
-what Dot sees of Messages' database) and has its switch. [Dot on the phone](phone.md) is the other way, the web UI
-itself on your phone through your own tailnet.
+(item 595). Settings › Channels shows where it stands (what macOS has granted, which numbers and addresses are
+connected and, under **Advanced**, what Dot sees of Messages' database) and has its switch. [Dot on the
+phone](phone.md) is the other way, the web UI itself on your phone through your own tailnet.
 
 ## How it works
 
@@ -142,15 +142,16 @@ Settings › Channels › iMessage, from the top:
    question, with Messages started hidden when it is not running; **Open Automation** shows the pane after a no.
 3. **Your number or Apple ID email**: type your own number with its country code (`+358 40 123 4567`) or the address of
    your Apple ID, and **Send a code**. Dot sends a six-digit code there through Messages: type back what you read on
-   your iPhone (good for ten minutes and five tries), and it is paired. Up to three can be paired; the cross on one
-   forgets it. **Which one:** with one Apple ID on the Mac and the iPhone, the one you write to yourself at. With two,
-   the Mac's own and your personal one on the iPhone (item 595), the number or address your iPhone writes **from**: in
-   Messages on this Mac the conversation with your iPhone is named for it. Pair that one, not the Mac's own; if your
-   iPhone writes from your number at times and from your address at others, pair both. **Pair only your own number or
-   Apple ID address: pairing someone else's gives them Dot.** Every message from a paired number or address runs as your
-   command, and the tab says so beside each one (*Messages from this address run as you*); every message you send to it
-   does too. The code shows only that it reached whoever holds that number or address, not that it is yours: with the
-   number of someone else, paired with their help, every message they send you would run as your command.
+   your iPhone (good for ten minutes and five tries), and it is connected (*paired* in the settings file and the API).
+   Up to three can be connected; the cross on one forgets it. **Which one:** with one Apple ID on the Mac and the
+   iPhone, the one you write to yourself at. With two, the Mac's own and your personal one on the iPhone (item 595), the
+   number or address your iPhone writes **from**: in Messages on this Mac the conversation with your iPhone is named for
+   it. Connect that one, not the Mac's own; if your iPhone writes from your number at times and from your address at
+   others, connect both. **Connect only your own number or Apple ID address: connecting someone else's gives them
+   Dot.** Every message from a connected number or address runs as your command, and the tab says so beside each one
+   (*Messages from this address run as you*); every message you send to it does too. The code shows only that it
+   reached whoever holds that number or address, not that it is yours: with the number of someone else, connected with
+   their help, every message they send you would run as your command.
 4. Switch **iMessage** on (`[channels] imessage`). Only what you send from then on is read: what was sent while it was
    off is never run.
 
@@ -223,8 +224,9 @@ resumes the runs of the web UI): the chat shows it and **Resume** is yours.
 
 ## What Dot sees
 
-When a message you wrote gets no answer, the tab says why. **What Dot sees in Messages** (and `seen` in `GET
-/api/channels`) shows, from the last look Dot took (every three seconds while the channel is on):
+When a message you wrote gets no answer, the tab says why. **What Dot sees in Messages**, under **Advanced** at the
+foot of the tab (shut until it is opened, item 625; and `seen` in `GET /api/channels`) shows, from the last look Dot
+took (every three seconds while the channel is on):
 
 - **Newest message**: the newest row of Messages' database, in any conversation: its number, the date it carries and
   when Dot first saw it. The number moves up when a message arrives. A number that stays put after you wrote means
@@ -326,7 +328,7 @@ Mac](safety.md#what-leaves-this-mac).
 | The tab says | What it means |
 | --- | --- |
 | Full Disk Access *missing* | macOS keeps Messages' database from the program that runs Dot: switch it on and restart Dot |
-| *no Messages database yet* | Messages has not made one on this Mac: sign in to Messages with your Apple ID |
+| *no messages saved yet* | Messages has not made one on this Mac: sign in to Messages with your Apple ID |
 | Automation *not asked yet*, *refused* | **Ask macOS**, or switch Messages on for the program in Automation |
 | *Messages is not open* | macOS tells about an application only while it runs: **Ask macOS** starts it hidden |
 | *the Messages database is laid out differently* | a macOS update changed `chat.db`: the channel reads nothing until Dot is updated |

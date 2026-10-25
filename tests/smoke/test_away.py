@@ -224,7 +224,7 @@ async def test_the_home_shows_the_news_once_then_mark_as_read_puts_it_away(
                 await _scheduled_runs(runtime.store, 3)
                 await page.reload()
                 await expect(card.locator(".away-line")).to_have_text(
-                    "3 scheduled runs: 3 done · 3 decisions made for you (3 by YOLO)"
+                    "3 scheduled tasks: 3 done · 3 decisions made for you (3 by YOLO)"
                 )
                 for rows, more in (
                     ("[data-away-run]", '[data-away-more="runs"]'),

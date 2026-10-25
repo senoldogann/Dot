@@ -14,23 +14,23 @@ import { anchoredPopover } from "./popover.js";
 import { providerMark, providerOf } from "./providers.js";
 import { approvalBadge, approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
 import { getSnapshot, loadModels, refresh } from "./state.js";
-import { attempt, toast } from "./ui.js";
+import { attempt, toast, toastError } from "./ui.js";
 
 const MODES = [
-  { id: "task", label: "Task", hint: "Carry the goal out end to end on this Mac", icon: "target" },
-  { id: "chat", label: "Chat", hint: "Converse; use tools whenever they help", icon: "message" },
-  { id: "research", label: "Research", hint: "Read-only: gather information and report, change nothing", icon: "search" },
+  { id: "task", label: "Task", hint: "Do the job from start to finish on this Mac", icon: "target" },
+  { id: "chat", label: "Chat", hint: "Talk it through; Dot still uses apps and files when that helps", icon: "message" },
+  { id: "research", label: "Research", hint: "Look things up and report back. Changes nothing", icon: "search" },
 ];
 // Auto (item 495), a message's mode on the home and in a chat: the message's own words settle it (the daemon's
 // agent/mode_words.py), so the box shows no mode pill until one is named with /task, /chat or /research.
-export const AUTO_MODE = { id: "auto", label: "Auto", hint: "Dot picks: read-only when you only ask it to look, else it carries the goal out", icon: "sparkles" };
+export const AUTO_MODE = { id: "auto", label: "Auto", hint: "Dot decides: it only looks when you ask it to look, and otherwise does the job", icon: "sparkles" };
 // The modes a message may ask for: Auto first, then each mode by name.
 export const MESSAGE_MODES = [AUTO_MODE, ...MODES];
 // Never a real value of a status, so the first synchronisation always paints.
 const NOTHING_SHOWN = false;
 // What the pills add to their tooltips while a run works on a chat's page: a message waits in the queue and starts
 // with them once that run, which keeps its own, has ended (item 148).
-const WAITING_NOTE = "For the next follow-up: the run under way keeps its own";
+const WAITING_NOTE = "For your next message: the task under way keeps its own";
 
 /** Where `word` stands in `text` as a whole word of its own, any case, or -1. */
 function wordAt(text, word) {
@@ -121,7 +121,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
   }
   const executionGroup = el(
     "div",
-    { class: "pop-group pop-execution", role: "group", "aria-label": "Execution" },
+    { class: "pop-group pop-execution", role: "group", "aria-label": "How Dot works" },
   );
   const optionsMenu = anchoredPopover({
     anchor: optionsPill.element,
@@ -131,7 +131,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
       const isChat = modeId === "chat";
       executionGroup.hidden = isChat;
       executionGroup.replaceChildren(
-        el("div", { class: "pop-heading" }, "Execution"),
+        el("div", { class: "pop-heading" }, "How Dot works"),
         ...executionItems.flatMap((build) => build()),
         goalMode.element,
         frame.picks.planRow(),
@@ -328,7 +328,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
         el(
           "div",
           { role: "listbox", "aria-label": "Reasoning" },
-          optionRow({ lead: null, label: fallback, hint: "The daemon's own choice", selected: chosen === null, onPick: () => pickLevel(info, null) }),
+          optionRow({ lead: null, label: fallback, hint: "Dot's own choice", selected: chosen === null, onPick: () => pickLevel(info, null) }),
           ...info.efforts.map((level) => optionRow({ lead: null, label: levelLabel(level), hint: "", selected: chosen === level, onPick: () => pickLevel(info, level) })),
         ),
       );
@@ -376,7 +376,7 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
       await api.post("/models/main", { model: ref });
     } catch (error) {
       console.error("the default model could not be changed", error);
-      toast("error", error.message);
+      toastError(error);
       return false;
     }
     toast("ok", `New chats start on ${modelName(ref)}.`);

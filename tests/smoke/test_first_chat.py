@@ -212,7 +212,7 @@ async def test_a_first_open_has_dot_greet_the_owner_name_itself_and_say_what_it_
             await expect(first).to_contain_text("I connect to your apps, such as mail and calendar")
             await expect(first).to_contain_text("I ask you before what is yours to decide")
             # Dot's browser here has no window: the card says so instead of offering a sign-in.
-            await expect(first.locator(".first-connect")).to_contain_text("runs without a window")
+            await expect(first.locator(".first-connect")).to_contain_text("works without a window")
             await expect(page.get_by_role("textbox", name="Goal")).to_have_attribute(
                 "placeholder", "Message Miro (@ for apps, / for skills and commands)"
             )
@@ -288,7 +288,7 @@ async def test_in_auto_dot_says_a_review_model_answers_for_the_owner_and_promise
             page: Page = await _home(chromium, address, False, playwright.devices)
             first = page.locator("section.first-chat")
             await first.get_by_role("button", name="Nova").click()
-            await expect(first).to_contain_text("a review model answers my other questions for you")
+            await expect(first).to_contain_text("a second AI answers for you")
             await expect(first).not_to_contain_text("I ask you before what is yours to decide")
             await expect(first).not_to_contain_text("Nothing is sent without your approval")
         finally:

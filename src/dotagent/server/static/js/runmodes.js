@@ -27,27 +27,27 @@ export const APPROVAL_OPTIONS = [
     id: "ask",
     label: "Auto-accept edits",
     short: "Edits",
-    hint: "Edits and routine work run; you answer what the policy asks",
+    hint: "Edits and everyday work go ahead; Dot asks you about the rest",
     icon: "pencil",
   },
   {
     id: "auto",
     label: "Auto",
     short: "Auto",
-    hint: "A review model answers; its doubts and Dot's own files come to you",
+    hint: "A second AI answers for you; you are asked only what it is unsure about, and about Dot's own files",
     icon: "shield",
   },
   {
     id: "yolo",
     label: "YOLO",
     short: "YOLO",
-    hint: "Nobody is asked: money, passwords, messages and posts are the run's too, each step recorded with why it would have asked",
+    hint: "Dot never asks, not even about money, passwords, messages or posts. Every step is recorded, with why it would have asked",
     icon: "lockOpen",
   },
 ];
-const GOAL_MODE_HINT = "A checker compares the answer with the goal and sends the run back to work until the goal is really reached";
-const STANDING_HINT = "Keep going until done: Dot works on the goal in sessions until a check confirms the outcome or you stop it";
-const STANDING_NOTE = "Keep going is on: Dot works on this goal in sessions until a check confirms it; Campaigns shows it.";
+const GOAL_MODE_HINT = "Dot checks its answer against your goal and keeps working until the goal is really reached";
+const STANDING_HINT = "Keep going until done: Dot works on the goal in several sessions until a check confirms it is done, or you stop it";
+const STANDING_NOTE = "Keep going is on: Dot works on this goal in several sessions until a check confirms it is done. You can follow it under Campaigns.";
 
 /** The words for an approval mode, for chips and facts. */
 export function approvalLabel(id) {
@@ -196,7 +196,7 @@ export function approvalsPicker(onPaint, kept) {
 export function standingPicker(onToggle) {
   let on = false;
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Keep going until done" });
-  const element = switchRow(pick("Keep going", toggle, "Work in sessions until outcome is verified"), toggle);
+  const element = switchRow(pick("Keep going", toggle, "Work in several sessions until the result is checked"), toggle);
   element.title = STANDING_HINT;
   const note = el("div", { class: "composer-note", hidden: true }, icon("target"), el("span", null, STANDING_NOTE));
 
@@ -233,7 +233,7 @@ export function goalModePicker(kept) {
     return kept.read() ?? status?.goal_mode === true;
   }
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Goal mode" });
-  const element = switchRow(pick("Goal mode", toggle, "Keep working until goal is verified"), toggle);
+  const element = switchRow(pick("Goal mode", toggle, "Keep working until the goal is reached"), toggle);
   element.title = GOAL_MODE_HINT;
 
   function paint() {

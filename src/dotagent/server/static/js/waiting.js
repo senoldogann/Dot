@@ -79,7 +79,7 @@ function chatPage(look, frame, note) {
  * lifted.
  */
 export function openingCurtain(runId) {
-  const note = el("div", { class: "waiting-note", hidden: true }, el("div", { class: "spinner" }), el("span", null, "Connecting to the daemon…"));
+  const note = el("div", { class: "waiting-note", hidden: true }, el("div", { class: "spinner" }), el("span", null, "Connecting to Dot…"));
   const showNote = showAfter(note, RETURN_GRACE_MS);
   showNote(true);
   const look = runId === null ? null : chatLook(runId);

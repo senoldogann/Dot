@@ -61,7 +61,7 @@ function buildIndicators() {
       // The connection shows while it is being made or lost; a live one says nothing (item 120), nor does a break that
       // mends at once (item 286). The runs that work are counted in the sidebar's Working section.
       showConnection(snapshot.stream !== "live");
-      connection.title = `Connection to the daemon: ${STREAM_LABEL[snapshot.stream]}`;
+      connection.title = `Connection to Dot: ${STREAM_LABEL[snapshot.stream]}`;
       banner.hidden = snapshot.status === null || !snapshot.status.failsafe_engaged;
       updated.hidden = !snapshot.outdated;
     },

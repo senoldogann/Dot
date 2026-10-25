@@ -74,7 +74,7 @@ FIRST_START_S: float = 300.0
 _SSE_SUFFIX: str = "/sse"
 _URL_SCHEMES: tuple[str, ...] = ("http://", "https://")
 _NAME_RULE: str = "a server's name is lowercase letters, digits and dashes, at most 24, starting with a letter"
-_TAKEN_NAME: str = "another MCP server has its name"
+_TAKEN_NAME: str = "another connected app has its name"
 
 
 @dataclass
@@ -192,7 +192,7 @@ def requested_service(body: McpServerAdd) -> McpService | None:
         return None
     service: McpService | None = next((one for one in MCP_SERVICES if one.id == body.service), None)
     if service is None:
-        raise NotFoundError("the MCP catalogue has no such service", {"service": body.service})
+        raise NotFoundError("the list of apps has no such app", {"service": body.service})
     return service
 
 
@@ -237,9 +237,9 @@ def chosen_tools(wanted: tuple[str, ...], offered: tuple[str, ...]) -> list[str]
     picked: set[str] = set(wanted)
     missing: list[JsonValue] = [name for name in sorted(picked - set(offered))]
     if missing:
-        raise ConfigError("the MCP server does not offer these tools", {"missing": missing})
+        raise ConfigError("the connected app does not offer these actions", {"missing": missing})
     if not picked:
-        raise ConfigError("choose at least one tool", {"chosen": 0, "offered": len(offered)})
+        raise ConfigError("choose at least one action", {"chosen": 0, "offered": len(offered)})
     if picked == set(offered):
         return []
     return [name for name in offered if name in picked]
@@ -487,15 +487,17 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(name)
         if found is None:
-            raise NotFoundError("Dot has no MCP server of this name", {"server": name})
+            raise NotFoundError("Dot has no connected app of this name", {"server": name})
         config, origin = found
         if origin == "builtin":
             if not config.enabled:
-                raise RunConflict("this MCP server is switched off: switch it on", {"server": name, "set_up": origin})
+                raise RunConflict(
+                    "this connected app is switched off: switch it on", {"server": name, "set_up": origin}
+                )
             config = builtin_now(name) or config
         if origin not in ("connected", "builtin") and not (origin == "config" and config.oauth):
             raise RunConflict(
-                "this MCP server is set up elsewhere; connect it again there", {"server": name, "set_up": origin}
+                "this connected app is set up elsewhere; connect it again there", {"server": name, "set_up": origin}
             )
         return await start(config, origin, page)
 
@@ -504,10 +506,10 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         ``allow``)."""
         found: tuple[McpServerConfig, McpOrigin] | None = (await everything()).get(name)
         if found is None:
-            raise NotFoundError("Dot has no MCP server of this name", {"server": name})
+            raise NotFoundError("Dot has no connected app of this name", {"server": name})
         if found[1] != "connected":
             raise RunConflict(
-                "this MCP server is set up elsewhere; choose its tools with `allow` there",
+                "this connected app is set up elsewhere; choose its actions there",
                 {"server": name, "set_up": found[1]},
             )
         return found[0]
@@ -554,12 +556,12 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         async with switching:
             found: tuple[McpServerConfig, McpOrigin] | None = (await everything()).get(name)
             if found is None:
-                raise NotFoundError("Dot has no MCP server of this name", {"server": name})
+                raise NotFoundError("Dot has no connected app of this name", {"server": name})
             config, origin = found
             switch = switch_of(name)
             if origin != "builtin" or switch is None:
                 raise RunConflict(
-                    "this MCP server does not come with Dot, so it has no switch", {"server": name, "set_up": origin}
+                    "this connected app does not come with Dot, so it has no switch", {"server": name, "set_up": origin}
                 )
             current: _Try | None = tries.get(name)
             if current is not None and current.running():
@@ -594,13 +596,13 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(name)
         if found is None:
-            raise NotFoundError("Dot has no MCP server of this name", {"server": name})
+            raise NotFoundError("Dot has no connected app of this name", {"server": name})
         if found[1] == "elsewhere":
             path = added_servers_path()
             record = await asyncio.to_thread(read_added_servers, path)
             item = next((one for one in record.servers if dot_server_name(one.name) == name), None)
             if item is None:
-                raise NotFoundError("no MCP server of this name was added from another agent", {"server": name})
+                raise NotFoundError("no connected app of this name was added from another app", {"server": name})
             await asyncio.to_thread(take_back_added_server, path, item.agent, item.name)
             await hub.disconnect(name)
             refresh_mcp_tools(ctx.runtime.registry, hub)
@@ -608,17 +610,17 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             return await listing()
         if found[1] == "plugin":
             raise RunConflict(
-                f"this MCP server comes with the plugin {plugin_of(name)}: remove the plugin",
+                f"this connected app comes with the plugin {plugin_of(name)}: remove the plugin",
                 {"server": name, "set_up": found[1], "plugin": plugin_of(name)},
             )
         if found[1] == "builtin":
             raise RunConflict(
-                "this MCP server comes with Dot: switch it off, which keeps it from starting",
+                "this connected app comes with Dot: switch it off, which keeps it from starting",
                 {"server": name, "set_up": found[1]},
             )
         if found[1] != "connected":
             raise RunConflict(
-                "this MCP server is set up in Dot's config: take its [[mcp]] block out of config.toml",
+                "this connected app is set up in Dot's settings file: take its [[mcp]] block out of config.toml",
                 {"server": name, "set_up": found[1]},
             )
         attempt: _Try | None = tries.pop(name, None)

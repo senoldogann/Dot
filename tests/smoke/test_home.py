@@ -260,7 +260,7 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
                 assert _GREETING.match(greeting) is not None, greeting
                 assert greeting.endswith("Something waits for you."), greeting
                 now_line = page.locator(".home-now")
-                expected: str = "Working on 1 run · 1 waits for you · 1 ended today · 1 lesson"
+                expected: str = "Working on 1 task · 1 waits for you · 1 ended today · 1 lesson"
                 if _still_today(due_at):
                     expected = f"{expected} · 1 thing due today"
                 await expect(now_line).to_have_text(expected)
@@ -285,7 +285,7 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
                 await manager.decide(question.id, True, "test", "blue")
                 await expect(page.locator(".home-who .avatar")).to_have_attribute("data-state", "working")
                 # The answered run may finish before the line repaints: it works or it ended, and nothing waits.
-                await expect(now_line).to_have_text(re.compile("^Working on [12] runs? · [12] ended today"))
+                await expect(now_line).to_have_text(re.compile("^Working on [12] tasks? · [12] ended today"))
                 await expect(page.locator(".home-today [data-section=waiting]")).to_have_count(0)
                 await asyncio.to_thread(stop.touch)
                 async with asyncio.timeout(_RUN_WAIT_S):

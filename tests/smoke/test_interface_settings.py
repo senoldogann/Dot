@@ -227,8 +227,8 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
     code = ".type-preview[data-preview='code']"
     assert (await _style(page, code, "font-family")).startswith("Menlo")
     assert await _style(page, code, "font-size") == "15px"
-    await page.get_by_role("combobox", name="Composer font").select_option("mono")
-    await page.get_by_role("slider", name="Composer size").fill("18")
+    await page.get_by_role("combobox", name="Message box font").select_option("mono")
+    await page.get_by_role("slider", name="Message box size").fill("18")
     composer = ".type-preview[data-preview='composer']"
     assert (await _style(page, composer, "font-family")).startswith("Menlo")
     assert await _style(page, composer, "font-size") == "18px"
@@ -286,8 +286,8 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
     await page.get_by_role("combobox", name="Interface font").select_option("")
     await page.get_by_role("slider", name="Text size").fill("14")
     await page.get_by_role("group", name="Answers").get_by_role("button", name="Theme").click()
-    await page.get_by_role("combobox", name="Composer font").select_option("")
-    await page.get_by_role("slider", name="Composer size").fill("15")
+    await page.get_by_role("combobox", name="Message box font").select_option("")
+    await page.get_by_role("slider", name="Message box size").fill("15")
     await page.get_by_role("combobox", name="Code font").select_option("")
     await page.get_by_role("slider", name="Code size").fill("13")
     await page.get_by_role("switch", name="Font smoothing").click()

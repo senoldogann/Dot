@@ -28,7 +28,7 @@ export const STEP_LABELS = { ask: "Allow", settings: "Open System Settings", sig
 export const MCP_STATE_WORDS = { ready: "Ready", left_out: "Left out", disabled: "Off", trying: "Trying…", signing_in: "Waiting for your sign-in" };
 export const MCP_STATE_TONES = { ready: "b-ok", left_out: "b-bad", trying: "b-info", signing_in: "b-warn" };
 // What each way is called on a service's page, and on its tile when it is the service's first.
-export const WAY_NAMES = { mcp: "MCP server", mac: "AppleScript", web: "Dot's browser", folder: "Synced folder", vault: "1Password's op" };
+export const WAY_NAMES = { mcp: "Connected app", mac: "Mac app", web: "Dot's browser", folder: "Synced folder", vault: "1Password" };
 // Where a service account token for 1Password is made (item 493), at 1password.com.
 const VAULT_TOKEN_HELP = "https://start.1password.com/developer-tools/infrastructure-secrets/serviceaccount/";
 // While Dot tries a server or waits for a sign-in, the page asks how it stands this often.
@@ -62,15 +62,15 @@ export function pluginMark(plugin, appIcon) {
  * started on this Mac. */
 function mcpWords(service) {
   if (service === undefined || service === null) {
-    return "MCP";
+    return "Connected app";
   }
   if (service.kind === "local") {
-    return service.secrets.length > 0 ? "MCP · On this Mac · Key" : "MCP · On this Mac";
+    return service.secrets.length > 0 ? "On this Mac · Key" : "On this Mac";
   }
   if (service.secrets.length > 0) {
-    return "MCP · Key";
+    return "Key";
   }
-  return service.signs_in ? "MCP · Sign in" : "MCP · Open to all";
+  return service.signs_in ? "Sign in" : "Open to all";
 }
 
 /** Where a service of the catalogue stands before it is added, in a badge's words (item 408). */
@@ -133,10 +133,10 @@ function toolsDialog(offered) {
       el(
         "div",
         { class: "modal-body" },
-        el("h3", { id: "tools-title" }, `Choose the tools of ${offered.server}`),
-        el("p", { class: "muted" }, `It offers ${plural(offered.tools.length, "tool", "tools")}. The ones you tick are offered to the runs that start next; with all of them ticked, so are the tools it adds later.`),
+        el("h3", { id: "tools-title" }, `Choose the actions of ${offered.server}`),
+        el("p", { class: "muted" }, `It offers ${plural(offered.tools.length, "action", "actions")}. The ones you tick are offered to the tasks that start next; with all of them ticked, so are the actions it adds later.`),
         count,
-        el("label", { class: "import-row" }, all, el("span", { class: "import-row-main" }, el("span", { class: "import-row-name" }, "All tools"))),
+        el("label", { class: "import-row" }, all, el("span", { class: "import-row-main" }, el("span", { class: "import-row-name" }, "All actions"))),
         el("div", { class: "import-list" }, rows),
       ),
       el("div", { class: "modal-actions" }, cancel, go),
@@ -306,7 +306,7 @@ export function createCatalogue(onChange) {
       return null;
     }
     if (!vault.connected) {
-      return el("span", { class: "badge b-muted" }, vault.cli === null ? "op not installed" : "Not connected");
+      return el("span", { class: "badge b-muted" }, vault.cli === null ? "Not installed" : "Not connected");
     }
     if (vault.error !== null) {
       return el("span", { class: "badge b-bad" }, "Cannot read");
@@ -320,11 +320,11 @@ export function createCatalogue(onChange) {
    * emptied as the dialog closes. Resolves once the dialog is closed. `returnFocus` finds the button the dialog gives
    * the focus back to when the page was drawn again meanwhile. */
   function askVault(returnFocus) {
-    const input = el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": "1Password: service account token" });
+    const input = el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": "1Password: service account key" });
     return formDialog({
-      title: "Use a service account token",
-      description: "A token you made at 1password.com that reads a vault of yours. Dot keeps it in its .env file on this Mac.",
-      body: field("Service account token", input, el("a", { href: VAULT_TOKEN_HELP, target: "_blank", rel: "noopener noreferrer" }, "Make one that reads a vault of yours")),
+      title: "Use a service account key",
+      description: "A key you made at 1password.com that reads a vault of yours. Dot keeps it on this Mac.",
+      body: field("Service account key", input, el("a", { href: VAULT_TOKEN_HELP, target: "_blank", rel: "noopener noreferrer" }, "Make one that reads a vault of yours")),
       submitLabel: "Connect",
       size: "narrow",
       returnFocus,
@@ -354,7 +354,7 @@ export function createCatalogue(onChange) {
   async function disconnectVault() {
     const sure = await confirmDialog({
       title: "Disconnect 1Password from Dot?",
-      message: "Runs fill no login from it any more, and Dot forgets the service account's token. The vault and the service account stay in 1Password, whose page removes them.",
+      message: "Tasks fill in no login from it any more, and Dot forgets the service account's key. The vault and the service account stay in 1Password, whose page removes them.",
       confirmLabel: "Disconnect",
       focusCancel: true,
     });
@@ -393,7 +393,7 @@ export function createCatalogue(onChange) {
     ]);
     return formDialog({
       title: `Add ${service.name}`,
-      description: "Dot tries the server before it keeps it, and keeps the key in its .env file on this Mac.",
+      description: "Dot tries the connection before it keeps it, and keeps the key on this Mac.",
       body: inputs.map(([secret, input]) =>
         field(secret.label, input, secret.help === null ? "" : el("a", { href: secret.help, target: "_blank", rel: "noopener noreferrer" }, "Where to get one")),
       ),
@@ -474,8 +474,8 @@ export function createCatalogue(onChange) {
       title: `Remove ${service ? service.name : server.name} from Dot?`,
       message:
         server.origin === "elsewhere"
-          ? "Dot stops it now and its tools leave the runs that start after; the agent it came from keeps it."
-          : "Its tools leave the runs that start after, and Dot forgets its address and its sign-in.",
+          ? "Dot stops it now and its actions leave the tasks that start after; the app it came from keeps it."
+          : "Its actions leave the tasks that start after, and Dot forgets its address and its sign-in.",
       confirmLabel: "Remove",
       focusCancel: true,
     });
@@ -495,7 +495,7 @@ export function createCatalogue(onChange) {
   async function removePlugin(server) {
     const sure = await confirmDialog({
       title: `Remove the plugin ${server.plugin} from Dot?`,
-      message: "Its MCP servers stop now and its skills leave the runs that start after. Its folder goes to the Trash, where you can put it back.",
+      message: "Its connected apps stop now and its skills leave the tasks that start after. Its folder goes to the Trash, where you can put it back.",
       confirmLabel: "Remove",
       focusCancel: true,
     });

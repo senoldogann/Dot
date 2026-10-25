@@ -210,9 +210,9 @@ async def test_add_key_is_a_dialog_that_says_what_a_key_may_not_hold_and_keeps_n
                 opener: Locator = page.get_by_role("button", name="Add key")
                 await expect(opener).to_have_attribute("aria-haspopup", "dialog")
                 # No field of a key stands in the page: the button opens it.
-                await expect(page.get_by_label("TypeSafe API key")).to_have_count(0)
+                await expect(page.get_by_label("TypeSafe key", exact=True)).to_have_count(0)
                 dialog: Locator = await open_form(page, opener, "Add the TypeSafe key")
-                key: Locator = dialog.get_by_label("TypeSafe API key")
+                key: Locator = dialog.get_by_label("TypeSafe key", exact=True)
                 await expect(key).to_be_focused()
                 await expect(key).to_have_attribute("type", "password")
                 await keeps_inside_the_window(page)
@@ -223,7 +223,7 @@ async def test_add_key_is_a_dialog_that_says_what_a_key_may_not_hold_and_keeps_n
                 await expect(key).to_have_attribute("type", "text")
                 await key.fill("a key with spaces")
                 await dialog.get_by_role("button", name="Save").click()
-                await shows_the_failure(dialog, "A key has no spaces or line breaks inside it")
+                await shows_the_failure(dialog, "A key has no spaces or line breaks in it")
                 await expect(key).to_have_value("a key with spaces")
                 # Dropped, the key is gone, and the field is hidden again when the dialog opens once more.
                 await asks_before_dropping(page, dialog, key, "tsk-typed-and-dropped")

@@ -156,7 +156,7 @@ async def _open(
     await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
     await page.goto(f"{address}/#/runs/{run_id}")
     if width < 960:
-        await page.get_by_role("button", name="Run details").click()
+        await page.get_by_role("button", name="Task details").click()
     await expect(page.locator(".inspector")).to_be_visible()
     return page
 
@@ -193,7 +193,7 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
                 page: Page = await _open(browser, address, latest.id, width, scheme)
                 panel: Locator = page.locator(".inspector")
                 tabs: Locator = panel.locator(".inspector-tab")
-                await expect(tabs).to_have_text(["Run", "Changes", "Plan", "Agents 7", "Screen"])
+                await expect(tabs).to_have_text(["Task", "Changes", "Plan", "Agents 7", "Screen"])
                 # Every tab wears its icon.
                 await expect(panel.locator(".inspector-tab > svg.icon")).to_have_count(5)
                 agents_tab: Locator = panel.get_by_role("tab", name="Agents")
@@ -212,7 +212,7 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
                 await expect(rows.locator(".agent-model")).to_have_text(["scripted"] * _FIRST_ROWS)
                 await expect(rows.first).to_have_attribute("href", f"#/runs/{newest_first[0].id}")
                 # The panel at its usual width has no room for every name: the tabs not chosen keep their icon.
-                hidden_label: Locator = panel.get_by_role("tab", name="Run").locator(".inspector-tab-label")
+                hidden_label: Locator = panel.get_by_role("tab", name="Task").locator(".inspector-tab-label")
                 label_width: float = await hidden_label.evaluate("(label) => label.getBoundingClientRect().width")
                 assert label_width <= 1, label_width
                 await expect(agents_tab.locator(".inspector-tab-label")).to_be_visible()

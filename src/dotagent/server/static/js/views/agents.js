@@ -131,7 +131,7 @@ function templateTools(template, known) {
   return el(
     "details",
     { class: "template-tools" },
-    el("summary", null, `Tools (${template.tools.length})`),
+    el("summary", null, `Actions (${template.tools.length})`),
     el(
       "div",
       { class: "template-tool-chips" },
@@ -139,7 +139,7 @@ function templateTools(template, known) {
         el(
           "code",
           known !== null && !known.has(name)
-            ? { class: "chip missing", title: "This home has no such tool: its group is off in the configuration, or its app is not here" }
+            ? { class: "chip missing", title: "This Mac has no such action: its group is switched off in the settings file, or its app is not here" }
             : { class: "chip" },
           name,
         ),
@@ -309,7 +309,7 @@ function select(label, entries, value) {
 function toolPicks(names, chosen) {
   const picked = new Set(chosen.length === 0 ? names : chosen);
   const boxes = names.map((name) => el("input", { type: "checkbox", value: name, checked: picked.has(name) }));
-  const all = el("input", { type: "checkbox", "aria-label": "All tools" });
+  const all = el("input", { type: "checkbox", "aria-label": "All actions" });
   const count = el("span", { class: "muted tool-picks-count" });
   const named = new Set(chosen);
   // Whether the owner ticked All tools since a box was last unticked: every tool, whatever the agent named.
@@ -322,7 +322,7 @@ function toolPicks(names, chosen) {
     const ticked = boxes.filter((box) => box.checked).length;
     all.checked = ticked === boxes.length;
     all.indeterminate = ticked > 0 && ticked < boxes.length;
-    count.textContent = widens() ? "every tool, and any added later" : `${ticked} of ${boxes.length}`;
+    count.textContent = widens() ? "every action, and any added later" : `${ticked} of ${boxes.length}`;
   }
   all.addEventListener("change", () => {
     allTicked = all.checked;
@@ -341,7 +341,7 @@ function toolPicks(names, chosen) {
   const element = el(
     "div",
     { class: "stack tight" },
-    el("label", { class: "tool-pick tool-pick-all" }, all, el("span", null, "All tools"), count),
+    el("label", { class: "tool-pick tool-pick-all" }, all, el("span", null, "All actions"), count),
     el(
       "div",
       { class: "tool-picks" },
@@ -384,8 +384,8 @@ function agentForm({ record, onSaved, onCancel }) {
   const look = lookPicker({ look: record === null || record.look === null ? fallbackLook(record === null ? "new" : record.id) : record.look, uid: record === null ? "new" : record.id });
   const lookField = field("Look", look.element, "The face this agent wears everywhere; it moves on its own page and beside its chats.");
   lookField.classList.add("wide");
-  const tools = el("div", null, el("span", { class: "muted" }, "Loading the tools"));
-  const toolsField = field("Tools", tools, "All tools: every tool, and any added later. Finishing, asking you and turning tool groups on stay in any case.");
+  const tools = el("div", null, el("span", { class: "muted" }, "Loading the actions"));
+  const toolsField = field("Actions", tools, "All actions: every action, and any added later. Finishing, asking you and turning on more actions stay in any case.");
   toolsField.classList.add("wide");
   let models = [];
 
@@ -434,7 +434,7 @@ function agentForm({ record, onSaved, onCancel }) {
       toolsListed = true;
     })
     .catch((error) => {
-      tools.replaceChildren(el("span", { class: "muted" }, `The tools could not be listed: ${error.message}`));
+      tools.replaceChildren(el("span", { class: "muted" }, `The actions could not be listed: ${error.message}`));
     });
   if (record !== null) {
     name.value = record.name;
@@ -455,7 +455,7 @@ function agentForm({ record, onSaved, onCancel }) {
     }
     const picked = picks.picked();
     if (picked.length === 0) {
-      toast("error", "Pick the tools it may use, or All tools for every one.");
+      toast("error", "Pick the actions it may use, or All actions for every one.");
       tools.querySelector(".tool-pick-all input")?.focus();
       return;
     }
@@ -607,7 +607,7 @@ function mountList(root, ctx) {
                   el(
                     "p",
                     { class: "hint", dataset: { templatesToolsUnknown: "" } },
-                    `The tools could not be listed: ${listingProblem.message}. A template that names one this home lacks is refused when used.`,
+                    `The actions could not be listed: ${listingProblem.message}. A template that names one this Mac lacks is refused when used.`,
                   ),
                 ]),
             el("div", { class: "template-grid" }, listed.map((template) => templateCard(template, useTemplate, known))),
@@ -786,7 +786,7 @@ function mountList(root, ctx) {
     editor.focus();
   }
 
-  const newButton = el("button", { class: "btn primary", type: "button", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
+  const newButton = el("button", { class: "btn primary", type: "button", "aria-label": "New agent", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
   const newTeamButton = el(
     "button",
     { class: "btn", type: "button", title: "Put agents of yours together as a team", "aria-label": "New team", onclick: () => attempt(openTeamEditor) },
@@ -1011,7 +1011,7 @@ function who(record, face) {
     face,
     el("div", { class: "home-name" }, record.name),
     record.role === "" ? null : el("p", { class: "home-greeting" }, record.role),
-    record.made_by === null ? null : el("p", { class: "home-greeting agent-made" }, "Made by Dot in one of its runs"),
+    record.made_by === null ? null : el("p", { class: "home-greeting agent-made" }, "Made by Dot in one of its tasks"),
     record.paused_at === null
       ? null
       : el(
@@ -1038,7 +1038,7 @@ function agentScheduleRow(view, onToggle) {
   });
   const state = !record.enabled
     ? el("span", { class: "badge b-muted" }, "switched off")
-    : el("span", null, view.next_local === null ? "No further runs" : `Next ${view.next_local}`);
+    : el("span", null, view.next_local === null ? "Will not run again" : `Next ${view.next_local}`);
   return el(
     "div",
     { class: "list-row", dataset: { schedule: record.id } },
@@ -1126,7 +1126,7 @@ function mountPage(root, ctx, agentId) {
     setStageTitle(actorFace(record.id, "idle", record.look), el("h1", { class: "stage-h1 stage-name" }, record.name));
     setStageTools(
       el("button", { class: "btn ghost sm", type: "button", title: "Edit the agent", onclick: () => edit(record) }, icon("pencil"), el("span", { class: "label" }, "Edit")),
-      el("button", { class: "btn ghost sm", type: "button", title: "Save the agent as a file, to import in another home", onclick: () => attempt(() => exportAgent(record)) }, icon("download"), el("span", { class: "label" }, "Export")),
+      el("button", { class: "btn ghost sm", type: "button", title: "Save the agent as a file, to import into another Dot", onclick: () => attempt(() => exportAgent(record)) }, icon("download"), el("span", { class: "label" }, "Export")),
       record.paused_at === null
         ? el(
             "button",
@@ -1136,7 +1136,7 @@ function mountPage(root, ctx, agentId) {
           )
         : el(
             "button",
-            { class: "btn ghost sm", type: "button", title: "Resume the agent: its schedules fire again", onclick: () => attempt(() => setPaused(record, false)) },
+            { class: "btn ghost sm", type: "button", title: "Resume the agent: its schedules start again", onclick: () => attempt(() => setPaused(record, false)) },
             icon("play"),
             el("span", { class: "label" }, "Resume"),
           ),
@@ -1213,7 +1213,7 @@ function mountPage(root, ctx, agentId) {
   async function forget(record) {
     const confirmed = await confirmDialog({
       title: "Forget this lesson?",
-      message: "The note is removed from memory; no run is handed it again.",
+      message: "The note is removed from memory; no task is handed it again.",
       confirmLabel: "Forget",
       danger: true,
       focusCancel: true,

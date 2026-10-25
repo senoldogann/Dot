@@ -16,11 +16,11 @@ import { toast } from "./ui.js";
 // so is the hint that offers it. A run of a dotx command works in that command's browser, which the daemon does not
 // cast (item 188).
 const EMPTY_STATES = {
-  "no-page": { mark: "globe", title: "No page yet", hint: "The view starts by itself when the run opens a page in its browser." },
-  waiting: { mark: "monitor", title: "Waiting for the page", hint: "The first frame comes when the run's browser paints." },
+  "no-page": { mark: "globe", title: "No page yet", hint: "The view starts by itself when the task opens a page in its browser." },
+  waiting: { mark: "monitor", title: "Waiting for the page", hint: "The first picture comes when the page in Dot's browser is drawn." },
   closed: { mark: "eye", title: "The view is closed", hint: "Watch shows the page Dot's browser is on. Nothing is sent while the view is closed." },
-  ended: { mark: "clock", title: "The run has ended", hint: "Its browser's page is shown here only while a run is going on." },
-  elsewhere: { mark: "terminal", title: "Working elsewhere", hint: "The run works in a dotx command, whose browser is not shown here." },
+  ended: { mark: "clock", title: "The task has ended", hint: "Its browser's page is shown here only while a task is going on." },
+  elsewhere: { mark: "terminal", title: "Working elsewhere", hint: "This task was started from Terminal, whose browser is not shown here." },
 };
 
 /**
@@ -53,7 +53,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   // that is touched has it first; one with a mouse, Take over first, which brings Chrome up on the Mac.
   const useButton = el(
     "button",
-    { class: "btn sm", type: "button", title: "Hold the run and use its page from this screen: your taps, scrolls and keys go to it", onclick: () => useHere() },
+    { class: "btn sm", type: "button", title: "Hold the task and use its page from this screen: your taps, scrolls and keys go to it", onclick: () => useHere() },
     "Use it here",
   );
   const controlNote = el("span", { class: "small muted computer-control-note", role: "status" });
@@ -84,7 +84,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     }
     who.textContent = isHeld ? "You have control" : `${name} has control`;
     handButton.textContent = isHeld ? "Return control" : "Take over";
-    handButton.title = isHeld ? "Let the run go on; it is told the page may have changed" : "Hold the run at its next tool call and use the browser yourself";
+    handButton.title = isHeld ? "Let the task go on; it is told the page may have changed" : "Hold the task at its next step and use the browser yourself";
     useButton.hidden = control !== null;
     pill.hidden = !isActive;
     pill.dataset.held = String(isHeld);

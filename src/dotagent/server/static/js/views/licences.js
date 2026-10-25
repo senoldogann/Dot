@@ -84,7 +84,7 @@ export function mount(root) {
     holder.replaceChildren(
       card("With Dot's pages", null, el("div", { class: "card-pad stack" }, el("p", { class: "hint" }, "The fonts, the icons and the code Dot took from other projects come with their notices, whose copyright Dot keeps."), view.bundled.map(noticeRow))),
       card("Python packages", count, el("div", null, el("div", { class: "card-pad" }, filter), table(["Package", "Version", "Licence"], rows))),
-      card("Tools Dot uses", null, el("div", { class: "list" }, view.tools.map(toolRow))),
+      card("Programs Dot uses", null, el("div", { class: "list" }, view.tools.map(toolRow))),
     );
   }
 
@@ -103,7 +103,7 @@ export function mount(root) {
 
   root.append(
     el("a", { class: "back", href: "#/settings/system" }, icon("arrowLeft"), "System"),
-    pageHead("Open source licences", "The notices of the packages, the assets and the tools Dot uses, as they are on this Mac.", null),
+    pageHead("Open source licences", "The notices of the open source software, fonts and pictures Dot is built from, as they are on this Mac.", null),
     holder,
   );
   attempt(load);

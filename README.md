@@ -105,7 +105,7 @@ Without a terminal, flags give each answer: `--model provider:model`, `--key-std
 
 The web UI says the same on its home. While the default model cannot answer, a **Set up a model** card says why: no
 key, a refused key, or a provider that is out of reach or does not offer the model. It leads to Settings › Models,
-Settings › Providers or `dotx setup`.
+Settings › AI services or `dotx setup`.
 
 ## What comes with Dot
 

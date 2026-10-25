@@ -1,6 +1,7 @@
 // Overlays shared by every page: toasts, the dialogs (a question, a choice, a form) and the screenshot viewer.
 
 import { el } from "./dom.js";
+import { explain } from "./errors.js";
 import { createFormFlow, firstFieldOf, stateOfControls } from "./formflow.js";
 import { icon } from "./icons.js";
 
@@ -22,16 +23,47 @@ function toastRegion() {
   return region;
 }
 
+/**
+ * A closed "Details" fold holding `text`, the program's own words for a failure (item 625), or null when there are none.
+ * The sentence above it is the one a person reads.
+ */
+export function detailsFold(text) {
+  if (text === "") {
+    return null;
+  }
+  return el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted mono" }, text));
+}
+
+/**
+ * A closed "Details" fold that names the key of the settings file a setting is kept under (item 625), for those who edit
+ * the file: the page says what the setting does, and this says where it lives.
+ */
+export function settingFold(key, lead = "In the settings file:") {
+  return el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, `${lead} `, el("code", { class: "mono" }, key)));
+}
+
 /** Show a short message; `kind` is "ok" or "error". `action` (`{ label, run }`), when given, is a button in it that runs
- * `run()` (item 616: Reload, for a microphone that Safari stopped hearing). */
-export function toast(kind, text, action = null) {
-  const node = el("div", { class: `toast ${kind}` }, icon(kind === "error" ? "alert" : "check"), el("span", null, text));
+ * `run()` (item 616: Reload, for a microphone that Safari stopped hearing). `details` are the program's own words for an
+ * error, in a fold of their own under the sentence, which stays long enough to be opened (item 625). */
+export function toast(kind, text, action = null, details = "") {
+  const fold = detailsFold(details);
+  const node = el("div", { class: `toast ${kind}` }, icon(kind === "error" ? "alert" : "check"), el("span", null, text, fold));
   if (action !== null) {
     node.append(el("button", { class: "btn sm toast-action", type: "button", onclick: action.run }, action.label));
   }
-  node.addEventListener("click", () => node.remove());
+  node.addEventListener("click", (event) => {
+    if (fold === null || !fold.contains(event.target)) {
+      node.remove();
+    }
+  });
   toastRegion().append(node);
-  setTimeout(() => node.remove(), action !== null ? ACTION_TOAST_MS : kind === "error" ? ERROR_TOAST_MS : TOAST_MS);
+  setTimeout(() => node.remove(), action !== null || fold !== null ? ACTION_TOAST_MS : kind === "error" ? ERROR_TOAST_MS : TOAST_MS);
+}
+
+/** Tell in a toast what `error` came to, in words a person reads, and its Details apart (item 625). */
+export function toastError(error) {
+  const { text, details } = explain(error);
+  toast("error", text, null, details);
 }
 
 /** Run `action`; when it fails, tell the user why instead of leaving the click without any effect. */
@@ -40,7 +72,7 @@ export async function attempt(action) {
     await action();
   } catch (error) {
     console.error("action failed", error);
-    toast("error", error.message);
+    toastError(error);
   }
 }
 
@@ -233,7 +265,8 @@ export function formDialog({
     }
     console.error("a form could not be submitted", error);
     const belowFoot = fields.scrollHeight - fields.clientHeight - fields.scrollTop;
-    problem.lastChild.textContent = error instanceof Error ? error.message : String(error);
+    const { text, details } = explain(error);
+    problem.lastChild.replaceChildren(...[text, detailsFold(details)].filter((part) => part !== null));
     problem.hidden = false;
     fields.scrollTop = fields.scrollHeight - fields.clientHeight - belowFoot;
   }
@@ -280,7 +313,7 @@ export function formDialog({
     },
     lost: (error) => {
       console.error("a form could not be submitted", error);
-      toast("error", error instanceof Error ? error.message : String(error));
+      toastError(error);
     },
   });
   // The page the dialog belongs to is gone when the address changes (a link inside the form, the browser's back button).

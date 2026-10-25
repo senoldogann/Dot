@@ -117,7 +117,7 @@ async function markAchieved(campaignId, done) {
 async function deleteCampaign(record, done) {
   const confirmed = await confirmDialog({
     title: "Delete this campaign?",
-    message: `“${clip(record.title, TITLE_CHARS)}” is deleted with its ledger and its sessions after the first, with all they hold. The conversation it started in stays in your chats. This cannot be undone.`,
+    message: `“${clip(record.title, TITLE_CHARS)}” is deleted with its progress notes and its sessions after the first, with all they hold. The conversation it started in stays in your chats. This cannot be undone.`,
     confirmLabel: "Delete",
     danger: true,
     focusCancel: true,
@@ -189,7 +189,7 @@ function mountList(root) {
       working = summaries.some((summary) => summary.working !== null);
       holder.replaceChildren(
         summaries.length === 0
-          ? emptyPanel("target", "No campaigns yet", "Switch on Keep going when you start a task, and Dot works on it until the outcome is verified.")
+          ? emptyPanel("target", "No campaigns yet", "Switch on Keep going when you start a task, and Dot works on it until the result is checked.")
           : el("div", { class: "card" }, summaries.map((summary) => campaignRow(summary, reload))),
       );
     } catch (error) {
@@ -199,7 +199,7 @@ function mountList(root) {
     }
   }
 
-  root.append(pageHead("Campaigns", "Goals that Dot keeps working on in sessions until a check confirms the outcome.", null), holder);
+  root.append(pageHead("Campaigns", "Goals that Dot keeps working on, one session at a time, until a check confirms they are done.", null), holder);
   const stopFollowing = followUpdates(reload, () => working);
   attempt(reload);
   return () => {
@@ -218,7 +218,7 @@ function outline(detail) {
   const { record } = detail;
   const approvals = el(
     "span",
-    { class: "chip", title: "Who answers the safety policy's questions in its sessions" },
+    { class: "chip", title: "Who answers Dot's safety questions in its sessions" },
     `Approvals: ${approvalLabel(record.approvals)}`,
   );
   return el(
@@ -236,11 +236,11 @@ function outline(detail) {
       el(
         "span",
         { class: "chip", title: "The Chrome its sessions work in" },
-        record.browser === "attach" ? "Browser: your Chrome" : record.browser === "own" ? "Browser: Dot's own" : "Browser: the daemon's",
+        record.browser === "attach" ? "Browser: your Chrome" : record.browser === "own" ? "Browser: Dot's own" : "Browser: Dot's default",
       ),
       el("span", { class: "chip" }, `Reasoning ${askedLabel(record.effort, record.once)}`),
       approvals,
-      el("span", { class: "chip", title: "Tokens of its sessions and of the runs they delegated to" }, `${compact(detail.tokens)} tokens`),
+      el("span", { class: "chip", title: "Usage of its sessions and of the tasks they handed to helpers" }, `${compact(detail.tokens)} usage`),
       el("span", { class: "faint" }, `Started ${dateTime(record.created_at)}`),
     ),
   );
@@ -275,7 +275,7 @@ function sessionRow(session, number) {
       "div",
       { class: "row-main" },
       el("div", { class: "row" }, el("a", { class: "row-title", href: `#/runs/${session.id}` }, `Session ${number}`), statusBadge(session.status)),
-      el("div", { class: "row-meta" }, el("span", { class: "faint" }, dateTime(session.created_at)), el("span", { class: "faint" }, `${compact(session.input_tokens + session.output_tokens)} tokens`)),
+      el("div", { class: "row-meta" }, el("span", { class: "faint" }, dateTime(session.created_at)), el("span", { class: "faint" }, `${compact(session.input_tokens + session.output_tokens)} usage`)),
       session.result === "" ? null : el("div", { class: "row-text muted" }, clip(session.result, RESULT_CHARS)),
     ),
   );
@@ -447,7 +447,7 @@ function mountPage(root, ctx, campaignId) {
     paintQuestions(detail.questions.filter((question) => WAITING_STATUSES.has(question.status)));
     rest.replaceChildren(
       section(
-        "Ledger",
+        "Progress notes",
         [...detail.entries].reverse().map((entry) => entryRow(entry, numbers)),
         "Empty: the sessions write what they did here.",
       ),

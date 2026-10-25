@@ -151,13 +151,13 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
       menu.append(el("div", { class: "slash-section", role: "group", "aria-label": section.title }, options));
     });
     if (problem !== null) {
-      menu.append(el("div", { class: "slash-note" }, `Skills and MCP tools could not be loaded: ${problem}`));
+      menu.append(el("div", { class: "slash-note" }, `Skills and connected apps could not be loaded: ${problem}`));
     }
     if (shown.length === 0 && problem === null) {
       // The at menu holds nothing but what the palette lists: until it is read, it says so rather than that nothing
       // matches.
       const loading = palette === null && range.trigger === "@";
-      menu.append(el("div", { class: "slash-note" }, loading ? "Reading the MCP servers and the plugins…" : `Nothing matches ${range.trigger}${range.word}.`));
+      menu.append(el("div", { class: "slash-note" }, loading ? "Looking for your connected apps and plugins…" : `Nothing matches ${range.trigger}${range.word}.`));
     }
     if (shown.length > 0) {
       // What the keys do, under the list (a touch screen has none of them: the foot is left off it).
@@ -345,7 +345,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     const words = stopShown ? "Stop" : sendWords;
     sendButton.replaceChildren(stopShown ? square : arrow, sendText);
     sendText.textContent = words;
-    sendButton.title = stopShown ? "Stop the run" : words;
+    sendButton.title = stopShown ? "Stop this task" : words;
     sendButton.setAttribute("aria-label", words);
   }
 

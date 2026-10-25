@@ -152,21 +152,21 @@ async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["li
     )
     await phone.goto(f"{address}/")
     # It names the button Settings › Phone has (item 565), which shows the code.
-    await expect(phone.locator(".signin")).to_contain_text("go to Settings › Phone and press Show code")
-    field: Locator = phone.get_by_role("textbox", name="Pairing code")
+    await expect(phone.locator(".signin")).to_contain_text("go to Settings › Phone and choose Show code")
+    field: Locator = phone.get_by_role("textbox", name="Sign-in code")
     # A token typed where the code goes is never sent: the daemon is not proven before a code goes.
     tried: list[str] = []
     phone.on("request", lambda request: tried.append(request.url) if request.url.endswith("/phone/pair") else None)
     await field.fill(TOKEN)
-    await phone.get_by_role("button", name="Pair", exact=True).click()
-    await expect(phone.locator(".signin .note.bad")).to_contain_text("That is not a pairing code")
+    await phone.get_by_role("button", name="Sign in", exact=True).click()
+    await expect(phone.locator(".signin .note.bad")).to_contain_text("That does not look like a sign-in code")
     assert tried == []
     await field.fill("0000-0000")
-    await phone.get_by_role("button", name="Pair", exact=True).click()
-    await expect(phone.locator(".signin .note.bad")).to_contain_text("the pairing code is wrong, used or out of date")
+    await phone.get_by_role("button", name="Sign in", exact=True).click()
+    await expect(phone.locator(".signin .note.bad")).to_contain_text("That sign-in code is wrong, used or out of date")
     await phone.screenshot(path=str(shots / f"signin-{width}-{scheme}.png"))
-    await phone.get_by_role("textbox", name="Pairing code").fill(code.lower())
-    await phone.get_by_role("textbox", name="Pairing code").press("Enter")
+    await phone.get_by_role("textbox", name="Sign-in code").fill(code.lower())
+    await phone.get_by_role("textbox", name="Sign-in code").press("Enter")
     await expect(phone.get_by_role("textbox", name="Goal")).to_be_visible()
     assert await phone.evaluate("localStorage.getItem('dot.token')") == TOKEN
     await phone.close()

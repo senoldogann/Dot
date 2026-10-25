@@ -29,7 +29,7 @@ export function createDetails(run, agent, campaign, keepGoing, team) {
   const model = el("dd");
   const calls = el("dd", { class: "meta-facts" });
   const tokens = el("dd", { class: "meta-facts" });
-  const contextLabel = el("dt", { hidden: true }, "Context");
+  const contextLabel = el("dt", { hidden: true }, "Chat size");
   const context = el("dd", { class: "meta-facts", hidden: true });
   const took = el("dd");
   const copy = el(
@@ -37,12 +37,12 @@ export function createDetails(run, agent, campaign, keepGoing, team) {
     {
       class: "btn ghost sm icon-only",
       type: "button",
-      title: "Copy the run id",
-      "aria-label": "Copy the run id",
+      title: "Copy the task ID",
+      "aria-label": "Copy the task ID",
       onclick: () =>
         attempt(async () => {
           await copyText(run.id);
-          toast("ok", "Run id copied");
+          toast("ok", "Task ID copied");
         }),
     },
     icon("copy"),
@@ -50,7 +50,7 @@ export function createDetails(run, agent, campaign, keepGoing, team) {
   const parent =
     run.parent_run_id === null
       ? null
-      : fact("Delegated by", el("dd", null, el("a", { href: `#/runs/${run.parent_run_id}` }, "Open the parent run")));
+      : fact("Handed over by", el("dd", null, el("a", { href: `#/runs/${run.parent_run_id}` }, "Open the task it came from")));
 
   const element = el(
     "dl",
@@ -66,15 +66,15 @@ export function createDetails(run, agent, campaign, keepGoing, team) {
     campaign === null
       ? null
       : fact("Campaign", el("dd", null, el("a", { href: `#/campaigns/${campaign.id}` }, campaign.title), `, session ${campaign.session}`)),
-    fact("Tool calls", calls),
-    fact("Tokens", tokens),
+    fact("Actions taken", calls),
+    fact("Usage", tokens),
     contextLabel,
     context,
     fact("Duration", took),
     parent,
     fact("Mode", el("dd", null, run.mode)),
     fact("Started", el("dd", null, dateTimeFull(run.created_at))),
-    fact("Run id", el("dd", { class: "run-id" }, el("code", { class: "mono" }, run.id), copy)),
+    fact("Task ID", el("dd", { class: "run-id" }, el("code", { class: "mono" }, run.id), copy)),
   );
 
   // What each fact was drawn from: the list is painted every second while the run works, and a fact is drawn again only
@@ -93,13 +93,13 @@ export function createDetails(run, agent, campaign, keepGoing, team) {
     model.title = state.model;
     draw(calls, `${state.calls} ${state.failed}`, () => [el("span", null, String(state.calls)), ...(state.failed === 0 ? [] : [el("span", null, `${state.failed} failed`)])]);
     draw(tokens, `${compact(state.input)} ${compact(state.output)}`, () => [el("span", null, `${compact(state.input)} in`), el("span", null, `${compact(state.output)} out`)]);
-    const compacted = state.compactions === 0 ? "Never compacted" : `Compacted ${plural(state.compactions, "time", "times")}`;
+    const compacted = state.compactions === 0 ? "Never summed up" : `Summed up ${plural(state.compactions, "time", "times")}`;
     const said = state.compactions > 0 || state.flagged > 0;
     contextLabel.hidden = !said;
     context.hidden = !said;
     draw(context, `${state.compactions} ${state.flagged}`, () => [
       el("span", null, compacted),
-      ...(state.flagged === 0 ? [] : [el("span", null, `${plural(state.flagged, "check", "checks")} flagged`)]),
+      ...(state.flagged === 0 ? [] : [el("span", null, `${plural(state.flagged, "summary", "summaries")} had a problem`)]),
     ]);
     const end = state.finishedAt === null ? Date.now() / 1000 : state.finishedAt;
     setText(took, duration(Math.max(0, end - run.created_at)));

@@ -176,7 +176,7 @@ async def _setup(page: Page, width: int) -> Locator:
     """The Set up section of the run's side panel (item 365): the panel turned on beside a wide conversation, opened as
     a drawer on a phone."""
     if width < 960:
-        await page.locator("button[aria-label='Run details']").click()
+        await page.locator("button[aria-label='Task details']").click()
     else:
         await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
         await page.reload()
@@ -205,29 +205,27 @@ async def test_the_context_meter_shows_how_much_of_the_budget_the_last_step_fill
                 meter: Locator = page.locator(_METER)
                 await expect(meter).to_be_visible()
                 await expect(meter).to_have_attribute("data-level", "near")
-                await expect(meter).to_have_attribute(
-                    "aria-label", "Context: 84% of the run's budget, 81k of 96k tokens"
-                )
+                await expect(meter).to_have_attribute("aria-label", "Chat size: 84% used, 81k of 96k")
                 # The ring is drawn filled as far as the share: no rule of the page's overrides it.
                 assert await _ring_filled(meter) == 84
                 await meter.click()
-                panel: Locator = page.locator(".composer-popover[aria-label='Context']")
-                await expect(panel.locator(".context-meter-title")).to_have_text("Context window")
+                panel: Locator = page.locator(".composer-popover[aria-label='Chat size']")
+                await expect(panel.locator(".context-meter-title")).to_have_text("Chat size")
                 await expect(panel.locator(".context-meter-figure")).to_have_text("84% · 81k / 96k")
-                # Why the budget is a tenth of the window, and where it is set (item 239).
+                # Why the limit is a tenth of what the model can take in, and where it is set (item 239).
                 await expect(panel.locator(".context-meter-text")).to_have_text(
                     [
-                        "The run's last step sent the model 81,000 tokens. Past 96,000, the run's budget, Dot "
-                        "summarizes its older part.",
-                        "The model holds 1,000,000 tokens.",
-                        "Each step sends the model the whole run again, so a run kept within its budget is answered "
-                        "sooner and costs less. Dot's default size sets the budget: the most the model's window "
-                        "allows, three quarters of it, unless [agent] context_tokens sets one number. Settings › "
-                        "Models gives a model a size of its own.",
+                        "The last step used 81,000. Past 96,000, Dot sums up the older part of the chat to make room.",
+                        "The model can take in 1,000,000 at once.",
+                        "Each step makes the model read the whole chat again, so a shorter chat is answered sooner "
+                        "and costs less. The limit is three quarters of the most the model can take in. Settings › "
+                        "Models lets you set a size for a model.",
                     ]
                 )
+                # The setting of the settings file stands under Details, shut until it is opened (item 625).
+                await expect(panel.locator("details.error-details")).to_contain_text("[agent] context_tokens")
                 # The way to the model's own size in Settings › Models (item 396).
-                link: Locator = panel.get_by_role("link", name="Change context size")
+                link: Locator = panel.get_by_role("link", name="Change the chat size")
                 await expect(link).to_have_attribute("href", _SIZE_SETTING)
                 await page.screenshot(path=str(tmp_path / f"meter-{width}-{scheme}.png"), animations="disabled")
                 await page.keyboard.press("Escape")
@@ -236,14 +234,14 @@ async def test_the_context_meter_shows_how_much_of_the_budget_the_last_step_fill
             # The link opens Settings › Models on the run's model.
             page = await _run_page(browser, served, near.id, 1280, "light")
             await page.locator(_METER).click()
-            await page.get_by_role("link", name="Change context size").click()
+            await page.get_by_role("link", name="Change the chat size").click()
             await expect(page).to_have_url(f"{served}/{_SIZE_SETTING}")
             await expect(page.get_by_role("heading", level=1)).to_have_text("Models")
             await page.close()
             # Past the budget the ring is full and says so; with room it says that.
             for run, level, label, filled in (
-                (past, "full", "Context: 105% of the run's budget, 101k of 96k tokens", 100),
-                (roomy, "room", "Context: 13% of the run's budget, 12k of 96k tokens", 13),
+                (past, "full", "Chat size: 105% used, 101k of 96k", 100),
+                (roomy, "room", "Chat size: 13% used, 12k of 96k", 13),
             ):
                 page = await _run_page(browser, served, run.id, 1280, "light")
                 await expect(page.locator(_METER)).to_have_attribute("data-level", level)
@@ -272,38 +270,35 @@ async def test_a_model_with_a_context_size_of_its_own_has_the_meter_and_the_time
                 page: Page = await _run_page(browser, served, sized.id, width, scheme)
                 # The conversation says nothing of the budget (item 365): the side panel does, below.
                 await expect(page.locator(".answer").last).to_be_visible()
-                await expect(page.locator(".timeline")).not_to_contain_text("Context budget")
+                await expect(page.locator(".timeline")).not_to_contain_text("Chat size limit")
                 meter: Locator = page.locator(_METER)
-                await expect(meter).to_have_attribute(
-                    "aria-label", "Context: 78% of the run's budget, 150k of 192k tokens"
-                )
+                await expect(meter).to_have_attribute("aria-label", "Chat size: 78% used, 150k of 192k")
                 await meter.click()
-                panel: Locator = page.locator(".composer-popover[aria-label='Context']")
+                panel: Locator = page.locator(".composer-popover[aria-label='Chat size']")
                 await expect(panel.locator(".context-meter-text")).to_have_text(
                     [
-                        "The run's last step sent the model 150,000 tokens. Past 163,200, Dot summarizes its older "
-                        "part, so the run stays within its budget of 192,000.",
-                        "The model holds 1,000,000 tokens.",
-                        "Each step sends the model the whole run again, so a run kept within its budget is answered "
-                        "sooner and costs less. The context size chosen for this model in Settings › Models, 192,000 "
-                        "tokens, sets the budget, up to three quarters of its window.",
+                        "The last step used 150,000. Past 163,200, Dot sums up the older part of the chat, so the "
+                        "chat stays within its limit of 192,000.",
+                        "The model can take in 1,000,000 at once.",
+                        "Each step makes the model read the whole chat again, so a shorter chat is answered sooner "
+                        "and costs less. The size you chose for this model in Settings › Models, 192,000, sets the "
+                        "limit, up to three quarters of what the model can take in.",
                     ]
                 )
                 await page.screenshot(path=str(tmp_path / f"sized-{width}-{scheme}.png"), animations="disabled")
                 # Where the budget comes from is a line of how the run was set up, in the side panel's Run tab.
                 await page.keyboard.press("Escape")
                 setup: Locator = await _setup(page, width)
-                await expect(page.locator(".setup-summary")).to_contain_text("budget 192k")
+                await expect(page.locator(".setup-summary")).to_contain_text("limit 192k")
                 await expect(setup).to_contain_text(
-                    "Context budget 192k tokens, the size chosen for the model in Settings, tool output up to 12k "
-                    "characters"
+                    "Chat size limit 192k, the size chosen for the model in Settings; step results up to 12k characters"
                 )
                 await page.close()
             # A size the window cut: the line names both.
             page = await _run_page(browser, served, cut.id, 1280, "light")
             await expect(await _setup(page, 1280)).to_contain_text(
-                "Context budget 154k tokens, the 192k chosen for the model in Settings cut to fit its window of 205k, "
-                "tool output up to 12k characters"
+                "Chat size limit 154k: the 192k chosen for the model in Settings, cut to fit the 205k the model can "
+                "take in; step results up to 12k characters"
             )
             await page.close()
         finally:

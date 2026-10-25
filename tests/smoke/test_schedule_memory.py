@@ -316,9 +316,9 @@ async def test_settings_show_the_two_choices_and_the_chat_shows_the_goal_alone(
                 await expect(form).to_have_count(0)
                 await page.get_by_role("button", name="New schedule").click()
                 form = page.locator("[data-schedule-form]").first
-                known: Locator = form.get_by_role("combobox", name="Earlier runs it knows")
+                known: Locator = form.get_by_role("combobox", name="Earlier tasks it knows")
                 await expect(known).to_have_value("")
-                await expect(known.locator("option").first).to_have_text("Default (The last 5 runs)")
+                await expect(known.locator("option").first).to_have_text("Default (The last 5 tasks)")
                 chat: Locator = form.get_by_role("combobox", name="Chat")
                 await expect(chat.locator("option").first).to_have_text("Default (A new chat each time)")
                 await expect(page.get_by_text("The same chat", exact=True).first).to_be_attached()

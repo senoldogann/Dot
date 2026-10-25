@@ -74,7 +74,7 @@ export function changesSection({ runId, onCount, onFiles }) {
     );
     body.replaceChildren(
       ...(view.files.length === 0
-        ? [el("div", { class: "small muted" }, "No file was written in this chat yet: the files its runs write or edit show here.")]
+        ? [el("div", { class: "small muted" }, "No file was written in this chat yet: the files its tasks write or edit show here.")]
         : view.files.map((file) => fileRow(file, opened.has(file.path)))),
     );
     onCount(view.files.length);

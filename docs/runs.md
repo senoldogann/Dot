@@ -15,7 +15,7 @@ tool's name, which a call keeps only where its words do not say what it is (item
 the turn's run showed with `show_page` stands where it came, in its frame
 (item 426). That line opens and folds on a click while the run still works and after it ends,
 and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
-Appearance › *Fold tool steps* says whether
+Appearance › *Fold steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). The short marks at the left of the
 conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
 work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out; the page
@@ -51,7 +51,7 @@ is the answer (a small model that is offered both writes the call out as text).
   a quota, rate-limit or key error (see `standby`) the run's own model writes it without asking the fast one (item 240);
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
   and the event says so with the reason. In the conversation a compaction is a quiet line across the column where it
-  happened, with the size of the context before and after it ("Context compacted 401k → 17k tokens", item 312); the
+  happened, with the size of the context before and after it ("Older part of the chat summed up: 401k → 17k", item 312); the
   facts under the side panel's More count them and say how many checks flagged something (item 260), and the Cost panel
   keeps the summaries' share. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
@@ -113,7 +113,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   false` in `[agent]` turns it off. Every tool result records its channel (a command, an API, the web, the browser, the
   desktop, or the run's own tools), and `dotx stats` shows the calls per channel and the share of the acting calls that
   went through a GUI: the prompt sends the agent to a command or an API first, the browser second, the desktop last.
-  The side panel's Run tab shows under Set up a budget cut to the window, why a model is weak, and each reminder
+  The side panel's Task tab shows under Set up a budget cut to the window, why a model is weak, and each reminder
   (item 365).
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
   step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
@@ -127,7 +127,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   of more than 128 tools starts `grouped` whatever the setting (item 524): some providers take no more in one request
   (Gemini documents 128 function declarations, and OpenAI's API has answered more with a 400), and an MCP server may
   offer any number of tools. The groups a grouped run has on (those its chat used, the servers picked for its message,
-  those it turns on) may still bring a request past that; it then fails with the provider's error. The side panel's Run
+  those it turns on) may still bring a request past that; it then fails with the provider's error. The side panel's Task
   tab shows under Set up the groups a grouped run starts with, why it is grouped, and each group it turns on.
 - `prompt` in `[agent]` decides how much the system prompt says (item 280). `full`, the default, says how to work and
   each kind of tool at length (the web, the browser, the desktop, memory, schedules). `lean` keeps the rules of trust
@@ -273,7 +273,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
 - A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269) and
   a file's path an answer names in code (under `~/` or `/Users/<you>/`; Dot names the files it made by their full
-  paths) open it in the side panel (the Run tab's list of the conversation's files went with item 544), which takes
+  paths) open it in the side panel (the Task tab's list of the conversation's files went with item 544), which takes
   half of the page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the
   daemon draws with Core Graphics as they come into view; a page more than 20,000 px tall at the width asked is refused
   rather than drawn (item 386). A Word document, an Excel
@@ -340,7 +340,7 @@ draws no line for it, on the run's own page or in the turns before a later run: 
   before the note is told is never told; one taken back after tells the run "go on as you were". A 📌 tells the run
   nothing.
 - A ✋ is told at once. The run holds before its next step (a tool at work finishes first, as for any message): the
-  conversation says so ("You held the run (✋): it waits for your next message."), and the box of the page sends
+  conversation says so ("You held the task (✋): it waits for your next message."), and the box of the page sends
   what you write to the run at once, not into the queue behind a run that waits for it. The hold ends when you
   write to the run (a message of yours, the answer to a question it left, a queued reaction you send on with
   Steer, a message sent to the chat from another screen: it waits in the queue as any does, and the run goes on),
@@ -390,9 +390,9 @@ secret Dot holds, is not kept, as the memory tools refuse such a note: the 📌 
 Taking the 📌 back forgets the note when it is as it was made; a note that was there before, or that you changed
 since, stays.
 
-**Settings.** Settings › General › Reactions has the switch **Start a run for a reaction** (`[reactions]
+**Settings.** Settings › General › Reactions has the switch **Start a task for a reaction** (`[reactions]
 follow_ups`; off, every reaction is only kept as feedback and a 📌 still makes its note) and, for each of the six
-other reactions, what it does after the run it is on has ended: **Start a follow-up run** or **Only feedback**
+other reactions, what it does after the run it is on has ended: **Start a follow-up task** or **Only feedback**
 (`good`, `love`, `wrong`, `again`, `explain` and `hold` of `[reactions]`). A change holds at once and is kept in
 `config.toml`. `follow_ups_per_hour` and `hold_minutes` are set in the file. The routes are in [the daemon
 page](daemon.md#the-daemon-the-web-ui-and-the-service).

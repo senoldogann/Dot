@@ -100,7 +100,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
   });
   const tabList = el(
     "div",
-    { class: "inspector-tabs", role: "tablist", "aria-label": "Run details", onkeydown: walkTabs },
+    { class: "inspector-tabs", role: "tablist", "aria-label": "Task details", onkeydown: walkTabs },
     tabNodes.map((tab) => tab.button),
   );
   // A phone's sheet has a grabber over its tabs (run.css).
@@ -108,7 +108,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
   const head = el("div", { class: "inspector-head" }, grabber, tabList, closeButton);
   const element = el(
     "aside",
-    { class: "inspector", "aria-label": "Run details", hidden: true },
+    { class: "inspector", "aria-label": "Task details", hidden: true },
     head,
     tabNodes.map((tab) => tab.panel),
   );
@@ -156,7 +156,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
   const scrim = el("div", { class: "inspector-scrim", hidden: true, onclick: () => setDrawer(false) });
   const toggle = el(
     "button",
-    { class: "icon-btn", type: "button", title: "Show the details", "aria-label": "Run details", "aria-pressed": "false" },
+    { class: "icon-btn", type: "button", title: "Show the details", "aria-label": "Task details", "aria-pressed": "false" },
     icon("panelRight"),
   );
 

@@ -256,7 +256,9 @@ async def test_a_switch_the_daemon_refused_says_so_and_not_that_it_was_done(
         await expect(switch).to_have_attribute("aria-checked", "false")
         await page.route("**/api/snapshots/settings", refuse)
         await switch.click()
-        await expect(page.locator(".toast.error")).to_have_text("config.toml could not be written")
+        # A failure says what happened in a sentence; the program's own message stands under Details (item 625).
+        await expect(page.locator(".toast.error")).to_contain_text("Dot ran into a problem and could not finish.")
+        await expect(page.locator(".toast.error")).to_contain_text("config.toml could not be written")
         await expect(switch).to_have_attribute("aria-checked", "false")
         # Counted at once, not waited for: a toast of "done" would be gone in a few seconds, and so pass a wait.
         assert await page.locator(".toast.ok").count() == 0

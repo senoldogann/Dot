@@ -337,20 +337,20 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{served}/#/settings/models")
-                size: Locator = page.get_by_role("combobox", name=f"Context size of {SCRIPTED_MODEL}")
+                size: Locator = page.get_by_role("combobox", name=f"Chat size of {SCRIPTED_MODEL}")
                 await expect(size.locator("option")).to_have_text(_SIZE_TEXTS)
                 assert await size.locator("option").evaluate_all("(options) => options.map((o) => o.value)") == _SIZES
                 # The window beside it; a model whose window holds no other size shows its budget as text.
                 cell: Locator = page.locator("td.context-cell", has=size)
                 await expect(cell).to_contain_text("of 1.0M")
-                asked: Locator = page.get_by_role("combobox", name=f"Context size of {_ASKED}")
+                asked: Locator = page.get_by_role("combobox", name=f"Chat size of {_ASKED}")
                 await expect(asked.locator("option")).to_have_text(
                     ["49k (default)", "48k", "64k", "96k", "128k", "192k", "197k (most)"]
                 )
                 # The window Dot asks Ollama for, the model's own beside it (item 221).
                 await expect(page.locator("td.context-cell", has=asked)).to_contain_text("of 66k (own 262k)")
                 tiny: Locator = page.locator(
-                    "td.context-cell", has=page.get_by_role("button", name=f"Why: the context size of {_TINY}")
+                    "td.context-cell", has=page.get_by_role("button", name=f"Why: the chat size of {_TINY}")
                 )
                 await expect(tiny.get_by_role("combobox")).to_be_hidden()
                 await expect(tiny).to_contain_text("25k")
@@ -358,14 +358,14 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                     await expect(size).to_have_value("")
                     await size.select_option("256000")
                     await expect(
-                        page.get_by_text("scripted gets a context size of 256,000 tokens from its next run.")
+                        page.get_by_text("scripted gets a chat size of 256,000 from its next task.")
                     ).to_be_visible()
                     await expect(size).to_have_value("256000")
                     assert runtime.context_sizes.of(SCRIPTED_MODEL) == 256_000
                     assert load_config(path).models.context == {SCRIPTED_MODEL: 256_000}
                 else:
                     await expect(size).to_have_value("256000")
-                why: Locator = page.get_by_role("button", name=f"Why: the context size of {SCRIPTED_MODEL}")
+                why: Locator = page.get_by_role("button", name=f"Why: the chat size of {SCRIPTED_MODEL}")
                 await expect(why).to_have_attribute("aria-expanded", "false")
                 await why.click()
                 await expect(why).to_have_attribute("aria-expanded", "true")
@@ -373,31 +373,31 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                 await expect(row).to_have_count(1)
                 body: Locator = row.locator(".context-why-body")
                 await expect(body.locator("h4")).to_have_text(
-                    ["Context size of scripted", "This model's runs, last 30 days"]
+                    ["Chat size of scripted", "This model's tasks, last 30 days"]
                 )
                 await expect(body).to_contain_text(
-                    "Once a step sends more than 217,600 tokens, Dot summarizes the run's older part, so the run stays "
-                    "within its 256,000."
+                    "Once a step sends more than 217,600 tokens, Dot sums up the older part of the task, so it stays "
+                    "within 256,000."
                 )
                 # Nothing left out is written as text.
                 await expect(body).not_to_contain_text("null")
                 await expect(body.locator(".context-facts dd")).to_have_text(
                     [
                         "1,000,000 tokens. Ollama gives it for the model.",
-                        "750,000 tokens, three quarters of the window: the rest is room for the reply and for the "
-                        "error of Dot's count of the tokens.",
-                        "The most this model's window allows, 750,000 tokens, as for every model without a size of "
-                        'its own. In the config file: [agent] context_tokens, "most" or one number for every model.',
-                        "48,000 tokens: a run's first step alone sends its instructions, its tools and the request.",
+                        "750,000 tokens, three quarters of what the model can take in: the rest is room for the reply "
+                        "and for the small error in Dot's count.",
+                        "The most this model can take in, 750,000 tokens, as for every model without a size of its "
+                        'own. In the settings file: [agent] context_tokens, "most" or one number for every model.',
+                        "48,000 tokens: a task's first step alone sends its instructions, its actions and the request.",
                     ]
                 )
                 evidence: Locator = body.locator(".context-evidence")
                 await expect(evidence.locator("p")).to_have_text(
                     [
-                        "3 steps in 1 run. A step sent 40,000 tokens at the median, 70,000 or fewer in 95% of steps "
-                        "and 70,000 at most. 23% of it the provider served from its cache. A run's first step sent "
+                        "3 steps in 1 task. A step sent 40,000 tokens at the median, 70,000 or fewer in 95% of steps "
+                        "and 70,000 at most. 23% of it the service had ready from before. A task's first step sent "
                         "20,000 at the median.",
-                        "1 summary in 1 run.",
+                        "1 summary in 1 task.",
                     ]
                 )
                 await expect(evidence.locator("tbody td")).to_have_text(
@@ -429,11 +429,9 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
             page = await browser.new_page(viewport={"width": 1280, "height": 800})
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"{served}/#/settings/models")
-            size = page.get_by_role("combobox", name=f"Context size of {SCRIPTED_MODEL}")
+            size = page.get_by_role("combobox", name=f"Chat size of {SCRIPTED_MODEL}")
             await size.select_option("")
-            await expect(
-                page.get_by_text("scripted gets Dot's default context size from its next run.")
-            ).to_be_visible()
+            await expect(page.get_by_text("scripted gets Dot's default chat size from its next task.")).to_be_visible()
             assert runtime.context_sizes.of(SCRIPTED_MODEL) is None
             assert load_config(path).models.context == {}
             await page.close()
@@ -456,7 +454,7 @@ async def test_an_address_that_names_a_model_shows_its_context_size(
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{served}/#/settings/models?model={quote(_OPUS, safe='')}")
-                size: Locator = page.get_by_role("combobox", name=f"Context size of {_OPUS}")
+                size: Locator = page.get_by_role("combobox", name=f"Chat size of {_OPUS}")
                 await expect(size).to_be_focused()
                 await expect(size).to_be_in_viewport()
                 await expect(page.locator("tr[data-asked]")).to_have_attribute("data-model", _OPUS)

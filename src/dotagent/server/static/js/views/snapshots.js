@@ -63,7 +63,7 @@ export function mount(root, ctx) {
     enabled.paint();
     const appText = switchRowSetting({
       label: "Include app text",
-      hint: "Include text and controls when the app makes them available: a Markdown file beside the picture.",
+      hint: "Include the text and buttons of the window when the app makes them available: a text file beside the picture.",
       read: () => view.app_text,
       write: (on) => change("app_text", on),
       onToggled: () => {
@@ -145,7 +145,7 @@ export function mount(root, ctx) {
     }
   }
 
-  ctx.head.setLead("A double tap of ⌘ in any application captures the window in front into the open chat's box.");
+  ctx.head.setLead("A double tap of ⌘ in any app captures the window in front into the box of the open chat.");
   root.append(holder);
   attempt(load);
   return () => {

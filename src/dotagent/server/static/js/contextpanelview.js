@@ -44,7 +44,7 @@ function fileMark(path) {
  * uses one. A skill is the `skill` tool's name, a server the one in `mcp__server__tool`. */
 function skillsSection() {
   const body = el("div", { class: "context-list" });
-  const section = panelSection({ id: "run-skills", title: "Skills & MCP", actions: null, body });
+  const section = panelSection({ id: "run-skills", title: "Skills & connected apps", actions: null, body });
   section.element.hidden = true;
   let usages = [];
 
@@ -73,7 +73,7 @@ function skillsSection() {
       counts.push(plural(skills, "skill", "skills"));
     }
     if (servers > 0) {
-      counts.push(plural(servers, "MCP server", "MCP servers"));
+      counts.push(plural(servers, "connected app", "connected apps"));
     }
     section.setSummary(el("span", null, counts.join(" · ")));
     section.element.hidden = usages.length === 0;
@@ -95,7 +95,7 @@ function skillsSection() {
  * Changes section's reading. */
 function artifactsSection(onOpen) {
   const body = el("div", { class: "context-list" });
-  const section = panelSection({ id: "run-artifacts", title: "Artifacts", actions: null, body });
+  const section = panelSection({ id: "run-artifacts", title: "Files made", actions: null, body });
   section.element.hidden = true;
 
   function set(files) {

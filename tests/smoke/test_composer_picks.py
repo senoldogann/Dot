@@ -620,9 +620,9 @@ async def test_an_at_word_picks_a_server_and_no_skill_and_the_slash_word_the_ski
                     await goal.type("Look it up @")
                     await expect(menu).to_be_visible()
                     # The sections have no title on the page (item 537); a screen reader hears each.
-                    await expect(menu.locator("[role=group]").first).to_have_attribute("aria-label", "MCP servers")
+                    await expect(menu.locator("[role=group]").first).to_have_attribute("aria-label", "Connected apps")
                     server: Locator = menu.get_by_role("option").filter(has_text=SERVER).first
-                    await expect(server.locator(".slash-hint")).to_have_text("10 tools")
+                    await expect(server.locator(".slash-hint")).to_have_text("10 actions")
                     await expect(menu.locator("[role=group][aria-label='Skills']")).to_have_count(0)
                     await expect(menu.locator("[role=group][aria-label='Commands']")).to_have_count(0)
                     # A server added by hand has no service behind it: Dot's own icon, as its Customize tile has (items

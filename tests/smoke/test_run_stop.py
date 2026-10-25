@@ -130,7 +130,7 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                 name: str = ".stage-heading" if width <= _PHONE_PX else ".stage-name"
                 await expect(page.locator(f".stage-title {name}")).to_be_visible()
                 await expect(page.locator(".stage-tools > *")).to_have_count(1)
-                await expect(page.locator(".stage-tools button[aria-label='Run details']")).to_be_visible()
+                await expect(page.locator(".stage-tools button[aria-label='Task details']")).to_be_visible()
                 await expect(page.locator(".stagebar .chip")).to_have_count(0)
                 await expect(page.locator(".stagebar .pill.run")).to_have_count(0)
                 # A run stops from its composer: the sidebar and the bar have no emergency stop (item 289).

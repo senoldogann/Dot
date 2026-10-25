@@ -436,7 +436,7 @@ async def test_the_bar_the_sidebar_the_composer_and_the_panel_keep_out_of_the_sa
             await page.screenshot(path=str(tmp_path / "safe-sidebar.png"))
             await page.get_by_role("button", name="Hide sidebar").click()
 
-            await page.get_by_role("button", name="Run details").click()
+            await page.get_by_role("button", name="Task details").click()
             panel: Locator = page.locator(".inspector[data-mode='drawer']")
             await expect(panel).to_have_attribute("data-open", "true")
             await page.wait_for_timeout(500)
@@ -491,7 +491,7 @@ async def test_the_bar_the_dock_and_the_drawers_stay_on_what_is_seen_while_the_p
             await page.wait_for_function(f"(want) => {_edge('.sidebar', 'top')} === want", arg=seen_top)
             await page.wait_for_function(f"(want) => {_edge('.sidebar', 'bottom')} === want", arg=seen_bottom)
             await page.get_by_role("button", name="Hide sidebar").click()
-            await page.get_by_role("button", name="Run details").click()
+            await page.get_by_role("button", name="Task details").click()
             await page.wait_for_function(f"(want) => {_edge('.inspector', 'bottom')} === want", arg=seen_bottom)
             await page.get_by_role("button", name="Close the details").click()
             # With the keyboard up and the page panned short of it, the dock and the sidebar stand on the keyboard,

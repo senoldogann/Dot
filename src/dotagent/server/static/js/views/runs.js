@@ -156,7 +156,7 @@ function buildComposer(ctx, listener) {
   // agents with their roles in its menu (item 115); the pill only shows once an agent exists. A campaign is Dot's own
   // work, so Keep going hides while an agent is picked.
   const agentPill = composerPill({ id: "agent", caption: "Agent", value: "Dot", icon: actorFace(DOT_ID, "idle", null) });
-  agentPill.element.title = "The agent the run is for";
+  agentPill.element.title = "The agent this task is for";
   agentPill.element.hidden = true;
   let agents = [];
   let agentId = "";
@@ -364,7 +364,12 @@ function buildSetup() {
         el("a", { class: "btn primary", href: "#/settings/models" }, "Choose a model"),
         el("a", { class: "btn", href: "#/settings/keys" }, "Add a key"),
       ),
-      el("p", { class: "hint" }, "Or run ", el("code", null, "dotx setup"), " in Terminal: it checks this Mac, stores a key and chooses the model."),
+      el(
+        "details",
+        { class: "error-details" },
+        el("summary", null, "Another way"),
+        el("p", { class: "small muted" }, "In Terminal, run ", el("code", null, "dotx setup"), ": it checks this Mac, saves a key and chooses the model."),
+      ),
     ),
   );
   let providers = null;

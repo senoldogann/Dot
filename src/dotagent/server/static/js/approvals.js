@@ -4,23 +4,24 @@
 import { api } from "./api.js";
 import { codeBlock } from "./codeblock.js";
 import { clip, dateTime, el } from "./dom.js";
+import { capital, flagWords, kindWords } from "./flagwords.js";
 import { icon } from "./icons.js";
-import { toast } from "./ui.js";
+import { toastError } from "./ui.js";
 
 const STATUS_BADGE = { approved: "b-ok", denied: "b-bad", expired: "b-muted" };
 const STATUS_LABEL = { approved: "Approved", denied: "Denied", expired: "Expired", pending: "Waiting for you" };
 // What becomes of the answer to a question a run left (`leftNote` of a card): it carries the work on in the run's
 // conversation, or, for a session of a campaign, reaches the session while it works and the next session after that.
-export const LEFT_IN_RUN = "The run went on without your answer. Your answer goes to this conversation and carries the work on.";
+export const LEFT_IN_RUN = "The task went on without your answer. Your answer goes to this conversation and carries the work on.";
 export const LEFT_IN_CAMPAIGN = "The session went on without your answer. While it works, your answer reaches it; after that, the campaign's next session reads it, and starts right away while the campaign is active.";
 // What a step kept for the owner (item 482) says: nobody answered it in time, so the run went on without it.
-const KEPT_NOTE = "Nobody answered in time, so the run went on without this step. Once you have done it yourself, I did it carries the work on in this conversation.";
+const KEPT_NOTE = "Nobody answered in time, so the task went on without this step. Once you have done it yourself, choose I did it to carry the work on in this conversation.";
 // What a question kept for the owner's yes (item 483) says: Allow once lets the run do this exact step once.
-const KEPT_ASK_NOTE = "Nobody answered in time, so the run went on without this step. Allow once carries the work on in this conversation, where Dot may do this exact step once.";
+const KEPT_ASK_NOTE = "Nobody answered in time, so the task went on without this step. Choose Allow once to carry the work on in this conversation, where Dot may do this exact step once.";
 // The same for a step a session of a campaign kept (item 484): the answer reaches the session while it works, and the
 // campaign's next session after that.
-const KEPT_IN_CAMPAIGN = "Nobody answered in time, so the session went on without this step. Once you have done it yourself, I did it reaches the session while it works; after that, the campaign's next session reads it and starts right away while the campaign is active.";
-const KEPT_ASK_IN_CAMPAIGN = "Nobody answered in time, so the session went on without this step. Allow once reaches the session while it works; after that, the campaign's next session reads it, may do this exact step once, and starts right away while the campaign is active.";
+const KEPT_IN_CAMPAIGN = "Nobody answered in time, so the session went on without this step. Once you have done it yourself, choose I did it: it reaches the session while it works; after that, the campaign's next session reads it and starts right away while the campaign is active.";
+const KEPT_ASK_IN_CAMPAIGN = "Nobody answered in time, so the session went on without this step. Choose Allow once: it reaches the session while it works; after that, the campaign's next session reads it, may do this exact step once, and starts right away while the campaign is active.";
 
 /** The common shape of an approval, from a stored record. */
 export function fromRecord(record) {
@@ -112,7 +113,7 @@ function iconOf(severity) {
   return severity === "handoff" ? "hand" : "shield";
 }
 
-const TAKEOVER_IDLE = "Dot's window comes to the front and the run waits while you have it.";
+const TAKEOVER_IDLE = "Dot's window comes to the front and Dot waits while you have it.";
 const TAKEOVER_HELD = "You have the browser. Do the step, return control, then say you did it.";
 
 /** On the hand-off of a browser step, the offer of the live view: take the browser over, do the step, give it back;
@@ -133,7 +134,7 @@ function takeoverOffer(runId, onUseHere) {
       button.replaceChildren(icon("hand"), held ? "Return control" : "Take the browser over");
       text.textContent = held ? TAKEOVER_HELD : TAKEOVER_IDLE;
     } catch (error) {
-      toast("error", error.message);
+      toastError(error);
     } finally {
       button.disabled = false;
     }
@@ -178,11 +179,11 @@ function present(...parts) {
 function technicalDetails(args) {
   const chips = [];
   if (typeof args.kind === "string") {
-    chips.push(el("span", { class: "chip" }, args.kind));
+    chips.push(el("span", { class: "chip", title: args.kind }, capital(kindWords(args.kind))));
   }
   if (Array.isArray(args.flags)) {
     for (const flag of args.flags) {
-      chips.push(el("span", { class: "chip" }, String(flag)));
+      chips.push(el("span", { class: "chip", title: String(flag) }, capital(flagWords(String(flag)))));
     }
   }
   const target = typeof args.target === "string" && args.target !== "" ? args.target : null;
@@ -246,7 +247,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       node.querySelectorAll("button, input").forEach((control) => {
         control.disabled = false;
       });
-      toast("error", error.message);
+      toastError(error);
       if (error.status === 409) {
         onSettled(null);
       }
@@ -330,7 +331,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         isQuestion || isHandoff
           ? null
           : guarded(approval)
-            ? el("div", { class: "small muted" }, "Dot asks you about this in every mode but yolo; no rule turns that off.")
+            ? el("div", { class: "small muted" }, "Dot always asks you about this, in every mode except YOLO. No rule can turn that off.")
             : ruleOffer(approval),
         isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId, onUseHere) : null,
         el(

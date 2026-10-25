@@ -95,7 +95,7 @@ async def test_a_schedule_fires_nothing_beside_its_resumed_run_and_gets_its_end(
         await scheduler.tick(schedule.next_run_at + 5)
         assert {run.id for run in await store.list_runs(10, schedule.thread_id)} == {cut.id, resumed.id}
         skipped: ScheduleRecord = await store.get_schedule(schedule.id)
-        assert skipped.last_status == "skipped: the previous run was still going", skipped
+        assert skipped.last_status == "skipped: the previous task was still going", skipped
         # Its end is written to the schedule, as the end of a run the scheduler started is.
         async with asyncio.timeout(WAIT_S):
             ended: RunRecord = await manager.wait(resumed.id)
@@ -113,7 +113,7 @@ async def test_the_resumed_follow_up_of_the_owner_is_not_the_schedules_run(login
         resumed: RunRecord = await manager.resume(cut.id)
         await scheduler.tick(schedule.next_run_at + 5)
         # The firing was not held back by it: a run of the schedule started in a chat of its own.
-        assert (await store.get_schedule(schedule.id)).last_status != "skipped: the previous run was still going"
+        assert (await store.get_schedule(schedule.id)).last_status != "skipped: the previous task was still going"
         async with asyncio.timeout(WAIT_S):
             await manager.wait(resumed.id)
             await scheduler.drain()
@@ -133,5 +133,5 @@ async def test_an_overdue_firing_says_the_daemon_was_off_or_the_mac_slept(login_
         grace: float = runtime.config.scheduler.misfire_grace_s
         await scheduler.tick(schedule.next_run_at + grace + 600)
         skipped: ScheduleRecord = await runtime.store.get_schedule(schedule.id)
-        assert skipped.last_status is not None and skipped.last_status.endswith("(the daemon was off or the Mac slept)")
+        assert skipped.last_status is not None and skipped.last_status.endswith("(Dot was off or the Mac slept)")
         assert skipped.last_status.startswith("skipped: ") and "minutes overdue" in skipped.last_status

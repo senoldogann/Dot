@@ -62,7 +62,7 @@ def _checked(request: AgentRequest, known: frozenset[str]) -> AgentRequest:
     unknown: list[str] = sorted(set(request.tools or ()) - known)
     if unknown:
         raise InvalidValueError(
-            f"an agent names tools that do not exist here: {', '.join(unknown)}", {"tools": ", ".join(unknown)}
+            f"an agent names actions that do not exist here: {', '.join(unknown)}", {"tools": ", ".join(unknown)}
         )
     return request
 
@@ -93,7 +93,7 @@ def new_agent_tools(said: list[str] | None) -> tuple[str, ...]:
         return ()
     if not said:
         raise InvalidValueError(
-            "a new agent has no tools to keep: name the tools it may use, or leave tools out for every tool",
+            "a new agent has no actions to keep: name the actions it may use, or leave actions out for every action",
             {"tools": "[]"},
         )
     return tuple(said)

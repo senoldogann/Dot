@@ -290,11 +290,13 @@ async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins:
                     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                     await page.goto(f"{address}/#/settings/phone")
                     steps: Locator = page.get_by_role("list", name="Steps on this Mac")
-                    await expect(steps).to_contain_text(f"This Mac is {_NAME} on your tailnet.")
+                    await expect(steps).to_contain_text(f"This Mac is {_NAME} on your Tailscale network.")
                     set_up: Locator = page.get_by_role("button", name="Set up")
                     if await set_up.is_visible():
                         await set_up.click()
-                    await expect(steps).to_contain_text("Tailscale serves Dot to your tailnet over HTTPS")
+                    await expect(steps).to_contain_text(
+                        "Tailscale makes Dot available on your private network, securely"
+                    )
                     await expect(steps).to_contain_text("Dot takes the name up when it starts again.")
                     # Two steps of three are done, and the one left is the one to do now (item 527).
                     progress: Locator = page.get_by_role("progressbar", name="Steps done on this Mac")
@@ -359,7 +361,9 @@ async def test_a_switch_the_daemon_refused_says_so_and_not_that_it_was_done(stan
             await expect(awake).to_have_attribute("aria-checked", "false")
             await page.route("**/api/phone/awake", _refuse_awake)
             await awake.click()
-            await expect(page.locator(".toast.error")).to_have_text("config.toml could not be written")
+            # A failure says what happened in a sentence; the program's own message stands under Details (item 625).
+            await expect(page.locator(".toast.error")).to_contain_text("Dot ran into a problem and could not finish.")
+            await expect(page.locator(".toast.error")).to_contain_text("config.toml could not be written")
             await expect(awake).to_have_attribute("aria-checked", "false")
             # Counted at once, not waited for: a toast of "done" would be gone in a few seconds, and so pass a wait.
             assert await page.locator(".toast.ok").count() == 0
@@ -464,7 +468,7 @@ async def test_what_tailscale_says_while_it_runs_is_shown_in_the_guide(stand_ins
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             await page.goto(f"{address}/#/settings/phone")
             steps: Locator = page.get_by_role("list", name="Steps on this Mac")
-            await expect(steps).to_contain_text(f"This Mac is {_NAME} on your tailnet.")
+            await expect(steps).to_contain_text(f"This Mac is {_NAME} on your Tailscale network.")
             await expect(steps).to_contain_text("Tailscale said: what Tailscale serves could not be read")
         finally:
             await chromium.close()

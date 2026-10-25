@@ -379,7 +379,7 @@ async def test_a_plugin_whose_pin_the_gallery_moved_since_says_older_version(
                         older: Locator = acme.locator(".gallery-outdated")
                         await expect(older).to_have_text("Older version")
                         await expect(older).to_have_attribute(
-                            "title", re.compile(r"Installed from d{7}; the gallery pins e{7} now")
+                            "title", re.compile(r"Installed from d{7}; the gallery now has e{7}\.")
                         )
                         await expect(acme.get_by_role("button", name="Remove Acme Skills")).to_be_visible()
                         await expect(acme.get_by_role("button", name="Install Acme Skills")).to_have_count(0)

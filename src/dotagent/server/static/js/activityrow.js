@@ -24,8 +24,8 @@ const KIND_ICON = {
 };
 
 const KIND_WORD = {
-  run: "run",
-  delegated: "delegated run",
+  run: "task",
+  delegated: "helper's task",
   campaign: "campaign session",
   approval: "approval",
   question: "question",
@@ -44,7 +44,7 @@ function rowFacts(item) {
   }
   if (item.minutes !== null) {
     // A run that ended: how long it took and what it cost in tokens.
-    facts.push(duration(item.minutes * 60), `${compact(item.tokens)} tokens`);
+    facts.push(duration(item.minutes * 60), `usage ${compact(item.tokens)}`);
   }
   return facts;
 }

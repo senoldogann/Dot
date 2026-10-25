@@ -40,7 +40,7 @@ export function recapSection({ runId, signal }) {
   function paint(view) {
     section.element.hidden = !view.enabled;
     if (view.recap === null) {
-      text.replaceChildren(el("p", { class: "muted" }, "A recap comes once the run has taken a few steps."));
+      text.replaceChildren(el("p", { class: "muted" }, "A recap comes once the task has taken a few steps."));
       meta.textContent = "";
       return;
     }

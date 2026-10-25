@@ -9,21 +9,21 @@ function decided(source, answeredBy, reason) {
   return { verdict: answeredBy === "policy" ? "allow" : "ask", source, reason, rule_id: source === "rule" ? "rul_1" : null, answered_by: answeredBy, preset: "balanced" };
 }
 
-test("what nobody was asked about names the rule, the preset or the reason", () => {
+test("what nobody was asked about names the rule, the safety level or the reason", () => {
   assert.equal(whyText(decided("rule", "policy", "Mail is fine"), []), "Allowed by your rule “Mail is fine”.");
-  assert.equal(whyText(decided("preset", "policy", "write actions are allowed in balanced."), []), "Allowed by the balanced preset: write actions are allowed in balanced.");
+  assert.equal(whyText(decided("preset", "policy", "write actions are allowed in balanced."), []), "Allowed by the balanced safety level: write actions are allowed in balanced.");
   assert.equal(whyText(decided("mode", "policy", "chat runs read"), []), "Allowed: chat runs read.");
 });
 
-test("a preset whose reason is its own name says it once", () => {
+test("a safety level whose reason is its own name says it once", () => {
   const aggressive = { ...decided("preset", "policy", "aggressive preset"), preset: "aggressive" };
-  assert.equal(whyText(aggressive, []), "Allowed by the aggressive preset.");
-  assert.equal(whyText(aggressive, ["install"]), "Allowed by the aggressive preset. Flags: install.");
+  assert.equal(whyText(aggressive, []), "Allowed by the aggressive safety level.");
+  assert.equal(whyText(aggressive, ["install"]), "Allowed by the aggressive safety level. It counts as: installs software.");
 });
 
 test("who answered a question says so, with why it was asked", () => {
-  assert.equal(whyText(decided("taint", "reviewer", "the run read a page"), []), "The review model approved it; the policy asked because the run read a page.");
-  assert.equal(whyText(decided("preset", "user", "deletes ask in balanced"), []), "You approved it; the policy asked because deletes ask in balanced.");
+  assert.equal(whyText(decided("taint", "reviewer", "the run read a page"), []), "The reviewer approved it. Dot's safety rules asked because the run read a page.");
+  assert.equal(whyText(decided("preset", "user", "deletes ask in balanced"), []), "You approved it. Dot's safety rules asked because deletes ask in balanced.");
   assert.equal(whyText(decided("supervised", "user", "Supervised asks before every change"), []), "Supervised: you approved it.");
 });
 

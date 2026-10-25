@@ -177,9 +177,9 @@ async def test_each_way_of_the_card_leads_to_a_model(own_home: Path) -> None:
                 dialog: Locator = await open_form(
                     page, page.get_by_role("button", name="Add key"), "Add the OpenAI key"
                 )
-                await expect(dialog.get_by_label("OpenAI API key")).to_be_focused()
+                await expect(dialog.get_by_label("OpenAI key", exact=True)).to_be_focused()
                 await foot_is_in_view(page, dialog)
-                await dialog.get_by_label("OpenAI API key").fill(KEY)
+                await dialog.get_by_label("OpenAI key", exact=True).fill(KEY)
                 await dialog.get_by_role("button", name="Save").click()
                 await expect(dialog).to_have_count(0)
                 await expect(row).to_have_attribute("data-state", "set")

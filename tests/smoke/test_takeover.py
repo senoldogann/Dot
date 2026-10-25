@@ -450,7 +450,7 @@ async def test_the_run_page_shows_the_computer_card_with_the_pill_wide_and_on_a_
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
-                await page.get_by_role("button", name="Run details").click()
+                await page.get_by_role("button", name="Task details").click()
                 card: Locator = page.locator("section.computer")
                 # Dot's computer is in the panel's Screen tab (item 203), not the tab the panel opens on.
                 await expect(card).to_be_hidden()
@@ -475,7 +475,7 @@ async def test_the_run_page_shows_the_computer_card_with_the_pill_wide_and_on_a_
             page = await browser.new_page(viewport={"width": 1280, "height": 900})
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
-            await page.get_by_role("button", name="Run details").click()
+            await page.get_by_role("button", name="Task details").click()
             await page.get_by_role("tab", name="Screen").click()
             await expect(page.locator("section.computer .computer-pill")).to_be_visible()
             assert (await client.post(f"/api/runs/{run.id}/handback")).status_code == 202
@@ -543,7 +543,7 @@ async def test_the_view_comes_back_by_itself_after_a_break_and_a_silence_and_res
             jpeg: bytes = await page.screenshot(type="jpeg", clip={"x": 0, "y": 0, "width": 8, "height": 8})
             casts: _Casts = _Casts([_BREAK, _SILENT, first, _SILENT, second], jpeg)
             await page.route("**/api/runs/*/screencast", casts.answer)
-            await page.get_by_role("button", name="Run details").click()
+            await page.get_by_role("button", name="Task details").click()
             await page.get_by_role("tab", name="Screen").click()
             card: Locator = page.locator("section.computer")
             await card.get_by_role("button", name="Watch").click()

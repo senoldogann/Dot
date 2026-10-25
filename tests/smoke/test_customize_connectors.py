@@ -306,8 +306,8 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
                 await expect(slack.get_by_role("button")).to_have_count(0)
                 # A service Dot cannot reach is not listed (item 542); Vercel, untried until item 535, signs in now.
                 await expect(_tile(page, "canva")).to_have_count(0)
-                await expect(_tile(page, "vercel").locator(".chip")).to_have_text("MCP · Sign in")
-                await expect(_tile(page, "linear").locator(".chip")).to_have_text("MCP · Sign in")
+                await expect(_tile(page, "vercel").locator(".chip")).to_have_text("Sign in")
+                await expect(_tile(page, "linear").locator(".chip")).to_have_text("Sign in")
                 await expect(_tile(page, "linear").get_by_role("button", name="Add Linear")).to_be_visible()
                 # Nothing is wider than the screen.
                 wide: int = await page.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
@@ -344,7 +344,7 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
                 await expect(way.locator(".plugin-guide")).to_contain_text("Privacy & Security › Automation")
                 await expect(way.locator(".plugin-guide")).to_contain_text("open Dot and switch on Notes")
                 await expect(page.locator(".plugin-card[data-kind='data']")).to_contain_text(
-                    "through macOS on this Mac; what a run reads there goes to the run's model"
+                    "through macOS on this Mac; what a task reads there goes to the task's model"
                 )
                 await expect(page.locator(".customize-body")).not_to_contain_text("null")
                 # On a phone the wide button goes under the text instead of squeezing it; on a wide page it sits beside.
@@ -489,10 +489,10 @@ async def test_a_keyed_services_tile_asks_for_its_key_in_a_dialog_and_keeps_none
                 await expect(tavily).to_be_visible()
                 await expect(opener).to_have_attribute("aria-haspopup", "dialog")
                 dialog: Locator = await open_form(page, opener, "Add Tavily")
-                key: Locator = dialog.get_by_label("Tavily: API key")
+                key: Locator = dialog.get_by_label("Tavily: Key")
                 await expect(key).to_be_focused()
                 # Nothing of it stands in the tile, whose link would take a click to the service's page.
-                await expect(tavily.get_by_label("Tavily: API key")).to_have_count(0)
+                await expect(tavily.get_by_label("Tavily: Key")).to_have_count(0)
                 await keeps_inside_the_window(page)
                 await foot_is_in_view(page, dialog)
                 await page.screenshot(path=str(tmp_path / f"key-{width}.png"))
@@ -540,26 +540,26 @@ async def test_your_own_mcp_server_is_added_from_a_dialog(address: str, mac_at_r
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"{address}/#/customize/connectors")
                 card: Locator = page.locator(".plugin-own")
-                await expect(card.get_by_text("Your own MCP server")).to_be_visible()
+                await expect(card.get_by_text("Your own connected app")).to_be_visible()
                 # No form stands in the page: the button opens it.
-                await expect(page.get_by_label("Server name")).to_have_count(0)
-                opener: Locator = card.get_by_role("button", name="Add server")
+                await expect(page.get_by_label("Name of the connected app")).to_have_count(0)
+                opener: Locator = card.get_by_role("button", name="Add connected app")
                 await expect(opener).to_have_attribute("aria-haspopup", "dialog")
-                dialog: Locator = await open_form(page, opener, "Add your own MCP server")
-                name: Locator = dialog.get_by_label("Server name")
+                dialog: Locator = await open_form(page, opener, "Add your own connected app")
+                name: Locator = dialog.get_by_label("Name of the connected app")
                 await expect(name).to_be_focused()
                 await keeps_inside_the_window(page)
                 await foot_is_in_view(page, dialog)
                 await page.screenshot(path=str(tmp_path / f"own-server-{width}.png"))
                 await closes_with_escape(page, dialog, opener)
                 # A name the daemon refuses (capitals) is said in the dialog, and what was typed stays.
-                dialog = await open_form(page, opener, "Add your own MCP server")
+                dialog = await open_form(page, opener, "Add your own connected app")
                 await name.fill("My-Server")
-                await dialog.get_by_label("Server address or command").fill("https://example.com/mcp")
+                await dialog.get_by_label("Address or command").fill("https://example.com/mcp")
                 await dialog.get_by_role("button", name="Add", exact=True).click()
                 await shows_the_failure(dialog, re.compile(r"\S"))
                 await expect(name).to_have_value("My-Server")
-                await expect(dialog.get_by_label("Server address or command")).to_have_value("https://example.com/mcp")
+                await expect(dialog.get_by_label("Address or command")).to_have_value("https://example.com/mcp")
                 await asks_before_dropping(page, dialog, name, "my-server")
                 await page.close()
         finally:

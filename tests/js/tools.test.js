@@ -27,8 +27,9 @@ test("the counts of a group of calls", () => {
 test("the words of the counts, in one order whatever the order of the calls", () => {
   assert.equal(flowWords({ read: 1, command: 2 }), "Ran 2 commands and read 1 file");
   assert.equal(flowWords({ read: 1 }), "Read 1 file");
-  assert.equal(flowWords({ search: 1, other: 2, page: 3 }), "Searched the web once, opened 3 pages and used 2 tools");
+  assert.equal(flowWords({ search: 1, other: 2, page: 3 }), "Searched the web once, opened 3 pages and took 2 other steps");
   assert.equal(flowWords({ desktop: 2 }), "Used the desktop 2 times");
+  assert.equal(flowWords({ other: 1 }), "Took 1 step");
   assert.equal(flowWords({}), "");
   assert.equal(flowWords({ command: 0 }), "");
 });

@@ -143,6 +143,11 @@ async def _opened(browser: Browser, served: Served, width: int, scheme: Literal[
     await page.goto(ui_url("127.0.0.1", served.port, TOKEN))
     await page.goto(f"{served.address}/#/settings/channels")
     await expect(page.get_by_role("group", name="iMessage", exact=True)).to_be_visible()
+    # What Dot sees in Messages stands under Advanced, shut until it is opened (item 625).
+    advanced: Locator = page.locator("details.rule-advanced")
+    assert await advanced.evaluate("(fold) => fold.open") is False
+    await advanced.locator("summary").click()
+    await expect(advanced.get_by_text("What Dot sees in Messages", exact=True)).to_be_visible()
     return page
 
 
@@ -186,10 +191,10 @@ async def test_the_tab_stands_beside_phone_and_says_where_imessage_stands(browse
         page: Page = await _opened(browser, served, width, scheme)
         card: Locator = page.get_by_role("group", name="iMessage", exact=True)
         await expect(card.get_by_role("switch", name="iMessage")).to_have_attribute("aria-checked", "false")
-        await expect(card.get_by_text("None paired yet.")).to_be_visible()
-        # Pairing shows the code reached a person, not whose number it is: the tab says to pair one's own only.
+        await expect(card.get_by_text("None connected yet.")).to_be_visible()
+        # Connecting shows the code reached a person, not whose number it is: the tab says to connect one's own only.
         await expect(
-            card.get_by_text("Pair only your own number or Apple ID email: the conversation with yourself.")
+            card.get_by_text("Connect only your own number or Apple ID email: the conversation with yourself.")
         ).to_be_visible()
         await expect(_row(page, "Full Disk Access").locator(".badge")).to_have_text("granted")
         await expect(_row(page, "Automation for Messages").locator(".badge")).to_have_text("allowed")
@@ -251,7 +256,7 @@ async def test_a_number_is_paired_with_the_code_typed_back_and_the_switch_turns_
     # What pairing means stands with the handle: what it writes to this Mac runs as the owner's command (item 595).
     await expect(card.locator(".channel-paired").filter(has_text=PHONE)).to_contain_text(_RUNS_AS_YOU)
     await expect(card.get_by_text(_RUNS_AS_YOU)).to_have_count(1)
-    await expect(card.get_by_text("None paired yet.")).to_have_count(0)
+    await expect(card.get_by_text("None connected yet.")).to_have_count(0)
     await expect(card.get_by_label("The code you read on your iPhone")).to_have_count(0)
     assert served.channels.imessage.handles == (PHONE,)
     # The switch turns the channel on at once; a page opened again finds it on.
@@ -276,9 +281,9 @@ async def test_the_switch_of_progress_messages_says_what_a_run_tells_and_is_kept
         progress: Locator = card.get_by_role("switch", name="Progress messages")
         await expect(progress).to_have_attribute("aria-checked", "true")
         await expect(
-            card.get_by_text("While a run you started from iMessage works, Dot sends a few lines of what it is doing")
+            card.get_by_text("While a task you started from iMessage works, Dot sends a few lines of what it is doing")
         ).to_be_visible()
-        await expect(card.get_by_text("Off, or for a run that ends sooner, only the answer comes.")).to_be_visible()
+        await expect(card.get_by_text("Off, or for a task that ends sooner, only the answer comes.")).to_be_visible()
         await _fits(page, f"{width} with the switch of progress")
         await progress.click()
         await _said(page, "Dot sends only the answers.")
@@ -291,7 +296,7 @@ async def test_the_switch_of_progress_messages_says_what_a_run_tells_and_is_kept
         await expect(card.get_by_role("switch", name="Progress messages")).to_have_attribute("aria-checked", "false")
         await expect(card.get_by_role("switch", name="iMessage", exact=True)).to_have_count(1)
         await card.get_by_role("switch", name="Progress messages").click()
-        await _said(page, "Dot tells you what a run is doing as it works.")
+        await _said(page, "Dot tells you what a task is doing as it works.")
         await expect(card.get_by_role("switch", name="Progress messages")).to_have_attribute("aria-checked", "true")
         assert served.channels.progress is True
         assert tomllib.loads(config_path().read_text(encoding="utf-8"))["channels"]["progress"] == "steps"
@@ -303,10 +308,10 @@ async def test_a_paired_number_is_forgotten_with_its_button(browser: Browser, se
     card: Locator = page.get_by_role("group", name="iMessage", exact=True)
     await expect(card.locator(".channel-handle")).to_have_text(PHONE)
     await expect(card.get_by_text(_RUNS_AS_YOU)).to_be_visible()
-    await expect(card.get_by_text("pairing someone else's gives them Dot")).to_be_visible()
+    await expect(card.get_by_text("connecting someone else's gives them Dot")).to_be_visible()
     await _fits(page, "390 with a number paired")
     await card.get_by_role("button", name=f"Stop reading {PHONE}").click()
-    await expect(card.get_by_text("None paired yet.")).to_be_visible()
+    await expect(card.get_by_text("None connected yet.")).to_be_visible()
     assert served.channels.imessage.handles == ()
     await page.context.close()
 

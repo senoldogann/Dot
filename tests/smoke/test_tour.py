@@ -267,8 +267,8 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             await page.screenshot(path=str(out / f"{tag}-run-top.png"), full_page=False)
             # The side panel on its Run tab, the details first (items 84, 203): on a wide window beside the chat, on a
             # phone a drawer.
-            await page.get_by_role("button", name="Run details").click()
-            await expect(page.locator(".inspector").get_by_role("tab", name="Run")).to_have_attribute(
+            await page.get_by_role("button", name="Task details").click()
+            await expect(page.locator(".inspector").get_by_role("tab", name="Task")).to_have_attribute(
                 "aria-selected", "true"
             )
             await page.wait_for_timeout(_SETTLE_MS)

@@ -6,7 +6,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | ------------------- | ----------------------------------------------------------------------------------------- | --------------------------- |
 | `main`              | the agent loop of a run that names no model; Settings › Models sets it                    | `ollama:minimax-m2.7:cloud` |
 | `vision`            | describing the images a tool returns, when `main` cannot see them; Settings › Models sets it | `ollama:gemma4:cloud`    |
-| `fast`              | writing the summary of a compaction (see [Tools](runs.md#tools)) and a run's recap (its page's Run tab, item 536); Settings › Models sets it | `ollama:gpt-oss:20b-cloud`  |
+| `fast`              | writing the summary of a compaction (see [Tools](runs.md#tools)) and a run's recap (its page's Task tab, item 536); Settings › Models sets it | `ollama:gpt-oss:20b-cloud`  |
 | `search`            | relaying a web search through the Anthropic API's own search tool (see [Tools](runs.md#tools))   | `anthropic:claude-haiku-5-5` |
 | `review`            | answering the policy's questions in `auto` approvals, checking a run against its goal, and drawing its lessons; Settings › Models sets it | `ollama:minimax-m2.7:cloud` |
 | `effort`            | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
@@ -35,7 +35,7 @@ on, with no restart (a run that moved already keeps its model), and the config f
 of the file as it was; a model named twice, one that cannot call tools and one of Zen's free models are refused, and
 nothing changes (`PUT /api/models/standby`, eight at most). An empty list moves no run: the error ends it.
 
-**Context size.** Beside each model's window, Settings › Models sets the context size of the model's runs (item 250):
+**Chat size** (the context size). Beside each model's window, Settings › Models sets the chat size of the model's runs (item 250):
 how much of a run each step sends the model before Dot summarizes its older part. The menu offers Dot's default and the
 smaller sizes from 48 000 up. The default is the most the model's window allows, three quarters of it, the first entry
 of the menu; an Ollama model whose own window is larger than the one Dot asks for by default (`num_ctx`, or
@@ -53,8 +53,8 @@ and what the model's runs of the last 30 days measured (`GET /api/models/context
 a step at the median, for 95 % of the steps and at most, the share the provider served from its cache, the input of a
 run's first step, the summaries, and the seconds of a step by its input. A size below 48 000 (a run's first step alone
 sends its instructions, its tools and the request) or past three quarters of the window (of the model's own window, for
-such an Ollama model) is refused, and nothing changes (`PUT /api/models/context`). The context meter of a run's composer
-links to its model's row (**Change context size**, `#/settings/models?model=<provider:model>`): its provider's fold
+such an Ollama model) is refused, and nothing changes (`PUT /api/models/context`). The ring beside a run's send (**Chat size**)
+links to its model's row (**Change the chat size**, `#/settings/models?model=<provider:model>`): its provider's fold
 opens and the row comes into sight, marked, with the focus on its size.
 
 **Helpers and standby.** `helpers` lists models, best first, that a run may turn to. The `consult` tool asks one of them
@@ -275,7 +275,7 @@ OpenRouter key (`OPENROUTER_API_KEY`) at openrouter.ai/settings/keys. The
 Ollama models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key added
 later when a run first uses that provider, without a restart.
 
-Settings › Providers in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows where
+Settings › AI services in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows where
 the key in use comes from (the daemon's environment, Dot's `.env` file or the Keychain) and, for a key of 16 characters
 or more, its last four characters; a key never comes back from the daemon whole. **Check** asks the provider whether it
 takes the key in use: the model listing of OpenAI and Anthropic, the subscription of OpenCode Go and the key's own page

@@ -144,8 +144,8 @@ function flowNotShown(past, flow, error) {
       "div",
       { class: "note" },
       icon("alert"),
-      el("span", null, `What this run did could not be shown: ${error.message}`),
-      el("a", { class: "small", href: `#/runs/${past.id}` }, "Open run"),
+      el("span", null, `What this task did could not be shown: ${error.message}`),
+      el("a", { class: "small", href: `#/runs/${past.id}` }, "Open task"),
     ),
   );
   flow.hidden = false;
@@ -326,10 +326,10 @@ function turn(past, editFromHereOf, eager, known, signal, reactions) {
   const ops = el("div", { class: "turn-ops", hidden: true });
   const answer = ended
     ? answerMessage({ actorId: past.agent_id ?? "dot", status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href: null, reactions, runId: past.id })
-    : el("div", { class: "note" }, icon("clock"), el("span", null, "This run is still going."), el("a", { class: "small", href }, "Open run"));
+    : el("div", { class: "note" }, icon("clock"), el("span", null, "This task is still going."), el("a", { class: "small", href }, "Open task"));
   const asked =
     past.source === RESUME_SOURCE
-      ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, "Resumed where the run above was cut off"))
+      ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, "Continued where the task above was cut off"))
       : past.source === BACKGROUND_SOURCE
         ? backgroundNote(past.goal)
         : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
@@ -365,15 +365,15 @@ export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal, rea
   const left = earlier.length - shown.length;
   // A chat of more runs than the page reads says so, with no count and no first run (item 559): it knows neither.
   const note = cut
-    ? el("div", { class: "note" }, icon("list"), el("span", null, `Earlier runs of this chat are not shown: the page reads its latest ${THREAD_LIMIT}.`))
+    ? el("div", { class: "note" }, icon("list"), el("span", null, `Earlier tasks of this chat are not shown: the page reads its latest ${THREAD_LIMIT}.`))
     : left === 0
       ? null
       : el(
           "div",
           { class: "note" },
           icon("list"),
-          el("span", null, `${plural(left, "earlier run is", "earlier runs are")} not shown.`),
-          el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first run"),
+          el("span", null, `${plural(left, "earlier task is", "earlier tasks are")} not shown.`),
+          el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first task"),
         );
   return el(
     "div",

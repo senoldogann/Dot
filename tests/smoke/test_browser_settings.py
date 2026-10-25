@@ -291,14 +291,15 @@ async def test_settings_browser_sets_the_browser_rows_and_keeps_them(tmp_path: P
                     [
                         "Where it browses",
                         "Profiles",
-                        "The page it opens",
-                        "While a run works",
-                        "Developer",
-                        "How Chrome stands",
+                        "How pages look",
+                        "While a task works",
                         "Let Dot join your Chrome",
                     ]
                 )
-                allowed: Locator = page.get_by_role("switch", name="Runs may use the browser")
+                # How Chrome stands and the port for programs are the expert's: under Advanced, shut until opened.
+                advanced: Locator = page.locator("details.rule-advanced")
+                assert await advanced.evaluate("(fold) => fold.open") is False
+                allowed: Locator = page.get_by_role("switch", name="Tasks may use the browser")
                 await expect(allowed).to_have_attribute("aria-checked", "true")
                 await _changed(page, "/api/browser/enabled", allowed.click)
                 await expect(allowed).to_have_attribute("aria-checked", "false")
@@ -320,7 +321,7 @@ async def test_settings_browser_sets_the_browser_rows_and_keeps_them(tmp_path: P
                 await _changed(page, "/api/browser/look", partial(zoom.select_option, "125"))
                 await expect(zoom).to_have_value("125")
                 assert "zoom = 125\n" in _kept()
-                shown: Locator = page.get_by_role("switch", name="Show Dot's computer when a run opens the browser")
+                shown: Locator = page.get_by_role("switch", name="Show Dot's computer when a task opens the browser")
                 await expect(shown).to_have_attribute("aria-checked", "true")
                 # Each row stays inside the window, on a phone too.
                 for row in (allowed, size, zoom, shown):
@@ -362,7 +363,9 @@ async def test_a_switch_the_daemon_refused_says_so_and_not_that_it_was_done() ->
             assert stood in ("true", "false")
             await page.route("**/api/browser/raise", _refuse_the_change)
             await front.click()
-            await expect(page.locator(".toast.error")).to_have_text("config.toml could not be written")
+            # A failure says what happened in a sentence; the program's own message stands under Details (item 625).
+            await expect(page.locator(".toast.error")).to_contain_text("Dot ran into a problem and could not finish.")
+            await expect(page.locator(".toast.error")).to_contain_text("config.toml could not be written")
             await expect(front).to_have_attribute("aria-checked", stood)
             # Counted at once, not waited for: a toast of "done" would be gone in a few seconds, and so pass a wait.
             assert await page.locator(".toast.ok").count() == 0
@@ -404,13 +407,13 @@ async def test_a_run_that_opens_its_browser_shows_its_page_beside_the_chat(site:
             # Nothing of the reader's choices changed: the next page follows them again.
             assert await wide.evaluate("localStorage.getItem('dot.panelTab')") is None
             # The panel's switch hides it, as it came.
-            details: Locator = wide.get_by_role("button", name="Run details")
+            details: Locator = wide.get_by_role("button", name="Task details")
             await expect(details).to_have_attribute("aria-pressed", "true")
             await details.click()
             await expect(wide.locator("[data-inspector='on']")).to_have_count(0)
             # Turned off in Settings › Browser, the next look at the run leaves the panel as it was.
             await wide.goto(f"{address}/#/settings/browser")
-            await wide.get_by_role("switch", name="Show Dot's computer when a run opens the browser").click()
+            await wide.get_by_role("switch", name="Show Dot's computer when a task opens the browser").click()
             await wide.goto(f"{address}/#/runs/{run.id}")
             await expect(wide.locator(".approval").first).to_be_visible()
             await expect(wide.locator("[data-inspector='on']")).to_have_count(0)
@@ -513,7 +516,7 @@ async def test_settings_browser_adds_uses_and_deletes_a_profile(tmp_path: Path) 
                 dialog = await open_form(page, opener, "Add a profile")
                 await name.fill("Default")
                 await dialog.get_by_role("button", name="Add", exact=True).click()
-                await shows_the_failure(dialog, "the two profiles every Dot has are written default and incognito")
+                await shows_the_failure(dialog, "The two profiles every Dot has are written default and incognito")
                 await expect(name).to_have_value("Default")
                 await name.fill("Work")
                 await _changed(
@@ -522,14 +525,16 @@ async def test_settings_browser_adds_uses_and_deletes_a_profile(tmp_path: Path) 
                 await expect(dialog).to_have_count(0)
                 work: Locator = profiles.locator("[data-profile='Work']")
                 await expect(work).to_be_visible()
-                await _changed(page, "/api/browser/profile", page.get_by_role("button", name="Use Work for runs").click)
+                await _changed(
+                    page, "/api/browser/profile", page.get_by_role("button", name="Use Work for tasks").click
+                )
                 await expect(work).to_contain_text("In use")
                 assert 'profile = "Work"\n' in _kept()
                 # The profile in use can be cleared, not deleted.
                 await expect(page.get_by_role("button", name="Delete Work")).to_have_count(0)
                 await page.screenshot(path=tmp_path / f"profiles-{width}-{scheme}.png", full_page=True)
                 await _changed(
-                    page, "/api/browser/profile", page.get_by_role("button", name="Use Default for runs").click
+                    page, "/api/browser/profile", page.get_by_role("button", name="Use Default for tasks").click
                 )
                 await page.get_by_role("button", name="Delete Work").click()
                 await _changed(

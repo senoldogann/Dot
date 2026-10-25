@@ -572,29 +572,27 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             await page.goto(f"{world.dot}/#/customize/connectors")
             fixture: Locator = _server_row(page, "fixture")
             await expect(fixture.locator(".badge")).to_have_text("Ready")
-            await expect(fixture).to_contain_text(
-                "Set up in Dot's config: take its [[mcp]] block out of config.toml to remove it."
-            )
-            await expect(fixture).to_contain_text("10 tools: ")
+            await expect(fixture).to_contain_text("Set up in Dot's settings file; remove it there.")
+            await expect(fixture).to_contain_text("10 actions: ")
             await expect(fixture.get_by_role("button")).to_have_count(0)
             # The server added by the API before is the Connectors page's own: it can be removed.
             await expect(_server_row(page, "open").get_by_role("button", name="Remove")).to_be_visible()
-            await expect(page.locator(".plugin-tile[data-plugin='notion'] .chip")).to_have_text("MCP · Sign in")
-            await expect(page.locator(".plugin-tile[data-plugin='deepwiki'] .chip")).to_have_text("MCP · Open to all")
+            await expect(page.locator(".plugin-tile[data-plugin='notion'] .chip")).to_have_text("Sign in")
+            await expect(page.locator(".plugin-tile[data-plugin='deepwiki'] .chip")).to_have_text("Open to all")
             # Added by its address, from the dialog of Add server (item 615): it asks for a sign-in, which happens on
             # the page that opens, and comes back here.
-            await page.locator(".plugin-own").get_by_role("button", name="Add server").click()
-            adding: Locator = page.get_by_role("dialog", name="Add your own MCP server")
-            await adding.get_by_label("Server name").fill("signed")
-            await adding.get_by_label("Server address or command").fill(f"{world.signed}/mcp")
+            await page.locator(".plugin-own").get_by_role("button", name="Add connected app").click()
+            adding: Locator = page.get_by_role("dialog", name="Add your own connected app")
+            await adding.get_by_label("Name of the connected app").fill("signed")
+            await adding.get_by_label("Address or command").fill(f"{world.signed}/mcp")
             await adding.get_by_role("button", name="Add", exact=True).click()
             await expect(adding).to_have_count(0)
             signed: Locator = _server_row(page, "signed")
             await expect(signed.locator(".badge")).to_have_text("Waiting for your sign-in")
             # The page asks every 2 s how the server stands; a dialog opened meanwhile keeps its field, its focus and
             # its words (review A3: each asking drew the page anew and took the focus from a field in it).
-            await page.locator(".plugin-own").get_by_role("button", name="Add server").click()
-            typing: Locator = adding.get_by_label("Server name")
+            await page.locator(".plugin-own").get_by_role("button", name="Add connected app").click()
+            typing: Locator = adding.get_by_label("Name of the connected app")
             await typing.fill("typing")
             await page.wait_for_timeout(2600)
             await expect(typing).to_be_focused()
@@ -609,9 +607,9 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             await expect(sign_in.locator("h1")).to_have_text("Back from signed")
             await sign_in.close()
             await expect(signed.locator(".badge")).to_have_text("Ready", timeout=READY_WITHIN_S * 1000)
-            await expect(signed).to_contain_text("1 tool: whoami")
+            await expect(signed).to_contain_text("1 action: whoami")
             await expect(signed.get_by_role("button", name="Sign in again")).to_be_visible()
-            await expect(page.get_by_label("Server name")).to_have_count(0)
+            await expect(page.get_by_label("Name of the connected app")).to_have_count(0)
             await page.screenshot(path=str(tmp_path / "connect-mcp-1280-light.png"), full_page=True)
             # Removed, after a yes.
             await _server_row(page, "open").get_by_role("button", name="Remove").click()
