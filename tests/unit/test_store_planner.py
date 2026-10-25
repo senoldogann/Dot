@@ -96,3 +96,11 @@ async def test_a_close_cancelled_while_it_makes_the_statistics_still_closes_the_
     with pytest.raises(asyncio.CancelledError):
         await store.close()
     assert not store._db._running
+
+
+async def test_a_store_closed_twice_closes_quietly_the_second_time(tmp_path: Path) -> None:
+    """A second close was a step that did nothing; the statistics made at a close (item 647) must not make it fail."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    await store.close()
+    await store.close()
+    assert not store._db._running

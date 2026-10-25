@@ -1351,6 +1351,9 @@ class Store:
         # The connection is closed whatever happens to that (cancelled at shutdown, or a store closed twice): its
         # worker thread is not a daemon, and left running it keeps the process alive (item 556).
         try:
+            # A store closed already has no connection to make them on: its second close does nothing, as before.
+            if self._db._connection is None:
+                return
             await self._db.execute("PRAGMA optimize")
         except sqlite3.Error as error:
             log.warning("store_optimize_failed", path=str(self._database), error=str(error))
