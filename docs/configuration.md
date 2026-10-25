@@ -71,6 +71,11 @@ compacting keeps aside, so that the chat can be rewound, stay until the chat is 
 how many messages they are and their size, and the screenshots they name stay with them. The database is locked for a
 moment while it compacts, so run it when no run is active.
 
+**The planner's statistics** (item 647). As it opens the database, the daemon has SQLite make the statistics its
+query planner reads (`PRAGMA optimize`), for the tables that have none or have grown much, and again as it closes it; it
+takes a few milliseconds. Without them SQLite read the events of one kind of a run (its bill, its steps) through those
+of every run, which grew slower with the history: 32 ms for a run of 600 events, 3 ms with them.
+
 **Copies of the database** (item 526). While the daemon runs, it copies the database every `[store] backup_every_hours`
 hours (1), and as it starts when no copy is younger, whenever the database changed since the last copy; a database found
 unchanged is looked at again every ten minutes, so a write after a quiet spell is copied soon. SQLite's online backup
