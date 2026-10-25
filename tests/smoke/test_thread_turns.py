@@ -349,7 +349,8 @@ async def test_an_earlier_turn_keeps_the_page_its_run_showed(
     runtime: Runtime, thread: tuple[str, list[RunRecord]], tmp_path: Path
 ) -> None:
     """A page a run showed (``show_page``, item 193) stays in its turn once the chat has gone on: the turn draws it from
-    the run's ``page_shown`` event, in its frame with its title and the way to open it. Its events are seeded."""
+    the run's ``page_shown`` event, in its frame as part of the answer, named for a screen reader and with no title over
+    it (item 651), and the ways to open it. Its events are seeded."""
     address, runs = thread
     first: RunRecord = runs[0]
     shown = await runtime.store.add_shown_page(first.id, "Tide chart", "<p>High water at noon.</p>")
@@ -365,7 +366,9 @@ async def test_an_earlier_turn_keeps_the_page_its_run_showed(
             turn: Locator = page.locator(".history .turn").first
             card: Locator = turn.locator(".turn-ops figure.shown-page")
             await expect(card).to_have_count(1, timeout=15000)
-            await expect(card.locator(".shown-page-title")).to_have_text("Tide chart")
+            await expect(card).to_have_attribute("aria-label", "Tide chart")
+            await expect(card.locator("figcaption")).to_have_count(0)
+            await expect(card.get_by_role("button", name="Full screen")).to_have_count(1)
             await expect(card.locator("iframe.shown-page-frame")).to_have_count(1)
             await page.screenshot(path=str(tmp_path / "chat-shown-page-turn.png"))
             await page.context.close()

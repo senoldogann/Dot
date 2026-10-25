@@ -36,20 +36,25 @@ _PAGE_MAX_BYTES: int = PAGE_MAX_CHARS * 4
 # What the tool says of a page; since item 521 it asks for one that lives: animated, with values on hover.
 _DESCRIPTION: str = (
     "Show the user a page you write in HTML, in the conversation where they read you: a chart, a table, a diagram, a "
-    "3D view, a mockup or anything that says more drawn than written. It sits under its title in a frame as wide as "
-    "the conversation that grows with the page, and the user can open it full size; do not repeat the title or draw "
-    "an outer box. Write a whole document or only its body. Its scripts run but fetch nothing except the libraries "
+    "3D view, a mockup or anything that says more drawn than written. It is part of your answer: no title over it and "
+    "no box round it, on the conversation's own ground, as wide as the conversation (about 360px on a phone) and as "
+    "tall as the page; the user can open it full screen. Give it a quiet heading of its own if it needs one, not a "
+    "banner; leave html, body and the outermost element without a background, a border or side padding, and give a "
+    "box that needs its own ground 16px of padding and var(--radius) corners. Keep its top right corner (about 72 by "
+    "40 pixels) free of controls: Full screen and Open sit there, always on a phone. Write a whole document or only its "
+    "body. Its scripts run but fetch nothing except the libraries "
     f"they load from {', '.join(LIBRARY_HOSTS)}: put the data and any image (as a data: URL) in the page itself. "
-    "Leave the page without a background of its own, give charts and 3D views a height in pixels, never 100vh, and "
-    "take the look of the user's theme, light or dark, from the CSS variables "
-    f"{', '.join(name for name, _ in THEME_VARIABLES)}. "
+    "Give charts and 3D views a height in pixels: a height in vh follows the frame, which grows with the page, so "
+    "the page grows again (clamp one between pixels if you must). Take the look of the user's theme, light or dark, "
+    f"from the CSS variables {', '.join(name for name, _ in THEME_VARIABLES)}. "
     "Make it live: animate its entrance, show values on hover, let a table sort and a chart toggle its "
     "series, and keep still under prefers-reduced-motion. Libraries that fit, in a pinned version: Apache ECharts or "
     "Chart.js for charts, Mermaid for diagrams, D3 for a drawing of your own, three.js for 3D. A page you made in the "
     f"workspace ({', '.join(sorted(PAGE_SUFFIXES))}) is shown by its path instead of html, with the style sheets, "
     "scripts, pictures (a srcset's too) and fonts beside it that it names written in; a frame, an object or an embed "
     "loads nothing, and neither does what a script loads by itself. The "
-    "answer gives the page's address, which your browser may open to see what you showed."
+    "answer gives the page's address: open it with your browser at a phone's width and the conversation's to see "
+    "what you showed, and show it again if something is cut, crowded or unreadable."
 )
 
 

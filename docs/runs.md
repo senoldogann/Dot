@@ -504,47 +504,50 @@ It is the only file a `research` run may write, and the write lands on that file
 or at the file, which a command of a `task` run can make, is refused, never followed (item 556).
 
 **Pages in the conversation.** `show_page(title, html | path)` shows you a page the run writes in HTML, in the chat: a
-chart, a table, a diagram, a 3D view, a mockup. It sits under its title in a frame as wide as the conversation and as
-tall as the page (80 to 2,000 pixels), and Open shows it full size in your browser. It is drawn in the colours of the
-theme on screen, given to it as CSS variables (`--background`, `--foreground`, `--accent`, `--chart-1` to `--chart-6`
-and others), and takes the new ones when the theme or the system's scheme changes. Its scripts run sandboxed, framed or
-full size: its origin is opaque, so they read nothing of the web UI and reach neither the API nor the page around them.
-They fetch nothing but libraries from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com and esm.sh, submit no form and
-ask for no camera, microphone or position. A link you click in the page opens in your browser; a script of the page
-cannot open one by itself, nor with a click you made elsewhere. A page that loads another page in its frame is closed,
-with Show it again. A page of up to 500,000 characters is kept in the database under an id that cannot be guessed, which
-is all it takes to read it (`GET /pages/<id>`, no token, never cached); it goes with its chat, and with the events of
-its run under `dotx prune`. `dotx run` prints the page's address. The tool is in a group of its own, `pages`. The
-system prompt asks for a page whenever an answer holds something with a shape (figures to compare, a trend, a
-ranking, a share, a timeline, the steps of a process, how parts connect, a place or a layout), rather than a long
-list or figures in text, one page a question and none for a single number. It asks for a page that lives: animated in
-(bars that grow, lines that draw themselves, rows that slide in, a 3D view that turns), with values on hover, tables
-that sort and series that switch on and off, and still under `prefers-reduced-motion`. It names the libraries that
-fit, in pinned versions: Apache ECharts or Chart.js for charts, Mermaid for diagrams, D3 for a drawing of the run's
-own, three.js for 3D (item 521).
-A page the run made in its workspace (an `.html`, `.htm`, `.xhtml` or `.svg` file) is shown by its path instead of its
-HTML (item 598): the file must lie in the workspace once its links are followed and not among the pages a crawl or an
-MCP answer kept there, and the call is judged as a read of it, as `read_file`'s is. The files beside it that it names
-are written into it, since a shown page loads nothing of this Mac (item 600): a style sheet becomes a style block, a
-script its text, and a picture, a sound, a video or a font of the page, of its styles or of a tag's `style` a `data:`
-address, each when it is one `read_file` reads without a question (in the workspace, not protected, not Dot's own, not
-a crawl's or an MCP answer's) and the page with it stays one page (500,000 characters): a file that would not fit is
-measured before it is read and left out, and the page is shown without it; a page that still comes out longer (a file
-that grew while it was read) is shown as it was written. A sheet a style imports (`@import`) is not written in. The
-answer names the files left out. What a script loads by itself (a module's imports, a fetch) does not load.
-What a page commonly names is told the same way (item 612). The pictures of a `srcset` (of an `img`, and of a `source`
-in a `picture`) and the icon of the page (`<link rel="icon">`, `apple-touch-icon` and the like) are written in as a
-tag's picture is; Chrome draws a `srcset` whose pictures are written in from its last candidate, whatever the screen.
-A frame, an object and an embed load nothing in a shown page (its policy has no frame, object or default source), so the
-files they name are not written in: the answer names them as not loaded, and says to write what they hold into the page.
-A picture that three `img` tags or more name by their `src` is written once, in a table at the end of the page that a
-small script of Dot's gives the tags from (each tag keeps `alt` and its other attributes and takes `data-dot-pic` in the
-place of its `src`), so that an icon in each row of a thousand is in every row and its bytes are in the page once; a
-picture named fewer times, or by a tag with a `srcset`, is written where it is named. Each file is found, read and
-encoded once however often the page names it. Writing the files in has ten seconds (a page that names files by the
-thousands is looked at for that long): after it the rest of the page is shown as written, and the answer says so. The
-tool's answer gives the page's address on this Mac (`/pages/<id>`), which the run's browser may open to see what it
-showed (item 601, [Browser](browser-and-computer-use.md)).
+chart, a table, a diagram, a 3D view, a mockup. Since item 651 it is part of the answer: no title over it and no box
+round it, on the conversation's own ground, as wide as the conversation and as tall as the page (80 to 2,000 pixels; a
+longer one scrolls inside it). Over its corner, seen on hover and always on a touch screen, Full screen opens it in a
+dialog of the UI and Open in the browser in yours. The height a page took is kept in the browser by its width, for the
+last 100 pages shown, so a page shown again stands at its height at once and the conversation does not jump. It is drawn
+in the colours of the theme on screen, given to it as CSS variables (`--background`, `--foreground`, `--accent`,
+`--chart-1` to `--chart-6` and others), and takes the new ones when the theme or the system's scheme changes. Its
+scripts run sandboxed, framed or full size: its origin is opaque, so they read nothing of the web UI and reach neither
+the API nor the page around them. They fetch nothing but libraries from cdn.jsdelivr.net, unpkg.com,
+cdnjs.cloudflare.com and esm.sh, submit no form and ask for no camera, microphone or position. A link you click in the
+page opens in your browser; a script of the page cannot open one by itself, nor with a click you made elsewhere. A page
+that loads another page in its frame is closed, with Show it again. A page of up to 500,000 characters is kept in the
+database under an id that cannot be guessed, which is all it takes to read it (`GET /pages/<id>`, no token, never
+cached); it goes with its chat, and with the events of its run under `dotx prune`. `dotx run` prints the page's address.
+The tool is in a group of its own, `pages`. The system prompt asks for a page whenever an answer holds something with a
+shape (figures to compare, a trend, a ranking, a share, a timeline, the steps of a process, how parts connect, a place
+or a layout), rather than a long list or figures in text, one page a question and none for a single number. It asks for
+a page that lives: animated in (bars that grow, lines that draw themselves, rows that slide in, a 3D view that turns),
+with values on hover, tables that sort and series that switch on and off, and still under `prefers-reduced-motion`. It
+names the libraries that fit, in pinned versions: Apache ECharts or Chart.js for charts, Mermaid for diagrams, D3 for a
+drawing of the run's own, three.js for 3D (item 521). A page the run made in its workspace (an `.html`, `.htm`, `.xhtml`
+or `.svg` file) is shown by its path instead of its HTML (item 598): the file must lie in the workspace once its links
+are followed and not among the pages a crawl or an MCP answer kept there, and the call is judged as a read of it, as
+`read_file`'s is. The files beside it that it names are written into it, since a shown page loads nothing of this Mac
+(item 600): a style sheet becomes a style block, a script its text, and a picture, a sound, a video or a font of the
+page, of its styles or of a tag's `style` a `data:` address, each when it is one `read_file` reads without a question
+(in the workspace, not protected, not Dot's own, not a crawl's or an MCP answer's) and the page with it stays one page
+(500,000 characters): a file that would not fit is measured before it is read and left out, and the page is shown
+without it; a page that still comes out longer (a file that grew while it was read) is shown as it was written. A sheet
+a style imports (`@import`) is not written in. The answer names the files left out. What a script loads by itself (a
+module's imports, a fetch) does not load. What a page commonly names is told the same way (item 612). The pictures of a
+`srcset` (of an `img`, and of a `source` in a `picture`) and the icon of the page (`<link rel="icon">`,
+`apple-touch-icon` and the like) are written in as a tag's picture is; Chrome draws a `srcset` whose pictures are
+written in from its last candidate, whatever the screen. A frame, an object and an embed load nothing in a shown page
+(its policy has no frame, object or default source), so the files they name are not written in: the answer names them as
+not loaded, and says to write what they hold into the page. A picture that three `img` tags or more name by their `src`
+is written once, in a table at the end of the page that a small script of Dot's gives the tags from (each tag keeps
+`alt` and its other attributes and takes `data-dot-pic` in the place of its `src`), so that an icon in each row of a
+thousand is in every row and its bytes are in the page once; a picture named fewer times, or by a tag with a `srcset`,
+is written where it is named. Each file is found, read and encoded once however often the page names it. Writing the
+files in has ten seconds (a page that names files by the thousands is looked at for that long): after it the rest of the
+page is shown as written, and the answer says so. The tool's answer gives the page's address on this Mac
+(`/pages/<id>`), which the run's browser may open to see what it showed (item 601,
+[Browser](browser-and-computer-use.md)).
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the

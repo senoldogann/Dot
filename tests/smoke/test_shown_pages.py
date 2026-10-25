@@ -104,7 +104,20 @@ _SHOW: ScriptedTurn = ScriptedTurn(
 _FINISH: ScriptedTurn = ScriptedTurn(
     text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "The chart is above.", "success": True}),)
 )
-_TURNS: list[ScriptedTurn] = [_SHOW, _FINISH] * len(_SHOTS)
+# A page longer than the 2,000 pixels a frame stops at, and one whose height follows its frame's.
+LONG: str = "A long page"
+GROWING: str = "A page that grows"
+_TWO: ScriptedTurn = ScriptedTurn(
+    text="",
+    calls=(
+        ScriptedCall(tool=SHOW_PAGE_TOOL, arguments={"title": LONG, "html": '<div style="height: 3000px">long</div>'}),
+        ScriptedCall(
+            tool=SHOW_PAGE_TOOL,
+            arguments={"title": GROWING, "html": '<div style="height: 100vh">tall</div><p>more</p>'},
+        ),
+    ),
+)
+_TURNS: list[ScriptedTurn] = [_SHOW, _FINISH] * len(_SHOTS) + [_TWO, _FINISH]
 # The text colour of the UI as the scheme on screen draws it.
 _TEXT_COLOUR: str = """() => {
   const probe = document.createElement("span");
@@ -218,8 +231,11 @@ async def _one_size(
     run, page_id = await _shown(runtime, manager, f"Chart the sales ({width}, {scheme})")
     await page.goto(f"{address}/#/runs/{run.id}")
 
+    # Part of the answer (item 651): no title over it, which names it for a screen reader alone, and no box round it.
     card: Locator = page.locator(".shown-page")
-    await expect(card.locator(".shown-page-title")).to_have_text(TITLE)
+    await expect(card).to_have_attribute("aria-label", TITLE)
+    await expect(card.locator("figcaption")).to_have_count(0)
+    await expect(card.locator("iframe.shown-page-frame")).to_have_css("border-top-width", "0px")
     framing: Locator = card.locator("iframe.shown-page-frame")
     await expect(framing).to_have_attribute("sandbox", "allow-scripts")
     await card.scroll_into_view_if_needed()
@@ -230,8 +246,16 @@ async def _one_size(
     frame: Frame | None = await handle.content_frame()
     assert frame is not None
 
-    # The frame is as tall as the page, and the page is in the colours of the scheme on screen.
+    # The frame is as tall as the page, and the page is in the colours of the scheme on screen; this browser keeps the
+    # height for the next time the page is shown at this width.
     await _settles(partial(_fits, framing, frame), True)
+    fitted: str = await framing.evaluate("(node) => node.style.height")
+    # Kept once the page has stood still a moment, not at every step of its growth.
+    kept_of: str = (
+        "(id) => Object.values(JSON.parse(localStorage.getItem('dot.pageHeights') ?? '{}')[id] ?? {})"
+        ".map((h) => `${h}px`)"
+    )
+    await _settles(partial(page.evaluate, f"({kept_of})('{page_id}').includes('{fitted}')"), True)
     await _settles(partial(frame.evaluate, _INK), await page.evaluate(_TEXT_COLOUR))
     await card.scroll_into_view_if_needed()
     await page.screenshot(path=str(shots / f"page-{width}-{scheme}.png"))
@@ -260,6 +284,17 @@ async def _one_size(
     await _settles(partial(full.evaluate, _INK), other)
     await _settles(partial(_address_of, full), f"{address}/pages/{page_id}")
 
+    # Full screen, in a dialog of the UI: the page in the theme on screen, reaching nothing; Escape closes it.
+    await card.hover()
+    await card.get_by_role("button", name="Full screen").click()
+    dialog: Locator = page.get_by_role("dialog", name=TITLE)
+    await expect(dialog).to_be_visible()
+    await expect(dialog.frame_locator("iframe.shown-page-frame").locator("#ink")).to_have_text(TITLE)
+    await _check_reach(dialog.frame_locator("iframe.shown-page-frame"))
+    await page.screenshot(path=str(shots / f"full-{width}-{_OTHER[scheme]}.png"))
+    await page.keyboard.press("Escape")
+    await expect(dialog).to_have_count(0)
+
     # A page that loads another in its frame is closed, and the run's page can be shown again.
     await inside.locator("#away").click()
     left: Locator = card.locator(".shown-page-left")
@@ -269,6 +304,33 @@ async def _one_size(
     await left.get_by_role("button", name="Show it again").click()
     await expect(card.frame_locator("iframe.shown-page-frame").locator("#ink")).to_have_text(TITLE)
     await context.close()
+
+
+async def _seen_height(frame: Locator) -> int:
+    """The height of ``frame``, kept in sight: Chrome slows the pages of frames out of sight, and a page that grows says
+    so only while it is drawn."""
+    await frame.scroll_into_view_if_needed()
+    height: int = await frame.evaluate("(node) => node.clientHeight")
+    return height
+
+
+async def _long_and_growing(browser: Browser, runtime: Runtime, manager: RunManager, address: str) -> None:
+    """A page of 3,000 pixels and one whose height follows its frame's both stop at 2,000 and scroll inside it."""
+    run: RunRecord = await manager.start(
+        "Two pages", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
+    )
+    async with asyncio.timeout(WAIT_S):
+        assert (await manager.wait(run.id)).status == "done"
+    page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+    await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+    await page.goto(f"{address}/#/runs/{run.id}")
+    long: Locator = page.locator(f".shown-page[aria-label='{LONG}'] iframe")
+    growing: Locator = page.locator(f".shown-page[aria-label='{GROWING}'] iframe")
+    await _settles(partial(_seen_height, long), 2000)
+    await _settles(partial(_seen_height, growing), 2000)
+    await page.wait_for_timeout(1000)
+    assert await _seen_height(growing) == 2000
+    await page.context.close()
 
 
 @pytest.mark.browser
@@ -285,6 +347,7 @@ async def test_a_page_a_run_shows_is_drawn_in_the_conversation_and_reaches_nothi
             try:
                 for size in _SHOTS:
                     await _one_size(browser, runtime, manager, address, size, tmp_path)
+                await _long_and_growing(browser, runtime, manager, address)
                 gone: APIResponse = await (await browser.new_page()).request.get(f"{address}/pages/page_nothing")
                 assert gone.status == 404
                 assert gone.headers["content-security-policy"].startswith("sandbox allow-scripts;")
