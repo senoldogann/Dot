@@ -81,7 +81,7 @@ async def draft_taught_skill(runtime: "Runtime", recording: Recording, words: st
     writer: PlaybookWriter = playbook_writer_for(
         runtime.router,
         runtime.roles.review(),
-        (),
+        runtime.roles.after_review(),
         runtime.config.agent.model_call_timeout_s,
         f"{recording.thread_id}:teach",
         None,

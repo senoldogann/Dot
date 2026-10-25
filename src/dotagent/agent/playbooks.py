@@ -1353,7 +1353,7 @@ async def _ask_writer(
     writer: PlaybookWriter = playbook_writer_for(
         runtime.router,
         runtime.roles.review(),
-        (run.model,),
+        runtime.roles.after_review((run.model,)),
         runtime.config.agent.model_call_timeout_s,
         f"{run.thread_id}:playbook",
         run.id,

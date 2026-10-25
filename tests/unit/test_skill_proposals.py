@@ -196,7 +196,7 @@ def _runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, models: _Models, *
         config=config,
         memory=SimpleNamespace(embedder=_Embedder({})),
         router=object(),
-        roles=SimpleNamespace(review=lambda: "scripted:any"),
+        roles=SimpleNamespace(review=lambda: "scripted:any", after_review=lambda own=(): tuple(own)),
     )
 
 

@@ -191,7 +191,7 @@ async def merge_near_duplicates(runtime: Runtime, owner_saved: Set[str], now: fl
         judge: MergeJudge = merge_judge_for(
             runtime.router,
             runtime.roles.review(),
-            (),
+            runtime.roles.after_review(),
             runtime.config.agent.model_call_timeout_s,
             f"reflection:{int(now)}:merge{'-outside' if outside else ''}",
         )
