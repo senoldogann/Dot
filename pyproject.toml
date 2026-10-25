@@ -24,7 +24,7 @@ classifiers = [
 dependencies = [
     "aiosqlite>=0.22.1",
     "croniter>=6.2.4",
-    "dotagent-web-research==1.4.7",
+    "dotagent-web-research==1.4.8",
     "fastapi>=0.143.0",
     "httpx>=0.28.1",
     "mcp>=2.3.0",
