@@ -20,12 +20,17 @@ export function anchoredPopover({ anchor, frame, label, build }) {
   anchor.setAttribute("aria-haspopup", "dialog");
   anchor.setAttribute("aria-expanded", "false");
 
+  // The control's place in the frame is measured on the screen: the offsets of a control inside a box of its own count
+  // from that box (the capsule's plan part, item 644, sits in a bar whose backdrop filter makes it one), and a row that
+  // scrolls sideways moves the control without changing them.
   function place() {
+    const box = frame.getBoundingClientRect();
+    const at = anchor.getBoundingClientRect();
     const room = frame.clientWidth - panel.offsetWidth - EDGE_PX;
-    panel.style.left = `${Math.max(EDGE_PX, Math.min(anchor.offsetLeft, room))}px`;
-    panel.style.bottom = `${frame.clientHeight - anchor.offsetTop + EDGE_PX}px`;
+    panel.style.left = `${Math.max(EDGE_PX, Math.min(at.left - box.left - frame.clientLeft, room))}px`;
+    panel.style.bottom = `${frame.clientHeight - (at.top - box.top - frame.clientTop) + EDGE_PX}px`;
     // The height the window has above the control, which the panel keeps within (app.css), so its top never leaves it.
-    panel.style.setProperty("--room-above", `${Math.max(0, anchor.getBoundingClientRect().top - 2 * EDGE_PX)}px`);
+    panel.style.setProperty("--room-above", `${Math.max(0, at.top - 2 * EDGE_PX)}px`);
   }
 
   function focusChoice() {
