@@ -1308,6 +1308,8 @@ class Store:
 
     def __init__(self, connection: aiosqlite.Connection, database: Path, image_dir: Path) -> None:
         self._db: aiosqlite.Connection = connection
+        # Closed already (:meth:`close`): a second close does nothing.
+        self._closed: bool = False
         self._database: Path = database
         self._image_dir: Path = image_dir
         # The one door for writes (``_writing``): the daemon's writers take turns on the one connection.
@@ -1352,8 +1354,9 @@ class Store:
         # worker thread is not a daemon, and left running it keeps the process alive (item 556).
         try:
             # A store closed already has no connection to make them on: its second close does nothing, as before.
-            if self._db._connection is None:
+            if self._closed:
                 return
+            self._closed = True
             await self._db.execute("PRAGMA optimize")
         except sqlite3.Error as error:
             log.warning("store_optimize_failed", path=str(self._database), error=str(error))
