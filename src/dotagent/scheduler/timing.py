@@ -120,32 +120,52 @@ def plan_cron(cron: str, zone: ZoneInfo, min_interval_s: int, now: float) -> Tim
     return Timing(cron=expression, run_at=None, first_run=sample[0])
 
 
-def local_moment(at: str, zone: ZoneInfo) -> float:
-    """The moment an ISO 8601 date and time names; without an offset it is read in ``zone``."""
+def local_moments(at: str, zone: ZoneInfo) -> tuple[float, ...]:
+    """The moments an ISO 8601 date and time names, the earlier first; without an offset it is read in ``zone``, where a
+    time of the hour that the clocks go back over names two moments (item 631: 03:30 on the night the clocks go back
+    happens once before the change and once after it)."""
     try:
         parsed: datetime = datetime.fromisoformat(at.strip())
     except ValueError as exc:
         raise ToolInputError(
             "'at' is not an ISO 8601 date and time such as 2026-10-06T09:30", {"at": at, "error": str(exc)}
         ) from exc
-    local: datetime = parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=zone)
-    try:
-        moment: float = local.timestamp()
-        shown: datetime = datetime.fromtimestamp(moment, tz=zone)
-    except (ValueError, OverflowError, OSError) as exc:
-        # A moment that cannot be shown in the zone (the first or the last day of the calendar) could never be listed.
-        raise ToolInputError(
-            "'at' is too far from now to be a time Dot can keep", {"at": at, "timezone": zone.key, "error": str(exc)}
-        ) from exc
-    if parsed.tzinfo is None and shown.replace(tzinfo=None) != parsed:
-        raise ToolInputError(
-            "that local time does not exist: the clocks jump over it", {"at": at, "timezone": zone.key}
-        )
-    return moment
+    folds: tuple[datetime, ...] = (
+        (parsed,) if parsed.tzinfo is not None else tuple(parsed.replace(tzinfo=zone, fold=fold) for fold in (0, 1))
+    )
+    moments: list[float] = []
+    for local in folds:
+        try:
+            moment: float = local.timestamp()
+            shown: datetime = datetime.fromtimestamp(moment, tz=zone)
+        except (ValueError, OverflowError, OSError) as exc:
+            # A moment that cannot be shown in the zone (the first or the last day of the calendar) could never be
+            # listed.
+            raise ToolInputError(
+                "'at' is too far from now to be a time Dot can keep",
+                {"at": at, "timezone": zone.key, "error": str(exc)},
+            ) from exc
+        if parsed.tzinfo is None and shown.replace(tzinfo=None) != parsed:
+            raise ToolInputError(
+                "that local time does not exist: the clocks jump over it", {"at": at, "timezone": zone.key}
+            )
+        if moment not in moments:
+            moments.append(moment)
+    return tuple(sorted(moments))
+
+
+def local_moment(at: str, zone: ZoneInfo, after: float | None = None) -> float:
+    """The moment an ISO 8601 date and time names; without an offset it is read in ``zone``. A time of the hour that
+    the clocks go back over is the first of its two moments, or, given ``after``, the first of them that is later than
+    it: 03:30 asked for at 03:10 after the change is the 03:30 to come, not the one an hour ago (item 631)."""
+    moments: tuple[float, ...] = local_moments(at, zone)
+    if after is None:
+        return moments[0]
+    return next((moment for moment in moments if moment > after), moments[0])
 
 
 def plan_once(at: str, zone: ZoneInfo, now: float) -> Timing:
-    moment: float = local_moment(at, zone)
+    moment: float = local_moment(at, zone, now)
     if moment <= now:
         raise ToolInputError("'at' is not in the future", {"at": at, "now": format_local(now, zone)})
     return Timing(cron=None, run_at=moment, first_run=moment)

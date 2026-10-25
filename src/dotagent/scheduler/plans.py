@@ -13,6 +13,7 @@ from dotagent.scheduler.timing import (
     Timing,
     format_local,
     local_moment,
+    local_moments,
     named_zone,
     next_firing,
     plan_cron,
@@ -173,7 +174,9 @@ def _edited_timing(
         return _EditedTiming(cron=planned.cron, run_at=None, upcoming=planned.first_run)
     if request.at is None:
         raise ToolInputError("give cron for a recurring schedule or at for a single run", {})
-    moment: float = local_moment(request.at, zone)
+    # The moment it had stays its moment when the time is unchanged, whichever of an hour's two moments it was.
+    moments: tuple[float, ...] = local_moments(request.at, zone)
+    moment: float = record.run_at if record.run_at in moments else local_moment(request.at, zone, now)
     if moment != record.run_at and moment <= now:
         raise ToolInputError("'at' is not in the future", {"at": request.at, "now": format_local(now, zone)})
     return _EditedTiming(cron=None, run_at=moment, upcoming=moment if moment > now else None)

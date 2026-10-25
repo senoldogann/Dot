@@ -234,7 +234,10 @@ dotx schedule disable|enable|delete ID
 ```
 
 A schedule is a complete goal that Dot runs later, once (`--at`) or on a cron rhythm (`--cron`, five fields, read in
-`[scheduler] timezone`, which defaults to the zone `TZ` names when it is set, else the zone of this Mac). Each firing
+`[scheduler] timezone`, which defaults to the zone `TZ` names when it is set, else the zone of this Mac). On the night
+the clocks go back, a time of the hour that happens twice is, for a one-time schedule, the first of its two moments that
+is still to come: 03:30 asked for at 03:10 after the change is the 03:30 to come, not the one an hour ago (item 631);
+a time that the clocks jump over in spring is refused. Each firing
 starts a run in a new chat, so the goal has to say everything; its first message carries, in front of the goal, the
 dated final answers of the schedule's last ended runs (`[scheduler] history_runs`, 5; 0 for none; at most
 `history_chars` characters, each answer cut at 600), marked as what the schedule found before and not as instructions,
