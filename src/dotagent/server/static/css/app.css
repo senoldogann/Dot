@@ -8273,38 +8273,62 @@ dialog.lightbox img {
 
 /* A page a run showed (item 193): its title and the way to open it full size over the page, in a frame as tall as the
    page says it is (pageframe.js); until it says, the frame has a height of its own. */
+/* A page a run showed is part of the answer (item 651): no title over it and no box round it,
+   on the conversation's own ground. Full screen and Open in the browser sit over its corner, seen on hover or focus
+   and always on a touch screen. */
 .shown-page {
-  display: grid;
-  gap: 8px;
+  position: relative;
   margin: 0;
 }
 
-.shown-page-head {
+.shown-page-tools {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
   display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: var(--text-xs);
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity var(--motion-quick) var(--ease);
 }
 
-.shown-page-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
+.shown-page:hover .shown-page-tools,
+.shown-page:focus-within .shown-page-tools {
+  opacity: 1;
+}
+
+@media (pointer: coarse) {
+  .shown-page-tools {
+    opacity: 1;
+  }
+}
+
+/* A page closed for loading another has no frame to open: its Show it again stands alone. */
+.shown-page:has(.shown-page-left) .shown-page-tools {
+  display: none;
+}
+
+.shown-page-tool {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-surface);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   color: var(--text-2);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  cursor: pointer;
 }
 
-.shown-page-open {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
-}
-
-.shown-page-open:hover {
+.shown-page-tool:hover {
   color: var(--text);
+}
+
+.shown-page-tool .icon {
+  width: 14px;
+  height: 14px;
 }
 
 /* A page that loaded another in its place: its frame is closed, and the run's page can be shown again. */
@@ -8323,15 +8347,50 @@ dialog.lightbox img {
   margin-left: auto;
 }
 
-/* The height is the page's own, so the border goes outside it. */
+/* The frame is the page's height, kept from the last time this browser showed it (pageframe.js), else 160 px until
+   the page says. */
 .shown-page-frame {
   display: block;
-  box-sizing: content-box;
-  width: calc(100% - 2px);
+  width: 100%;
   height: 160px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 0;
+}
+
+/* The page full screen, in a dialog of the UI (item 651): its title and Close, and the page under them filling it. */
+dialog.modal.page-dialog {
+  width: min(1200px, calc(100vw - 32px));
+  max-width: min(1200px, calc(100vw - 32px));
+  height: calc(100vh - 64px);
+  height: calc(100dvh - 64px);
+  max-height: none;
   background: var(--bg);
+}
+
+dialog.modal.page-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.page-dialog-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--weight-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+dialog.modal.page-dialog .shown-page-frame {
+  flex: 1;
+  height: auto;
 }
 
 /* What the owner picked for a message (item 318): chips under the message box and under a sent message, each with the

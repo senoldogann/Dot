@@ -5,6 +5,11 @@
  * as CSS variables, at first and on every change; it takes the page's height, between MIN_HEIGHT and MAX_HEIGHT; and it
  * opens in the user's browser a link they clicked in the page. A page that loads another page in its frame is
  * closed, and can be shown again.
+ *
+ * Since item 651 a page is part of the answer: no title over it and no box round it, on the
+ * conversation's own ground, with Full screen (in a dialog of the UI) and Open in the browser over its corner. The
+ * height a page took is kept in this browser by its width, so a page shown again stands at its height at once and
+ * the conversation does not jump under the reader.
  */
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -12,6 +17,12 @@ import { shownScheme } from "./theme.js";
 
 const MIN_HEIGHT = 80;
 const MAX_HEIGHT = 2000;
+// The height a frame took is kept once the page has stood still this long, not at every step of its growth.
+const SETTLED_MS = 600;
+// The heights pages took, by page and by width (a step of WIDTH_STEP pixels), for the KEPT_PAGES shown last.
+const HEIGHTS_KEY = "dot.pageHeights";
+const WIDTH_STEP = 40;
+const KEPT_PAGES = 100;
 const CONTEXT_CHANGED = "ui/notifications/host-context-changed";
 const SIZE_CHANGED = "ui/notifications/size-changed";
 const OPEN_LINK = "ui/open-link";
@@ -37,6 +48,45 @@ const COLOURS = [
 ];
 
 let watching = false;
+
+/** @returns {Record<string, Record<string, number>>} */
+function keptHeights() {
+  try {
+    const kept = JSON.parse(localStorage.getItem(HEIGHTS_KEY) ?? "{}");
+    return kept !== null && typeof kept === "object" ? kept : {};
+  } catch {
+    return {};
+  }
+}
+
+const widthStep = (width) => String(Math.round(width / WIDTH_STEP) * WIDTH_STEP);
+
+/** The height the page `pageId` took at about `width` in this browser, or null. */
+function heightAt(pageId, width) {
+  const height = keptHeights()[pageId]?.[widthStep(width)];
+  return typeof height === "number" && Number.isFinite(height) ? height : null;
+}
+
+/** Keep the height the page `pageId` took at about `width`, for the next time it is shown. */
+function keepHeight(pageId, width, height) {
+  const kept = keptHeights();
+  const step = widthStep(width);
+  if (kept[pageId]?.[step] === height) {
+    return;
+  }
+  const own = { ...(kept[pageId] ?? {}), [step]: height };
+  delete kept[pageId];
+  kept[pageId] = own;
+  const pages = Object.keys(kept);
+  for (const old of pages.slice(0, Math.max(0, pages.length - KEPT_PAGES))) {
+    delete kept[old];
+  }
+  try {
+    localStorage.setItem(HEIGHTS_KEY, JSON.stringify(kept));
+  } catch {
+    // A browser that keeps nothing (private, or full) shows the page all the same.
+  }
+}
 
 /**
  * The theme on screen as a page takes it, `{ theme, styles: { variables } }`: every colour worked out for the scheme on
@@ -95,8 +145,15 @@ function onMessage(event) {
   }
   if (message.method === SIZE_CHANGED) {
     const height = message.params?.height;
-    if (typeof height === "number" && Number.isFinite(height)) {
-      frame.style.height = `${Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.ceil(height)))}px`;
+    // The frame of a page full screen fills its dialog: the page scrolls in it.
+    if (typeof height === "number" && Number.isFinite(height) && frame.dataset.full !== "true") {
+      const fitted = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.ceil(height)));
+      frame.style.height = `${fitted}px`;
+      const page = frame.dataset.page;
+      if (page !== undefined) {
+        clearTimeout(Number(frame.dataset.keeping ?? 0));
+        frame.dataset.keeping = String(setTimeout(() => keepHeight(page, frame.clientWidth, fitted), SETTLED_MS));
+      }
     }
     return;
   }
@@ -138,12 +195,18 @@ function themed(address) {
 }
 
 /**
- * The frame of the page at `address`, sent the theme on screen when it loads. A page that loads another in its place (a
- * script or a refresh of its own) shows what the run did not write, so `onLeft(frame)` takes its frame away. A frame
- * moved in the document loads again too, so the card never moves it.
+ * The frame of the page `pageId` at `address`, sent the theme on screen when it loads. A page that loads another in its
+ * place (a script or a refresh of its own) shows what the run did not write, so `onLeft(frame)` takes its frame away. A
+ * frame moved in the document loads again too, so the card never moves it. `full` is the frame of the full-screen
+ * dialog, which fills it.
  */
-function pageFrame(address, title, onLeft) {
-  const frame = el("iframe", { class: "shown-page-frame", src: themed(address), sandbox: "allow-scripts", title, loading: "lazy", referrerpolicy: "no-referrer" });
+function pageFrame(pageId, address, title, onLeft, full = false) {
+  const frame = el("iframe", { class: "shown-page-frame", src: themed(address), sandbox: "allow-scripts", title, loading: full ? "eager" : "lazy", referrerpolicy: "no-referrer" });
+  if (full) {
+    frame.dataset.full = "true";
+  } else {
+    frame.dataset.page = pageId;
+  }
   let loads = 0;
   frame.addEventListener("load", () => {
     loads += 1;
@@ -157,27 +220,61 @@ function pageFrame(address, title, onLeft) {
   return frame;
 }
 
-/** The card of the page `pageId` that a run showed: its title, a way to open it full size, and the page in its frame. */
+/** The page full screen, in a dialog of the UI (item 651): Escape, its Close or a click beside it closes it. */
+function showFull(pageId, address, title, opener) {
+  const close = el("button", { class: "icon-btn", type: "button", "aria-label": "Close" }, icon("x"));
+  const dialog = el("dialog", { class: "modal page-dialog", "aria-label": title });
+  const frame = pageFrame(pageId, address, title, () => dialog.close(), true);
+  dialog.append(el("div", { class: "page-dialog-head" }, el("span", { class: "page-dialog-title" }, title), close), frame);
+  close.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  });
+  dialog.addEventListener("close", () => {
+    dialog.remove();
+    opener.focus();
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+/**
+ * The page `pageId` that a run showed, as part of the answer (item 651): the page in its frame, as tall as it was
+ * the last time this browser showed it at this width, and over its corner Full screen and Open in the browser.
+ */
 export function pageCard(pageId, title) {
   if (!watching) {
     watch();
   }
   const address = `/pages/${encodeURIComponent(pageId)}`;
-  const show = () =>
-    pageFrame(address, title, (frame) => {
+  const show = () => {
+    const frame = pageFrame(pageId, address, title, (shown) => {
       const again = el("button", { class: "btn sm ghost", type: "button" }, "Show it again");
       const left = el("div", { class: "shown-page-left" }, el("span", null, "The page loaded another page in its place, so Dot closed it."), again);
       again.addEventListener("click", () => left.replaceWith(show()));
-      frame.replaceWith(left);
+      shown.replaceWith(left);
     });
+    // The width the card will have is the conversation's; its height is the one the page took there before.
+    requestAnimationFrame(() => {
+      const known = heightAt(pageId, card.clientWidth);
+      if (known !== null && frame.isConnected && frame.style.height === "") {
+        frame.style.height = `${known}px`;
+      }
+    });
+    return frame;
+  };
+  const full = el("button", { class: "shown-page-tool", type: "button", "aria-label": "Full screen", title: "Full screen" }, icon("maximize"));
+  full.addEventListener("click", () => showFull(pageId, address, title, full));
   const open = el(
     "a",
-    { class: "shown-page-open", href: address, target: "_blank", rel: "noopener noreferrer", title: "Open the page full size in your browser" },
+    { class: "shown-page-tool shown-page-open", href: address, target: "_blank", rel: "noopener noreferrer", "aria-label": "Open in your browser", title: "Open in your browser" },
     icon("external"),
-    el("span", null, "Open"),
   );
   open.addEventListener("click", () => {
     open.href = themed(address);
   });
-  return el("figure", { class: "shown-page" }, el("figcaption", { class: "shown-page-head" }, icon("image"), el("span", { class: "shown-page-title" }, title), open), show());
+  const card = el("figure", { class: "shown-page", "aria-label": title }, show(), el("div", { class: "shown-page-tools" }, full, open));
+  return card;
 }
