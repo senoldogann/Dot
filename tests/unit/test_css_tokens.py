@@ -99,6 +99,22 @@ def test_what_repeats_forever_is_drawn_by_the_compositor() -> None:
     assert set(redrawn) == _REDRAWN_WHILE_AT_WORK, redrawn
 
 
+def test_what_repeats_forever_stands_still_while_dots_window_is_away() -> None:
+    """Item 662: every endless animation takes its play state from ``--endless``, which the page sets to paused while
+    Dot's window is not the one in front or is out of sight, so that nothing is drawn at the screen's rate with nobody
+    looking. A new endless animation without it fails here."""
+    sheets: str = "\n".join((_CSS / name).read_text(encoding="utf-8") for name in _DRAWN)
+    endless: int = len(re.findall(r"\binfinite\b[^;{}]*;", sheets))
+    switched: int = len(
+        re.findall(
+            r"\binfinite\b[^;{}]*;\s*\n(?:\s*/\*[^*]*\*/\n)?\s*animation-play-state: (?:running, )*var\(--endless\);",
+            sheets,
+        )
+    )
+    assert endless > 0 and switched == endless, (switched, endless)
+    assert re.search(r":root\[data-away\] \{\s*--endless: paused;\s*\}", sheets)
+
+
 def test_the_tokens_are_declared_once_each_in_the_base_look() -> None:
     app: str = (_CSS / "app.css").read_text(encoding="utf-8")
     themes: str = (_CSS / "themes.css").read_text(encoding="utf-8")

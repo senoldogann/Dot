@@ -336,6 +336,24 @@ async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_
                 assert glow["own"] == "none", glow
                 assert glow["name"] == ("none" if motion == "reduce" else "loop-glow"), glow
                 assert motion == "reduce" or set(glow["frames"].split(",")) == {"opacity"}, glow
+                if motion != "reduce":
+                    # While Dot's window is not the one in front its glow stands still, and moves again once it is
+                    # (item 662). The browser here is always in front, so the page is told it is not.
+                    states: str = (
+                        "() => [...document.getAnimations()].filter((one) => one.animationName === 'loop-glow')"
+                        ".map((one) => one.playState).join()"
+                    )
+                    assert await page.evaluate(states) == "running"
+                    await page.evaluate(
+                        "() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); }"
+                    )
+                    await page.wait_for_function("document.documentElement.hasAttribute('data-away')")
+                    assert await page.evaluate(states) == "paused"
+                    await page.evaluate(
+                        "() => { document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); }"
+                    )
+                    await page.wait_for_function("!document.documentElement.hasAttribute('data-away')")
+                    assert await page.evaluate(states) == "running"
                 await sidebar.screenshot(path=tmp_path / f"loop-mark-{scheme}.png")
                 # While chats are chosen for deletion, the row keeps the mark, ticked or not (item 635).
                 await sidebar.get_by_role("button", name="Select", exact=True).click()
