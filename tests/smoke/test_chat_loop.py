@@ -347,12 +347,12 @@ async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_
                     await page.evaluate(
                         "() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); }"
                     )
-                    await page.wait_for_function("document.documentElement.hasAttribute('data-away')")
+                    await expect(page.locator("html")).to_have_attribute("data-away", "")
                     assert await page.evaluate(states) == "paused"
                     await page.evaluate(
                         "() => { document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); }"
                     )
-                    await page.wait_for_function("!document.documentElement.hasAttribute('data-away')")
+                    await expect(page.locator("html")).not_to_have_attribute("data-away", "")
                     assert await page.evaluate(states) == "running"
                 await sidebar.screenshot(path=tmp_path / f"loop-mark-{scheme}.png")
                 # While chats are chosen for deletion, the row keeps the mark, ticked or not (item 635).

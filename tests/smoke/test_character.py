@@ -303,25 +303,14 @@ async def test_a_window_not_in_front_stops_the_loop_and_one_in_front_resumes_it(
     page: Page = await _open(browser, client, False, "light")
     assert await page.evaluate(_TICKER) is True
     await page.evaluate("() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); }")
-    await page.wait_for_function("document.documentElement.hasAttribute('data-away')")
+    await expect(page.locator("html")).to_have_attribute("data-away", "")
     assert await page.evaluate(_TICKER) is False
     assert not await _path_moves(page, _ORBIT)
     await page.evaluate("() => { document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); }")
-    await page.wait_for_function("!document.documentElement.hasAttribute('data-away')")
+    await expect(page.locator("html")).not_to_have_attribute("data-away", "")
     assert await page.evaluate(_TICKER) is True
     assert await _path_moves(page, _ORBIT)
     await page.close()
-
-
-async def _marked_away(page: Page, away: bool) -> bool:
-    """Whether the page comes to be marked away (or not) within five seconds. Looked at from here: the page's policy
-    lets no script be evaluated from a string, which `wait_for_function` does once it has to wait."""
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        if await page.evaluate("() => document.documentElement.hasAttribute('data-away')") is away:
-            return True
-        await asyncio.sleep(0.1)
-    return False
 
 
 async def test_focus_in_a_frame_still_tells_whether_the_page_is_away(
@@ -330,11 +319,12 @@ async def test_focus_in_a_frame_still_tells_whether_the_page_is_away(
     """Item 662: with the focus in a frame of the page (a page Dot shows, a preview), going to another app and coming
     back to the frame fire nothing on the page's window. The page still finds out, both ways, by looking again."""
     page: Page = await _open(browser, client, False, "light")
+    assert await page.evaluate(_TICKER) is True
     await page.evaluate("() => { document.hasFocus = () => false; }")
-    assert await _marked_away(page, True)
+    await expect(page.locator("html")).to_have_attribute("data-away", "")
     assert await page.evaluate(_TICKER) is False
     await page.evaluate("() => { document.hasFocus = () => true; }")
-    assert await _marked_away(page, False)
+    await expect(page.locator("html")).not_to_have_attribute("data-away", "")
     assert await page.evaluate(_TICKER) is True
     await page.close()
 
