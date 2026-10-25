@@ -684,7 +684,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     provider issued is too long and random to guess, and one you chose yourself is as easy to find as you made it. How
     often a site is acted on (the pace of public posts and the caps of a payment) counts by the site's name as the
     step shows it, a name that holds the password included, which needs a site of that name and as many posts as
-    guesses.
+    guesses. Not held: a site whose own scripts share what its tabs hold (a `BroadcastChannel`, the `storage` event)
+    and have the filled tab fetch an address built from it would let a script of the run in another tab of that site
+    steer the filled tab's requests and read back what came of them; it needs the site to do both, and was not seen.
   - **The eye and the screen.** A saved secret the eye shows is hidden again by the page after twenty seconds. Each time
     the eye shows one it asks Dot, which for the thirty seconds after leaves Dot's own windows (the desktop app's, and a
     window of any application that shows the web UI, known by the title the UI gives its page) out of a screenshot of
