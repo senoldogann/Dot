@@ -8,7 +8,7 @@ from pydantic import JsonValue
 
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import RunRecord, ToolStep
 
 # The turns of a chat read at most, as the Changes do (server.changes.CHAT_RUNS).
 CONTEXT_TURNS: int = 200
@@ -48,45 +48,35 @@ def _cut(value: JsonValue, chars: int = _STRING_CHARS) -> JsonValue:
     return value
 
 
-def _steps(events: list[EventRecord]) -> list[ContextStep]:
-    """The calls of one run that succeeded, each with its arguments, in the order they ended."""
-    calls: dict[str, EventRecord] = {}
+def _steps(rows: list[ToolStep]) -> list[ContextStep]:
+    """The calls that succeeded, each with its arguments, in the order they ended."""
+    calls: dict[tuple[str, str], ToolStep] = {}
     steps: list[ContextStep] = []
-    for event in events:
-        call_id: JsonValue = event.data.get("call_id")
-        if not isinstance(call_id, str):
+    for row in rows:
+        key: tuple[str, str] = (row.run_id, row.call_id)
+        if row.kind == "tool_call":
+            calls[key] = row
             continue
-        if event.kind == "tool_call":
-            calls[call_id] = event
+        call: ToolStep | None = calls.pop(key, None)
+        if call is None or not row.ok or row.tool == "":
             continue
-        call: EventRecord | None = calls.pop(call_id, None)
-        tool: JsonValue = event.data.get("tool")
-        if call is None or event.data.get("ok") is not True or not isinstance(tool, str):
-            continue
-        args: JsonValue = call.data.get("args")
-        kind: JsonValue = event.data.get("kind")
-        memory: bool = kind == _MEMORY_WRITE
-        text: JsonValue = event.data.get("text")
-        summary: JsonValue = event.data.get("summary")
+        cut: JsonValue = _cut(call.args)
         steps.append(
             ContextStep(
-                tool=tool,
-                args=cut if isinstance(args, dict) and isinstance(cut := _cut(args), dict) else {},
-                kind=kind if isinstance(kind, str) else "",
-                text=text[:_STRING_CHARS] if memory and isinstance(text, str) else "",
-                summary=summary[:_STRING_CHARS] if memory and isinstance(summary, str) else "",
+                tool=row.tool,
+                args=cut if isinstance(cut, dict) else {},
+                kind=row.result_kind,
+                text=row.text[:_STRING_CHARS] if row.result_kind == _MEMORY_WRITE else "",
+                summary=row.summary[:_STRING_CHARS] if row.result_kind == _MEMORY_WRITE else "",
             )
         )
     return steps
 
 
 async def chat_context(store: Store, run: RunRecord) -> ChatContext:
-    """The steps of the turns of ``run``'s chat before it, oldest first; none for a delegated run."""
+    """The steps of the turns of ``run``'s chat before it, oldest first, read in one go; none for a delegated run."""
     if run.parent_run_id is not None:
         return ChatContext(steps=())
     turns: list[RunRecord] = await store.chat_turns_until(run.thread_id, run.created_at, CONTEXT_TURNS)
-    steps: list[ContextStep] = []
-    for turn in reversed(turns):
-        if turn.id != run.id:
-            steps.extend(_steps(await store.tool_events(turn.id)))
-    return ChatContext(steps=tuple(steps))
+    earlier: list[str] = [turn.id for turn in reversed(turns) if turn.id != run.id]
+    return ChatContext(steps=tuple(_steps(await store.turn_tool_steps(earlier))))
