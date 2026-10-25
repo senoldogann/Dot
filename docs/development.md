@@ -38,10 +38,13 @@ service are marked:
 | `hosted`   | your own `OPENAI_API_KEY`, `OPENCODE_API_KEY`, `ANTHROPIC_API_KEY` and `OLLAMA_API_KEY`; a few tiny requests, skipped per missing key |
 
 `pytest -m "not live and not internet"` skips the first and third kind, `pytest -m "not hosted"` the requests that use
-your keys. A few smoke tests that use the local Ollama server's embedding model skip themselves without it. A bare
-`pytest` collects every test, as each test module is imported by its path (`tests/unit` and `tests/smoke` have modules
-of the same name), and a mark that is not in the table fails, so a mistyped one cannot pick a test that needs a service
-(item 213).
+your keys. A few smoke tests that use the local Ollama server's embedding model skip themselves without it; that model
+runs on this Mac. A test that asks the server for a cloud model (a name that ends in `:cloud`, which Ollama answers from
+its own servers) is `live`, as every test that calls a model is (`tests/smoke/ollama_live.py`, item 632): before, such
+tests were only skipped where the server was not there, so the offline selection of the gate called the model on a Mac
+that had it. A bare `pytest` collects every test, as each test module is imported by its path (`tests/unit` and
+`tests/smoke` have modules of the same name), and a mark that is not in the table fails, so a mistyped one cannot pick a
+test that needs a service (item 213).
 
 No test opens a microphone (item 626). Chrome's own fake microphone (`--use-fake-device-for-media-stream`) still makes
 macOS ask for the microphone for the app that runs the tests, a permission dialog on the screen, and `getUserMedia`

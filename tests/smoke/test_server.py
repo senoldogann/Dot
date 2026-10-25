@@ -22,6 +22,7 @@ import openpyxl
 import pptx
 import pytest
 import pytest_asyncio
+from ollama_live import live_with
 from PIL import Image
 from playwright.async_api import Browser, FilePayload, Page, async_playwright, expect
 from structlog.testing import capture_logs
@@ -83,7 +84,8 @@ def _tags() -> list[str]:
     return [model["name"] for model in answer.json()["models"]] if answer.status_code == 200 else []
 
 
-requires_model = pytest.mark.skipif(MODEL not in _tags(), reason=f"needs the local Ollama server with {MODEL}")
+# Live (item 632): the cloud model answers from off this Mac; the embedding model below is local.
+requires_model = live_with(MODEL in _tags(), f"needs the local Ollama server with {MODEL}")
 requires_embedder = pytest.mark.skipif(
     not any(name.startswith(EMBED_MODEL) for name in _tags()),
     reason=f"needs the local Ollama server with {EMBED_MODEL}",
