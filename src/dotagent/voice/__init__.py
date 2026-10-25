@@ -9,4 +9,7 @@ down with macOS 26's dictation model, on the device:
 - :mod:`dotagent.voice.toolchain` says whether this Mac can do it, and finds the compiler that builds the program;
 - :mod:`dotagent.voice.helper` builds ``transcribe.swift`` with it once in a daemon's life, runs it on a recording and
   returns the words.
+
+The composer's microphone in the desktop app is macOS's, not this package's: :mod:`dotagent.voice.desktopapp` says
+whether the Dot.app that runs can be given it, and shows System Settings where the owner allows it (item 636).
 """

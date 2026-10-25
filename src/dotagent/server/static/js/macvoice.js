@@ -5,7 +5,8 @@
 // its microphone listens (voice.js `listeningWay`) from the answer once it is in: a composer made before it listens the
 // browser's way, and one that is not listening takes the way the answer gives at its next press (microphone.js). The
 // daemon builds the program that writes down in the background meanwhile, so that the first recording does not wait for
-// it. And the call that has the Mac write a recording down.
+// it. And the calls that have the Mac write a recording down, and show System Settings where Dot.app is allowed the
+// microphone (item 636).
 
 import { api } from "./api.js";
 import { macLanguage } from "./recording.js";
@@ -78,4 +79,17 @@ export const loadMacVoice = shared.loadMacVoice;
 export async function writeDown(tag, wav) {
   const answer = await api.post("/voice/transcribe", { language: macLanguage(tag), data_b64: base64Of(wav) });
   return answer.text;
+}
+
+/**
+ * Have the Mac show System Settings at the pane where Dot.app is allowed the microphone (`"microphone"`) or its speech
+ * recognition (`"speech"`) (item 636, `POST /api/voice/allow`). Resolves with what the Mac did: `opened`, whether it showed
+ * the pane, and `app`, the Dot.app it found (`"ready"`, `"old"`, one built before Dot asked macOS for the microphone, for
+ * which System Settings is no help and nothing is shown, or `"unknown"`). Rejects with the daemon's error, or the one of a
+ * Mac that could not be reached.
+ * @param {"microphone" | "speech"} pane
+ * @returns {Promise<{ opened: boolean, app: "ready" | "old" | "unknown" }>}
+ */
+export function allowAtSettings(pane) {
+  return api.post("/voice/allow", { pane });
 }

@@ -69,6 +69,7 @@ from dotagent.store.models import (
 )
 from dotagent.tailnet import TailnetState
 from dotagent.undo.restore import UndoAction, UndoState
+from dotagent.voice.desktopapp import AppState, VoicePane
 from dotagent.voice.wav import MAX_RECORDING_BYTES
 
 _GOAL_CHARS: int = 50_000
@@ -467,6 +468,23 @@ class TranscriptView(FrozenModel):
     """The words a recording was written down as; empty when nothing was heard in it."""
 
     text: str
+
+
+class VoiceAllowRequest(FrozenModel):
+    """Where in System Settings › Privacy & Security the owner allows Dot.app the microphone (item 636): the
+    ``microphone`` pane, or the ``speech`` recognition one."""
+
+    pane: VoicePane
+
+
+class VoiceAllowView(FrozenModel):
+    """What the Mac did for the owner who was refused the microphone in Dot.app (item 636). ``app`` is the Dot.app that
+    runs: ``ready``, it asks macOS for the microphone, so ``opened`` says System Settings was shown at the pane;
+    ``old``, it was built before it asked, so macOS gives it none whatever System Settings shows and nothing was
+    opened; ``unknown``, none was found running, and the pane was shown all the same."""
+
+    opened: bool
+    app: AppState
 
 
 class LoopRequest(FrozenModel):

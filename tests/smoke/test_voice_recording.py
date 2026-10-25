@@ -549,6 +549,38 @@ async def test_a_microphone_the_browser_refuses_says_where_to_allow_it(
     await page.context.close()
 
 
+async def test_in_dot_app_a_microphone_macos_refuses_to_the_recording_has_system_settings_shown(
+    chromium: Browser, address: str, mac_can: StandIn
+) -> None:
+    """Item 636: where Dot.app records (its web view has no speech recognition, here an iPhone's page in the shell), the
+    microphone `getUserMedia` refuses has the Mac show System Settings at the Microphone pane, as a refused dictation
+    does, and one toast says so, calm because it is help. The test answers the ask; the daemon never sees it."""
+    asked: list[object] = []
+
+    async def answer(route: Route) -> None:
+        asked.append(route.request.post_data_json)
+        await route.fulfill(json={"opened": True, "app": "ready"})
+
+    async def routes(page: Page) -> None:
+        await page.route("**/api/voice/allow", answer)
+
+    page: Page = await _open(
+        chromium, address, scripts=(_MICROPHONE, _RECOGNITION, "window.__TAURI__ = {};"), routes=routes
+    )
+    await expect(page.locator("html")).to_have_attribute("data-shell", "desktop")
+    await page.evaluate("() => { window.__mic.refuse = 'NotAllowedError'; }")
+    await _microphone(page).click()
+    calm: Locator = page.locator(".toast.ok")
+    await expect(calm).to_contain_text("System Settings is open at Microphone: switch Dot on there")
+    await expect(page.locator(".toast.error")).to_have_count(0)
+    await expect(page.locator(".toast")).to_have_count(1)
+    assert asked == [{"pane": "microphone"}]
+    await expect(_recorder(page)).to_be_hidden()
+    await expect(_microphone(page)).to_have_attribute("aria-pressed", "false")
+    await _released(page)
+    await page.context.close()
+
+
 async def test_a_page_put_out_of_sight_lets_the_microphone_go_and_sends_nothing(
     chromium: Browser, address: str, mac_can: StandIn
 ) -> None:

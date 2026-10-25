@@ -207,14 +207,26 @@ Settings › Privacy & Security › Microphone; in the desktop app, which macOS 
 only once the app asks for them (a Dot.app built before item 594 cannot), Dot in System Settings, the toast naming macOS
 and Dot, not a browser (item 593); and on a phone, the browser's and the device's settings, with no word of a Mac's. On
 a Mac they name macOS Dictation (the Dictation key, or Fn twice), on a phone the keyboard's own microphone, which type
-into the box meanwhile. A dictation that ends by itself having heard nothing says so and what to check (the microphone's
-permission, on a Mac the input in System Settings › Sound, the language), where it ended without a word before; one you
-stop says nothing. Safari's way of saying it, "aborted" where Chrome says "no-speech", counts the same (item 616). On an
-iPhone or an iPad, Safari hears the first dictation after the page loads, and at times a later one opens the microphone
-and hears nothing (WebKit bugs 317741 and 321436): the wave stays flat. Such a dictation says that Safari heard nothing,
-whoever ended it, and its toast's **Reload** brings the microphone back, the box's words kept as its draft; the
-keyboard's own microphone types meanwhile. A dictation stops a reading aloud first, as Safari does not hear while it
-speaks.
+into the box meanwhile. In the desktop app the refusal does more than say where to look (item 636). The page asks the
+daemon to show System Settings at the pane where Dot is switched on (`POST /api/voice/allow`): Microphone, or Speech
+Recognition when the engine's message names speech recognition. It does so for a dictation macOS refuses (`not-allowed`,
+`service-not-allowed`) and for a recording whose microphone it refuses (`NotAllowedError`, `PermissionDeniedError`,
+`SecurityError`), and one toast says what came of it, calm, since it is help and not an error: "System Settings is open
+at Microphone: switch Dot on there, and under Speech Recognition too." (or the same at Speech Recognition, naming
+Microphone), with the sentence about macOS Dictation. A Dot.app built before item 594 cannot be helped that way: it
+names no reason for the microphone and has no entitlement to it, so WebKit refuses it before macOS is asked, and System
+Settings can list Dot as allowed all the same. For that Dot.app the daemon shows nothing, and the toast says it was
+built before Dot asked macOS for the microphone, that macOS gives it none whatever System Settings shows, and that the
+next Dot.app asks for it and is offered by the app's updater as soon as it is out. One toast comes for a press; when the
+daemon cannot be asked, or fails, it is the words of item 593. A browser on the Mac and a phone keep their words and ask
+for nothing: only the desktop app has a System Settings the daemon opens for it. A dictation that ends by itself having
+heard nothing says so and what to check (the microphone's permission, on a Mac the input in System Settings › Sound, the
+language), where it ended without a word before; one you stop says nothing. Safari's way of saying it, "aborted" where
+Chrome says "no-speech", counts the same (item 616). On an iPhone or an iPad, Safari hears the first dictation after the
+page loads, and at times a later one opens the microphone and hears nothing (WebKit bugs 317741 and 321436): the wave
+stays flat. Such a dictation says that Safari heard nothing, whoever ended it, and its toast's **Reload** brings the
+microphone back, the box's words kept as its draft; the keyboard's own microphone types meanwhile. A dictation stops a
+reading aloud first, as Safari does not hear while it speaks.
 
 **The recording** (item 626) is how an iPhone or an iPad hears every time. Safari's recognition there hears the first
 dictation of a page and at times none after it, and nothing a page does brings it back (item 616 only says so), so where
@@ -1028,6 +1040,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /channels/imessage/code` (`{"handle": "+358401234567"}`), `POST /channels/imessage/confirm` (`{"code": "482 913"}`), `POST /channels/imessage/remove` (`{"handle": …}`), `POST /channels/imessage/check`, `POST /channels/imessage/poll` | send a pairing code to a number (with its country code) or an address through Messages; pair it when the code is typed back (422 for a wrong one, with the tries left, and for one out of date or used up); forget a paired one; show macOS's question whether Dot may control Messages, a minute for the answer; look at Messages' database now (Check now, item 595): a poll like the loop's, never reading a row twice with it, when the channel is on and a number paired, else a look that reads no message |
 | `GET /snapshots`, `POST /snapshots/settings` (`{"key": "sound", "value": "pop"}`), `POST /snapshots/take`, `POST /snapshots/claim` | SnapShots (item 405): the settings as they stand, whether the Command key is watched and the captures waiting; a setting changed, live and in the config file; a capture taken by hand; the captures a composer takes into its draft |
 | `GET /desktop/permissions`, `POST /desktop/permissions`, `POST /desktop/permissions/open` (`{"pane": "screen_recording"}`), `POST /system/restart` | the desktop permissions as macOS reports them, make macOS ask for the missing ones, show a pane, start the service's daemon again (item 409) |
+| `POST /voice/allow` (`{"pane": "microphone"}` or `{"pane": "speech"}`)         | for the composer's microphone in the desktop app (item 636): show System Settings at the pane where Dot.app is allowed the microphone, or speech recognition, from this Mac's own address only (422 from any other, and for any other pane). It reads the Dot.app that runs first and answers `{"opened", "app"}`: `ready`, it asks macOS for the microphone, and the pane is shown; `old`, it was built before it asked, so macOS gives it none whatever System Settings shows, and nothing is shown (`opened` false); `unknown`, none was found running, and the pane is shown all the same. A Dot.app or a `codesign` that cannot be read is an error (500), not an answer. It changes no setting: you switch Dot on |
 
 `POST /runs`, `POST /runs/{id}/steer` and `POST /threads/{id}/queue` take a `key` of the caller's own (16 to 64 letters,
 digits and dashes), which the pages send with each new message. The same message sent again with its key is not done
@@ -1193,7 +1206,13 @@ and Quit. Closing the window keeps the shell in the menu bar.
   is asked. The page given the microphone could record sound with it too (`getUserMedia`), as a site given a browser's
   microphone can; Dot's takes only the words. What you say may go to Apple to be recognized, as in Safari
   ([Safety](safety.md)). A Dot.app built before it can do neither: its composer says so and names macOS Dictation (item
-  593).
+  593), and does not send you to System Settings, which would fix nothing (item 636). For a Dot.app that does ask, a
+  refused microphone has the daemon show System Settings at the pane where Dot is switched on. The daemon tells the two
+  apart by reading the Dot.app that runs, found by its bundle identifier (`dev.dot.desktop`) with
+  `NSRunningApplication`: its `Info.plist` must give both reasons in words, and its signature (`codesign -dv` and
+  `codesign -d --entitlements - --xml`) must have no hardened runtime or carry `com.apple.security.device.audio-input`.
+  What it read is kept while the app's `Info.plist` and the seal of its signature stay as they were, so an update is
+  seen at the next press.
 - **Updates** (item 432). As it starts, and from **Check for Updates…**, the shell reads `latest.json` of the latest
   release on GitHub (`plugins.updater` in `desktop/src-tauri/tauri.conf.json`). A newer version is offered in a dialog:
   **Install and Restart** downloads it, checks that it is signed with the updater's key and that the signature names the

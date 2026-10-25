@@ -135,15 +135,30 @@ def _kept(home: Path) -> list[str]:
     return sorted(entry.name for entry in folder.iterdir()) if folder.exists() else []
 
 
-async def test_both_routes_are_behind_the_token_like_every_other(address: str, mac_can: StandIn) -> None:
+async def test_the_routes_are_behind_the_token_like_every_other(address: str, mac_can: StandIn) -> None:
+    allow: dict[str, str] = {"pane": "microphone"}
     async with httpx.AsyncClient(base_url=address) as stranger:
         assert (await stranger.get("/api/voice")).status_code == 401
         refused: httpx.Response = await stranger.post("/api/voice/transcribe", json=_body(wav_of(SAMPLES)))
         assert refused.status_code == 401
+        # Item 636: nothing is read or shown for a caller without the token.
+        assert (await stranger.post("/api/voice/allow", json=allow)).status_code == 401
     async with httpx.AsyncClient(base_url=address, headers={"Authorization": "Bearer not-the-token"}) as wrong:
         assert (await wrong.get("/api/voice")).status_code == 401
         assert (await wrong.post("/api/voice/transcribe", json=_body(wav_of(SAMPLES)))).status_code == 401
+        assert (await wrong.post("/api/voice/allow", json=allow)).status_code == 401
     assert mac_can.runs_made() == []
+
+
+async def test_system_settings_is_asked_for_by_one_of_two_panes_and_nothing_else(client: httpx.AsyncClient) -> None:
+    """Item 636: the daemon's own application has the route that shows System Settings at the pane where Dot.app is
+    allowed the microphone, and a body it does not know is refused before anything is read or shown. The answers of a
+    Dot.app that runs are the unit tests' (`tests/unit/test_voice_desktop_app.py`): here the daemon would ask this
+    Mac."""
+    for body in ({"pane": "camera"}, {"pane": ""}, {}, {"pane": "microphone", "url": "https://example.com"}):
+        refused: httpx.Response = await client.post("/api/voice/allow", json=body)
+        assert refused.status_code == 422, (body, refused.text)
+        assert refused.json()["message"] == "the request is not valid"
 
 
 async def test_a_mac_that_cannot_says_why_and_writes_nothing_down(client: httpx.AsyncClient, stand_in: StandIn) -> None:

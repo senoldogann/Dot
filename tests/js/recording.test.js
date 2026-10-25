@@ -83,7 +83,7 @@ const arrive = () => new Promise((resolve) => setImmediate(resolve));
  */
 function recordingOf({ held = "", rate = RATE, userAgent = IPHONE } = {}) {
   freshPage(userAgent);
-  const seen = { shown: [], states: [], problems: [], began: 0, sounds: [], writing: [], settled: 0 };
+  const seen = { shown: [], states: [], problems: [], offers: [], began: 0, sounds: [], writing: [], settled: 0 };
   const mic = { calls: [], last: () => mic.calls.at(-1) };
   const mac = { sent: [], answer: () => {}, refuse: () => {} };
   const capture = (onBlock, onEnded) => {
@@ -114,7 +114,10 @@ function recordingOf({ held = "", rate = RATE, userAgent = IPHONE } = {}) {
       seen.settled += 1;
     },
     state: (listening) => seen.states.push(listening),
-    problem: (words) => seen.problems.push(words),
+    problem: (words, offer) => {
+      seen.problems.push(words);
+      seen.offers.push(offer);
+    },
     began: () => {
       seen.began += 1;
     },
@@ -418,6 +421,50 @@ test("a microphone the browser refuses, or has none of, says where to allow it, 
   assert.deepEqual(await asked(Object.assign(new Error("none"), { name: "NotFoundError" })), ["No microphone was found."]);
   assert.match((await asked(Object.assign(new Error("busy"), { name: "NotReadableError" })))[0], /another app may be using it/);
   assert.deepEqual(await asked(new Error("boom")), ["The microphone could not start: boom"]);
+});
+
+test("a microphone macOS refuses in Dot.app comes with the pane to show in System Settings, and in a browser with none", async () => {
+  // Item 636: the page asks the Mac to show System Settings where Dot is allowed; the words stand if the Mac cannot.
+  const asked = async (error, shell) => {
+    const made = recordingOf();
+    globalThis.document.documentElement.dataset.shell = shell;
+    made.recording.start();
+    made.mic.last().fail(error);
+    await arrive();
+    return made.seen;
+  };
+  for (const name of ["NotAllowedError", "PermissionDeniedError", "SecurityError"]) {
+    const app = await asked(Object.assign(new Error("denied"), { name }), "desktop");
+    assert.deepEqual(app.offers, [{ allow: "microphone" }], name);
+    assert.match(app.problems[0], /^macOS has not given Dot the microphone\. Allow Dot in System Settings/);
+    assert.deepEqual((await asked(Object.assign(new Error("denied"), { name }), undefined)).offers, [undefined], name);
+  }
+  const speech = await asked(Object.assign(new Error("Speech recognition was refused"), { name: "NotAllowedError" }), "desktop");
+  assert.deepEqual(speech.offers, [{ allow: "speech" }]);
+  // Nothing else the microphone can meet is helped by System Settings.
+  for (const name of ["NotFoundError", "NotReadableError", "InvalidStateError", "Error"]) {
+    assert.deepEqual((await asked(Object.assign(new Error("x"), { name }), "desktop")).offers, [undefined], name);
+  }
+});
+
+test("a microphone that cannot even be asked for, refused in Dot.app, comes with the pane to show as well", () => {
+  freshPage();
+  globalThis.document.documentElement.dataset.shell = "desktop";
+  const offers = [];
+  const recording = createRecording({
+    language: () => "tr-TR",
+    text: () => "",
+    show() {},
+    settled() {},
+    state() {},
+    problem: (_words, offer) => offers.push(offer),
+    capture() {
+      throw Object.assign(new Error("denied"), { name: "NotAllowedError" });
+    },
+    send: async () => "",
+  });
+  recording.start();
+  assert.deepEqual(offers, [{ allow: "microphone" }]);
 });
 
 test("a microphone that cannot even be asked for says why, and the press leaves no recording", () => {

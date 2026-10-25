@@ -6,7 +6,10 @@ import { test } from "node:test";
 
 import {
   QUIET_BAR,
+  allowPane,
+  allowToast,
   appleTouch,
+  captureOffer,
   captureProblem,
   clockText,
   deafWords,
@@ -16,6 +19,7 @@ import {
   localVoice,
   macOffer,
   nextWave,
+  problemOffer,
   problemWords,
   sendProblem,
   sentenceChunks,
@@ -363,5 +367,101 @@ test("what a recording met on its way to the Mac is said in plain words: unreach
   // None of it says what the page does: no file format, no program, no model.
   for (const words of [sendProblem({ status: 0 }), sendProblem({ context: { code: "unsupported-language" } })]) {
     assert.doesNotMatch(words, /WAV|Swift|transcrib|locale/i);
+  }
+});
+
+// ----- a refusal in Dot.app opens System Settings (item 636) --------------------------------------------------------
+
+const DICTATION_APP = "macOS Dictation types into the box meanwhile: the Dictation key, or Fn twice.";
+
+test("the pane to show is Speech Recognition when the error names it, and Microphone for every other error", () => {
+  // WebKit words a refusal of macOS's speech recognition and one of the microphone apart in the event's message.
+  for (const message of [
+    "Speech recognition service permission check has failed",
+    "speech recognition is not allowed",
+    "SpeechRecognition was refused",
+    "Speech-recognition denied",
+  ]) {
+    assert.equal(allowPane({ message }), "speech", message);
+  }
+  for (const message of ["Microphone permission check has failed", "Permission denied", "", "Permission check failed"]) {
+    assert.equal(allowPane({ message }), "microphone", message);
+  }
+  // An error that says nothing (no message at all) is the microphone's.
+  assert.equal(allowPane({}), "microphone");
+  assert.equal(allowPane(null), "microphone");
+  assert.equal(allowPane(undefined), "microphone");
+});
+
+test("only Dot.app offers System Settings, and only for macOS refusing the microphone or its speech recognition", () => {
+  const speech = { message: "Speech recognition service permission check has failed" };
+  for (const code of ["not-allowed", "service-not-allowed"]) {
+    assert.deepEqual(problemOffer({ error: code, message: "" }, "app"), { allow: "microphone" });
+    assert.deepEqual(problemOffer({ error: code, message: speech.message }, "app"), { allow: "speech" });
+    // A browser on a Mac or a phone has no System Settings that the Mac opens for it: today's words alone.
+    assert.equal(problemOffer({ error: code, ...speech }, "mac"), undefined);
+    assert.equal(problemOffer({ error: code, ...speech }, "other"), undefined);
+  }
+  // Nothing else that goes wrong is helped by it.
+  for (const code of ["no-speech", "aborted", "audio-capture", "network", "language-not-supported", "something-new"]) {
+    assert.equal(problemOffer({ error: code, message: "" }, "app"), undefined, code);
+  }
+  assert.equal(problemOffer({}, "app"), undefined);
+});
+
+test("the offer goes with the words of the refusals it is made for and with no other", () => {
+  // The offer and the words are of the same errors: what is offered System Settings is told macOS has not given Dot it.
+  for (const code of ["not-allowed", "service-not-allowed"]) {
+    assert.notEqual(problemOffer({ error: code }, "app"), undefined);
+    assert.match(problemWords(code, "app"), /^macOS has not given Dot the microphone or its speech recognition/);
+  }
+  for (const name of ["NotAllowedError", "PermissionDeniedError", "SecurityError"]) {
+    assert.notEqual(captureOffer({ name }, "app"), undefined);
+    assert.match(captureProblem({ name }, "app"), /^macOS has not given Dot the microphone\./);
+  }
+});
+
+test("a refused recording in Dot.app offers System Settings, and every other error of the microphone offers nothing", () => {
+  for (const name of ["NotAllowedError", "PermissionDeniedError", "SecurityError"]) {
+    assert.deepEqual(captureOffer({ name, message: "Permission denied" }, "app"), { allow: "microphone" });
+    assert.deepEqual(captureOffer({ name, message: "Speech recognition was refused" }, "app"), { allow: "speech" });
+    assert.equal(captureOffer({ name, message: "x" }, "mac"), undefined);
+    assert.equal(captureOffer({ name, message: "x" }, "other"), undefined);
+  }
+  for (const name of ["NotFoundError", "OverconstrainedError", "NotReadableError", "AbortError", "InvalidStateError", "Error"]) {
+    assert.equal(captureOffer({ name, message: "x" }, "app"), undefined, name);
+  }
+  assert.equal(captureOffer(null, "app"), undefined);
+  assert.equal(captureOffer(undefined, "app"), undefined);
+});
+
+test("System Settings opened is said calmly, at the pane, naming the other pane too, with macOS Dictation after", () => {
+  assert.deepEqual(allowToast({ opened: true, app: "ready" }, "microphone"), {
+    kind: "ok",
+    words: `System Settings is open at Microphone: switch Dot on there, and under Speech Recognition too. ${DICTATION_APP}`,
+  });
+  assert.deepEqual(allowToast({ opened: true, app: "ready" }, "speech"), {
+    kind: "ok",
+    words: `System Settings is open at Speech Recognition: switch Dot on there, and under Microphone too. ${DICTATION_APP}`,
+  });
+  // A Dot.app the Mac did not find running had the pane shown all the same.
+  assert.deepEqual(allowToast({ opened: true, app: "unknown" }, "microphone"), allowToast({ opened: true, app: "ready" }, "microphone"));
+});
+
+test("a Dot.app built before Dot asked macOS for the microphone is told so, as an error, with macOS Dictation after", () => {
+  const old = allowToast({ opened: false, app: "old" }, "microphone");
+  assert.equal(old.kind, "error");
+  assert.equal(
+    old.words,
+    `This Dot.app was built before Dot asked macOS for the microphone, so macOS gives it none, whatever System Settings shows. The next Dot.app asks for it, and Dot offers it as soon as it is out. ${DICTATION_APP}`,
+  );
+  // The pane asked for does not change what is true of the app.
+  assert.deepEqual(allowToast({ opened: false, app: "old" }, "speech"), old);
+  assert.doesNotMatch(old.words, /switch Dot on/);
+});
+
+test("an answer that says neither leaves the words of the refusal to stand", () => {
+  for (const answer of [null, undefined, {}, { opened: false }, { opened: false, app: "ready" }, { app: "ready" }, { opened: "yes" }]) {
+    assert.equal(allowToast(answer, "microphone"), null, JSON.stringify(answer));
   }
 });

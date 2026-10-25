@@ -152,6 +152,11 @@ export function deafWords(words, mac) {
 // How many dictations of a page began to listen, by its document: a page loaded anew starts at none.
 const pageDictations = new WeakMap();
 
+// What a refused microphone is called: by the recognition, the codes of its error events, and by `getUserMedia`, the names of
+// the errors it rejects with (recording.js).
+const RECOGNITION_REFUSED = new Set(["not-allowed", "service-not-allowed"]);
+const CAPTURE_REFUSED = new Set(["NotAllowedError", "PermissionDeniedError", "SecurityError"]);
+
 /**
  * What to tell the owner of the recognition's error `code`, or null for none (the owner stopped it), in the words of
  * `place` (`voicePlace`): in Dot.app macOS, not a browser, gives the microphone (item 593), and only a Mac has System
@@ -162,15 +167,15 @@ export function problemWords(code, place) {
   const app = place === "app";
   const who = app ? "Dot" : "the browser";
   const onMac = place !== "other";
+  if (RECOGNITION_REFUSED.has(code)) {
+    if (app) {
+      return `macOS has not given Dot the microphone or its speech recognition. Allow Dot in System Settings › Privacy & Security › Microphone and Speech Recognition; a Dot that is not listed there is an older Dot.app, which cannot ask for them. ${DICTATION.app}`;
+    }
+    return onMac
+      ? `The browser has not allowed the microphone, or its speech recognition, on this page. Allow it for this address in the browser, and the browser in System Settings › Privacy & Security › Microphone. ${DICTATION.mac}`
+      : `The browser has not allowed the microphone, or its speech recognition, on this page. Allow it for this address in the browser's settings, and the browser in the device's settings. ${DICTATION.other}`;
+  }
   switch (code) {
-    case "not-allowed":
-    case "service-not-allowed":
-      if (app) {
-        return `macOS has not given Dot the microphone or its speech recognition. Allow Dot in System Settings › Privacy & Security › Microphone and Speech Recognition; a Dot that is not listed there is an older Dot.app, which cannot ask for them. ${DICTATION.app}`;
-      }
-      return onMac
-        ? `The browser has not allowed the microphone, or its speech recognition, on this page. Allow it for this address in the browser, and the browser in System Settings › Privacy & Security › Microphone. ${DICTATION.mac}`
-        : `The browser has not allowed the microphone, or its speech recognition, on this page. Allow it for this address in the browser's settings, and the browser in the device's settings. ${DICTATION.other}`;
     case "no-speech":
       return onMac
         ? `Nothing was heard. Check that ${who} may use the microphone in System Settings › Privacy & Security › Microphone, the input in System Settings › Sound, and the language in Settings › General › Voice.`
@@ -196,16 +201,15 @@ export function problemWords(code, place) {
  * @param {"app" | "mac" | "other"} place
  */
 export function captureProblem(error, place) {
+  if (CAPTURE_REFUSED.has(error?.name)) {
+    if (place === "app") {
+      return `macOS has not given Dot the microphone. Allow Dot in System Settings › Privacy & Security › Microphone. ${DICTATION.app}`;
+    }
+    return place === "mac"
+      ? `The browser has not allowed the microphone on this page. Allow it for this address in the browser, and the browser in System Settings › Privacy & Security › Microphone. ${DICTATION.mac}`
+      : `The browser has not allowed the microphone on this page. Allow it for this address in the browser's settings, and the browser in the device's settings. ${DICTATION.other}`;
+  }
   switch (error?.name) {
-    case "NotAllowedError":
-    case "PermissionDeniedError":
-    case "SecurityError":
-      if (place === "app") {
-        return `macOS has not given Dot the microphone. Allow Dot in System Settings › Privacy & Security › Microphone. ${DICTATION.app}`;
-      }
-      return place === "mac"
-        ? `The browser has not allowed the microphone on this page. Allow it for this address in the browser, and the browser in System Settings › Privacy & Security › Microphone. ${DICTATION.mac}`
-        : `The browser has not allowed the microphone on this page. Allow it for this address in the browser's settings, and the browser in the device's settings. ${DICTATION.other}`;
     case "NotFoundError":
     case "OverconstrainedError":
       return problemWords("audio-capture", place);
@@ -217,6 +221,63 @@ export function captureProblem(error, place) {
     default:
       return `The microphone could not start: ${error?.message ?? "the browser gave no reason"}`;
   }
+}
+
+/**
+ * The pane of System Settings to show for a microphone macOS refused in Dot.app (item 636): Speech Recognition when the
+ * error's `message` names speech recognition, Microphone otherwise.
+ * @param {{ message?: string } | null | undefined} error  what the engine or the capture gave
+ * @returns {"microphone" | "speech"}
+ */
+export function allowPane(error) {
+  return /speech[\s_-]*recognition/i.test(error?.message ?? "") ? "speech" : "microphone";
+}
+
+/**
+ * What goes with the words of the recognition's `event`, an error (item 636): in Dot.app, a refusal by macOS has the
+ * Mac show System Settings where Dot is allowed, `{ allow: pane }`, and nothing else has an offer. Beside `problemWords`.
+ * @param {{ error?: string, message?: string }} event
+ * @param {"app" | "mac" | "other"} place
+ * @returns {{ allow: "microphone" | "speech" } | undefined}
+ */
+export function problemOffer(event, place) {
+  return place === "app" && RECOGNITION_REFUSED.has(event.error) ? { allow: allowPane(event) } : undefined;
+}
+
+/**
+ * What goes with the words of the error the browser gave when the page asked for the microphone to record it (item 636),
+ * as `problemOffer` does for a dictation. Beside `captureProblem`.
+ * @param {{ name?: string, message?: string } | null | undefined} error
+ * @param {"app" | "mac" | "other"} place
+ * @returns {{ allow: "microphone" | "speech" } | undefined}
+ */
+export function captureOffer(error, place) {
+  return place === "app" && CAPTURE_REFUSED.has(error?.name) ? { allow: allowPane(error) } : undefined;
+}
+
+// What the toast says when the Dot.app that runs was built before Dot asked macOS for the microphone: macOS gives it none,
+// whatever System Settings shows, and only a newer one does (item 636).
+const OLD_APP =
+  "This Dot.app was built before Dot asked macOS for the microphone, so macOS gives it none, whatever System Settings shows. The next Dot.app asks for it, and Dot offers it as soon as it is out.";
+
+/**
+ * The toast for the answer to the ask that the Mac show System Settings at the pane where Dot is allowed (item 636,
+ * `POST /api/voice/allow`), as its kind (`ok`, the calmer one, for help; `error`) and its words; null for an answer that
+ * says neither, for which the words of the refusal stand. `pane` is the one asked for. The sentence about macOS Dictation
+ * comes last, as in every refusal of Dot.app.
+ * @param {{ opened?: boolean, app?: string } | null | undefined} answer
+ * @param {"microphone" | "speech"} pane
+ * @returns {{ kind: "ok" | "error", words: string } | null}
+ */
+export function allowToast(answer, pane) {
+  if (answer?.app === "old") {
+    return { kind: "error", words: `${OLD_APP} ${DICTATION.app}` };
+  }
+  if (answer?.opened === true) {
+    const [here, other] = pane === "speech" ? ["Speech Recognition", "Microphone"] : ["Microphone", "Speech Recognition"];
+    return { kind: "ok", words: `System Settings is open at ${here}: switch Dot on there, and under ${other} too. ${DICTATION.app}` };
+  }
+  return null;
 }
 
 // The `context.code` of the failures the Mac says itself, with words written for the owner (`VoiceError`).
@@ -252,7 +313,9 @@ export function sendProblem(error) {
  * `sound(loud)` whether it hears a sound now, for the recorder's clock and wave (item 605); both may be left out.
  * `end()` ends a dictation the owner stopped that the engine has not closed, with what it heard, saying Safari's
  * deafness on an iPhone's later dictation (item 616). A
- * `problem(words, offer)` may come with `{ reload: true }`: reloading the page is what brings the microphone back.
+ * `problem(words, offer)` may come with `{ reload: true }`: reloading the page is what brings the microphone back; or with
+ * `{ allow: pane }`: in Dot.app macOS refused the microphone or its speech recognition, and the Mac can show System Settings
+ * at that pane (item 636, `problemOffer`).
  */
 export function createDictation({ language, text, show, settled, state, problem, began = () => {}, sound = (/** @type {boolean} */ _loud) => {} }) {
   let recognition = null;
@@ -368,7 +431,7 @@ export function createDictation({ language, text, show, settled, state, problem,
         }
         return;
       }
-      finish(problemWords(event.error, place()));
+      finish(problemWords(event.error, place()), problemOffer(event, place()));
     };
     engine.addEventListener("result", heardSomething);
     engine.addEventListener("error", failed);
