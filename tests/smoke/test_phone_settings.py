@@ -50,6 +50,7 @@ _TABS: dict[str, str] = {
     "appearance": "Appearance",
     "models": "Models",
     "keys": "AI services",
+    "websearch": "Web search",
     "rules": "Rules",
     "memory": "Memory",
     "harness": "Self-improvement",

@@ -32,6 +32,7 @@ _TABS: list[str] = [
     "Appearance",
     "Models",
     "AI services",
+    "Web search",
     "Rules",
     "Memory",
     "Self-improvement",

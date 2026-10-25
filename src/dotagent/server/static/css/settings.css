@@ -4255,3 +4255,46 @@
 .settings-pane .card.fold > .card-head > .fold-toggle {
   flex: 1 1 12rem;
 }
+
+/* Settings › Web search (item 657): each engine's state under its words, its controls in a row, its key under it. */
+.websearch-state {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-half);
+}
+
+.websearch-ready {
+  color: var(--ok);
+}
+
+.websearch-needs,
+.websearch-tried.bad {
+  color: var(--warn);
+}
+
+.websearch-ready .icon,
+.websearch-needs .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.websearch-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.websearch-key {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.websearch-key .input {
+  flex: 1;
+  min-width: 0;
+}

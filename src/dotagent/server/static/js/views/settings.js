@@ -20,6 +20,7 @@ import * as memory from "./memory.js";
 import * as phone from "./phone.js";
 import * as rules from "./rules.js";
 import * as snapshots from "./snapshots.js";
+import * as websearch from "./websearch.js";
 import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.js";
 
 const MOUNTS = {
@@ -27,6 +28,7 @@ const MOUNTS = {
   appearance: appearance.mount,
   models: mountModels,
   keys: keys.mount,
+  websearch: websearch.mount,
   browser: mountBrowser,
   rules: rules.mount,
   memory: memory.mount,
