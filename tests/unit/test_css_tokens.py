@@ -73,6 +73,32 @@ def test_every_transition_and_animation_runs_on_a_motion_token(name: str) -> Non
     assert hits == [], hits
 
 
+_KEYFRAMES: re.Pattern[str] = re.compile(r"@keyframes ([\w-]+) \{(.*?)\n\}", re.DOTALL)
+_ENDLESS: re.Pattern[str] = re.compile(r"animation:([^;]*\binfinite\b[^;]*);")
+# What the compositor draws without the page drawing again: an animation of these alone costs next to nothing.
+_COMPOSITED: frozenset[str] = frozenset({"opacity", "transform"})
+# The endless animations that still change what the page draws, each only while something is at work in front of the
+# owner: the ring of the microphone while it listens and of the plan's step at work (``pulse``, a growing shadow), and
+# the light that runs over the words of a thought being written and of a chat being opened (``shimmer`` and
+# ``sunshine``, a text's background).
+_REDRAWN_WHILE_AT_WORK: frozenset[str] = frozenset({"pulse", "shimmer", "sunshine"})
+
+
+def test_what_repeats_forever_is_drawn_by_the_compositor() -> None:
+    """Item 645: an animation that never stops changes only opacity and transform. The loop mark's glow, a shadow
+    that changed, was drawn again on every frame: with three loops in the sidebar the page at rest kept a third of a
+    core at work in Dot.app. Those that still redraw are named, and run only while something works."""
+    sheets: str = "\n".join((_CSS / name).read_text(encoding="utf-8") for name in _DRAWN)
+    changed: dict[str, set[str]] = {}
+    for name, body in _KEYFRAMES.findall(sheets):
+        changed.setdefault(name, set()).update(re.findall(r"^\s*([a-z-]+)\s*:", body, re.MULTILINE))
+    endless: set[str] = {word for value in _ENDLESS.findall(sheets) for word in value.split() if word in changed}
+    redrawn: dict[str, set[str]] = {
+        name: changed[name] - _COMPOSITED for name in endless if changed[name] - _COMPOSITED
+    }
+    assert set(redrawn) == _REDRAWN_WHILE_AT_WORK, redrawn
+
+
 def test_the_tokens_are_declared_once_each_in_the_base_look() -> None:
     app: str = (_CSS / "app.css").read_text(encoding="utf-8")
     themes: str = (_CSS / "themes.css").read_text(encoding="utf-8")
