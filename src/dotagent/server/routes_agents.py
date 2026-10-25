@@ -293,7 +293,9 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         chats or a secret."""
         if agent_id == DOT_AGENT_ID:
             raise InvalidValueError("Dot is not an agent to export", {"agent_id": agent_id})
-        return agent_file(await store.get_agent(agent_id), await asyncio.to_thread(known_secrets))
+        # A refusal, so the values filled into a page are not among the secrets it looks for (item 621); the file is
+        # made with them masked.
+        return agent_file(await store.get_agent(agent_id), await asyncio.to_thread(known_secrets, filled=False))
 
     @router.get("/agents/{agent_id}")
     async def get_agent(agent_id: str) -> AgentDetail:

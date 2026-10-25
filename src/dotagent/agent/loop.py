@@ -253,7 +253,7 @@ from dotagent.store.models import (
 )
 from dotagent.store.stats import ACT_TOOLS
 from dotagent.terminal.session import TerminalSession, ended_notices
-from dotagent.tools.browser import VAULT_TOOLS
+from dotagent.tools.browser import withheld_vault_tools
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import AskMode, Spawner, ToolContext
@@ -642,7 +642,7 @@ async def _compact(
         attempts += own_attempts
     # The summary stays in the run's context and its record: the secrets Dot holds, and any of a known form, are
     # masked in it (review Y3).
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     if text is None:
         reason: str = problem if problem is not None else "no reply"
         mechanical: str = redact_known(mechanical_summary(transcript, reason, part_chars), secrets)
@@ -1742,7 +1742,7 @@ async def _route_step(
     if service is None:
         return None
     # TypeSafe is a service outside the Mac: what it is sent has the secrets Dot holds masked (item 551).
-    known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     state: JsonObject = route_state(step_state(agent.run.goal, step, history, failures, failures_in_a_row, known))
     try:
         answers: dict[str, ChoiceAnswer] | None = await service.choices(
@@ -1809,9 +1809,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     signed_in: list[Account] = await runtime.accounts.accounts()
     if not signed_in:
         specs = tuple(spec for spec in specs if group_of(spec.name) != ACCOUNTS_GROUP)
-    # The logins of 1Password (item 493) are a run's only while the owner has connected it.
-    if await asyncio.to_thread(kept_token) is None:
-        specs = tuple(spec for spec in specs if spec.name not in VAULT_TOOLS)
+    # The logins of 1Password (item 493) are a run's only while the owner has connected it, and the logins,
+    # cards and contacts of Dot's own vault (item 621) only while it holds some.
+    withheld: frozenset[str] = withheld_vault_tools(
+        await runtime.vault_items.items(), await asyncio.to_thread(kept_token) is not None
+    )
+    specs = tuple(spec for spec in specs if spec.name not in withheld)
     # Without a teammate the message tool goes, unless the run may make one (item 99): then it stays, so a teammate
     # made mid-run can be messaged at once.
     if not team and all(spec.name != CREATE_AGENT_TOOL for spec in specs):
@@ -1860,8 +1863,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     query: str = await _goal_query(runtime, run)
     recalled: Remembered = await _start_notes(runtime, run, query, notes_budget)
     # The secrets Dot holds, which the texts a prompt takes from what Dot learned are asked for again, as when they
-    # were written (item 587).
-    held_at_start: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # were written (item 587). A gate refuses by a value, so the values filled into a page are not among them (item
+    # 621); a text that holds one reaches the prompt with it masked (``given_text``, ``owner_prompt_lines``).
+    held_at_start: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     # The adopted version of the harness (item 389): its texts go into the prompt, and the run records which it took.
     harness_text, harness_version = await adopted_text(runtime.store, held_at_start)
     if harness_version is not None:
@@ -2229,7 +2233,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         steps += 1
         asked_at: float = time.monotonic()
         # The secrets Dot holds, masked in what the step streams and in the message it stores (item 551).
-        held_secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        held_secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         sink.begin(held_secrets)
         try:
             call: Awaitable[ModelReply] = _complete_in_time(

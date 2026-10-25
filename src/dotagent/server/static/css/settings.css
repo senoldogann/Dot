@@ -4298,3 +4298,228 @@
   flex: 1;
   min-width: 0;
 }
+
+/* ---------- Settings › Vault (item 621): the logins, cards and contacts Dot may type for the owner. The tabs and the search
+   are the Memory page's (`note-tools`); each item is a row of a card; the forms are dialogs (item 615). ---------- */
+
+.vault-count {
+  margin-left: var(--space-1);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.vault-tabs button[aria-pressed="true"] .vault-count {
+  color: var(--text-2);
+}
+
+.vault-rows > .vault-row + .vault-row {
+  border-top: 1px solid var(--border);
+}
+
+.vault-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+}
+
+/* A kind's mark: a tile with its picture, the tint of the kind. */
+.vault-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+
+.vault-mark-login {
+  background: color-mix(in srgb, var(--mark-blue) 16%, var(--surface-2));
+  color: var(--mark-blue);
+}
+
+.vault-mark-card {
+  background: color-mix(in srgb, var(--mark-orange) 16%, var(--surface-2));
+  color: var(--mark-orange);
+}
+
+.vault-mark-contact {
+  background: color-mix(in srgb, var(--mark-teal) 16%, var(--surface-2));
+  color: var(--mark-teal);
+}
+
+.vault-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.vault-title {
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  font-weight: var(--weight-label);
+  overflow-wrap: anywhere;
+}
+
+.vault-sub {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  overflow-wrap: anywhere;
+}
+
+.vault-actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-half);
+}
+
+/* What an import did: a card of lines at the head of the list until the owner has read it. */
+.vault-report {
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.vault-report[hidden] {
+  display: none;
+}
+
+.vault-report-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.vault-report-lines p {
+  margin: 0;
+}
+
+.vault-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.vault-note .icon {
+  flex: none;
+  margin-top: var(--space-half);
+}
+
+/* The forms. A label's line may carry a note at its right end (the brand of a card); what is wrong with a field stands
+   under it in the colour of faults. */
+.vault-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.vault-brand {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.vault-problem {
+  margin-top: calc(-1 * var(--space-2));
+  color: var(--bad);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.vault-problem[hidden] {
+  display: none;
+}
+
+/* A secret's box with its eye inside at the right. */
+.vault-secret {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.vault-secret > .input {
+  padding-right: 40px;
+}
+
+.vault-secret > .vault-eye {
+  position: absolute;
+  right: var(--space-1);
+}
+
+.vault-photo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.vault-photo-note {
+  margin: 0;
+}
+
+.vault-billing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.vault-billing[hidden] {
+  display: none;
+}
+
+.vault-billing-toggle {
+  align-self: flex-start;
+}
+
+.vault-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.vault-assurance {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.vault-assurance .icon {
+  flex: none;
+}
+
+@container (max-width: 640px) {
+  .vault-row {
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  /* The four tabs with their counts fit a phone's width. */
+  .note-tools .segmented.vault-tabs button {
+    padding-inline: var(--space-2);
+  }
+}
+
+/* A phone's fields are 16 px, so that it does not zoom into one, and the pairs of fields go one under the other. */
+@media (max-width: 720px) {
+  .vault-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vault-assurance {
+    flex: 1 0 100%;
+  }
+}

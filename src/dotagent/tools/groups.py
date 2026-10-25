@@ -42,6 +42,8 @@ _GROUP_OF_TOOL: dict[str, str] = {
     # Making a teammate is rare (item 99); the core group stays about a third of the tool definitions.
     "create_agent": "team",
     "show_page": "pages",
+    # The owner's saved contact details (item 621).
+    "vault_contacts": "vault",
 }
 _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
@@ -53,6 +55,7 @@ _PURPOSES: dict[str, str] = {
     "team": "making a lasting teammate agent for a role the work needs again or in parallel",
     "pages": "showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views",
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
+    "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
 LISTED_TOOLS: int = 16

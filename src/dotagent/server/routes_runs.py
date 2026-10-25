@@ -314,7 +314,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         ``server.changes``)."""
         runs: list[RunRecord] = await chat_runs(store, await store.get_run(run_id))
         # The secrets are read from Dot's .env file off the event loop, as the journals and the files are.
-        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         return await asyncio.to_thread(
             chat_changes, ctx.runtime.undo_dir, [run.id for run in runs], Path.home(), workspace_dir(), known
         )

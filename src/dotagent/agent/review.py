@@ -1434,7 +1434,7 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
     ref: ModelRef = parse_model_ref(question.review_model)
     # The review model may be another provider's than the run's: what it reads has the secrets Dot holds and the ones
     # it recognises masked (item 350; before, only the digest of a run was).
-    masked: str = redact_known(question.prompt, await asyncio.to_thread(known_secrets))
+    masked: str = redact_known(question.prompt, await asyncio.to_thread(known_secrets, filled=True))
     prompt: str = masked if retry_note == "" else f"{masked}\n\n{retry_note}"
     request: ChatRequest = ChatRequest(
         model=ref.model,
@@ -2230,7 +2230,9 @@ def harness_proposer_for(
             tool=_PROPOSE_SPEC,
             verdict_type=HarnessProposal,
         )
-        held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        # The check refuses a reply that holds a secret and asks again: the values filled into a page are not among
+        # them (item 621).
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
         return await _decide_checked(question, proposal_check(request, held))
 
     return propose
@@ -2254,7 +2256,9 @@ def harness_composer_for(
             tool=_COMPOSE_SPEC,
             verdict_type=HarnessComposition,
         )
-        held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        # The check refuses a reply that holds a secret and asks again: the values filled into a page are not among
+        # them (item 621).
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
         return await _decide_checked(question, composition_check(request, held))
 
     return compose
@@ -2301,7 +2305,9 @@ def experience_writer_for(
             tool=_EXPERIENCE_SPEC,
             verdict_type=ExperienceDraft,
         )
-        held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        # The check refuses a reply that holds a secret and asks again: the values filled into a page are not among
+        # them (item 621).
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
         return await _decide_checked(question, experience_check(request, held))
 
     return write

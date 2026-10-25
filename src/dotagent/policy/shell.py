@@ -642,6 +642,11 @@ _CLIPBOARD_WORD: re.Pattern[str] = re.compile(r"clipboard", re.IGNORECASE)
 # Any pasteboard of the system's, named on the line: inline code in another language (``python3 -c`` with
 # ``NSPasteboard``, ``swift -e``) reads it by the class's name.
 _PASTEBOARD: re.Pattern[str] = re.compile(r"pasteboard", re.IGNORECASE)
+# The Keychain service Dot's own vault keeps its secrets in (item 621), in any letter case, wherever a line says it: a
+# program that asks the Keychain for them, however its line is written, has to name it, as ``security`` is refused by
+# its name alone. A line that builds the name from parts, or a script of a file, is not read: what the guard does not
+# read is said in the safety page.
+_VAULT_SERVICE: re.Pattern[str] = re.compile(r"dot-vault", re.IGNORECASE)
 _AS_KEYSTROKES: re.Pattern[str] = re.compile(r"\bkeystroke\b|\bkey\s+code\b|\bkeyCode\b", re.IGNORECASE)
 # The Objective-C bridge: JavaScript's (the ``ObjC`` object: ``ObjC.import``, ``ObjC.classes``; ``$.NSString``) and
 # AppleScriptObjC's (``use framework``, ``current application's``), through which a script may call any method of the
@@ -1908,6 +1913,24 @@ def _names_the_clipboard() -> Finding:
         "names the clipboard, which can hold a password the user copied (a script that puts text there is not told "
         "from one that reads it)",
     )
+
+
+def _names_the_vault() -> Finding:
+    """A line or a script that names the Keychain service of Dot's own vault (item 621), which holds the owner's
+    passwords and cards: asked about in every preset (item 534's ask for a read that may reach a protected location).
+    The vault is kept from the model by Dot's tools, not by the Keychain: a program of the run's that asks it can read
+    it."""
+    return _finding(
+        "high",
+        ("protected_read",),
+        "names the Keychain service of Dot's vault, which holds the owner's passwords and cards",
+    )
+
+
+def _vault_findings(text: str) -> list[Finding]:
+    """What a line says of the vault's Keychain service anywhere in it, in any letter case, as the line was written and
+    as its words are once the shell has taken the quotes out (``dot-v''ault``)."""
+    return [_names_the_vault()] if _VAULT_SERVICE.search(text) else []
 
 
 def _maybe_protected(reason: str) -> Finding:
@@ -3282,6 +3305,8 @@ def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
         findings.extend(_shell_statement_findings(statement, scope))
     if _AS_CLIPBOARD.search(script) or _AS_CLIPBOARD.search(unescaped):
         findings.append(_names_the_clipboard())
+    if _VAULT_SERVICE.search(script) or _VAULT_SERVICE.search(unescaped):
+        findings.append(_names_the_vault())
     if _AS_KEYSTROKES.search(script):
         findings.append(_finding("high", (), "types into whatever application has the keyboard focus"))
     if _AS_NATIVE.search(script):
@@ -3648,6 +3673,7 @@ def _universal_findings(command: str, scope: ShellScope) -> list[Finding]:
     if _EXPANDS_AS_CODE.search(command):
         findings.append(_unknown("expands a variable as code"))
     findings.extend(_clipboard_findings(command))
+    findings.extend(_vault_findings(command))
     return findings
 
 
@@ -3680,6 +3706,7 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
     if tokens is None:
         return [*findings, _unknown("the line cannot be parsed, so what it runs cannot be judged")]
     findings.extend(_clipboard_findings(" ".join(tokens)))
+    findings.extend(_vault_findings(" ".join(tokens)))
     state: ShellScope = replace(scope, depth=scope.depth + 1)
     stages: list[list[str]] = []
     for operator, segment in _commands(_without_patterns(tokens)):

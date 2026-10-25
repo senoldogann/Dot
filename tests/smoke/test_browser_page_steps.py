@@ -120,6 +120,13 @@ class _Vault:
         return LoginSecret(username=SecretStr("ada"), password=SecretStr("not-a-real-password"), otp=None)
 
 
+class _VaultItems:
+    """Dot's own vault, holding nothing: the logins a run may fill are the connected 1Password's alone."""
+
+    async def of_kind(self, kind: str) -> list[object]:
+        return []
+
+
 @pytest.fixture(autouse=True)
 def connected(monkeypatch: pytest.MonkeyPatch) -> None:
     """1Password is connected: the tool of the logins reads a token."""
@@ -182,6 +189,7 @@ def _context(run: tuple[Store, EventBus, RunRecord], workspace: Path, gate: RunG
         config=load_default_config(),
         judge=_Judge(),
         vault=_Vault(),
+        vault_items=_VaultItems(),
         peers=Peers(),
         protected=(Path.home() / ".ssh",),
         dot_paths=(),

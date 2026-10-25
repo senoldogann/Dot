@@ -82,6 +82,7 @@ from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.campaign import build_campaign_tools
 from dotagent.tools.codes import build_code_tools
 from dotagent.tools.consult import build_consult_tools
+from dotagent.tools.contacts import build_contacts_tools
 from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.desktop import build_desktop_tools
 from dotagent.tools.drafts import build_draft_tool
@@ -102,7 +103,9 @@ from dotagent.tools.skill import build_skill_tool
 from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.web import build_web_tools
+from dotagent.vault.items import VaultItems
 from dotagent.vault.onepassword import OnePassword
+from dotagent.vault.secretstore import LoginKeychain
 from dotagent.web.client import WebClient
 from dotagent.web.keyed import keyed_engines
 from dotagent.web.ladder import SearchEngine
@@ -173,6 +176,9 @@ class Runtime:
     accounts: Accounts
     # The owner's 1Password, through its command line (item 493): the logins a run fills without seeing them.
     vault: OnePassword
+    # Dot's own vault of logins, cards and contacts (item 621): its records in the database, its secrets in the
+    # Keychain.
+    vault_items: VaultItems
     terminals: Terminals
     web: WebClient
     # Whether the key of Ollama's hosted search (the first rung of web_search's ladder when [web] search_backend is
@@ -237,6 +243,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_meta_tools(),
         build_page_tools(),
         (build_skill_tool(), build_find_help_tool()),
+        build_contacts_tools(),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),
         *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
@@ -499,6 +506,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             assistant=Assistant(config.assistant, await asyncio.to_thread(mac_first_name)),
             accounts=Accounts(store, Keychain(keychain_file()), None),
             vault=OnePassword(None),
+            vault_items=VaultItems(store, LoginKeychain(keychain_file())),
             router=router,
             roles=ModelRoles(config.models),
             context_sizes=router.context_sizes,

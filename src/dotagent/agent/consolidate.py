@@ -275,7 +275,9 @@ async def rest_repeating_habits(runtime: Runtime, owner_saved: Set[str], now: fl
     the lessons found to repeat no rule. A night with no lesson that is new or rewritten since, on the same basis, asks
     the embedding service for nothing; a lesson that changed, or a new version of the harness, is checked again. An
     embedding service that fails raises its error, and nothing is remembered of that night."""
-    text, version = await adopted_text(runtime.store, await asyncio.to_thread(known_secrets))
+    # The gate of the harness text refuses by a value: the values filled into a page are not among its
+    # secrets (item 621).
+    text, version = await adopted_text(runtime.store, await asyncio.to_thread(known_secrets, filled=False))
     rules: tuple[str, ...] = rules_of(text)
     if not rules or version is None:
         return 0

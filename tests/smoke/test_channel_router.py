@@ -16,6 +16,7 @@ import pytest_asyncio
 from channel_stand_ins import PROVIDER, Replies, finish, stop_file
 from picture_files import HEADS, NOT_IMAGE
 
+from dotagent import secrets as dot_secrets
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.channels.intake import UNREAD_ANSWER, UNREAD_NOTE
@@ -315,6 +316,20 @@ async def test_an_answer_is_masked_of_the_secrets_dot_holds_and_cut_to_the_chann
     assert secret not in sent and "The password is ***." in sent
     assert len(sent) <= LIMIT
     assert sent.endswith(f"{BASE}#/runs/{run.id}") and "The rest of the answer is in Dot" in sent
+
+
+async def test_an_answer_is_masked_of_a_value_a_vault_filled_as_it_is_of_the_keys_in_the_env_file(
+    wired: Wired, replies: Replies, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 621: a value filled into a page is a mask and no more: every text that goes to the phone has it masked."""
+    password: str = "S3cret-Passw0rd!"
+    monkeypatch.setattr(dot_secrets, "_filled", frozenset())
+    dot_secrets.hold_filled(password)
+    replies.push(finish(f"The shop wanted {password} and it worked."))
+    before: int = len(wired.channel.sent)
+    await wired.router.inbound("imessage", "tell me how it went")
+    await _until(lambda: len(wired.channel.sent) == before + 1, "the answer")
+    assert password not in wired.channel.sent[-1] and "The shop wanted *** and it worked." in wired.channel.sent[-1]
 
 
 async def test_a_run_that_failed_says_how_it_ended(wired: Wired, replies: Replies) -> None:

@@ -196,7 +196,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         asked_at: float = time.monotonic()
         try:
             # The call's arguments go with it: a run that read outside content sends no secret out in them (item 525).
-            authorized: Authorization = await gate.authorize_recorded(action, call.arguments)
+            authorized: Authorization = await gate.authorize_recorded(action, call.arguments, prepared.weighed)
             note, decision = authorized.note, authorized.decision
             # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock.
             held_s: float = await gate.wait_free()
@@ -251,7 +251,7 @@ async def _execute_one(
 ) -> ToolOutcome:
     started: float = time.monotonic()
     # The secrets Dot holds, masked in the step's events as the forms of keys are.
-    known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     await ctx.runtime.bus.emit(
         ctx.run_id,
         "tool_call",

@@ -22,6 +22,7 @@ from dotagent.harness.components import (
     description_problem,
     normalized,
 )
+from dotagent.secrets import mask_filled
 from dotagent.store.db import Store
 from dotagent.store.models import HarnessStep, HarnessVersion
 
@@ -221,7 +222,10 @@ def given_text(version: HarnessVersion, secrets: Sequence[str]) -> GivenText:
     are the values Dot holds, which a caller reads as the write-time check does, and which a probe's own home cannot
     know) is left out, and logged once for each version and component. The step plays its base, its candidates and the
     composed version through it, and shows its roles their texts through it, so that what is scored is what a run
-    would take; :func:`adopted_text` is it for the version in use. The text as it is stored is :func:`raw_text_of`."""
+    would take; :func:`adopted_text` is it for the version in use. The text as it is stored is :func:`raw_text_of`.
+
+    A value filled into a page is not among ``secrets`` (the gate must not tell by it, item 621), so a component that
+    holds one is given, with the value masked: a model never reads it."""
     text: HarnessText = raw_text_of(version)
     refused: dict[str, str] = refusals(text, secrets)
     for name, problem in refused.items():
@@ -229,8 +233,8 @@ def given_text(version: HarnessVersion, secrets: Sequence[str]) -> GivenText:
             _LEFT_OUT.add((version.id, name))
             log.warning("harness_component_left_out", version=version.id, component=name, problem=problem)
     return GivenText(
-        habits="" if "habits" in refused else text.habits,
-        tool_guidance="" if "tool_guidance" in refused else text.tool_guidance,
+        habits="" if "habits" in refused else mask_filled(text.habits),
+        tool_guidance="" if "tool_guidance" in refused else mask_filled(text.tool_guidance),
     )
 
 

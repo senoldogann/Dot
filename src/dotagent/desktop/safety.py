@@ -257,6 +257,18 @@ def window_role(name: str, bundle_id: str | None, title: str | None) -> AppRole:
     return role
 
 
+def shows_own_window(name: str, bundle_id: str | None, pid: int, windows: Sequence[WindowInfo]) -> bool:
+    """Whether the application is Dot's own (the desktop app), or has a window that shows Dot's web UI
+    (:func:`window_role`: a browser, an installed web app): what the owner's vault shows in the eye is in the
+    accessibility tree of such a window, and in no other (item 621). A window that is minimized, on another Space or
+    hidden counts as well: the window list says it is not on the screen, but the desktop tools read the windows of an
+    application through its accessibility tree (``AXWindows``), which lists a minimized window and may list one the
+    list calls hidden. The window being Dot's decides, and not where it is."""
+    if app_role(name, bundle_id) == "dot":
+        return True
+    return any(window.pid == pid and window_role(name, bundle_id, window.title) == "dot" for window in windows)
+
+
 def step_role(name: str, bundle_id: str | None, title: str | None, label: str | None) -> AppRole:
     """The kind of window a step acts in (:func:`window_role`), or Chrome's grant of remote debugging when the step is
     on a Chrome window or control that is about it (item 343): what an error tells the owner to do there ("click
@@ -268,14 +280,22 @@ def step_role(name: str, bundle_id: str | None, title: str | None, label: str | 
     return window_role(name, bundle_id, title)
 
 
-def hidden_regions(windows: Sequence[WindowInfo], bundles: Mapping[int, str | None]) -> tuple[Rect, ...]:
+def hidden_regions(
+    windows: Sequence[WindowInfo], bundles: Mapping[int, str | None], own: bool = False
+) -> tuple[Rect, ...]:
     """Where password managers and the keychain show on screen; screenshots black these out. A window is known by the
     bundle id of its application (``bundles``, by pid) as well as by the name the window server gives it, which is the
-    application's name in the language of the Mac: Keychain Access is Schlüsselbundverwaltung in German (item 555)."""
+    application's name in the language of the Mac: Keychain Access is Schlüsselbundverwaltung in German (item 555).
+    With ``own``, Dot's own windows too (:func:`window_role`: the desktop app's, and any that shows the web UI), while
+    the owner has a secret of Dot's vault on the screen (item 621, :mod:`dotagent.vault.shown`)."""
     return tuple(
         window.bounds
         for window in windows
-        if window.on_screen and is_secrets_app(window.owner, bundles.get(window.pid))
+        if window.on_screen
+        and (
+            is_secrets_app(window.owner, bundles.get(window.pid))
+            or (own and window_role(window.owner, bundles.get(window.pid), window.title) == "dot")
+        )
     )
 
 

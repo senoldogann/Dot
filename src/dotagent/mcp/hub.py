@@ -269,7 +269,7 @@ def _failure(config: McpServerConfig, error: Exception) -> McpFailure:
         log.warning("mcp_server_left_out", server=config.name, error=error.message, context=detail)
         return McpFailure(server=config.name, error=error.message, detail=detail, log=log_file)
     log.error("mcp_server_crashed", server=config.name, exc_info=error)
-    words: str = redact_known(f"{type(error).__name__}: {error}", known_secrets())
+    words: str = redact_known(f"{type(error).__name__}: {error}", known_secrets(filled=True))
     return McpFailure(server=config.name, error=words, detail={}, log=log_file)
 
 

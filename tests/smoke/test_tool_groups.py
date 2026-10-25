@@ -253,9 +253,10 @@ async def test_a_run_that_offers_every_tool_has_no_groups_and_answers_use_tools_
     assert played.groups == ()
     # Every tool of the mode at every step, as before there were groups (consult is left out, as no helper model is set
     # up, and so are the campaign tools, which only a session of a campaign has, the mail and calendar tools, as no
-    # account is signed in, item 424, and the logins of 1Password, which is not connected, item 493; skill stays, for
-    # the skills that come with Dot, item 196; message_agent stays although the owner made no agent, since the run may
-    # make one with create_agent, item 99).
+    # account is signed in, item 424, and the tools of the vaults that hold nothing: 1Password's logins, which is not
+    # connected, item 493, and Dot's own vault, which is empty, item 621; skill stays, for the skills that come with
+    # Dot, item 196; message_agent stays although the owner made no agent, since the run may make one with
+    # create_agent, item 99).
     every: list[str] = [
         spec.name
         for spec in specs_for_mode(build_registry(_tool_groups(config, False)), "task")

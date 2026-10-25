@@ -71,9 +71,10 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
 
   /** What the tabs hold, read from the daemon each time the nav is shown or the tab changes; one that cannot be read leaves its place empty. */
   async function readValues() {
-    const [keys, notes, phone] = await Promise.allSettled([
+    const [keys, notes, vault, phone] = await Promise.allSettled([
       api.get("/keys"),
       api.get(`/memories${query({ limit: 1, offset: 0 })}`),
+      api.get("/vault/counts"),
       Date.now() - phoneReadAt < PHONE_FRESH_MS ? Promise.resolve(null) : api.get("/phone"),
     ]);
     if (disposed) {
@@ -85,6 +86,10 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
     }
     if (notes.status === "fulfilled") {
       setText(values.get("memory"), notes.value.total === 0 ? "" : String(notes.value.total));
+    }
+    if (vault.status === "fulfilled") {
+      const held = vault.value.login + vault.value.card + vault.value.contact;
+      setText(values.get("vault"), held === 0 ? "" : String(held));
     }
     if (phone.status === "fulfilled" && phone.value !== null) {
       phoneReadAt = Date.now();

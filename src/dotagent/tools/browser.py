@@ -10,6 +10,7 @@ import asyncio
 import base64
 import posixpath
 import secrets
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import PurePosixPath
 from typing import Literal, Self
@@ -67,6 +68,8 @@ from dotagent.policy.pace import pace_class, paced_in_batch
 from dotagent.policy.paths import PathClass, classify_path, expand_path
 from dotagent.policy.spend import amount_in_label, render_amount, total_on_page
 from dotagent.policy.types import ActionInfo, ActionKind, Amount, Flag, PaceClass, Risk
+from dotagent.secrets import hold_filled
+from dotagent.store.models import VaultRecord
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -84,12 +87,15 @@ from dotagent.tools.base import (
     text_room,
 )
 from dotagent.tools.batch import batch_cut_note, first_steps
+from dotagent.tools.contacts import CONTACTS_TOOL
 from dotagent.tools.context import ToolContext
 from dotagent.tools.groups import group_of
 from dotagent.tools.meta import USE_TOOLS_TOOL
 from dotagent.tools.pages import PAGE_SUFFIXES, SHOW_PAGE_TOOL
-from dotagent.vault.hosts import fills_on, website_hosts
-from dotagent.vault.onepassword import Login, LoginSecret, kept_token
+from dotagent.vault.choices import LoginChoice, find_login, login_choices
+from dotagent.vault.hosts import fills_on
+from dotagent.vault.items import LoginFill
+from dotagent.vault.onepassword import Login, LoginSecret, VaultError, kept_token
 
 _log = get_logger(__name__)
 
@@ -844,43 +850,70 @@ def _upload_tool() -> RegisteredTool:
     )
 
 
-# The tools of the owner's 1Password (item 493), offered to a run only while it is connected.
+# The tools of the owner's 1Password (item 493) and of Dot's own vault (item 621), each offered to a run only while it
+# has something to fill: the logins while 1Password is connected or the vault holds one, and the contacts' listing
+# while it holds a contact or a billing address.
+LOGINS_TOOL: str = "browser_logins"
 FILL_LOGIN_TOOL: str = "browser_fill_login"
-VAULT_TOOLS: frozenset[str] = frozenset({"browser_logins", FILL_LOGIN_TOOL})
+LOGIN_TOOLS: frozenset[str] = frozenset({LOGINS_TOOL, FILL_LOGIN_TOOL})
+# Every tool :func:`withheld_vault_tools` may withhold.
+VAULT_TOOLS: frozenset[str] = LOGIN_TOOLS | {CONTACTS_TOOL}
 # What a run is told when 1Password is not connected (item 493).
 _NOT_CONNECTED: str = (
     "1Password is not connected: the owner connects it on Customize › Connectors › 1Password, and until then the "
-    "logins are theirs to type"
+    "logins of 1Password are theirs to type"
 )
 
 
-async def _vault_token(ctx: ToolContext) -> str:
-    """The service account's token, from Dot's .env, which no tool of a run reads; refused while 1Password is not
-    connected."""
+def withheld_vault_tools(saved: Sequence[VaultRecord], onepassword: bool) -> frozenset[str]:
+    """The tools of the vaults a run does not get at its start (items 493 and 621): the logins' while 1Password is not
+    connected and Dot's vault holds no login, the contacts' while it holds no contact and no card with a billing
+    address. A run that began before the owner saved something has them from its next start."""
+    kinds: set[str] = {record.kind for record in saved}
+    withheld: set[str] = set()
+    if not onepassword and "login" not in kinds:
+        withheld |= LOGIN_TOOLS
+    if not any(record.fields for record in saved):
+        withheld.add(CONTACTS_TOOL)
+    return frozenset(withheld)
+
+
+async def _login_choices(ctx: ToolContext) -> tuple[list[LoginChoice], str | None]:
+    """The logins a run may fill: those of 1Password while it is connected, and those of Dot's vault. 1Password that
+    cannot be read (its command line is missing, or fails) leaves the logins of the vault listed and filled, as they
+    need none of it; the second part says what failed, for the words of a list or of a refusal."""
     token: str | None = await asyncio.to_thread(kept_token)
-    if token is None:
-        raise ToolInputError(_NOT_CONNECTED, {})
-    return token
+    connected: tuple[Login, ...] = ()
+    unreadable: str | None = None
+    if token is not None:
+        try:
+            connected = await ctx.runtime.vault.logins(token)
+        except VaultError as error:
+            unreadable = error.message
+    return login_choices(connected, await ctx.runtime.vault_items.of_kind("login")), unreadable
 
 
-async def _login(ctx: ToolContext, token: str, wanted: str) -> Login:
-    """The login ``wanted`` names, by its id or its title (any case); refused for one the vault does not hold, and for
-    a title two logins share, which only an id tells apart."""
-    logins: tuple[Login, ...] = await ctx.runtime.vault.logins(token)
-    by_id: Login | None = next((login for login in logins if login.id == wanted), None)
-    titled: list[Login] = [login for login in logins if login.title.lower() == wanted.lower()]
-    if by_id is None and len(titled) > 1:
+def _unreadable_note(reason: str) -> str:
+    """What a list or a refusal adds when 1Password's logins could not be read, and why."""
+    return f"1Password's logins could not be read ({reason})"
+
+
+async def _login(ctx: ToolContext, wanted: str) -> LoginChoice:
+    """The login ``wanted`` names, by its id or its title, among those of 1Password and of Dot's vault."""
+    choices, unreadable = await _login_choices(ctx)
+    if not choices:
         raise ToolInputError(
-            f"{len(titled)} logins of 1Password are called {wanted!r}: name one by its id, as browser_logins lists it",
-            {"login": wanted, "ids": [login.id for login in titled]},
+            "there is no login to fill: the owner keeps theirs in Settings › Vault, or connects 1Password on "
+            "Customize › Connectors, and until then the logins are theirs to type"
+            + ("" if unreadable is None else f" ({_unreadable_note(unreadable)})"),
+            {},
         )
-    found: Login | None = by_id if by_id is not None else (titled[0] if titled else None)
-    if found is None:
-        raise ToolInputError(
-            f"1Password holds no login {wanted!r} that Dot may fill: browser_logins lists them",
-            {"login": wanted, "logins": len(logins)},
-        )
-    return found
+    try:
+        return find_login(choices, wanted)
+    except ToolInputError as missing:
+        if unreadable is None:
+            raise
+        raise ToolInputError(f"{missing.message}; {_unreadable_note(unreadable)}", missing.context) from None
 
 
 class LoginsArgs(ToolArgs):
@@ -891,29 +924,31 @@ class LoginsArgs(ToolArgs):
 
 def _logins_tool() -> RegisteredTool:
     def classify(args: LoginsArgs, ctx: ToolContext) -> ActionInfo:
-        return _observe_action("browser_logins", "List the logins Dot may fill from 1Password", ctx)
+        return _observe_action(LOGINS_TOOL, "List the logins Dot may fill", ctx)
 
     async def run(args: LoginsArgs, ctx: ToolContext) -> ToolResult:
-        token: str = await _vault_token(ctx)
         wanted: str = (args.site or "").lower()
-        logins: list[Login] = [
-            login
-            for login in await ctx.runtime.vault.logins(token)
-            if not wanted or any(wanted in host for host in website_hosts(login.websites))
+        choices, unreadable = await _login_choices(ctx)
+        logins: list[LoginChoice] = [
+            login for login in choices if not wanted or any(wanted in host for host in login.hosts)
         ]
+        note: str = (
+            "" if unreadable is None else f"\n{_unreadable_note(unreadable)}: only those of Dot's vault are listed."
+        )
         if not logins:
-            return ok("No login of 1Password that Dot may fill" + (f" is for {args.site}." if args.site else "."))
-        lines: list[str] = [
-            f"- {login.id}: {login.title} ({', '.join(website_hosts(login.websites)) or 'no website'})"
-            for login in logins
-        ]
-        return ok("The logins Dot may fill from 1Password, by id:\n" + "\n".join(lines))
+            return ok("No login that Dot may fill" + (f" is for {args.site}." if args.site else ".") + note)
+        lines: list[str] = []
+        for login in logins:
+            hosts: str = ", ".join(login.hosts)
+            shown: str = f" ({hosts})" if hosts and hosts not in login.title else ""
+            lines.append(f"- {login.id}: {login.title}{shown}, in {login.source_name}")
+        return ok("The logins Dot may fill, by id:\n" + "\n".join(lines) + note)
 
     return make_tool(
-        name="browser_logins",
+        name=LOGINS_TOOL,
         description=(
-            "List the logins of the owner's 1Password that Dot may fill into a page with browser_fill_login: each "
-            "one's id, title and websites, never a username or a password."
+            "List the logins Dot may fill into a page with browser_fill_login, from the owner's 1Password and from "
+            "their own vault (Settings › Vault): each one's id, title and websites, never a password."
         ),
         args_model=LoginsArgs,
         modes=ACTING_MODES,
@@ -928,7 +963,9 @@ class FillLoginArgs(ToolArgs):
     login: str = Field(min_length=1, description="The login's id, or its title, as browser_logins lists it.")
     username: str | None = Field(default=None, description="The ref of the field the username goes into.")
     password: str | None = Field(default=None, description="The ref of the password field.")
-    otp: str | None = Field(default=None, description="The ref of the field the one-time code goes into.")
+    otp: str | None = Field(
+        default=None, description="The ref of the field the one-time code goes into (a login of 1Password only)."
+    )
 
     @model_validator(mode="after")
     def _something(self) -> Self:
@@ -946,34 +983,51 @@ def _parts(args: FillLoginArgs) -> list[tuple[VaultFieldKind, str]]:
     return [(kind, ref) for kind, ref in asked if ref is not None]
 
 
-def _value(secret: LoginSecret, kind: VaultFieldKind, login: Login) -> SecretStr:
+def _value(secret: LoginSecret, kind: VaultFieldKind, login: LoginChoice) -> SecretStr:
     value: SecretStr | None = {"username": secret.username, "password": secret.password, "otp": secret.otp}[kind]
     if value is None:
         raise ToolInputError(f"the login {login.title} has no {kind} to fill", {"login": login.id, "part": kind})
     return value
 
 
+async def _login_secret(ctx: ToolContext, login: LoginChoice, otp: bool) -> LoginSecret:
+    """What a login gives a page, read when the run fills it: from 1Password with its token, from Dot's vault with the
+    Keychain. The values are among the secrets Dot holds from then on (item 621)."""
+    if login.onepassword is not None:
+        token: str | None = await asyncio.to_thread(kept_token)
+        if token is None:
+            raise ToolInputError(_NOT_CONNECTED, {})
+        secret: LoginSecret = await ctx.runtime.vault.secret(token, login.onepassword, otp)
+        hold_filled(*(one.get_secret_value() for one in (secret.password, secret.otp) if one))
+        return secret
+    filled: LoginFill = await ctx.runtime.vault_items.login_for_fill(login.id)
+    return LoginSecret(username=filled.username, password=filled.password, otp=None)
+
+
 def _fill_login_tool() -> RegisteredTool:
     async def classify(args: FillLoginArgs, ctx: ToolContext) -> ActionInfo:
-        token: str = await _vault_token(ctx)
-        login: Login = await _login(ctx, token, args.login)
+        login: LoginChoice = await _login(ctx, args.login)
         url: str = ctx.browser.current_url(ctx.thread_id) or ""
-        sites: str = ", ".join(website_hosts(login.websites)) or "no website"
+        sites: str = ", ".join(login.hosts) or "no website"
         if not fills_on(url, login.websites):
             raise ToolInputError(
                 f"the login {login.title} is for {sites}, and this page is {_clip(url, 120) or 'no page'}: Dot fills a "
                 "login only on its own site, over https",
                 {"login": login.id, "url": url},
             )
+        if args.otp is not None and login.onepassword is None:
+            raise ToolInputError(
+                f"the login {login.title} is in Dot's vault, which keeps no one-time codes: the owner types them",
+                {"login": login.id},
+            )
         parts: str = ", ".join(kind for kind, _ in _parts(args))
-        summary: str = f"Fill your login {login.title} ({sites}) from 1Password into this page: {parts}"
+        summary: str = f"Fill your login {login.title} ({sites}) from {login.source_name} into this page: {parts}"
         return _action("browser_fill_login", "browser_input", "high", summary, url, ("vault_fill",))
 
     async def run(args: FillLoginArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
-        token: str = await _vault_token(ctx)
-        login: Login = await _login(ctx, token, args.login)
+        login: LoginChoice = await _login(ctx, args.login)
         parts: list[tuple[VaultFieldKind, str]] = _parts(args)
-        secret: LoginSecret = await ctx.runtime.vault.secret(token, login, any(kind == "otp" for kind, _ in parts))
+        secret: LoginSecret = await _login_secret(ctx, login, any(kind == "otp" for kind, _ in parts))
         fills: list[VaultFill] = [
             VaultFill(ref=ref, kind=kind, value=_value(secret, kind, login)) for kind, ref in parts
         ]
@@ -981,19 +1035,20 @@ def _fill_login_tool() -> RegisteredTool:
             ctx.thread_id, fills, lambda address: fills_on(address, login.websites)
         )
         said: str = (
-            f"Filled the {', '.join(kind for kind, _ in parts)} of the login {login.title} from 1Password. The values "
-            "were not shown to you and never are; scripts stay off in this chat's tabs while this tab is open."
+            f"Filled the {', '.join(kind for kind, _ in parts)} of the login {login.title} from {login.source_name}. "
+            "The values were not shown to you and never are; scripts stay off in this chat's tabs while this tab is "
+            "open."
         )
         # The page the fill leaves is the site's to write (item 561).
         return mark_untrusted(ok(f"{said}\n{render_page_view(view, _nonce(), _body_budget(ctx))}"))
 
     return make_reviewed_tool(
-        name="browser_fill_login",
+        name=FILL_LOGIN_TOOL,
         description=(
-            "Fill a login of the owner's 1Password into the current page: give the login (browser_logins lists them) "
-            "and the refs of its fields: the username's, the password field's, the one-time code's. Dot reads the "
-            "values from 1Password and types them itself; you never see them. It fills a login only on its own "
-            "website, a password only into a password field. " + _REF_HELP
+            "Fill a login of the owner's 1Password or of their own vault into the current page: give the login "
+            "(browser_logins lists them) and the refs of its fields: the username's, the password field's, the "
+            "one-time code's (1Password only). Dot reads the values and types them itself; you never see them. It "
+            "fills a login only on its own website, a password only into a password field. " + _REF_HELP
         ),
         args_model=FillLoginArgs,
         modes=ACTING_MODES,
@@ -1015,7 +1070,11 @@ def masked_tool(tool: RegisteredTool) -> RegisteredTool:
     its chat's pages from the password manager (item 493) and the cookies its scripts ran with (item 533) taken out of
     what it gives back and of what it tells the gate: its result's text, an error it raises (its words and its context),
     and the action's summary and target, which the approvals, the policy's events and the review model read. A page's
-    address holds them once a form sent by GET put them there, or a script wrote one into the address."""
+    address holds them once a form sent by GET put them there, or a script wrote one into the address.
+
+    The step is *shown* masked and *decided* as it is: the unmasked action goes along as ``weighed``, and the owner's
+    rules are matched against it (item 621). A rule that fits a word and not a mask would otherwise ask for a guess and
+    run the password, which tells the run whether a guess is right."""
 
     async def prepare(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
         try:
@@ -1026,6 +1085,7 @@ def masked_tool(tool: RegisteredTool) -> RegisteredTool:
         action: ActionInfo = call.action.model_copy(
             update={"summary": _held_back(call.action.summary, ctx), "target": _held_back(call.action.target, ctx)}
         )
+        weighed: ActionInfo = call.action if call.weighed is None else call.weighed
 
         async def run(context: ToolContext) -> ToolResult:
             try:
@@ -1044,7 +1104,7 @@ def masked_tool(tool: RegisteredTool) -> RegisteredTool:
                 ) from None
             return result.model_copy(update={"text": _held_back(result.text, context)})
 
-        return PreparedCall(action=action, run=run)
+        return PreparedCall(action=action, run=run, weighed=weighed)
 
     return replace(tool, prepare=prepare)
 

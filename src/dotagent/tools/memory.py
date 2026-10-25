@@ -70,9 +70,11 @@ def _write_action(tool: str, summary: str, flags: tuple[Flag, ...]) -> ActionInf
 async def _secret_refusal(content: str) -> ToolResult | None:
     """The refused note when ``content`` holds a secret, like a key Dot holds or something that looks like a key;
     ``None`` when it holds none. The model is told where the key lives instead. The secrets Dot holds are read from
-    ``<home>/.env``, so in a thread of their own, off the event loop."""
+    ``<home>/.env``, so in a thread of their own, off the event loop. The values filled into a page are not among
+    them (item 621): a run never saw one, and a note refused for holding the password it guessed would tell it the
+    password. Such a note is saved with the value masked, as every note is (``save_memory``)."""
     if not looks_like_key(content):
-        held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
         if not any(secret in content for secret in held):
             return None
     return fail(

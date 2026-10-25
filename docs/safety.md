@@ -178,6 +178,9 @@ run needs, sent where the configuration points:
   (`graph.microsoft.com`) for your messages and events, with the words of a search (see
   [Mail and calendars](runs.md#mail-and-calendars)); a mail or calendar watcher asks them for the newest mail of the
   inbox or the events of the next minutes every few minutes (item 571).
+- **Nowhere, for Dot's own vault (item 621), but the page a fill types into.** Its secrets stay in your Keychain; a
+  login is typed only into a page of its own site, and a card into none; a card's photo
+  is read by Vision on this Mac; the text of an import is read in memory (see [Secrets](#safety)).
 - **To 1Password, once you connect it: the requests of `op`.** Its service account reads the vault you shared with Dot
   through 1Password's servers (see [1Password](extending.md#1password)).
 - **To GitHub, when you install a plugin of the gallery: the request for its archive.** It names the plugin's
@@ -253,8 +256,8 @@ currency, so list sites that bill in one currency. Empty by default.
    your rules say: yours in `supervised` and `ask`, the review model's in `auto`, where it answers the policy's
    questions; only a rule that hands the step to you is stricter. A rule that allows it does not answer for you. A login
    filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, except that in `auto` you answer
-   it, not the review model. A `yolo` run asks nothing and makes the step, its record keeping the reason it would have
-   asked for (item 443).
+   it, not the review model, and so is one of Dot's own vault (item 621, below). A `yolo` run asks nothing and makes
+   the step, its record keeping the reason it would have asked for (item 443).
    What the policy cannot tell for a message is not guarded: a key that sends in a web page's chat box, a page's own script
    (`browser_eval`), a program of the shell that talks to a mail server or a chat's API itself (`curl`, a script).
    For an AppleScript or JXA script (the tool `apple_script`, and `osascript` in a command line) the guard reads the
@@ -346,9 +349,9 @@ currency, so list sites that bill in one currency. Empty by default.
    part is changed: how many steps it fits and which earlier rules
    decide some of them first. Of the rest, it counts apart the steps of yolo runs, which ask nothing whatever the rules
    say, and those settled before any rule is read, by the checks above that no rule changes (money, credentials,
-   messages and posts, a login from your 1Password, Dot's own files, the always-on review, a research run, a spend
-   within its caps; a rule that hands the step to you does take the place of the question about a message, a post, a
-   login or a spend). The steps it would decide it
+   messages and posts, a login from your 1Password or Dot's vault, Dot's own files, the always-on review,
+   a research run, a spend within its caps; a rule that hands the step to you does take the place of the question
+   about a message, a post, a login or a spend). The steps it would decide it
    compares with what was decided then: the decision a step's record keeps since item 468, or for a step the gate did
    not let through (refused, declined, handed to you), what the policy said of it before, in the `policy` event of its
    call. It says how many would ask more, how many less and how many the same, with the taint the gate weighed then
@@ -521,9 +524,14 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
 
 **Secrets.**
 
-- The memory tools refuse a note that holds a key-like string or one of the secrets Dot holds (`memory_save`,
-  `memory_update`), and tell the model to record where the key lives, not the key. A note you write yourself, with
-  `dotx memory add` or on the Memory page, is yours and not refused.
+- The memory tools refuse a note that holds a key-like string or one of the keys Dot holds (`memory_save`,
+  `memory_update`), and tell the model to record where the key lives, not the key. A password that a login of 1Password
+  or of Dot's vault filled into a page is not one of the keys (see Dot's own vault, below): a note that holds it is
+  saved with it masked and not refused, so that no refusal tells a run whether a password it guesses is right, and the
+  size of a note is judged as it was written, not after the mask (the mask is shorter than a password, so a note a
+  few characters over the limit would have been saved with the password in it and refused with a wrong word). A note
+  you write yourself, with `dotx memory add` or on the Memory page, is yours and not refused (on the Memory page the
+  daemon masks in it a password that it filled).
 - What a run records of a step holds none of the secrets Dot holds (item 551), nor a key of a known form (a token, a
   private key, a password in an address or a header): the call's arguments (item 525) and the summary, the target and
   the text of its result, its `policy` event, its approval with the card and the push to your phone that ask about it,
@@ -544,8 +552,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   another application (a browser, an installed web app) that shows the web UI, known at each step by the title the UI
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
   title is refused as well). Desktop screenshots black out the password managers' windows, each known by its
-  application's bundle id as well as its name, so on a Mac in any language (item 555); their secure fields are not
-  masked.
+  application's bundle id as well as its name, so on a Mac in any language (item 555), and Dot's own windows for thirty
+  seconds after the eye of Settings › Vault showed a secret (item 621), which `desktop_snapshot` and `desktop_read`
+  read no more than a password manager's then; their secure fields are not masked.
 - A login of your 1Password is filled by Dot, never by the run's model (item 493). Once you connect 1Password
   (Customize › Connectors › 1Password: a vault "Shared with Dot" and a service account that only reads it, or a service
   account token of yours), a run sees the logins' titles and websites (`browser_logins`) and names one with the refs
@@ -554,9 +563,12 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   - The values are in no argument of the model. Every result of the browser and web tools of the chat masks them
     from then on, for as long as Dot runs, as typed and as an address or a JSON string writes them: an error's words
     and context, a script's value, and the step's summary and target, which the approvals, the policy's events and
-    the review model read (a form sent by GET puts them in the address). The judge of clicks and checks gets them
-    masked too, in a button's words and a page's address, title and text. A screenshot of the browser covers the
-    fields they were filled into, in every mode.
+    the review model read (a form sent by GET puts them in the address). Your rules are the exception: a rule is
+    matched against the step as the run and the page wrote it, so that a rule such as "ask before an address with a
+    long value in its query" asks alike for the password and for a word of its shape, and what it asks never tells a
+    run whether a word it tried is the password; the question, the record and the reason that quote the step show it
+    masked. The judge of clicks and checks gets them masked too, in a button's words and a page's address, title and
+    text. A screenshot of the browser covers the fields they were filled into, in every mode.
   - What is kept from the model is the password and the one-time code (your word of 2026-10-21). The username is no
     secret: a site shows it once you are signed in, and what the browser and web tools do not answer shows it as it
     is (the files a crawl writes, an MCP tool). The desktop tools are not wrapped: their screenshots show Dot's Chrome
@@ -571,10 +583,12 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
     so a frame of another site gets nothing. A password goes only into a password field, where it shows in no text.
   - No address holds a password or a code: an address is written into the views of the page, Chrome's history and
-    Dot's log, and shortened where it is long. A form that names GET as its method, or a word no browser knows, gets
-    neither. Dot's own Chrome refuses every request whose address carries one, as it is or once its escapes are read
-    back (as UTF-8, and as a page of Western European text writes them), as a form that names no method sends it, or a
-    script: a password for as long as Dot runs, a code for five minutes after it went in. The refusal and Dot's log
+    Dot's log, and shortened where it is long. A form that names GET as its method, names none (a browser sends a
+    form with no method by GET), or names a word no browser knows, gets neither (item 621: a form with no method used
+    to be left to the guard of Dot's Chrome). Dot's own Chrome refuses every request whose address carries one, as it
+    is or once its escapes are read back (as UTF-8, and as a page of Western European text writes them), as a script
+    builds the address from a field that is in no form: a password for as long as Dot runs, a code for five minutes
+    after it went in. The refusal and Dot's log
     name such a request by its host alone, or by its scheme when the value is in the host. A page in another legacy
     charset (Shift_JIS, KOI8-R and the like) can write a value Dot does not read back. Your own Chrome (Settings ›
     Browser › My Chrome) sends its requests unguarded, so there Dot fills a username alone; your password manager
@@ -587,6 +601,156 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
 
   As every refusal of the review, that one is waived in `yolo`, which may read any file: the fill itself still shows
   the model no value.
+- **Dot's own vault** (item 621, Settings › Vault) keeps the logins, cards and contact details you give it. A run can
+  have a login typed into a page and can read contact details; a card is kept, shown to you by the eye, and filled into
+  no page (that is another item's, and what it needs is in roadmap 621). Dot's tools never show a run a password, a
+  card number, an expiry or a security code; what a program that the run writes and starts can reach is under **What
+  keeps a value from a run, and what does not**.
+  - **Where they are kept.** A login's password and notes and a card's number, expiry, security code and name are in
+    your macOS login Keychain and nowhere else: one generic password item for each, of the service `dot-vault`, named
+    by the item's id. They are written through `security -i`, whose commands come from its standard input, so that no
+    value is ever on a command line another process could read, and read with `find-generic-password`. Dot's
+    database keeps what a list shows and no more: a login's site and username, a card's brand, last four digits and
+    nickname, a contact's details (a card's billing address is an address like them), and the dates. No log line,
+    event, record of a run, note, config file or `.env` holds a value, and an error says what failed and never one.
+    What the vault's routes answer to a `GET` holds none; the page shows a password or a card number only when you
+    press the eye, which asks Dot for that one part, from this Mac's own address alone (a phone saves and lists
+    items, and is told to show a value on the Mac). Deleting an item removes its Keychain item and its record, and a
+    run that holds its id is told there is no such item.
+  - **What a run is told.** `browser_logins` lists the logins of 1Password and of the vault by id, label and site;
+    `vault_contacts` lists the contacts and the billing address of each card, in your own words, for the run to type
+    where a form asks (it reads them as it reads any words, and a step that sends them somewhere is judged as ever: a
+    run that read outside content needs the review of its step). No tool returns a value, and none lists a card.
+  - **How a login reaches a page.** Dot reads it from the Keychain when the fill is made, after your yes, and types it
+    itself. From then on its password is among the secrets Dot holds (`known_secrets`), so that everywhere a secret is
+    masked it is masked: what the model says and thinks, an approval, an event, the tail of a log, a note a run saves,
+    and the results of the browser tools. It is a mask and no more: nothing refuses, blocks or answers differently
+    because a text holds it, since the run never saw it, and an answer that differs by whether a guess is the password
+    would tell the run the password (a tainted run found one in 13 calls from a list of 1,640 words; the review found
+    one in `memory_save`). So the check of item 525, which refuses a step of a run that read outside content when it
+    would send a secret Dot holds out of the Mac, goes by the keys Dot keeps and not by what a vault filled; a note
+    (`memory_save`, `memory_update`, a lesson, a pin) that holds it is saved with it masked, and a habit of the harness
+    or a line of the owner section that holds it reaches a prompt masked, an agent that holds it is exported masked:
+    none of them is refused for it. This is so for the logins of 1Password as for those of the vault. In the code
+    `known_secrets` has no default for `filled`: each place that asks for the secrets Dot holds says whether it masks
+    (it asks with the values filled) or refuses (it asks without them), and a test holds who asks which. The field the
+    value went into is marked: a screenshot of the browser covers it, and its value shows as `[hidden]` in every view of
+    the page in every mode, `yolo` too. No script runs in the chat's tabs while the tab is open. A ref that names an
+    element inside the label of a field (the snapshot gives a div or a span in a label a ref of its own) names that
+    field: Dot finds the label's input once, and every check (the form that sends by GET among them), the mark and the
+    fill are of it, so such a ref is refused as the input's own is. Only an input, a textarea or a dropdown takes a
+    password or a one-time code: an element that is edited (`contenteditable`) or a box a script draws as a text box
+    (`role=textbox`) is hidden by no mark, has no autocomplete to keep Chrome from storing what it holds, and shows its
+    text in the text of the page, so it gets nothing, in a shadow root too. A page that removes the mark, or builds a
+    new field in place of the one that was filled, shows what it keeps of it; the masks by value are the second layer.
+    In your own Chrome (`attach`) Dot fills no password, as it fills no code there.
+  - **Going back, and Chrome's profile.** Chrome gives a page's fields back what they held when a tab goes back or
+    forward to it, in a new document with none of Dot's marks, and keeps what is typed into a form in the files of its
+    profile. Dot says `autocomplete="off"` in each field it fills (what the page wrote there is kept in
+    `data-dot-autocomplete`, which the checks still read), and Chrome keeps no value of such a field: the page after
+    Back is empty, and the session Chrome saves and the entries it makes of a form that was sent hold none. If the
+    page's own script gives the fields their values again, each field that holds a value Dot filled (compared by its
+    letters and digits alone, none shorter than three) is marked again before every view and every screenshot, so that
+    the view hides it and the picture covers it; the values are compared in Dot and never sent into the page. That is
+    done in the documents of the origin the value was typed into (its scheme, its host and its port, not every site the
+    login names; a host with a dot at its end, `example.com.`, is another host, as Chrome has it), in the tab it was
+    typed into, and in no other, and
+    Dot runs nothing in a frame of another origin, whatever it holds: a frame that planted fields with the values a
+    login might have and read which of them Dot marked would learn a password it was never given. The script is told the
+    address the frame had when Dot read it and touches no field of a document that is another by then, so that a frame
+    that moves between the two is not looked into. A value the page writes in a shape that does not compare (a value
+    with a prefix or a suffix, a document of more than two thousand fields) is not found. The body of a form the page
+    sends by POST is in Chrome's session files while Chrome runs, so that the page can be sent again, which no `off`
+    changes: once Dot's own Chrome has exited, Dot deletes them, if something was filled in its run (Dot's Chrome opens
+    no page of its last run). A Chrome that dies leaves them until Dot's Chrome starts again.
+  - **Addresses.** A form with no method is a form that sends by GET, to a browser, so a password or a code is not typed
+    into it, as into one that names GET. Dot's own Chrome refuses a request a page sends whose address carries the
+    password (for as long as Dot runs) or a one-time code (for five minutes), as it is or once its escapes are read
+    back: a fetch, a frame, a script's request, whatever the page builds from a field that is in no form. It refuses it
+    to the documents of the origin the value was typed into, in the tab it was typed into, as the browser knows the
+    document that sent the request, and to nothing else. A rule that acts by what a secret is tells whoever can try
+    addresses and watch which are refused, and a dictionary of passwords would give a weak one away in a dozen
+    requests; and whoever can run a script of their own can try addresses: a page of another origin (in another chat,
+    another tab, or a frame of the page itself), and the run itself, whose `browser_eval` runs in a page of the very
+    same origin in another chat, or in this chat once it closed the tab it filled. That page is not the site's but the
+    run's, and the run was never given the password, so the page of the same origin is no longer taken for the site's.
+    In the tab the password was typed into no script of the run runs while it is open, so the guard holds it there
+    alone. The tab's own address is not a request a page sends but the run's: the address it opens,
+    the link it clicks, the form it types in and the page then sends are judged by the rules on addresses and by no
+    value filled, since a run cannot carry a value it never saw, and a refusal by a value would tell it whether a guess
+    is the password (the review found one in 22 calls from a list of 1,640 words). So a page whose script sends the tab
+    to an address that holds the password, or a form of it that sends by GET what the run typed, is not stopped: the
+    address stands in the tab and in Chrome's history, and every view of the page and every result of a tool shows it
+    masked. Nor is a request that no document can be named for (a service worker's, the first request of a tab a page
+    opened) or a redirect hop of a frame inside the page held to a value; they are judged by the rules on addresses. A
+    form in a frame of the page's own origin (an iframe of the login's site) that sends by GET what the run typed in it
+    is not the tab's navigation but a request the frame's document sends, so it is judged by the value like a fetch of
+    the page: the right password is blocked ("blocked by Chrome") and another word loads, which tells the run (see the
+    next paragraph).
+  - **What a run can still guess.** A value that is masked in text is masked wherever it stands, and a refusal of a
+    request a page sends is how a guard tells that a page tried to send it: a run that types a word into a box of a page
+    and looks at the view sees the mask in its place if the word is the password, and a page whose script fetches what
+    is typed in it (a search box that suggests as it is typed in), or a form in a frame of that origin that sends it by
+    GET, is refused the request if it is. The masks of the notes it saves are texts it reads back in the same way:
+    `memory_save` takes every word, and the note it is told it saved (`Saved: …`) and finds again with `memory_search`
+    shows `***` in the place of the word if it is the password, as a lesson, a habit or a line of the owner section that
+    reaches its prompt does. A weak password can be found so, a word at a time; a long one cannot.
+  - **The rule, and where Dot keeps to it.** A check that decides by a password a login filled is an oracle wherever
+    the run can act and watch. So Dot decides by that value in the documents of the tab it was typed into alone, where
+    no script of the run runs (the guard of requests, and the marking of a field again), and nowhere else: your rules,
+    the size of a note, the refusal of a note, a lesson, a habit, a line of the owner section or an exported agent, and
+    the check of a run that read outside content judge the text as it was written or look for the keys Dot holds, and
+    never for a password a login filled (roadmap 621 lists every place). The keys Dot holds, those of your `.env` and
+    of the Keychain, are still looked for by value in those refusals, which tells a run a key it guesses: a key a
+    provider issued is too long and random to guess, and one you chose yourself is as easy to find as you made it. How
+    often a site is acted on (the pace of public posts and the caps of a payment) counts by the site's name as the
+    step shows it, a name that holds the password included, which needs a site of that name and as many posts as
+    guesses. Not held: a site whose own scripts share what its tabs hold (a `BroadcastChannel`, the `storage` event)
+    and have the filled tab fetch an address built from it would let a script of the run in another tab of that site
+    steer the filled tab's requests and read back what came of them; it needs the site to do both, and was not seen.
+  - **The eye and the screen.** A saved secret the eye shows is hidden again by the page after twenty seconds. Each time
+    the eye shows one it asks Dot, which for the thirty seconds after leaves Dot's own windows (the desktop app's, and a
+    window of any application that shows the web UI, known by the title the UI gives its page) out of a screenshot of
+    the Mac that a run takes (`desktop_screenshot`), as a password manager's windows always are, and refuses to read
+    them: `desktop_snapshot`, `desktop_read` and the view that follows a step or an opening are refused for an
+    application that has such a window, wherever the window is (a minimized one, or one on another Space, counts), since
+    the accessibility tree of an application lists its windows and gives the text of what they show. The twenty seconds
+    are the page's own timer and the thirty are the daemon's: a window that the system throttles (hidden, behind others,
+    in the background) may run the page's timer late, which the ten seconds of slack cover, and a page the system
+    freezes can keep the secret in its text past them (not tested: the desktop app's webview is outside the tests). A
+    number or a password you are typing into a new item is on the screen as you type it, which this does not see. A
+    hidden secret is not in the page's text either: when the eye hides a secret (or the twenty seconds do) the text
+    leaves the box, and the next show asks again, because the accessibility tree of the page gives the text a box holds
+    however a style draws it. A text drawn as dots is a password input; the notes, which cannot be one, hold no text
+    while hidden and take none until shown. What you changed stays as you wrote it.
+  - **What an item may hold.** A login's website holds no user name or password (it would be kept and listed whole),
+    and an address Python cannot read is no site; the nickname of a card and the label of a contact hold no run of
+    twelve digits or more, since a run is told them and a card's number is twelve to nineteen (digits with letters
+    between them are not a run).
+  - **What keeps a value from a run, and what does not.** Dot's tools and its policy keep the vault's values from the
+    model, as they keep Dot's own keys: the Keychain does not stop a program of the run's. A run that runs code of its
+    own with your rights (`python3 -c`, `node -e`, a script it wrote) can ask the Keychain for the service `dot-vault`
+    as it can for `dot-agent` (Dot's keys) and `dot-oauth` (the tokens of your accounts, item 422), or read Chrome's
+    history: an item written through `security` is read by any `security` process without a question, and the sandbox
+    does not stand in its way. The shell guard reads two things. The command `security` is refused as a reading of a
+    secret store; and the name `dot-vault`, in any letter case, anywhere in a line, as written and as it reads once
+    the shell has taken its quotes out, or in a script of the `apple_script` tool, is asked about in every preset, as a
+    read of a protected place is (item 534): in `auto` the review model answers it, and a rule of yours that allows the
+    command lets it through. It does not read a name put together from parts, a script in a file the run wrote, or a
+    program that asks the Keychain another way, and in `yolo` it asks and refuses nothing. What would stop such a
+    program, a question of macOS at each read or an access list that names Dot's daemon alone, would ask you at every
+    fill, on the Mac, where a fill you are away from cannot be answered: it is not made (roadmap 621).
+  - **A login** is filled only on a page of its own site, as 1Password's is (above), and asks you first in every mode
+    but `yolo`; the vault keeps no one-time codes.
+  - **A card is kept, not filled.** Its number, expiry, security code and name are in the Keychain and the eye shows
+    them to you; no tool of a run lists it or fills it into a page, and the guards of this section are a login's. Its
+    billing address is listed with the contacts. Filling a card is money: it needs its own item, and roadmap 621 says
+    what that item must hold.
+  - **An import and a photo.** The logins of a CSV export of Chrome, Edge, Safari, Firefox, 1Password or Bitwarden are
+    read in memory from the upload and dropped: never written to a file, never logged. The page says how many went
+    in, how many were left out and why, and to delete the CSV file, which holds your passwords in plain text. A card's
+    photo is read on this Mac by Vision, the text recognition of macOS, from memory: it is kept nowhere and sent to no
+    model and no service.
 - What a run reads of a web page never carries the value of a password, one-time-code or card field, outside `yolo`
   (item 467): the page's lines show `[hidden]` in its place, in the view of the page, in a search of it and in what
   changed after a step, and a screenshot covers the field in every frame, a payment provider's too. The fields are the
@@ -755,7 +919,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   the caches of npm and uv) and your shell's startup files, which those programs and your own Terminal then run. And it
   keeps files: a key saved with `dotx auth set` or in Settings is in the key file, which it seals, while a key kept in
   the keychain (service `dot-agent`) can be read by a command through `security`, in the sandbox too, and so can
-  the tokens of the accounts of Google and Microsoft signed in (service `dot-oauth`, item 422).
+  the tokens of the accounts of Google and Microsoft signed in (service `dot-oauth`, item 422) and Dot's own vault
+  (service `dot-vault`, item 621: the guard asks about a line that names it, which is what it can read of a program
+  that does).
 
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a

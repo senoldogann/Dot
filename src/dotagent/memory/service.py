@@ -26,6 +26,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.memory.embedder import Embedder, build_embedder
 from dotagent.memory.ranking import Similar, Vector, fused_scores, most_similar, ranked_by_use
 from dotagent.memory.words import lowercase, search_terms
+from dotagent.secrets import mask_filled
 from dotagent.store.db import Store
 from dotagent.store.models import AwakeNotes, MemoryRecord, MemoryScore
 
@@ -118,15 +119,20 @@ def normalize_tags(tags: Sequence[str]) -> tuple[str, ...]:
 
 
 def _checked_text(content: str, max_chars: int) -> str:
-    text: str = normalize_text(content)
-    if len(text) < _MIN_NOTE_CHARS:
+    # Every write of a note comes here, a model's save, a lesson, a pin and the owner's own: a value filled into a page
+    # is never kept in one, nor sent to the embedding model (item 621). Nothing refuses a note for holding one, and
+    # nothing about its size is judged after the mask: a mask is shorter or longer than the value, so a note of 608
+    # characters with the password in it would fit the limit and the same note with a word of its shape would not, and
+    # the refusal would tell a run whether the word is the password. The size is the note as it was written.
+    written: str = normalize_text(content)
+    if len(written) < _MIN_NOTE_CHARS:
         raise InvalidValueError("the note is empty", {"content": content})
-    if len(text) > max_chars:
+    if len(written) > max_chars:
         raise InvalidValueError(
-            f"the note is {len(text)} characters long; the limit is {max_chars}. Save one shorter, single fact.",
-            {"chars": len(text), "max_chars": max_chars},
+            f"the note is {len(written)} characters long; the limit is {max_chars}. Save one shorter, single fact.",
+            {"chars": len(written), "max_chars": max_chars},
         )
-    return text
+    return normalize_text(mask_filled(content))
 
 
 async def open_memory_index(store: Store, config: AppConfig) -> MemoryIndex:
@@ -427,10 +433,11 @@ def vetted_dot_lines(
 def owner_prompt_lines(section: OwnerSection, secrets: Sequence[str] = ()) -> tuple[str, ...]:
     """The section as the prompt lists it: the owner's own lines first, marked as theirs, then Dot's. A line of Dot's
     that the gate refuses (:func:`dot_line_problem`, with ``secrets``, the values Dot holds) is left out here too, also
-    one written before the gate was: the prompt says a line with the owner's mark outranks the others."""
+    one written before the gate was: the prompt says a line with the owner's mark outranks the others. A value filled
+    into a page is not among ``secrets`` (the gate must not tell by it, item 621); no line shows one, it is masked."""
     return (
-        *(f"{OWNER_MARK} {line}" for line in section.owner_lines),
-        *(line for line in section.dot_lines if dot_line_problem(line, secrets) is None),
+        *(mask_filled(f"{OWNER_MARK} {line}") for line in section.owner_lines),
+        *(mask_filled(line) for line in section.dot_lines if dot_line_problem(line, secrets) is None),
     )
 
 

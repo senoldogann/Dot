@@ -275,6 +275,11 @@ class SignInError(DotError):
     provider refused, its tokens cannot be read or refreshed, or the Keychain did not answer."""
 
 
+class VaultRefused(DotError):
+    """Dot's vault shows a secret to this Mac's own page alone (item 621): a request that came another way, a phone's
+    over Tailscale, is refused."""
+
+
 class AccountApiError(DotError):
     """A call to the mail or the calendar of an account signed in failed (item 424): Gmail's, Google Calendar's or
     Microsoft Graph's API refused it, could not be reached, or answered with what Dot does not read."""

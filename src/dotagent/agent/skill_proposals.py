@@ -65,7 +65,7 @@ from dotagent.core.paths import playbooks_dir
 from dotagent.core.text import redact_known
 from dotagent.core.types import FrozenModel
 from dotagent.memory.ranking import Vector
-from dotagent.secrets import known_secrets
+from dotagent.secrets import known_secrets, mask_filled
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.parse import parse_skill
 from dotagent.skills.types import SKILL_FILE
@@ -575,7 +575,7 @@ async def propose_merges(runtime: "Runtime", now: float) -> int:
         config.model_call_timeout_s,
         f"reflection:{int(now)}:skills",
     )
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     made: int = 0
     by_pair: dict[int, OverlapVerdict] = {verdict.pair: verdict for verdict in judgement.verdicts}
     for number, (first, second) in enumerate(pairs, start=1):
@@ -614,9 +614,12 @@ async def propose_rewrite(runtime: "Runtime", name: str, words: str, now: float)
         raise InvalidValueError(
             f"say what to change in 1 to {MOST_WORDS} characters", {"name": name, "chars": len(said)}
         )
-    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # A refusal: the values filled into a page are not among the secrets it looks for (item 621); what is kept and sent
+    # on has them masked all the same.
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     if redact_known(said, secrets) != said:
         raise InvalidValueError("the words hold a secret: say where it lives, not what it is", {"name": name})
+    said = mask_filled(said)
     root: Path = playbooks_dir()
     entry: PlaybookEntry | None = next(
         (
@@ -635,7 +638,8 @@ async def propose_rewrite(runtime: "Runtime", name: str, words: str, now: float)
         runtime.config.agent.model_call_timeout_s,
         f"reflection:{int(now)}:skills",
     )
-    draft: PlaybookDraft = redacted_draft(await reviser(ReviseRequest(sources=(brief_of(entry),), words=said)), secrets)
+    masks: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+    draft: PlaybookDraft = redacted_draft(await reviser(ReviseRequest(sources=(brief_of(entry),), words=said)), masks)
     proposal: SkillProposal = SkillProposal(
         id=new_id("skp"),
         kind="rewrite",

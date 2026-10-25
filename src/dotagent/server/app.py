@@ -30,6 +30,7 @@ from dotagent.core.errors import (
     ToolExecutionError,
     ToolInputError,
     UndoError,
+    VaultRefused,
     VoiceError,
 )
 from dotagent.core.logs import get_logger
@@ -68,6 +69,7 @@ from dotagent.server.routes_teams import teams_router
 from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
 from dotagent.server.routes_vault import vault_router
+from dotagent.server.routes_vaultitems import vault_items_router
 from dotagent.server.routes_voice import voice_router
 from dotagent.server.routes_websearch import websearch_router
 from dotagent.server.views import ErrorView
@@ -85,6 +87,7 @@ _FAULT_CHARS: int = 500
 # logged.
 _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (PairingRefused, 403),
+    (VaultRefused, 403),
     (NotFoundError, 404),
     (RunConflict, 409),
     (UndoError, 409),
@@ -196,6 +199,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(assistant_router(ctx))
     app.include_router(accounts_router(ctx))
     app.include_router(vault_router(ctx))
+    app.include_router(vault_items_router(ctx))
     app.include_router(voice_router())
 
     @app.exception_handler(DotError)

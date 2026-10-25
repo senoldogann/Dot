@@ -21,6 +21,7 @@ import * as phone from "./phone.js";
 import * as rules from "./rules.js";
 import * as snapshots from "./snapshots.js";
 import * as websearch from "./websearch.js";
+import * as vault from "./vault.js";
 import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.js";
 
 const MOUNTS = {
@@ -30,6 +31,7 @@ const MOUNTS = {
   keys: keys.mount,
   websearch: websearch.mount,
   browser: mountBrowser,
+  vault: vault.mount,
   rules: rules.mount,
   memory: memory.mount,
   harness: harness.mount,
@@ -86,6 +88,11 @@ function mountList(root, ctx) {
   attempt(async () => {
     const found = await api.get("/harness");
     values.get("harness").textContent = found.adopted === null ? "built-in" : "changed";
+  });
+  attempt(async () => {
+    const counts = await api.get("/vault/counts");
+    const held = counts.login + counts.card + counts.contact;
+    values.get("vault").textContent = held === 0 ? "" : String(held);
   });
   return () => {
     SYSTEM_DARK.removeEventListener("change", paintTheme);

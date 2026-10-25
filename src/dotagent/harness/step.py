@@ -203,7 +203,9 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
     config: HarnessConfig = runtime.config.harness
     # The values Dot holds, which a probe's own home cannot know: a stored text is played, or shown to a role, only as
     # :func:`given_text` leaves it (the gate with them), so that what is scored is what a run would take (item 587).
-    held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    # (The values filled into a page are not among them: a gate refuses by a value, item 621. A text is given with
+    # them masked, :func:`given_text`.)
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
     base: HarnessVersion | None = await adopted(store)
     base_text: GivenText = NO_HARNESS if base is None else given_text(base, held)
     from_run: str | None = step.from_run

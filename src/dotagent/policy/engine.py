@@ -266,13 +266,14 @@ def decide(
     preset: Preset,
     rules: list[RuleRecord],
     allowance: Decision | None,
+    weighed: ActionInfo | None = None,
 ) -> Decision:
     """Combine every policy layer into one decision, strictest layer first: the always-on review, then the layers after
     it (:func:`decide_past_review`)."""
     refusal: Decision | None = auto_review(info)
     if refusal is not None:
         return refusal
-    return decide_past_review(info, mode, tainted, preset, rules, allowance)
+    return decide_past_review(info, mode, tainted, preset, rules, allowance, weighed)
 
 
 def decide_past_review(
@@ -282,12 +283,15 @@ def decide_past_review(
     preset: Preset,
     rules: list[RuleRecord],
     allowance: Decision | None,
+    weighed: ActionInfo | None = None,
 ) -> Decision:
     """Every policy layer after the always-on review, strictest first: all of :func:`decide` but the review, which a
     yolo run waives (item 433). ``allowance`` is the question a pre-approved spend asks instead of the money hand-off
     (:mod:`dotagent.policy.spend`), ``None`` for any other action; it takes the hand-off's place, and only a rule of the
     owner's that hands the step off is stricter (item 385): the allowance stands in for the money hand-off, not for the
-    owner's rules."""
+    owner's rules. ``weighed`` is the action as the run and the page wrote it, when a tool masked ``info`` (the values
+    a login filled, item 621): the owner's rules are matched against it, so that a rule fits a step alike whether or
+    not a word in it is the password, and every reason and record is of ``info``."""
     gated: Decision | None = mode_gate(info, mode)
     if gated is not None:
         return gated
@@ -297,7 +301,7 @@ def decide_past_review(
     stopped: Decision | None = hard_stop(info, allowance)
     if stopped is not None:
         return stopped
-    rule: RuleRecord | None = match_rule(info, rules)
+    rule: RuleRecord | None = match_rule(info if weighed is None else weighed, rules)
     guarded: Decision | None = guard(info) or vault_guard(info)
     if guarded is not None:
         return _handed_off(rule) if rule is not None and rule.behavior == "handoff" else guarded

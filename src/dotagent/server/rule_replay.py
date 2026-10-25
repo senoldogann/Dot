@@ -65,7 +65,9 @@ def candidate_rule(behavior: Behavior, tool_glob: str, match_regex: str, existin
 
 def _action(step: StepRow) -> ActionInfo | None:
     """The step as the policy matched rules on it: its tool, summary and target; a step of a kind or risk this Dot does
-    not know is passed over."""
+    not know is passed over. In a chat where a login was filled, the policy matched the step as written and only its
+    masked record was kept (item 621), so a rule tried here on such a step can count otherwise than the live decision
+    did: the password is not stored to be matched again."""
     if step.kind not in _KINDS or step.risk not in _RISKS:
         return None
     return ActionInfo.model_validate(

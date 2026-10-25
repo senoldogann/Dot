@@ -1,7 +1,8 @@
 """Screenshots of the main display, in the coordinates the model clicks in.
 
 A screenshot shows the whole screen at one pixel per model unit, or a zoomed region of it at the display's own
-sharpness. Windows of password managers are painted black before the picture leaves this module. Everything here blocks
+sharpness. Windows of password managers are painted black before the picture leaves this module, and Dot's own
+while a secret of its vault may be on the screen. Everything here blocks
 and runs on the session's worker thread.
 """
 
@@ -13,6 +14,7 @@ from dotagent.config import DesktopConfig
 from dotagent.core.errors import DesktopError
 from dotagent.desktop import apps, capture, perms, safety, screen
 from dotagent.desktop.types import DisplayInfo, Point, Rect, ScreenshotView, WindowInfo
+from dotagent.vault import shown
 
 MIN_REGION_UNITS: int = 16
 _NO_APP: str = "(none)"
@@ -38,10 +40,12 @@ def _pointer_units(scale: float) -> Point:
 
 
 def _picture_of(config: DesktopConfig, area: Rect, windows: Sequence[WindowInfo]) -> tuple[Image.Image, int]:
-    """The pixels of ``area`` (points) with password manager windows blacked out, and how many were."""
+    """The pixels of ``area`` (points) with password manager windows blacked out, and Dot's own while a secret of its
+    vault may be on the screen (item 621), and how many were."""
     perms.require_screen_recording()
     picture: Image.Image = capture.capture_native(area, config.capture_timeout_s)
-    return capture.black_out(picture, area, safety.hidden_regions(windows, apps.bundle_ids()))
+    hidden: tuple[Rect, ...] = safety.hidden_regions(windows, apps.bundle_ids(), own=shown.on_screen())
+    return capture.black_out(picture, area, hidden)
 
 
 def take_screen(config: DesktopConfig) -> ScreenshotView:

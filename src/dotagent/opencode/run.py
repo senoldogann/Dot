@@ -509,7 +509,7 @@ class _Follow:
                     self.answer = answer
             case StepStarted():
                 self.idle = False
-                self.stream.begin(await asyncio.to_thread(known_secrets))
+                self.stream.begin(await asyncio.to_thread(known_secrets, filled=True))
                 self.assistants.setdefault(event.message_id, _Step(started=time.monotonic())).started = time.monotonic()
             case PartSeen():
                 await self.part(event)
@@ -558,7 +558,7 @@ class _Follow:
             return
         name: str = f"{TOOL_PREFIX}{event.tool}"
         # The secrets Dot holds are masked word for word, as the executor masks those of its own calls (item 525).
-        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         if not call.announced:
             call.announced = True
             step.tools.append(name)
@@ -595,7 +595,7 @@ class _Follow:
         if text.strip():
             self.answer = text.strip()
         await self.stream.flush()
-        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         await self.emit(
             "assistant",
             {

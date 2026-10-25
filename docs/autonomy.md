@@ -50,8 +50,8 @@ strictest first (item 398). The composer's Options menu lists them with their ic
 In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
 [Safety](safety.md#safety)) is a question to you: the review model never answers it, and no rule of yours does either.
 Allowed, the run makes the change with the file tools; a command line never makes it, and neither does OpenCode's own
-agent, which writes past the journal `dotx undo` reads (item 398). So is a login filled from your 1Password (item 493):
-the review model never answers it, and a rule of yours can only hand it to you.
+agent, which writes past the journal `dotx undo` reads (item 398). So is a login filled from your 1Password (item 493)
+or from Dot's own vault (item 621): the review model never answers it, and a rule of yours can only hand it to you.
 
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, the summary is the action
 and the note holds the reason) and an `approval_auto` event, so you can see afterwards what went through and why. A chat
@@ -77,7 +77,8 @@ off, and a yolo run waives the last two with every other question.) The modes th
 `supervised`, `ask` and `auto` money and credentials are still yours (Dot stops and asks you to do that step yourself;
 the review model is never asked about them, and a payment under its pre-approved caps asks you, or the review model in
 `auto`), and a message sent for you or a post in your name still waits for your yes (the review model answers it in
-`auto`; a rule that allows it does not), and a login filled from your 1Password waits for yours alone, in `auto` too.
+`auto`; a rule that allows it does not), and a login filled from your 1Password or from Dot's vault waits for
+yours alone, in `auto` too.
 
 **What an upload asks** (item 561). A file sent to a server carries the flag `upload`: one chosen in a page's upload
 control with `browser_upload` (many pages send it as soon as it is chosen), a `curl -T`, a form sent with a file, a

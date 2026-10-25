@@ -166,15 +166,21 @@ def redact_secrets(text: str) -> str:
     return masked
 
 
-def redact_known(text: str, known: Sequence[str]) -> str:
+def mask_known(text: str, known: Sequence[str]) -> str:
     """``text`` with every value of ``known`` (secrets Dot holds, :func:`dotagent.secrets.known_secrets`) masked where
-    it stands, word for word and the longest first, then :func:`redact_secrets`. A value shorter than
+    it stands, word for word and the longest first, and nothing else. A value shorter than
     :data:`KNOWN_SECRET_MIN_CHARS` is left alone."""
     masked: str = text
     for value in sorted(set(known), key=len, reverse=True):
         if len(value) >= KNOWN_SECRET_MIN_CHARS:
             masked = masked.replace(value, "***")
-    return redact_secrets(masked)
+    return masked
+
+
+def redact_known(text: str, known: Sequence[str]) -> str:
+    """``text`` with every value of ``known`` (secrets Dot holds, :func:`dotagent.secrets.known_secrets`) masked where
+    it stands (:func:`mask_known`), then :func:`redact_secrets`."""
+    return redact_secrets(mask_known(text, known))
 
 
 def secret_value(name: str, value: str, prose: bool) -> bool:

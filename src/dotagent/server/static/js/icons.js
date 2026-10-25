@@ -402,6 +402,15 @@ const SHAPES = {
   ],
   lock: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2 }], ["path", { d: "M7 11V7a5 5 0 0 1 10 0v4" }]],
   lockOpen: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2 }], ["path", { d: "M7 11V7a5 5 0 0 1 9.9-1" }]],
+  // For the vault (item 621): a card, and a contact's card with a head on it.
+  creditCard: [["rect", { width: 20, height: 14, x: 2, y: 5, rx: 2 }], ["path", { d: "M2 10h20" }]],
+  contact: [
+    ["path", { d: "M16 2v2" }],
+    ["path", { d: "M17.915 22a6 6 0 0 0-12 0" }],
+    ["path", { d: "M8 2v2" }],
+    ["circle", { cx: 12, cy: 12, r: 4 }],
+    ["rect", { x: 3, y: 4, width: 18, height: 18, rx: 2 }],
+  ],
   sun: [
     ["circle", { cx: 12, cy: 12, r: 4 }],
     ["path", { d: "M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" }],

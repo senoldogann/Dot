@@ -199,7 +199,8 @@ class SnapshotView(FrozenModel):
 
 class ScreenshotView(FrozenModel):
     """A screenshot plus where it sits in model units: pixel (px, py) of the image is the coordinate
-    (left + px / zoom, top + py / zoom). ``redacted`` windows (password managers) are blacked out."""
+    (left + px / zoom, top + py / zoom). ``redacted`` windows (password managers, and Dot's own while its vault shows
+    a secret) are blacked out."""
 
     image: bytes
     width: int

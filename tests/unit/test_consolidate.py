@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from structlog.testing import capture_logs
 
+from dotagent import secrets
 from dotagent.agent import consolidate
 from dotagent.agent.consolidate import (
     MergeGroup,
@@ -465,6 +466,27 @@ async def test_a_lesson_that_says_what_an_adopted_habit_says_rests_and_the_other
         again = await _note(store, habit + " Again.", None)
         assert await rest_repeating_habits(runtime, protected, time.time()) == 0  # type: ignore[arg-type]
         assert REST_TAG not in (await store.get_memory(again.id)).tags
+
+
+async def test_a_habit_that_holds_a_value_a_page_was_given_still_counts_for_the_lessons_that_repeat_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 621: the gate that leaves a habit out of the rules (a text that holds a secret) does not look for a value a
+    vault filled into a page, so the habit is a rule whether or not the value is the password, with the value masked."""
+    password: str = "S3cret-Passw0rd!"
+    monkeypatch.setattr(secrets, "_filled", frozenset())
+    secrets.hold_filled(password)
+    async with _home(tmp_path, monkeypatch) as (runtime, _):
+        store: Store = runtime.store
+        config: AppConfig = runtime.config  # type: ignore[assignment]
+        habit: HarnessText = HarnessText(
+            habits=f"- Read a file before you change it, the shop wants {password}.\n", tool_guidance=""
+        )
+        version = await create_version(store, config.harness, habit, "habits", "owner", "", ())
+        await adopt(store, version.id, time.time())
+        repeats = await _note(store, "Read a file before you change it, the shop wants ***.", None)
+        assert await rest_repeating_habits(runtime, set(), time.time()) == 1  # type: ignore[arg-type]
+        assert REST_TAG in (await store.get_memory(repeats.id)).tags
 
 
 async def test_a_lesson_is_checked_against_the_adopted_rules_once_and_a_quiet_night_embeds_nothing(

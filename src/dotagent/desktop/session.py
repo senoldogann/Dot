@@ -53,6 +53,7 @@ from dotagent.desktop.types import (
 )
 from dotagent.desktop.views import ViewRequest
 from dotagent.policy.elements import Element
+from dotagent.vault import shown
 
 _log = get_logger("dotagent.desktop.session")
 
@@ -154,6 +155,13 @@ def _refuse_secrets(app: AppInfo) -> None:
             f"{app.name} holds passwords or keys; its content is never read and it is never controlled",
             {"app": app.name, "bundle_id": app.bundle_id or ""},
         )
+
+
+_OWN_WINDOW_SHOWN: str = (
+    "Dot's own window may show a secret of the owner's vault right now, and the accessibility tree of a window gives "
+    "the text of what it shows: it is not read while the secret may be on the screen, as a password manager is never "
+    "read. Try again in a minute"
+)
 
 
 def _notes_of(snapshot: Snapshot) -> tuple[str, ...]:
@@ -504,6 +512,7 @@ class DesktopSession:
     ) -> tuple[SnapshotView, ThreadDesktop]:
         """Take a view of ``app`` and the thread's memory after it."""
         _refuse_secrets(app)
+        await self._refuse_own_while_shown(app)
         remembered: AppMemory = memory.memory_of(state, app.pid)
         probe: Callable[[], _Walk] = partial(
             _walk_job,
@@ -542,6 +551,17 @@ class DesktopSession:
             tuple(notes),
         )
         return result.view, memory.after_walk(state, app.pid, walk.snapshot, key, result.baseline)
+
+    async def _refuse_own_while_shown(self, app: AppInfo) -> None:
+        """No look at Dot's own windows while a secret of the owner's vault may be on the screen (item 621,
+        :mod:`dotagent.vault.shown`): the eye of Settings › Vault shows it in the window's text, which the
+        accessibility tree gives whole. As a password manager's content is never read (:func:`_refuse_secrets`), the
+        window of Dot is not, for as long as the secret may be on the screen. The windows are listed only then."""
+        if not shown.on_screen():
+            return
+        windows: tuple[WindowInfo, ...] = await self._call(screen.windows_everywhere)
+        if safety.shows_own_window(app.name, app.bundle_id, app.pid, windows):
+            raise DesktopError(_OWN_WINDOW_SHOWN, {"app": app.name})
 
     async def _closing_view(
         self, state: ThreadDesktop, app: AppInfo, max_chars: int
@@ -593,6 +613,7 @@ class DesktopSession:
             running, preferred = await self._call(self._running)
             target: AppInfo = _pick_app(state, app, running, preferred)
             _refuse_secrets(target)
+            await self._refuse_own_while_shown(target)
             element: AXElement | None = memory.known_elements(memory.memory_of(state, target.pid)).get(ref)
             if element is None:
                 raise DesktopError(

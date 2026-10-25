@@ -1,6 +1,7 @@
-"""The values a login of the password manager filled into a page (item 493), taken out of what the browser tools of
-the same chat give back: a page that shows a code it was given, a script's value, an error that quotes a field. A value
-shorter than a few characters is left as it is: masking it would cut ordinary words."""
+"""The values a login of the password manager filled into a page (item 493), or a login of Dot's own vault (item 621),
+taken out of what the browser tools of the same chat give back: a page that shows a code it was given, a script's
+value, an error that quotes a field. A value shorter than a few characters is left as it is: masking it would cut
+ordinary words."""
 
 import json
 import string
@@ -13,7 +14,7 @@ from pydantic import JsonValue
 from dotagent.core.errors import DotError, ForbiddenUrlError
 
 # What stands where a value was.
-MASK: str = "[filled from 1Password]"
+MASK: str = "[filled from your vault]"
 # The shortest value masked: a one-time code has six digits; a shorter one would match ordinary text.
 _MASKED_FROM_CHARS: int = 4
 # How many times over the escapes of an address are read back, for a value escaped again and again.
@@ -51,8 +52,8 @@ def _forms(value: str) -> frozenset[str]:
 
 def masked(text: str, values: Iterable[str], mask: str = MASK) -> str:
     """``text`` with each of ``values`` of a few characters or more replaced by ``mask`` (:data:`MASK` for a value of
-    the password manager), in each of the forms a page may write it in, the longest first, so that a value inside
-    another is masked with it."""
+    a vault), in each of the forms a page may write it in, the longest first, so that a value inside another is masked
+    with it."""
     forms: set[str] = {
         form
         for value in values
