@@ -23,6 +23,10 @@ import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 const LIFECYCLE_KINDS = new Set(["run_started", "run_finished", "schedule_stopped"]);
 const RELOAD_DELAY_MS = 400;
 const GOAL_PREVIEW_CHARS = 220;
+// Past its third schedule the list scrolls inside (item 634): it shows three rows and the top of the fourth, which says
+// that more lie under them.
+const SHOWN_ROWS = 3;
+const NEXT_ROW_PX = 32;
 // A firing's answer is shown by its first line, cut to this.
 const FIRING_RESULT_CHARS = 120;
 const REPEATS = [
@@ -322,6 +326,30 @@ function scheduleRow(view, handlers) {
     ),
     el("div", { class: "row-actions" }, runNow, edit, remove),
   );
+}
+
+/**
+ * Cut the list of schedules `list` under its third row and the top of its fourth (item 634), so that it scrolls inside:
+ * measured where the rows stand, since a goal's lines and a schedule's opened Firings make rows of differing heights,
+ * and measured again whenever one of the three changes size (the window, Firings). A list of three or fewer is not cut.
+ * Returns `dispose()`.
+ */
+function cutAfterThird(list) {
+  if (list.children.length <= SHOWN_ROWS) {
+    return () => {};
+  }
+  const shown = [...list.children].slice(0, SHOWN_ROWS);
+  const measure = () => {
+    const foot = shown[SHOWN_ROWS - 1].getBoundingClientRect().bottom - list.getBoundingClientRect().top + list.scrollTop;
+    list.style.setProperty("--shown-rows", `${Math.ceil(foot) + NEXT_ROW_PX}px`);
+  };
+  list.classList.add("cut");
+  const observer = new ResizeObserver(measure);
+  for (const row of shown) {
+    observer.observe(row);
+  }
+  measure();
+  return () => observer.disconnect();
 }
 
 /** When a schedule runs, in words: "Every day at 08:00" for a repeating one the page can read, else what the daemon says
@@ -667,6 +695,8 @@ export function mount(root, ctx) {
   let views = null;
   // The schedules whose Firings are open: they stay open, and are read again, as the list is painted again.
   const openFirings = new Set();
+  // What stops measuring the list's cut after its third row (item 634), when it is painted again or the page goes.
+  let stopCut = () => {};
   const holder = el("div", null, loadingPanel());
   const count = el("span", { class: "hint" });
   // The form that adds a schedule opens in a dialog when New schedule asks for it; the list is what this page is for.
@@ -683,6 +713,10 @@ export function mount(root, ctx) {
     if (views === null) {
       return;
     }
+    // A list painted again keeps where it was scrolled to inside (item 634): a run's start or end paints it.
+    const scrolled = holder.querySelector(".schedule-list")?.scrollTop ?? 0;
+    stopCut();
+    stopCut = () => {};
     if (views.length === 0) {
       holder.replaceChildren(emptyPanel("calendar", "No schedules yet", "Add one with New schedule and Dot will start it by itself."));
       return;
@@ -695,7 +729,10 @@ export function mount(root, ctx) {
       onFirings: (record, button, list) => attempt(() => toggleFirings(record, button, list)),
       firingsOpen: (id) => openFirings.has(id),
     };
-    holder.replaceChildren(el("div", { class: "schedule-list" }, views.map((view) => scheduleRow(view, handlers))));
+    const list = el("div", { class: "schedule-list" }, views.map((view) => scheduleRow(view, handlers)));
+    holder.replaceChildren(list);
+    stopCut = cutAfterThird(list);
+    list.scrollTop = scrolled;
     count.textContent = plural(views.length, "schedule", "schedules");
     for (const list of holder.querySelectorAll("[data-firings]")) {
       if (!list.hidden) {
@@ -848,6 +885,7 @@ export function mount(root, ctx) {
   attempt(reload);
   return () => {
     disposed = true;
+    stopCut();
     brief.dispose();
     watchers.dispose();
     stopLifecycle();

@@ -264,7 +264,10 @@ under it (item 571) is not a schedule: it looks at mail, calendar events and Git
 you care about.
 
 On Schedules the list is the page and **New schedule** opens the form, in a dialog over the page (item 615), as a
-schedule's pencil opens the same dialog filled; a schedule is created and edited
+schedule's pencil opens the same dialog filled. Past its third schedule, **Your schedules** scrolls inside (item 634):
+it shows the first three and the top of the fourth, and it is never taller than most of the window (a phone's rows are
+taller). Painted again, as a switch or the end of a run paints it, it keeps where it was scrolled to. A schedule is
+created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task or research: a chat that only talks
 schedules tasks), model, reasoning
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat, when its failures switch it
