@@ -382,15 +382,18 @@ async def test_the_list_of_agents_names_the_chat_each_agents_newest_run_is_in(
 ) -> None:
     scout: JsonObject = await _agent(client, "Scout", "Finds sources")
     rows: list[JsonObject] = (await client.get("/api/agents")).json()
-    assert [(row["record"]["name"], row["latest"], row["latest_title"]) for row in rows] == [
-        ("Dot", None, None),
-        ("Scout", None, None),
-    ]
+    assert [row["record"]["name"] for row in rows] == ["Dot", "Scout"]
+    assert (rows[1]["latest"], rows[1]["latest_title"]) == (None, None)
+    # Dot's card names its newest chat as an agent's does (item 633), and an agent's run after it is not Dot's.
+    dots: JsonObject = await _message(client, manager, {"goal": "Plan the week"})
+    named = await client.patch(f"/api/threads/{dots['thread_id']}", json={"title": "The week"})
+    assert named.status_code == 204, named.text
     run: JsonObject = await _message(
         client, manager, {"goal": "Find two sources on the matter", "agent_id": scout["id"]}
     )
     renamed = await client.patch(f"/api/threads/{run['thread_id']}", json={"title": "Sources for the matter"})
     assert renamed.status_code == 204, renamed.text
     rows = (await client.get("/api/agents")).json()
+    assert rows[0]["latest"]["id"] == dots["id"] and rows[0]["latest_title"] == "The week"
     assert rows[1]["latest"]["id"] == run["id"] and rows[1]["latest_title"] == "Sources for the matter"
     await _clear(client)

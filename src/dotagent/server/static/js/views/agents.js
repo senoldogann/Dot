@@ -11,7 +11,7 @@ import { api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
-import { ago, clip, el, modelName, plural, switchRow } from "../dom.js";
+import { ago, clip, el, modelName, plural, setText, switchRow } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
@@ -37,14 +37,14 @@ const MOST_TEAM_FACES = 4;
 const WORKING = new Set(["queued", "running", "blocked"]);
 // The largest agent file Import reads: its instructions take at most 50,000 characters, of up to four bytes each.
 const MOST_AGENT_FILE_BYTES = 256 * 1024;
+// How often the cards' "5m ago" are written again while the list stays open (item 633).
+const AGE_REFRESH_MS = 60_000;
 // Names in one line of words, as a toast says them: "A", "A and B", "A, B, and C".
 const AND_LIST = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
 
 function faceOf(record, latest) {
-  if (record.id === DOT_ID) {
-    return dotFace("idle");
-  }
-  return actorFace(record.id, latest !== null && WORKING.has(latest.status) ? "working" : "idle", record.look);
+  const state = latest !== null && WORKING.has(latest.status) ? "working" : "idle";
+  return record.id === DOT_ID ? dotFace(state) : actorFace(record.id, state, record.look);
 }
 
 function hrefOf(record) {
@@ -53,7 +53,8 @@ function hrefOf(record) {
 
 /**
  * An agent's compact card in the grid of Your agents (item 610): its face, its name and its role on one line, and under
- * them the title of its newest chat with when it began, or that it has none. Dot's opens the chats.
+ * them the title of its newest chat with when it began, or that it has none. Dot's names its newest chat of its own
+ * (item 633) and opens the chats.
  */
 function agentCard({ record, latest, latest_title: latestTitle }) {
   // The chat's own title, which the owner may have named; a daemon from before it was sent says the run's goal.
@@ -79,7 +80,7 @@ function agentCard({ record, latest, latest_title: latestTitle }) {
       "div",
       { class: "agent-card-chat" },
       el("span", { class: "agent-card-chat-title muted", title: latest === null ? "" : chat }, chat),
-      latest === null ? null : el("span", { class: "agent-when" }, ago(latest.created_at)),
+      latest === null ? null : el("span", { class: "agent-when", dataset: { ts: String(latest.created_at) } }, ago(latest.created_at)),
     ),
   );
 }
@@ -112,7 +113,7 @@ function teamTile({ record, members, latest }) {
       "div",
       { class: "agent-card-chat" },
       el("span", { class: "agent-card-chat-title muted", title: latest === null ? "" : latest.title }, latest === null ? "No chats yet" : clip(latest.title, GOAL_CHARS)),
-      latest === null ? null : el("span", { class: "agent-when" }, ago(latest.updated_at)),
+      latest === null ? null : el("span", { class: "agent-when", dataset: { ts: String(latest.updated_at) } }, ago(latest.updated_at)),
     ),
   );
 }
@@ -832,11 +833,18 @@ function mountList(root, ctx) {
     attempt(reload);
     attempt(reloadTeams);
   });
+  // The list is read again when a run starts or ends; in between, the cards' ages keep up with the clock (item 633).
+  const ages = setInterval(() => {
+    for (const node of root.querySelectorAll(".agent-when[data-ts]")) {
+      setText(node, ago(Number(node.dataset.ts)));
+    }
+  }, AGE_REFRESH_MS);
   attempt(reload);
   attempt(reloadTeams);
   attempt(loadTemplates);
   return () => {
     disposed = true;
+    clearInterval(ages);
     stopLifecycle();
     stopBack();
     closeEditor();
