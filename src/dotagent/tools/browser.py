@@ -8,11 +8,15 @@ steps is classified once, from the elements it targets in the latest snapshot.
 
 import asyncio
 import base64
+import contextlib
+import os
 import posixpath
 import secrets
+import shutil
+import time
 from collections.abc import Sequence
 from dataclasses import replace
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Literal, Self
 from urllib.parse import unquote, urlsplit
 
@@ -59,8 +63,9 @@ from dotagent.browser.types import (
 )
 from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import DotError, ToolExecutionError, ToolInputError
+from dotagent.core.held import held_folder, open_regular
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import workspace_dir
+from dotagent.core.paths import uploads_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, combine_assessments
@@ -100,6 +105,8 @@ from dotagent.vault.onepassword import Login, LoginSecret, VaultError, kept_toke
 _log = get_logger(__name__)
 
 _NONCE_BYTES: int = 8
+# How long the copies of an upload are kept for the browser, which reads them when the page sends them (item 681).
+_UPLOAD_COPIES_KEPT_S: float = 86400.0
 _HEADROOM_CHARS: int = 3500  # room next to the page body for steps, tabs, notes and the fence lines
 _SUMMARY_CHARS: int = 240
 _LABEL_CHARS: int = 50
@@ -823,6 +830,34 @@ def _upload_flags(path_classes: list[PathClass]) -> tuple[Flag, ...]:
     return (*flags, "upload")
 
 
+def upload_copies(paths: Sequence[Path], now: float) -> list[str]:
+    """Copies of the regular files ``paths`` (resolved, as checked) in a new private folder of Dot's own, each read with
+    no link followed along its path, for the browser to read when the page sends them (item 681); the folders of copies
+    older than :data:`_UPLOAD_COPIES_KEPT_S` are removed first. Blocking."""
+    root: Path = uploads_dir()
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for old in root.iterdir():
+        with contextlib.suppress(OSError):
+            if now - old.lstat().st_mtime > _UPLOAD_COPIES_KEPT_S:
+                shutil.rmtree(old)
+    target: Path = root / secrets.token_hex(8)
+    target.mkdir(mode=0o700)
+    copies: list[str] = []
+    for number, path in enumerate(paths):
+        folder: int = held_folder(path.parent)
+        try:
+            source: int = open_regular(folder, path.name)
+        finally:
+            os.close(folder)
+        # One folder per file, so that two files of the same name keep their names.
+        copy: Path = target / str(number) / path.name
+        copy.parent.mkdir(mode=0o700)
+        with os.fdopen(source, "rb") as reading, copy.open("xb") as writing:
+            shutil.copyfileobj(reading, writing)
+        copies.append(str(copy))
+    return copies
+
+
 def _upload_tool() -> RegisteredTool:
     def classify(args: UploadArgs, ctx: ToolContext) -> ActionInfo:
         resolved = [expand_path(raw, ctx.workspace) for raw in args.paths]
@@ -837,7 +872,16 @@ def _upload_tool() -> RegisteredTool:
         return _action("browser_upload", "browser_input", risk, f"Upload {names} to {target}", target, flags)
 
     async def run(args: UploadArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
-        paths: list[str] = [str(expand_path(raw, ctx.workspace)) for raw in args.paths]
+        resolved: list[Path] = [expand_path(raw, ctx.workspace) for raw in args.paths]
+        # Chrome reads a file when the page sends it, after the call: it is given a copy Dot made of the file it
+        # checked, with no link followed, where a command of a run writes nothing (item 681).
+        try:
+            paths: list[str] = await asyncio.to_thread(upload_copies, resolved, time.time())
+        except OSError as exc:
+            raise ToolExecutionError(
+                "the files were not uploaded: one is no longer the file that was checked (a link, or gone)",
+                {"paths": [str(path) for path in resolved], "error": str(exc)},
+            ) from exc
         view: PageView = await ctx.browser.upload(ctx.thread_id, args.ref, paths, hides_secrets(ctx.approvals))
         # The page the upload brings up is the site's to write (item 561).
         return mark_untrusted(_page_result(view, ctx))

@@ -7,15 +7,17 @@ not copied cannot be put back, nor can one below a folder that is a link now (th
 resolved, so a link above it came since, and taking the change back through it would write or delete elsewhere).
 """
 
+import contextlib
 import hashlib
 import os
+import secrets
 import stat
-import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Literal
 
 from dotagent.core.errors import UndoError
+from dotagent.core.held import held_folder, open_regular
 from dotagent.core.types import FrozenModel
 from dotagent.undo.journal import JournalEntry, backup_path, digest, run_journal
 
@@ -138,8 +140,17 @@ def file_state(path: Path) -> FileState:
         return FileState(kind="folder", digest=None)
     if not stat.S_ISREG(status.st_mode):
         return FileState(kind="other", digest=None)
-    with path.open("rb") as stream:
+    with os.fdopen(_opened_regular(path), "rb") as stream:
         return FileState(kind="file", digest=hashlib.file_digest(stream, "sha256").hexdigest())
+
+
+def _opened_regular(path: Path) -> int:
+    """The regular file at ``path`` opened to read with no link followed on the way (item 681). Blocking."""
+    folder: int = held_folder(path.parent)
+    try:
+        return open_regular(folder, path.name)
+    finally:
+        os.close(folder)
 
 
 def current_states(paths: Sequence[str]) -> dict[str, FileState]:
@@ -171,29 +182,45 @@ def apply_undo(steps: Sequence[UndoStep], root: Path) -> None:
 
 
 def _carry_out(step: UndoStep, root: Path) -> None:
+    """Take one change back, in the folder of its path opened with no link followed on the way (item 681): a link a
+    process left on the path since the plan was made has the step refused, not the daemon delete or write the file the
+    link names."""
     path: Path = Path(step.path)
     # Looked at again: a link may have come above the path since the plan was made.
     if _linked_above(path):
         raise UndoError(_LINKED_REASON, {"folder": str(path.parent), "resolves_to": os.path.realpath(path.parent)})
     if step.action == "delete":
-        path.unlink(missing_ok=True)
+        try:
+            folder: int = held_folder(path.parent)
+        except FileNotFoundError:
+            return
+        try:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(path.name, dir_fd=folder)
+        finally:
+            os.close(folder)
         return
     first: JournalEntry = step.origin.entry
     backup: Path = backup_path(run_journal(root, step.origin.run_id), first.seq)
     data: bytes = backup.read_bytes()
     if digest(data) != first.before:
         raise UndoError("the copy in the journal is not the one that was noted", {"copy": str(backup)})
-    path.parent.mkdir(parents=True, exist_ok=True)
-    handle, temp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    folder = held_folder(path.parent, make=True)
+    temp: str = f".{path.name}.{secrets.token_hex(8)}"
     try:
-        with os.fdopen(handle, "wb") as stream:
-            stream.write(data)
-        if first.mode is not None:
-            os.chmod(temp_name, first.mode)
-        os.replace(temp_name, path)
-    except OSError:
-        Path(temp_name).unlink(missing_ok=True)
-        raise
+        handle: int = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=folder)
+        try:
+            with os.fdopen(handle, "wb") as stream:
+                if first.mode is not None:
+                    os.fchmod(stream.fileno(), first.mode)
+                stream.write(data)
+            os.replace(temp, path.name, src_dir_fd=folder, dst_dir_fd=folder)
+        except OSError:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(temp, dir_fd=folder)
+            raise
+    finally:
+        os.close(folder)
 
 
 def remove_empty_dirs(folders: Sequence[Path]) -> list[Path]:

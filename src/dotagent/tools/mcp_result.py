@@ -4,6 +4,7 @@ data."""
 import asyncio
 import base64
 import binascii
+import os
 import re
 import time
 from pathlib import Path
@@ -21,11 +22,13 @@ from mcp.types import (
 )
 
 from dotagent.core.errors import McpError, ToolExecutionError
+from dotagent.core.held import workspace_folder, write_new
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import unclosing
 from dotagent.llm.types import ImageData
 from dotagent.tools.base import ToolResult
+from dotagent.tools.third_party import MCP_FOLDER
 
 MAX_IMAGES: int = 4
 FENCE_OVERHEAD_CHARS: int = 300
@@ -101,11 +104,15 @@ def _file_name(server: str, tool: str, nonce: str) -> str:
     return f"{safe(server)}-{safe(tool)}-{time.strftime('%Y%m%d-%H%M%S')}-{nonce[:6]}.txt"
 
 
-def _write_answer(folder: Path, name: str, body: str) -> Path:
-    folder.mkdir(parents=True, exist_ok=True)
-    path: Path = folder / name
-    path.write_text(body, encoding="utf-8")
-    return path
+def _write_answer(workspace: Path, name: str, body: str) -> Path:
+    """Keep ``body`` as the new file ``name`` in the workspace's folder of answers, made and opened with no link
+    followed on the way (item 681): a link a command of the run put there does not have the daemon write elsewhere."""
+    folder: int = workspace_folder(workspace, (MCP_FOLDER,), make=True)
+    try:
+        write_new(folder, name, body.encode("utf-8"))
+    finally:
+        os.close(folder)
+    return workspace / MCP_FOLDER / name
 
 
 def _kept_note(path: Path, body: str, shown_lines: int) -> str:
@@ -127,11 +134,11 @@ async def render_call_result(
     max_edge: int,
     quality: int,
     nonce: str,
-    folder: Path,
+    workspace: Path,
 ) -> ToolResult:
     """The answer of a tool as the model sees it. Everything a server returns counts as untrusted input. An answer
-    longer than ``text_chars`` is written whole to a file in ``folder`` (item 494): the result shows the lines at its
-    start that fit, and says where the file is."""
+    longer than ``text_chars`` is written whole to a file in the workspace's folder of answers (item 494): the result
+    shows the lines at its start that fit, and says where the file is."""
     parts: list[str] = []
     images: list[ImageData] = []
     pictures: int = 0
@@ -154,7 +161,7 @@ async def render_call_result(
     if len(body) <= text_chars:
         text = fence_mcp(server, tool, body, nonce)
     else:
-        path: Path = await asyncio.to_thread(_write_answer, folder, _file_name(server, tool, nonce), body)
+        path: Path = await asyncio.to_thread(_write_answer, workspace, _file_name(server, tool, nonce), body)
         # The note is longest when it names the last line or no whole line; what it leaves of the budget is shown.
         longest: int = max(len(_kept_note(path, body, lines)) for lines in (0, len(body.splitlines())))
         room: int = text_chars - longest

@@ -827,7 +827,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   files to a command.
   In any mode, a tool that names files (the file tools, `web_extract`, `browser_upload`) looks at them again as it
   starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
-  and called again it is decided for where the path leads now. A path is judged by the place it names (item 399):
+  and called again it is decided for where the path leads now. As it works, a tool that reads, writes or lists a path (`read_file`, `write_file`, `edit_file`, `list_dir`, `web_extract`) does so on the path it was allowed with no link followed on the way (item 681), so a link a command put on it in the meantime is refused too, as is a named pipe, and a link in a folder listed is said to be one, not entered (`find_files` and `search_files` hand the path to ripgrep in the run's sandbox, which enters no link below it but is given the path again); `browser_upload` hands the browser copies of the files it checked, which a link made after
+  does not change, and the files Dot keeps in the workspace (a crawl's pages, an MCP answer kept whole, an
+  attachment) are made with no link followed; an undo deletes or writes a file back that way too. A path is judged by the place it names (item 399):
   through a link, in another letter case, through the Data volume (`/System/Volumes/Data/Users/…`, which macOS joins to
   `/Users/…`) or behind `/.nofollow` or `/.resolve/<flags>`, `~/.ssh` is `~/.ssh`, for the file tools and for the words
   and globs of a command line; a file named by its number (`/.vol/<device>/<inode>`), which can be any file, is refused

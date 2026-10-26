@@ -3,6 +3,8 @@
 import asyncio
 import contextlib
 import difflib
+import errno
+import io
 import os
 import re
 import secrets
@@ -11,8 +13,9 @@ import stat
 from collections.abc import Iterator
 from itertools import islice
 from pathlib import Path
+from typing import BinaryIO
 
-from Foundation import NSURL, NSData, NSMutableData
+from Foundation import NSData, NSMutableData
 from pydantic import Field
 from Quartz import (
     CGImageDestinationAddImage,
@@ -26,6 +29,7 @@ from Quartz import (
 )
 
 from dotagent.core.errors import ToolExecutionError
+from dotagent.core.held import held_folder, open_regular
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.text import truncate_middle
 from dotagent.office import OfficeKind, names_office_file, office_kind, office_text, unreadable_office_file
@@ -75,6 +79,12 @@ _RG_ERROR: int = 2
 # reading of a folder of a large tree, such as those under ~/Library/Containers, which reads a moment later).
 _UNREAD_PATH: re.Pattern[str] = re.compile(r"rg: (.+ \(os error (?:1|4|13)\))")
 _UNREAD_SHOWN: int = 10
+# What a file tool says when the path it was allowed to act on leads through a link now (item 681); another failure to
+# open a folder of it (a file in a folder's place, no permission) is said as it is (:func:`_not_opened`).
+_MOVED: str = (
+    "the call was not run: a folder on its path is a link now, which it was not when the call was allowed; call the "
+    "tool again"
+)
 
 
 def resolve_path(raw: str, ctx: ToolContext) -> Path:
@@ -136,8 +146,8 @@ def write_action(
     return ActionInfo(tool=tool, kind="write", risk=risk, summary=summary, target=str(path), flags=flags)
 
 
-def _pdf_text(path: Path) -> str:
-    document = PDFDocument.alloc().initWithURL_(NSURL.fileURLWithPath_(str(path)))
+def _pdf_text(path: Path, data: bytes) -> str:
+    document = PDFDocument.alloc().initWithData_(NSData.dataWithBytes_length_(data, len(data)))
     if document is None:
         raise ToolExecutionError("the PDF could not be opened", {"path": str(path)})
     return str(document.string() or "")
@@ -159,9 +169,40 @@ def _drawn_by_macos(data: bytes) -> bytes:
     return bytes(drawn) if CGImageDestinationFinalize(destination) else data
 
 
-def _is_binary(path: Path) -> bool:
-    with path.open("rb") as handle:
-        return b"\0" in handle.read(8192)
+def _not_opened(path: Path, error: OSError) -> ToolExecutionError:
+    """Why a folder on ``path`` could not be opened: a link that came on the path since the call was allowed, which
+    calling again decides anew, or what the system said. Blocking."""
+    # macOS says ELOOP, or ENOTDIR where a link stands in a folder's place: the folders on the path tell which.
+    if error.errno in (errno.ELOOP, errno.ENOTDIR) and any(folder.is_symlink() for folder in path.parents):
+        return ToolExecutionError(_MOVED, {"path": str(path), "error": str(error)})
+    return ToolExecutionError(f"a folder on the path cannot be opened: {error.strerror}", {"path": str(path)})
+
+
+def _opened(path: Path) -> int:
+    """A descriptor of the regular file at the resolved ``path`` to read, opened with no link followed along it (item
+    681): a link a command of the run put on the way since the call was allowed, a named pipe, a device or a folder is
+    refused, saying so. Blocking."""
+    try:
+        folder: int = held_folder(path.parent)
+    except FileNotFoundError as exc:
+        raise ToolExecutionError("file does not exist", {"path": str(path)}) from exc
+    except OSError as exc:
+        raise _not_opened(path, exc) from exc
+    try:
+        try:
+            status: os.stat_result = os.stat(path.name, dir_fd=folder, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise ToolExecutionError("file does not exist", {"path": str(path)}) from exc
+        if stat.S_ISDIR(status.st_mode):
+            raise ToolExecutionError("path is a directory; use list_dir", {"path": str(path)})
+        try:
+            return open_regular(folder, path.name)
+        except OSError as exc:
+            raise ToolExecutionError(
+                "not a file Dot reads: a link, a named pipe or a device", {"path": str(path), "error": str(exc)}
+            ) from exc
+    finally:
+        os.close(folder)
 
 
 def _numbered(lines: Iterator[str], path: Path, offset: int, limit: int, budget: int) -> str:
@@ -187,32 +228,30 @@ def _numbered(lines: Iterator[str], path: Path, offset: int, limit: int, budget:
     return "\n".join(shown) + f"\n[lines {offset}-{last}; end of file]"
 
 
-def _numbered_window(path: Path, offset: int, limit: int, budget: int) -> str:
-    """Numbered lines of a text file starting at ``offset`` (1-based), cut by line count and by character budget."""
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
-        return _numbered(handle, path, offset, limit, budget)
-
-
 def _read_blocking(path: Path, offset: int, limit: int, budget: int, max_edge: int, quality: int) -> ToolResult:
-    if not path.exists():
-        raise ToolExecutionError("file does not exist", {"path": str(path)})
-    if path.is_dir():
-        raise ToolExecutionError("path is a directory; use list_dir", {"path": str(path)})
+    with os.fdopen(_opened(path), "rb") as handle:
+        return _read_held(handle, path, offset, limit, budget, max_edge, quality)
+
+
+def _read_held(
+    handle: BinaryIO, path: Path, offset: int, limit: int, budget: int, max_edge: int, quality: int
+) -> ToolResult:
+    """What ``read_file`` shows of the file open in ``handle``, which is the one at ``path``."""
     suffix: str = path.suffix.lower()
     if suffix in _IMAGE_SUFFIXES:
-        raw: bytes = path.read_bytes()
+        raw: bytes = handle.read()
         drawn: bytes = _drawn_by_macos(raw) if suffix in _MACOS_IMAGE_SUFFIXES else raw
         encoded: EncodedImage = encode_image(drawn, max_edge, quality)
         return ok_with_images(f"Image {path.name}: {encoded.source_width}x{encoded.source_height}px", (encoded.image,))
     if suffix == ".pdf":
         # The text of a PDF is paged by its lines like a text file's, so no part of a long one is out of reach.
-        text: str = _pdf_text(path)
+        text: str = _pdf_text(path, handle.read())
         if not text:
             return ok("(the PDF contains no extractable text)")
         return ok(_numbered(iter(text.splitlines()), path, offset, limit, budget))
     if names_office_file(path.name):
         # A Word, Excel or PowerPoint file reads as its text (dotagent.office), paged by its lines like a PDF's.
-        data: bytes = path.read_bytes()
+        data: bytes = handle.read()
         unreadable: str | None = unreadable_office_file(path.name, data)
         if unreadable is not None:
             raise ToolExecutionError(unreadable, {"path": str(path)})
@@ -222,9 +261,12 @@ def _read_blocking(path: Path, offset: int, limit: int, budget: int, max_edge: i
             if not written:
                 return ok("(the file holds no text)")
             return ok(_numbered(iter(written.splitlines()), path, offset, limit, budget))
-    if _is_binary(path):
-        return ok(f"Binary file ({path.stat().st_size} bytes): {path}")
-    return ok(_numbered_window(path, offset, limit, budget))
+    handle.seek(0)
+    if b"\0" in handle.read(8192):
+        return ok(f"Binary file ({os.fstat(handle.fileno()).st_size} bytes): {path}")
+    handle.seek(0)
+    text_handle: io.TextIOWrapper = io.TextIOWrapper(handle, encoding="utf-8", errors="replace")
+    return ok(_numbered(text_handle, path, offset, limit, budget))
 
 
 class ReadFileArgs(ToolArgs):
@@ -239,7 +281,8 @@ def _read_file_tool() -> RegisteredTool:
 
     async def run(args: ReadFileArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         desktop = ctx.runtime.config.desktop
-        path: Path = resolve_path(args.path, ctx)
+        # The path as it was checked (item 681), not resolved again.
+        path: Path = Path(authorized.target)
         read: ToolResult = await asyncio.to_thread(
             _read_blocking,
             path,
@@ -303,13 +346,18 @@ def replace_in(folder: int, name: str, data: bytes) -> None:
 def atomic_write(path: Path, content: str, journal: JournalTarget) -> int:
     """Replace ``path`` with ``content`` through a temporary file (:func:`replace_in`). The change is noted in
     ``journal`` first; when that fails, the file is not changed."""
-    if path.is_dir():
-        raise ToolExecutionError("path is a directory", {"path": str(path)})
+    with contextlib.suppress(FileNotFoundError, NotADirectoryError):
+        if stat.S_ISDIR(os.lstat(path).st_mode):
+            raise ToolExecutionError("path is a directory", {"path": str(path)})
     data: bytes = content.encode("utf-8")
     note_change(journal, path, data)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Opened to search it alone, as making a file in it needs: a folder one may write in but not list is written too.
-    folder: int = os.open(path.parent, os.O_SEARCH | os.O_DIRECTORY)
+    # Each folder opened in the one above, searched alone (a folder one may write in but not list is written too) and
+    # never followed when it is a link: the path is the one checked, and a link a command put on it since is refused
+    # (item 681).
+    try:
+        folder: int = held_folder(path.parent, make=True)
+    except OSError as exc:
+        raise _not_opened(path, exc) from exc
     try:
         replace_in(folder, path.name, data)
     finally:
@@ -327,7 +375,7 @@ def _write_file_tool() -> RegisteredTool:
         return _write_action("write_file", resolve_path(args.path, ctx), ctx, "Write")
 
     async def run(args: WriteFileArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
-        path: Path = resolve_path(args.path, ctx)
+        path: Path = Path(authorized.target)
         written: int = await asyncio.to_thread(atomic_write, path, args.content, journal_for(ctx, "write_file"))
         return ok(f"Wrote {written} bytes ({args.content.count(chr(10)) + 1} lines) to {path}")
 
@@ -381,10 +429,10 @@ def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: J
     UTF-8 text is edited; a file in another encoding is refused, saying so, rather than guessed at. When ``old`` is not
     found, the error names the file's closest lines, but for a file third parties wrote (item 494): an error does not
     mark the run untrusted."""
-    if not path.is_file():
-        raise ToolExecutionError("file does not exist", {"path": str(path)})
+    with os.fdopen(_opened(path), "rb") as handle:
+        held: bytes = handle.read()
     try:
-        text: str = path.read_bytes().decode("utf-8")
+        text: str = held.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ToolExecutionError(
             "the file is not UTF-8 text, the only kind edit_file changes; change it with the shell instead",
@@ -416,7 +464,7 @@ def _edit_file_tool() -> RegisteredTool:
     async def run(args: EditFileArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         message: str = await asyncio.to_thread(
             _edit_blocking,
-            resolve_path(args.path, ctx),
+            Path(authorized.target),
             args.old,
             args.new,
             args.replace_all,
@@ -445,37 +493,84 @@ class ListDirArgs(ToolArgs):
     depth: int | None = Field(default=None, ge=1, le=4, description="How many levels to descend (default 1).")
 
 
-def _entry_size(entry: Path) -> int:
+# A folder opened to be listed: never through a link (item 681).
+_LISTED: int = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
+def _entry_line(entry: os.DirEntry[str], indent: str, directory: int) -> str:
+    """A line of the listing for ``entry`` in the open folder ``directory``, read without following it: a link says
+    where it leads, read from the link itself, and is never looked into."""
     try:
-        return entry.stat().st_size
+        status: os.stat_result = entry.stat(follow_symlinks=False)
     except OSError:
-        return 0
+        return f"{indent}{entry.name}"
+    if stat.S_ISLNK(status.st_mode):
+        try:
+            leads: str = os.readlink(entry.name, dir_fd=directory)
+        except OSError:
+            return f"{indent}{entry.name}  (link)"
+        return f"{indent}{entry.name} -> {leads}  (link)"
+    if stat.S_ISDIR(status.st_mode):
+        return f"{indent}{entry.name}/"
+    return f"{indent}{entry.name}  ({status.st_size} B)"
+
+
+def _listed_folder(root: Path) -> int:
+    """A descriptor of the folder at the resolved ``root``, to list: the folders above held (:func:`held_folder`), the
+    folder itself opened in the last of them with no link followed. Blocking."""
+    if root.parent == root:
+        return os.open(root, _LISTED)
+    above: int = held_folder(root.parent)
+    try:
+        return os.open(root.name, _LISTED, dir_fd=above)
+    finally:
+        os.close(above)
 
 
 def _walk(root: Path, depth: int) -> list[str]:
-    if not root.is_dir():
-        raise ToolExecutionError("path is not a directory", {"path": str(root)})
+    """The listing of the folder at the resolved ``root``, opened and walked with no link followed (item 681): a link a
+    command of the run put on the way since the call was allowed is refused, and a link inside is listed, not
+    entered. Blocking."""
+    try:
+        folder: int = _listed_folder(root)
+    except FileNotFoundError as exc:
+        raise ToolExecutionError("path does not exist", {"path": str(root)}) from exc
+    except OSError as exc:
+        if root.is_symlink():
+            raise ToolExecutionError(_MOVED, {"path": str(root), "error": str(exc)}) from exc
+        if isinstance(exc, NotADirectoryError) and not any(parent.is_symlink() for parent in root.parents):
+            raise ToolExecutionError("path is not a directory", {"path": str(root)}) from exc
+        raise _not_opened(root, exc) from exc
     lines: list[str] = []
 
-    def visit(directory: Path, level: int) -> None:
+    def visit(directory: int, level: int) -> None:
+        indent: str = "  " * level
         try:
-            entries: list[Path] = sorted(
-                directory.iterdir(), key=lambda entry: (not entry.is_dir(), entry.name.lower())
-            )
+            with os.scandir(directory) as listed:
+                entries: list[os.DirEntry[str]] = list(listed)
         except OSError as exc:
-            lines.append(f"{'  ' * level}[unreadable: {exc.strerror}]")
+            lines.append(f"{indent}[unreadable: {exc.strerror}]")
             return
+        entries.sort(key=lambda entry: (not entry.is_dir(follow_symlinks=False), entry.name.lower()))
         for entry in entries:
             if len(lines) >= _LIST_LIMIT:
                 return
-            if entry.is_dir():
-                lines.append(f"{'  ' * level}{entry.name}/")
-                if level + 1 < depth and entry.name not in _SKIPPED_DIRS and not entry.is_symlink():
-                    visit(entry, level + 1)
-            else:
-                lines.append(f"{'  ' * level}{entry.name}  ({_entry_size(entry)} B)")
+            lines.append(_entry_line(entry, indent, directory))
+            if level + 1 < depth and entry.name not in _SKIPPED_DIRS and entry.is_dir(follow_symlinks=False):
+                try:
+                    inner: int = os.open(entry.name, _LISTED, dir_fd=directory)
+                except OSError as exc:
+                    lines.append(f"{indent}  [unreadable: {exc.strerror}]")
+                    continue
+                try:
+                    visit(inner, level + 1)
+                finally:
+                    os.close(inner)
 
-    visit(root, 0)
+    try:
+        visit(folder, 0)
+    finally:
+        os.close(folder)
     if len(lines) >= _LIST_LIMIT:
         lines.append(f"[listing capped at {_LIST_LIMIT} entries]")
     return lines
@@ -486,7 +581,8 @@ def _list_dir_tool() -> RegisteredTool:
         return _read_action("list_dir", resolve_path(args.path, ctx), ctx, "List")
 
     async def run(args: ListDirArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
-        path: Path = resolve_path(args.path, ctx)
+        # The path as it was checked (item 681), not resolved again.
+        path: Path = Path(authorized.target)
         lines: list[str] = await asyncio.to_thread(_walk, path, args.depth or 1)
         return ok(f"{path}\n" + ("\n".join(lines) if lines else "(empty)"))
 

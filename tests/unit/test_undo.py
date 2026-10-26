@@ -9,6 +9,7 @@ import pytest
 
 from dotagent.core.errors import UndoError
 from dotagent.tools.files import _edit_blocking, atomic_write
+from dotagent.undo import restore
 from dotagent.undo.journal import JOURNAL_FILE, JournalTarget, backup_path, read_journal, run_journal
 from dotagent.undo.restore import (
     RunChange,
@@ -213,6 +214,29 @@ def test_a_link_that_came_above_a_changed_file_is_not_followed(tmp_path: Path) -
     with pytest.raises(UndoError, match="link"):
         apply_undo([plan[0].model_copy(update={"state": "ready"})], root)
     assert (elsewhere / "config").read_text(encoding="utf-8") == "made by the run\n"
+
+
+def test_a_link_that_comes_between_the_check_and_the_write_is_not_followed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The security review of item 681: the link may come after the step looked at the path and before it acts; the
+    folder is opened with no link followed, so neither the delete nor the write-back reaches the folder the link
+    names."""
+    root: Path = tmp_path / "undo"
+    work: Path = tmp_path / "work"
+    elsewhere: Path = tmp_path / "elsewhere"
+    work.mkdir()
+    elsewhere.mkdir()
+    made: Path = work / "project" / "config"
+    atomic_write(made, "made by the run\n", _target(root, RUN_ID, MIB, MIB))
+    plan: list[UndoStep] = _plan(_changes(root, (RUN_ID,)))
+    (work / "project").rename(tmp_path / "moved")
+    (elsewhere / "config").write_text("the owner's\n", encoding="utf-8")
+    (work / "project").symlink_to(elsewhere, target_is_directory=True)
+    monkeypatch.setattr(restore, "_linked_above", lambda path: False)
+    with pytest.raises(UndoError):
+        apply_undo(due_steps(plan), root)
+    assert (elsewhere / "config").read_text(encoding="utf-8") == "the owner's\n"
 
 
 def test_a_folder_the_run_made_below_a_link_that_came_since_is_not_removed(tmp_path: Path) -> None:
