@@ -14,12 +14,16 @@ from dotagent.agent import reflection as reflection_module
 from dotagent.agent.lessons import (
     LESSON_DISMISSED,
     LESSON_SAVED,
+    LESSONS_FAILED,
+    LESSONS_NONE,
     LESSONS_PROPOSED,
     DrawnLessons,
     LessonCase,
 )
 from dotagent.agent.reflection import (
     _MERGE_RECENT,
+    MAX_DRAW_FAILURES,
+    _asked_already,
     _learn,
     _Result,
     call_facts,
@@ -509,14 +513,61 @@ async def test_the_journal_names_the_lessons_that_were_saved_and_not_the_ones_le
             await store.finish_run(run.id, "failed", "Could not finish.")
             runs.append(await store.get_run(run.id))
         runtime = SimpleNamespace(store=store)
-        written, named, tainted = await _learn(runtime, asyncio.Lock(), runs)  # type: ignore[arg-type]
-        assert (written, named, tainted) == (
+        written, named, tainted, errors = await _learn(runtime, asyncio.Lock(), runs)  # type: ignore[arg-type]
+        assert (written, named, tainted, errors) == (
             ["Use -layout with pdftotext.", "Always ask twice.", "Check the date."],
             ["Use -layout with pdftotext."],
             False,
+            [],
         )
         text: str = journal_text("On 2026-10-11", runs, named, 0, 0, 0, 500)
         assert "Learned: Use -layout with pdftotext." in text
         assert "Always ask twice" not in text and "Check the date" not in text
+    finally:
+        await store.close()
+
+
+async def test_a_run_whose_draw_failed_is_asked_again_until_it_failed_the_bound_and_one_drawn_is_not(
+    tmp_path: Path,
+) -> None:
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        thread = await store.create_thread("t", "test")
+        runs: list[RunRecord] = []
+        for goal in ("never", "failed", "given up", "drawn", "none kept"):
+            run: RunRecord = await store.create_run(
+                thread.id,
+                goal,
+                "task",
+                "ollama:x",
+                None,
+                "test",
+                None,
+                "standard",
+                None,
+                "ask",
+                False,
+                None,
+                None,
+                None,
+            )
+            await store.finish_run(run.id, "failed", "Could not finish.")
+            runs.append(run)
+        never, failed, given_up, drawn, none_kept = runs
+        await store.add_event(failed.id, LESSONS_FAILED, {"error": "down"})
+        for _ in range(MAX_DRAW_FAILURES):
+            await store.add_event(given_up.id, LESSONS_FAILED, {"error": "down"})
+        # Drawn after a failed try, and failed deciding after being drawn: neither is drawn again.
+        await store.add_event(drawn.id, LESSONS_FAILED, {"error": "down"})
+        await store.add_event(drawn.id, LESSONS_PROPOSED, {"lessons": ["x"], "tainted": False})
+        await store.add_event(drawn.id, LESSONS_FAILED, {"error": "could not be saved"})
+        await store.add_event(none_kept.id, LESSONS_NONE, {})
+        assert [await _asked_already(store, run.id) for run in runs] == [False, False, True, True, True]
+        found: list[RunRecord] = await store.runs_with_failed_lessons(
+            0.0, LESSONS_FAILED, (LESSONS_PROPOSED, LESSONS_NONE)
+        )
+        # The store lists every run whose draw failed and was never made; the bound is the reflection's.
+        assert sorted(run.goal for run in found) == ["failed", "given up"]
+        assert never.id not in {run.id for run in found}
     finally:
         await store.close()

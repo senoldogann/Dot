@@ -328,7 +328,8 @@ when it fits its goal, and the Memory page edits or forgets it; a lesson of an a
 Agents), and the notes it is checked against are the ones that agent's runs are handed. The same text saved again is
 the same note, also one that rested, which is awake again. Delegated runs, chats, runs that failed or were stopped,
 and evals (which always run without lessons) are not asked at their end; the nightly reflection asks about the failed
-and the stopped ones, once each (a run whose lessons were drawn and none kept says so). `"off"` learns nothing. Every
+and the stopped ones, once each (a run whose lessons were drawn and none kept says so), and asks again about a run
+whose lessons could not be drawn, until the draw has failed three times (item 687). `"off"` learns nothing. Every
 note a run is handed (at its start, by `memory_search`, or changed while it ran) is recorded with how the run ended, so
 the Memory page says "Handed to 5 runs, 4 done" under a note and `dotx stats` scores the notes. The lessons are
 also compared with the adopted harness (item 584): the model is shown its habits and tool guidance, which every
@@ -371,7 +372,9 @@ daemon that was off at that time, or whose stop cut the reflection (a stop does 
 until its end), reflects at the next `reflection_time` on everything since the last reflection. The home's Today strip,
 when a new chat shows the day (Settings › General › Chat, item 640), lists the reflection among what ended today;
 `dotx reflect` runs one now. A reflection that fails is kept: the strip shows "The nightly review failed" with why until
-one after it is done, and `dotx stats` says when the reflection was last done and the failure since; with the day not
+one after it is done (a reflection that could not draw the lessons of some runs is done and failed at once: it says
+"lessons of 2 runs failed", is kept as a failure, and counts in the record of how learning fares, which tells you when
+the reflection failed three nights in a row), and `dotx stats` says when the reflection was last done and the failure since; with the day not
 shown, `dotx stats` is where to look. Learning does not stop unseen at a run's end either: lessons that could not be drawn
 leave `lessons_failed` with why on the run's page, skill work that failed `playbook_failed`, and `dotx stats` counts the
 runs of each. The card of a run's lessons arrives folded (item 374); its head says "could not be drawn" in red, or how

@@ -40,6 +40,7 @@ from dotagent.agent.lessons import (
     LESSONS_FAILED,
     LESSONS_NONE,
     LESSONS_PROPOSED,
+    DrawnLessons,
     LessonCase,
     RunLessons,
     learn_from,
@@ -110,6 +111,11 @@ log = get_logger(__name__)
 _FIRST_WINDOW_S: float = 86400.0
 # The longest time a journal tells as one day, a day and a quarter: a reflection that fired late still names its day.
 _ONE_DAY_S: float = 30 * 3600.0
+# How many times the lessons of a run may fail to be drawn (the loop's own draw at its end counts, and each night's try
+# after it) before the reflection lets the run be; and how long after a run ended a reflection still tries again
+# (item 687).
+MAX_DRAW_FAILURES: int = 3
+_RETRY_WINDOW_S: float = 7 * 86400.0
 # How many tool results of a run make its digest, and how many of its characters each result gives.
 _RESULTS_READ: int = 60
 _RESULT_CHARS: int = 160
@@ -460,7 +466,9 @@ async def record_reflection_failure(store: Store, at: float, error: str) -> None
 
 
 async def reflection_failure(store: Store) -> ReflectionFailure | None:
-    """The last reflection that failed, while no reflection after it is done; ``None`` otherwise."""
+    """The last reflection that failed, while no reflection after it is done; ``None`` otherwise. A reflection that
+    was done but could not draw the lessons of some runs (item 687) is recorded as done and as failed at one time, so it
+    does not clear its own failure."""
     raw: str | None = await store.kv_get(REFLECTION_FAILED_KEY)
     if raw is None:
         return None
@@ -471,15 +479,16 @@ async def reflection_failure(store: Store) -> ReflectionFailure | None:
             "the last failed reflection cannot be read", {"key": REFLECTION_FAILED_KEY, "error": str(exc)}
         ) from exc
     last: Reflection | None = await last_reflection(store)
-    return failure if last is None or last.at < failure.at else None
+    return failure if last is None or last.at <= failure.at else None
 
 
 async def _asked_already(store: Store, run_id: str) -> bool:
-    """Whether the run was asked for its lessons already: some were proposed, none was kept, or drawing them failed."""
-    for kind in (LESSONS_PROPOSED, LESSONS_NONE, LESSONS_FAILED):
+    """Whether the run needs no more asking for its lessons: some were proposed, none was kept, or drawing them failed
+    :data:`MAX_DRAW_FAILURES` times. A run whose draw failed fewer times is asked again (item 687)."""
+    for kind in (LESSONS_PROPOSED, LESSONS_NONE):
         if await store.last_event(run_id, kind) is not None:
             return True
-    return False
+    return len(await store.events_of_kind(run_id, LESSONS_FAILED, MAX_DRAW_FAILURES)) >= MAX_DRAW_FAILURES
 
 
 async def _saved_lessons(store: Store, run_id: str) -> list[str]:
@@ -490,16 +499,18 @@ async def _saved_lessons(store: Store, run_id: str) -> list[str]:
 
 async def _learn(
     runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRecord]
-) -> tuple[list[str], list[str], bool]:
-    """``(the lessons the reflection drew, the ones among them that were saved, whether the saved ones are tainted)``,
-    from ``runs``: the ones the loop did not ask about, with their ending as one more signal when they did not reach
-    their goal. Only the saved lessons are the journal's to name (item 557): one the second look left out, or one that
+) -> tuple[list[str], list[str], bool, list[str]]:
+    """``(the lessons the reflection drew, the ones among them that were saved, whether the saved ones are tainted, what
+    failed)``, from ``runs``: the ones the loop did not ask about, or whose draw failed fewer than
+    :data:`MAX_DRAW_FAILURES` times (item 687), with their ending as one more signal when they did not reach their
+    goal. Only the saved lessons are the journal's to name (item 557): one the second look left out, or one that
     waits for the owner (``propose``), is not handed to later runs through a note of Dot's. They are tainted when one
     came from a run that had read content third parties can author, which the journal that names them then carries too
     (item 384)."""
     written: list[str] = []
     saved: list[str] = []
     tainted: bool = False
+    errors: list[str] = []
     for run in runs:
         if await _asked_already(runtime.store, run.id):
             continue
@@ -512,11 +523,21 @@ async def _learn(
         signals: tuple[str, ...] = (*await stored_signals(runtime.store, case), *(() if ending is None else (ending,)))
         if not signals:
             continue
-        written.extend((await learn_from(runtime, deciding, case, signals)).lessons)
+        drawn: DrawnLessons = await learn_from(runtime, deciding, case, signals)
+        written.extend(drawn.lessons)
+        if drawn.error is not None:
+            errors.append(drawn.error)
         kept: list[str] = await _saved_lessons(runtime.store, run.id)
         saved.extend(kept)
         tainted = tainted or (case.tainted and bool(kept))
-    return written, saved, tainted
+    return written, saved, tainted, errors
+
+
+def _lessons_error(errors: Sequence[str]) -> str | None:
+    """What the reflection says of the runs whose lessons failed: the first error, and how many more there were."""
+    if not errors:
+        return None
+    return errors[0] if len(errors) == 1 else f"{errors[0]} (and {len(errors) - 1} more runs failed the same night)"
 
 
 async def merge_duplicates(
@@ -676,7 +697,9 @@ async def _tidy_skills(runtime: Runtime, now: float) -> int:
 async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Reflection:
     """One reflection at ``now`` (see the module). ``deciding`` is the run manager's lock of the owner's decisions on
     lessons. The reflection is recorded before it returns; an error on the way (the store, the embedder) raises and
-    records nothing, so the next attempt starts from the same place."""
+    records nothing, so the next attempt starts from the same place. The lessons of a run that could not be drawn do
+    not stop it: the run is asked again by a later reflection (:data:`MAX_DRAW_FAILURES`), and the reflection says
+    what failed (``lessons_error``) for the caller to record as a failure (item 687)."""
     store: Store = runtime.store
     last: Reflection | None = await last_reflection(store)
     since: float = last.at if last is not None else now - _FIRST_WINDOW_S
@@ -685,8 +708,26 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         for run in await store.runs_finished_since(since)
         if wants_reflection(run) and run.finished_at is not None and run.finished_at < now
     ]
-    lessons, named, lessons_tainted = (
-        await _learn(runtime, deciding, runs) if runtime.config.agent.lessons != "off" and runs else ([], [], False)
+    # The runs of earlier nights whose lessons could not be drawn are drawn again, up to a bound (item 687); they are
+    # not among the runs this reflection tells in its journal.
+    retried: list[RunRecord] = (
+        [
+            run
+            for run in await store.runs_with_failed_lessons(
+                now - _RETRY_WINDOW_S, LESSONS_FAILED, (LESSONS_PROPOSED, LESSONS_NONE)
+            )
+            if wants_reflection(run)
+            and run.finished_at is not None
+            and run.finished_at < now
+            and run.id not in {read.id for read in runs}
+        ]
+        if runtime.config.agent.lessons != "off"
+        else []
+    )
+    lessons, named, lessons_tainted, lesson_errors = (
+        await _learn(runtime, deciding, [*retried, *runs])
+        if runtime.config.agent.lessons != "off" and (runs or retried)
+        else ([], [], False, [])
     )
     own: list[MemoryRecord] = _own(await store.memories_with_tag(LESSON_TAG, _LESSON_NOTES))
     # The notes no reflection folds, retires, puts aside or merges: a lesson the owner saved, a note the owner pinned.
@@ -723,6 +764,8 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         to_forget=to_forget,
         purged=purged,
         skills_proposed=skills_proposed,
+        lessons_failed=len(lesson_errors),
+        lessons_error=_lessons_error(lesson_errors),
     )
     await store.kv_set(REFLECTION_KEY, reflection.model_dump_json())
     log.info(
@@ -737,5 +780,6 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         to_forget=to_forget,
         purged=purged,
         skills_proposed=skills_proposed,
+        lessons_failed=len(lesson_errors),
     )
     return reflection

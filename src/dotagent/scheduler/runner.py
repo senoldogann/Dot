@@ -315,7 +315,9 @@ class Scheduler:
             outcome = failed_with(f"{type(exc).__name__}: {exc}")
         else:
             log.info("reflection_fired", summary=summary_line(reflection))
-            outcome = LEARNED
+            # A reflection that could not draw the lessons of some runs is done, and a failure too (item 687): the
+            # record of how learning fares counts it, so that a draw that keeps failing is told to the owner.
+            outcome = LEARNED if reflection.lessons_error is None else failed_with(reflection.lessons_error)
         quiet_s: float | None = quiet_limit(self._runtime.config.agent.reflection_time)
         try:
             if outcome.error is not None:
