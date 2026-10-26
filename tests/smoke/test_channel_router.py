@@ -1347,8 +1347,12 @@ async def test_a_run_typed_in_the_page_or_in_another_chat_tells_no_progress(
     await _quiet_for_a_moment()
     assert wired.channel.sent[before:] == []
     await _let_go(wired, replies)
-    # The answer of a run in the channel's chat goes back, as it always did; the other chat's does not.
-    assert wired.channel.sent[before:] == ["Typed in the page."]
+    # The answer of a run in the channel's chat goes back, as it always did; the other chat's does not. The two runs ask
+    # the model at once, so which of the two replies each gets is the order they asked in (item 673): the one sent is
+    # the channel's run's own answer, whichever it got.
+    answered: str = (await runtime.store.get_run(typed.id)).result
+    assert answered in ("Typed in the page.", "In another chat.")
+    assert wired.channel.sent[before:] == [answered]
 
 
 async def test_the_steps_of_a_run_it_delegated_are_not_told_but_the_delegating_is(
