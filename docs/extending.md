@@ -464,11 +464,20 @@ server's words: "Session not found", "Session has been terminated") is a connect
 connects again. A call
 whose connection broke is not repeated, as the tool may have done part of its work, unless the server declares the
 tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
-quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,
-or the input schema of one of its tools cannot be handed to a model: a reference that leads nowhere, or a tree whose
-nodes hold nodes, which `allow` can leave out) is left out, and Dot starts without its tools: Settings › System, under **Details**,
+quits or does not answer in time, its `allow` list names a tool it does not offer, or two of its tools would share a
+name) is left out, and Dot starts without its tools: Settings › System, under **Details**,
 names it with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin, and `dotx doctor` warns of a
-missing command or secret. It is tried again when Dot starts again; `enabled = false` stops trying it. Plugins add their
+missing command or secret. It is tried again when Dot starts again; `enabled = false` stops trying it. A tool's input
+schema is handed to the model flattened (item 671): a part that refers again to a definition its own path already went
+through (a tree whose nodes hold nodes, a filter of and, or and not), that nests deeper than twelve levels (a feature
+flag's rules within rules, as Vercel's `update_flag` has) or that refers to a definition the schema does not hold is cut
+to a loose schema of its kind (an object, a list of objects or the scalar its definition or its list of types says),
+whose description says that its parts nest deeper than shown, and the service checks what the model sends there; the
+tool's other parameters stay whole. A schema that grows past 5,000 parts as it is written out, or past 32,000
+characters once flattened, is refused, as one whose arguments are no object at all: such a tool is left out alone, with
+`mcp_tool_left_out` in the log, and the server's other tools serve. A tool the server's `allow` list names, which the
+owner asked for, leaves the server out with the reason instead, and so does a server none of whose tools can be used.
+Before, any of these left the whole server out. Plugins add their
 servers too (see [Skills and plugins](#skills-and-plugins)); their names become `<plugin>-<server>`. MCP results are
 untrusted content, and so is an error that a server answers a call with: the model reads its words inside the fence as
 data, and the run is marked untrusted (item 551). An answer longer than one result holds is kept whole in

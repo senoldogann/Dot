@@ -32,10 +32,11 @@ Semgrep, Replicate and Otter (their authorization servers name themselves with a
 MCP library refuses), Gamma (it refuses a callback on 127.0.0.1), Railway (registration turned off), PlanetScale, Make
 and Coda (a client with a secret only), Asana, Box, HubSpot's own server, PagerDuty's, Smartsheet, Zendesk, Xero,
 Render and DocuSign (no registration), QuickBooks (it refuses a client that is not a browser), Datadog (as above),
-Storyblok's open server (it lists no tools), Bright Data's (a tool's schema nests deeper than Dot reads), Postgres MCP
-Pro (it fails to start with the current MCP library), the open servers of Gorgias and Retell (by their tools, Gorgias's
-is its own team's, and Retell's calls take a key it names no way to pass), and the deprecated packages of Railway,
-Dynatrace, CircleCI, Readwise, Browserbase and Semgrep. HubSpot and PagerDuty come in by their own local servers and
+Storyblok's open server (it lists no tools), Bright Data's (a tool's schema nested deeper than Dot read until item
+671, which cuts such a part; not tried again since), Postgres MCP Pro (it fails to start with the current MCP
+library), the open servers of Gorgias and Retell (by their tools, Gorgias's is its own team's, and Retell's calls
+take a key it names no way to pass), and the deprecated packages of Railway, Dynatrace, CircleCI, Readwise,
+Browserbase and Semgrep. HubSpot and PagerDuty come in by their own local servers and
 your token instead. Redis, ClickHouse, Neo4j and Qdrant start, but each takes its address and user besides its
 password, and a service asks the page for secrets alone, which Dot keeps in its .env and so masks wherever their
 words appear (``localhost`` among them): they wait for settings of the catalogue that are not secrets, and can be

@@ -80,16 +80,41 @@ def select_tools(config: McpServerConfig, listed: tuple[McpTool, ...]) -> tuple[
 
 
 def tool_parameters(tool: McpTool) -> JsonObject:
-    """The input schema of ``tool``, flattened as every provider takes it. ``McpError`` names a tool whose schema Dot
-    cannot hand to a model: a reference that leads nowhere, or one that nests deeper than Dot follows (a tree whose
-    nodes hold nodes)."""
+    """The input schema of ``tool``, flattened as every provider takes it: a part that refers to itself again, nests
+    deeper than Dot follows, or refers to nothing is cut to a loose one (item 671). ``McpError`` names a tool whose
+    arguments are no object at all, or whose schema grows too large once flattened."""
     try:
         return flatten_json_schema(tool.input_schema)
     except ValueError as exc:
         raise McpError(
             "the input schema of an MCP tool cannot be used",
-            {"server": tool.server, "tool": tool.remote_name, "error": str(exc), "hint": "leave it out with `allow`"},
+            {"server": tool.server, "tool": tool.remote_name, "error": str(exc)},
         ) from exc
+
+
+def usable_tools(config: McpServerConfig, tools: tuple[McpTool, ...]) -> tuple[McpTool, ...]:
+    """``tools`` but those whose schema no model takes (:func:`tool_parameters`), each left out alone and logged: the
+    server's other tools serve (item 671; before, one such tool left its whole server out). A tool the ``allow`` list
+    names, which the owner asked for, leaves its server out with the reason instead, and so does a server left with no
+    tool: neither would serve as the owner set it up."""
+    kept: list[McpTool] = []
+    for tool in tools:
+        try:
+            tool_parameters(tool)
+        except McpError as error:
+            if tool.remote_name in config.allow:
+                raise
+            log.warning(
+                "mcp_tool_left_out", server=tool.server, tool=tool.remote_name, error=error.context.get("error")
+            )
+            continue
+        kept.append(tool)
+    if tools and not kept:
+        raise McpError(
+            "no input schema of the MCP server's tools can be used",
+            {"server": config.name, "tools": [tool.remote_name for tool in tools[:_SHOWN_TOOL_NAMES]]},
+        )
+    return tuple(kept)
 
 
 def server_folder(config: McpServerConfig) -> Path:
@@ -119,11 +144,8 @@ async def _connect_server(
     async with AsyncExitStack() as cleanup:
         cleanup.push_async_callback(connection.close)
         listed: tuple[McpTool, ...] = await connection.list_tools()
-        tools: tuple[McpTool, ...] = select_tools(config, listed)
+        tools: tuple[McpTool, ...] = usable_tools(config, select_tools(config, listed))
         require_distinct_names(tools)
-        # A tool that cannot be handed to a model leaves its server out, as a server that cannot start is left out.
-        for tool in tools:
-            tool_parameters(tool)
         instructions: str = (connection.instructions() or "")[:READ_CHARS]
         cleanup.pop_all()
     log.info("mcp_server_ready", server=config.name, tools=len(tools), offered=len(listed))
