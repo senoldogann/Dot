@@ -72,6 +72,10 @@ compacting keeps aside, so that the chat can be rewound, stay until the chat is 
 how many messages they are and their size, and the screenshots they name stay with them. The database is locked for a
 moment while it compacts, so run it when no run is active.
 
+Deleting a chat (or a campaign with its chats) removes its screenshot files after the delete has committed, asking
+the database about each file's name instead of reading every message and event, and hands the freed pages back in parts,
+so the other writers go on between them (item 686). A file that cannot be removed is logged and left for `dotx prune`.
+
 **The planner's statistics** (item 647). As it opens the database, the daemon has SQLite make the statistics its
 query planner reads (`PRAGMA optimize`), for the tables that have none or have grown much, and again as it closes it; it
 takes a few milliseconds. Without them SQLite read the events of one kind of a run (its bill, its steps) through those

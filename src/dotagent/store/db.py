@@ -288,6 +288,10 @@ def _awake(among: AwakeNotes) -> tuple[str, tuple[object, ...]]:
 # A screenshot saved this recently may belong to a message or event that is not stored yet, so deleting a chat leaves it
 # for ``orphan_images`` to find later.
 _RECENT_IMAGE_S: float = 60.0
+# How many free pages one step of ``_return_free_pages`` hands back (4 MB at 4 KB a page).
+_VACUUM_PAGES: int = 1000
+# How many rows of stored text a delete reads at a time, to find the screenshots still named (``_named_images``).
+_ROWS_PER_READ: int = 2000
 # The random bytes of a shown page's id. The id is all that serves the page (``GET /pages/<id>``), so it is too
 # long to guess, as the API's token is.
 _PAGE_ID_BYTES: int = 18
@@ -1965,7 +1969,6 @@ class Store:
         )
         return [_summary(row) for row in rows]
 
-    @_writing
     async def delete_threads(self, thread_ids: Sequence[str]) -> list[str]:
         """Delete chats with everything they hold, in one transaction: their messages (with what was kept aside of their
         history) and queue, their runs, the runs
@@ -1974,8 +1977,18 @@ class Store:
         that named a thread, in the order given; the others are skipped. A schedule keeps the id of the thread it last
         fired into and makes a new one per firing, so it is left alone. Nothing is deleted while a run of any process
         works on one of the chats, itself or through a run it delegated to: ``RunConflict`` names the chats and the
-        runs. The check is made in the transaction of the deletes, which holds the write lock from its start."""
+        runs. The check is made in the transaction of the deletes, which holds the write lock from its start. The
+        screenshot files the chats named go once that transaction has committed and the lock is let go (item 686)."""
         named: tuple[str, ...] = tuple(thread_ids)
+        existing, candidates = await self._delete_threads_once(named)
+        await self._release_images(candidates)
+        await self._return_free_pages()
+        return [thread_id for thread_id in named if thread_id in existing]
+
+    @_writing
+    async def _delete_threads_once(self, named: tuple[str, ...]) -> tuple[set[str], set[str]]:
+        """The transaction of :meth:`delete_threads`: the ids of the chats that existed and the screenshot files they
+        named, once it is committed."""
         await self._db.execute("BEGIN IMMEDIATE")
         await self._refuse_working_chats(named, "chats with a run under way cannot be deleted")
         found: list[aiosqlite.Row] = await self._all(
@@ -1984,9 +1997,7 @@ class Store:
         existing: set[str] = {str(row["id"]) for row in found}
         candidates: set[str] = await self._delete_chats(named)
         await self._db.commit()
-        await self._release_images(candidates)
-        await self._return_free_pages()
-        return [thread_id for thread_id in named if thread_id in existing]
+        return existing, candidates
 
     async def _delete_chats(self, named: tuple[str, ...]) -> set[str]:
         """Delete the chats ``named`` with everything they hold, as :meth:`delete_threads` says, in the transaction its
@@ -2074,20 +2085,70 @@ class Store:
         return await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
 
     async def _release_images(self, candidates: set[str]) -> None:
-        """Remove those of ``candidates`` that no stored message or event names any more: a file can be shared, because
-        a screenshot is stored under the hash of its content."""
+        """Remove those of ``candidates`` that no stored message or event names any more, once the delete that freed
+        them has committed: a file can be shared, because a screenshot is stored under the hash of its content. The
+        stored text is read once (:meth:`_named_images`), never under one long hold of the write lock, and a file that
+        is too young (``_RECENT_IMAGE_S``) or was saved again is left. A
+        read or a removal that fails is logged and leaves the files: the delete is done."""
         if not candidates:
             return
-        still_named: set[str] = await self.referenced_images()
-        await self.remove_images(
-            [self._image_dir / name for name in sorted(candidates - still_named)], time.time() - _RECENT_IMAGE_S
-        )
+        try:
+            named: set[str] = await self._named_images(candidates)
+        except sqlite3.Error as error:
+            log.warning("screenshot_files_not_released", error=str(error), names=len(candidates))
+            return
+        unnamed: list[str] = sorted(candidates - named)
+        try:
+            await self.remove_images([self._image_dir / name for name in unnamed], time.time() - _RECENT_IMAGE_S)
+        except StoreError as error:
+            log.warning("screenshot_files_not_removed", error=error.message, **error.context)
+
+    async def _named_images(self, candidates: set[str]) -> set[str]:
+        """Those of the screenshot files ``candidates`` that a stored message, one kept aside, or an event names. The
+        messages and the ones kept aside are read each in one question, as their rows have no key that only grows (a
+        compaction between two parts could give a new row the number of one read already); the events, the bulk, in
+        parts of ``_ROWS_PER_READ`` by their growing id. The write lock is held for one question only, so that a read
+        does not see the half of another writer's transaction (as :meth:`load_messages`) and other writers go on
+        between the parts; the names are found off the event loop (:func:`image_names_in`)."""
+        named: set[str] = set()
+        for table in ("messages", "message_archive"):
+            async with self._write_lock:
+                rows: list[aiosqlite.Row] = await self._all(f"SELECT body AS text FROM {table}", ())
+            named |= candidates & await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
+        last: int = 0
+        while True:
+            async with self._write_lock:
+                rows = await self._all(
+                    "SELECT id, data AS text FROM events WHERE id > ? ORDER BY id LIMIT ?", (last, _ROWS_PER_READ)
+                )
+            if not rows:
+                return named
+            last = int(rows[-1]["id"])
+            named |= candidates & await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
 
     async def _return_free_pages(self) -> None:
-        """Hand the pages that a delete freed back to the disk. Does nothing until ``compact`` has switched the
-        database file to incremental vacuuming."""
-        async with self._db.execute("PRAGMA incremental_vacuum") as cursor:
-            await cursor.fetchall()
+        """Hand the pages that a delete freed back to the disk, ``_VACUUM_PAGES`` at a time with the write lock let go
+        between the parts, so that a big delete does not hold the writers. Does nothing until ``compact`` has switched
+        the database file to incremental vacuuming. A part that fails is logged: the delete is done, and the pages go
+        with a later one."""
+        free: int | None = None
+        while True:
+            try:
+                async with self._write_lock:
+                    left: int = await self._free_pages()
+                    if left == 0 or (free is not None and left >= free):
+                        return
+                    free = left
+                    async with self._db.execute(f"PRAGMA incremental_vacuum({_VACUUM_PAGES})") as cursor:
+                        await cursor.fetchall()
+            except sqlite3.Error as error:
+                log.warning("free_pages_not_returned", error=str(error))
+                return
+
+    async def _free_pages(self) -> int:
+        """How many pages inside the database file are free."""
+        rows: list[aiosqlite.Row] = await self._all("PRAGMA freelist_count", ())
+        return int(rows[0][0])
 
     async def referenced_images(self) -> set[str]:
         """The screenshot files that a stored message (one kept aside too) or event names."""
@@ -2111,8 +2172,8 @@ class Store:
     @_writing
     async def delete_events_of_runs_ended_before(self, before: float, taint_kinds: Sequence[str]) -> int:
         """Delete the events of the runs that ended before ``before``, and the pages they showed and the drafts they
-        wrote, which the conversation showed; the runs stay. Returns how many events went. The screenshots those events
-        named become orphans for :meth:`orphan_images`.
+        wrote, which the conversation showed (a draft not sent or discarded yet stays); the runs stay. Returns how many
+        events went. The screenshots those events named become orphans for :meth:`orphan_images`.
 
         Two things the events said outlive them (item 556), as nothing else records them: that a run ended tainted,
         which decides how a run that resumes it or builds on it starts (:meth:`pruned_run_tainted`), read from the
@@ -2132,7 +2193,10 @@ class Store:
             f"DELETE FROM events WHERE run_id IN ({ended}) AND NOT ({_OWNER_SAVED_LESSON})", (before,)
         )
         await self._db.execute(f"DELETE FROM shown_pages WHERE run_id IN ({ended})", (before,))
-        await self._db.execute(f"DELETE FROM drafts WHERE run_id IN ({ended})", (before,))
+        # A draft the owner has not sent or discarded stays: it waits for them, or failed and can be sent again.
+        await self._db.execute(
+            f"DELETE FROM drafts WHERE run_id IN ({ended}) AND status IN ('sent', 'discarded')", (before,)
+        )
         await self._db.commit()
         return cursor.rowcount
 
@@ -5578,14 +5642,22 @@ class Store:
         await self._db.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
         await self._db.commit()
 
-    @_writing
     async def delete_campaign_with_sessions(self, campaign_id: str) -> None:
         """Delete a campaign that is not active, on the owner's word, in one transaction: its ledger, and the threads of
         its sessions after the first with everything they hold, as :meth:`delete_threads` deletes chats. The campaign's
         conversation stays a chat: its runs are no longer the campaign's, and the questions they left for the owner
         expire, as no session reads their answers any more. ``RunConflict`` while the campaign is active or a run of any
         process works in its conversation or in the thread of one of its sessions; the checks are made in the
-        transaction of the deletes, which holds the write lock from its start."""
+        transaction of the deletes, which holds the write lock from its start. The screenshot files of the chats go once
+        it has committed and the lock is let go (item 686)."""
+        candidates: set[str] = await self._delete_campaign_once(campaign_id)
+        await self._release_images(candidates)
+        await self._return_free_pages()
+
+    @_writing
+    async def _delete_campaign_once(self, campaign_id: str) -> set[str]:
+        """The transaction of :meth:`delete_campaign_with_sessions`: the screenshot files its chats named, once it is
+        committed."""
         await self._db.execute("BEGIN IMMEDIATE")
         campaign: CampaignRecord = await self.get_campaign(campaign_id)
         if campaign.status == "active":
@@ -5610,8 +5682,7 @@ class Store:
         await self._db.execute("DELETE FROM campaign_entries WHERE campaign_id = ?", (campaign.id,))
         await self._db.execute("DELETE FROM campaigns WHERE id = ?", (campaign.id,))
         await self._db.commit()
-        await self._release_images(candidates)
-        await self._return_free_pages()
+        return candidates
 
     @_writing
     async def add_campaign_entry(
