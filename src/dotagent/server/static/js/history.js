@@ -5,7 +5,7 @@ import { api, query } from "./api.js";
 import { el, plural, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
-import { answerMessage, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+import { answerMessage, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
@@ -222,6 +222,10 @@ function drawFlow(past, flow, asked, events, reactions) {
             ? { kept: event.data.text }
             : { steer: { text: event.data.text, files: event.data.files ?? [], sentAt: event.ts } },
       );
+    } else if (event.kind === "schedule_made") {
+      // A schedule the turn made (item 665) is a line of the conversation where it came, as on the run's own page.
+      batch = null;
+      blocks.push({ schedule: event.data });
     } else if (event.kind === "dot_reaction") {
       reaction = event.data.reaction;
       reactedTo = [...blocks].reverse().find((block) => block.steer !== undefined) ?? null;
@@ -260,6 +264,8 @@ function drawFlow(past, flow, asked, events, reactions) {
   const nodes = blocks.map((block) =>
     block.page !== undefined
       ? pageCard(block.page.id, block.page.title)
+      : block.schedule !== undefined
+      ? scheduleLine(block.schedule)
       : block.steer !== undefined
       ? steerMessage(block, block === reactedTo ? reaction : null)
       : block.kept !== undefined

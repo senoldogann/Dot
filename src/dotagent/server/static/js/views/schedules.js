@@ -695,6 +695,9 @@ export function mount(root, ctx) {
   let views = null;
   // The schedules whose Firings are open: they stay open, and are read again, as the list is painted again.
   const openFirings = new Set();
+  // The schedule a line of a conversation led here to (item 665, `#/schedules?schedule=ID`): marked and in sight once,
+  // when the list is first painted.
+  let askedId = new URLSearchParams(location.hash.split("?")[1] ?? "").get("schedule") ?? "";
   // What stops measuring the list's cut after its third row (item 634), when it is painted again or the page goes.
   let stopCut = () => {};
   const holder = el("div", null, loadingPanel());
@@ -733,6 +736,12 @@ export function mount(root, ctx) {
     holder.replaceChildren(list);
     stopCut = cutAfterThird(list);
     list.scrollTop = scrolled;
+    const asked = askedId === "" ? null : list.querySelector(`[data-schedule="${CSS.escape(askedId)}"]`);
+    askedId = "";
+    if (asked !== null) {
+      asked.classList.add("asked");
+      asked.scrollIntoView({ block: "nearest" });
+    }
     count.textContent = plural(views.length, "schedule", "schedules");
     for (const list of holder.querySelectorAll("[data-firings]")) {
       if (!list.hidden) {

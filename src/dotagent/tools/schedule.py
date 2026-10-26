@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import Field
 
+from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo, Risk
 from dotagent.scheduler import DAEMON_NOTE
 from dotagent.scheduler.plans import (
@@ -21,6 +22,7 @@ from dotagent.scheduler.plans import (
     render_schedule_entry,
     render_schedule_header,
     schedule_order,
+    schedule_timing,
     schedule_zone,
 )
 from dotagent.scheduler.timing import Timing, describe_timing, plan_timing
@@ -97,6 +99,10 @@ def schedule_mode(asked: Literal["task", "research"] | None, chat: ChatMode) -> 
     return "research" if chat == "research" else "task"
 
 
+# The event of a schedule a run made, which the conversation shows as a line that leads to it (item 665).
+SCHEDULE_MADE_EVENT: str = "schedule_made"
+
+
 def chat_options(run: RunRecord, choices: ChatChoices | None) -> ScheduleOptions:
     """How the runs of a schedule that the run ``run`` makes start (item 291): as the next follow-up of its chat starts,
     ``choices`` (those its first run started with, until the owner picked others), else as ``run`` started, its chat's
@@ -162,6 +168,16 @@ def _create_tool() -> RegisteredTool:
         record: ScheduleRecord = await create_schedule(
             store, ctx.runtime.config.scheduler, zone, request, time.time(), owner.thread_id
         )
+        # The conversation says so in a line of its own that leads to the schedule (item 665): its rhythm in words from
+        # the cron, which the page reads as the Schedules page does, else the daemon's words ("once, 25 Oct 08:00"),
+        # both of the schedule as it was kept.
+        made: JsonObject = {
+            "schedule_id": record.id,
+            "name": record.name,
+            "cron": record.cron,
+            "when": schedule_timing(record, zone),
+        }
+        await ctx.runtime.bus.emit(ctx.run_id, SCHEDULE_MADE_EVENT, made, True)
         return ok(
             f"Scheduled: {render_schedule(record, zone)}\nEach run goes on in this chat, with its model, reasoning "
             f"level, speed, approvals and goal mode. {DAEMON_NOTE}"

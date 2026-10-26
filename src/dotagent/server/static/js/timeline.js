@@ -17,7 +17,7 @@ import { helperCard } from "./helpercard.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
-import { answerMessage, userMessage } from "./messages.js";
+import { answerMessage, scheduleLine, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
@@ -1237,6 +1237,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         return;
       }
       place(scope, userMessage({ text, sentAt: record.ts, files, editFromHere: null }), record.ts);
+    },
+
+    // A schedule the run made (item 665): a line of the conversation that leads to it.
+    schedule_made(scope, record) {
+      place(scope, scheduleLine(record.data), record.ts);
     },
 
     // Dot's reaction on your latest message (item 664): it stands on that message, which the page finds.

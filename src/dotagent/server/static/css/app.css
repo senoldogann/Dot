@@ -5631,6 +5631,49 @@ a.memory-line:hover .memory-change {
   text-underline-offset: 2px;
 }
 
+/* A schedule a run made (item 665): a quiet line of the conversation, as a change of the memory is, that leads to it on
+   the Schedules page; its name stands out. */
+.schedule-line {
+  align-items: center;
+}
+
+.schedule-line .icon {
+  margin-top: 0;
+}
+
+.schedule-line strong {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+a.schedule-line:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+a.schedule-line:hover .schedule-made {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* The schedule a line of a conversation led to, on the Schedules page: its row in the accent's light, fading. */
+.list-row.asked {
+  animation: asked-row var(--motion-moment) var(--ease) both;
+}
+
+@keyframes asked-row {
+  from {
+    background: var(--accent-weak);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-row.asked {
+    animation: none;
+    background: var(--accent-weak);
+  }
+}
+
 .note.bad {
   color: var(--bad);
 }
