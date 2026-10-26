@@ -43,6 +43,7 @@ from pydantic import JsonValue
 from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, read_debug_endpoint, redact_endpoint
 from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
+    TextWaitEnd,
     bring_to_front,
     capture_lines,
     cookie_secrets,
@@ -63,7 +64,7 @@ from dotagent.browser.driver import (
     upload_files,
     visible_text,
     wait_dom_quiet,
-    wait_for_text,
+    wait_for_text_or_dialog,
 )
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
 from dotagent.browser.look import PageLook, color_scheme
@@ -214,6 +215,8 @@ _SCRIPTED_NOTE: str = (
     "a script of this run ran in this chat's tabs and could have copied what is typed there: when the user took over, "
     "the other tabs were closed and this page was opened again"
 )
+# What ended a wait for a text that a dialog interrupted (item 698).
+_DIALOG_OPENED: str = "a dialog opened in front of the page"
 # Why a chat's tabs were made new before a login was filled (item 697).
 _FRESH_FOR_LOGIN_NOTE: str = (
     "a script of this run ran in this chat's tabs and could copy what is typed there: before the login, Dot closed "
@@ -2704,7 +2707,8 @@ class BrowserSession:
             # Not waited on a page that went to a URL the rules forbid (item 554): the answer would tell what it shows.
             await self._enforce_landing(tab)
             started: float = time.monotonic()
-            appeared: bool = await wait_for_text(tab.page, text, _ms(timeout_s))
+            end: TextWaitEnd = await wait_for_text_or_dialog(tab.page, text, _ms(timeout_s))
+            appeared: bool = end == "text"
             waited_s: float = time.monotonic() - started
             if appeared:
                 await self._settle(tab)
@@ -2713,7 +2717,8 @@ class BrowserSession:
             await self._enforce_landing(tab)
             view: PageView = await self._changes_view(thread, tab, hide_secrets)
             await self._enforce_landing(tab)
-            return TextWait(appeared=appeared, waited_s=waited_s, view=view)
+            ended_by: str | None = _DIALOG_OPENED if end == "dialog" else None
+            return TextWait(appeared=appeared, waited_s=waited_s, view=view, ended_by=ended_by)
 
     def _refuse_fill(self, url: str, fills_on: Callable[[str], bool], kinds: Sequence[VaultFieldKind]) -> None:
         """Raise when a fill of ``kinds`` into the page at ``url`` is refused whatever the tabs: the page is not one of

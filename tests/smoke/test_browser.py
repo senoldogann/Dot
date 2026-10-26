@@ -106,6 +106,13 @@ _PAGES: dict[str, str] = {
 <button onclick="setTimeout(() => {
   document.getElementById('s').textContent = 'Order placed' }, 800)">Place order</button>
 <p id="s">Working</p>""",
+    # A dialog opens 400 ms after the first click, one that says the order is placed after the second (item 698).
+    "/asks": """<!doctype html><title>Asks</title>
+<button onclick="setTimeout(() => { const d = document.createElement('div'); d.setAttribute('role', 'dialog');
+  d.setAttribute('aria-label', 'Confirm'); d.innerHTML = '<p>Are you sure?</p><button>Yes</button>';
+  document.body.append(d) }, 400)">Pay</button>
+<button onclick="setTimeout(() => { const d = document.createElement('div'); d.setAttribute('role', 'dialog');
+  d.innerHTML = '<p>Order placed</p>'; document.body.append(d) }, 400)">Order</button>""",
     # The page leaves half a second after the click, for one whose end comes only after _SLOW_REST_S.
     "/leaving": """<!doctype html><title>Leaving</title>
 <button onclick="setTimeout(() => { location.href = '/half-page' }, 500)">Leave</button>""",
@@ -557,6 +564,31 @@ async def test_a_wait_for_text_that_does_not_come_fails_and_still_shows_the_page
     assert result.is_error
     assert result.untrusted  # the gate counts no failed result as a read, and this one shows the page
     assert result.text.startswith(f"The text did not appear within {wait.waited_s:.1f} s; the page now · Tab 1 of 1 · ")
+
+
+async def test_a_dialog_that_opens_during_a_wait_ends_it_and_one_that_brings_the_text_is_the_text(
+    browser: BrowserSession, site: str
+) -> None:
+    """A wait for a text that a dialog stands in front of ends when the dialog opens, not at its time (item 698): the
+    text would not come until the dialog is answered. A dialog that holds the text is the text appearing."""
+    view: PageView = await browser.open_url("wait-asks", f"{site}/asks", True)
+    await act(browser, "wait-asks", [Step(action="click", ref=ref_of(view.body, 'button "Pay"'))], False)
+    wait: TextWait = await browser.wait_text("wait-asks", "Payment received", 10.0, True)
+    assert not wait.appeared
+    assert wait.ended_by == "a dialog opened in front of the page"
+    assert 0.2 < wait.waited_s < 2.0, wait.waited_s
+    assert "Are you sure?" in wait.view.body or "Are you sure?" in wait.view.overlay
+    result: ToolResult = wait_text_result(wait, "n0nce", 20_000)
+    assert result.is_error and result.untrusted
+    assert result.text.startswith("The text has not appeared; the wait ended after "), result.text
+    assert "because a dialog opened in front of the page: answer it first" in result.text
+    # With a dialog open already, another wait is for the text alone.
+    again: TextWait = await browser.wait_text("wait-asks", "Payment received", 1.0, True)
+    assert not again.appeared and again.ended_by is None and again.waited_s >= 0.9
+    view = await browser.open_url("wait-asks", f"{site}/asks", True)
+    await act(browser, "wait-asks", [Step(action="click", ref=ref_of(view.body, 'button "Order"'))], False)
+    placed: TextWait = await browser.wait_text("wait-asks", "Order placed", 10.0, True)
+    assert placed.appeared and placed.ended_by is None, placed
 
 
 async def test_a_wait_that_times_out_while_a_page_still_loads_shows_it_without_waiting_for_the_rest(
