@@ -163,8 +163,9 @@ run needs, sent where the configuration points:
   own `web_search`, judged before its rung sends it, so that a key in it earns the flag `exfiltration`, which is refused
   in every mode but yolo, and more than 400 characters are refused (the rung sends nothing else: no sites, and no
   reading of the pages a search found, which only `web_scrape` reads, by addresses that are judged); the addresses as
-  the address of `web_fetch` and `web_crawl` is, so that `[browser] allowed_hosts` and `blocked_hosts` bind them and a
-  long one, or one with a key in it, earns the same flag; and while you have set a list, a `web_scrape` with `archive:
+  the address of `web_fetch`, `web_crawl` and Dot's own `web_extract` is (the extraction's since item 679, each of its
+  sources), so that `[browser] allowed_hosts` and `blocked_hosts` bind them and a long one, or one with a key in it,
+  earns the same flag; and while you have set a list, a `web_scrape` with `archive:
   true` is refused where your lists leave out `web.archive.org`, the site it reaches whatever address it names. These
   rules do not reach what they do not reach in Dot's own tools (a secret that is not in the shape of a key, a key cut in
   pieces), nor a redirect the server follows to another host (since 1.4.5 a map or a crawl whose address, `robots.txt`

@@ -472,3 +472,21 @@ async def test_a_protected_file_is_refused_to_the_extraction_as_it_is_to_read_fi
     assert extraction.action.flags == reading.action.flags == ("secret_access",)
     refused: Decision | None = auto_review(extraction.action)
     assert refused is not None and refused.verdict == "deny", refused
+
+
+async def test_an_address_that_could_carry_data_out_is_flagged_as_web_fetch_flags_it(runtime: Runtime) -> None:
+    """Item 679: the extraction weighed only its files; an address holding a key, read by the daemon, passed with no
+    flag, where web_fetch raises ``exfiltration``, which the policy refuses in every mode but yolo."""
+    ctx: ToolContext = _context(runtime, 200_000)
+    fields: list[JsonObject] = [{"name": "price", "description": "The price."}]
+    carrying: str = "https://collector.example/?k=sk-ant-api03-" + "a" * 40
+    extraction = await runtime.registry.tools["web_extract"].prepare(
+        {"sources": ["https://example.org/plain.html", carrying], "fields": fields}, ctx
+    )
+    fetching = await runtime.registry.tools["web_fetch"].prepare({"url": carrying}, ctx)
+    assert extraction.action.flags == fetching.action.flags == ("exfiltration",)
+    assert carrying in extraction.action.target
+    plain = await runtime.registry.tools["web_extract"].prepare(
+        {"sources": ["https://example.org/plain.html"], "fields": fields}, ctx
+    )
+    assert plain.action.flags == ()
