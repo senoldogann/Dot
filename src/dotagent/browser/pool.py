@@ -63,6 +63,16 @@ class BrowserPool:
             await other.aclose()
             _log.info("browser_session_retired", mode=mode, profile=str(other.profile_dir))
 
+    async def end_of_run(self, thread_id: str, *, helper: bool) -> None:
+        """Tidy the chat's tabs in every session once its run has ended (item 696, :meth:`BrowserSession.end_of_run`):
+        all of a helper's, every one but the current tab of another run's. A session that fails to tidy is logged and
+        the others are still tidied."""
+        for session in (self.main, *self._others.values()):
+            try:
+                await session.end_of_run(thread_id, keep_current=not helper)
+            except Exception:  # noqa: BLE001 - logged with its traceback
+                _log.exception("browser_end_of_run_tidy_failed", thread_id=thread_id, mode=session.mode)
+
     def chrome_pids(self) -> frozenset[int]:
         """The Chromes the sessions work in, by the pid that holds each one's profile: Dot's own Chrome while it runs,
         and the Chrome of the user. A name that fits several Chromes means one of these on the desktop (item 343)."""

@@ -673,7 +673,14 @@ navigation_attempts = 3
 navigation_backoff_ms = 80
 # Tabs one conversation thread may keep open; the oldest background tab is closed beyond that.
 max_tabs = 4
+# A chat's tabs close once none of them was used for tab_idle_s, unless a run of the chat is at work. A tab that is
+# not the chat's current one closes once unused for background_tab_idle_s, while its run works as well (item 696; 0
+# keeps it). When a run ends, its chat's background tabs close at once and the current one stays for a message that goes
+# on from it; a helper's chat (a delegated run, an agent's) closes all of its tabs. Only the chat's own tabs are closed,
+# never those of another chat at work at the same time, nor a tab you opened yourself. A tab opened from one of the
+# chat's tabs (a link or a page that opens a new tab) is the chat's, also when you opened it that way.
 tab_idle_s = 1800.0
+background_tab_idle_s = 300.0
 # Dot's own Chrome, and the Playwright driver with it, close once nothing used them for this long (item 454): no step of
 # a chat is under way in it, no run at work holds tabs in it, no page is being read in it for the web tools or watched
 # under "Dot's computer", no task is being taught in it and its window is not the one in front. A Chrome left open keeps

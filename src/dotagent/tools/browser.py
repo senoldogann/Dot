@@ -777,17 +777,24 @@ def _switch_tab_tool() -> RegisteredTool:
     )
 
 
-def _close_tab_tool() -> RegisteredTool:
-    def classify(args: TabArgs, ctx: ToolContext) -> ActionInfo:
-        return _observe_action("browser_close_tab", f"Close tab {args.index}", ctx)
+class CloseTabArgs(ToolArgs):
+    index: int | None = Field(
+        default=None, ge=1, description="Tab number from the tab list; leave it out for all others."
+    )
 
-    async def run(args: TabArgs, ctx: ToolContext) -> ToolResult:
+
+def _close_tab_tool() -> RegisteredTool:
+    def classify(args: CloseTabArgs, ctx: ToolContext) -> ActionInfo:
+        summary: str = "Close the other tabs" if args.index is None else f"Close tab {args.index}"
+        return _observe_action("browser_close_tab", summary, ctx)
+
+    async def run(args: CloseTabArgs, ctx: ToolContext) -> ToolResult:
         return _page_result(await ctx.browser.close_tab(ctx.thread_id, args.index, hides_secrets(ctx.approvals)), ctx)
 
     return make_tool(
         name="browser_close_tab",
-        description="Close a tab you no longer need; the tab that was current before it, or its neighbour, is shown.",
-        args_model=TabArgs,
+        description="Close a tab you are done with, or without an index every tab of this chat but the current one.",
+        args_model=CloseTabArgs,
         modes=ALL_MODES,
         parallel_safe=False,
         timeout_s=_QUICK_TIMEOUT_S,

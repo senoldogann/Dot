@@ -412,6 +412,13 @@ def threads_to_release(threads: Mapping[str, ThreadTabs], cutoff: float, kept: f
     ]
 
 
+def idle_background_tabs(thread: ThreadTabs, cutoff: float) -> list[Tab]:
+    """The tabs of ``thread`` that are not its current one and that no call has had current since ``cutoff``: the
+    pages a run went on from (item 696). Only the thread's own tabs are looked at, so a chat never closes a tab of
+    another chat, or of the owner."""
+    return [tab for index, tab in enumerate(thread.tabs) if index != thread.active and tab.last_used < cutoff]
+
+
 def no_runs_at_work() -> frozenset[str]:
     """The chats a session works for when no run does (``dotx browser``): none, so every idle chat is released."""
     return frozenset()
@@ -1109,6 +1116,10 @@ class BrowserSession:
                 except Exception:  # noqa: BLE001 - logged with its traceback
                     _log.exception("browser_idle_release_failed", thread_id=thread_id)
             try:
+                await self.close_idle_background_tabs()
+            except Exception:  # noqa: BLE001 - logged with its traceback
+                _log.exception("browser_idle_tabs_close_failed")
+            try:
                 await self._close_unused()
             except Exception:  # noqa: BLE001 - logged with its traceback
                 _log.exception("browser_idle_close_failed", profile=str(self._profile))
@@ -1190,6 +1201,60 @@ class BrowserSession:
                 "the cookies of the browser profile could not be listed",
                 {"profile": str(self._profile), "error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)},
             ) from error
+
+    async def close_idle_background_tabs(self) -> None:
+        """Close the background tabs that no call of their chat has had current for ``background_tab_idle_s`` (item
+        696), while its run works as well: a page the run went on from. A chat in the middle of a step is left for the
+        next round, and so is the tab the owner is showing a task in. The current tab of the chat is told which closed.
+        """
+        idle_s: float = self._config.background_tab_idle_s
+        if idle_s == 0:
+            return
+        cutoff: float = time.monotonic() - idle_s
+        for thread_id, thread in list(self._threads.items()):
+            if thread.lock.locked() or not idle_background_tabs(thread, cutoff):
+                continue
+            async with thread.lock:
+                if self._threads.get(thread_id) is not thread:
+                    continue
+                closed: list[Tab] = await self._close_background(thread, idle_background_tabs(thread, cutoff))
+            if closed:
+                _log.info("browser_idle_background_tabs_closed", thread_id=thread_id, tabs=len(closed))
+
+    async def end_of_run(self, thread_id: str, *, keep_current: bool) -> None:
+        """Tidy the tabs of a chat whose run has ended (item 696): every one when ``keep_current`` is false (a helper's
+        chat, which no message continues), else every one but the current tab, which stays for a message that goes on
+        from it until ``tab_idle_s``. Nothing is closed while another run works in the chat. Only the chat's own tabs
+        are closed: those of other chats, at work or not, and the owner's tabs are not touched."""
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        if thread is None or thread_id in self._kept():
+            return
+        if not keep_current:
+            async with thread.lock:
+                if self._threads.get(thread_id) is thread and thread_id not in self._kept():
+                    await self.release_thread(thread_id)
+            _log.info("browser_run_tabs_released", thread_id=thread_id)
+            return
+        async with thread.lock:
+            if self._threads.get(thread_id) is not thread or thread_id in self._kept():
+                return
+            background: list[Tab] = [tab for index, tab in enumerate(thread.tabs) if index != thread.active]
+            closed: list[Tab] = await self._close_background(thread, background)
+        if closed:
+            _log.info("browser_run_background_tabs_closed", thread_id=thread_id, tabs=len(closed))
+
+    async def _close_background(self, thread: ThreadTabs, tabs: Sequence[Tab]) -> list[Tab]:
+        """Close ``tabs`` of ``thread``, but not its current one nor the tab a task is being shown in, and note on the
+        current tab what closed; return the tabs closed."""
+        current: Tab | None = thread.tabs[thread.active] if thread.tabs else None
+        teaching: object = None if self._teaching is None else self._teaching.page
+        closing: list[Tab] = [tab for tab in tabs if tab is not current and tab.page is not teaching]
+        for tab in closing:
+            url: str = tab.page.url
+            await self._close_tab_object(thread, tab)
+            if current is not None:
+                add_note(current, f"closed a tab no longer in use: {truncate_middle(url, _LAUNCH_ERROR_CHARS)}")
+        return closing
 
     async def release_thread(self, thread_id: str) -> None:
         """Close the tabs of a thread that is finished."""
@@ -1420,6 +1485,8 @@ class BrowserSession:
                 raise connection_broke(error) from error
             finally:
                 thread.last_used = time.monotonic()
+                if thread.tabs:
+                    thread.tabs[thread.active].last_used = thread.last_used
 
     # ------------------------------------------------------------------ observation
 
@@ -2822,10 +2889,17 @@ class BrowserSession:
                 await bring_to_front(tab.page)
             return await self._full_view(thread, tab, hide_secrets)
 
-    async def close_tab(self, thread_id: str, index: int, hide_secrets: bool) -> PageView:
+    async def close_tab(self, thread_id: str, index: int | None, hide_secrets: bool) -> PageView:
+        """Close the chat's tab ``index``, or every tab of the chat but its current one when ``index`` is ``None``
+        (item 696), and show the tab that is current then. Only the chat's own tabs are counted and closed."""
         async with self._locked(thread_id) as thread:
-            self._require_tab_index(thread, index)
-            await self._close_tab_object(thread, thread.tabs[index - 1])
+            if index is None:
+                current: Tab = await self._current_tab(thread)
+                for other in [tab for tab in thread.tabs if tab is not current]:
+                    await self._close_tab_object(thread, other)
+            else:
+                self._require_tab_index(thread, index)
+                await self._close_tab_object(thread, thread.tabs[index - 1])
             tab: Tab = await self._current_tab(thread)
             return await self._full_view(thread, tab, hide_secrets)
 

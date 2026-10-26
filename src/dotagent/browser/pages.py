@@ -5,6 +5,7 @@ structured fields and shown to the model as a note.
 """
 
 import asyncio
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import partial
@@ -61,6 +62,9 @@ class Tab:
     # in the documents of the origin it was filled into and in no other. The same values are kept out of the addresses
     # this tab's pages send by the session, which holds them by tab (``BrowserSession._kept_out``).
     filled_values: set[HeldValue] = field(default_factory=set)
+    # When a call of the thread last ended with this tab current (``time.monotonic``): a tab in the background unused
+    # for ``[browser] background_tab_idle_s`` is closed (item 696).
+    last_used: float = field(default_factory=time.monotonic)
 
 
 @dataclass(slots=True)

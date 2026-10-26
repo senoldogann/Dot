@@ -427,6 +427,8 @@ class BrowserConfig(FrozenModel):
     navigation_backoff_ms: int = Field(ge=0)
     max_tabs: int = Field(ge=1)
     tab_idle_s: float = Field(gt=0, allow_inf_nan=False)
+    # A tab of a chat that is not its current one closes once unused this long (item 696); 0 keeps it.
+    background_tab_idle_s: float = Field(ge=0, allow_inf_nan=False)
     # Dot's own Chrome closes once unused this long (item 454); 0 keeps it open until the daemon stops.
     idle_close_s: float = Field(ge=0, allow_inf_nan=False)
     # The JPEG quality Chrome takes a screenshot with.
