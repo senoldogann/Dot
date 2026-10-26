@@ -124,6 +124,9 @@ async def test_the_agents_answer_is_its_message_in_the_conversation(own_home: Pa
                     await page.goto(ui_url("127.0.0.1", port, TOKEN))
                     await page.goto(f"{address}/#/runs/{run.id}")
                     await expect(page.locator(".answer .prose").last).to_have_text("It is May.")
+                    # The agent's row is named by its name, before what it was asked (item 669).
+                    await expect(page.locator(".child-row .child-name")).to_have_text("Scout")
+                    await expect(page.locator(".child-row .child-goal")).to_have_text("Check the date")
                     said = page.locator(".agent-said")
                     await expect(said.locator(".agent-said-head")).to_have_text("Message from Scout")
                     message = said.locator(".agent-message")

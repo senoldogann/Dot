@@ -378,8 +378,11 @@ the file tools, each file that is as they left it; a file changed since is left 
 stays. A message sent before Dot kept the place of each message in its chat has no Edit from here, nor has one that
 steered a turn at work, and a chat is not rewound while a run works on it or messages wait in its queue. A delegated run
 is a row: the face with its state at the corner (turning while it works, amber while it waits for you, green with a
-check when it is done, red when it failed), its goal over the last thing it did and, once it ended, the start of its
-answer (item 245), the time it has taken (counting on every second while it works), the way to its own page and a
+check when it is done, red when it failed), its name and its goal over the last thing it did and, once it ended, the
+start of its answer (item 245): an agent's run is named by the agent ("Scout"), any other by its place among the
+helpers of the run that started it ("Helper 1", "Helper 2"), and the goal follows quieter, its paths cut to their last
+two parts ("…/housestory/brief.md"); the last thing it did names the tool in the words the steps use ("step 32 ·
+Write file", "Web Research · Web scrape"; item 669), the time it has taken (counting on every second while it works), the way to its own page and a
 chevron that opens its steps. Rows that follow each other gather in one group: its head shows their faces, how many they
 are and how they stand ("3 helpers", "1 working · 2 done"), the time from the first one's start to the last one's end
 and a chevron that folds the rows away; an approval a helper asks for opens the group. The row is closed from the start;

@@ -187,9 +187,13 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                         assert before is not None and before != "", before
                         await expect(span).not_to_have_text(before)
                     # The rows that are done show the start of their answer, one plain line; the working one its step.
+                    # Each row is named by its place, as no agent's (item 669).
+                    await expect(group.locator(".child-name")).to_have_text(
+                        [f"Helper {number}" for number in range(1, len(SHELVES) + 1)]
+                    )
                     previews: Locator = group.locator(".child-progress")
                     await expect(previews.filter(has_text=PLAIN)).to_have_count(len(SHELVES) - 1)
-                    await expect(_row(page, working.id).locator(".child-progress")).to_contain_text("shell")
+                    await expect(_row(page, working.id).locator(".child-progress")).to_contain_text("Command")
                     for row in await group.locator("summary.child-row").all():
                         assert await row.evaluate(
                             "(row) => row.querySelector('.child-progress').offsetHeight"

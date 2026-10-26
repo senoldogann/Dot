@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { callKind, countKinds, describeArguments, flowWords, toolWords } from "../../src/dotagent/server/static/js/tools.js";
+import { callKind, countKinds, describeArguments, flowWords, shortPaths, toolWords } from "../../src/dotagent/server/static/js/tools.js";
 
 test("a tool's kind: by name, by prefix, else other", () => {
   assert.equal(callKind("shell"), "command");
@@ -58,4 +58,14 @@ test("a tool's row names it in words: Dot's in its own, an MCP tool by its serve
   // Any other tool reads in words of its name, and a name that is a property of every object is no tool's words.
   assert.equal(toolWords("draft_reply"), "Draft reply");
   assert.equal(toolWords("constructor"), "Constructor");
+});
+
+test("a helper's task keeps the last two parts of the paths in it (item 669)", () => {
+  assert.equal(
+    shortPaths("Görevi başlat. Önce `/Users/dogan/Library/Application Support/Dot/workspace/housestory/brief.md` oku."),
+    "Görevi başlat. Önce `…/housestory/brief.md` oku.",
+  );
+  assert.equal(shortPaths("Read /Users/dogan/notes/2026/plan.md first"), "Read …/2026/plan.md first");
+  assert.equal(shortPaths("Open /tmp/a and ~/x.md"), "Open /tmp/a and ~/x.md");
+  assert.equal(shortPaths("No path here"), "No path here");
 });

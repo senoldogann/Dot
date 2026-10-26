@@ -22,7 +22,7 @@ import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
-import { callKind, describeArguments, flowIcon, flowWords, toolRow, toolWords } from "./tools.js";
+import { callKind, describeArguments, flowIcon, flowWords, shortPaths, toolRow, toolWords } from "./tools.js";
 import { detailsFold } from "./ui.js";
 
 const GOAL_CHARS = 160;
@@ -406,6 +406,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       handoffs: new Map(),
       // The agent the scope's run is of, by its name, or null (item 668).
       agentName: null,
+      // How many helpers that are no agent the scope's run started: the next is named after them (item 669).
+      helpers: 0,
       // The cards that wait for the reader's answer in this scope and the delegated runs inside it.
       asking: 0,
       // While the run waits for its model to be reached again: the note that says so and the attempts it counts.
@@ -631,6 +633,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
   function childScope(runId, data, ts) {
     const parent = scopes.get(data.parent_run_id) ?? scopes.get(rootRunId);
+    // The row names the run (item 669): an agent by its name, any other helper by its place among its parent's.
+    const agentName = typeof data.agent_name === "string" && data.agent_name !== "" ? data.agent_name : null;
+    if (agentName === null) {
+      parent.helpers += 1;
+    }
+    const name = agentName ?? `Helper ${parent.helpers}`;
     // A run of an agent (item 87, a message to it) wears the agent's face; any other delegated run its own.
     const face = actorFace(data.agent_id ?? runId, "working", null);
     const status = el("span", { role: "img" });
@@ -654,7 +662,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       { class: "child-row" },
       el("span", { class: "child-face" }, face, status),
       el("span", { class: "visually-hidden" }, "Helper:"),
-      el("span", { class: "child-main" }, el("span", { class: "child-title" }, clip(data.goal ?? "", GOAL_CHARS)), progress),
+      el(
+        "span",
+        { class: "child-main" },
+        el("span", { class: "child-title" }, el("span", { class: "child-name" }, name), " ", el("span", { class: "child-goal" }, clip(shortPaths(data.goal ?? ""), GOAL_CHARS))),
+        progress,
+      ),
       meta,
       time,
       open,
@@ -681,7 +694,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     const panel = { node, face, status, meta, progress, line: "starting", time, steps: 0, helper, flock: null };
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
     // The agent the run is of, by its name (item 668): its answer stands in the parent's conversation as its message.
-    scope.agentName = typeof data.agent_name === "string" && data.agent_name !== "" ? data.agent_name : null;
+    scope.agentName = agentName;
     if (scope.agentName !== null) {
       arrived(parent, scope.agentName);
     }
@@ -1148,7 +1161,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         onBrowserStep();
       }
       if (scope.panel !== null) {
-        paintChild(scope, record.ts, [`step ${scope.panel.steps}`, data.tool]);
+        // The tool in the words the steps use ("Write file", "Web Research · Web scrape").
+        paintChild(scope, record.ts, [`step ${scope.panel.steps}`, toolWords(data.tool)]);
         scope.panel.helper.action = describeCall(data.tool, data.args);
         scope.panel.helper.calls += 1;
       }

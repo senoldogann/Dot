@@ -144,6 +144,8 @@ def test_a_caller_that_refuses_does_not_look_for_a_value_a_page_was_given_and_on
     values looked up stay in both."""
     monkeypatch.setenv("DOT_HOME", str(tmp_path))
     monkeypatch.setattr(secrets, "_filled", frozenset())
+    # The values an earlier test of this process resolved are among them too: none here, whichever ran before.
+    monkeypatch.setattr(secrets, "_resolved", set())
     kept: str = "MARKER-" + "k" * 16
     (tmp_path / ".env").write_text(f"SHOP_KEY={kept}\n", encoding="utf-8")
     password: str = "S3cret-Passw0rd!"
