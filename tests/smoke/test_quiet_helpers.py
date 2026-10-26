@@ -181,7 +181,7 @@ async def test_a_chat_whose_helpers_work_writes_only_what_changed(served: tuple[
             lines: Locator = page.locator(".child-last")
             await expect(page.locator(".helpers-state")).to_have_text(f"{_HELPERS} working", timeout=_WAIT_S * 1000)
             await expect(lines).to_have_count(_HELPERS)
-            await expect(lines.first).to_contain_text("list_dir", timeout=_WAIT_S * 1000)
+            await expect(lines.first).to_contain_text("List folder", timeout=_WAIT_S * 1000)
             before: tuple[str, list[str]] = (await head_time.inner_text(), await lines.all_inner_texts())
             await page.evaluate(_WATCH)
             await page.wait_for_timeout(_WATCH_MS)

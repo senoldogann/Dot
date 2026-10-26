@@ -6180,6 +6180,16 @@ a.schedule-line:hover .schedule-made {
   font-weight: var(--weight-label);
 }
 
+/* A helper's name stands first, in the text's colour, and what it is for after it, quieter (item 669). */
+.child-name {
+  color: var(--text);
+}
+
+.child-goal {
+  color: var(--muted);
+  font-weight: var(--weight-text);
+}
+
 .child-time {
   flex: none;
   color: var(--muted);

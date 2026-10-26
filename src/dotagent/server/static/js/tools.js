@@ -265,6 +265,20 @@ function titled(name) {
     .join(" ");
 }
 
+/**
+ * A task's words with the paths in it cut to their last two parts (item 669): a helper's row names what it is for, and
+ * "/Users/dogan/Library/Application Support/Dot/workspace/housestory/brief.md" filled the row before the words that
+ * said it. A path in backticks is cut whole, spaces and all; a bare one ends at a space. A path of two parts or fewer
+ * stays as it is.
+ */
+export function shortPaths(text) {
+  const cut = (path) => {
+    const parts = path.split("/").filter((part) => part !== "");
+    return parts.length <= 2 ? path : `…/${parts.slice(-2).join("/")}`;
+  };
+  return text.replace(/`(\/[^`\n]+)`/g, (_match, path) => `\`${cut(path)}\``).replace(/(^|\s)(\/(?:[^\s/]+\/){2,}[^\s/]*)/g, (_match, space, path) => `${space}${cut(path)}`);
+}
+
 /** What a tool's row calls it (item 513): one of Dot's in its own words ("Edit file"), an MCP tool by its server and
  * what it does, the server's name taken off the tool's own ("mcp__tavily__tavily_search" reads "Tavily · Search"), and
  * any other in words of its name. The name itself is the words' title. */
