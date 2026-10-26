@@ -1163,6 +1163,10 @@ def _send_back_note(reason: str) -> str:
     )
 
 
+# The start of a follow-up's goal the goal check reads (item 675), enough to tell what it picks up.
+_FOLLOW_UP_GOAL_CHARS: int = 300
+
+
 def _scheduled_end(reason: str, ended: RunOutcome) -> RunOutcome:
     """The end of a run whose goal check found that all it can do now is done and that what is left waits on time, which
     a follow-up scheduled in its chat picks up (item 675): done, with the check's words under the answer."""
@@ -1332,15 +1336,19 @@ async def _ask_checker(
 
 
 async def _follow_ups(agent: AgentRun) -> str:
-    """The schedules that will start runs in the run's chat, one line each, for the goal check (item 675): what is
-    left of a goal that waits on time is picked up by one of them. Empty when there is none."""
+    """The schedules that will start runs in the run's chat, one line each with the start of their goal, for the goal
+    check (item 675): what is left of a goal that waits on time is picked up by one of them. A schedule whose runs go
+    in a chat of their own is not one, even when its last run was in this chat. Empty when there is none."""
     now: float = time.time()
     zone: ZoneInfo = agent.runtime.schedule_zone
+    same_chat: bool = agent.runtime.config.scheduler.same_chat
     lines: list[str] = [
-        f"- {record.name}: next run {format_local(record.next_run_at, zone)} ({schedule_timing(record, zone)})"
+        f"- {record.name}: next run {format_local(record.next_run_at, zone)} ({schedule_timing(record, zone)}); "
+        f"its goal: {truncate_middle(' '.join(record.goal.split()), _FOLLOW_UP_GOAL_CHARS)}"
         for record in await agent.runtime.store.list_schedules()
         if record.enabled
         and record.thread_id == agent.run.thread_id
+        and (same_chat if record.options.same_chat is None else record.options.same_chat)
         and record.next_run_at is not None
         and record.next_run_at > now
     ]

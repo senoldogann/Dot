@@ -173,8 +173,9 @@ _GOAL_SYSTEM: str = (
     "- When the question holds an ASKED part, the user asked the agent to keep going until the goal is done: achieved "
     "only when every part of the goal is done and the digest shows it; a stop to report progress is continue, unless "
     "it is scheduled as above: work the agent could do now never waits on a follow-up.\n"
-    "- The FOLLOW-UPS part comes from the harness: the schedules that will start runs in this chat. A follow-up the "
-    "answer names that is not listed there is not scheduled.\n"
+    "- The FOLLOW-UPS part comes from the harness: the schedules that will start runs in this chat, each with the "
+    "start of its goal. A follow-up the answer names that is not listed there is not scheduled, and one whose goal "
+    "does not take up what is left does not pick it up.\n"
     "- An agent that reports a failure honestly after trying the sensible ways is blocked, not continue.\n"
     "- Give the reason in one or two sentences, in the language of the goal."
 )

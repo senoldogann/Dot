@@ -161,3 +161,4 @@ async def test_a_rest_that_waits_on_a_run_scheduled_in_the_chat_ends_the_run_as_
     assert [(check["decision"], check["final"]) for check in played.data("goal_check")] == [("scheduled", True)]
     assert _asked_with(played, FOLLOW_UPS_PART) == [True]
     assert _asked_with(played, "- Read the replies: next run ") == [True]
+    assert _asked_with(played, "its goal: Read the replies to the posts and answer each one.") == [True]

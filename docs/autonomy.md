@@ -120,9 +120,9 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
 - `scheduled` (item 675): all the run can do now is done, and what is left waits on something only time brings (a reply
   to what it sent, a payment, a site's review, a moment the goal names), which a run scheduled in the same chat picks
   up. The run ends as done, with the check's words under its answer. The checker is shown the chat's schedules that are
-  still to run, read by Dot from its own list, not from the answer; with none, Dot takes the verdict as `continue` and
-  tells the run to schedule one with `schedule_create` or do the work now. A campaign's claim is never accepted this
-  way: its sessions are its follow-ups.
+  still to run and go on in this chat, with the start of each one's goal, read by Dot from its own list, not from the
+  answer; with none, Dot takes the verdict as `continue` and tells the run to schedule one with `schedule_create` or do
+  the work now. A campaign's claim is never accepted this way: its sessions are its follow-ups.
 
 A check can only ask for the original goal to be finished: it adds no work and does not clear the untrusted mark. If the
 check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event and a line in the timeline.
