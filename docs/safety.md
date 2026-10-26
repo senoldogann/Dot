@@ -250,7 +250,14 @@ currency, so list sites that bill in one currency. Empty by default.
    payment page ("Checkout", "Continue to payment") is an ordinary click, so the run fills the order and the button
    that pays is the one handed to you (item 522). Enter or Space pressed on a button, which presses it, is judged by
    the button's label as a click on it is (item 561), and so is Return on a focused or default button of an
-   application of the Mac (item 555).
+   application of the Mac (item 555). In the browser a click is judged by its element's label whatever its role, a
+   `div` that shows "Pay now" as a button would, and Enter (with or without a modifier) or a line break typed in a
+   text field (a number field too, and Enter on a checkbox or a radio button of a form) by the field's name and by the
+   buttons near it that it may press (item 682): those of every level up to the form it is in, else up to three levels
+   up, as a chat's Send sits beside its box and a form's Pay a level above a button beside the field. Enter or a line break that names no field goes where the
+   batch last put the focus (a fill, a click) and is judged there; where the batch named none, or a Tab moved the
+   focus since, it sends what is not
+   known and asks as a send. A field whose surroundings show no button is judged by its name alone.
 5. *The guard* (item 429): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for a yes in every mode that asks, whatever

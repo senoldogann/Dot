@@ -69,6 +69,13 @@ class Box:
     height: float
 
 
+# How far up from a field, and over how many lines, the buttons that Enter in it may press are looked for (item 682):
+# a composer's Send sits beside its box, two or three levels up at most; a whole page is no field's surroundings.
+_NEAR_LEVELS: int = 3
+_NEAR_LINES: int = 80
+_PRESSED_ROLES: frozenset[str] = frozenset({"button", "menuitem"})
+
+
 @dataclass(frozen=True, slots=True)
 class SnapshotLine:
     depth: int
@@ -599,3 +606,45 @@ def fence_untrusted(url: str, body: str, nonce: str) -> str:
 def squeeze_text(text: str) -> str:
     """Page text without trailing blanks and with at most one empty line in a row."""
     return _BLANK_RUNS.sub("\n\n", _TRAILING_SPACE.sub("\n", text.replace("\r\n", "\n"))).strip()
+
+
+def controls_near(lines: Sequence[SnapshotLine], ref: str) -> tuple[str, ...]:
+    """The lines of the buttons that Enter in the field ``ref`` may press (item 682): those of the form the field is in,
+    however deep the field sits in it, when the snapshot shows the form; else those under each of its ancestors up to
+    :data:`_NEAR_LEVELS` levels, while an ancestor holds at most :data:`_NEAR_LINES` lines, where a page puts the button
+    that sends what the field holds (a composer's Send beside its box). Empty when the field is not in the view or no
+    button is near it."""
+    index: int | None = next((number for number, line in enumerate(lines) if line.ref == ref), None)
+    if index is None:
+        return ()
+    parents: list[int | None] = _parents(lines)
+    ancestors: list[int] = []
+    ancestor: int | None = parents[index]
+    while ancestor is not None:
+        ancestors.append(ancestor)
+        ancestor = parents[ancestor]
+    form: int | None = next((number for number in ancestors if lines[number].role == "form"), None)
+    if form is not None:
+        return _buttons(_subtree(lines, form))
+    found: dict[str, None] = {}
+    for number in ancestors[:_NEAR_LEVELS]:
+        block: list[SnapshotLine] = _subtree(lines, number)
+        if len(block) > _NEAR_LINES:
+            break
+        found.update(dict.fromkeys(_buttons(block)))
+    return tuple(found)
+
+
+def _buttons(block: Sequence[SnapshotLine]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(line.text.strip() for line in block if line.role in _PRESSED_ROLES))
+
+
+def _subtree(lines: Sequence[SnapshotLine], index: int) -> list[SnapshotLine]:
+    """The line ``index`` and the lines under it."""
+    depth: int = lines[index].depth
+    block: list[SnapshotLine] = [lines[index]]
+    for line in lines[index + 1 :]:
+        if line.depth <= depth:
+            break
+        block.append(line)
+    return block

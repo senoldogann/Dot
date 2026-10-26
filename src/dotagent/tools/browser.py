@@ -38,12 +38,15 @@ from dotagent.browser.safety import (
     assess_step,
     check_browser_url,
     hides_secrets,
+    keys_go_to,
     normalize_url,
     parse_element,
     payment_steps,
     refuse_secret_field,
     secret_field_flag,
     secret_field_label,
+    submits_field,
+    submits_unnamed,
     unexplained_clicks,
     url_flags,
 )
@@ -381,6 +384,25 @@ def _element_at(ref: str | None, ctx: ToolContext) -> Element | None:
     return parse_element(line) if line is not None else None
 
 
+def _assessed(
+    step: Step, ref: str | None, element: Element | None, target: Element | None, ctx: ToolContext
+) -> StepAssessment:
+    """How the policy weighs ``step``, which acts on ``ref`` (its own, or the field the batch last named): Enter or a
+    line break where no field is named at all sends what is not known, and is judged as a send (item 682)."""
+    if ref is None and submits_unnamed(step):
+        return combine_assessments([assess_step(step, None, target), assessment_for(["send"])])
+    return assess_step(step, element, target, _near(step, ref, element, ctx))
+
+
+def _near(step: Step, ref: str | None, element: Element | None, ctx: ToolContext) -> tuple[Element, ...]:
+    """The buttons Enter or a line break in the field ``ref`` may press, when ``step`` sends what the field holds
+    (:func:`dotagent.browser.safety.submits_field`, item 682)."""
+    if ref is None or not submits_field(step, element):
+        return ()
+    near: tuple[Element | None, ...] = tuple(parse_element(line) for line in ctx.browser.peek_near(ctx.thread_id, ref))
+    return tuple(button for button in near if button is not None)
+
+
 def _named(element: Element | None) -> str:
     return f" {_clip(element.name, _LABEL_CHARS)!r}" if element is not None and element.name else ""
 
@@ -452,10 +474,15 @@ async def _page_check(expected: str, outcome: ActOutcome, ctx: ToolContext) -> P
 def _act_tool() -> RegisteredTool:
     async def classify(args: ActArgs, ctx: ToolContext) -> ActionInfo:
         steps: list[Step] = first_steps(args.steps, ctx.runtime.config.browser.max_batch_steps)
-        elements: list[Element | None] = [_element_at(step.ref, ctx) for step in steps]
+        # A key or a text that names no field goes where the batch last put the focus (item 682).
+        refs: list[str | None] = keys_go_to(steps, [step.ref for step in steps])
+        elements: list[Element | None] = [_element_at(ref, ctx) for ref in refs]
         targets: list[Element | None] = [_element_at(step.to_ref, ctx) for step in steps]
         judged: list[tuple[Step, Element | None, Element | None]] = list(zip(steps, elements, targets, strict=True))
-        assessed: list[StepAssessment] = [assess_step(step, element, target) for step, element, target in judged]
+        assessed: list[StepAssessment] = [
+            _assessed(step, ref, element, target, ctx)
+            for (step, element, target), ref in zip(judged, refs, strict=True)
+        ]
         assessment: StepAssessment = combine_assessments(assessed)
         kind: ActionKind = _act_kind(steps)
         summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)

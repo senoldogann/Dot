@@ -49,7 +49,20 @@ _TYPING_ACTIONS: frozenset[StepAction] = frozenset({"fill", "type", "press", "se
 _ACTIVATING_KEYS: frozenset[str] = frozenset({"enter", "numpadenter", "space", " "})
 _CLICKING_ACTIONS: frozenset[StepAction] = frozenset({"click", "double_click", "right_click", "click_at"})
 _QUIET_ACTIONS: frozenset[StepAction] = frozenset({"hover", "scroll_into_view"})
-_CLICKABLE_ROLES: frozenset[str] = frozenset({"button", "link", "menuitem", "tab", "option", "checkbox", "switch"})
+# The controls whose name says what dragging them does, as a click on them would (a dragged list item is named for what
+# it is, not for what the drag does).
+_CONTROL_ROLES: frozenset[str] = frozenset({"button", "link", "menuitem", "tab", "option", "checkbox", "switch"})
+# The steps that put the focus on what they name, those that leave it where it was, as keys go where the focus is
+# (:func:`keys_go_to`, item 682); any other step leaves it where Dot cannot tell.
+_FOCUSING_ACTIONS: frozenset[StepAction] = frozenset(
+    {"click", "double_click", "right_click", "fill", "type", "insert", "select", "check", "uncheck", "press"}
+)
+_FOCUS_KEEPING_ACTIONS: frozenset[StepAction] = frozenset({"hover", "scroll_into_view"})
+# The fields Enter submits from, and the keys that do (item 682).
+_TEXT_FIELD_ROLES: frozenset[str] = frozenset({"textbox", "searchbox", "combobox", "spinbutton"})
+# The other controls of a form that Enter submits it from (a checkbox, a radio button), as a text field does.
+_ENTER_SUBMITS_ROLES: frozenset[str] = frozenset({"checkbox", "radio"})
+_SUBMITTING_KEYS: frozenset[str] = frozenset({"enter", "numpadenter"})
 _SECRET_KINDS: dict[str, SecretKind] = {kind: kind for kind in get_args(SecretKind)}
 # Keys that move, delete, submit or modify rather than put a character in (Playwright's key names, lower case).
 _KEYS_WITHOUT_TEXT: frozenset[str] = frozenset(
@@ -300,11 +313,14 @@ def url_flags(url: str) -> tuple[Flag, ...]:
 
 
 def parse_element(line: str) -> Element | None:
-    """Role and accessible name from a snapshot line, or ``None`` when the line is not an element."""
+    """Role and accessible name from a snapshot line, or ``None`` when the line is not an element. An element with no
+    name of its own is named by the text it shows inline (item 682: ``- generic [ref=e5] [cursor=pointer]: Pay now`` is
+    what a click on it presses). A text field's inline text is its value, not its name, and never names it."""
     parsed: tuple[SnapshotLine, ...] = parse_snapshot(line)
     if not parsed or not parsed[0].role:
         return None
-    return Element(role=parsed[0].role, name=parsed[0].name)
+    shown: str = "" if parsed[0].role in _TEXT_FIELD_ROLES else (parsed[0].inline or "").strip()
+    return Element(role=parsed[0].role, name=parsed[0].name or shown)
 
 
 def _activates(step: Step) -> bool:
@@ -316,24 +332,82 @@ def _activates(step: Step) -> bool:
     return key.lower() in _ACTIVATING_KEYS
 
 
-def assess_step(step: Step, element: Element | None, target: Element | None) -> StepAssessment:
-    """Risk and flags of one step, judged from the action and the element it targets. A drag's element is judged as a
-    click on it would be; the element it drops onto is more often a list or a region than a button, and its name says
-    what the drop does, so it is judged by its name whatever its role, and as a field that takes typed text."""
+def keys_go_to(steps: Sequence[Step], refs: Sequence[str | None]) -> list[str | None]:
+    """The ref each step of a batch acts on: its own, or, for a key or a text that names none, where the focus is
+    then (item 682). The focus is the ref of the last step that puts it on what it names (:data:`_FOCUSING_ACTIONS`:
+    a fill, a type, a click, a choice); a step that does not move it (a hover, a scroll into view, a key that names
+    no field) leaves it as it was; a step that moves it where Dot cannot tell (a click at a point, a Tab, any other
+    step that names nothing) leaves it unknown, ``None``, and a key after that names no field. One class of the
+    steps that place the focus, rather than one step at a time (the code review of this item took six rounds over
+    them)."""
+    focus: str | None = None
+    went: list[str | None] = []
+    for step, ref in zip(steps, refs, strict=True):
+        went.append(focus if ref is None and step.action in _TYPING_ACTIONS else ref)
+        if _moves_focus(step):
+            focus = None
+        elif step.action in _FOCUSING_ACTIONS and ref is not None:
+            focus = ref
+        elif step.action in _FOCUS_KEEPING_ACTIONS:
+            pass
+        elif ref is None and step.action in _TYPING_ACTIONS:
+            # A key or a text that names no field goes where the focus is and leaves it there.
+            pass
+        else:
+            focus = None
+    return went
+
+
+def _moves_focus(step: Step) -> bool:
+    """Whether a key step moves the focus away: Tab, with or without a modifier."""
+    return step.action == "press" and bool(step.key) and str(step.key).rsplit("+", 1)[-1].lower() == "tab"
+
+
+def submits_unnamed(step: Step) -> bool:
+    """Whether ``step`` presses Enter (with or without a modifier) or types a line break where no field is named, in
+    the batch or by the step: what it sends is not known, so it is judged as a send (item 682)."""
+    if step.action == "press" and step.key:
+        return step.key.rsplit("+", 1)[-1].lower() in _SUBMITTING_KEYS
+    return step.action in ("type", "insert") and step.text is not None and ("\n" in step.text or "\r" in step.text)
+
+
+def submits_field(step: Step, element: Element | None) -> bool:
+    """Whether ``step`` sends what a text field holds: Enter (with or without a modifier) pressed in it, or a line
+    break typed into it, which a page takes as the press of its form's button or of the Send beside a composer (item
+    682)."""
+    if element is None or element.role not in _TEXT_FIELD_ROLES | _ENTER_SUBMITS_ROLES:
+        return False
+    if step.action == "press" and step.key:
+        return step.key.rsplit("+", 1)[-1].lower() in _SUBMITTING_KEYS
+    if element.role in _ENTER_SUBMITS_ROLES:
+        return False
+    return step.action in ("type", "insert") and step.text is not None and ("\n" in step.text or "\r" in step.text)
+
+
+def assess_step(
+    step: Step, element: Element | None, target: Element | None, near: Sequence[Element] = ()
+) -> StepAssessment:
+    """Risk and flags of one step, judged from the action and the element it targets. A click is judged by its
+    element's name whatever its role (item 682: a page's ``div`` that pays is a ``generic`` with a pointer). A drag's
+    element is judged as a click on it would be; the element it drops onto is more often a list or a region than a
+    button, and its name says what the drop does, so it is judged by its name, and as a field that takes typed text.
+    Enter or a line break in a text field is judged by the buttons ``near`` it, which it may press
+    (:func:`submits_field`), and by the field's own name."""
     reasons: list[str] = []
     if step.action in _TYPING_ACTIONS:
         reasons = typing_reasons(element, step.text)
         # Enter or Space on a button presses it: judged by its name, as a click on it is (the review of item 561).
         if _activates(step):
-            reasons = list(dict.fromkeys(reasons + clicking_reasons(element, _CLICKABLE_ROLES)))
+            reasons = list(dict.fromkeys(reasons + naming_reasons(element)))
+        if submits_field(step, element):
+            pressed: list[str] = [reason for button in near for reason in naming_reasons(button)]
+            reasons = list(dict.fromkeys(reasons + naming_reasons(element) + pressed))
     elif step.action in _CLICKING_ACTIONS or step.action in ("check", "uncheck"):
-        reasons = clicking_reasons(element, _CLICKABLE_ROLES)
+        reasons = naming_reasons(element)
     elif step.action == "drag":
-        reasons = list(
-            dict.fromkeys(
-                clicking_reasons(element, _CLICKABLE_ROLES) + naming_reasons(target) + typing_reasons(target, None)
-            )
-        )
+        # What is dragged is named for what it is, not for what the drag does: a control dragged is judged as a click.
+        dragged: list[str] = clicking_reasons(element, _CONTROL_ROLES)
+        reasons = list(dict.fromkeys(dragged + naming_reasons(target) + typing_reasons(target, None)))
     if step.action in _QUIET_ACTIONS and not reasons:
         return quiet_assessment()
     return assessment_for(reasons)
@@ -348,21 +422,21 @@ def unexplained_clicks(steps: Sequence[tuple[Step, Element | None]]) -> tuple[El
             for step, element in steps
             if (step.action in _CLICKING_ACTIONS or step.action in ("check", "uncheck"))
             and element is not None
-            and element.role in _CLICKABLE_ROLES
-            and not clicking_reasons(element, _CLICKABLE_ROLES)
+            and element.name
+            and not naming_reasons(element)
         )
     )
 
 
 def payment_steps(steps: Sequence[tuple[Step, Element | None, StepAssessment]], judged: Collection[Element]) -> int:
     """How many steps of a batch pay (item 561): a click, a check, a drag or a key that presses its control
-    (:func:`_activates`) whose control's name asks to pay (``financial``), or that the typed judge found a payment
-    (``judged``: the controls it found so). Typing into a card field is flagged as money too, but moves none by
-    itself."""
+    (:func:`_activates`) or Enter in a field that presses one near it (:func:`submits_field`, item 682), whose name
+    asks to pay (``financial``), or that the typed judge found a payment (``judged``: the controls it found so). Typing
+    into a card field is flagged as money too, but moves none by itself."""
     return sum(
         1
         for step, element, part in steps
-        if (step.action not in _TYPING_ACTIONS or _activates(step))
+        if (step.action not in _TYPING_ACTIONS or _activates(step) or submits_field(step, element))
         and ("financial" in part.flags or (element is not None and element in judged))
     )
 
