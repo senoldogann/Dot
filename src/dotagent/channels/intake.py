@@ -78,6 +78,10 @@ class Intake:
         :data:`UNREAD_NOTE` after them, so that the run, and then the owner, know it was not looked at (item 611)."""
         if text is None and not attachment:
             return Skip("its words could not be read")
+        words: str = (text or "").strip()
+        # A stop is read whatever came before it (item 683): a run that floods the chat is what it is sent to stop.
+        if is_stop(words) and now - sent_at <= STALE_S:
+            return Accept(words)
         while self._seen and now - self._seen[0] >= _WINDOW_S:
             self._seen.popleft()
         if len(self._seen) >= MAX_PER_MINUTE:
@@ -89,7 +93,6 @@ class Intake:
         self._seen.append(now)
         if now - sent_at > STALE_S:
             return Tell(TOO_OLD)
-        words: str = (text or "").strip()
         if words == "":
             return Tell(ATTACHMENT) if attachment else Skip("it holds no words")
         if len(words) > MAX_IN_CHARS:

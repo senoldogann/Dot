@@ -1098,3 +1098,22 @@ async def test_a_scheduler_whose_ticks_keep_failing_ends_with_their_error(
     with pytest.raises(ExceptionGroup) as ended:
         await scheduler.stop()
     assert [type(error) for error in ended.value.exceptions] == [StoreError]
+
+
+async def test_the_emergency_stop_cancels_the_harness_step_and_the_reflection_under_way(runtime: Runtime) -> None:
+    """Item 683: the step of the harness plays real runs in a process of its own, and the reflection calls models; a
+    stop engaged while they work cancels them, as the daemon's own stop does, and none starts while it is engaged."""
+    scheduler: Scheduler = Scheduler(runtime, _Starts(runtime))
+    stepping: asyncio.Task[None] = asyncio.create_task(asyncio.sleep(30))
+    reflecting: asyncio.Task[None] = asyncio.create_task(asyncio.sleep(30))
+    scheduler._stepping = stepping
+    scheduler._reflecting = reflecting
+    stop: Path = failsafe_path()
+    await asyncio.to_thread(stop.touch)
+    try:
+        await scheduler._step_if_due(time.time())
+        await scheduler._reflect_if_due(time.time())
+        await asyncio.wait({stepping, reflecting})
+    finally:
+        await asyncio.to_thread(stop.unlink)
+    assert stepping.cancelled() and reflecting.cancelled()

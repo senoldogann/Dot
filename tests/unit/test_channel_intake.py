@@ -83,3 +83,13 @@ def test_thirty_messages_a_minute_are_read_and_the_flood_after_them_is_told_of_o
         assert isinstance(intake.judge("again", NOW, False, NOW + second), Skip)
     # A minute after the first, messages are read again.
     assert isinstance(intake.judge("later", NOW, False, NOW + 61), Accept)
+
+
+def test_a_stop_is_read_through_a_flood() -> None:
+    """Item 683: a run that floods the chat is what a stop is sent to stop; the flood's limit kept the stop out."""
+    intake: Intake = Intake()
+    for second in range(MAX_PER_MINUTE + 3):
+        intake.judge(f"m{second}", NOW, False, NOW + second)
+    assert intake.judge("/stop", NOW + 34, False, NOW + 34) == Accept("/stop")
+    assert intake.judge("Dur", NOW + 35, False, NOW + 35) == Accept("Dur")
+    assert isinstance(intake.judge("one more", NOW + 36, False, NOW + 36), Skip)

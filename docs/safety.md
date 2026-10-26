@@ -236,28 +236,27 @@ currency, so list sites that bill in one currency. Empty by default.
 3. *Dot's own files*: a change of them (`self_change`, below) is a question to you in every approval mode but `yolo`,
    which no rule of yours and no review model answers in your place (item 398). Allowed, the run makes the change.
 4. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
-   yourself. A payment under the pre-approved caps of its site (above) is a question instead of a hand-off, unless
-   one of your rules hands that step to you (item 385): the caps stand in for the money hand-off, not for your rules.
-   A click is about money when its control's label asks for it: at the start of the label or of a sentence in it,
-   after a stop, a dot, a bar, a dash, a colon or a new line ("Pay $19.90", "Buy", "Order now", "Lamp — $9.90 —
-   Buy", "Öde", "Maksa"), anywhere in it ("Place order", "Confirm and pay", "Complete checkout", "Satın al"), or with
-   an amount in the label next to a verb that offers something for it ("Rent HD $3.99", "Subscribe for €4.99/month",
-   "Book 2 tickets · $40", "Book 1500 TL", "Book: $199"). "Order", "Book" and "Reserve" with an amount count unless
-   the word is followed by "#" or by "summary", "history", "details", "status", "number", "total" or "price", which
-   make the label a record ("Order #4521 · $45.00 · Delivered", "Order summary · $45.00"); a row of past orders that
-   shows its number without "#" hands the click off. A dialog that asks to confirm is judged by the same words,
-   without that exception: there, an order's number is the order about to be paid. The way to the
-   payment page ("Checkout", "Continue to payment") is an ordinary click, so the run fills the order and the button
-   that pays is the one handed to you (item 522). Enter or Space pressed on a button, which presses it, is judged by
-   the button's label as a click on it is (item 561), and so is Return on a focused or default button of an
-   application of the Mac (item 555). In the browser a click is judged by its element's label whatever its role, a
-   `div` that shows "Pay now" as a button would, and Enter (with or without a modifier) or a line break typed in a
-   text field (a number field too, and Enter on a checkbox or a radio button of a form) by the field's name and by the
-   buttons near it that it may press (item 682): those of every level up to the form it is in, else up to three levels
-   up, as a chat's Send sits beside its box and a form's Pay a level above a button beside the field. Enter or a line break that names no field goes where the
-   batch last put the focus (a fill, a click) and is judged there; where the batch named none, or a Tab moved the
-   focus since, it sends what is not
-   known and asks as a send. A field whose surroundings show no button is judged by its name alone.
+   yourself. A payment under the pre-approved caps of its site (above) is a question instead of a hand-off, unless one
+   of your rules hands that step to you (item 385): the caps stand in for the money hand-off, not for your rules. A
+   click is about money when its control's label asks for it: at the start of the label or of a sentence in it, after a
+   stop, a dot, a bar, a dash, a colon or a new line ("Pay $19.90", "Buy", "Order now", "Lamp — $9.90 — Buy", "Öde",
+   "Maksa"), anywhere in it ("Place order", "Confirm and pay", "Complete checkout", "Satın al"), or with an amount in
+   the label next to a verb that offers something for it ("Rent HD $3.99", "Subscribe for €4.99/month", "Book 2 tickets
+   · $40", "Book 1500 TL", "Book: $199"). "Order", "Book" and "Reserve" with an amount count unless the word is followed
+   by "#" or by "summary", "history", "details", "status", "number", "total" or "price", which make the label a record
+   ("Order #4521 · $45.00 · Delivered", "Order summary · $45.00"); a row of past orders that shows its number without
+   "#" hands the click off. A dialog that asks to confirm is judged by the same words, without that exception: there, an
+   order's number is the order about to be paid. The way to the payment page ("Checkout", "Continue to payment") is an
+   ordinary click, so the run fills the order and the button that pays is the one handed to you (item 522). Enter or
+   Space pressed on a button, which presses it, is judged by the button's label as a click on it is (item 561), and so
+   is Return on a focused or default button of an application of the Mac (item 555). In the browser a click is judged by
+   its element's label whatever its role, a `div` that shows "Pay now" as a button would, and Enter (with or without a
+   modifier) or a line break typed in a text field (a number field too, and Enter on a checkbox or a radio button of a
+   form) by the field's name and by the buttons near it that it may press (item 682): those of every level up to the
+   form it is in, else up to three levels up, as a chat's Send sits beside its box and a form's Pay a level above a
+   button beside the field. Enter or a line break that names no field goes where the batch last put the focus (a fill, a
+   click) and is judged there; where the batch named none, or a Tab moved the focus since, it sends what is not known
+   and asks as a send. A field whose surroundings show no button is judged by its name alone.
 5. *The guard* (item 429): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for a yes in every mode that asks, whatever
@@ -814,29 +813,31 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   command is not told where your SSH agent listens (`[shell] pass_env` lists exceptions). The agent's socket is a file
   in a fixed place under `/private/var/run`, which the sandbox does not close: a command that looks for it there still
   reaches the keys the agent holds unlocked.
-- Outside a `yolo` run (which may, without asking, item 433) the agent can neither read nor change `~/.ssh`,
-  `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
-  `~/.config/gcloud`, the tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`,
-  `~/.config/gh`, `~/.npmrc`, `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`,
-  `~/.azure`, `~/.config/op`, `~/.password-store`), what 1Password, Bitwarden and Dashlane keep on this Mac, the keys
-  that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them) and the shell's history
-  (`[policy] protected_paths`; a list of your own replaces this one), the data and caches of your browsers (Chrome and
-  its Beta, Dev and Canary, Chromium, Safari, Firefox, Brave, Edge, Arc, Vivaldi and Opera), their cookies, Messages and
-  Mail (`[policy] sealed_paths`, which the sandbox below closes to a command as well, item 531; a list of your own
-  replaces this one too), nor Dot's own key file, token, what signing in to an MCP server gave it, browser profiles,
-  configuration,
-  database, the copies of the database (`[store] backup_dir`, and `<home>/backups-partial` while one is made, item
-  526) and journals of file changes. The configuration holds the policy and the MCP servers, the database the rules,
-  a copy all of the database and what you go back to, the journals what `dotx undo` writes back.
-  For the locations of `[policy] protected_paths` this holds as far as the policy sees: the file tools refuse them, and
-  the shell guard refuses a command line whose words reach one. What a script or a program reaches by itself is not
-  seen (see "The shell guardrail is best-effort" below), and the sandbox closes only the sealed stores and Dot's own
-  files to a command.
-  In any mode, a tool that names files (the file tools, `web_extract`, `browser_upload`) looks at them again as it
-  starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
-  and called again it is decided for where the path leads now. As it works, a tool that reads, writes or lists a path (`read_file`, `write_file`, `edit_file`, `list_dir`, `web_extract`) does so on the path it was allowed with no link followed on the way (item 681), so a link a command put on it in the meantime is refused too, as is a named pipe, and a link in a folder listed is said to be one, not entered (`find_files` and `search_files` hand the path to ripgrep in the run's sandbox, which enters no link below it but is given the path again); `browser_upload` hands the browser copies of the files it checked, which a link made after
-  does not change, and the files Dot keeps in the workspace (a crawl's pages, an MCP answer kept whole, an
-  attachment) are made with no link followed; an undo deletes or writes a file back that way too. A path is judged by the place it names (item 399):
+- Outside a `yolo` run (which may, without asking, item 433) the agent can neither read nor change `~/.ssh`, `~/.gnupg`,
+  `~/Library/Keychains`, `~/.aws`, `~/.config/gcloud`, the tokens and passwords that command lines keep (`~/.netrc`,
+  `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`, `~/.pypirc`, the credentials of Cargo and RubyGems,
+  `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`, `~/.password-store`), what 1Password, Bitwarden and
+  Dashlane keep on this Mac, the keys that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them) and the
+  shell's history (`[policy] protected_paths`; a list of your own replaces this one), the data and caches of your
+  browsers (Chrome and its Beta, Dev and Canary, Chromium, Safari, Firefox, Brave, Edge, Arc, Vivaldi and Opera), their
+  cookies, Messages and Mail (`[policy] sealed_paths`, which the sandbox below closes to a command as well, item 531; a
+  list of your own replaces this one too), nor Dot's own key file, token, what signing in to an MCP server gave it,
+  browser profiles, configuration, database, the copies of the database (`[store] backup_dir`, and
+  `<home>/backups-partial` while one is made, item 526) and journals of file changes. The configuration holds the policy
+  and the MCP servers, the database the rules, a copy all of the database and what you go back to, the journals what
+  `dotx undo` writes back. For the locations of `[policy] protected_paths` this holds as far as the policy sees: the
+  file tools refuse them, and the shell guard refuses a command line whose words reach one. What a script or a program
+  reaches by itself is not seen (see "The shell guardrail is best-effort" below), and the sandbox closes only the sealed
+  stores and Dot's own files to a command. In any mode, a tool that names files (the file tools, `web_extract`,
+  `browser_upload`) looks at them again as it starts: a call whose path leads elsewhere by then (a link moved while the
+  call waited for its approval) is refused, and called again it is decided for where the path leads now. As it works, a
+  tool that reads, writes or lists a path (`read_file`, `write_file`, `edit_file`, `list_dir`, `web_extract`) does so on
+  the path it was allowed with no link followed on the way (item 681), so a link a command put on it in the meantime is
+  refused too, as is a named pipe, and a link in a folder listed is said to be one, not entered (`find_files` and
+  `search_files` hand the path to ripgrep in the run's sandbox, which enters no link below it but is given the path
+  again); `browser_upload` hands the browser copies of the files it checked, which a link made after does not change,
+  and the files Dot keeps in the workspace (a crawl's pages, an MCP answer kept whole, an attachment) are made with no
+  link followed; an undo deletes or writes a file back that way too. A path is judged by the place it names (item 399):
   through a link, in another letter case, through the Data volume (`/System/Volumes/Data/Users/…`, which macOS joins to
   `/Users/…`) or behind `/.nofollow` or `/.resolve/<flags>`, `~/.ssh` is `~/.ssh`, for the file tools and for the words
   and globs of a command line; a file named by its number (`/.vol/<device>/<inode>`), which can be any file, is refused
@@ -1101,24 +1102,35 @@ event and approval.
   the stop button of its composer) creates the `STOP` file in the home
   directory and ends every run as an emergency stop, a run that was starting at that moment too (a campaign whose
   session it ends stops too), and the run of a `dotx` command that works in its own terminal: the command asks its
-  process to end it so, which it does within a second (item 553); the page shows a banner with a button that releases it
+  process to end it so, which it does within a second (item 553); it closes every terminal session of a run too, so
+  that what a run sent a program that has not read it yet is not typed after the stop, and what it left running there
+  ends (item 683); the page shows a banner with a button that releases it
 - `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way, without ending a run; delete the
   file to allow it again
 - while the `STOP` file exists, no schedule fires (a firing due then is skipped to its next time, saying why; a
   one-time schedule, which has no next time, waits and fires once the stop is released) and no campaign starts a
   session (it starts once the stop is released); a run that a schedule or a campaign was starting when the file
-  appeared ends as an emergency stop as soon as it exists
-- while the `STOP` file exists, no watcher looks, and **a message on a channel** (iMessage, [Channels](channels.md),
+  appeared ends as an emergency stop as soon as it exists; the reflection and the harness's step neither start nor go
+  on (one under way is cancelled, as at the daemon's stop, and the harness's probe ends with the commands it started,
+  item 683)
+- while the `STOP` file exists, no watcher looks (a stop engaged while one looks keeps the next from looking and the
+  one at work from starting a run, item 683), and **a message on a channel** (iMessage, [Channels](channels.md),
   item 611) starts no run and is not queued either: a message queued starts its run when the one at work ends, stop or
   no stop. A channel is a way to start a run from away, so the same check holds it as holds the schedules and the
   watchers. Dot answers the message, once, that it is stopped and where to release it (the banner at the top of any
   page of Dot has the button), and you send it again. What stays open on purpose, so that you can still
-  reach Dot and stop it: `/stop` and the plain words `stop`, `dur` and `durdur` stop the run at work, pairing a number
+  reach Dot and stop it: `/stop` and the plain words `stop`, `dur` and `durdur` stop the run at work (read through the
+  channel's limit of thirty messages a minute too, which a run that floods the chat would else keep it behind, item
+  683), pairing a number
   and its code go on, and what Dot tells you of a run that ended still comes
 - with `[desktop] failsafe_corner = true` (the default), moving the pointer into the top-left corner of the screen
-  aborts the desktop step in progress, and Dot never clicks that corner
+  aborts the desktop step in progress, and Dot never clicks that corner: a text typed key by key, a scroll and a drag
+  look at the corner and at the `STOP` file between their events, while no key or button is held down, and end there
+  (item 683)
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is
-  moving the mouse, the rest of the batch is not run
+  moving the mouse, the rest of the batch is not run (a check that was written but called nowhere before item 683). A
+  step whose review took longer than a second (your answer, which you may give with the mouse, or the review model's)
+  is not checked so, and still goes only to what was reviewed
 
 > **The shell guardrail is best-effort; the sandbox holds only Dot's own files and what would act outside it.** Dot
 > reads a shell command before it runs it and judges what it would touch: it reads the line as the shell does (quotes,

@@ -6,7 +6,7 @@ key codes, so they are positional; text is typed as Unicode and does not depend 
 
 import time
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -56,6 +56,14 @@ class Chord:
     modifiers: tuple[Modifier, ...]
 
 
+# How many events are posted between two looks at the emergency stop (item 683): a fiftieth of a second of typing.
+_CHECK_EVERY: int = 5
+_DOWN_EVENTS: frozenset[int] = frozenset(
+    {Quartz.kCGEventKeyDown, Quartz.kCGEventLeftMouseDown, Quartz.kCGEventRightMouseDown, Quartz.kCGEventOtherMouseDown}
+)
+_UP_EVENTS: frozenset[int] = frozenset(
+    {Quartz.kCGEventKeyUp, Quartz.kCGEventLeftMouseUp, Quartz.kCGEventRightMouseUp, Quartz.kCGEventOtherMouseUp}
+)
 _FLAGS: dict[Modifier, int] = {
     "cmd": Quartz.kCGEventFlagMaskCommand,
     "shift": Quartz.kCGEventFlagMaskShift,
@@ -322,11 +330,30 @@ def text_events(source: EventSource, text: str) -> tuple[TimedEvent, ...]:
     return tuple(events)
 
 
-def post(events: Sequence[TimedEvent]) -> None:
-    """Send the events to the session's HID tap and wait out each pause."""
+def post(events: Sequence[TimedEvent], check: Callable[[], None] | None = None) -> None:
+    """Send the events to the session's HID tap and wait out each pause. ``check`` is called once
+    :data:`_CHECK_EVERY` events went by and nothing is held down, and stops the posting by raising (item 683: the
+    emergency stop, which a long text typed key by key would else outlast, typing into whatever then has the keyboard).
+    It never comes between a press and its release: a key or a button left down would turn the owner's next keys or
+    moves into the rest of the step (a drag would drop what it holds where the owner next clicks)."""
+    held: int = 0
+    since: int = _CHECK_EVERY
     for item in events:
+        if check is not None and held == 0 and since >= _CHECK_EVERY:
+            check()
+            since = 0
         Quartz.CGEventPost(Quartz.kCGHIDEventTap, item.event)
+        held = max(0, held + presses(item.event))
+        since += 1
         time.sleep(item.pause_s)
+
+
+def presses(event: CGEvent) -> int:
+    """1 for an event that presses a key or a button down, -1 for one that lets it up, 0 for any other."""
+    kind: int = Quartz.CGEventGetType(event)
+    if kind in _DOWN_EVENTS:
+        return 1
+    return -1 if kind in _UP_EVENTS else 0
 
 
 def _snapshot_pasteboard(pasteboard: PasteboardLike) -> PasteboardSnapshot:

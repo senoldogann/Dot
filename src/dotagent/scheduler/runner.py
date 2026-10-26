@@ -240,7 +240,14 @@ class Scheduler:
             await self._start_session(campaign.id)
 
     async def _reflect_if_due(self, now: float) -> None:
-        """Start the reflection in a task when its daily time has passed since the last one (or the last attempt)."""
+        """Start the reflection in a task when its daily time has passed since the last one (or the last attempt). While
+        the emergency stop is engaged none starts, and one under way is cancelled, as at the daemon's stop: it records
+        nothing until its end (item 683)."""
+        if await _emergency_stop_engaged():
+            if self._reflecting is not None and not self._reflecting.done():
+                self._reflecting.cancel()
+                log.info("reflection_stopped_by_emergency_stop")
+            return
         if self.reflecting():
             return
         last: Reflection | None = await last_reflection(self._runtime.store)
@@ -256,7 +263,14 @@ class Scheduler:
 
     async def _step_if_due(self, now: float) -> None:
         """Start the step of the harness (item 391) in a task when its daily time has passed since the last one (or the
-        last attempt); never while one is under way, and never with ``[harness] step_time`` off."""
+        last attempt); never while one is under way, and never with ``[harness] step_time`` off. While the emergency
+        stop is engaged none starts, and one under way is cancelled, which ends its probe's process and the commands
+        it started (item 683)."""
+        if await _emergency_stop_engaged():
+            if self.stepping() and self._stepping is not None:
+                self._stepping.cancel()
+                log.info("harness_step_stopped_by_emergency_stop")
+            return
         if self.stepping():
             return
         step_time: str = self._runtime.config.harness.step_time
