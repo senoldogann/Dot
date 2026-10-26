@@ -4,14 +4,17 @@ the end of a run, what a database from before the switches gets, and what the mo
 import asyncio
 import re
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from types import SimpleNamespace
+from typing import Literal, cast
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from dotagent.agent.compact import drop_old_images
-from dotagent.agent.loop import RunOutcome, SendBack, _acts, _after_verdict, _since_goal
+from dotagent.agent.loop import AgentRun, RunOutcome, SendBack, _acts, _after_verdict, _follow_ups, _since_goal
 from dotagent.agent.prompt import (
     build_system_prompt,
     clock_note,
@@ -23,6 +26,7 @@ from dotagent.agent.prompt import (
     recalled_note,
     turn_note,
 )
+from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT
 from dotagent.agent.review import GoalVerdict
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
@@ -32,10 +36,11 @@ from dotagent.llm.types import ImageData, Message, ToolCall, assistant_message, 
 from dotagent.policy.engine import route_for
 from dotagent.policy.types import ApprovalMode, Decision, DecisionSource, Route
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.scheduler.plans import UNSET_OPTIONS
 from dotagent.server import UI_SOURCE
 from dotagent.skills.types import Skill
 from dotagent.store.db import Store
-from dotagent.store.models import RunMode, RunRecord
+from dotagent.store.models import RunMode, RunRecord, ScheduleOptions, ScheduleRecord
 from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
@@ -67,7 +72,7 @@ def test_a_question_goes_where_the_mode_sends_it(
     assert route_for(Decision(verdict=verdict, source=source, reason="", rule_id=None), mode) == route
 
 
-def _verdict(decision: Literal["achieved", "continue", "blocked"], reason: str) -> GoalVerdict:
+def _verdict(decision: Literal["achieved", "continue", "blocked", "scheduled"], reason: str) -> GoalVerdict:
     return GoalVerdict(decision=decision, reason=reason, unproven_steps=())
 
 
@@ -104,6 +109,84 @@ def test_a_run_that_used_up_its_patience_fails_and_keeps_its_answer() -> None:
     assert outcome.result.startswith(ENDED.result)
     assert f"still not reached after {PATIENCE} rounds" in outcome.result
     assert "the second file is missing" in outcome.result
+
+
+def test_a_goal_whose_rest_waits_on_a_scheduled_run_ends_the_run_as_done_with_the_check_under_it() -> None:
+    """Item 675: an open-ended goal whose rest waits on replies, with a run scheduled in the chat to read them, ended
+    as failed after four rounds; it is done, and says what waits."""
+    for sent_back in (0, PATIENCE):
+        outcome: RunOutcome | SendBack = _after_verdict(
+            _verdict("scheduled", "the replies are read at 19:00"), ENDED, sent_back, PATIENCE
+        )
+        assert isinstance(outcome, RunOutcome)
+        assert outcome.status == "done"
+        assert outcome.result.startswith(ENDED.result)
+        assert "a scheduled run picks it up" in outcome.result
+        assert "the replies are read at 19:00" in outcome.result
+
+
+async def _run_in(store: Store, thread_id: str, source: str) -> AgentRun:
+    """A new run of ``source`` in the chat ``thread_id``, with only what :func:`_follow_ups` reads of the runtime."""
+    run: RunRecord = await store.create_run(
+        thread_id, "a goal", "task", "ollama:x", None, source, "medium", "standard", None, "ask", True, None, None, None
+    )
+    return cast(
+        AgentRun,
+        SimpleNamespace(
+            runtime=SimpleNamespace(
+                store=store,
+                schedule_zone=ZoneInfo("UTC"),
+                config=SimpleNamespace(scheduler=SimpleNamespace(same_chat=False)),
+            ),
+            run=run,
+        ),
+    )
+
+
+async def test_the_follow_ups_of_a_run_are_the_schedules_still_to_run_in_its_own_chat(tmp_path: Path) -> None:
+    """Item 675: the goal check is shown only the schedules whose next run goes on in the run's chat, each with its
+    goal; one whose runs open a chat of their own is left out, even when its last run was in this chat, and so is the
+    schedule whose firing the run is."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "images")
+    try:
+        chat: str = (await store.create_thread("the chat", UI_SOURCE)).id
+        later: float = time.time() + 3600
+        here: ScheduleOptions = UNSET_OPTIONS.model_copy(update={"same_chat": True})
+        elsewhere: ScheduleOptions = UNSET_OPTIONS.model_copy(update={"same_chat": False})
+        made: list[ScheduleRecord] = [
+            await store.add_schedule(
+                name, None, next_run_at, f"{name}: the goal.", "task", next_run_at, options, thread_id, enabled
+            )
+            for name, next_run_at, options, thread_id, enabled in (
+                ("Read the replies", later, here, chat, True),
+                ("Own chat", later, elsewhere, chat, True),
+                ("As configured", later, UNSET_OPTIONS, chat, True),
+                ("Other chat", later, here, "thr_other", True),
+                ("Switched off", later, here, chat, False),
+                ("Gone by", time.time() - 60, here, chat, True),
+            )
+        ]
+        listed: list[str] = (await _follow_ups(await _run_in(store, chat, UI_SOURCE))).splitlines()
+        # The schedule fired in the chat and its run asks: its own next firing is no follow-up.
+        await store.link_schedule_thread(chat, made[0].id)
+        fired: AgentRun = await _run_in(store, chat, SCHEDULE_SOURCE)
+        firing: str = await _follow_ups(fired)
+        # Cut by the daemon's end and resumed twice by the owner, it is still the firing.
+        resumed: AgentRun = fired
+        for _ in range(2):
+            later_run: AgentRun = await _run_in(store, chat, RESUME_SOURCE)
+            await store.add_event(later_run.run.id, RESUMED_EVENT, {"from_run_id": resumed.run.id})
+            resumed = later_run
+        resumed_firing: str = await _follow_ups(resumed)
+        followed: list[str] = (await _follow_ups(await _run_in(store, chat, UI_SOURCE))).splitlines()
+    finally:
+        await store.close()
+    assert len(listed) == 1, listed
+    assert listed[0].startswith("- Read the replies: next run ")
+    assert listed[0].endswith("its goal: Read the replies: the goal.")
+    assert firing == ""
+    assert resumed_firing == ""
+    assert followed == listed
 
 
 def test_the_conversation_of_a_run_starts_at_its_goal() -> None:

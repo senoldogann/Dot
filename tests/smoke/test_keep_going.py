@@ -6,6 +6,7 @@ No network and no model service is used: the scripted model plays the run and an
 
 import asyncio
 from collections.abc import Sequence
+from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -13,6 +14,7 @@ from test_run_limits import Played, RecordingProvider, _call, _config, _finish, 
 
 from dotagent.agent.review import GOAL_TOOL
 from dotagent.config import load_default_config
+from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
@@ -39,12 +41,14 @@ async def login_env() -> dict[str, str]:
     return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
 
 
-async def _play(login_env: dict[str, str], goal: str, goal_mode: bool, turns: Sequence[ScriptedTurn]) -> Played:
+async def _play(
+    login_env: dict[str, str], goal: str, goal_mode: bool, turns: Sequence[ScriptedTurn], approvals: str = "ask"
+) -> Played:
     """``goal`` as a task with goal mode chosen as ``goal_mode``, played by the scripted model in a throw-away home."""
     model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, turns))
     async with _session(_config(0.0, 0, False), login_env, model) as (runtime, manager):
         run: RunRecord = await manager.start(
-            goal, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, "ask", goal_mode, ()
+            goal, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, approvals, goal_mode, ()
         )
         async with asyncio.timeout(_TIME_LIMIT_S):
             record: RunRecord = await manager.wait(run.id)
@@ -53,6 +57,11 @@ async def _play(login_env: dict[str, str], goal: str, goal_mode: bool, turns: Se
 
 def _verdict(decision: str, reason: str) -> ScriptedTurn:
     return _turn(_call(GOAL_TOOL, {"decision": decision, "reason": reason, "unproven_steps": []}))
+
+
+def _asked_with(played: Played, part: str) -> list[bool]:
+    """For each goal check of the run, whether its question held ``part``."""
+    return [any(part in message.content for message in check.messages) for check in played.checks]
 
 
 def _told(played: Played) -> list[bool]:
@@ -98,3 +107,58 @@ async def test_a_task_not_asked_keeps_the_goal_mode_chosen_and_its_checker_is_no
     assert on.record.goal_mode, on.record
     assert [check["decision"] for check in on.data("goal_check")] == ["achieved"]
     assert _told(on) == [False]
+
+
+WAITS: str = "The posts are out; the replies come in over the next hours."
+FOLLOW_UPS_PART: str = "FOLLOW-UPS (scheduled runs in this chat, listed by the harness"
+# A day ahead, so that the schedule is still to come when the goal check reads it.
+FOLLOW_UP: JsonObject = {
+    "name": "Read the replies",
+    "goal": "Read the replies to the posts and answer each one.",
+    "at": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"),
+}
+
+
+async def test_a_rest_that_waits_on_time_with_no_run_scheduled_is_sent_back_to_schedule_one(
+    login_env: dict[str, str],
+) -> None:
+    """Item 675: the checker's "scheduled" holds only when the harness finds a run scheduled in the chat."""
+    played: Played = await _play(
+        login_env,
+        ASKED,
+        False,
+        [
+            _finish(WAITS, True),
+            _verdict("scheduled", "The replies are read later."),
+            _finish(WHOLE, True),
+            _verdict("achieved", "All ten facts are in the answer."),
+        ],
+    )
+    assert (played.record.status, played.record.result) == ("done", WHOLE), played.record
+    assert [check["decision"] for check in played.data("goal_check")] == ["continue", "achieved"]
+    assert _asked_with(played, FOLLOW_UPS_PART) == [False, False]
+    assert any("schedule_create" in message.content for message in played.steps[1].messages)
+
+
+async def test_a_rest_that_waits_on_a_run_scheduled_in_the_chat_ends_the_run_as_done(
+    login_env: dict[str, str],
+) -> None:
+    """Item 675: the run schedules the follow-up, the checker is shown it and the run ends done, not failed."""
+    played: Played = await _play(
+        login_env,
+        ASKED,
+        False,
+        [
+            _turn(_call("schedule_create", FOLLOW_UP)),
+            _finish(WAITS, True),
+            _verdict("scheduled", "The replies are read by the run scheduled tonight."),
+        ],
+        approvals="yolo",
+    )
+    assert played.record.status == "done", played.record
+    assert played.record.result.startswith(WAITS), played.record
+    assert "a scheduled run picks it up" in played.record.result
+    assert [(check["decision"], check["final"]) for check in played.data("goal_check")] == [("scheduled", True)]
+    assert _asked_with(played, FOLLOW_UPS_PART) == [True]
+    assert _asked_with(played, "- Read the replies: next run ") == [True]
+    assert _asked_with(played, "its goal: Read the replies to the posts and answer each one.") == [True]

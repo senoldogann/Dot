@@ -144,7 +144,7 @@ class AutoApprovalPayload(Payload):
 
 
 class GoalCheckPayload(Payload):
-    decision: Literal["achieved", "continue", "blocked", "error"]
+    decision: Literal["achieved", "continue", "blocked", "scheduled", "error"]
     reason: str
     check: int
     patience: int
@@ -629,6 +629,8 @@ class TerminalUi:
                 self._line(self._paint(f"  ◎ goal check {check.check}/{check.patience}: not yet, {note}{reason}", "33"))
             case "blocked":
                 self._line(self._paint(f"  ◎ goal check: blocked{reason}", "31"))
+            case "scheduled":
+                self._line(self._paint(f"  ◎ goal check: the rest waits on a scheduled run{reason}", "32"))
             case "error":
                 self._line(self._paint(f"  ◎ goal check could not run{reason}", "31"))
 

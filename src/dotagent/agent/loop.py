@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import JsonValue, ValidationError
 
@@ -182,6 +183,7 @@ from dotagent.core.errors import (
     DotError,
     InvalidValueError,
     MissingSecretError,
+    NotFoundError,
     ProviderError,
     ProviderFilterError,
     ProviderTransportError,
@@ -238,6 +240,8 @@ from dotagent.oauth.tokens import Account
 from dotagent.proactive import NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.scheduler.plans import schedule_timing
+from dotagent.scheduler.timing import format_local
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
@@ -1160,11 +1164,29 @@ def _send_back_note(reason: str) -> str:
     )
 
 
+# The start of a follow-up's goal the goal check reads (item 675), enough to tell what it picks up.
+_FOLLOW_UP_GOAL_CHARS: int = 300
+# How many runs back the goal check follows a resumed run to the firing it goes on from.
+_RESUMES_FOLLOWED: int = 20
+
+
+def _scheduled_end(reason: str, ended: RunOutcome) -> RunOutcome:
+    """The end of a run whose goal check found that all it can do now is done and that what is left waits on time, which
+    a follow-up scheduled in its chat picks up (item 675): done, with the check's words under the answer."""
+    return RunOutcome(
+        status="done",
+        result=_with_check_note(ended.result, f"what is left waits on time, and a scheduled run picks it up. {reason}"),
+        needs=ended.needs,
+    )
+
+
 def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, patience: int) -> RunOutcome | SendBack:
     """What the checker's verdict makes of the end a run reached: it stands, or the run is sent back to work."""
     reason: str = shorten_reason(verdict.reason)
     if verdict.decision == "achieved":
         return RunOutcome(status="done", result=ended.result, needs=ended.needs)
+    if verdict.decision == "scheduled":
+        return _scheduled_end(reason, ended)
     if verdict.decision == "blocked":
         return RunOutcome(
             status="failed",
@@ -1188,6 +1210,8 @@ def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
     reason: str = shorten_reason(verdict.reason)
     if verdict.decision == "achieved":
         return RunOutcome(status="done", result=ended.result, needs=ended.needs)
+    if verdict.decision == "scheduled":
+        return _scheduled_end(reason, ended)
     if verdict.decision == "blocked":
         return RunOutcome(
             status="failed",
@@ -1249,6 +1273,7 @@ async def _ask_checker(
         answer=ended.result,
         claimed_success=ended.status == "done",
         keep_going=keep_going_ask(run.goal) is not None,
+        follow_ups=await _follow_ups(agent),
     )
     # The typed judge, when one is on, refuses a claim it finds clearly false before the review model is called.
     if request.claimed_success:
@@ -1275,7 +1300,7 @@ async def _ask_checker(
                 unproven_steps=(),
             )
     try:
-        return await checker(request)
+        verdict: GoalVerdict = await checker(request)
     except (ProviderError, MissingSecretError) as error:
         log.error("goal_check_failed", run_id=run.id, error=error.message, context=error.context)
         await agent.runtime.bus.emit(
@@ -1299,6 +1324,63 @@ async def _ask_checker(
             ),
             needs=ended.needs,
         )
+    if verdict.decision == "scheduled" and not request.follow_ups:
+        # The harness holds what the prompt asks: no run scheduled in the chat, nothing to wait for.
+        return verdict.model_copy(
+            update={
+                "decision": "continue",
+                "reason": (
+                    f"{verdict.reason} No run is scheduled in this chat to pick up what is left: schedule one with "
+                    "schedule_create, or do it now."
+                ),
+            }
+        )
+    return verdict
+
+
+async def _is_firing(agent: AgentRun) -> bool:
+    """Whether the run is a schedule's firing, or goes on from one by Resume (item 553: the scheduler keeps such a run
+    as the firing's), however many times it was resumed."""
+    run: RunRecord = agent.run
+    for _ in range(_RESUMES_FOLLOWED):
+        if run.source != RESUME_SOURCE:
+            return run.source == SCHEDULE_SOURCE
+        resumed: EventRecord | None = await agent.runtime.store.last_event(run.id, RESUMED_EVENT)
+        origin: object = None if resumed is None else resumed.data.get("from_run_id")
+        if not isinstance(origin, str):
+            return False
+        try:
+            run = await agent.runtime.store.get_run(origin)
+        except NotFoundError:
+            return False
+    return False
+
+
+async def _follow_ups(agent: AgentRun) -> str:
+    """The schedules that will start runs in the run's chat, one line each with the start of their goal, for the goal
+    check (item 675): what is left of a goal that waits on time is picked up by one of them. A schedule whose runs go
+    in a chat of their own is not one, even when its last run was in this chat, and neither is the schedule whose
+    firing the run is: its next firing would make a run that fails each time end done each time. Empty when there is
+    none."""
+    now: float = time.time()
+    zone: ZoneInfo = agent.runtime.schedule_zone
+    same_chat: bool = agent.runtime.config.scheduler.same_chat
+    # A firing's chat is marked as its schedule's before its run starts (``Scheduler._firing_chat``).
+    firing_of: str | None = (
+        await agent.runtime.store.schedule_of_thread(agent.run.thread_id) if await _is_firing(agent) else None
+    )
+    lines: list[str] = [
+        f"- {record.name}: next run {format_local(record.next_run_at, zone)} ({schedule_timing(record, zone)}); "
+        f"its goal: {truncate_middle(' '.join(record.goal.split()), _FOLLOW_UP_GOAL_CHARS)}"
+        for record in await agent.runtime.store.list_schedules()
+        if record.enabled
+        and record.id != firing_of
+        and record.thread_id == agent.run.thread_id
+        and (same_chat if record.options.same_chat is None else record.options.same_chat)
+        and record.next_run_at is not None
+        and record.next_run_at > now
+    ]
+    return "\n".join(lines)
 
 
 async def _check_goal(
