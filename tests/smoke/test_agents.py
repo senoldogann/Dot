@@ -590,3 +590,24 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
         finally:
             await browser.close()
     assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204
+
+
+async def test_an_agent_may_be_given_a_tool_that_joined_the_registry_after_the_daemon_started(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 689: an app connected from the Apps page joins the registry (``refresh_mcp_tools``) while the daemon runs;
+    its tools are listed and an agent may name them, with no restart."""
+    name: str = "mcp__demo__ping"
+    refused = await client.post("/api/agents", json=_agent([name]))
+    assert refused.status_code == 422, refused.text
+    runtime.registry.tools[name] = runtime.registry.tools["shell"]
+    try:
+        assert name in (await client.get("/api/tools")).json()
+        made = await client.post("/api/agents", json=_agent([name]))
+        assert made.status_code == 201, made.text
+        assert made.json()["tools"] == [name]
+        assert (await client.delete(f"/api/agents/{made.json()['id']}")).status_code == 204
+    finally:
+        del runtime.registry.tools[name]
+    assert name not in (await client.get("/api/tools")).json()
+    assert (await client.post("/api/agents", json=_agent([name]))).status_code == 422

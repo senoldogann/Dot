@@ -194,7 +194,7 @@ and `plan_each_turn` (on: the open plan is appended to the system message of eve
 changed nor deleted; `tools` names the tools the agent may use, or is empty with `every_tool: true` for all of them, and
 a request with neither is refused, so a tool list that did not load never lifts an agent's bounds; the editor's Save
 waits for the list, and a level the form cannot show is kept as saved), `GET /api/tools` (the names an agent may be
-given), and `POST /api/runs` with `agent_id` (not with
+given, read at each request: a tool of an app connected after Dot started is among them, item 689), and `POST /api/runs` with `agent_id` (not with
 `standing`: a campaign is Dot's own, and the two together are refused with a 422).
 
 ## Campaigns
