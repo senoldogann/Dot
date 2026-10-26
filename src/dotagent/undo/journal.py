@@ -18,6 +18,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from dotagent.core.errors import UndoError
+from dotagent.core.held import read_regular
 from dotagent.core.types import FrozenModel
 
 JOURNAL_FILE: str = "journal.jsonl"
@@ -128,7 +129,9 @@ def _note(target: JournalTarget, path: Path, data: bytes) -> JournalEntry:
     copy: bytes | None = None
     if first and status is not None:
         skipped = _why_no_copy(status, sum(entry.copied for entry in entries), target)
-        copy = path.read_bytes() if skipped is None else None
+        # Read with no link followed along the path, which is the one the tool was allowed to change (item 681): a link
+        # a command put on it since would copy another file into the journal, which an undo writes back here.
+        copy = read_regular(path) if skipped is None else None
     target.directory.mkdir(mode=_PRIVATE_DIR, parents=True, exist_ok=True)
     if copy is not None:
         backup: Path = backup_path(target.directory, seq)

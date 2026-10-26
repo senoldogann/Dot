@@ -6,6 +6,7 @@ with a fresh random nonce; the line above the fence is produced by Dot.
 
 import asyncio
 import json
+import os
 import re
 import secrets
 import time
@@ -24,6 +25,7 @@ from dotagent.browser.snapshot import fence_untrusted
 from dotagent.browser.types import PageView
 from dotagent.config import AppConfig
 from dotagent.core.errors import BrowserError, McpError, ProviderError, ToolInputError, WebError
+from dotagent.core.held import read_regular, workspace_folder, write_new
 from dotagent.core.text import text_window
 from dotagent.core.types import JsonObject
 from dotagent.llm.router import ModelRef, parse_model_ref
@@ -724,16 +726,25 @@ def render_index(result: CrawlResult, files: tuple[Path, ...], nonce: str) -> st
     return "\n".join(lines)
 
 
-def _crawl_files(root: Path, result: CrawlResult, nonce: str) -> tuple[Path, ...]:
-    """Write every page of the crawl as a Markdown file under ``root`` and the index next to them."""
-    root.mkdir(parents=True, exist_ok=False)
-    files: list[Path] = []
-    for number, page in enumerate(result.pages, start=1):
-        file: Path = root / f"{number:03d}.md"
-        file.write_text(page_markdown(page), encoding="utf-8")
-        files.append(file)
-    written: tuple[Path, ...] = tuple(files)
-    (root / "index.md").write_text(render_index(result, written, nonce) + "\n", encoding="utf-8")
+def _crawl_files(workspace: Path, name: str, result: CrawlResult, nonce: str) -> tuple[Path, ...]:
+    """Write every page of the crawl as a Markdown file in the new folder ``name`` of the workspace's crawls and the
+    index next to them, each folder and file made with no link followed on the way (item 681)."""
+    crawls: int = workspace_folder(workspace, (CRAWL_FOLDER,), make=True)
+    try:
+        os.mkdir(name, 0o777, dir_fd=crawls)
+        folder: int = os.open(name, os.O_SEARCH | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=crawls)
+    finally:
+        os.close(crawls)
+    root: Path = workspace / CRAWL_FOLDER / name
+    try:
+        files: list[Path] = []
+        for number, page in enumerate(result.pages, start=1):
+            write_new(folder, f"{number:03d}.md", page_markdown(page).encode("utf-8"))
+            files.append(root / f"{number:03d}.md")
+        written: tuple[Path, ...] = tuple(files)
+        write_new(folder, "index.md", (render_index(result, written, nonce) + "\n").encode("utf-8"))
+    finally:
+        os.close(folder)
     return written
 
 
@@ -804,8 +815,9 @@ def _crawl_tool() -> RegisteredTool:
         if len(inline) <= budget:
             return mark_untrusted(ok(f"{render_index(result, (), nonce)}\n\n{inline}"))
         host: str = scope.url.split("//", 1)[-1].split("/", 1)[0].replace(":", "-")
-        root: Path = ctx.workspace / CRAWL_FOLDER / f"{host}-{time.strftime('%Y%m%d-%H%M%S')}-{nonce[:6]}"
-        files: tuple[Path, ...] = await asyncio.to_thread(_crawl_files, root, result, nonce)
+        name: str = f"{host}-{time.strftime('%Y%m%d-%H%M%S')}-{nonce[:6]}"
+        files: tuple[Path, ...] = await asyncio.to_thread(_crawl_files, ctx.workspace, name, result, nonce)
+        root: Path = ctx.workspace / CRAWL_FOLDER / name
         return mark_untrusted(
             ok(
                 f"{render_index(result, files, nonce)}\n\nThe pages are {len(inline)} characters in all, more than one "
@@ -868,8 +880,10 @@ def _source_flags(sources: list[str], ctx: ToolContext) -> tuple[Flag, ...]:
     return tuple(sorted(flags))
 
 
-async def _source_text(source: str, ctx: ToolContext) -> str:
-    """The text of a source: a page, PDF or text file fetched from the web, or a file (:func:`_local_file`)."""
+async def _source_text(source: str, ctx: ToolContext, allowed: tuple[Flag, ...]) -> str:
+    """The text of a source: a page, PDF or text file fetched from the web, or a file (:func:`_local_file`). A file is
+    read with no link followed on the way (item 681), and refused when it leads now where the call was not allowed to
+    read (``allowed``: the flags of the action that was authorised), as a link put on its path since would."""
     config: AppConfig = ctx.runtime.config
     local: Path | None = await asyncio.to_thread(_local_file, source, ctx)
     if local is None:
@@ -883,8 +897,12 @@ async def _source_text(source: str, ctx: ToolContext) -> str:
         if kind == "binary":
             raise WebError("not a page, a PDF or a text file", {"url": _clip(url, _SHOWN_URL_CHARS)})
         return (await _readable(document, kind, config.web.fetch_max_bytes)).text
+    if not set(read_flags(local, ctx)) <= set(allowed):
+        raise ToolInputError(
+            f"{source} leads elsewhere now than when the call was allowed; call the tool again", {"source": source}
+        )
     try:
-        return await asyncio.to_thread(local.read_text, encoding="utf-8")
+        return (await asyncio.to_thread(read_regular, local)).decode("utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise ToolInputError(f"{source} cannot be read as a text file: {exc}", {"source": source}) from exc
 
@@ -959,7 +977,7 @@ def _extract_tool() -> RegisteredTool:
                 continue
             try:
                 async with asyncio.timeout(left) as budget:
-                    text: str = await _source_text(source, ctx)
+                    text: str = await _source_text(source, ctx, authorized.flags)
                     extractions.append(
                         await extract(
                             ctx.runtime.router,

@@ -424,7 +424,7 @@ async def test_a_call_that_runs_out_of_time_returns_what_it_extracted_and_lists_
     not reach listed as not extracted."""
     asked: list[str] = []
 
-    async def source_text(source: str, ctx: ToolContext) -> str:
+    async def source_text(source: str, ctx: ToolContext, allowed: tuple[str, ...]) -> str:
         return f"The text of {source}."
 
     async def extraction(

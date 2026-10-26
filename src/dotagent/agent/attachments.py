@@ -12,6 +12,7 @@ that cannot see, as the vision model's description.
 
 import asyncio
 import json
+import os
 import re
 import secrets
 from collections import deque
@@ -24,6 +25,7 @@ from pydantic import JsonValue
 from dotagent.agent.vision import text_for_blind_images
 from dotagent.browser.safety import safe_download_name
 from dotagent.core.errors import InvalidValueError, NotFoundError, WebError
+from dotagent.core.held import workspace_folder, write_new
 from dotagent.core.ids import new_id
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.text import truncate_middle, unclosing
@@ -212,22 +214,26 @@ def store_attachment(workspace: Path, name: str, media_type: str, data: bytes) -
     else:
         text = _text_of(name, kind, data)
     attachment_id: str = new_id("att")
-    folder: Path = attachments_root(workspace) / attachment_id
-    folder.mkdir(parents=True)
-    path: Path = folder / _upload_name(name)
-    path.write_bytes(data)
-    if kind != "image":
-        (folder / _TEXT).write_text(text, encoding="utf-8")
-    stored: StoredAttachment = StoredAttachment(
-        id=attachment_id,
-        name=path.name,
-        media_type=declared,
-        kind=kind,
-        size=len(data),
-        chars=len(text),
-        path=str(path),
-    )
-    (folder / _META).write_text(stored.model_dump_json(), encoding="utf-8")
+    path: Path = attachments_root(workspace) / attachment_id / _upload_name(name)
+    # Made with no link followed on the way (item 681): a link a command of a run put in the folder's place does not
+    # have the daemon write the owner's file elsewhere.
+    folder: int = workspace_folder(workspace, (ATTACHMENTS_DIR, attachment_id), make=True)
+    try:
+        write_new(folder, path.name, data)
+        if kind != "image":
+            write_new(folder, _TEXT, text.encode("utf-8"))
+        stored: StoredAttachment = StoredAttachment(
+            id=attachment_id,
+            name=path.name,
+            media_type=declared,
+            kind=kind,
+            size=len(data),
+            chars=len(text),
+            path=str(path),
+        )
+        write_new(folder, _META, stored.model_dump_json().encode("utf-8"))
+    finally:
+        os.close(folder)
     return stored
 
 

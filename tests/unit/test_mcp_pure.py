@@ -237,7 +237,7 @@ def test_a_server_cannot_close_the_fence_early() -> None:
 
 async def _render(blocks: Sequence[ContentBlock], structured: JsonValue, is_error: bool) -> ToolResult:
     result: CallToolResult = CallToolResult(content=list(blocks), structured_content=structured, is_error=is_error)
-    return await render_call_result("srv", "tool", result, 4000, 512, 70, "n0nce", Path("/nonexistent/mcp-results"))
+    return await render_call_result("srv", "tool", result, 4000, 512, 70, "n0nce", Path("/nonexistent/workspace"))
 
 
 async def test_every_kind_of_block_becomes_text_or_a_picture() -> None:
@@ -288,7 +288,7 @@ async def test_a_long_answer_is_kept_whole_in_a_file_and_its_start_shown_inside_
     body: str = "\n".join(f"line {number}" for number in range(1, 5001))
     result: CallToolResult = CallToolResult(content=[TextContent(text=body)], is_error=False)
     folder: Path = tmp_path / "mcp-results"
-    rendered: ToolResult = await render_call_result("my srv", "big/list", result, 2000, 512, 70, "n0nce1234", folder)
+    rendered: ToolResult = await render_call_result("my srv", "big/list", result, 2000, 512, 70, "n0nce1234", tmp_path)
     assert rendered.untrusted and len(rendered.text) < 2400
     (kept,) = await asyncio.to_thread(lambda: list(folder.iterdir()))
     assert kept.name.startswith("my_srv-big_list-") and kept.name.endswith("-n0nce1.txt")

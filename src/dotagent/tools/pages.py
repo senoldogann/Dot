@@ -18,6 +18,7 @@ from dotagent.agent.pages import (
     page_address,
 )
 from dotagent.core.errors import ToolInputError
+from dotagent.core.held import read_regular
 from dotagent.policy.paths import expand_path, within
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import ShownPage
@@ -100,14 +101,18 @@ def page_file(path: Path, workspace: Path) -> str:
             f"{path.name} is no page: a file of {', '.join(sorted(PAGE_SUFFIXES))} is shown by its path",
             {"path": str(path)},
         )
-    if not path.is_file():
-        raise ToolInputError(f"there is no page at {path}", {"path": str(path)})
-    if path.stat().st_size > _PAGE_MAX_BYTES:
+    # Read along the path it was judged by, with no link followed on the way (item 681): one a command put there since
+    # leaves the page unread, not another file shown in the conversation.
+    try:
+        data: bytes = read_regular(path)
+    except OSError as exc:
+        raise ToolInputError(f"there is no page at {path}", {"path": str(path), "error": str(exc)}) from exc
+    if len(data) > _PAGE_MAX_BYTES:
         raise ToolInputError(
             f"{path.name} is longer than a page may be ({PAGE_MAX_CHARS:,} characters)", {"path": str(path)}
         )
     try:
-        text: str = path.read_text(encoding="utf-8")
+        text: str = data.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ToolInputError(f"{path.name} is not text in UTF-8", {"path": str(path)}) from exc
     if len(text) > PAGE_MAX_CHARS:

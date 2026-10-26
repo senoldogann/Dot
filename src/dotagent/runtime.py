@@ -50,6 +50,7 @@ from dotagent.core.paths import (
     skills_dir,
     token_path,
     undo_dir,
+    uploads_dir,
     vapid_path,
     voice_dir,
     web_research_dir,
@@ -266,7 +267,8 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     one planted in their folder would be what the owner goes back to), the journals of file changes (``dotx undo``
     writes back what a journal says), the locks that tell which process drives a run, the ledger of the tabs Dot has
     open in the Chrome of the user (item 703: Dot writes and reads it outside the sandbox), and the daemon's pid file
-    and mark, which it opens and writes at its start (item 676)."""
+    and mark, which it opens and writes at its start (item 676), and the copies of the files a run uploaded, which the
+    browser reads (item 681: one may be of a file the owner allowed from a place a command may not read)."""
     database: Path = db_path()
     return (
         env_file_path(),
@@ -290,6 +292,7 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         *ledger_files(),
         pid_path(),
         running_mark_path(),
+        uploads_dir(),
     )
 
 

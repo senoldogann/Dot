@@ -60,6 +60,12 @@ def downloads_dir() -> Path:
     return dot_home() / "downloads"
 
 
+def uploads_dir() -> Path:
+    """The copies of the files a run uploads in the browser, which Chrome reads when the page sends them (item 681): in
+    Dot's home, where a command of a run writes nothing."""
+    return dot_home() / "uploads"
+
+
 def browser_profile_dir() -> Path:
     return dot_home() / "browser-profile"
 
