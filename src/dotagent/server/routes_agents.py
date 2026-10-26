@@ -144,7 +144,11 @@ async def team_messages(store: Store, runs: list[RunRecord]) -> list[TeamMessage
 def agents_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     store: Store = ctx.runtime.store
-    known: frozenset[str] = frozenset(ctx.runtime.registry.tools)
+
+    def known() -> frozenset[str]:
+        """The tools an agent may be given now: the registry changes while the daemon runs, as an app of the owner's
+        joins or leaves (item 689)."""
+        return frozenset(ctx.runtime.registry.tools)
 
     @router.get("/team")
     async def team() -> TeamView:
@@ -154,7 +158,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     @router.get("/tools")
     async def list_tools() -> list[str]:
         """The names of the tools an agent may be given, in alphabetical order."""
-        return sorted(known)
+        return sorted(known())
 
     @router.get("/agents")
     async def list_agents() -> list[AgentSummary]:
@@ -181,7 +185,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         ]
 
     async def created(request: AgentRequest) -> AgentRecord:
-        return await saved(_checked(request, known))
+        return await saved(_checked(request, known()))
 
     async def saved(checked: AgentRequest) -> AgentRecord:
         """The agent of a request ``_checked`` passed."""
@@ -236,7 +240,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         for template in (find_template(member) for member in chosen.members):
             have: AgentRecord | None = find_agent(agents, template.name)
             if have is None:
-                to_make.append(_checked(_template_request(template), known))
+                to_make.append(_checked(_template_request(template), known()))
             else:
                 have_them.append(have)
         made: list[AgentRecord] = [await saved(request) for request in to_make]
@@ -312,7 +316,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     async def update_agent(agent_id: str, request: AgentRequest) -> AgentRecord:
         if agent_id == DOT_AGENT_ID:
             raise InvalidValueError("Dot is not an agent to change", {"agent_id": agent_id})
-        checked: AgentRequest = _checked(request, known)
+        checked: AgentRequest = _checked(request, known())
         saved: AgentRecord = await store.get_agent(agent_id)
         return await store.update_agent(
             agent_id,
