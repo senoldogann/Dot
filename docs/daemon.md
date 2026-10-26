@@ -139,8 +139,12 @@ stream, so an answer or a run's end moves them at once; `GET /api/activity` carr
 and `due`. The composer is one frame on a 24 px corner with a soft shadow under it: the goal in a box of one line that
 grows with it, the files attached and the picks under it, then one bar that never wraps: the **+** and the mode at the
 left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
-reads, when they ask only to look ("read-only", "don't change anything", "just research", "salt okunur", "hiçbir şeyi
-değiştirme", "sadece araştır"), and a task otherwise, which ends at once when it answers without a tool, as a chat does
+reads, when they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir
+şeyi değiştirme", "sadece araştır"; "read-only" or "salt okunur" opening a sentence counts, "stay", "remain", "work", "operate",
+"run", "go" or "keep things read-only" where a sentence or a clause starts (after a comma, a semicolon, a colon, a dash,
+a bracket, "and", "then" or "but"), and "keep it read-only" opening the message, none of them followed by a noun; but "make config.toml read-only", "copy prod.db.
+Keep it read-only", "run read-only checks", "the DB must stay read-only" and "dosyayı salt okunur yap" name a thing and
+are a task, item 691), and a task otherwise, which ends at once when it answers without a tool, as a chat does
 (`agent/mode_words.py`). A mode named with `/task`, `/chat` or `/research` brings the pill (Task, Chat or Research; its
 menu says what each does and leads back to Auto); `POST /api/runs` takes `mode: "auto"`; at the right the agent with its face and name once an agent
 exists (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's
