@@ -72,6 +72,14 @@ _MASKED: list[tuple[str, str]] = [
     ("bearer=abcd1234", "bearer=***"),
     ("cookie=abcd1234", "cookie=***"),
     (f"secret_key_base: {_LETTERS[:24]}", "secret_key_base: ***"),
+    # A value that only looks like a placeholder is one (item 690): a password that starts with a dollar sign, a
+    # percent sign pair or an angle bracket, and a hint that has a digit in it.
+    ("DB_PASSWORD=$Tr0ngPass1 ./run", "DB_PASSWORD=*** ./run"),
+    ('{"password":"$Tr0ngPass1"}', '{"password":"***"}'),
+    ("password=%secretkey%", "password=***"),
+    ("api_key=<abc12345>", "api_key=***"),
+    ("token=%tok3n%", "token=***"),
+    ("token=${secrets.Tok3n}", "token=***}"),
 ]
 _KEPT: list[str] = [
     '"max_tokens": 4096',
@@ -103,6 +111,10 @@ _KEPT: list[str] = [
     "token=${GITHUB_TOKEN} and api_key=<your key>",
     "GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
     "token=none",
+    "token=$GITHUB_TOKEN and password=${DB_PASSWORD} and secret=%SECRET_KEY%",
+    "password=<your password> api_key=<your-api-key> token=<API_KEY>",
+    "password=******** token=xxxxxxxx secret=.... key=…",
+    "token={{ token }} secret=${{ secrets.DEPLOY }}",
 ]
 
 
@@ -158,3 +170,24 @@ def test_a_value_dot_holds_is_masked_wherever_it_stands_the_longest_first() -> N
         'use *** in https://x.test/?k=***&q=1, as \'***\' and {"note": "***"}, then ***; a MARKER alone; password: ***'
     )
     assert redact_known(text, ()) == redact_secrets(text)
+
+
+def test_a_list_or_an_object_under_a_field_named_for_a_secret_is_masked_whole() -> None:
+    """Item 690: the value of such a field is masked whatever shape it has; before, only a string was."""
+    assert redact_json(
+        {
+            "token": ["abcdef123456", "second-value"],
+            "auth": {"credentials": {"user": "alice", "keys": ["k1"]}},
+            "passwords": {"main": "hunter2"},
+            "max_tokens": [1, 2],
+            "secret": "",
+            "api_key": 12,
+        }
+    ) == {
+        "token": ["***", "***"],
+        "auth": {"credentials": {"user": "***", "keys": ["***"]}},
+        "passwords": {"main": "hunter2"},
+        "max_tokens": [1, 2],
+        "secret": "",
+        "api_key": 12,
+    }

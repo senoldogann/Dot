@@ -8,6 +8,7 @@ model plays the runs; no network and no model service is used.
 """
 
 import asyncio
+import json
 import secrets
 import sqlite3
 from collections.abc import AsyncIterator
@@ -18,7 +19,7 @@ import pytest
 import pytest_asyncio
 
 from dotagent.agent import manager as manager_module
-from dotagent.agent.attachments import UserInput
+from dotagent.agent.attachments import RunInbox, UserInput
 from dotagent.agent.gate import RunGate
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
@@ -30,6 +31,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, close_runtime, open_runtime
+from dotagent.secrets import hold_filled
 from dotagent.server import UI_SOURCE
 from dotagent.store.endings import RESULT_STOPPED
 from dotagent.store.models import EventRecord, RunRecord, RunStatus, ThreadRecord
@@ -313,6 +315,33 @@ async def test_a_run_whose_start_failed_ends_with_the_event_the_pages_wait_for(
             assert "run_finished" in kinds
             finished = await runtime.store.last_event(run.id, "run_finished")
             assert finished is not None and finished.data["result"] == run.result
+        finally:
+            await manager.shutdown()
+
+
+async def test_the_end_of_a_run_masks_the_secrets_dot_holds_in_its_answer_its_need_and_its_error(
+    login_env: dict[str, str],
+) -> None:
+    """Item 690: the answer, what the run needs and the context of its error pass through the same masking as each of
+    its steps, so a value Dot holds that no pattern knows (a filled password) is not stored nor told as it stands."""
+    held: str = f"vault-{secrets.token_hex(8)}"
+    hold_filled(held)
+    async with _runtime(login_env) as runtime:
+        manager: RunManager = RunManager(runtime)
+        try:
+            thread: ThreadRecord = await runtime.store.create_thread("Ends", UI_SOURCE)
+            run: RunRecord = await runtime.store.create_run(
+                thread.id, GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, "medium", "standard", None, "ask", False,
+                None, None, None,
+            )  # fmt: skip
+            error: JsonObject = {"message": f"refused {held}", "context": {"url": f"https://x.test/{held}"}}
+            await manager._record_end(run, "failed", f"The password is {held}.", f"Ask for {held}", error, RunInbox())
+            stored: RunRecord = await runtime.store.get_run(run.id)
+            finished = await runtime.store.last_event(run.id, "run_finished")
+            assert finished is not None
+            assert held not in stored.result
+            assert held not in json.dumps(finished.data)
+            assert finished.data["needs"] == "Ask for ***"
         finally:
             await manager.shutdown()
 

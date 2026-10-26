@@ -102,7 +102,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
-from dotagent.core.text import redact_json, redact_secrets, truncate_tail
+from dotagent.core.text import redact_json, redact_known, redact_secrets, truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import fail_unsettled_drafts
 from dotagent.evals import EVAL_SOURCE
@@ -116,6 +116,7 @@ from dotagent.proactive import NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
+from dotagent.secrets import known_secrets
 from dotagent.server import UI_SOURCE
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import Skill, SkillCatalog
@@ -2856,10 +2857,13 @@ class RunManager:
         the run, when one did. An end the store refuses is kept to be stored later (:meth:`store_left_ends`)."""
         runtime: Runtime = self._runtime
         runtime.approvals.release_run(run.id)
-        clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
-        data: JsonObject = {"status": status, "result": clean, "needs": redact_secrets(needs)}
+        # The secrets Dot holds are masked in the answer, in what it needs and in the error as in each step (item 690).
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+        clean: str = truncate_tail(redact_known(result, held), _RESULT_CHARS)
+        needed: str = redact_known(needs, held)
+        data: JsonObject = {"status": status, "result": clean, "needs": needed}
         if error is not None:
-            data["error"] = redact_json(error)
+            data["error"] = redact_json(error, held)
         if restated:
             # The steps of the replies the answer restates, which the run's page leaves out (item 620).
             data["restated"] = list(restated)
@@ -2867,7 +2871,7 @@ class RunManager:
             await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
             ended: EventRecord = await runtime.store.end_run(run.id, status, clean, data)
         except DotError:
-            self._left_ends[run.id] = _LeftEnd(run=run, status=status, result=clean, needs=needs, data=data)
+            self._left_ends[run.id] = _LeftEnd(run=run, status=status, result=clean, needs=needed, data=data)
             raise
         runtime.bus.publish(ended)
         # A session the daemon's own end cut off is planned by :meth:`resume_campaigns` when it starts again; any other
@@ -2876,7 +2880,7 @@ class RunManager:
         # 553).
         ending: Ending = classify_ending(status, clean)
         if run.campaign_id is not None and ending != "daemon_shutdown":
-            await self._follow_session(run, run.campaign_id, ending, needs)
+            await self._follow_session(run, run.campaign_id, ending, needed)
 
     async def _follow_queue(self, run: RunRecord, status: RunStatus) -> None:
         """Move the queue of a run's chat on as the run ends: an end done starts its next message (:meth:`_drain`), or,

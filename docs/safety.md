@@ -535,7 +535,13 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
 - What a run records of a step holds none of the secrets Dot holds (item 551), nor a key of a known form (a token, a
   private key, a password in an address or a header): the call's arguments (item 525) and the summary, the target and
   the text of its result, its `policy` event, its approval with the card and the push to your phone that ask about it,
-  and the reason kept with its result. So do what the model says and thinks, as it streams and as it is stored, and the
+  and the reason kept with its result. So do a run's answer, what it needs from you and the context of the error that
+  ended it, a terminal's command in the log lines of its opening and closing, and the context of any error the API
+  answers with or logs (the key in a connector's address, an argument that is one, a field named `password`), which
+  the handler masks for every route; a value that only looks like a placeholder (`$Tr0ngPass1`, `<abc12345>`,
+  `%secretkey%`) is masked, and only an environment variable's name (`$TOKEN`, `${TOKEN}`, `%TOKEN%`), a hint in
+  angle brackets without a digit, a template (`{{ token }}`) or a run of `*`, `x` and dots is left (item 690).
+  So do what the model says and thinks, as it streams and as it is stored, and the
   answer to a side question (`/btw`). The policy and the review model weigh the step as it is, and a card shows `***`
   where your own key stood in a command. What streams is masked as it comes, a secret split between two pieces of the
   stream included: what may still become part of a secret waits for the next piece (the word being written, the start
