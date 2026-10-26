@@ -1,0 +1,88 @@
+{
+ "name": "claude-plugins-official",
+ "plugins": [
+  {
+   "name": "agent-sdk-dev",
+   "description": "Development kit for working with the Claude Agent SDK",
+   "author": {
+    "name": "Anthropic",
+    "email": "support@anthropic.com"
+   },
+   "source": "./plugins/agent-sdk-dev",
+   "category": "development",
+   "homepage": "https://github.com/anthropics/claude-plugins-public/tree/main/plugins/agent-sdk-dev"
+  },
+  {
+   "name": "asana",
+   "description": "Asana project management integration. Connects Claude Code to Asana's V2 MCP server to create and manage tasks, search projects, update assignments, and track progress. Requires a one-time Asana OAuth app setup \u2014 run /asana-setup after installing.",
+   "category": "productivity",
+   "source": "./external_plugins/asana",
+   "homepage": "https://github.com/anthropics/claude-plugins-public/tree/main/external_plugins/asana"
+  },
+  {
+   "name": "42crunch-api-security-testing",
+   "description": "Automate API security directly in Claude Code with 42Crunch - automatically audit OpenAPI specs, detect vulnerabilities aligned with OWASP API Security risks (including BOLA/BFLA), and apply AI-powered fixes. Designed for AI-assisted development workflows, it provides continuous guardrails through an audit->scan->remediate->validate loop, ensuring APIs meet enterprise security standards before deployment.",
+   "author": {
+    "name": "42Crunch"
+   },
+   "category": "security",
+   "source": {
+    "source": "git-subdir",
+    "url": "https://github.com/42Crunch-AI/claude-plugins.git",
+    "path": "plugins/api-security-testing",
+    "ref": "v1.5.5",
+    "sha": "faf5305385de8afed9468904e8639be737aff39e"
+   },
+   "homepage": "https://42crunch.com"
+  },
+  {
+   "name": "adobe-for-creativity",
+   "description": "Harness Adobe's creative AI-powered tools to edit images, automate design workflows, and bring creative visions to life \u2014 from background removal to vectorization and professional retouching.",
+   "author": {
+    "name": "Adobe"
+   },
+   "category": "design",
+   "source": {
+    "source": "git-subdir",
+    "url": "https://github.com/adobe/skills.git",
+    "path": "plugins/creative-cloud/adobe-for-creativity",
+    "ref": "main",
+    "sha": "0f487c9b1b98d8e62dfc80ee4d28b29f5471261f"
+   },
+   "homepage": "https://github.com/adobe/skills/tree/main/plugins/creative-cloud/adobe-for-creativity"
+  },
+  {
+   "name": "agentforce-adlc",
+   "description": "Agentforce Agent Development Life Cycle \u2014 author, discover, scaffold, deploy, test, and optimize .agent files",
+   "category": "development",
+   "source": {
+    "source": "url",
+    "url": "https://github.com/SalesforceAIResearch/agentforce-adlc.git",
+    "sha": "09bf1539d41f9ff355ba3eb5d05d4a75813423bb"
+   },
+   "homepage": "https://github.com/SalesforceAIResearch/agentforce-adlc"
+  },
+  {
+   "name": "unpinned",
+   "description": "a plugin kept elsewhere with no commit pinned",
+   "source": {
+    "source": "url",
+    "url": "https://github.com/example/unpinned.git"
+   }
+  },
+  {
+   "name": "escapes",
+   "description": "a folder outside the repository",
+   "source": "../outside"
+  },
+  {
+   "name": "off-github",
+   "description": "kept off GitHub",
+   "source": {
+    "source": "url",
+    "url": "https://gitlab.com/x/y.git",
+    "sha": "0000000000000000000000000000000000000000"
+   }
+  }
+ ]
+}
