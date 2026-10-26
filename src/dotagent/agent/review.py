@@ -95,6 +95,11 @@ _INSTRUCTION_CHARS: int = 1500
 _FIELD_CHARS: int = 1500
 # What an action acts on is read whole up to here (item 242): a command of a few hundred lines, a long path or address.
 _TARGET_CHARS: int = 12_000
+# What the review says of an action longer than that, which it hands to the owner without asking the model (item 680).
+_TOO_LONG_TO_REVIEW: str = (
+    "The action is {chars} characters long, more than the review reads whole, so the user decides it: a part left "
+    "unread is not approved."
+)
 _REASON_CHARS: int = 400
 _DIGEST_CHARS: int = 30_000
 _ANSWER_CHARS: int = 8000
@@ -1601,6 +1606,12 @@ def reviewer_for(
     ``review_model``; the model reference is read when the first question comes."""
 
     async def review(request: ReviewRequest) -> ReviewVerdict:
+        if len(request.action.target) > _TARGET_CHARS:
+            # The model would read its beginning and its end alone, and what is cut out of the middle is what it would
+            # approve unseen (item 680): the owner decides, who sees it whole.
+            return ReviewVerdict(
+                decision="escalate", reason=_TOO_LONG_TO_REVIEW.format(chars=len(request.action.target))
+            )
         nonce: str = secrets.token_hex(6)
         question: _Question[ReviewVerdict] = _Question(
             router=router,
