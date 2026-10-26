@@ -5493,6 +5493,14 @@ details[open] > summary .chev {
   transform: rotate(90deg);
 }
 
+/* What a folded box holds is not drawn, and the browser does not work out its style either (item 674): WebKit, which
+   Dot.app draws in, styles the content of a closed details over again at every change of the page, and a long chat folds
+   tens of thousands of elements, which froze it at each step of a run. Opened, it fades in from here (@starting-style).
+   Chrome's find in the page no longer opens a folded box to show a match in it, which WebKit never did. */
+details:not([open]) > :not(summary) {
+  display: none;
+}
+
 .tool-body {
   display: flex;
   flex-direction: column;

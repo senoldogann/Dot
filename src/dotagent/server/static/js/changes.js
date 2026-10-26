@@ -42,23 +42,31 @@ function fileRow(file, open) {
     counts(file.added, file.removed),
     el("span", { class: "chev" }, icon("chevron")),
   );
-  const lines = file.diff === "" ? [] : file.diff.replace(/\n$/, "").split("\n");
-  const body =
-    file.note === null
-      ? el("pre", { class: "diff" }, lines.map(diffLine))
-      : el("div", { class: "note" }, icon("info"), el("span", null, file.note));
+  // The lines of a diff are drawn when the file is first opened (item 674): a chat's diffs run to thousands of lines,
+  // and the section is drawn again after each file a run writes.
+  const diff = el("pre", { class: "diff" });
+  const body = file.note === null ? diff : el("div", { class: "note" }, icon("info"), el("span", null, file.note));
   const node = el("details", { class: "change", open }, head, body);
   node.dataset.path = file.path;
+  const draw = () => {
+    if (node.open && file.note === null && diff.childElementCount === 0 && file.diff !== "") {
+      diff.replaceChildren(...file.diff.replace(/\n$/, "").split("\n").map(diffLine));
+    }
+  };
+  node.addEventListener("toggle", draw);
+  draw();
   return node;
 }
 
 /**
  * The Changes section of the run `runId`'s chat: `refresh()` reads them again, a file opened staying open; `onCount(n)`
- * gets the number of files each time, `onFiles(files)` the files themselves.
+ * gets the number of files each time they changed, `onFiles(files)` the files themselves.
  */
 export function changesSection({ runId, onCount, onFiles }) {
   const body = el("div", { class: "changes" });
   const section = panelSection({ id: "run-changes", title: "Changes", actions: null, body });
+  // What the section was last drawn from: the same changes read again are not drawn again.
+  let drawn = null;
 
   async function refresh() {
     const opened = new Set([...body.querySelectorAll("details.change[open]")].map((node) => node.dataset.path));
@@ -66,9 +74,15 @@ export function changesSection({ runId, onCount, onFiles }) {
     try {
       view = await api.get(`/runs/${runId}/changes`);
     } catch (error) {
+      drawn = null;
       body.replaceChildren(el("div", { class: "note bad" }, icon("alert"), el("span", null, `The changes could not be read: ${error.message}`)));
       return;
     }
+    const read = JSON.stringify(view);
+    if (read === drawn) {
+      return;
+    }
+    drawn = read;
     section.setSummary(
       view.files.length === 0 ? null : el("span", { class: "changes-total" }, plural(view.files.length, "file", "files"), counts(view.added, view.removed)),
     );
