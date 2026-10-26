@@ -38,7 +38,9 @@ import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import {
   chooseDensity,
+  chooseWork,
   currentDensity,
+  currentWork,
   DENSITIES,
   followTheme,
   foldSteps,
@@ -46,6 +48,7 @@ import {
   setFoldSteps,
   setShowInspector,
   showInspector,
+  WORK_SHOWN,
 } from "../layout.js";
 import { choiceSetting, rangeSetting, switchSetting } from "../panels.js";
 import {
@@ -619,6 +622,13 @@ function interfaceCard() {
     selected: currentDensity(),
     onSelect: chooseDensity,
   });
+  const work = choiceSetting({
+    label: "Work in a chat",
+    hint: "What a conversation shows while Dot works: every step it takes, or one line of what it does now.",
+    options: WORK_SHOWN.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
+    selected: currentWork(),
+    onSelect: chooseWork,
+  });
   const layoutNote = el("div", { class: "hint grow" });
   const fold = switchSetting({
     label: "Fold steps",
@@ -663,6 +673,7 @@ function interfaceCard() {
       contrast.element,
       width.element,
       density.element,
+      work.element,
       fold.element,
       inspector.element,
       el("div", { class: "setting" }, el("div", { class: "row" }, layoutNote, reset)),

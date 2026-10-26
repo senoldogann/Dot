@@ -41,6 +41,7 @@ import { createStageSize } from "../stagesize.js";
 import { RUN_BACK_EVENT } from "../shell.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
+import { createWorkStatus } from "../workstatus.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { stopReading } from "../voice.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
@@ -1339,6 +1340,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       // gives no tick.
       kept.detail = { ...kept.detail, active: false, elsewhere: false, run: { ...kept.detail.run, status: update.status, finished_at: endedAt } };
       computer.setActive(false);
+      workStatus.setActive(false);
       messagesMissed();
       finishedAt = endedAt;
       paintWorking();
@@ -1534,6 +1536,12 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       syncControls();
     },
   });
+  // The line of what the run does now, for a reader who chose it over the steps (item 663; run.css shows it then).
+  const workStatus = createWorkStatus({
+    rootRunId: runId,
+    active,
+    onToggle: (shown) => threadBox?.classList.toggle("steps-shown", shown),
+  });
   const problem =
     historyProblem === null
       ? null
@@ -1577,6 +1585,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     earlier,
     goalMessage,
     timeline.element,
+    workStatus.element,
     waitingList,
     questionsList,
     lessonsCard,
@@ -1679,6 +1688,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       messageRead(message.data.data.owner_text ?? message.data.data.text);
     }
     timeline.push(message.data);
+    workStatus.push(message.data);
     recap.onEvent(message.data);
     if (!replaying && message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
       refreshChanges();
@@ -1778,6 +1788,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     stage.dispose();
     stopStatus();
     choices.dispose();
+    workStatus.dispose();
     queue.dispose();
     background.dispose();
     loops.dispose();
