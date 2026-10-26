@@ -23,7 +23,9 @@ by itself, with a loop of `/loop` or a schedule a run of it made that goes on in
 a disc of violet and blue whose arrows turn slowly in a glow that breathes (still when the system reduces motion), its
 row saying how often and when next ("Loops every 30 minutes, next 15:30", "Loops on Mon, Wed and Fri at 18:30, next Fri
 18:30": a rhythm of days and times in words too, item 590, days together by their short names, item 592); stopped, the
-loop takes its mark with it.
+loop takes its mark with it. A campaign's conversation wears another mark at the other foot (item 705), a still target
+on a disc of orange and pink, so that a chat a schedule asks again and one a campaign drives are told apart; deleted,
+the campaign takes its mark with it.
 Each chat stands once (item 202):
 while its latest run works, a chat leaves its day for the **Working** section above the list, and goes back once the run
 ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,
@@ -94,7 +96,10 @@ for, and a run whose browser you took over) and **Working** (the runs going on, 
 delegated by another; a schedule about to fire is no work yet, and stands under the home's **Due today**, item 608),
 each row with its state dot, the first words of its title on one
 line, and under it the channel it last worked in (browser, files, shell, desktop, mail) and what it needs; a row opens
-the run. They are `GET /api/activity`, which carries the runs that ended today too, for the home's **Today** strip; the
+the run. A run at work that is no chat's latest run, a later session of a campaign among them, is drawn under
+**Working** as a chat is (item 705): its creature, its name over what it is, and **Working** with how long at the
+right; a session wears the campaign's target at the foot of its creature. They are `GET /api/activity`, which carries
+the runs that ended today too, for the home's **Today** strip; the
 Activity page that showed it all is gone (item 364), and its address leads to the home. A run that ended shows how long
 it took and what it cost in tokens. The sections and the strip follow the lifecycle stream, so a run moves between the
 sections the moment it starts, waits, is taken over or

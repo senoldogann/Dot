@@ -707,6 +707,9 @@ async def test_the_owner_deletes_a_campaign_with_its_sessions_and_its_conversati
             await manager.wait(opening.id)
             second: RunRecord = await manager.start_session(campaign_id)
             await manager.wait(second.id)
+        marked: dict[str, str | None] = {
+            chat.id: chat.campaign_id for chat in await runtime.store.list_thread_summaries(50)
+        }
         active: httpx.Response = await client.delete(f"/api/campaigns/{campaign_id}")
         await _post(client, f"/campaigns/{campaign_id}/stop", None)
         deleted: httpx.Response = await client.delete(f"/api/campaigns/{campaign_id}")
@@ -714,7 +717,9 @@ async def test_the_owner_deletes_a_campaign_with_its_sessions_and_its_conversati
         listed: list[JsonObject] = (await client.get("/api/campaigns")).json()
         kept: httpx.Response = await client.get(f"/api/runs/{opening.id}")
         gone: httpx.Response = await client.get(f"/api/runs/{second.id}")
-        chats: list[str] = [chat.id for chat in await runtime.store.list_thread_summaries(50)]
+        unmarked: dict[str, str | None] = {
+            chat.id: chat.campaign_id for chat in await runtime.store.list_thread_summaries(50)
+        }
         threads: list[str] = [thread.id for thread in await runtime.store.list_threads(50)]
         (question,) = await runtime.store.run_questions(opening.id, ASK_USER_TOOL)
         entries: list[CampaignEntry] = await runtime.store.campaign_entries(campaign_id, 10)
@@ -725,7 +730,10 @@ async def test_the_owner_deletes_a_campaign_with_its_sessions_and_its_conversati
     assert kept.status_code == 200, kept.text
     assert (kept.json()["campaign"], kept.json()["run"]["campaign_id"]) == (None, None)
     assert gone.status_code == 404
-    assert opening.thread_id in chats
+    # The list of chats marks the campaign's conversation while the campaign is there (item 705), and only it.
+    assert [chat for chat, campaign in marked.items() if campaign is not None] == [opening.thread_id]
+    assert marked[opening.thread_id] == campaign_id
+    assert unmarked[opening.thread_id] is None
     assert opening.thread_id in threads and second.thread_id not in threads
     assert (question.status, question.note) == ("expired", "the campaign was deleted")
     assert entries == []

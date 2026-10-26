@@ -116,8 +116,9 @@ class ThreadSummary(FrozenModel):
     plain line: the answer of the latest run once it ended with one, else the message that started it; ``last_role``
     says whose they are. ``loop_cron`` is the rhythm of the chat's loop (item 580): of the switched-on repeating
     schedule whose runs go on in the chat (``/loop``, or one a run of it made) that fires next, ``None`` for a chat
-    with no such schedule; ``loop_next_at`` is when it fires next. Threads that only hold delegated runs are not chats
-    and are never listed."""
+    with no such schedule; ``loop_next_at`` is when it fires next. ``campaign_id`` is the campaign whose conversation
+    the chat is (the sidebar marks it, as it marks a loop), ``None`` for any other chat. Threads that only hold
+    delegated runs are not chats and are never listed."""
 
     id: str
     title: str
@@ -137,6 +138,7 @@ class ThreadSummary(FrozenModel):
     loop_cron: str | None
     loop_next_at: float | None
     team: ChatTeam | None
+    campaign_id: str | None = None
 
 
 class RunRecord(FrozenModel):
