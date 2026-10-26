@@ -8,13 +8,16 @@ it and how old the message is: the message itself never reaches the model.
 from pydantic import Field
 
 from dotagent.core.errors import ToolInputError
+from dotagent.core.text import truncate_middle
 from dotagent.desktop.codes import APP_NAMES, CodeSource, FoundCode, FoundMessage, find_code
 from dotagent.policy.types import ActionInfo
-from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
+from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
 
 CODE_TOOL: str = "code_fetch"
 _TIMEOUT_S: float = 120.0
+# How much of a message's subject the result shows: the code is what is read, the subject only says where it came from.
+_SUBJECT_CHARS: int = 200
 _TEXT: str = r"^[^\x00-\x1f]*$"
 
 
@@ -39,18 +42,24 @@ def _describe(args: CodeFetchArgs) -> str:
 
 
 def render_found(found: FoundCode | FoundMessage | None, args: CodeFetchArgs) -> ToolResult:
-    """What the model reads: the code and where it came from, or why there is none."""
+    """What the model reads: the code and where it came from, or why there is none. The sender and the subject are
+    words whoever sent the message wrote, so a result that names them is untrusted: it marks the run as one that read
+    content third parties can author, as a page does (item 684)."""
     if found is None:
         return fail(f"No message in {_describe(args)}. Wait and try again, or widen the window.")
     if isinstance(found, FoundMessage):
-        return fail(
-            f"The newest message in {_describe(args)} (from {found.sender or 'an unknown sender'}, "
-            f"{round(found.age_s)} s old) holds no code Dot recognises (4 to 8 digits after a cue such as 'code')."
+        return mark_untrusted(
+            fail(
+                f"The newest message in {_describe(args)} (from {found.sender or 'an unknown sender'}, "
+                f"{round(found.age_s)} s old) holds no code Dot recognises (4 to 8 digits after a cue such as 'code')."
+            )
         )
-    subject: str = f", subject {found.subject!r}" if found.subject else ""
-    return ok(
-        f"Code {found.code} from {APP_NAMES[args.app]}: sender {found.sender or 'unknown'}{subject}, received "
-        f"{round(found.age_s)} s ago. Nothing else of the message was read."
+    subject: str = f", subject {truncate_middle(found.subject, _SUBJECT_CHARS)!r}" if found.subject else ""
+    return mark_untrusted(
+        ok(
+            f"Code {found.code} from {APP_NAMES[args.app]}: sender {found.sender or 'unknown'}{subject}, received "
+            f"{round(found.age_s)} s ago. Nothing else of the message was read."
+        )
     )
 
 
