@@ -2,6 +2,7 @@
 
 import codecs
 import re
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -208,6 +209,9 @@ def _render(tokens: Sequence[_Token]) -> str:
     the first line of a list item stays on the line of its marker."""
     parts: list[str] = []
     open_links: list[int] = []
+    # The index of the last part that holds more than white space: a link has words when one stands after its own part,
+    # which is asked once per link without joining what follows it (item 692).
+    last_words: int = -1
     last: str = ""
     newlines: int = 0
     at_marker: bool = False
@@ -219,9 +223,10 @@ def _render(tokens: Sequence[_Token]) -> str:
             case "link_close":
                 if open_links:
                     start: int = open_links.pop()
-                    if "".join(parts[start + 1 :]).strip():
+                    if last_words > start:
                         parts[start] = "["
                         parts.append(f"]({token.value})")
+                        last_words = len(parts) - 1
                         newlines = 0
             case "break":
                 missing: int = int(token.value) - newlines
@@ -231,9 +236,13 @@ def _render(tokens: Sequence[_Token]) -> str:
                     last = "\n"
             case "marker":
                 parts.append(token.value)
+                if token.value.strip():
+                    last_words = len(parts) - 1
                 newlines, last, at_marker = 0, " ", True
             case "raw":
                 parts.append(token.value)
+                if token.value.strip():
+                    last_words = len(parts) - 1
                 newlines = _trailing_newlines(token.value, newlines)
                 last = token.value[-1:] or last
                 at_marker = False
@@ -241,6 +250,8 @@ def _render(tokens: Sequence[_Token]) -> str:
                 value: str = token.value.lstrip(" ") if last in ("", " ", "\n") else token.value
                 if value:
                     parts.append(value)
+                    if value.strip():
+                        last_words = len(parts) - 1
                     newlines, last, at_marker = 0, value[-1], False
     joined: str = "".join(parts)
     return _BLANK_RUNS.sub("\n\n", _TRAILING_SPACES.sub("\n", joined)).strip()
@@ -259,6 +270,8 @@ class _Reader(HTMLParser):
         self.description: str = ""
         self._main_stack: list[str] = []
         self._skip_stack: list[str] = []
+        # How many of each tag are in the skipped stack, so that an end tag asks without scanning it (item 692).
+        self._skipped: Counter[str] = Counter()
         self._link_stack: list[str] = []
         self._list_stack: list[int] = []
         self._pre_depth: int = 0
@@ -296,6 +309,7 @@ class _Reader(HTMLParser):
         if self._skip_stack or tag in _SKIPPED_TAGS or _is_furniture(tag, attributes):
             if tag not in _VOID_TAGS:
                 self._skip_stack.append(tag)
+                self._skipped[tag] += 1
             return
         self._open(tag, attributes)
         if tag in _MAIN_TAGS or attributes.get("role") == "main":
@@ -371,9 +385,10 @@ class _Reader(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         if self._skip_stack:
-            if tag in self._skip_stack:
-                while self._skip_stack.pop() != tag:
-                    pass
+            if self._skipped[tag] > 0:
+                while (closed := self._skip_stack.pop()) != tag:
+                    self._skipped[closed] -= 1
+                self._skipped[tag] -= 1
             return
         self._close(tag)
         if self._main_stack and self._main_stack[-1] == tag:

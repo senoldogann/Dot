@@ -283,3 +283,71 @@ test("a picture written as a link is its words as a link, and nothing is drawn f
     ["text", " here", undefined],
   ]);
 });
+
+// A line the size of a page of a hostile text, read in a moment (item 692): the readers of links, table separators and
+// closing heading marks took a time that grew with the square of the line. The bound is far above what a run takes
+// (a few milliseconds) and far below what the old readers took (seconds).
+const MOST_MS = 500;
+
+function readInAMoment(text) {
+  const started = performance.now();
+  const blocks = parseBlocks(text);
+  sourceLines(text);
+  assert.ok(performance.now() - started < MOST_MS, `took ${Math.round(performance.now() - started)} ms`);
+  return blocks;
+}
+
+test("a line of unclosed brackets is read in a moment, and its links still found", () => {
+  readInAMoment("[a".repeat(50000));
+  readInAMoment("[a](http://".repeat(9000));
+  // A line break ends the words of a link, so the brackets before it close nothing and the links after it are found.
+  const started = performance.now();
+  const links = parseInline(`${"[a".repeat(30000)}\n[the docs](https://example.com/docs) and ![pic](https://example.com/p.png)`).filter(
+    (part) => part.type === "link",
+  );
+  assert.ok(performance.now() - started < MOST_MS);
+  assert.deepEqual(
+    links.map((part) => [part.value, part.href]),
+    [
+      ["the docs", "https://example.com/docs"],
+      ["pic", "https://example.com/p.png"],
+    ],
+  );
+});
+
+test("links are read as they were: the words may hold a bracket, a line break ends them, an address needs its text", () => {
+  const link = (text) => parseInline(text).filter((part) => part.type === "link").map((part) => [part.value, part.href]);
+  assert.deepEqual(link("[a [b](https://x.test/y)"), [["a [b", "https://x.test/y"]]);
+  assert.deepEqual(link("[a](https://x.test/1)[b](https://x.test/2)"), [
+    ["a", "https://x.test/1"],
+    ["b", "https://x.test/2"],
+  ]);
+  // No words, no address, an address cut by a space, another scheme: none is a link with words (a bare address is still one).
+  assert.deepEqual(link("[](https://x.test/y)"), [["https://x.test/y", "https://x.test/y"]]);
+  assert.deepEqual(link("[a](https://) [b](http://x y) [c](ftp://x/y)"), []);
+  assert.deepEqual(link("[a](http://x [b](https://x.test/y)"), [["b", "https://x.test/y"]]);
+  assert.deepEqual(link("[a\nb](https://x.test/y)"), [["https://x.test/y", "https://x.test/y"]]);
+  assert.deepEqual(link("![a](https://x.test/y)"), [["a", "https://x.test/y"]]);
+});
+
+test("a table separator that fails after a long run of spaces is read in a moment, and a real one still is a separator", () => {
+  readInAMoment(`a|b\n${" ".repeat(40000)}x`);
+  readInAMoment(`a|b\n-${" ".repeat(40000)}x`);
+  for (const separator of ["|---|---|", "| :--- | ---: |", "--- | ---", "|-|", "  |:-:|:-:|  ", "---|"]) {
+    assert.equal(parseBlocks(`a | b\n${separator}\n1 | 2`)[0].type, "table", separator);
+  }
+  for (const separator of ["--- ---", "|--- x|", "||---|", "---:: |"]) {
+    assert.notEqual(parseBlocks(`a | b\n${separator}\n1 | 2`)[0].type, "table", separator);
+  }
+});
+
+test("a heading with a long run of spaces is read in a moment, and its closing marks still go", () => {
+  const [block] = readInAMoment(`# a${" ".repeat(40000)}x`);
+  assert.equal(block.type, "heading");
+  const words = (line) => parseBlocks(line)[0].inline.map((part) => part.value).join("");
+  assert.equal(words("## Title ##"), "Title");
+  assert.equal(words("## Title   #  "), "Title");
+  assert.equal(words("# C#"), "C#");
+  assert.equal(words("# a ## b"), "a ## b");
+  assert.equal(words("# a # #"), "a #");
+});
