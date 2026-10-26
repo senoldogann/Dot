@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.config import McpServerConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import PluginError, SkillError
-from dotagent.doctor import CheckResult, _office_row, _onedrive_row
+from dotagent.doctor import CheckResult, _office_row, _onedrive_row, _skills_row
 from dotagent.harness.components import NO_HARNESS
 from dotagent.help.listed import SkillListing, listed_skills
 from dotagent.plugins.catalog import load_plugins, read_plugin
@@ -156,23 +156,37 @@ def test_the_catalog_keeps_each_name_once_and_reports_what_it_left_out(tmp_path:
     second: Path = tmp_path / "second"
     _skill_dir(first, "alpha", _simple("alpha"))
     _skill_dir(first, "broken", "no frontmatter\n")
-    _skill_dir(second, "alpha", _simple("alpha"))
+    _skill_dir(second, "alpha", _simple("alpha").replace("Do alpha.", "Do alpha another way."))
     _skill_dir(second, "beta", _simple("beta"))
+    # A copy of a skill, as a sync of the same skills leaves in another folder, counts once and is no problem.
+    _skill_dir(tmp_path / "synced", "beta", _simple("beta"))
     (tmp_path / "link").symlink_to(second, target_is_directory=True)
     roots: tuple[SkillRoot, ...] = (
         SkillRoot(path=first, source="home"),
         SkillRoot(path=second, source="config"),
         SkillRoot(path=tmp_path / "link", source="config"),
+        SkillRoot(path=tmp_path / "synced", source="config"),
         SkillRoot(path=tmp_path / "missing", source="config"),
     )
     catalog = load_catalog(roots)
     assert [(skill.name, skill.source) for skill in catalog.skills] == [("alpha", "home"), ("beta", "config")]
-    reasons: dict[str, str] = {str(problem.path.relative_to(tmp_path)): problem.reason for problem in catalog.problems}
-    assert reasons == {
-        "first/broken/SKILL.md": "SKILL.md does not start with the --- line that opens the frontmatter",
-        "second/alpha/SKILL.md": f"another skill is already called alpha: {first / 'alpha'}",
-        "missing": "the skills directory does not exist",
+    reasons: dict[str, tuple[str, bool]] = {
+        str(problem.path.relative_to(tmp_path)): (problem.reason, problem.shadowed) for problem in catalog.problems
     }
+    assert reasons == {
+        "first/broken/SKILL.md": ("SKILL.md does not start with the --- line that opens the frontmatter", False),
+        "second/alpha/SKILL.md": (f"another skill is already called alpha: {first / 'alpha'}", True),
+        "missing": ("the skills directory does not exist", False),
+    }
+    # The health check counts what is broken against its row, not a skill another one has the name of.
+    row: CheckResult = _skills_row(catalog)
+    assert not row.ok and "second/alpha" not in row.detail
+    clashing: tuple[SkillRoot, ...] = (
+        SkillRoot(path=second, source="home"),
+        SkillRoot(path=first / "alpha", source="config"),
+    )
+    row = _skills_row(load_catalog(clashing))
+    assert row.ok and "1 not offered, as another skill has the name" in row.detail, row.detail
 
 
 def test_the_names_of_the_skills_dot_learned_or_was_taught_are_kept_for_its_playbook_folder(tmp_path: Path) -> None:

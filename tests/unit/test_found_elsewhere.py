@@ -201,6 +201,8 @@ def test_each_skill_and_server_is_found_once_by_its_agent_and_name_so_an_import_
     for bundle in ("first", "second", "third"):
         _skill(skills / bundle / "skills" / "pdf-tools", "pdf-tools", f"Fill PDF forms ({bundle}).")
     (skills / "linked").symlink_to(skills / "first" / "skills" / "pdf-tools")
+    # A copy of the first, as a sync of the same skills leaves, is not listed (item 707).
+    _skill(skills / "synced" / "skills" / "pdf-tools", "pdf-tools", "Fill PDF forms (first).")
     # A plugin installed for a project at 0.9.0 and for the user at 1.0.0, and one of the same name elsewhere.
     cache: Path = tmp_path / ".claude" / "plugins" / "cache"
     for market, version in (("market", "0.9.0"), ("market", "1.0.0"), ("other", "2.0.0")):

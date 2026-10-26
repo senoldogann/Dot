@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.browser.profile_lock import IMPORT_LOCK, held_for_import, held_for_start, profile_holder_pid
+from dotagent.browser.profile_lock import (
+    IMPORT_LOCK,
+    held_for_import,
+    held_for_start,
+    profile_holder_pid,
+    started_by_dot,
+)
 from dotagent.core.errors import BrowserError
 
 
@@ -82,3 +88,33 @@ def test_the_lock_of_a_profile_that_is_not_there_yet_makes_its_folder(tmp_path: 
     with held_for_start(folder):
         assert (folder / IMPORT_LOCK).is_file()
     assert oct(folder.stat().st_mode & 0o777) == "0o700"
+
+
+# A parent that stands in for Playwright's driver: its command line names it, as the driver's does, and it starts a
+# child that waits, as the driver starts Chrome, and says the child's pid.
+_DRIVER_STAND_IN: str = (
+    "import subprocess, sys; child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)']); "
+    "print(child.pid, flush=True); sys.stdin.read(); child.kill()"
+)
+
+
+def test_a_chrome_is_a_runs_when_playwrights_driver_started_it() -> None:
+    """The health check's profile row (item 707): a Chrome whose parent is Playwright's driver is a run's, and its
+    profile in use is as it should be; one any other process started is not."""
+    driver: subprocess.Popen[str] = subprocess.Popen(
+        [sys.executable, "-c", _DRIVER_STAND_IN, "/venv/lib/playwright/driver/package/cli.js"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    other: subprocess.Popen[bytes] = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        assert driver.stdout is not None
+        child: int = int(driver.stdout.readline())
+        assert started_by_dot(child)
+        assert not started_by_dot(other.pid)
+        assert not started_by_dot(exited_pid())
+    finally:
+        other.kill()
+        other.wait()
+        driver.communicate("")

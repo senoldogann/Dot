@@ -79,8 +79,11 @@ def read_skill(file: Path, source: str) -> Skill:
 def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
     """Read every root. A root that is missing, a folder that is not a skill, a name used twice, or a name that is
     Dot's (:data:`PLAYBOOK_PREFIXES`, on a skill that is not in the playbook folder) is reported and left out while the
-    other skills still load. A skill reached through two roots (a symlink and its target) counts once. A skill that
-    comes with Dot gives way to one of the user's with its name, which is no problem: it is how the user replaces it."""
+    other skills still load. A skill reached through two roots (a symlink and its target) counts once, and so does a
+    copy of one (the same name, description and instructions in its SKILL.md in another folder, as a sync of the same
+    skills leaves; the other files of the folders are not compared, and the first one's are used).
+    A skill that comes with Dot gives way to one of the user's with its name, which is no problem: it is how the user
+    replaces it."""
     skills: dict[str, Skill] = {}
     problems: list[SkillProblem] = []
     seen: set[Path] = set()
@@ -113,10 +116,15 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
                 )
                 continue
             if skill.name in skills:
-                if root.source != BUILTIN_SOURCE:
-                    taken: Path = skills[skill.name].root
+                kept: Skill = skills[skill.name]
+                copy: bool = (kept.description, kept.body) == (skill.description, skill.body)
+                if root.source != BUILTIN_SOURCE and not copy:
                     problems.append(
-                        SkillProblem(path=file, reason=f"another skill is already called {skill.name}: {taken}")
+                        SkillProblem(
+                            path=file,
+                            reason=f"another skill is already called {skill.name}: {kept.root}",
+                            shadowed=True,
+                        )
                     )
                 continue
             skills[skill.name] = skill

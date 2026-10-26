@@ -21,7 +21,7 @@ from dotagent.agent.helpers import Roster, keyed_providers, roster_for, unavaila
 from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import CHROME_APP
-from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.profile_lock import profile_holder_pid, started_by_dot
 from dotagent.browser.profiles import profile_dir
 from dotagent.config import (
     AppConfig,
@@ -519,13 +519,25 @@ async def _check_browser_launch(config: AppConfig) -> CheckResult:
 
 
 def _check_browser_profile(config: AppConfig) -> CheckResult:
+    """The profile of Dot's Chrome: free, or open in the Chrome Playwright started for a run, which is as it should be;
+    open in any other Chrome window (Sign in…, or one the owner opened), which keeps a run's from starting, it needs a
+    look."""
     profile: Path = profile_dir(config.browser.profile)
     holder: int | None = profile_holder_pid(profile)
     keychain: KeychainMode = read_keychain_mode(profile)
-    state: str = f"in use by pid {holder}" if holder is not None else "free"
+    fine: bool = True
+    state: str = "free"
+    if holder is not None and started_by_dot(holder):
+        state = f"in use by a run's Chrome, pid {holder}"
+    elif holder is not None:
+        fine = False
+        state = (
+            f"open in pid {holder}, a Chrome window that is not a run's (Sign in… opens one): quit it for a run's "
+            "to start"
+        )
     return _result(
         "browser profile",
-        holder is None,
+        fine,
         False,
         f"{profile} ({state}, {keychain} keychain); sign in with: dotx browser login, "
         "or copy your Chrome sign-ins with: dotx browser import-chrome",
@@ -762,14 +774,20 @@ def _plugins_row(catalog: PluginCatalog) -> CheckResult:
 
 
 def _skills_row(catalog: SkillCatalog) -> CheckResult:
-    """The skills found, and whatever had to be left out; a folder with a problem never stops Dot."""
+    """The skills found, and whatever had to be left out; a folder with a problem never stops Dot. A skill another one
+    has the name of is said, not counted against the row: nothing is wrong with it, and one of the two is offered."""
     names: str = ", ".join(skill.name for skill in catalog.skills)
-    if catalog.problems:
+    broken: list[SkillProblem] = [problem for problem in catalog.problems if not problem.shadowed]
+    shadowed: int = len(catalog.problems) - len(broken)
+    if broken:
         found: str = f"{len(catalog.skills)} skill(s) ({names}); " if catalog.skills else ""
-        return _result("skills", False, False, f"{found}left out: {_left_out(catalog.problems)}")
+        return _result("skills", False, False, f"{found}left out: {_left_out(broken)}")
     if not catalog.skills:
         return _result("skills", True, False, f"none installed (put them in {skills_dir()} or in [skills] dirs)")
-    return _result("skills", True, False, f"{len(catalog.skills)} skill(s): {names}")
+    aside: str = (
+        f"; {shadowed} not offered, as another skill has the name (dotx skills list shows which)" if shadowed else ""
+    )
+    return _result("skills", True, False, f"{len(catalog.skills)} skill(s): {names}{aside}")
 
 
 def _office_row(versions: Mapping[str, str | None]) -> CheckResult:

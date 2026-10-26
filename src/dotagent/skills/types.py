@@ -44,10 +44,12 @@ class Skill(FrozenModel):
 
 
 class SkillProblem(FrozenModel):
-    """A folder taken for a skill that cannot be used, and why."""
+    """A folder taken for a skill that cannot be used, and why; ``shadowed`` when it is a skill of its own that another,
+    found first, has the name of: nothing is wrong with it, it is only not offered."""
 
     path: Path
     reason: str
+    shadowed: bool = False
 
 
 class SkillCatalog(FrozenModel):
