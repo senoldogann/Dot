@@ -174,6 +174,16 @@ src/dotagent/
   core/       errors, logging, retries, paths, shared types
 ```
 
+## Pinned versions of what Dot starts
+
+The packages Dot starts on this Mac for a connector (`npx`, `uvx`: `mcp/catalogue.py`) are pinned to one exact version
+each (item 695), so that a release of one of them reaches Dot only when you raise it. Before a release, or when a
+connector's own news asks for it, run `uv run python scripts/catalogue_versions.py`: it asks npm's registry and PyPI for
+the newest version of each and lists it beside the pinned one (the network, and no test runs it). Read what a newer
+release changed, try the server (add it on Customize › Connectors), then change the number in the catalogue; the unit
+test `test_each_server_started_on_this_mac_runs_the_one_version_the_catalogue_pins` fails on a package left with no
+exact version. Dot's own dependencies are pinned by `uv.lock`.
+
 ## Releasing
 
 A release is one version, the same in `pyproject.toml`, `src/dotagent/__init__.py`, `desktop/package.json`,

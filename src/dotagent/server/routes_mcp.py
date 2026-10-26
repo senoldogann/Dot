@@ -29,7 +29,7 @@ from dotagent.help.added import read_added_servers
 from dotagent.help.added import remove_server as take_back_added_server
 from dotagent.help.elsewhere import dot_server_name
 from dotagent.mcp.builtin import builtin_servers, switch_of
-from dotagent.mcp.catalogue import MCP_SERVICES, McpService
+from dotagent.mcp.catalogue import MCP_SERVICES, McpService, unversioned
 from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_connected, read_connected
 from dotagent.mcp.hub import McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
@@ -109,13 +109,16 @@ def _address(config: McpServerConfig, origin: McpOrigin) -> str:
 
 def service_of(config: McpServerConfig) -> str | None:
     """The service of the catalogue ``config`` is a server of: the one at its URL, or the one started by its command
-    and first arguments (the package), so that a server added by hand wears the service's mark too (item 408)."""
+    and first arguments (the package), so that a server added by hand wears the service's mark too (item 408). The
+    version written after a package is not compared (item 695): the catalogue pins one, and a server added before it did
+    (with ``@latest`` or none) is the service's still."""
     for service in MCP_SERVICES:
         if service.url is not None and service.url == config.url:
             return service.id
         if service.command is not None and service.command == config.command:
-            package: tuple[str, ...] = tuple(arg for arg in service.args if not arg.startswith("-"))
-            if package and package == tuple(arg for arg in config.args if not arg.startswith("-"))[: len(package)]:
+            package: tuple[str, ...] = tuple(unversioned(arg) for arg in service.args if not arg.startswith("-"))
+            given: tuple[str, ...] = tuple(unversioned(arg) for arg in config.args if not arg.startswith("-"))
+            if package and package == given[: len(package)]:
                 return service.id
     return None
 

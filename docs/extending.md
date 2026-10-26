@@ -118,6 +118,18 @@ tests/smoke/test_catalogue_reachable.py -m internet` checks the whole catalogue 
 that signs in answers 401 and its authorization server registers a client without a secret with PKCE, one open to all
 answers, and a package is on its registry, not deprecated.
 
+**The version of a server started on this Mac is pinned** (item 695). `npx` and `uvx` run the newest release of a
+package at each start, with your rights and the keys the server is given, so a release that is compromised or broken
+would reach you the day it is published. Each package the catalogue starts is therefore written with one exact version
+in `mcp/catalogue.py` (`name@x.y.z` for npm, `name==x.y.z` for PyPI), and a test fails on one that is not. A pin moves
+only when someone moves it: `uv run python scripts/catalogue_versions.py` asks the registries and lists the version
+pinned and the newest of each, to read what changed and to try the server before the number is raised. A server you
+already added keeps the arguments it was added with (`@latest`, or no version), and is still the service's in the list;
+what the package pulls in is not pinned with it: npm and PyPI resolve its own dependencies to the newest each one allows
+at its start, which only a lock of the server's own would fix;
+to move it to the pinned version, remove it and add it again. A server you write under `[[mcp]]` is yours: pin it the
+same way (`args = ["-y", "some-mcp-server@1.2.3"]`).
+
 ### Connect apps
 
 **Connect apps** (items 492 and 545), at the foot of the sidebar right of the cog of Settings, on the sidebar's own
@@ -185,13 +197,13 @@ The ways a service connects:
   Relic and PayPal (item 505: each one's metadata, read on 2026-10-21, offers a client that registers itself without a
   secret), DeepWiki, Microsoft Learn, Context7, Exa, Cloudflare Docs, Jina and Parallel Search, open to all, and the
   services that take a key (**Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix,
-  Firecrawl and Tavily; a few run on this Mac (**On this Mac**), started by Dot with `npx` or `uvx` and talked to
-  over standard input and output: Memory, Sequential Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation,
-  and with a key (**On this Mac · Key**) Brave Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana
-  and Atlassian (with a key); a value the owner knows, such as a site's address, is asked for with the keys, without a
-  link. A service that takes a key asks for it in a dialog (item 615) that its tile's **Add** and its page's open, with
-  where to get one; a key typed and then dropped is gone when the dialog opens again (item 559), and the daemon's
-  refusal is said inside it, with the key still typed;
+  Firecrawl and Tavily; a few run on this Mac (**On this Mac**), started by Dot with `npx` or `uvx` (at the exact
+  version the catalogue pins, item 695: see above) and talked to over standard input and output: Memory, Sequential
+  Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation, and with a key (**On this Mac · Key**) Brave
+  Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana and Atlassian (with a key); a value the owner
+  knows, such as a site's address, is asked for with the keys, without a link. A service that takes a key asks for it in
+  a dialog (item 615) that its tile's **Add** and its page's open, with where to get one; a key typed and then dropped
+  is gone when the dialog opens again (item 559), and the daemon's refusal is said inside it, with the key still typed;
   Dot keeps each in its `.env` (mode 0600) under `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the
   server's headers or environment refer to it as `${...}`, so the value is in no record and leaves the daemon only to
   the service; **Remove** takes the key out of `.env` with the service's own server, and nothing else does (`keep` in
