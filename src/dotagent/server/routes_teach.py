@@ -18,7 +18,7 @@ from pydantic import BaseModel, JsonValue
 from dotagent.browser.teach import Recording
 from dotagent.core.errors import NotFoundError
 from dotagent.server.context import ServerContext
-from dotagent.server.stream import KEEPALIVE, SSE_HEADERS, SSE_TYPE, encode_frame
+from dotagent.server.stream import KEEPALIVE, encode_frame, event_stream
 from dotagent.server.views import ScheduleRepeatView
 from dotagent.store.models import ScheduleRecord
 from dotagent.teach import TaughtSkill, draft_taught_skill, repeat_taught_skill, save_taught_skill
@@ -149,7 +149,7 @@ def teach_router(ctx: ServerContext) -> APIRouter:
     async def teaching_screencast(thread_id: str) -> StreamingResponse:
         """The frames of the recorded tab, while the recording goes on and this client reads them: the same stream the
         browser's page shows, so the owner sees on a phone what they do on the Mac."""
-        return StreamingResponse(_follow_teaching(ctx, thread_id), media_type=SSE_TYPE, headers=SSE_HEADERS)
+        return event_stream(_follow_teaching(ctx, thread_id))
 
     return router
 

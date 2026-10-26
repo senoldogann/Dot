@@ -43,7 +43,7 @@ from dotagent.server.chatcontext import ChatContext, chat_context
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import local_hosts
 from dotagent.server.sending import send_once
-from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run, follow_screencast
+from dotagent.server.stream import event_stream, follow_lifecycle, follow_run, follow_screencast
 from dotagent.server.views import (
     ActivityCount,
     ActivityView,
@@ -356,7 +356,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     @router.get("/runs/{run_id}/stream")
     async def run_stream(run_id: str, query: Annotated[StreamQuery, Query()]) -> StreamingResponse:
         await store.get_run(run_id)
-        return StreamingResponse(follow_run(ctx, run_id, query.after), media_type=SSE_TYPE, headers=SSE_HEADERS)
+        return event_stream(follow_run(ctx, run_id, query.after))
 
     @router.post("/runs/{run_id}/steer", status_code=202)
     async def steer_run(run_id: str, request: SteerRequest) -> RunDetail:
@@ -464,7 +464,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         """The page of the run's browser as Chrome paints it, one ``frame`` event per paint, while the run is active
         and this client reads (see ``stream.follow_screencast``)."""
         await store.get_run(run_id)
-        return StreamingResponse(follow_screencast(ctx, run_id), media_type=SSE_TYPE, headers=SSE_HEADERS)
+        return event_stream(follow_screencast(ctx, run_id))
 
     @router.post("/runs/{run_id}/takeover", status_code=202)
     async def take_over_run(run_id: str) -> RunDetail:
@@ -521,9 +521,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/stream")
     async def lifecycle_stream() -> StreamingResponse:
-        return StreamingResponse(
-            follow_lifecycle(ctx.runtime.bus, ctx.stopping), media_type=SSE_TYPE, headers=SSE_HEADERS
-        )
+        return event_stream(follow_lifecycle(ctx.runtime.bus, ctx.stopping))
 
     @router.get("/approvals")
     async def list_approvals(query: Annotated[ApprovalsQuery, Query()]) -> list[ApprovalRecord]:

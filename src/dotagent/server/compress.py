@@ -13,9 +13,9 @@ class GzipExceptEventStreams:
     """Starlette's gzip for every answer but an event stream, which the page asks for with ``Accept: text/event-stream``
     (`api.js`). Starlette leaves alone the event streams and what is compressed already (images, fonts, archives) and
     compresses a body past 128 KiB off the event loop; but it holds the start of an answer it leaves alone until the
-    first chunk of its body, and the first chunk of a quiet stream is its keepalive, 15 s on, so the page would wait
-    that long to learn that it is connected. A request for an event stream goes around it; a client that asks for one
-    without saying so in ``Accept`` has the start of its answer with the first frame."""
+    first chunk of its body. A request for an event stream goes around it, so the start of its answer goes at once; a
+    client that asks for one without saying so in ``Accept`` has it with the stream's opening line, which comes at once
+    too (``OPENING``, item 709)."""
 
     def __init__(self, app: ASGIApp) -> None:
         self._app: ASGIApp = app

@@ -108,6 +108,8 @@ is back every page that follows it, the run's page and its queue among them, rea
 page when the stream fell so far behind that events were lost (`resync`). A page that cannot read again keeps what it
 showed and says so. A stream from which nothing came for 45 seconds, not even the keepalive the daemon writes every 15,
 has stopped without closing (a network that changed, a Mac that slept): the page cuts it and makes it again (item 200).
+Every stream opens with a comment line at once, as Safari, the iPhone and Dot.app hand the page a stream only once its
+body begins: a quiet one read as not connected until its first keepalive (item 709).
 Between tries the page waits half a second, then longer, up to 8 seconds, and from half a second again once a stream is
 made; a page that comes back into view, or a browser back on the network, tries at once. The rules page reads its rules
 again when one is added, switched or deleted on another page. A page loaded before Dot was updated says so in a banner,

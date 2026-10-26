@@ -27,6 +27,9 @@ const snapshot = {
   status: null,
   approvals: [],
   stream: "connecting",
+  // How many times the page came back into view or onto the network: a break told before the return is told again only
+  // once the grace after it is over (item 709).
+  returns: 0,
   // The daemon serves other pages than this one was loaded from (Dot was updated meanwhile, or the service worker
   // answered from a copy of an earlier build): it is loaded again to match them.
   outdated: false,
@@ -183,7 +186,9 @@ export async function runLifecycle(signal, onAuthRejected) {
   const onBack = () => {
     if (document.visibilityState === "visible") {
       returnedAt = Date.now();
+      snapshot.returns += 1;
       settle();
+      announce();
     }
   };
   document.addEventListener("visibilitychange", onBack);
