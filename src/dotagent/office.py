@@ -79,6 +79,23 @@ _PLACES_PER_CELL: int = 50
 # is refused as the file is (item 556), rather than left to fail inside the reader of its kind.
 _PACKED: frozenset[int] = frozenset({zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED})
 _LOCKED_PART: int = 0x1
+# What a package may unpack to (item 693): the size of an Office file on disk says nothing of what its parts hold once
+# unpacked (a 100 KB Word document held 34 MB of XML, and reading it took the daemon to 1.15 GB), so a package is
+# refused before it is read when its parts, as they declare themselves, hold more than this in all, when one holds more
+# than ``_MAX_PART_BYTES`` or, if it is XML that its reader builds a tree of, ``_MAX_XML_PART_BYTES`` (a tree takes
+# about thirty times the XML), when a part of 1 MiB or more is packed tighter than ``_MAX_RATIO`` to one (deflate itself
+# stops near 1000; real XML packs ten to thirty to one) or when it has more than ``_MAX_PARTS`` parts. The sheets of a
+# workbook are read as a stream, never as a tree, so they have the first bounds only.
+_MAX_PACKAGE_BYTES: int = 200 * 1024 * 1024
+_MAX_PART_BYTES: int = 64 * 1024 * 1024
+_MAX_XML_PART_BYTES: int = 16 * 1024 * 1024
+_MAX_RATIO: int = 200
+_RATIO_FROM_BYTES: int = 1024 * 1024
+_MAX_PARTS: int = 10_000
+_STREAMED_PREFIX: str = "xl/worksheets/"
+_XML_SUFFIXES: tuple[str, ...] = (".xml", ".rels", ".vml")
+# How much of a part is unpacked at a time when its real size is checked against what it says.
+_CHUNK_BYTES: int = 64 * 1024
 
 
 class OfficeTable(FrozenModel):
@@ -219,15 +236,52 @@ def names_office_file(name: str) -> bool:
     return suffix in OFFICE_SUFFIXES or suffix in _OLD_SUFFIXES
 
 
+def _megabytes(size: int) -> str:
+    return f"{size / (1024 * 1024):.0f} MB"
+
+
+def _size_problem(part: zipfile.ZipInfo) -> str | None:
+    """Why the part ``part`` is too large for its declared size, packed size or name to be read, or ``None``."""
+    name: str = part.filename
+    xml: bool = name.lower().endswith(_XML_SUFFIXES) and not name.startswith(_STREAMED_PREFIX)
+    if part.file_size > _MAX_PART_BYTES or (xml and part.file_size > _MAX_XML_PART_BYTES):
+        return f"its part {name} unpacks to {_megabytes(part.file_size)}, more than Dot reads of one part"
+    if part.file_size >= _RATIO_FROM_BYTES and part.file_size > part.compress_size * _MAX_RATIO:
+        return f"its part {name} is packed to a size that is {_MAX_RATIO} times smaller or less than it unpacks to"
+    return None
+
+
 def _package_problem(data: bytes) -> str | None:
     """Why the parts of the zip package ``data`` cannot be read, or ``None`` when each is packed as Office packs its
-    parts and none is locked."""
+    parts, none is locked and the package unpacks to no more than Dot reads (item 693): the sizes the parts declare are
+    checked first, then each part is unpacked in chunks, up to its declared size and to what the package may hold, so
+    that a part that declares less than it holds is refused here and not read whole by its reader (a part whose
+    unpacked size or checksum is not what it says is damaged: ``zipfile`` raises ``BadZipFile`` at its end)."""
     with zipfile.ZipFile(io.BytesIO(data)) as package:
-        for part in package.infolist():
+        parts: list[zipfile.ZipInfo] = package.infolist()
+        if len(parts) > _MAX_PARTS:
+            return f"it has {len(parts)} parts, more than Dot reads"
+        declared: int = 0
+        for part in parts:
             if part.flag_bits & _LOCKED_PART:
                 return f"its part {part.filename} is locked"
             if part.compress_type not in _PACKED:
                 return f"its part {part.filename} is packed in a way Office does not use"
+            problem: str | None = _size_problem(part)
+            if problem is not None:
+                return problem
+            declared += part.file_size
+        if declared > _MAX_PACKAGE_BYTES:
+            return f"its parts unpack to {_megabytes(declared)} in all, more than Dot reads"
+        unpacked: int = 0
+        for part in parts:
+            read: int = 0
+            with package.open(part) as handle:
+                while chunk := handle.read(_CHUNK_BYTES):
+                    read += len(chunk)
+                    unpacked += len(chunk)
+                    if read > part.file_size or unpacked > _MAX_PACKAGE_BYTES:
+                        return f"its part {part.filename} unpacks to more than it says"
     return None
 
 
