@@ -26,6 +26,8 @@ from functools import partial
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from pydantic import JsonValue
+
 from dotagent.agent.attachments import (
     ATTACHMENTS_EVENT,
     StoredAttachment,
@@ -90,7 +92,7 @@ from dotagent.opencode.events import (
 from dotagent.opencode.server import OpenCodeServer, PromptFile
 from dotagent.policy.paths import expand_path
 from dotagent.policy.shell import ShellAssessment, assess_shell
-from dotagent.policy.types import ActionInfo
+from dotagent.policy.types import ActionInfo, Flag, Risk
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.endings import PREFIX_CUT_SHORT
@@ -108,6 +110,7 @@ log = get_logger(__name__)
 # The names of OpenCode's tools in Dot's timeline: ``opencode_bash``, ``opencode_edit``, ...
 TOOL_PREFIX: str = "opencode_"
 _EVENT_TEXT_CHARS: int = 4000
+_RISK_RANK: dict[Risk, int] = {"safe": 0, "low": 1, "medium": 2, "high": 3}
 _THINKING_CHARS: int = 12_000
 _PREVIEW_CHARS: int = 200
 # What of the chat on other models comes with a run's first message: its newest messages, each cut to a length.
@@ -257,6 +260,29 @@ def _target_path(asked: PermissionAsked, workspace: Path) -> Path:
     return expand_path(raw.removesuffix("/*").removesuffix("*") or ".", workspace)
 
 
+def _written_paths(asked: PermissionAsked, workspace: Path) -> tuple[Path, ...]:
+    """Every file an edit OpenCode asks for writes: each of its patterns, one per file (a patch of several files names
+    them all there, and its ``filepath`` is their names joined by commas, item 677), else the file it names."""
+    raw: tuple[str, ...] = asked.patterns or (get_str(asked.metadata, "filepath") or get_str(asked.metadata, "path"),)
+    return tuple(expand_path(pattern or ".", workspace) for pattern in raw)
+
+
+def _worst(actions: Sequence[ActionInfo]) -> ActionInfo:
+    """The action of the file the policy weighs most, with the flags of all of them: a patch is as much as its worst
+    file asks for."""
+    ranked: list[ActionInfo] = sorted(actions, key=lambda action: (_RISK_RANK[action.risk], len(action.flags)))
+    worst: ActionInfo = ranked[-1]
+    flags: tuple[Flag, ...] = tuple(dict.fromkeys(flag for action in actions for flag in action.flags))
+    if len(actions) == 1:
+        return worst
+    shown: str = truncate_middle(", ".join(action.target for action in actions), _PREVIEW_CHARS)
+    # Every file in the target, one a line, so that a rule of the owner's and the review model read each of them, not
+    # the worst alone (the code review of item 677).
+    targets: str = "\n".join(action.target for action in actions)
+    summary: str = f"Write {len(actions)} files: {shown}"
+    return worst.model_copy(update={"flags": flags, "summary": summary, "target": targets})
+
+
 def local_target(url: str) -> bool:
     """Whether ``url`` names this Mac or its network by itself: ``localhost`` or a name under it, or an address that is
     not public in any spelling a browser reads (the code review's Y1). A name that resolves to such an address is not
@@ -274,16 +300,23 @@ def local_target(url: str) -> bool:
 
 
 def permission_action(
-    asked: PermissionAsked, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
+    asked: PermissionAsked,
+    workspace: Path,
+    protected: tuple[Path, ...],
+    dot_paths: tuple[Path, ...],
+    workdir: str | None = None,
 ) -> ActionInfo:
     """A permission OpenCode's agent asks for, as Dot's policy weighs the same action of one of its own tools: a command
-    as the shell tool's, an edit as a write of the file, a read, a search or a folder outside the run's as a read, a
-    fetch or a search of the web as reading the web. A permission of a kind Dot does not know is high risk."""
+    as the shell tool's, in the folder it runs in (``workdir``, the call's own, item 677: the workspace when it names
+    none), an edit as a write of each file it writes, a read, a search or a folder outside the run's as a read, a fetch
+    or a search of the web as reading the web. A permission of a kind Dot does not know is high risk."""
     tool: str = f"{TOOL_PREFIX}{asked.permission}"
     match asked.permission:
         case "bash":
             command: str = get_str(asked.metadata, "command") or _patterns(asked)
-            assessment: ShellAssessment = assess_shell(command, workspace, workspace, protected, dot_paths)
+            folder: str | None = workdir or get_str(asked.metadata, "workdir") or None
+            cwd: Path = workspace if folder is None else expand_path(folder, workspace)
+            assessment: ShellAssessment = assess_shell(command, cwd, workspace, protected, dot_paths)
             preview: str = truncate_middle(" ".join(command.split()), _PREVIEW_CHARS)
             return ActionInfo(
                 tool=tool,
@@ -294,8 +327,11 @@ def permission_action(
                 flags=assessment.flags,
             )
         case "edit":
-            edit: ActionInfo = write_action(
-                tool, _target_path(asked, workspace), workspace, protected, dot_paths, "Write"
+            edit: ActionInfo = _worst(
+                [
+                    write_action(tool, path, workspace, protected, dot_paths, "Write")
+                    for path in _written_paths(asked, workspace)
+                ]
             )
             # OpenCode's agent writes outside Dot's file tools and their undo journal: a change of Dot's own files,
             # which those tools make once the user agrees (item 398), stays refused to it outside yolo (item 433).
@@ -336,6 +372,8 @@ class _Call:
     what decided it when the gate let it through (item 474)."""
 
     announced: bool = False
+    # What the agent called the tool with, once OpenCode showed the call (the folder a command runs in, item 677).
+    arguments: JsonObject = field(default_factory=dict)
     action: ActionInfo | None = None
     waited_s: float = 0.0
     decision: StepDecision | None = None
@@ -547,9 +585,13 @@ class _Follow:
 
     async def tool(self, event: ToolSeen) -> None:
         step: _Step | None = self.step_of(event.message_id)
-        if step is None or event.status == "pending":
+        if step is None:
             return
         call: _Call = self.calls.setdefault(event.call_id, _Call())
+        if event.input:
+            call.arguments = event.input
+        if event.status == "pending":
+            return
         if event.tool.startswith(self.door):
             # A tool of Dot's: the call runs as Dot's loop runs one, which shows it in the timeline under its own name.
             if not call.announced:
@@ -666,7 +708,14 @@ class _Follow:
         if event.permission == "task":
             await self.server.reply(event.request_id, self.directory, "reject", NO_SUBAGENT_NOTE)
             return
-        action: ActionInfo = permission_action(event, self.directory, runtime.protected, runtime.dot_paths)
+        workdir: JsonValue = call.arguments.get("workdir")
+        action: ActionInfo = permission_action(
+            event,
+            self.directory,
+            runtime.protected,
+            runtime.dot_paths,
+            workdir if isinstance(workdir, str) and workdir else None,
+        )
         call.asked(action)
         # An edit that would step on another run at work is refused, as a call of Dot's own tools is (item 301).
         held: str | None = runtime.peers.conflict(self.agent.run.id, action.tool, action)
@@ -898,7 +947,10 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
     run = agent.run
     ref: ModelRef = parse_model_ref(run.model)
     provider: OpenCodeProvider = await _server_of(runtime, ref)
-    server: OpenCodeServer = provider.server
+    # Outside yolo the agent works in the sandbox of the run's commands, a server of its own (item 677).
+    server: OpenCodeServer = provider.server.confined(
+        () if run.approvals == "yolo" else runtime.sandbox.current().commands
+    )
     info: ModelInfo = await provider.model_info(ref.model)
     variant: str | None = run.effort if run.effort is not None and run.effort in info.efforts else None
     directory: Path = runtime.workspace

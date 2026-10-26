@@ -11,6 +11,11 @@ environment is the login shell's PATH and the few variables a program expects, n
 HOME stays the owner's, for the commands its agent runs. Every tool of its agent asks Dot before it acts, and Dot's own
 policy answers (:mod:`dotagent.opencode.run`).
 
+Outside yolo the server runs in the sandbox of a run's commands (item 677: :func:`dotagent.policy.sandbox.
+confined_server`), so that what its agent runs and writes is held where a command of Dot's own would be, from a home
+of its own (``sandboxed``) whose data, state and cache it may write and whose config it may not; and nothing it starts
+reaches back to its port. A yolo run's server is the other one, as before, and never runs what the confined one left.
+
 The server starts when a run needs it (about 2 s) and stops once it has served nothing for
 ``[providers.opencode] idle_stop_s`` (it holds about 340 MB while up), and with the daemon. The list of free models
 comes from OpenCode's command line instead, in the same home and environment, its catalog refreshed first.
@@ -23,6 +28,8 @@ import re
 import secrets
 import shutil
 import socket
+import stat
+import tempfile
 import time
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager, suppress
@@ -41,6 +48,7 @@ from dotagent.core.paths import log_dir, opencode_command, opencode_dir
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort
 from dotagent.llm.wire import get_int, get_obj, get_str
+from dotagent.policy.sandbox import confined_server
 
 log = get_logger(__name__)
 # How much of an event line that cannot be read its error keeps.
@@ -86,6 +94,13 @@ PERMISSIONS: JsonObject = {
     "task": "ask",
 }
 _EFFORTS: tuple[Effort, ...] = ("minimal", "low", "medium", "high", "xhigh", "max")
+# The home of the server that runs in the sandbox of a run's commands (item 677), in the other's, and the folders of it
+# that server writes; its config, and the home where OpenCode looks for a ``.opencode`` folder of settings, are written
+# by Dot alone (the code review: a settings file its agent left there would be read at the server's next start).
+_CONFINED_HOME: str = "sandboxed"
+_WRITTEN: tuple[str, ...] = ("data", "state", "cache")
+# OpenCode's catalog of models in its cache folder, which the confined server starts from as the other one refreshed it.
+_CATALOG: tuple[str, ...] = ("opencode", "models.json")
 
 NOT_INSTALLED: str = (
     "OpenCode is not installed: Zen's free models run as OpenCode's own agent, so install it (brew install opencode,"
@@ -203,16 +218,64 @@ def _managed_config() -> JsonObject:
     return {"$schema": "https://opencode.ai/config.json", "autoupdate": False, "share": "disabled"}
 
 
-async def _prepared_home() -> Path:
-    """The server's home in Dot's (:func:`dotagent.core.paths.opencode_dir`), its folders made and its config
-    written."""
-    home: Path = opencode_dir()
-    for name in ("config", "data", "state", "cache", "home"):
-        await asyncio.to_thread((home / name).mkdir, mode=0o700, parents=True, exist_ok=True)
+def _folder_made(path: Path) -> None:
+    """Make the folder ``path`` and those above it. One of the confined server's own folders that its agent replaced
+    by a link or a file (the security review of item 677) is removed, the link itself, never what it names, and made
+    again, so that the server still starts; the folders above it are Dot's, which its agent cannot write. Blocking."""
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    folder: int = os.open(path.parent, os.O_SEARCH | os.O_DIRECTORY)
+    try:
+        _folder_made_in(folder, path.name)
+    finally:
+        os.close(folder)
+
+
+def _folder_made_in(folder: int, name: str) -> None:
+    """Make the folder ``name`` in the open ``folder``, removing first what stands in its place that is not a folder (a
+    link, never followed, or a file). Blocking."""
+    try:
+        status: os.stat_result = os.stat(name, dir_fd=folder, follow_symlinks=False)
+    except FileNotFoundError:
+        os.mkdir(name, 0o700, dir_fd=folder)
+        return
+    if not stat.S_ISDIR(status.st_mode):
+        os.unlink(name, dir_fd=folder)
+        os.mkdir(name, 0o700, dir_fd=folder)
+
+
+async def _prepared_home(home: Path) -> Path:
+    """The server's home ``home`` in Dot's (:func:`dotagent.core.paths.opencode_dir`), its folders made (OpenCode's own
+    in the config folder too, which a confined server may not make) and its config written."""
+    for name in ("config", "config/opencode", "home", *_WRITTEN):
+        await asyncio.to_thread(_folder_made, home / name)
     await asyncio.to_thread(
         (home / "opencode.json").write_text, json.dumps(_managed_config(), indent=2) + "\n", encoding="utf-8"
     )
     return home
+
+
+def _copy_catalog(source: Path, home: Path) -> None:
+    """Start the cache of the confined server's ``home`` with the catalog the other server refreshed
+    (:meth:`OpenCodeServer._catalog`), so that it knows the models listed. That cache is the confined agent's to write:
+    the copy is made in folders opened with no link followed and as a new file, after what is there is removed, so a
+    link the agent left in its place does not have the daemon write elsewhere. Blocking."""
+    found: Path = source.joinpath(*_CATALOG)
+    if not found.is_file():
+        return
+    folder: int = os.open(os.path.realpath(home), os.O_SEARCH | os.O_DIRECTORY)
+    try:
+        for part in ("cache", *_CATALOG[:-1]):
+            _folder_made_in(folder, part)
+            inner: int = os.open(part, os.O_SEARCH | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=folder)
+            os.close(folder)
+            folder = inner
+        with suppress(FileNotFoundError):
+            os.unlink(_CATALOG[-1], dir_fd=folder)
+        new: int = os.open(_CATALOG[-1], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=folder)
+        with os.fdopen(new, "wb") as copy:
+            copy.write(found.read_bytes())
+    finally:
+        os.close(folder)
 
 
 def server_environment(login_env: Mapping[str, str], home: Path) -> dict[str, str]:
@@ -244,9 +307,13 @@ def server_environment(login_env: Mapping[str, str], home: Path) -> dict[str, st
 class OpenCodeServer:
     """The OpenCode server Dot starts, started on first need and stopped when idle; a connector to the program."""
 
-    def __init__(self, config: OpenCodeConfig, login_env: Mapping[str, str]) -> None:
+    def __init__(self, config: OpenCodeConfig, login_env: Mapping[str, str], confinement: tuple[str, ...] = ()) -> None:
         self._config: OpenCodeConfig = config
         self._login_env: dict[str, str] = dict(login_env)
+        # The words a command of a run starts with in its sandbox (item 677), none for the server of a yolo run; and the
+        # confined servers of this one, by those words.
+        self._confinement: tuple[str, ...] = confinement
+        self._confined: dict[tuple[str, ...], OpenCodeServer] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
         self._live: _Live | None = None
         self._holds: int = 0
@@ -258,18 +325,40 @@ class OpenCodeServer:
     def program(self) -> Path | None:
         return find_program(opencode_command(self._config.command), self._login_env.get("PATH", ""))
 
+    def confined(self, sandbox: tuple[str, ...]) -> "OpenCodeServer":
+        """The server of a run whose commands start with ``sandbox`` (:attr:`dotagent.policy.sandbox.Sandbox.commands`):
+        one that runs in that sandbox, from a home of its own (item 677), or this one for a run that has none (yolo, or
+        the sandbox switched off)."""
+        if not sandbox:
+            return self
+        server: OpenCodeServer | None = self._confined.get(sandbox)
+        if server is None:
+            server = OpenCodeServer(self._config, self._login_env, sandbox)
+            self._confined[sandbox] = server
+        return server
+
+    def _home(self) -> Path:
+        return opencode_dir() / _CONFINED_HOME if self._confinement else opencode_dir()
+
     async def _start(self) -> _Live:
         program: Path | None = self.program()
         if program is None:
             raise OpenCodeMissing(NOT_INSTALLED, {"command": opencode_command(self._config.command)})
-        home: Path = await _prepared_home()
+        home: Path = await _prepared_home(self._home())
         password: str = secrets.token_urlsafe(24)
         port: int = _free_port()
         started_at: float = time.monotonic()
         env: dict[str, str] = {**server_environment(self._login_env, home), "OPENCODE_SERVER_PASSWORD": password}
-        log_path: Path = log_dir() / "opencode.log"
+        words: tuple[str, ...] = ()
+        if self._confinement:
+            await asyncio.to_thread(_copy_catalog, opencode_dir() / "cache", home)
+            await self._prepare_config(program, home)
+            resolved: Path = Path(await asyncio.to_thread(os.path.realpath, home))
+            words = confined_server(self._confinement, tuple(resolved / name for name in _WRITTEN), port)
+        log_path: Path = log_dir() / ("opencode-sandboxed.log" if self._confinement else "opencode.log")
         output: IO[str] = await asyncio.to_thread(log_path.open, "w", encoding="utf-8")
         process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+            *words,
             str(program),
             "serve",
             "--hostname",
@@ -306,6 +395,43 @@ class OpenCodeServer:
             await asyncio.sleep(_POLL_S)
         log.info("opencode_server_started", program=str(program), pid=process.pid)
         return live
+
+    async def _prepare_config(self, program: Path, home: Path) -> None:
+        """Have OpenCode write what it writes in its own config folder at its start (``.gitignore``), which the confined
+        server may not write: ``opencode models`` is run once outside the sandbox, with the confined home's config and
+        fresh data, state and cache folders of its own, so that nothing the confined agent left in its folders runs
+        outside the sandbox. A preparation that fails is logged; the server's start then says what went wrong."""
+        with tempfile.TemporaryDirectory(prefix="dot-opencode-") as scratch:
+            fresh: Path = Path(scratch)
+            env: dict[str, str] = server_environment(self._login_env, home)
+            env.update(
+                {
+                    "XDG_DATA_HOME": str(fresh / "data"),
+                    "XDG_STATE_HOME": str(fresh / "state"),
+                    "XDG_CACHE_HOME": str(fresh / "cache"),
+                    "OPENCODE_TEST_HOME": str(fresh / "home"),
+                }
+            )
+            await asyncio.to_thread(_copy_catalog, opencode_dir() / "cache", fresh)
+            process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+                str(program),
+                "models",
+                ZEN_PROVIDER,
+                cwd=scratch,
+                env=env,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                _, err = await asyncio.wait_for(process.communicate(), timeout=self._config.start_timeout_s)
+            except TimeoutError:
+                process.kill()
+                await process.wait()
+                log.warning("opencode_config_not_prepared", reason="timeout")
+                return
+            if process.returncode != 0:
+                log.warning("opencode_config_not_prepared", exit=process.returncode, stderr=err.decode()[-500:])
 
     async def _release(self, live: _Live) -> None:
         if live.process.returncode is None:
@@ -410,7 +536,7 @@ class OpenCodeServer:
         opencode --refresh --verbose`` in the server's home and environment. A server answers from the catalog it read
         as it started and refreshes it only after (measured 2026-10-15: its list lacked three free models that its
         refreshed catalog, written a second earlier, had), and a server started later reads the refreshed one."""
-        home: Path = await _prepared_home()
+        home: Path = await _prepared_home(opencode_dir())
         process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
             str(program),
             "models",
@@ -535,6 +661,8 @@ class OpenCodeServer:
             ) from error
 
     async def aclose(self) -> None:
+        for server in self._confined.values():
+            await server.aclose()
         if self._idle is not None:
             self._idle.cancel()
             with suppress(asyncio.CancelledError):

@@ -4,8 +4,10 @@ models as ``opencode models opencode --verbose`` prints them, a permission as Do
 environment of the server Dot starts. Item 284's: the tools of Dot's the agent gets, each chat's door and the rules
 that keep a session to its own, and a result of Dot's tool as an MCP result."""
 
+import asyncio
 import json
 import re
+import shutil
 from fnmatch import fnmatchcase
 from pathlib import Path
 
@@ -14,6 +16,7 @@ from mcp.types import CallToolResult, ImageContent, TextContent
 from pydantic import JsonValue
 
 from dotagent.agent.authorization import StepDecision
+from dotagent.config import load_default_config
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData, assistant_message, user_message
 from dotagent.opencode.bridge import door_name, mcp_result, session_rules
@@ -38,7 +41,16 @@ from dotagent.opencode.run import (
     permission_action,
     step_result,
 )
-from dotagent.opencode.server import PERMISSIONS, FreeModel, free_models, server_environment
+from dotagent.opencode.server import (
+    PERMISSIONS,
+    FreeModel,
+    OpenCodeServer,
+    _copy_catalog,
+    _prepared_home,
+    free_models,
+    server_environment,
+)
+from dotagent.policy.sandbox import confined_server
 from dotagent.policy.types import ActionInfo
 from dotagent.tools.base import ToolResult
 from dotagent.tools.browser import build_browser_tools
@@ -179,6 +191,50 @@ def test_a_permission_is_weighed_as_the_same_action_of_dots_own_tools(tmp_path: 
     assert carrying.flags == ("exfiltration",)
     unknown = permission_action(_asked("teleport", ("mars",), {}), workspace, (), ())
     assert (unknown.tool, unknown.risk) == ("opencode_teleport", "high")
+
+
+def test_a_patch_is_weighed_by_every_file_it_writes_and_a_command_in_its_own_folder(tmp_path: Path) -> None:
+    """Item 677: a patch of several files names them all in its patterns and joins them by commas in ``filepath``, which
+    read as one path inside the workspace; and a command runs in the folder its call names, not the workspace."""
+    workspace: Path = tmp_path / "workspace"
+    home: Path = tmp_path / "home"
+    keys: Path = home / ".ssh"
+    patch = permission_action(
+        _asked(
+            "edit", ("ok.txt", "../home/.ssh/authorized_keys"), {"filepath": "ok.txt, ../home/.ssh/authorized_keys"}
+        ),
+        workspace,
+        (keys,),
+        (),
+    )
+    assert (patch.risk, patch.flags) == ("high", ("secret_access",))
+    # Every file is in the target, one a line, for a rule and the review model to read.
+    assert patch.target.splitlines() == [str(workspace / "ok.txt"), str(keys / "authorized_keys")]
+    assert patch.summary.startswith("Write 2 files: ")
+    alone = permission_action(
+        _asked("edit", ("ok.txt", "b.txt"), {"filepath": "ok.txt, b.txt"}), workspace, (keys,), ()
+    )
+    assert (alone.risk, alone.flags) == ("low", ())
+    read_there = permission_action(
+        _asked("bash", ("cat .ssh/id_rsa",), {"command": "cat .ssh/id_rsa"}), workspace, (keys,), (), str(home)
+    )
+    read_here = permission_action(
+        _asked("bash", ("cat .ssh/id_rsa",), {"command": "cat .ssh/id_rsa"}), workspace, (keys,), ()
+    )
+    assert "secret_access" in read_there.flags and "secret_access" not in read_here.flags
+
+
+def test_a_run_outside_yolo_gets_a_server_of_its_own_in_its_sandbox(tmp_path: Path) -> None:
+    """Item 677: the confined server is one per sandbox, apart from the server of a yolo run, and nothing it starts
+    reaches back to its port."""
+    base: OpenCodeServer = OpenCodeServer(load_default_config().providers.opencode, {"PATH": "/usr/bin"})
+    words: tuple[str, ...] = ("/usr/bin/sandbox-exec", "-p", "(version 1)\n(allow default)")
+    assert base.confined(()) is base
+    assert base.confined(words) is base.confined(words) is not base
+    started: tuple[str, ...] = confined_server(words, (tmp_path / "data", tmp_path / "cache"), 4242)
+    assert started[:2] == words[:2] and started[2].startswith(words[2])
+    assert f'(allow file-write* (subpath "{tmp_path / "cache"}") (subpath "{tmp_path / "data"}"))' in started[2]
+    assert started[2].endswith('(deny network-outbound (remote tcp "*:4242"))')
 
 
 def test_a_new_session_hears_what_the_chat_said_meanwhile() -> None:
@@ -429,3 +485,41 @@ def test_a_call_asked_about_twice_keeps_only_what_its_last_ask_was_let_through_f
     )
     result: JsonObject = step_result(refused, "opencode_edit", call, "refused", 0.0, False, ())
     assert (result["decision"], result["kind"], result["summary"]) == (None, "write", "Edit /tmp/x/a.md")
+
+
+def test_the_catalog_is_copied_into_the_confined_home_with_no_link_followed(tmp_path: Path) -> None:
+    """The confined agent may write its cache: a link it left where the daemon copies the catalog must not have the
+    daemon write over the file the link names (the review of item 677)."""
+    source: Path = tmp_path / "open" / "cache"
+    (source / "opencode").mkdir(parents=True)
+    (source / "opencode" / "models.json").write_text('{"models": 1}', encoding="utf-8")
+    home: Path = tmp_path / "sandboxed"
+    (home / "cache" / "opencode").mkdir(parents=True)
+    token: Path = tmp_path / "api-token"
+    token.write_text("secret", encoding="utf-8")
+    (home / "cache" / "opencode" / "models.json").symlink_to(token)
+    _copy_catalog(source, home)
+    copied: Path = home / "cache" / "opencode" / "models.json"
+    assert not copied.is_symlink() and copied.read_text(encoding="utf-8") == '{"models": 1}'
+    assert token.read_text(encoding="utf-8") == "secret"
+    elsewhere: Path = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    shutil.rmtree(home / "cache")
+    (home / "cache").symlink_to(elsewhere)
+    # The link is replaced by a folder of the home's own, never followed.
+    _copy_catalog(source, home)
+    assert list(elsewhere.iterdir()) == [] and not (home / "cache").is_symlink()
+    assert (home / "cache" / "opencode" / "models.json").read_text(encoding="utf-8") == '{"models": 1}'
+
+
+def test_a_link_the_confined_agent_put_in_place_of_its_folder_is_replaced_not_followed(tmp_path: Path) -> None:
+    """The security review of item 677: the confined agent may replace its data folder by a link to a file; the server
+    must still start, and the file the link names stays as it was."""
+    home: Path = tmp_path / "sandboxed"
+    home.mkdir()
+    token: Path = tmp_path / "api-token"
+    token.write_text("secret", encoding="utf-8")
+    (home / "data").symlink_to(token)
+    asyncio.run(_prepared_home(home))
+    assert (home / "data").is_dir() and not (home / "data").is_symlink()
+    assert token.read_text(encoding="utf-8") == "secret"
