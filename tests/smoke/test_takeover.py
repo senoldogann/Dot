@@ -38,7 +38,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.server.stream import encode_frame
+from dotagent.server.stream import OPENING, encode_frame
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 
@@ -286,6 +286,8 @@ async def test_a_takeover_holds_the_run_until_the_handback_and_the_waiting_call_
     async with client.stream("GET", f"/api/runs/{run.id}/screencast") as cast:
         assert cast.status_code == 200
         chunks: AsyncIterator[bytes] = cast.aiter_bytes()
+        # The stream's opening line (item 709), then a keepalive while no frame comes.
+        assert await asyncio.wait_for(anext(chunks), _QUIET_WAIT_S) == OPENING
         first_chunk: bytes = await asyncio.wait_for(anext(chunks), _QUIET_WAIT_S)
         assert first_chunk.startswith(b": keepalive")
 

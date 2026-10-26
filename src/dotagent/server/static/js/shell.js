@@ -29,6 +29,7 @@ function buildIndicators() {
   const connectionLabel = el("span", { class: "label" }, STREAM_LABEL.connecting);
   const connection = el("span", { class: "pill", hidden: true }, dot, connectionLabel);
   const showConnection = showAfter(connection, quietBreak);
+  let returnsSeen = 0;
   const banner = el(
     "div",
     { class: "banner", hidden: true, role: "alert" },
@@ -59,7 +60,13 @@ function buildIndicators() {
       dot.className = `live-dot ${snapshot.stream}`;
       setText(connectionLabel, STREAM_LABEL[snapshot.stream]);
       // The connection shows while it is being made or lost; a live one says nothing (item 120), nor does a break that
-      // mends at once (item 286). The runs that work are counted in the sidebar's Working section.
+      // mends at once (item 286). The runs that work are counted in the sidebar's Working section. A break that began
+      // while the page was away waits again from the page's return, for the grace a waking network takes (items 328
+      // and 709): its wait was counted from when it began, so it showed at once on the return.
+      if (snapshot.returns !== returnsSeen) {
+        returnsSeen = snapshot.returns;
+        showConnection(false);
+      }
       showConnection(snapshot.stream !== "live");
       connection.title = `Connection to Dot: ${STREAM_LABEL[snapshot.stream]}`;
       banner.hidden = snapshot.status === null || !snapshot.status.failsafe_engaged;

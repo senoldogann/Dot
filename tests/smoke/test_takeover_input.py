@@ -37,6 +37,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
+from dotagent.server.stream import OPENING
 from dotagent.store.models import EventRecord, RuleRecord, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 
@@ -584,7 +585,10 @@ async def test_the_cast_and_the_input_of_a_campaign_come_from_its_own_browser(
         sent: httpx.Response = await client.post(f"/api/runs/{campaign.id}/input", json=_tapped(_BUTTON))
         assert sent.status_code == 200 and sent.json()["url"] == "https://example.test/", sent.text
         async with client.stream("GET", f"/api/runs/{campaign.id}/screencast") as cast:
-            first: bytes = await asyncio.wait_for(anext(cast.aiter_bytes()), _RUN_WAIT_S)
+            frames: AsyncIterator[bytes] = cast.aiter_bytes()
+            # The stream's opening line (item 709), then its first frame.
+            assert await asyncio.wait_for(anext(frames), _RUN_WAIT_S) == OPENING
+            first: bytes = await asyncio.wait_for(anext(frames), _RUN_WAIT_S)
         assert b"https://example.test/" in first
         assert sorted(asked) == ["cast", "input"]
         await client.post(f"/api/runs/{campaign.id}/handback")

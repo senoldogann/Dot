@@ -46,6 +46,7 @@ from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.guard import daemon_proof
 from dotagent.server.kept_pages import keep_pages
 from dotagent.server.links import ui_url
+from dotagent.server.stream import OPENING
 from dotagent.server.views import PermissionsView
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_STOPPED
 from dotagent.store.models import NO_PICKS, ApprovalRecord, EventRecord, RunRecord, ThreadRecord, ThreadSummary
@@ -1009,8 +1010,9 @@ async def test_an_open_stream_ends_with_the_server_instead_of_holding_up_its_shu
             assert response.status_code == 200
             server.should_exit = True
             await asyncio.wait_for(asyncio.shield(serving), STOP_WITHIN_S)
-            # The stream was completed, not cut off: reading it to the end raises nothing.
-            assert await response.aread() == b""
+            # The stream was completed, not cut off: reading it to the end raises nothing, and it holds its opening
+            # line alone (item 709).
+            assert await response.aread() == OPENING
     finally:
         server.should_exit = True
         await serving

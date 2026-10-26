@@ -9,6 +9,8 @@ import base64
 import json
 from collections.abc import AsyncIterator, Iterable
 
+from starlette.responses import StreamingResponse
+
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
@@ -31,6 +33,10 @@ from dotagent.store.models import EventRecord, RunRecord
 SSE_TYPE: str = "text/event-stream"
 SSE_HEADERS: dict[str, str] = {"Cache-Control": "no-store", "X-Accel-Buffering": "no"}
 KEEPALIVE: bytes = b": keepalive\n\n"
+# The first bytes of every stream (item 709): WebKit (Safari, the iPhone, Dot.app) hands the page an answer only once
+# its body begins, so a stream with nothing to say yet, as the lifecycle stream mostly is, read as not connected until
+# its first keepalive, 15 s on, and the page said "Reconnecting" for that long after every break.
+OPENING: bytes = b": open\n\n"
 # Tells a page whose lifecycle stream fell so far behind that events were lost to read again what it shows.
 RESYNC: bytes = b"event: resync\ndata: {}\n\n"
 # The event of the screencast stream (``GET /runs/{id}/screencast``).
@@ -145,6 +151,17 @@ async def _next_event(queue: asyncio.Queue[EventRecord], stopping: asyncio.Event
         getter.cancel()
         stopper.cancel()
         await asyncio.wait({getter, stopper})
+
+
+async def _opened(body: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
+    yield OPENING
+    async for chunk in body:
+        yield chunk
+
+
+def event_stream(body: AsyncIterator[bytes]) -> StreamingResponse:
+    """The answer of an event stream: ``body`` after an opening comment that every browser hands the page at once."""
+    return StreamingResponse(_opened(body), media_type=SSE_TYPE, headers=SSE_HEADERS)
 
 
 async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterator[bytes]:

@@ -79,7 +79,8 @@ under the composer and the tops of the drawers under the status bar (item 293). 
 caret for a tap as it opens, so the keyboard comes only when you ask for it.
 
 A phone that comes back to Dot finds it as it left it (item 328). Back from the background, the page makes its
-connections again without a word for 8 seconds, as long as a phone's network (a VPN such as Tailscale) takes to wake;
+connections again without a word for 8 seconds, as long as a phone's network (a VPN such as Tailscale) takes to wake,
+counted from the return even for a connection that broke while the page was away (item 709);
 only a connection still not there then shows the bar's pill and, on a chat's page, a note that floats under the bar
 over the conversation, so that nothing read moves as it comes and goes. What changed meanwhile is read again, and only
 what changed is drawn again: the sidebar and the helpers keep the rows that did not. Opened again after iOS let it go,
