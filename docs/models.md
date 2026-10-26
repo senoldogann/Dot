@@ -184,9 +184,13 @@ answer keeps its words, Ollama's too.
   OpenCode's own tools (commands, reading and editing files, searching, fetching and searching the web, its to-do list),
   and each of them asks Dot first: Dot weighs it as the same action of its own tools, by your rules, the preset and the
   run's approval mode, and asks you, the review model or nobody as for any run; a refusal tells the agent why, and it
-  goes on. A subagent it asks for is refused, as its session would not be the run's. Its commands run outside Dot's
-  sandbox (Settings › Rules › Advanced › Keep Dot's commands in a safe box), each after Dot's policy, and its web
-  fetches reach no address of this Mac or its network
+  goes on. A subagent it asks for is refused, as its session would not be the run's. An edit is weighed by every file
+  it writes (a patch of several files by the one your policy weighs most), and a command in the folder it runs in.
+  Outside `yolo` the server and all it runs work in Dot's sandbox, as Dot's own commands do (Settings › Rules ›
+  Advanced › Keep Dot's commands in a safe box, item 677): from a home of their own (`opencode/sandboxed`), whose
+  data, state and cache they write and whose config they do not, and nothing it starts reaches the server's own port
+  (where the password its environment holds would answer its own asks); a `yolo` run's agent works in the other server,
+  as before. Its web fetches reach no address of this Mac or its network
   unless `[web] allow_private_hosts` says so. Besides its own, the agent has Dot's tools for what OpenCode has none for
   (item 284): Dot's browser with your sign-ins, the Mac's applications, memory, schedules, notify, a page in the
   conversation, skills, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow

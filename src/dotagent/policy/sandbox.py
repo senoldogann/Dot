@@ -178,6 +178,22 @@ def build_sandbox(
     )
 
 
+def confined_server(words: tuple[str, ...], writable: tuple[Path, ...], port: int) -> tuple[str, ...]:
+    """The words that start a server of Dot's own (OpenCode's, item 677) in the sandbox that ``words`` start a command
+    of a run in: the folders ``writable`` (resolved) are its own to write, and no process of it, the commands its agent
+    runs among them, reaches back to it at ``port`` on this Mac, where the password its environment holds would let
+    them answer their own asks."""
+    program, flag, profile = words
+    rules: list[str] = [
+        profile,
+        f"(allow file-write* {_filters('subpath', sorted(set(writable)))})",
+        # Every address, not "localhost" alone: an IPv4 address written in IPv6 (``::ffff:127.0.0.1``) reaches the
+        # same listener past a rule of loopback's names.
+        f'(deny network-outbound (remote tcp "*:{port}"))',
+    ]
+    return (program, flag, "\n".join(rules))
+
+
 def hard_linked(paths: Sequence[Path]) -> dict[Path, int]:
     """The regular files among ``paths`` that have more than one name on this Mac, each with how many (item 561). A
     profile of paths cannot close a hard link made outside the sandbox: it is another path to the same file, and a run's
