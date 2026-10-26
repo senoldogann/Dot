@@ -5,8 +5,9 @@ that never answers. Nothing here looks at or draws on the screen.
 """
 
 import asyncio
+import contextlib
 import sys
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
 import pytest
@@ -33,11 +34,13 @@ class _Pointer(PointerOverlay):
     async def move(self, x: float, y: float, click: bool) -> None:
         self.told.append(("move", f"{x:g}", f"{y:g}", str(click)))
 
-    async def hide(self) -> None:
+    @contextlib.asynccontextmanager
+    async def hidden(self) -> AsyncIterator[None]:
         self.told.append(("hide",))
-
-    async def reveal(self) -> None:
-        self.told.append(("reveal",))
+        try:
+            yield
+        finally:
+            self.told.append(("reveal",))
 
     async def rest(self) -> None:
         self.told.append(("rest",))
@@ -169,8 +172,10 @@ async def test_a_hide_waits_for_its_own_answer(monkeypatch: pytest.MonkeyPatch) 
     overlay: PointerOverlay = PointerOverlay()
     try:
         await overlay.move(1.0, 2.0, False)
-        await overlay.hide()
-        await overlay.hide()
+        async with overlay.hidden():
+            pass
+        async with overlay.hidden():
+            pass
         assert overlay._process is not None and overlay._process.returncode is None
         assert overlay._enabled
     finally:
@@ -184,11 +189,13 @@ async def test_a_helper_that_does_not_answer_is_ended_and_no_capture_waits_for_i
     monkeypatch.setattr(pointer, "HIDE_WITHIN_S", 0.2)
     overlay: PointerOverlay = PointerOverlay()
     await overlay.move(1.0, 2.0, False)
-    await overlay.hide()
+    async with overlay.hidden():
+        pass
     assert overlay._process is None and not overlay._enabled
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     started: float = loop.time()
-    await overlay.hide()
+    async with overlay.hidden():
+        pass
     await overlay.move(3.0, 4.0, True)
     assert loop.time() - started < 0.05 and overlay._process is None
     await overlay.aclose()
@@ -202,7 +209,8 @@ async def test_a_helper_that_cannot_start_costs_only_the_pointer(monkeypatch: py
     overlay: PointerOverlay = PointerOverlay()
     await overlay.warm()
     await overlay.move(1.0, 2.0, True)
-    await overlay.hide()
+    async with overlay.hidden():
+        pass
     await overlay.rest()
     await overlay.aclose()
 
@@ -250,11 +258,34 @@ async def test_with_two_captures_at_once_the_pointer_comes_back_only_after_the_s
     monkeypatch.setattr(overlay, "_send", noting)
     try:
         await overlay.move(1.0, 2.0, False)
-        await overlay.hide()
-        await overlay.hide()
-        await overlay.reveal()
-        assert told == ["move", "hide"]
-        await overlay.reveal()
+        async with overlay.hidden():
+            async with overlay.hidden():
+                pass
+            assert told == ["move", "hide"]
         assert told == ["move", "hide", "reveal"]
+    finally:
+        await overlay.aclose()
+
+
+async def test_a_capture_cancelled_while_it_waited_for_the_helper_leaves_no_count_behind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Item 705's review: a capture cancelled while the helper had not yet said it hid the pointer left the count of
+    captures raised, and the pointer was never hidden or shown again. The count goes back down however it ends."""
+    _stand_in(monkeypatch, "import sys\nfor line in sys.stdin:\n    pass\n")
+    overlay: PointerOverlay = PointerOverlay()
+
+    async def capture() -> None:
+        async with overlay.hidden():
+            raise AssertionError("the helper never said it hid the pointer")
+
+    try:
+        await overlay.move(1.0, 2.0, False)
+        waiting: asyncio.Task[None] = asyncio.create_task(capture())
+        await asyncio.sleep(0.3)
+        waiting.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiting
+        assert overlay._capturing == 0 and overlay._enabled
     finally:
         await overlay.aclose()

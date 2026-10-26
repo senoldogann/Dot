@@ -3,7 +3,9 @@ and the service that keeps captures for the composer, plays the sound and tells 
 in place of the window in front."""
 
 import asyncio
+import contextlib
 import time
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
@@ -267,11 +269,13 @@ class _Pointer(PointerOverlay):
         super().__init__(enabled=False)
         self.told: list[str] = []
 
-    async def hide(self) -> None:
+    @contextlib.asynccontextmanager
+    async def hidden(self) -> AsyncIterator[None]:
         self.told.append("hide")
-
-    async def reveal(self) -> None:
-        self.told.append("reveal")
+        try:
+            yield
+        finally:
+            self.told.append("reveal")
 
 
 async def test_a_capture_takes_dots_pointer_off_the_screen_while_it_captures_and_puts_it_back() -> None:

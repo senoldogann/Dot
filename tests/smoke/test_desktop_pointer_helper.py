@@ -18,11 +18,11 @@ async def test_the_helper_moves_hides_at_once_comes_back_rests_and_stops() -> No
         await overlay.warm()
         await overlay.move(160.0, 160.0, False)
         await overlay.move(260.0, 200.0, True)
-        await overlay.hide()  # the first answer comes once the helper runs
+        async with overlay.hidden():  # the first answer comes once the helper runs
+            pass
         started: float = loop.time()
-        await overlay.hide()
-        assert loop.time() - started < 0.1
-        await overlay.reveal()
+        async with overlay.hidden():
+            assert loop.time() - started < 0.1
         await overlay.rest()
         process = overlay._process
         assert process is not None and process.returncode is None and overlay._enabled

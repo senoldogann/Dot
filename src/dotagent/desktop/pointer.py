@@ -6,16 +6,18 @@ It only shows: the step itself is done as before, through the HID event tap, whi
 The daemon has no AppKit run loop for windows of its own, so a helper process draws it (``python -m
 dotagent.desktop.pointer``), as the flight of SnapShots is drawn (:mod:`dotagent.desktop.flight`), started at the first
 step that needs it and fed one JSON line per command (:class:`PointerCommand`): ``move`` glides to a point and, with
-``click``, ripples there; ``hide`` takes it off the screen at once and answers ``hidden`` on its output, so that a
+``click``, ripples there; ``hide`` takes it off the screen at once and answers ``hidden <n>`` on its output, so that a
 screenshot the model is shown never holds it; ``reveal`` puts it back; ``rest`` fades it out. Points are the screen's,
 from the top left of the main display, as the steps' events take them. The helper takes no permission: it draws, and
 reads nothing of the screen. A helper that cannot start, or that died, only costs the pointer: the steps go on.
 """
 
 import asyncio
+import contextlib
 import math
 import sys
 import threading
+from collections.abc import AsyncIterator
 from typing import Literal
 
 from pydantic import ValidationError
@@ -187,38 +189,48 @@ class PointerOverlay:
             except OSError as error:
                 log.warning("pointer_not_started", error=str(error))
 
-    async def hide(self) -> None:
-        """Take the pointer off the screen and wait, :data:`HIDE_WITHIN_S` at most, until the helper says it did: what
-        is captured next does not hold it. A helper that is not running has nothing on the screen; one that does not
-        answer in time is ended, and no pointer is drawn from then on, so that no capture waits for it again."""
-        async with self._sending:
-            self._capturing += 1
-            if self._capturing > 1:
-                return
-            self._hides += 1
-            wanted: str = hidden_line(self._hides)
-            process: asyncio.subprocess.Process | None = await self._send(
-                PointerCommand(op="hide", number=self._hides), start=False
-            )
-            if process is None or process.stdout is None:
-                return
-            try:
-                async with asyncio.timeout(HIDE_WITHIN_S):
-                    while (line := await process.stdout.readline()) and line.decode("utf-8").strip() != wanted:
-                        pass
-            except TimeoutError:
-                log.warning("pointer_not_hidden_in_time", waited_s=HIDE_WITHIN_S)
-                self._enabled = False
-                process.kill()
-                await process.wait()
-                self._process = None
+    @contextlib.asynccontextmanager
+    async def hidden(self) -> AsyncIterator[None]:
+        """The pointer off the screen while the block runs, for a capture: the helper is asked to hide it and the block
+        starts once it says it did (:data:`HIDE_WITHIN_S` at most), and it comes back once the last of the captures
+        under way has ended. A capture that comes while another hid it starts at once. The count of captures goes back
+        down however the block ends, cancelled while it waited for the helper as well."""
+        counted: bool = False
+        try:
+            async with self._sending:
+                self._capturing += 1
+                counted = True
+                if self._capturing == 1:
+                    await self._hide_now()
+            yield
+        finally:
+            if counted:
+                async with self._sending:
+                    self._capturing -= 1
+                    if self._capturing == 0:
+                        await self._send(PointerCommand(op="reveal"), start=False)
 
-    async def reveal(self) -> None:
-        """Put the pointer back where it was, once the last capture that hid it has ended."""
-        async with self._sending:
-            self._capturing = max(0, self._capturing - 1)
-            if self._capturing == 0:
-                await self._send(PointerCommand(op="reveal"), start=False)
+    async def _hide_now(self) -> None:
+        """Ask the helper to hide the pointer and wait until it says it did. A helper that is not running has nothing
+        on the screen; one that does not answer in time is ended, and no pointer is drawn from then on, so that no
+        capture waits for it again."""
+        self._hides += 1
+        wanted: str = hidden_line(self._hides)
+        process: asyncio.subprocess.Process | None = await self._send(
+            PointerCommand(op="hide", number=self._hides), start=False
+        )
+        if process is None or process.stdout is None:
+            return
+        try:
+            async with asyncio.timeout(HIDE_WITHIN_S):
+                while (line := await process.stdout.readline()) and line.decode("utf-8").strip() != wanted:
+                    pass
+        except TimeoutError:
+            log.warning("pointer_not_hidden_in_time", waited_s=HIDE_WITHIN_S)
+            self._enabled = False
+            process.kill()
+            await process.wait()
+            self._process = None
 
     async def rest(self) -> None:
         """Fade the pointer out: the run that moved it has ended."""

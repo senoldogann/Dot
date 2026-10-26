@@ -645,11 +645,8 @@ class DesktopSession:
     async def _without_pointer(self, capture: Callable[[], ScreenshotView]) -> ScreenshotView:
         """``capture`` with Dot's pointer off the screen (item 705): the model sees the screen, not Dot's arrow over
         what it is to read."""
-        await self._pointer.hide()
-        try:
+        async with self._pointer.hidden():
             return await self._call(capture)
-        finally:
-            await self._pointer.reveal()
 
     async def read(self, thread_id: str, app: str | None, ref: int, offset: int, max_chars: int) -> TextRead:
         """The text of one element, ``max_chars`` of it from ``offset``."""

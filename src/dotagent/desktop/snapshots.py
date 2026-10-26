@@ -9,6 +9,7 @@ never which. Dot's own window and a password manager's are never captured. Setti
 parts (``[snapshots]``)."""
 
 import asyncio
+import contextlib
 import threading
 import time
 from collections.abc import Callable
@@ -445,10 +446,9 @@ class SnapshotService:
         taker: Taker = self._taker
         overlay: Overlay = self._overlay
         async with self._taking:
-            if self._pointer is not None:
-                await self._pointer.hide()
             try:
-                kept: Kept = await asyncio.to_thread(taker, self.app_text)
+                async with self._pointer.hidden() if self._pointer is not None else contextlib.nullcontext():
+                    kept: Kept = await asyncio.to_thread(taker, self.app_text)
             except (DesktopError, InvalidValueError, OSError) as error:
                 # Refused (Dot's own window, a password manager, no window, no permission) or the files could not be
                 # stored: the pages hear why, and the caller.
@@ -456,9 +456,6 @@ class SnapshotService:
                 log.warning("snapshot_failed", error=reason)
                 await self._bus.emit(SYSTEM_RUN_ID, SNAPSHOT_FAILED_EVENT, {"reason": reason}, False)
                 raise
-            finally:
-                if self._pointer is not None:
-                    await self._pointer.reveal()
             taken: SnapshotTaken = kept.snapshot
             if self.sound != "off":
                 await asyncio.to_thread(play_sound, self.sound)
