@@ -12,6 +12,7 @@ from dotagent.config import load_default_config
 from dotagent.core.errors import DesktopError
 from dotagent.desktop import snapshots
 from dotagent.desktop.flight import FlightCommand, Frame
+from dotagent.desktop.pointer import PointerOverlay
 from dotagent.desktop.snapshots import Kept, SnapshotService, SnapshotTaken, TapDetector, _stem
 from dotagent.events import SNAPSHOT_EVENT, SNAPSHOT_FAILED_EVENT, SYSTEM_RUN_ID
 
@@ -257,3 +258,43 @@ async def test_the_service_starts_without_the_key_watched_while_snapshots_are_of
     await service.stop()
     assert overlay.closed == 1
     await asyncio.sleep(0)
+
+
+class _Pointer(PointerOverlay):
+    """Dot's pointer (item 705), keeping what it was told instead of drawing, and what the capture saw of it."""
+
+    def __init__(self) -> None:
+        super().__init__(enabled=False)
+        self.told: list[str] = []
+
+    async def hide(self) -> None:
+        self.told.append("hide")
+
+    async def reveal(self) -> None:
+        self.told.append("reveal")
+
+
+async def test_a_capture_takes_dots_pointer_off_the_screen_while_it_captures_and_puts_it_back() -> None:
+    """Item 705's review: the window the owner captures, which goes to the model, is captured without Dot's pointer
+    over it, also when the capture fails."""
+    pointer: _Pointer = _Pointer()
+    seen: list[list[str]] = []
+
+    def taker(with_text: bool) -> Kept:
+        seen.append(list(pointer.told))
+        return _kept("Notes")
+
+    def refusing(with_text: bool) -> Kept:
+        seen.append(list(pointer.told))
+        raise DesktopError("no window in front", {})
+
+    config = load_default_config().snapshots.model_copy(update={"sound": "off", "enabled": False})
+    service: SnapshotService = SnapshotService(config, _Bus())  # type: ignore[arg-type]
+    await service.start(taker, _Shower(), _Overlay(), pointer)
+    await service.take()
+    failing: SnapshotService = SnapshotService(config, _Bus())  # type: ignore[arg-type]
+    await failing.start(refusing, _Shower(), _Overlay(), pointer)
+    with pytest.raises(DesktopError):
+        await failing.take()
+    assert seen == [["hide"], ["hide", "reveal", "hide"]]
+    assert pointer.told == ["hide", "reveal", "hide", "reveal"]

@@ -450,6 +450,15 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
   Vision from the picture the model is shown (what is painted black is not read), each with the x, y of its centre
   that `desktop_act` takes (item 701, `read_screen_text`; 50 ms a screen once warm): a window that shows nothing to
   accessibility can be read and clicked by a model that sees no image.
+- Dot's own pointer, a glowing violet arrow, glides to where each step of `desktop_act` went and ripples where it
+  clicked, so that you see what Dot does and where (item 705, `show_pointer`, on by default). It only shows: the
+  step is done as before, through the HID event tap, which moves the Mac's own pointer as it did. A helper process
+  draws it (`python -m dotagent.desktop.pointer`, as the flight of SnapShots is drawn; it takes no permission and
+  reads nothing of the screen), started with the first act. It is taken off the screen for each of Dot's screenshots
+  and while a SnapShot captures the window in front, which wait for the helper to say so (2 ms once it runs), so the model never sees the arrow over what it reads; a
+  helper that does not answer within two seconds is ended and no pointer is drawn until the daemon starts again. It
+  fades two and a half seconds after its last step, and when the run ends. Dot's browser does not move it: its steps
+  go to Chrome directly and move no pointer at all.
 - When a run that acted on the desktop ends, the application that was in front before its first act comes forward
   again, if the one the run left in front still is (item 702, `give_front_back`): not when you went to another
   application meanwhile, not when it quit, and not while another run acts on the desktop.
