@@ -136,8 +136,13 @@ class PointerOverlay:
         self._process: asyncio.subprocess.Process | None = None
         self._sending: asyncio.Lock = asyncio.Lock()
         self._hides: int = 0
+        # The captures under way that took the pointer off the screen: it comes back once the last of them has ended,
+        # so that a capture that ends first does not put it back over one still being taken.
+        self._capturing: int = 0
 
     async def _running(self) -> asyncio.subprocess.Process:
+        if self._process is not None and self._process.returncode is not None:
+            log.warning("pointer_helper_ended", returncode=self._process.returncode)
         if self._process is None or self._process.returncode is not None:
             self._process = await asyncio.create_subprocess_exec(
                 sys.executable,
@@ -187,6 +192,9 @@ class PointerOverlay:
         is captured next does not hold it. A helper that is not running has nothing on the screen; one that does not
         answer in time is ended, and no pointer is drawn from then on, so that no capture waits for it again."""
         async with self._sending:
+            self._capturing += 1
+            if self._capturing > 1:
+                return
             self._hides += 1
             wanted: str = hidden_line(self._hides)
             process: asyncio.subprocess.Process | None = await self._send(
@@ -206,9 +214,11 @@ class PointerOverlay:
                 self._process = None
 
     async def reveal(self) -> None:
-        """Put the pointer back where it was, after a capture."""
+        """Put the pointer back where it was, once the last capture that hid it has ended."""
         async with self._sending:
-            await self._send(PointerCommand(op="reveal"), start=False)
+            self._capturing = max(0, self._capturing - 1)
+            if self._capturing == 0:
+                await self._send(PointerCommand(op="reveal"), start=False)
 
     async def rest(self) -> None:
         """Fade the pointer out: the run that moved it has ended."""

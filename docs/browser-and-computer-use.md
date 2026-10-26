@@ -455,8 +455,10 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
   step is done as before, through the HID event tap, which moves the Mac's own pointer as it did. A helper process
   draws it (`python -m dotagent.desktop.pointer`, as the flight of SnapShots is drawn; it takes no permission and
   reads nothing of the screen), started with the first act. It is taken off the screen for each of Dot's screenshots
-  and while a SnapShot captures the window in front, which wait for the helper to say so (2 ms once it runs), so the model never sees the arrow over what it reads; a
-  helper that does not answer within two seconds is ended and no pointer is drawn until the daemon starts again. It
+  and while a SnapShot captures the window in front, which wait for the helper to say so (2 ms once it runs), so the
+  model never sees the arrow over what it reads; it comes back once the last of two captures at the same time has
+  ended. A helper that does not answer within two seconds is ended and no pointer is drawn until the daemon starts
+  again; one that died is logged (`pointer_helper_ended`) and started again with the next step. It
   fades two and a half seconds after its last step, and when the run ends. Dot's browser does not move it: its steps
   go to Chrome directly and move no pointer at all.
 - When a run that acted on the desktop ends, the application that was in front before its first act comes forward

@@ -224,3 +224,37 @@ def test_a_pointer_fades_after_its_last_move_also_when_a_capture_hid_and_reveale
     assert fades.due(two)
     # A pointer that does not show is not set off again by a reveal.
     assert fades.revealed() is None
+
+
+async def test_with_two_captures_at_once_the_pointer_comes_back_only_after_the_second(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Item 705's review: a SnapShot while a run takes a screenshot; the first that ends does not put the pointer back
+    over the other."""
+    told: list[str] = []
+    _stand_in(
+        monkeypatch,
+        "import sys, json\n"
+        "for line in sys.stdin:\n"
+        "    c = json.loads(line)\n"
+        "    if c['op'] == 'hide':\n"
+        "        print('hidden %d' % c['number'], flush=True)\n",
+    )
+    overlay: PointerOverlay = PointerOverlay()
+    sent = overlay._send
+
+    async def noting(command: PointerCommand, start: bool) -> object:
+        told.append(command.op)
+        return await sent(command, start)
+
+    monkeypatch.setattr(overlay, "_send", noting)
+    try:
+        await overlay.move(1.0, 2.0, False)
+        await overlay.hide()
+        await overlay.hide()
+        await overlay.reveal()
+        assert told == ["move", "hide"]
+        await overlay.reveal()
+        assert told == ["move", "hide", "reveal"]
+    finally:
+        await overlay.aclose()
