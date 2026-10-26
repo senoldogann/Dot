@@ -728,6 +728,10 @@ max_batch_steps = 25
 # Vision (about 50-300 ms): a model that cannot see images can still act on a window that shows nothing to
 # accessibility. What the screenshot blacks out is not read.
 read_screen_text = true
+# When a run that acted on the desktop ends, the application that was in front before its first act comes forward
+# again, if the one the run left in front still is (item 702): not when you went to another one meanwhile, nor while
+# another run acts on the desktop.
+give_front_back = true
 launch_timeout_s = 20.0
 activate_timeout_s = 3.0
 osascript_timeout_s = 30.0
