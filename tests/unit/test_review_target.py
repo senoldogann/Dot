@@ -1,6 +1,7 @@
-"""The reviewer of an ``auto`` run reads what an action acts on whole up to 12,000 characters, and of a longer target
-its start and its end, with how much was left out between (item 242). Before, it read 1,500 characters of it. It reads
-no secret: those Dot holds and those it recognises are masked (item 350)."""
+"""The reviewer of an ``auto`` run reads what an action acts on whole up to 12,000 characters (item 242), and hands a
+longer one to the owner without asking the model (item 680): it read the start and the end of it, and what was cut out
+between was approved unseen. Before item 242, it read 1,500 characters of it. It reads no secret: those Dot holds and
+those it recognises are masked (item 350)."""
 
 from pathlib import Path
 
@@ -43,8 +44,8 @@ def _command(names: int) -> str:
     return "touch " + " ".join(f"shelf-{number:05}.txt" for number in range(names))
 
 
-async def _read(command: str) -> str:
-    """What the review model is sent about a shell call of ``command``."""
+async def _reviewed(command: str) -> tuple[ReviewVerdict, list[str]]:
+    """How the review decides a shell call of ``command``, and what the review model was sent about it."""
     provider: ReadProvider = ReadProvider()
     router: ModelRouter = ModelRouter(load_default_config(), _ignore, {})
     await router.register("ollama", provider)
@@ -60,22 +61,26 @@ async def _read(command: str) -> str:
             tainted=False,
         )
     )
+    return verdict, provider.read
+
+
+async def _read(command: str) -> str:
+    """What the review model is sent about a shell call of ``command``, which it approves."""
+    verdict, read = await _reviewed(command)
     assert verdict.decision == "approve"
-    assert len(provider.read) == 1
-    return provider.read[0]
+    assert len(read) == 1
+    return read[0]
 
 
-async def test_the_reviewer_reads_a_long_command_whole_and_the_start_and_the_end_of_a_longer_one() -> None:
+async def test_the_reviewer_reads_a_long_command_whole_and_hands_a_longer_one_to_the_owner() -> None:
     command: str = _command(700)
     assert 9_000 < len(command) < 12_000
     assert command in await _read(command)
 
     longer: str = _command(2_000)
-    read: str = await _read(longer)
-    assert longer[:7_000] in read
-    assert longer[-3_500:] in read
-    assert "chars omitted" in read
-    assert "shelf-01000.txt" not in read
+    verdict, read = await _reviewed(longer)
+    assert verdict.decision == "escalate" and "the user decides it" in verdict.reason
+    assert read == []
 
 
 async def test_the_reviewer_reads_no_secret_of_the_action(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

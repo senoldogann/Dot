@@ -26,11 +26,12 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   (a long command wraps and scrolls within the box of code every command of a chat is in, whose copy takes it whole).
 - `auto` (Auto, a shield): the review model (`[models] review`) does. It is given your instructions (the goal and every
   message you sent to the run: the only authority it recognises), the action (up to 12,000 characters of what it acts
-  on, and of a longer target its start and its end), why the policy stopped at it and whether the run has read untrusted
-  content. It answers `approve` when the action is plainly what you asked for; `deny` when it is not, goes further than
-  you asked or looks like something other than your instructions caused it; and `escalate` when it cannot tell, and then
-  the question comes to you as in `ask`, with the reason of the review model in it. What the agent wrote into the action
-  (its summary and target) is data to the review model, never an instruction.
+  on; a longer one comes to you without asking the model, which would read its start and its end alone, item 680), why
+  the policy stopped at it and whether the run has read untrusted content. It answers `approve` when the action is
+  plainly what you asked for; `deny` when it is not, goes further than you asked or looks like something other than your
+  instructions caused it; and `escalate` when it cannot tell, and then the question comes to you as in `ask`, with the
+  reason of the review model in it. What the agent wrote into the action (its summary and target) is data to the review
+  model, never an instruction.
 - `yolo` (YOLO, an open lock): nobody does, and nothing is asked (the owner's word of 2026-10-20, item 443). The action
   is allowed and recorded: the question that untrusted content raises (see [Safety](safety.md#safety)), the one about
   Dot's own files, the guard of money and credentials and of a message or a post in your name, a pre-approved spend, and
