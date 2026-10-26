@@ -193,9 +193,25 @@ class SignInLink(FrozenModel):
 
 
 class PairedView(FrozenModel):
-    """The access token a pairing code was traded for (item 267)."""
+    """The key a pairing code was traded for (item 267): since item 670 the phone's own, ``phone.<id>.<secret>``."""
 
     token: str
+
+
+class PhoneDeviceView(FrozenModel):
+    """A phone that holds a key of its own (item 670), as Settings › Phone lists it; never its key or the key's hash."""
+
+    id: str
+    name: str
+    paired_at: float
+    last_used_at: float | None
+
+
+class PhoneDevicesView(FrozenModel):
+    """The phones that hold a key of their own, the one paired first first, and how many may."""
+
+    phones: list[PhoneDeviceView]
+    limit: int
 
 
 # ----------------------------------------------------------------------------------------------- queries
@@ -279,6 +295,8 @@ class ProofQuery(FrozenModel):
     """A nonce of the client, made fresh for each proof it asks for."""
 
     nonce: str = Field(pattern=r"^[0-9a-f]{32,128}$")
+    # The id of the phone whose key the client holds (item 670), when it holds one.
+    phone: str | None = Field(default=None, pattern=r"^[0-9a-f]{12}$")
 
 
 # ---------------------------------------------------------------------------------------------- requests

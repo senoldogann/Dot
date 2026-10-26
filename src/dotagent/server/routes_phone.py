@@ -1,5 +1,7 @@
 """Routes for a phone (item 267): the addresses it reaches Dot at, and pairing an app added to its home screen, which
-trades a short code for the access token (:mod:`dotagent.server.pairing`). The code and the token are never logged.
+trades a short code for a key of the phone's own (item 670, :mod:`dotagent.server.phones`), and the list of the phones
+that hold one, with their removal (the installation's token alone reaches these, never a phone's key: the guard's
+``needs_main_token``). The code and the keys are never logged.
 Setting up Tailscale for it, and keeping the Mac awake while it charges (item 271); Tailscale opened for its install or
 its sign-in, and the QR codes a phone's camera opens (item 421)."""
 
@@ -7,23 +9,32 @@ import asyncio
 import time
 from typing import Literal
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 
 from dotagent.config import load_user_config
 from dotagent.config_edit import set_setting
-from dotagent.core.errors import ConfigError, PairingRefused, PhoneSetupError
+from dotagent.core.errors import ConfigError, NotFoundError, PairingRefused, PhoneSetupError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path
 from dotagent.qr import qr_png
 from dotagent.server.context import ServerContext
 from dotagent.server.pairing import PairingCode, Redeemed, new_code, redeem, shown_code
-from dotagent.server.views import AwakeRequest, PairedView, PairingView, PairRequest, PhoneView
+from dotagent.server.phones import MAX_PHONES, PairedPhones, is_phone_id
+from dotagent.server.views import (
+    AwakeRequest,
+    PairedView,
+    PairingView,
+    PairRequest,
+    PhoneDevicesView,
+    PhoneDeviceView,
+    PhoneView,
+)
 from dotagent.tailnet import DOWNLOAD_PAGE, TailnetState, open_tailscale, serve_daemon, tailnet_state
 
 log = get_logger(__name__)
 
 
-def phone_router(ctx: ServerContext) -> APIRouter:
+def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     # The code that is good now; one at a time, held only in memory.
     current: PairingCode | None = None
@@ -112,8 +123,9 @@ def phone_router(ctx: ServerContext) -> APIRouter:
         return PairingView(code=shown_code(current), expires_at=current.expires_at)
 
     @router.post("/phone/pair")
-    async def pair(request: PairRequest) -> PairedView:
-        """The access token, for the code that is good now; the code is used up by it. Needs no token."""
+    async def pair(request: PairRequest, http: Request) -> PairedView:
+        """A key of the phone's own (item 670), for the code that is good now; the code is used up by it. Needs no
+        token."""
         nonlocal current
         outcome: Redeemed = redeem(current, request.code, time.time())
         current = outcome.left
@@ -123,7 +135,28 @@ def phone_router(ctx: ServerContext) -> APIRouter:
                 "that sign-in code is wrong, used or out of date; ask for a new one in Settings › Phone on your Mac",
                 {"tries_left": 0 if outcome.left is None else outcome.left.tries_left},
             )
+        _, key = await phones.pair(http.headers.get("user-agent"), time.time())
         log.info("phone_paired")
-        return PairedView(token=ctx.token)
+        return PairedView(token=key)
+
+    @router.get("/phone/phones")
+    async def paired_phones() -> PhoneDevicesView:
+        """The phones that hold a key of their own (item 670), without their keys."""
+        return PhoneDevicesView(
+            phones=[
+                PhoneDeviceView(
+                    id=phone.id, name=phone.name, paired_at=phone.paired_at, last_used_at=phone.last_used_at
+                )
+                for phone in phones.listed()
+            ],
+            limit=MAX_PHONES,
+        )
+
+    @router.delete("/phone/phones/{phone_id}", status_code=204)
+    async def remove_phone(phone_id: str) -> Response:
+        """Remove a phone: its key is refused from now on, and its streams that are open end (item 670)."""
+        if not is_phone_id(phone_id) or not await phones.remove(phone_id):
+            raise NotFoundError("that phone is not paired", {})
+        return Response(status_code=204)
 
     return router

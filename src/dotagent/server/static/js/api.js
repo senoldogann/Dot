@@ -75,6 +75,11 @@ export function clearToken() {
   }
 }
 
+/** Whether this page signed in with a key of a phone's own (item 670), which cannot pair or remove phones. */
+export function holdsPhoneKey() {
+  return phoneIdOf(token) !== null;
+}
+
 export function hasToken() {
   return token !== null && token !== "";
 }
@@ -138,10 +143,22 @@ function hexOf(buffer) {
   return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-/** What the daemon answers to `nonce` when it holds this page's token. */
+// A key of a phone's own (item 670): `phone.<id>.<secret>`. The daemon holds only its SHA-256, so its proof for such a key
+// is keyed with that hash, and the page asks for it with the phone's id.
+const PHONE_KEY = /^phone\.([0-9a-f]{12})\.[A-Za-z0-9_-]{43}$/;
+
+/** The id of the phone whose key this page holds, or null when it holds the installation's token. */
+function phoneIdOf(value) {
+  const found = typeof value === "string" ? PHONE_KEY.exec(value) : null;
+  return found === null ? null : found[1];
+}
+
+/** What the daemon answers to `nonce` when it holds this page's token: keyed with the token, or for a phone's key with
+ * the hex SHA-256 of it (item 670). */
 async function proofOf(nonce) {
   const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", encoder.encode(token), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const secret = phoneIdOf(token) === null ? token : hexOf(await crypto.subtle.digest("SHA-256", encoder.encode(token)));
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return hexOf(await crypto.subtle.sign("HMAC", key, encoder.encode(`${PROOF_LABEL}${nonce}`)));
 }
 
@@ -158,7 +175,8 @@ async function proveDaemon() {
   const nonce = hexOf(crypto.getRandomValues(new Uint8Array(NONCE_BYTES)));
   let response;
   try {
-    response = await fetch(`/api/proof?nonce=${nonce}`, { cache: "no-store" });
+    const phone = phoneIdOf(token);
+    response = await fetch(`/api/proof?nonce=${nonce}${phone === null ? "" : `&phone=${phone}`}`, { cache: "no-store" });
   } catch (cause) {
     throw new ApiError(0, UNREACHABLE, { path: "/proof", cause: String(cause) });
   }

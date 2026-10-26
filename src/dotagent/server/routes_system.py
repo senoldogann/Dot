@@ -2,8 +2,11 @@
 checks, desktop permissions, the emergency stop and screenshots."""
 
 import asyncio
+import hashlib
+import hmac
 import os
 import re
+import secrets
 import time
 from pathlib import Path
 from typing import Annotated, Literal
@@ -107,6 +110,7 @@ from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import daemon_proof
 from dotagent.server.palette import palette_view
+from dotagent.server.phones import PairedPhones
 from dotagent.server.routes_mcp import service_of
 from dotagent.server.views import (
     ContextChoice,
@@ -240,14 +244,23 @@ def health_router() -> APIRouter:
     return router
 
 
-def proof_router(token: str) -> APIRouter:
+def proof_router(token: str, phones: PairedPhones) -> APIRouter:
     """The answer to a client's nonce with which the daemon shows that it holds ``token``, asked before the token is
-    sent (:func:`dotagent.server.guard.daemon_proof`)."""
+    sent (:func:`dotagent.server.guard.daemon_proof`). A phone with a key of its own asks with its id, and the proof is
+    keyed with the hash of its key, the one thing the daemon holds of it (item 670); an id that is not listed is
+    answered under a key of its own that a secret of this daemon makes, the same at every ask as a listed one's, so the
+    answer tells nothing of which ids are, nor whether a phone was removed, and the phone signs in again."""
     router: APIRouter = APIRouter(prefix="/api")
+    unknown: bytes = secrets.token_bytes(32)
 
     @router.get("/proof")
     async def proof(query: Annotated[ProofQuery, Query()]) -> ProofView:
-        return ProofView(proof=daemon_proof(token, query.nonce))
+        if query.phone is None:
+            return ProofView(proof=daemon_proof(token, query.nonce))
+        key: str | None = phones.proof_key(query.phone)
+        if key is None:
+            key = hmac.new(unknown, query.phone.encode("ascii"), hashlib.sha256).hexdigest()
+        return ProofView(proof=daemon_proof(key, query.nonce))
 
     return router
 

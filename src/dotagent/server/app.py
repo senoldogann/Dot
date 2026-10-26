@@ -34,13 +34,14 @@ from dotagent.core.errors import (
     VoiceError,
 )
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import looks_dir
+from dotagent.core.paths import looks_dir, phones_path
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.previews.quicklook import QuickLook, open_quick_look
 from dotagent.server.compress import GzipExceptEventStreams
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import LocalGuard
 from dotagent.server.kept_pages import KeptPages, ServedPages, keep_pages
+from dotagent.server.phones import PairedPhones
 from dotagent.server.routes_about import about_router
 from dotagent.server.routes_accounts import accounts_router
 from dotagent.server.routes_agents import agents_router
@@ -165,7 +166,8 @@ def create_app(ctx: ServerContext) -> FastAPI:
     pages: KeptPages = keep_pages(STATIC_DIR)
     app: FastAPI = FastAPI(title="Dot", version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
     app.include_router(health_router())
-    app.include_router(proof_router(ctx.token))
+    phones: PairedPhones = ctx.phones if ctx.phones is not None else PairedPhones.load(phones_path())
+    app.include_router(proof_router(ctx.token, phones))
     app.include_router(system_router(ctx, pages.build))
     app.include_router(about_router(ctx))
     app.include_router(runs_router(ctx))
@@ -193,7 +195,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     looks: QuickLook = open_quick_look(looks_dir())
     app.include_router(files_router(ctx, looks))
     app.include_router(looks_router(looks))
-    app.include_router(phone_router(ctx))
+    app.include_router(phone_router(ctx, phones))
     app.include_router(channels_router(ctx))
     app.include_router(snapshots_router(ctx))
     app.include_router(assistant_router(ctx))
@@ -233,7 +235,13 @@ def create_app(ctx: ServerContext) -> FastAPI:
 
     # Added before the guard, so that the guard wraps it and its answer carries the guard's headers (item 558).
     app.add_middleware(_AnswerFaults)
-    app.add_middleware(LocalGuard, token=ctx.token, port=ctx.port, reach=frozenset(ctx.runtime.config.server.reach))
+    app.add_middleware(
+        LocalGuard,
+        token=ctx.token,
+        port=ctx.port,
+        reach=frozenset(ctx.runtime.config.server.reach),
+        phones=phones,
+    )
     # Added last to be the outermost layer, so that the pages' answers go through gzip as much as the API's (item 381).
     app.add_middleware(GzipExceptEventStreams)
     # The web app manifest has a type of its own that the platform's table may not know.

@@ -23,7 +23,7 @@ from dotagent.channels.service import Channels
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import db_path, dot_home, pid_path, running_mark_path, token_path
+from dotagent.core.paths import db_path, dot_home, phones_path, pid_path, running_mark_path, token_path
 from dotagent.desktop.flight import FlightOverlay
 from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
@@ -35,6 +35,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import read_or_create_token, require_loopback
 from dotagent.server.links import base_url, ui_url
+from dotagent.server.phones import PairedPhones
 from dotagent.store.backup import keep_backups
 from dotagent.store.models import RunRecord
 
@@ -329,6 +330,7 @@ async def run_daemon(config: AppConfig) -> int:
                 restart=restart,
                 channels=channels,
                 reactions=reactions,
+                phones=await asyncio.to_thread(PairedPhones.load, phones_path()),
             )
             server: DotServer = DotServer(serving_config(create_app(context)), stopping)
             scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))

@@ -34,6 +34,11 @@ def token_path() -> Path:
     return dot_home() / "api-token"
 
 
+def phones_path() -> Path:
+    """The phones paired with Dot (item 670): each one's id, name and dates, and the SHA-256 of its key, not the key."""
+    return dot_home() / "phones.json"
+
+
 def vapid_path() -> Path:
     """The daemon's web push key pair (PEM), made on first start."""
     return dot_home() / "vapid-key.pem"

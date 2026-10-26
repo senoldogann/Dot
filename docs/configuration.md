@@ -20,6 +20,7 @@ it). Two environment variables of the process move things: `DOT_HOME` (the home 
 | `.env`                                           | API keys (mode 0600)                                                 |
 | `dot.sqlite3`                                    | runs, events, conversations, notes, schedules, rules, approvals      |
 | `api-token`                                      | the bearer token of the web UI and the API (mode 0600)               |
+| `phones.json`                                    | the phones paired with a code: names, dates and the SHA-256 of each one's key, never the key (mode 0600, item 670) |
 | `vapid-key.pem`                                  | the daemon's web push key pair, made on its first start (see [Dot on the phone](phone.md#dot-on-the-phone)) |
 | `workspace/`                                     | the working directory of the shell and the file tools                |
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |

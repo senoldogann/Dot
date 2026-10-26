@@ -2,9 +2,10 @@
 // at the head says whether the phone reaches Dot, with the three steps on this Mac, each saying where it stands and
 // offering what does it (Tailscale from the App Store or opened to sign in, Dot served to the tailnet, the daemon started
 // again to take its name), and the switch that keeps the Mac awake. Under it the phone's own steps, with the QR codes its
-// camera opens, and the code that signs in the app added to its home screen, which iOS keeps apart from Safari.
+// camera opens, and the code that signs in the app added to its home screen, which iOS keeps apart from Safari. Under
+// that the phones paired with a code, each holding a key of its own, with Remove (item 670).
 
-import { api, blobUrl, unreachable } from "../api.js";
+import { api, blobUrl, holdsPhoneKey, unreachable } from "../api.js";
 import { copyText, el } from "../dom.js";
 import { icon } from "../icons.js";
 import { errorPanel, loadingPanel, segmented, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
@@ -35,6 +36,10 @@ const QR_CHOICES = [
 const CODE_GROUPS = 2;
 const CODE_GROUP_CHARS = 4;
 const CODE_HIDDEN = "Hidden until you show it, so it isn't on screen by accident.";
+
+function dayOf(seconds) {
+  return new Date(seconds * 1000).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+}
 
 function clockTime(seconds) {
   return new Date(seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -407,9 +412,67 @@ export function mount(root, ctx) {
     title: "Sign-in code",
     body: setCard(setRow({ title: "A code signs in the app on one phone", lead: codeLead, control: [dots, code, pairButton] })),
   });
+  // The phones that hold a key of their own (item 670), each with Remove. A page signed in with a phone's key can neither
+  // pair nor remove a phone: the daemon answers those to the Mac's own key alone, and the page says where to do it.
+  const phonesBody = el("div", null, loadingPanel());
+  const paired = setSection({ title: "Paired phones", body: setCard(phonesBody) });
+
+  function phoneRow(phone) {
+    const used = phone.last_used_at === null ? "not used yet" : `last used ${dayOf(phone.last_used_at)}`;
+    const remove = el("button", { class: "btn sm", type: "button", "aria-label": `Remove ${phone.name}, paired ${dayOf(phone.paired_at)}` }, "Remove");
+    remove.addEventListener("click", () =>
+      attempt(async () => {
+        const confirmed = await confirmDialog({
+          title: `Remove this ${phone.name}?`,
+          message: "It is signed out at once, and needs a new sign-in code to use Dot again.",
+          confirmLabel: "Remove",
+          danger: true,
+          focusCancel: true,
+        });
+        if (!confirmed) {
+          return;
+        }
+        await api.del(`/phone/phones/${encodeURIComponent(phone.id)}`);
+        toast("ok", `${phone.name} removed.`);
+        await loadPhones();
+      }),
+    );
+    const row = setRow({ title: phone.name, lead: `Paired ${dayOf(phone.paired_at)}, ${used}`, control: remove });
+    row.dataset.phone = phone.id;
+    return row;
+  }
+
+  async function loadPhones() {
+    if (holdsPhoneKey()) {
+      phonesBody.replaceChildren(el("p", { class: "hint" }, "This phone signed in with a code. Pair or remove phones in Settings › Phone on your Mac."));
+      return;
+    }
+    let listed;
+    try {
+      listed = await api.get("/phone/phones");
+    } catch (error) {
+      if (!disposed) {
+        phonesBody.replaceChildren(errorPanel(error, () => attempt(loadPhones)));
+      }
+      return;
+    }
+    if (disposed) {
+      return;
+    }
+    const rows = listed.phones.map(phoneRow);
+    phonesBody.replaceChildren(
+      ...(rows.length > 0 ? rows : [el("p", { class: "hint" }, "No phone signed in with a code yet.")]),
+      el("p", { class: "hint" }, "A phone signed in with a code before this list existed holds your Mac's own key and is not listed here. To cut one off, take it off your Tailscale network in Tailscale's admin console."),
+    );
+  }
+
+  if (holdsPhoneKey()) {
+    pairButton.hidden = true;
+    codeLead.textContent = "Show a code in Settings › Phone on your Mac.";
+  }
   const reachSlot = el("div", null);
   const setupSlot = el("div", null);
-  const sections = el("div", { class: "set-sections" }, reachSlot, setupSlot, signIn);
+  const sections = el("div", { class: "set-sections" }, reachSlot, setupSlot, signIn, paired);
 
   /** Read Tailscale again a moment from now while a step is left: the guide follows an install, a sign-in or a start. */
   function follow(phone) {
@@ -494,8 +557,17 @@ export function mount(root, ctx) {
   ctx.head.setLead("Use Dot from your phone, at home or away, as an app on its home screen.");
   root.append(holder);
   attempt(load);
+  attempt(loadPhones);
+  // A phone that pairs while this page is open shows up when the page is looked at again.
+  const relist = () => {
+    if (document.visibilityState === "visible") {
+      attempt(loadPhones);
+    }
+  };
+  window.addEventListener("focus", relist);
   return () => {
     disposed = true;
+    window.removeEventListener("focus", relist);
     clearTimeout(following);
     for (const url of made) {
       URL.revokeObjectURL(url);

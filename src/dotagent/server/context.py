@@ -10,6 +10,7 @@ from dotagent.channels.service import Channels
 from dotagent.core.errors import ConfigError
 from dotagent.runtime import Runtime
 from dotagent.scheduler.runner import Scheduler
+from dotagent.server.phones import PairedPhones
 
 
 def no_restart() -> None:
@@ -28,7 +29,8 @@ class ServerContext:
     ``restart`` stops the daemon so that what started it starts it again (the service's launchd job, item 409); the
     default refuses, for a daemon nothing would start again. ``channels`` is the owner's messaging apps as ways to reach
     Dot (item 572), ``None`` when the server runs without them. ``reactions`` is the service of the reactions on Dot's
-    messages (item 586); a server without one makes its own."""
+    messages (item 586); a server without one makes its own. ``phones`` are the phones that hold a key of their own
+    (item 670); a server without them reads them from ``<home>/phones.json``."""
 
     runtime: Runtime
     manager: RunManager
@@ -41,3 +43,4 @@ class ServerContext:
     restart: Callable[[], None] = no_restart
     channels: Channels | None = None
     reactions: Reactions | None = None
+    phones: PairedPhones | None = None
