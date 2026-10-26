@@ -534,8 +534,8 @@ class DesktopSession:
             woken: _Walk | None = await self._wake(app, probe)
             if woken is None:
                 notes.append(
-                    "this application shows almost nothing to accessibility; "
-                    "use desktop_screenshot to see it and coordinates to act"
+                    "this application shows almost nothing to accessibility; use desktop_screenshot, which lists "
+                    "the text on the screen with the x, y of each line, and act by coordinates"
                 )
             else:
                 walk = woken

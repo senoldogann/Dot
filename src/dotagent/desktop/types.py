@@ -197,6 +197,15 @@ class SnapshotView(FrozenModel):
     notes: tuple[str, ...]
 
 
+class ScreenText(FrozenModel):
+    """A line of text read on a screenshot (item 701), at the centre of its box in the coordinates ``desktop_act``
+    takes."""
+
+    text: str
+    x: int
+    y: int
+
+
 class ScreenshotView(FrozenModel):
     """A screenshot plus where it sits in model units: pixel (px, py) of the image is the coordinate
     (left + px / zoom, top + py / zoom). ``redacted`` windows (password managers, and Dot's own while its vault shows
@@ -212,6 +221,8 @@ class ScreenshotView(FrozenModel):
     pointer_y: int
     frontmost: str
     redacted: int
+    # The text on the picture with where to click it (item 701); empty when ``[desktop] read_screen_text`` is off.
+    text_lines: tuple[ScreenText, ...] = ()
 
 
 class StepReport(FrozenModel):

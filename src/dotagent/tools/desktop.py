@@ -333,7 +333,8 @@ def _screenshot_tool() -> RegisteredTool:
         description=(
             "Take a screenshot of the main display, or zoom into a region (x, y, width, height) for fine detail. Use "
             "it when the element list is not enough: canvases, games, images, custom-drawn controls, or to check how "
-            "things look. Coordinates in the image are the x and y that desktop_act accepts. Windows of password "
+            "things look. Coordinates in the image are the x and y that desktop_act accepts; the text on it is "
+            "listed with the x and y of each line. Windows of password "
             "managers are blacked out, and Dot's own while the owner's vault shows a secret."
         ),
         args_model=ScreenshotArgs,

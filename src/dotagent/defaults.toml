@@ -724,6 +724,10 @@ paste_threshold_chars = 40
 keep_awake = true
 keep_awake_s = 900
 max_batch_steps = 25
+# A screenshot comes with the lines of text on it and the x, y to click each (item 701), read on this Mac by macOS's
+# Vision (about 50-300 ms): a model that cannot see images can still act on a window that shows nothing to
+# accessibility. What the screenshot blacks out is not read.
+read_screen_text = true
 launch_timeout_s = 20.0
 activate_timeout_s = 3.0
 osascript_timeout_s = 30.0

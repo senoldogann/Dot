@@ -438,7 +438,10 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels
   (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920). The windows of password
   managers and Keychain Access are painted black, known by their application's bundle id and not only by its name,
-  which is in the language of the Mac (item 555).
+  which is in the language of the Mac (item 555). It comes with the lines of text on it, read on this Mac by macOS's
+  Vision from the picture the model is shown (what is painted black is not read), each with the x, y of its centre
+  that `desktop_act` takes (item 701, `read_screen_text`; 50 ms a screen once warm): a window that shows nothing to
+  accessibility can be read and clicked by a model that sees no image.
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields outside `yolo`, where the step is the user's; in `yolo` the run types the field itself (item 443),
   and a step the review sees take a credential keeps that reason in its record (item 429, see

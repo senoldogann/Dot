@@ -8,7 +8,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from dotagent.core.text import fold_search, unclosing
+from dotagent.core.text import fold_search, truncate_middle, unclosing
 from dotagent.desktop.ax import INTERACTIVE_ROLES
 from dotagent.desktop.types import (
     DEFAULT_SCROLL_PX,
@@ -35,6 +35,9 @@ _MAX_NOTES: int = 12
 _MAX_APP_WINDOWS: int = 4
 _GAP_RESERVE: int = 300
 _MAX_DELTA_LINES: int = 80
+# A line read on a screenshot, and all of them (item 701).
+_TEXT_LINE_CHARS: int = 160
+_SCREEN_TEXT_CHARS: int = 6000
 _PRIORITIES: tuple[int, ...] = (0, 1, 2, 3)
 _ROLE_NAMES: dict[str, str] = {
     "AXStaticText": "text",
@@ -395,7 +398,17 @@ def render_screenshot_caption(view: ScreenshotView, nonce: str) -> str:
             f"{view.redacted} windows are blacked out "
             "(a password manager's, or Dot's own while its vault shows a secret)"
         )
-    return "\n".join((" · ".join(parts), fence_screen("frontmost application", view.frontmost or "(none)", nonce)))
+    shown: list[str] = [" · ".join(parts), fence_screen("frontmost application", view.frontmost or "(none)", nonce)]
+    if view.text_lines:
+        shown.append(
+            f"{len(view.text_lines)} lines of text read on the screenshot, each at the x, y of its centre for "
+            "desktop_act (read by OCR: a letter may be wrong):"
+        )
+        listed: str = "\n".join(
+            f"({line.x}, {line.y}) {_clip(line.text, _TEXT_LINE_CHARS)}" for line in view.text_lines
+        )
+        shown.append(fence_screen("text on the screen", truncate_middle(listed, _SCREEN_TEXT_CHARS), nonce))
+    return "\n".join(shown)
 
 
 def _target(step: Step) -> str:

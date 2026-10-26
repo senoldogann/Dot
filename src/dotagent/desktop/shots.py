@@ -12,9 +12,12 @@ from PIL import Image
 
 from dotagent.config import DesktopConfig
 from dotagent.core.errors import DesktopError
-from dotagent.desktop import apps, capture, perms, safety, screen
-from dotagent.desktop.types import DisplayInfo, Point, Rect, ScreenshotView, WindowInfo
+from dotagent.core.logs import get_logger
+from dotagent.desktop import apps, capture, ocr, perms, safety, screen
+from dotagent.desktop.types import DisplayInfo, Point, Rect, ScreenshotView, ScreenText, WindowInfo
 from dotagent.vault import shown
+
+_log = get_logger("dotagent.desktop.shots")
 
 MIN_REGION_UNITS: int = 16
 _NO_APP: str = "(none)"
@@ -48,6 +51,29 @@ def _picture_of(config: DesktopConfig, area: Rect, windows: Sequence[WindowInfo]
     return capture.black_out(picture, area, hidden)
 
 
+def _text_of(config: DesktopConfig, picture: Image.Image, area: Rect) -> tuple[ScreenText, ...]:
+    """The text Vision reads on ``picture``, which shows ``area`` (model units) with what is hidden blacked out
+    already, at the centre of each line in model units (item 701); none when ``read_screen_text`` is off. A failure of
+    Vision costs the text, not the screenshot."""
+    if not config.read_screen_text:
+        return ()
+    try:
+        lines: tuple[ocr.TextLine, ...] = ocr.read_lines(picture)
+    except DesktopError as error:
+        _log.warning("screen_text_unread", error=error.message)
+        return ()
+    across: float = area.width / picture.width
+    down: float = area.height / picture.height
+    return tuple(
+        ScreenText(
+            text=line.text,
+            x=round(area.x + (line.x + line.width / 2) * across),
+            y=round(area.y + (line.y + line.height / 2) * down),
+        )
+        for line in lines
+    )
+
+
 def take_screen(config: DesktopConfig) -> ScreenshotView:
     """The whole main display at one pixel per model unit."""
     main: DisplayInfo = screen.main_display()
@@ -67,6 +93,7 @@ def take_screen(config: DesktopConfig) -> ScreenshotView:
         pointer_y=round(pointer.y),
         frontmost=_frontmost_name(windows),
         redacted=redacted,
+        text_lines=_text_of(config, picture, Rect(0, 0, width, height)),
     )
 
 
@@ -117,4 +144,5 @@ def take_region(config: DesktopConfig, region: Rect) -> ScreenshotView:
         pointer_y=round(pointer.y),
         frontmost=_frontmost_name(windows),
         redacted=redacted,
+        text_lines=_text_of(config, picture, whole),
     )
