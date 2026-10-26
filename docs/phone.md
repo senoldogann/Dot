@@ -184,12 +184,20 @@ the file unpairs every phone. The phone reaches Dot while the Mac is on and awak
 
 Until it is removed, a phone's key is as strong as the Mac's own key, but for the ways into Dot: it cannot make a
 sign-in code, nor see or remove the paired phones, nor switch the iMessage channel or pair or remove a number of it
-(403), so a phone that is taken cannot open another way in, nor close yours. It can still do all the rest, a schedule or
-a mode switched to `yolo` and a run that reads Dot's own key among it, and removing it does not undo what it did: a
-phone that may have been used against you is removed, the installation's key made new as well (below), and what it may
-have changed looked over (schedules, Settings). On a phone, Settings › Phone says so and has no Show code, and Settings
-› Channels says where to pair a number. The paired phones' file is one of Dot's own files, which a run's
-commands and file tools can neither read nor change in every mode but `yolo` ([Safety](safety.md)).
+(403), so a phone that is taken cannot open another way in, nor close yours. Nor can it widen for good what runs do
+without asking, which would outlast its removal (item 678, 403): add a connected app (a server Dot starts runs its
+command at each start of the daemon), or one another agent of the Mac set up, switch Dot's safe box for commands or its
+extra checker (the typed judge) off, add or switch on a rule that lets steps through (allow, pre-approved), delete or
+switch off a rule that asks, or move any rule; what narrows (a rule that asks, the safe box on) it still does. What is
+shown or connected on the Mac alone (the eye of the vault, 1Password, a sign-in of Google or Microsoft, the microphone's
+pane of System Settings) answers the installation's token alone, never a phone's key, whatever address a phone's request
+names. `yolo`, which asks nothing, is yours to use from the phone as from the Mac: a phone's key can start a run, a chat
+or a campaign in `yolo`, make a schedule, a loop of a chat (`/loop`) or an agent kept in `yolo`, switch one on or let
+one go on, and what such a run does is not held by these limits (it may do whatever your account may). Removing a phone
+does not undo what it did: a phone that may have been used against you is removed, the installation's key made new as
+well (below), and what it may have changed looked over (schedules, campaigns, agents, Settings). On a phone, Settings
+› Phone says so and has no Show code, and Settings › Channels says where to pair a number. The paired phones' file is one of Dot's own files, which a run's commands and file
+tools can neither read nor change in every mode but `yolo` ([Safety](safety.md)).
 
 A phone that is lost, or that should no longer reach Dot: **Settings › Phone › Paired phones** lists each phone that
 signed in with a code, with when it was paired and last used, and **Remove** signs it out at once (`DELETE

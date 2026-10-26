@@ -26,7 +26,7 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from dotagent.agent.pages import LIBRARY_HOSTS, PAGES_PREFIX
-from dotagent.core.errors import ConfigError
+from dotagent.core.errors import ConfigError, PhoneRefused
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.mcp.signin import CALLBACK_PATH
@@ -55,6 +55,9 @@ _WAYS_IN: frozenset[str] = frozenset(
     }
 )
 LOOKS_PREFIX: str = "/looks/"
+# Where the guard leaves, in the state of a request a phone's key let in, the id of that phone (item 678): what a route
+# reads to know the request came from a phone, whatever its Host header says, which any client may write.
+PHONE_STATE: str = "dot_phone"
 
 _PRIVATE_FILE_MODE: int = 0o600
 _PERMISSION_BITS: int = 0o777
@@ -295,6 +298,21 @@ def needs_main_token(path: str) -> bool:
     return path in _WAYS_IN or path.startswith(f"{PHONES_PATH}/")
 
 
+def from_a_phone(scope: Scope) -> bool:
+    """Whether the guard let the request of ``scope`` in by a phone's key (:data:`PHONE_STATE`), not the installation's
+    token."""
+    state: object = scope.get("state")
+    return isinstance(state, dict) and state.get(PHONE_STATE) is not None
+
+
+def refuse_from_a_phone(scope: Scope, what: str) -> None:
+    """Refuse the request of ``scope`` when a phone's key made it (item 678): what ``what`` names is done on the Mac,
+    with the installation's token, so that a phone that is taken cannot leave Dot doing more without asking after the
+    phone is removed."""
+    if from_a_phone(scope):
+        raise PhoneRefused(f"a phone cannot {what}: do it on your Mac", {"phone": True})
+
+
 def check_request(
     path: str,
     host: str | None,
@@ -431,6 +449,7 @@ class LocalGuard:
         )
         if refusal is None:
             if phone is not None and self._phones is not None:
+                scope.setdefault("state", {})[PHONE_STATE] = phone
                 await self._phones.used(phone, time.time())
                 receive = _ends_when_removed(receive, self._phones.removed(phone))
             await self._app(scope, receive, secured)

@@ -275,6 +275,11 @@ class SignInError(DotError):
     provider refused, its tokens cannot be read or refreshed, or the Keychain did not answer."""
 
 
+class PhoneRefused(DotError):
+    """What a phone's key may not do (item 678): show a secret, connect an account or a password manager, or widen for
+    good what runs may do without asking, which would outlast the phone's removal."""
+
+
 class VaultRefused(DotError):
     """Dot's vault shows a secret to this Mac's own page alone (item 621): a request that came another way, a phone's
     over Tailscale, is refused."""

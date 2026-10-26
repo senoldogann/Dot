@@ -66,7 +66,7 @@ def voice_router(desktop_app: DesktopApp | None = None, opener: Opener = open_ur
         """Show System Settings at the pane where Dot is allowed the microphone or speech recognition (item 636), for
         the Dot.app that was refused it, unless that Dot.app was built before it asked macOS for either: then nothing is
         shown and the answer says ``old``. Refused (422) from any address but this Mac's own."""
-        if not on_this_mac(request.headers.get("host")):
+        if not on_this_mac(request):
             raise SignInError(
                 "System Settings opens on the Mac itself: ask for it at the Mac's own address, not from another device",
                 {},

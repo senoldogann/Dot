@@ -7,6 +7,7 @@ import hashlib
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from starlette.requests import Request
 
 from dotagent.core.errors import SignInError
 from dotagent.oauth.accounts import authorize_link, client_names
@@ -14,6 +15,7 @@ from dotagent.oauth.keychain import pieces_of, tokens_of, without_pieces
 from dotagent.oauth.pkce import challenge_of, new_state, new_verifier
 from dotagent.oauth.providers import GOOGLE, MICROSOFT
 from dotagent.oauth.tokens import Tokens, address_from, tokens_from
+from dotagent.server.guard import PHONE_STATE
 from dotagent.server.routes_accounts import on_this_mac
 
 
@@ -76,9 +78,18 @@ def test_the_address_is_googles_email_or_microsofts_mail_or_its_user_name() -> N
         address_from({"name": "Ada"})
 
 
+def _request(host: str | None, phone: str | None = None) -> Request:
+    headers: list[tuple[bytes, bytes]] = [] if host is None else [(b"host", host.encode())]
+    state: dict[str, str] = {} if phone is None else {PHONE_STATE: phone}
+    return Request({"type": "http", "method": "POST", "path": "/", "headers": headers, "state": state})
+
+
 def test_a_sign_in_starts_only_from_this_macs_own_address() -> None:
-    assert [on_this_mac(host) for host in ("127.0.0.1:8765", "localhost", "LOCALHOST:8765", "[::1]:8765")] == [True] * 4
-    assert [on_this_mac(host) for host in ("mac.tail1234.ts.net", "192.168.1.5:8765", None)] == [False] * 3
+    mine: tuple[str, ...] = ("127.0.0.1:8765", "localhost", "LOCALHOST:8765", "[::1]:8765")
+    assert [on_this_mac(_request(host)) for host in mine] == [True] * 4
+    assert [on_this_mac(_request(host)) for host in ("mac.tail1234.ts.net", "192.168.1.5:8765", None)] == [False] * 3
+    # A phone's key is not this Mac, whatever Host its request writes (item 678).
+    assert not on_this_mac(_request("127.0.0.1:8765", "029d9a7ce196"))
 
 
 def test_tokens_longer_than_a_line_of_securitys_prompt_go_in_pieces_and_come_back_whole() -> None:

@@ -65,7 +65,7 @@ def vault_router(ctx: ServerContext) -> APIRouter:
         return await state()
 
     def on_the_mac(request: Request) -> None:
-        if not on_this_mac(request.headers.get("host")):
+        if not on_this_mac(request):
             raise SignInError(
                 "connect 1Password on the Mac itself: the 1Password app asks you there, and a token is pasted there",
                 {},
