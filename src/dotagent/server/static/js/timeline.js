@@ -49,6 +49,12 @@ const RING_LABELS = { blocked: "waiting" };
 // keeps for its last line.
 const FLOCK_FACES = 3;
 const PREVIEW_CHARS = 240;
+// The blocks of agents' messages in the conversation and who wrote in each, in order (item 668; see agentSaid).
+const SAID_BLOCKS = new WeakMap();
+// The tool that hands a part to one of the owner's agents (item 668): its call shows that the part is on its way.
+const MESSAGE_AGENT_TOOL = "message_agent";
+// How much of an agent's reply its message in the conversation shows; the rest is on its run's page.
+const AGENT_SAID_CHARS = 1200;
 // What a line of the conversation says of a change of the memory (item 313); it shows this much of the note.
 const MEMORY_CHANGES = { Saved: "Saved to memory", Updated: "Updated memory", Forgot: "Removed from memory" };
 const MEMORY_WORDS_CHARS = 120;
@@ -396,6 +402,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       // The messages of the scope's turn, each with its words: an answer that repeats one of them leaves it out.
       replies: [],
       touched: false,
+      // The parts on their way to an agent, by the call that sent them (item 668; see sending).
+      handoffs: new Map(),
+      // The agent the scope's run is of, by its name, or null (item 668).
+      agentName: null,
       // The cards that wait for the reader's answer in this scope and the delegated runs inside it.
       asking: 0,
       // While the run waits for its model to be reached again: the note that says so and the attempts it counts.
@@ -670,10 +680,79 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // `line`: the facts its last line shows (see paintChild).
     const panel = { node, face, status, meta, progress, line: "starting", time, steps: 0, helper, flock: null };
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
+    // The agent the run is of, by its name (item 668): its answer stands in the parent's conversation as its message.
+    scope.agentName = typeof data.agent_name === "string" && data.agent_name !== "" ? data.agent_name : null;
+    if (scope.agentName !== null) {
+      arrived(parent, scope.agentName);
+    }
     scopes.set(runId, scope);
     liveChildren.add(scope);
     placeHelper(scope, ts);
     return scope;
+  }
+
+  /**
+   * A part handed to an agent is on its way (item 668): "Sending to Scout…" with Dot's three dots, at the end of the
+   * scope, until the agent's run starts and its row takes over, or the call ends without one. It splits no stretch of
+   * work, so it is put after it, not placed as a line of its own.
+   */
+  function sending(scope, callId, name) {
+    const node = el(
+      "div",
+      { class: "agent-handoff", role: "status" },
+      el("span", { class: "agent-handoff-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span")),
+      el("span", null, `Sending to ${name}…`),
+    );
+    scope.container.append(node);
+    scope.handoffs.set(callId, { node, name });
+  }
+
+  /** The agent `name`'s run started: the first part on its way to it in `scope` has arrived. A part sent under another
+   * spelling of the name than the agent's own, when it is the one on its way, has arrived as well. */
+  function arrived(scope, name) {
+    const named = [...scope.handoffs].find(([, handoff]) => handoff.name.toLowerCase() === name.toLowerCase());
+    const only = scope.handoffs.size === 1 ? [...scope.handoffs][0] : undefined;
+    const [callId, handoff] = named ?? only ?? [null, null];
+    if (handoff !== null) {
+      handoff.node.remove();
+      scope.handoffs.delete(callId);
+    }
+  }
+
+  /**
+   * What an agent answered, as its message in the conversation that handed it the part (item 668): under one head,
+   * "Message from Scout", that the next agent's answer joins ("Messages from Scout and Editor"), each a bubble with
+   * the agent's face and name over its words, cut to AGENT_SAID_CHARS with a way to the rest on its run's page.
+   */
+  function agentSaid(scope, child, result, ts) {
+    const last = scope.container.lastElementChild;
+    let block = last !== null && SAID_BLOCKS.has(last) ? last : null;
+    if (block === null) {
+      block = el("section", { class: "agent-said" }, el("div", { class: "agent-said-head" }));
+      SAID_BLOCKS.set(block, []);
+      place(scope, block, ts);
+    }
+    const names = SAID_BLOCKS.get(block);
+    if (!names.some((each) => each.name === child.agentName)) {
+      names.push({ name: child.agentName, id: child.actorId });
+    }
+    const head = block.querySelector(".agent-said-head");
+    const said = names.flatMap((each, index) => [
+      index === 0 ? null : index === names.length - 1 ? " and " : ", ",
+      el("span", { class: "agent-said-who" }, actorFace(each.id, "idle", null), each.name),
+    ]);
+    head.replaceChildren(el("span", null, names.length === 1 ? "Message from" : "Messages from"), " ", ...said.filter((part) => part !== null));
+    const text = result.trim();
+    const cut = text.length > AGENT_SAID_CHARS;
+    block.append(
+      el(
+        "div",
+        { class: "bubble agent-message" },
+        el("div", { class: "agent-message-name" }, actorFace(child.actorId, "idle", null), child.agentName),
+        prose(cut ? `${text.slice(0, AGENT_SAID_CHARS).trimEnd()}…` : text),
+        cut ? el("a", { class: "agent-message-more", href: `#/runs/${child.runId}` }, "Read it all") : null,
+      ),
+    );
   }
 
   /** The row of a delegated run as it stands at `ts`: its last line as facts, drawn again only when they changed (item
@@ -937,6 +1016,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         return;
       }
       endChild(scope, status, scope.panel.steps, record.ts, result);
+      if (scope.agentName !== null && status === "done" && typeof result === "string" && result.trim() !== "") {
+        agentSaid(scope.parent, scope, result, record.ts);
+      }
       // The parent resumes when the delegated run is over; the time in between was spent on the delegation.
       scope.parent.boundary = record.ts;
     },
@@ -1058,6 +1140,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         scope.finishing.set(data.call_id, data.args);
         return;
       }
+      if (data.tool === MESSAGE_AGENT_TOOL && typeof data.args?.agent === "string" && data.args.agent.trim() !== "") {
+        sending(scope, data.call_id, data.args.agent.trim());
+      }
       if (scope.runId === rootRunId && data.tool.startsWith("browser_") && !browserSeen) {
         browserSeen = true;
         onBrowserStep();
@@ -1072,6 +1157,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
     tool_result(scope, record) {
       const data = record.data;
+      // The part's call ended: what is still on its way never arrived (an agent not found, a refusal).
+      const handoff = scope.handoffs.get(data.call_id);
+      if (handoff !== undefined) {
+        handoff.node.remove();
+        scope.handoffs.delete(data.call_id);
+      }
       const finishArgs = scope.finishing.get(data.call_id);
       if (finishArgs !== undefined) {
         scope.finishing.delete(data.call_id);

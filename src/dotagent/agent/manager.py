@@ -1,6 +1,7 @@
 """Run lifecycle: start, queue, steer, cancel and finish agent runs, each in its own asyncio task."""
 
 import asyncio
+import contextlib
 import json
 import sqlite3
 import time
@@ -2532,6 +2533,13 @@ class RunManager:
                         goal_mode=with_goal_mode,
                     ),
                 )
+            # The name of the agent a message went to, for the conversation that shows its answer as its message (item
+            # 668). A helper an agent's run delegated to carries the agent's id too (item 553), but it is no message to
+            # the agent: it is named as a helper.
+            agent_name: str | None = None
+            if agent_id is not None and source == TEAM_SOURCE:
+                with contextlib.suppress(NotFoundError):
+                    agent_name = (await runtime.store.get_agent(agent_id)).name
             await runtime.bus.emit(
                 run.id,
                 "run_queued",
@@ -2545,6 +2553,7 @@ class RunManager:
                     "goal_mode": with_goal_mode,
                     "parent_run_id": parent_run_id,
                     "agent_id": agent_id,
+                    "agent_name": agent_name,
                     "tainted": starts_tainted,
                     "models": {
                         "steps": model_ref,
