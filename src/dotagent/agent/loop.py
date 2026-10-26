@@ -183,6 +183,7 @@ from dotagent.core.errors import (
     DotError,
     InvalidValueError,
     MissingSecretError,
+    NotFoundError,
     ProviderError,
     ProviderFilterError,
     ProviderTransportError,
@@ -1165,6 +1166,8 @@ def _send_back_note(reason: str) -> str:
 
 # The start of a follow-up's goal the goal check reads (item 675), enough to tell what it picks up.
 _FOLLOW_UP_GOAL_CHARS: int = 300
+# How many runs back the goal check follows a resumed run to the firing it goes on from.
+_RESUMES_FOLLOWED: int = 20
 
 
 def _scheduled_end(reason: str, ended: RunOutcome) -> RunOutcome:
@@ -1335,6 +1338,24 @@ async def _ask_checker(
     return verdict
 
 
+async def _is_firing(agent: AgentRun) -> bool:
+    """Whether the run is a schedule's firing, or goes on from one by Resume (item 553: the scheduler keeps such a run
+    as the firing's), however many times it was resumed."""
+    run: RunRecord = agent.run
+    for _ in range(_RESUMES_FOLLOWED):
+        if run.source != RESUME_SOURCE:
+            return run.source == SCHEDULE_SOURCE
+        resumed: EventRecord | None = await agent.runtime.store.last_event(run.id, RESUMED_EVENT)
+        origin: object = None if resumed is None else resumed.data.get("from_run_id")
+        if not isinstance(origin, str):
+            return False
+        try:
+            run = await agent.runtime.store.get_run(origin)
+        except NotFoundError:
+            return False
+    return False
+
+
 async def _follow_ups(agent: AgentRun) -> str:
     """The schedules that will start runs in the run's chat, one line each with the start of their goal, for the goal
     check (item 675): what is left of a goal that waits on time is picked up by one of them. A schedule whose runs go
@@ -1344,11 +1365,9 @@ async def _follow_ups(agent: AgentRun) -> str:
     now: float = time.time()
     zone: ZoneInfo = agent.runtime.schedule_zone
     same_chat: bool = agent.runtime.config.scheduler.same_chat
-    # A firing's chat is marked as its schedule's before its run starts (``SchedulerRunner._firing_chat``).
+    # A firing's chat is marked as its schedule's before its run starts (``Scheduler._firing_chat``).
     firing_of: str | None = (
-        await agent.runtime.store.schedule_of_thread(agent.run.thread_id)
-        if agent.run.source == SCHEDULE_SOURCE
-        else None
+        await agent.runtime.store.schedule_of_thread(agent.run.thread_id) if await _is_firing(agent) else None
     )
     lines: list[str] = [
         f"- {record.name}: next run {format_local(record.next_run_at, zone)} ({schedule_timing(record, zone)}); "
