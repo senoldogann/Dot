@@ -2478,6 +2478,71 @@ a.pill:hover {
   height: 13px;
 }
 
+/* Proposed for you (item 712): the scout's proposals, a card a line, each with its badges, the review's words and its
+   details folded; Install (or Update) and Skip at its right, under it on a phone. */
+.scout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.scout-line.hint {
+  margin: 0;
+}
+
+.scout-card {
+  align-items: flex-start;
+}
+
+.scout-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.scout-why.hint {
+  margin: 0;
+}
+
+.scout-actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.scout-details > summary,
+.scout-refused > summary {
+  width: max-content;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.scout-details .gallery-facts {
+  margin-top: var(--space-2);
+}
+
+.scout-findings {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.scout-refused ul {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
 @media (max-width: 960px) {
   .gallery-featured {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2487,6 +2552,22 @@ a.pill:hover {
 @media (max-width: 720px) {
   .gallery-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The mark stays beside the name; the buttons take the card's width under it. */
+  .scout-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .scout-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+  }
+
+  .scout-actions > .btn {
+    flex: 1 1 0;
+    justify-content: center;
   }
 
   .gallery-featured {

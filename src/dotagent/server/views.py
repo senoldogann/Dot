@@ -1527,7 +1527,7 @@ class PluginsView(FrozenModel):
     plugins: tuple[PluginView, ...]
 
 
-type GalleryState = Literal["available", "installed", "outdated", "taken"]
+type GalleryState = Literal["available", "installed", "outdated", "updated", "taken"]
 
 
 class GalleryPluginView(FrozenModel):
@@ -1555,6 +1555,10 @@ class GalleryPluginView(FrozenModel):
     homepage: str
     state: GalleryState
     installed_commit: str | None
+    # Item 712: an update the owner took from a proposal of the scout (``updated``), which Revert can take back while
+    # the version it replaced is kept; and a plugin the scout proposed and the owner installed (not one of Dot's list).
+    revertible: bool = False
+    scouted: bool = False
 
 
 class InstalledPluginView(FrozenModel):
@@ -1565,6 +1569,57 @@ class InstalledPluginView(FrozenModel):
     description: str | None
     servers: int
     own: bool
+
+
+class ScoutFindingView(FrozenModel):
+    rule: str
+    severity: str
+    path: str
+    detail: str
+
+
+class ScoutCandidateView(FrozenModel):
+    """A proposal of the plugin scout (item 712) as Customize › Plugins shows it: a new plugin or an update, where it
+    comes from and how far that is trusted, what the review made of it (in the owner's language), what the scan found,
+    how near it is to the owner's work, and where it stands."""
+
+    id: str
+    kind: str
+    name: str
+    publisher: str
+    tier: str
+    source: str
+    category: str
+    repository: str
+    commit: str
+    homepage: str
+    skills: tuple[str, ...]
+    licence: str
+    stars: int
+    pushed: str
+    risk: str | None
+    refuse: bool
+    does: str
+    why: str
+    fit: float
+    findings: tuple[ScoutFindingView, ...]
+    previous: str | None
+    changed: tuple[str, ...]
+    state: str
+    found_at: float
+    failure: str | None
+
+
+class ScoutView(FrozenModel):
+    """``GET /plugin-scout``: the scout's proposals waiting for the owner, newest first, the ones the review refused,
+    when it last looked and what it found, whether a night is under way, and when the next one comes."""
+
+    proposals: tuple[ScoutCandidateView, ...]
+    refused: tuple[ScoutCandidateView, ...]
+    last_run: float | None
+    last_summary: str
+    running: bool
+    time: str
 
 
 class GalleryView(FrozenModel):

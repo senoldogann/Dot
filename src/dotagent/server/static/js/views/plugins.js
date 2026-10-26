@@ -10,6 +10,11 @@
 // reads that are not the gallery's. A service's page, which was at `#/customize/plugins/<id>` before item 542, is under
 // Connectors; the address of a service whose gallery plugin has the same id (Cloudflare, Supabase, MongoDB, Hugging
 // Face) is the plugin's.
+//
+// Proposed for you (item 712) stands above them: what the scout found last night, each a card with where it comes
+// from, what the review made of it in the owner's language, its risk and what the scan found, how near it is to the
+// owner's work, and Install (or Update) and Skip. Look now starts a night; what the review refused is listed under it.
+// A plugin updated from a proposal stands as Updated, with Revert while the version it replaced is kept.
 
 import { api } from "../api.js";
 import { customizeHead } from "../customizehead.js";
@@ -43,10 +48,19 @@ function galleryMark(plugin) {
   return mark;
 }
 
-/** Whether Dot installed the plugin: from the commit the gallery pins, or from an older one (`outdated`, item 558). */
+/** Whether Dot installed the plugin: from the commit the gallery pins, from an older one (`outdated`, item 558), or from
+ * a newer one the owner took from the scout (`updated`, item 712). */
 function isInstalled(plugin) {
-  return plugin.state === "installed" || plugin.state === "outdated";
+  return plugin.state === "installed" || plugin.state === "outdated" || plugin.state === "updated";
 }
+
+/** The words of a proposal's risk, as a badge of its colour. */
+const RISKS = {
+  low: { label: "Low risk", tone: "b-ok" },
+  medium: { label: "Medium risk", tone: "b-warn" },
+  high: { label: "High risk", tone: "b-bad" },
+};
+const TIME = new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
 
 /** The check beside the name of a plugin whose publisher makes what its skills are about. */
 function verified(plugin) {
@@ -71,6 +85,9 @@ export function mount(root, ctx) {
   let words = "";
   // The plugins being installed or removed, by id or name: their buttons stay off while the page paints again.
   const busy = new Set();
+  // The scout's proposals (item 712), and the timer that asks again while a night runs.
+  let scout = null;
+  let scoutTimer = null;
   const holder = el("div", { class: "stack" }, loadingPanel());
 
   const search = el("input", { class: "input customize-search", type: "search", placeholder: "Search plugins and skills", "aria-label": "Search plugins", autocomplete: "off", spellcheck: "false" });
@@ -118,8 +135,19 @@ export function mount(root, ctx) {
     el("div", { class: "gallery-section-head" }, el("h2", { class: "section-label gallery-section-title" }, "All plugins"), el("div", { class: "gallery-controls" }, filters.element, orders.element)),
     allGrid,
   );
+  const scoutGrid = el("div", { class: "scout-grid" });
+  const scoutLine = el("p", { class: "hint scout-line" });
+  const lookButton = el("button", { class: "btn sm scout-look", type: "button" }, icon("refresh"), "Look now");
+  lookButton.addEventListener("click", () => attempt(lookNow));
+  const scoutSection = el(
+    "section",
+    { class: "gallery-section scout-section", dataset: { section: "proposals" }, hidden: true },
+    el("div", { class: "gallery-section-head" }, el("h2", { class: "section-label gallery-section-title" }, "Proposed for you"), lookButton),
+    scoutLine,
+    scoutGrid,
+  );
   // Made once and painted again in place, so that the search keeps the focus and the controls their state.
-  const body = el("div", { class: "gallery", hidden: true }, featured, all);
+  const body = el("div", { class: "gallery", hidden: true }, scoutSection, featured, all);
 
   /** Install `plugin`: the daemon downloads its pinned commit, checks it and offers its skills to the next runs. */
   async function install(plugin) {
@@ -135,6 +163,186 @@ export function mount(root, ctx) {
       paint();
     }
     toast("ok", `${plugin.name} is installed: the tasks that start now are offered its ${plural(plugin.skills.length, "skill", "skills")}.`);
+  }
+
+  /** Ask the scout for its proposals, and again every few seconds while a night runs. */
+  async function loadScout() {
+    const found = await api.get("/plugin-scout");
+    if (disposed) {
+      return;
+    }
+    scout = found;
+    paintScout();
+    clearTimeout(scoutTimer);
+    if (scout.running) {
+      scoutTimer = setTimeout(() => attempt(loadScout), 3000);
+    }
+  }
+
+  async function lookNow() {
+    lookButton.disabled = true;
+    try {
+      scout = await api.post("/plugin-scout/look", {});
+      clearTimeout(scoutTimer);
+      scoutTimer = setTimeout(() => attempt(loadScout), 3000);
+    } finally {
+      // Refused (the emergency stop answers 409), the button is given back as it was.
+      paintScout();
+    }
+  }
+
+  /** Install or update what `proposal` proposes; the gallery is read again, as it lists what was installed. */
+  async function take(proposal) {
+    const key = `scout:${proposal.kind}:${proposal.id}`;
+    busy.add(key);
+    paintScout();
+    try {
+      scout = await api.post(`/plugin-scout/${encodeURIComponent(proposal.id)}/install?kind=${proposal.kind}`, {});
+      const now = await api.get("/plugin-gallery");
+      if (!disposed) {
+        gallery = now;
+      }
+    } finally {
+      busy.delete(key);
+      paint();
+      paintScout();
+    }
+    toast(
+      "ok",
+      proposal.kind === "update"
+        ? `${proposal.name} is updated; Revert on its card puts the earlier version back.`
+        : `${proposal.name} is installed: the tasks that start now are offered its ${plural(proposal.skills.length, "skill", "skills")}.`,
+    );
+  }
+
+  async function skip(proposal) {
+    const key = `scout:${proposal.kind}:${proposal.id}`;
+    busy.add(key);
+    paintScout();
+    try {
+      scout = await api.post(`/plugin-scout/${encodeURIComponent(proposal.id)}/skip?kind=${proposal.kind}`, {});
+    } finally {
+      busy.delete(key);
+      paintScout();
+    }
+  }
+
+  /** Put back the version an update replaced (item 712). */
+  async function revert(plugin) {
+    const sure = await confirmDialog({
+      title: `Put back the earlier version of ${plugin.name}?`,
+      message: "The updated version goes to the Trash, and the tasks that start after read the earlier one again.",
+      confirmLabel: "Revert",
+      focusCancel: true,
+    });
+    if (!sure) {
+      return;
+    }
+    busy.add(plugin.id);
+    paint();
+    try {
+      const now = await api.post(`/plugin-gallery/${encodeURIComponent(plugin.id)}/revert`, {});
+      if (!disposed) {
+        gallery = now;
+      }
+    } finally {
+      busy.delete(plugin.id);
+      paint();
+    }
+    toast("ok", `${plugin.name} is back at its earlier version.`);
+  }
+
+  /** A proposal's card: its mark and name, whether it is new or an update and where it comes from, its risk and how
+   * near it is to the owner's work, what it does and why the risk is what it is (the review's words), the details
+   * folded (its skills, what the scan found, its source), and Install or Update with Skip. */
+  function proposalCard(proposal) {
+    const key = `scout:${proposal.kind}:${proposal.id}`;
+    const working = busy.has(key);
+    const risk = RISKS[proposal.risk] ?? { label: "Not reviewed", tone: "b-muted" };
+    const takeButton = el(
+      "button",
+      { class: "btn sm primary scout-take", type: "button", disabled: working, "aria-label": `${proposal.kind === "update" ? "Update" : "Install"} ${proposal.name}` },
+      working ? [el("span", { class: "spinner", "aria-hidden": "true" }), proposal.kind === "update" ? "Updating…" : "Installing…"] : [icon("download"), proposal.kind === "update" ? "Update" : "Install"],
+    );
+    takeButton.addEventListener("click", () => attempt(() => take(proposal)));
+    const skipButton = el("button", { class: "btn sm ghost scout-skip", type: "button", disabled: working, "aria-label": `Skip ${proposal.name}` }, "Skip");
+    skipButton.addEventListener("click", () => attempt(() => skip(proposal)));
+    const findings = proposal.findings.map((finding) =>
+      el("li", { dataset: { severity: finding.severity } }, el("span", { class: `badge ${finding.severity === "high" ? "b-bad" : finding.severity === "medium" ? "b-warn" : "b-muted"}` }, finding.rule), " ", el("span", { class: "mono" }, finding.path), ": ", finding.detail),
+    );
+    const details = el(
+      "details",
+      { class: "scout-details" },
+      el("summary", null, "Details"),
+      el("dl", { class: "gallery-facts" }, [
+        el("dt", null, "Source"),
+        el("dd", null, el("a", { href: proposal.homepage, target: "_blank", rel: "noopener noreferrer" }, `github.com/${proposal.repository}`, icon("external")), ` · ${proposal.source}`),
+        el("dt", null, "Version checked"),
+        el("dd", null, el("span", { class: "mono" }, proposal.commit.slice(0, 7)), proposal.previous ? ` (installed: ${proposal.previous.slice(0, 7)})` : ""),
+        el("dt", null, "Licence"),
+        el("dd", null, `${proposal.licence} · ${compact(proposal.stars)} stars on GitHub`),
+        el("dt", null, "Skills"),
+        el("dd", null, el("span", { class: "mono" }, proposal.skills.join(", "))),
+        ...(proposal.changed.length > 0 ? [el("dt", null, "Changed"), el("dd", null, el("span", { class: "mono" }, proposal.changed.join(", ")))] : []),
+      ]),
+      findings.length > 0 ? el("ul", { class: "scout-findings" }, findings) : el("p", { class: "hint" }, "The scan found nothing to point out."),
+    );
+    return el(
+      "article",
+      { class: "gallery-card scout-card", dataset: { plugin: proposal.id, kind: proposal.kind, risk: proposal.risk ?? "none" } },
+      galleryMark({ logo: null, category: proposal.category }),
+      el(
+        "div",
+        { class: "gallery-card-main" },
+        el("div", { class: "gallery-card-head" }, el("span", { class: "gallery-card-name" }, proposal.name), proposal.tier === "a" ? verified({ publisher: proposal.publisher }) : null),
+        el(
+          "div",
+          { class: "gallery-card-by" },
+          ...joined([proposal.kind === "update" ? "Update" : "New", proposal.publisher, proposal.tier === "a" ? "Anthropic or its maker" : "Community", plural(proposal.skills.length, "skill", "skills")]),
+        ),
+        el(
+          "div",
+          { class: "scout-badges" },
+          el("span", { class: `badge ${risk.tone}`, title: proposal.why }, risk.label),
+          el("span", { class: "badge b-info", title: "How close its skills are to the tasks you gave Dot lately" }, `Fits your work ${Math.round(proposal.fit * 100)}%`),
+        ),
+        el("p", { class: "gallery-card-does" }, proposal.does || proposal.name),
+        proposal.why ? el("p", { class: "hint scout-why" }, proposal.why) : null,
+        details,
+      ),
+      el("div", { class: "gallery-action scout-actions" }, takeButton, skipButton),
+    );
+  }
+
+  function paintScout() {
+    if (disposed || scout === null || pluginId !== undefined) {
+      return;
+    }
+    scoutSection.hidden = words !== "";
+    lookButton.disabled = scout.running;
+    lookButton.replaceChildren(...(scout.running ? [el("span", { class: "spinner", "aria-hidden": "true" }), "Looking…"] : [icon("refresh"), "Look now"]));
+    const when = scout.last_run === null ? "Dot has not looked yet." : `Last looked ${TIME.format(new Date(scout.last_run * 1000))}: ${scout.last_summary}.`;
+    const nightly = scout.time === "off" ? "The nightly look is off in the settings." : `Dot looks every night at ${scout.time} for plugins worth having and for updates, checks each and waits for your word.`;
+    scoutLine.textContent = `${nightly} ${when}`;
+    const parts = scout.proposals.map(proposalCard);
+    if (parts.length === 0) {
+      parts.push(emptyPanel("sparkles", "Nothing waiting", "What the next look finds, and passes Dot's checks, comes here for you to install or skip."));
+    }
+    if (scout.refused.length > 0) {
+      parts.push(
+        el(
+          "details",
+          { class: "scout-refused" },
+          el("summary", null, `${plural(scout.refused.length, "plugin", "plugins")} refused by Dot's review`),
+          el(
+            "ul",
+            null,
+            scout.refused.map((one) => el("li", null, el("strong", null, one.name), ` (github.com/${one.repository}): `, one.why)),
+          ),
+        ),
+      );
+    }
+    scoutGrid.replaceChildren(...parts);
   }
 
   /** Take the plugin `name` out of Dot after a confirmation: its folder goes to the Trash (item 497). `title` is how
@@ -186,8 +394,18 @@ export function mount(root, ctx) {
               { class: "badge b-warn gallery-installed gallery-outdated", title: `Installed from ${plugin.installed_commit.slice(0, 7)}; the gallery now has ${plugin.commit.slice(0, 7)}. Remove it and Install it again to get the new one.` },
               "Older version",
             )
-          : el("span", { class: "badge b-ok gallery-installed" }, icon("check"), "Installed");
-      return el("div", { class: "gallery-action" }, badge, button);
+          : plugin.state === "updated"
+            ? el("span", { class: "badge b-ok gallery-installed gallery-updated", title: `Updated to ${plugin.installed_commit.slice(0, 7)} from a proposal of Dot's.` }, icon("check"), "Updated")
+            : el("span", { class: "badge b-ok gallery-installed" }, icon("check"), "Installed");
+      let revertButton = null;
+      if (plugin.revertible) {
+        const revertLabel = `Put back the earlier version of ${plugin.name}`;
+        revertButton = wide
+          ? el("button", { class: "btn sm", type: "button", disabled: removing }, icon("undo"), "Revert")
+          : el("button", { class: "btn sm ghost icon-only gallery-revert", type: "button", title: revertLabel, "aria-label": revertLabel, disabled: removing }, icon("undo"));
+        revertButton.addEventListener("click", () => attempt(() => revert(plugin)));
+      }
+      return el("div", { class: "gallery-action" }, badge, revertButton, button);
     }
     if (plugin.state === "taken") {
       return el(
@@ -288,6 +506,7 @@ export function mount(root, ctx) {
     paintHead();
     paintCounts();
     featured.hidden = words !== "" || shown !== "all";
+    paintScout();
     featuredGrid.replaceChildren(...gallery.plugins.filter((plugin) => plugin.featured).map(card));
     const showing = ordered(
       gallery.plugins.filter((plugin) => (shown === "all" || (shown === "featured" && plugin.featured) || (shown === "installed" && isInstalled(plugin))) && matches(plugin)),
@@ -316,7 +535,7 @@ export function mount(root, ctx) {
     const facts = [
       ["Source", el("a", { href: plugin.homepage, target: "_blank", rel: "noopener noreferrer" }, `github.com/${plugin.repository}`, icon("external"))],
       ["Version checked", el("span", { class: "mono" }, plugin.commit.slice(0, 7))],
-      ...(plugin.state === "outdated" ? [["Installed from", el("span", { class: "mono" }, plugin.installed_commit.slice(0, 7))]] : []),
+      ...(plugin.state === "outdated" || plugin.state === "updated" ? [["Installed from", el("span", { class: "mono" }, plugin.installed_commit.slice(0, 7))]] : []),
       ["Licence", plugin.licence],
       ["Stars", `${compact(plugin.stars)} on GitHub`],
       ["In the gallery since", DAY.format(new Date(`${plugin.added}T00:00:00`))],
@@ -402,7 +621,11 @@ export function mount(root, ctx) {
     root.append(holder);
   }
   attempt(load);
+  if (pluginId === undefined) {
+    attempt(loadScout);
+  }
   return () => {
     disposed = true;
+    clearTimeout(scoutTimer);
   };
 }
