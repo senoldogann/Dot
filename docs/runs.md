@@ -291,7 +291,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   presentation (`.pptx`) slide by slide, with its tables, its charts' series and its notes; `read_file` reads such a
   file on disk the same way. A file of before 2007 (`.doc`,
   `.xls`, `.ppt`) or one locked with a password is refused, saying what to save instead, and so is a package that is
-  damaged, or has a part packed in a way Office does not use, as a file that cannot be read. Anything else is refused at
+  damaged, or has a part packed in a way Office does not use, as a file that cannot be read. So is a package that
+  unpacks to more than Dot reads (item 693): parts that declare more than 200 MB in all, a part of more than 64 MB, an
+  XML part of more than 16 MB (a worksheet is read as a stream and has the first bound only), a part of 1 MB or more
+  packed 200 times smaller than it unpacks to, or more than 10,000 parts. It is refused before anything is read, each
+  part is unpacked in chunks up to the size it declares, and a part that declares less than it holds is damaged, so a
+  small file that unpacks to gigabytes cannot take the daemon's memory. Anything else is refused at
   upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one named like a file
   Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
 - A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269) and

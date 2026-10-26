@@ -5,6 +5,7 @@ files are made here with the same libraries, and edited in their zip packages in
 write."""
 
 import io
+import os
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -18,6 +19,7 @@ from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.util import Inches
 
+from dotagent import office
 from dotagent.core.errors import InvalidValueError, ToolExecutionError
 from dotagent.office import (
     WorkbookContent,
@@ -258,3 +260,74 @@ def test_a_package_with_a_part_that_cannot_be_unpacked_is_refused_as_a_file_that
             broken = _repacked(package, part, _locked)
     with pytest.raises(InvalidValueError, match="the Word document cannot be read"):
         office_text("document", broken)
+
+
+def _with_part(package: bytes, part: str, body: bytes) -> bytes:
+    """``package`` with the part ``part`` holding ``body``, or a new part of that name."""
+    written: io.BytesIO = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(package)) as source, zipfile.ZipFile(written, "w", zipfile.ZIP_DEFLATED) as target:
+        for item in source.infolist():
+            if item.filename != part:
+                target.writestr(item, source.read(item), compress_type=item.compress_type)
+        target.writestr(part, body)
+    return written.getvalue()
+
+
+def _letter() -> bytes:
+    document = docx.Document()
+    document.add_paragraph("A letter.")
+    return _saved(document)
+
+
+def test_a_part_that_unpacks_to_more_than_dot_reads_of_one_is_refused_before_it_is_read() -> None:
+    """Item 693: a small file whose document.xml unpacks to 34 MB took the daemon to 1.15 GB; its XML is no more than
+    16 MB, and it is not parsed once it is refused."""
+    comment: bytes = b"<!--" + b"a" * (20 * 1024 * 1024) + b"-->"
+    package: bytes = _letter()
+    with zipfile.ZipFile(io.BytesIO(package)) as source:
+        xml: bytes = source.read("word/document.xml")
+    bomb: bytes = _with_part(
+        package, "word/document.xml", xml[: xml.index(b">") + 1] + comment + xml[xml.index(b">") + 1 :]
+    )
+    assert len(bomb) < 100 * 1024
+    with pytest.raises(
+        InvalidValueError, match=r"the Word document cannot be read: its part word/document.xml unpacks to 20 MB"
+    ):
+        office_text("document", bomb)
+
+
+def test_a_part_packed_far_tighter_than_office_packs_is_refused() -> None:
+    bomb: bytes = _with_part(_letter(), "word/media/zeros.bin", bytes(8 * 1024 * 1024))
+    with pytest.raises(InvalidValueError, match=r"its part word/media/zeros.bin is packed to a size that is 200 times"):
+        office_text("document", bomb)
+
+
+def test_a_package_of_too_many_parts_or_unpacking_to_too_much_in_all_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package: bytes = _letter()
+    monkeypatch.setattr(office, "_MAX_PARTS", 3)
+    with pytest.raises(InvalidValueError, match=r"it has \d+ parts, more than Dot reads"):
+        office_text("document", package)
+    monkeypatch.setattr(office, "_MAX_PARTS", 10_000)
+    monkeypatch.setattr(office, "_MAX_PACKAGE_BYTES", 10_000)
+    with pytest.raises(InvalidValueError, match=r"its parts unpack to \d+ MB in all, more than Dot reads"):
+        office_text("document", package)
+
+
+def test_a_part_that_declares_less_than_it_holds_is_refused_and_not_read() -> None:
+    """The size a part records of itself is what the checks go by, so a part that records too little must not get
+    past them: it is unpacked in chunks before its reader takes it, and the checksum it records is not the data's."""
+
+    def lying(entry: zipfile.ZipInfo) -> None:
+        entry.file_size = 100
+
+    with pytest.raises(InvalidValueError, match="the Word document cannot be read"):
+        office_text("document", _repacked(_letter(), "word/document.xml", lying))
+
+
+def test_a_package_that_is_large_for_its_pictures_is_read() -> None:
+    """A part that is no XML is not read as a tree, and one that does not pack (a photograph) is no bomb: 12 MB of them
+    are read."""
+    package: bytes = _with_part(_letter(), "word/media/photo.jpg", os.urandom(12 * 1024 * 1024))
+    assert office_text("document", package) == "A letter."
