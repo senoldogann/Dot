@@ -8,7 +8,7 @@
 import { api, blobUrl, holdsPhoneKey, unreachable } from "../api.js";
 import { copyText, el } from "../dom.js";
 import { icon } from "../icons.js";
-import { errorPanel, loadingPanel, segmented, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
+import { emptyPanel, errorPanel, inlineLoading, loadingPanel, segmented, setCard, setRow, setSection, switchRowSetting } from "../panels.js";
 import { getSnapshot } from "../state.js";
 import { attempt, confirmDialog, settingFold, toast } from "../ui.js";
 
@@ -414,8 +414,19 @@ export function mount(root, ctx) {
   });
   // The phones that hold a key of their own (item 670), each with Remove. A page signed in with a phone's key can neither
   // pair nor remove a phone: the daemon answers those to the Mac's own key alone, and the page says where to do it.
-  const phonesBody = el("div", null, loadingPanel());
-  const paired = setSection({ title: "Paired phones", body: setCard(phonesBody) });
+  const phonesBody = el("div", null, inlineLoading());
+  // Under the card, apart from the list: what holds for a phone that paired before there was one (item 672).
+  const pairedNote = el(
+    "p",
+    { class: "hint phone-paired-note" },
+    icon("info"),
+    el("span", null, "A phone that signed in before this list existed uses your Mac's own key and is not listed. To cut one off, remove it from your Tailscale network."),
+  );
+  const paired = setSection({
+    title: "Paired phones",
+    lead: "Each phone that signs in with a code gets a key of its own. Remove signs it out at once.",
+    body: el("div", { class: "phone-paired" }, setCard(phonesBody), pairedNote),
+  });
 
   function phoneRow(phone) {
     const used = phone.last_used_at === null ? "not used yet" : `last used ${dayOf(phone.last_used_at)}`;
@@ -444,7 +455,8 @@ export function mount(root, ctx) {
 
   async function loadPhones() {
     if (holdsPhoneKey()) {
-      phonesBody.replaceChildren(el("p", { class: "hint" }, "This phone signed in with a code. Pair or remove phones in Settings › Phone on your Mac."));
+      pairedNote.hidden = true;
+      phonesBody.replaceChildren(emptyPanel("smartphone", "Pair phones on your Mac", "This phone signed in with a code. Settings › Phone on your Mac pairs and removes phones."));
       return;
     }
     let listed;
@@ -459,10 +471,10 @@ export function mount(root, ctx) {
     if (disposed) {
       return;
     }
-    const rows = listed.phones.map(phoneRow);
     phonesBody.replaceChildren(
-      ...(rows.length > 0 ? rows : [el("p", { class: "hint" }, "No phone signed in with a code yet.")]),
-      el("p", { class: "hint" }, "A phone signed in with a code before this list existed holds your Mac's own key and is not listed here. To cut one off, take it off your Tailscale network in Tailscale's admin console."),
+      ...(listed.phones.length > 0
+        ? listed.phones.map(phoneRow)
+        : [emptyPanel("smartphone", "No phone paired yet", "A phone shows up here once it signs in with a code from Sign-in code above.")]),
     );
   }
 

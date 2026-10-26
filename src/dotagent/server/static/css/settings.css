@@ -601,6 +601,26 @@
   background: var(--faint);
 }
 
+/* The paired phones (items 670 and 672): their card, and under it the note on a phone that paired before the list. */
+.phone-paired {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.phone-paired-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding-inline: var(--space-1);
+}
+
+.phone-paired-note .icon {
+  flex: none;
+  margin-top: var(--space-half);
+}
+
 @container (max-width: 640px) {
   .phone-guide,
   .phone-setup-grid {

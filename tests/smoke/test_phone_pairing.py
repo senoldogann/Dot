@@ -253,7 +253,7 @@ async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["li
     assert PHONE_KEY.match(held)
     # The phone's Settings › Phone neither makes a code nor lists the phones; the Mac's lists it, with Remove.
     await phone.goto(f"{address}/#/settings/phone")
-    await expect(phone.get_by_text("Pair or remove phones in Settings › Phone on your Mac")).to_be_visible()
+    await expect(phone.get_by_text("Pair phones on your Mac")).to_be_visible()
     await expect(phone.get_by_role("button", name="Show code")).to_be_hidden()
     await mac.reload()
     row: Locator = mac.locator(f'[data-phone="{held.split(".")[1]}"]')
