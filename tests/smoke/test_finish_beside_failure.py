@@ -116,3 +116,24 @@ async def test_a_plan_call_that_failed_does_not_hold_back_a_finish(login_env: di
         (MARK_PLAN_STEP_TOOL, False),
         (FINISH_TOOL, True),
     ]
+
+
+async def test_a_finish_before_other_calls_ends_nothing_and_those_calls_run(login_env: dict[str, str]) -> None:
+    """The mail of ``[finish, send_email]`` is sent, and the run ends on the finish that comes after reading it (item
+    685)."""
+    turns: list[ScriptedTurn] = [
+        ScriptedTurn(
+            text="", calls=(_finish(FIRST), ScriptedCall(tool="shell", arguments={"command": "echo sent-42"}))
+        ),
+        ScriptedTurn(text="", calls=(_finish(SECOND),)),
+    ]
+    ended, sent_back, results = await _run(login_env, turns)
+    assert (ended.status, ended.result, sent_back) == ("done", SECOND, []), ended
+    assert [(event.data["tool"], event.data["ok"]) for event in results] == [
+        (FINISH_TOOL, False),
+        ("shell", True),
+        (FINISH_TOOL, True),
+    ]
+    assert "finish must be the last call of a reply" in str(results[0].data["text"])
+    assert "(shell)" in str(results[0].data["text"])
+    assert "sent-42" in str(results[1].data["text"])

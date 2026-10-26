@@ -185,6 +185,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - A `finish` in the same reply as a call that did not work (an error, a refusal of the policy, a step kept for you; the
   plan's bookkeeping apart) does not end the run: its answer was written before the model saw the result. The run is
   sent back once with a note naming the call, and the timeline's data has a `finish_after_failure` event (item 552).
+- A `finish` that is not the last call of its reply does not end the run either: it gets an error result saying that
+  `finish` must come last, the calls after it run as any call does, and the model calls `finish` again once it has read
+  their results (item 685).
 - A reply the service's content filter stopped (it ends with `content_filter`) is no nudge: asked again with the same
   conversation the model is stopped again (item 437). The run moves to a standby model at once (see
   [Helpers and standby](models.md#models-and-providers)), and the model is not paused for other runs; with no standby
