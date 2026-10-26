@@ -4,7 +4,7 @@
 import { api, query } from "./api.js";
 import { el, plural, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
-import { foldSteps } from "./layout.js";
+import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
@@ -12,11 +12,11 @@ import { sayFoot, stepMessage } from "./reactions.js";
 import { countKinds, flowIcon, flowWords, toolRow } from "./tools.js";
 
 const THREAD_LIMIT = 200;
-// The last turns whose tool calls are read with the page; older ones read them as they come near it (item 374).
-const EAGER_TURNS = 6;
-// The last of them is read before the page is drawn: its work stands right above the run's own, where a chat opens and
-// where the chat goes on from when a message is sent, so it is there whole instead of growing in under the reader.
-const READ_FIRST = 1;
+// The last turns whose tool calls are read before the page is drawn (items 374 and 708), side by side: they stand right
+// above the run's own, where a chat opens and goes on from when a message is sent, so they are there whole instead of
+// growing in under the reader, which moved the page for most of a second as it opened. Older turns read theirs as they
+// come near what is seen.
+const READ_FIRST = 6;
 const OPS_MARGIN = "800px";
 // The events of a run are read this many at a time (the most `GET /runs/{id}/events` gives).
 const EVENTS_PAGE = 2000;
@@ -41,7 +41,7 @@ function conversation(runs) {
 
 /**
  * The runs before `run` in its thread, as `{ earlier, read, cut }` (oldest first). A run the thread does not list, such
- * as a delegated one, stands alone: the list is empty. `read` holds what the last turn did (`READ_FIRST`), a run's id to
+ * as a delegated one, stands alone: the list is empty. `read` holds what the last turns did (`READ_FIRST`), a run's id to
  * `{ events }`, or to `{ error }`, why they could not be read. `cut` says that the chat has runs before those read,
  * which the page does not show (item 559): it reads the newest `THREAD_LIMIT` of them, the most `GET /runs` gives.
  * Nothing more is read once `signal` aborted.
@@ -289,9 +289,12 @@ function drawFlow(past, flow, asked, events, reactions) {
   });
 }
 
-/** The box the conversation scrolls in: its own on a phone (`html.chat-shell`, run.css), else null for the window. */
+/** The box the conversation scrolls in: its own on a phone (`html.chat-shell` within the phone's width, run.css), else
+ * null for the window. A chat's page holds `chat-shell` at every width, and on a wider window its box does not scroll
+ * and is as tall as all the turns: taken for the box, every turn was near what is seen, and every one of them was read
+ * and drawn in as the chat opened, which moved the page for a second (item 708). */
 function scrollBox(node) {
-  return document.documentElement.classList.contains("chat-shell") ? node.closest(".run-thread") : null;
+  return PHONE.matches && document.documentElement.classList.contains("chat-shell") ? node.closest(".run-thread") : null;
 }
 
 /** `change()` fills the turn's `flow`. A browser that keeps the reader's place by itself does (scroll anchoring);
@@ -344,9 +347,9 @@ function whenNear(element, ops, asked, run, signal, reactions) {
 
 /** One earlier run as what was asked, what it did and how it ended; a run still going keeps the foot of its message back.
  * What the run did is drawn at once when `known` holds it (`loadHistory`'s `read`: `{ events }`, or `{ error }`), else
- * read now for an `eager` turn and once the turn comes near what is seen for the others. The answer and what the run
- * said have the reactions' button and chips (item 586) when `reactions` is given. */
-function turn(past, editFromHereOf, eager, known, signal, reactions) {
+ * read once the turn comes near what is seen. The answer and what the run said have the reactions' button and chips
+ * (item 586) when `reactions` is given. */
+function turn(past, editFromHereOf, known, signal, reactions) {
   const href = `#/runs/${past.id}`;
   const ended = FINISHED.has(past.status);
   const ops = el("div", { class: "turn-ops", hidden: true });
@@ -367,8 +370,6 @@ function turn(past, editFromHereOf, eager, known, signal, reactions) {
       } else {
         drawRead(past, ops, asked, known.events, reactions);
       }
-    } else if (eager) {
-      void fillFlow(past, ops, asked, signal, reactions);
     } else {
       whenNear(element, ops, asked, past, signal, reactions);
     }
@@ -405,7 +406,7 @@ export function earlierTurns({ earlier, read, cut }, editFromHereOf, signal, rea
     "div",
     { class: "history", role: "region", "aria-label": "Earlier in this conversation" },
     note,
-    shown.map((past, index) => turn(past, editFromHereOf, index >= shown.length - EAGER_TURNS, read.get(past.id), signal, reactions)),
+    shown.map((past) => turn(past, editFromHereOf, read.get(past.id), signal, reactions)),
   );
 }
 

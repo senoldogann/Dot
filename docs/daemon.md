@@ -603,7 +603,8 @@ itself: Dot's face and name on the left, the panel button on the right; the bar 
 nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. Every other page names
 itself in the same bar (Agents, Campaigns, Settings) and opens with one line of description. A run's page, live or over, opens at
 its end, where its next words come or its newest message stands, and stays there as the earlier turns fill in above (items
-403 and 440). The six runs opened
+403 and 440). What the last six earlier turns did is read before the page is drawn, side by side, so a long chat opens
+whole at its foot; an older turn reads its work only as the reader scrolls up to it (item 708). The six runs opened
 last are kept while the page lives, so that coming back to one (from a delegated run's page, say) draws it at once as it
 stood and follows its stream on from the last message read, not from the first; what the lessons, the questions and the
 cost show is read again (item 426). It goes on after the last stored event read, not after a live piece of a thought
