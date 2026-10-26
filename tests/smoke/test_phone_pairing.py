@@ -1,16 +1,22 @@
 """Pairing a phone (item 267), on a served daemon: Settings › Phone gives a code, and an app on a phone's home screen,
-whose storage is its own, trades it for the access token. Through the API a code needs the token to be given and none
-to be traded, is traded once, in the case and the dashes a person types it, and five wrong tries or a newer code use it
-up; the guard still turns away another site's page, and the phone's address comes from ``[server] reach``. In Chrome,
-a page signed in on the Mac gets a code from Settings › Phone, and a phone with no token types it on the sign-in screen
-and is let in; a wrong code is told, and a token typed where the code goes is not sent. Wide and on a phone, light
-and dark. Before, the sign-in screen took the token only.
+whose storage is its own, trades it for a key of the phone's own (item 670), which Settings › Phone lists and
+removes. Through the API a code needs the token to be given and none to be traded, is traded once, in the case and
+the dashes a person types it, and five wrong tries or a newer code use it up; the guard still turns away another
+site's page, and the phone's address comes from ``[server] reach``. In Chrome, a page signed in on the Mac gets a
+code from Settings › Phone, and a phone with no token types it on the sign-in screen and is let in; a wrong code is
+told, and a token typed where the code goes is not sent. Wide and on a phone, light and dark. Before, the sign-in
+screen took the token only. A phone's key cannot make a code nor see or remove the phones; once removed, it is
+refused and its open stream ends; the daemon keeps the key's hash, never the key. Before item 670 the phone got the
+installation's one token.
 
 No network and no model service is used.
 """
 
 import asyncio
+import hashlib
+import json
 import re
+import stat
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -28,6 +34,7 @@ from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
+from dotagent.server.guard import daemon_proof
 from dotagent.server.links import ui_url
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
@@ -35,6 +42,7 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 TOKEN: str = "phone-pairing-test-token"
 TAILNET_NAME: str = "dot-mac.tailnet-test.ts.net"
 CODE: re.Pattern[str] = re.compile(r"^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$")
+PHONE_KEY: re.Pattern[str] = re.compile(r"^phone\.[0-9a-f]{12}\.[A-Za-z0-9_-]{43}$")
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (1280, "light"),
     (1280, "dark"),
@@ -103,7 +111,9 @@ async def test_a_code_is_traded_once_for_the_token(own_home: Path) -> None:
         assert CODE.match(code) and issued.json()["expires_at"] > time.time() + 590
         typed: str = code.lower().replace("-", " ")
         paired: httpx.Response = await client.post("/phone/pair", json={"code": typed}, headers=phone)
-        assert (paired.status_code, paired.json()) == (200, {"token": TOKEN})
+        assert paired.status_code == 200
+        key: str = paired.json()["token"]
+        assert PHONE_KEY.match(key) and key != TOKEN
         again: httpx.Response = await client.post("/phone/pair", json={"code": code}, headers=phone)
         assert again.status_code == 403 and "ask for a new one in Settings › Phone" in again.json()["message"]
 
@@ -121,7 +131,78 @@ async def test_a_code_is_traded_once_for_the_token(own_home: Path) -> None:
         elsewhere: dict[str, str] = {"Host": TAILNET_NAME, "Origin": "https://pages.example"}
         assert (await client.post("/phone/pair", json={"code": newer}, headers=elsewhere)).status_code == 403
         newest: str = (await client.post("/phone/pairing", headers=signed)).json()["code"]
-        assert (await client.post("/phone/pair", json={"code": newest}, headers=phone)).json() == {"token": TOKEN}
+        second: str = (await client.post("/phone/pair", json={"code": newest}, headers=phone)).json()["token"]
+        assert PHONE_KEY.match(second) and second not in (key, TOKEN)
+
+
+async def test_a_phone_key_is_its_own_and_ends_when_the_phone_is_removed(own_home: Path) -> None:
+    async with _served(own_home) as address, httpx.AsyncClient(base_url=f"{address}/api", timeout=30.0) as client:
+        signed: dict[str, str] = {"Authorization": f"Bearer {TOKEN}"}
+        iphone: str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15"
+        phone: dict[str, str] = {"Host": TAILNET_NAME, "Origin": f"https://{TAILNET_NAME}", "User-Agent": iphone}
+        code: str = (await client.post("/phone/pairing", headers=signed)).json()["code"]
+        key: str = (await client.post("/phone/pair", json={"code": code}, headers=phone)).json()["token"]
+        keyed: dict[str, str] = {**phone, "Authorization": f"Bearer {key}"}
+        phone_id: str = key.split(".")[1]
+
+        # The key reaches Dot, but neither makes a code nor sees or removes the phones: those are the Mac's.
+        assert (await client.get("/phone", headers=keyed)).status_code == 200
+        assert (await client.post("/phone/pairing", headers=keyed)).status_code == 403
+        assert (await client.get("/phone/phones", headers=keyed)).status_code == 403
+        assert (await client.delete(f"/phone/phones/{phone_id}", headers=keyed)).status_code == 403
+        listed: dict[str, object] = (await client.get("/phone/phones", headers=signed)).json()
+        assert listed["limit"] == 20
+        assert [(row["id"], row["name"]) for row in listed["phones"]] == [(phone_id, "iPhone")]  # type: ignore[attr-defined]
+        assert "key" not in json.dumps(listed)
+
+        # The daemon keeps the key's hash, readable by the owner only, and never the key.
+        kept: str = (own_home / "phones.json").read_text(encoding="utf-8")
+        assert key not in kept and hashlib.sha256(key.encode()).hexdigest() in kept
+        assert stat.S_IMODE((own_home / "phones.json").stat().st_mode) == 0o600
+
+        # It proves the daemon with the key's hash; an id that is not listed gets a proof under another key.
+        nonce: str = "ab" * 16
+        hashed: str = hashlib.sha256(key.encode()).hexdigest()
+        proof: dict[str, str] = (await client.get(f"/proof?nonce={nonce}&phone={phone_id}", headers=phone)).json()
+        assert proof["proof"] == daemon_proof(hashed, nonce)
+        unknown: dict[str, str] = (await client.get(f"/proof?nonce={nonce}&phone=0123456789ab", headers=phone)).json()
+        assert unknown["proof"] != daemon_proof(hashed, nonce)
+        # The same at every ask, as a listed phone's is: the answer tells nothing of which ids are listed.
+        again: dict[str, str] = (await client.get(f"/proof?nonce={nonce}&phone=0123456789ab", headers=phone)).json()
+        assert again == unknown
+
+        # Removed, its stream that is open ends and the key is refused; a phone not listed is not found.
+        async with client.stream("GET", "/stream", headers=keyed) as stream:
+            assert stream.status_code == 200
+            removed: httpx.Response = await client.delete(f"/phone/phones/{phone_id}", headers=signed)
+            assert removed.status_code == 204
+
+            async def drained() -> None:
+                # The daemon cuts the stream, as it does one whose client went away: the end of it is all there is.
+                try:
+                    async for _ in stream.aiter_bytes():
+                        pass
+                except httpx.RemoteProtocolError:
+                    pass
+
+            await asyncio.wait_for(drained(), timeout=10)
+        assert (await client.get("/phone", headers=keyed)).status_code == 401
+        assert (await client.delete(f"/phone/phones/{phone_id}", headers=signed)).status_code == 404
+        assert (await client.get("/phone/phones", headers=signed)).json()["phones"] == []
+
+        # Twenty phones at most: the twenty-first pairing is refused and its code stays good for after a removal.
+        for _ in range(20):
+            given: str = (await client.post("/phone/pairing", headers=signed)).json()["code"]
+            assert (await client.post("/phone/pair", json={"code": given}, headers=phone)).status_code == 200
+        kept: str = (await client.post("/phone/pairing", headers=signed)).json()["code"]
+        # A wrong code is told as a wrong code, full or not: it learns nothing of how many phones are paired.
+        wrong: httpx.Response = await client.post("/phone/pair", json={"code": "0000-0000"}, headers=phone)
+        assert wrong.status_code == 403 and "paired" not in wrong.json()["message"]
+        full: httpx.Response = await client.post("/phone/pair", json={"code": kept}, headers=phone)
+        assert full.status_code == 422 and "remove one" in full.json()["message"]
+        first: str = (await client.get("/phone/phones", headers=signed)).json()["phones"][0]["id"]
+        assert (await client.delete(f"/phone/phones/{first}", headers=signed)).status_code == 204
+        assert (await client.post("/phone/pair", json={"code": kept}, headers=phone)).status_code == 200
 
 
 async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["light", "dark"]], shots: Path) -> None:
@@ -168,7 +249,22 @@ async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["li
     await phone.get_by_role("textbox", name="Sign-in code").fill(code.lower())
     await phone.get_by_role("textbox", name="Sign-in code").press("Enter")
     await expect(phone.get_by_role("textbox", name="Goal")).to_be_visible()
-    assert await phone.evaluate("localStorage.getItem('dot.token')") == TOKEN
+    held: str = await phone.evaluate("localStorage.getItem('dot.token')")
+    assert PHONE_KEY.match(held)
+    # The phone's Settings › Phone neither makes a code nor lists the phones; the Mac's lists it, with Remove.
+    await phone.goto(f"{address}/#/settings/phone")
+    await expect(phone.get_by_text("Pair or remove phones in Settings › Phone on your Mac")).to_be_visible()
+    await expect(phone.get_by_role("button", name="Show code")).to_be_hidden()
+    await mac.reload()
+    row: Locator = mac.locator(f'[data-phone="{held.split(".")[1]}"]')
+    await expect(row).to_contain_text("Paired")
+    await mac.screenshot(path=str(shots / f"phones-{width}-{scheme}.png"), full_page=True)
+    await row.get_by_role("button", name=re.compile("^Remove ")).click()
+    await mac.get_by_role("button", name="Remove", exact=True).click()
+    await expect(row).to_have_count(0)
+    # Removed, the phone's next request is refused and it is back at the sign-in screen.
+    await phone.reload()
+    await expect(phone.get_by_role("textbox", name="Sign-in code")).to_be_visible()
     await phone.close()
     await mac.close()
 

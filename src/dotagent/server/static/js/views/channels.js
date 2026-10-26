@@ -6,7 +6,7 @@
 // to send in it) and what the channel sees of that database, with Check now, which looks at once. A run started from
 // there tells what it does while it works, a few messages (item 618): the card has a switch for that too.
 
-import { api } from "../api.js";
+import { api, holdsPhoneKey } from "../api.js";
 import { linkFact, lookWords, seenFacts } from "../channelfacts.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
@@ -351,7 +351,11 @@ export function mount(root, ctx) {
     }, REFRESH_MS);
   }
 
-  ctx.head.setLead("Reach Dot from the Messages app on your iPhone, without setting up Tailscale. A message of yours starts a task in a chat of its own and the answer comes back; an approval is answered in Dot, never in a message.");
+  ctx.head.setLead(
+    holdsPhoneKey()
+      ? "Reach Dot from the Messages app on your iPhone. A phone signed in with a code can look here, but turn the channel on or off and pair or remove a number in Settings › Channels on your Mac."
+      : "Reach Dot from the Messages app on your iPhone, without setting up Tailscale. A message of yours starts a task in a chat of its own and the answer comes back; an approval is answered in Dot, never in a message.",
+  );
   ctx.head.setActions(offer("Check again", "refresh", load));
   root.append(holder);
   attempt(load);

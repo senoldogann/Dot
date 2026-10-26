@@ -5,16 +5,20 @@ the pages of other sites from using the API through the browser, the Fetch Metad
 browser to the UI (:func:`navigation_is_foreign`), and the token keeps other programs of this Mac out.
 The clients send the token only to a server that first proves it holds it (:func:`daemon_proof`), so a program that took
 the port while the daemon was down is sent nothing. A phone's app trades a pairing code for the token without it
-(``/api/phone/pair``, item 267; :mod:`dotagent.server.pairing`). A page that a run showed (``/pages/<id>``) is served
+(``/api/phone/pair``, item 267; :mod:`dotagent.server.pairing`), and since item 670 the phone gets a key of its own,
+which the guard takes beside the token while the phone is listed (:mod:`dotagent.server.phones`); a phone's key cannot
+make or remove a key (:func:`needs_main_token`). A page that a run showed (``/pages/<id>``) is served
 without the token, to whoever names its id, which cannot be guessed; it runs the run's scripts, so it is sandboxed
 wherever it opens (:data:`PAGE_HEADERS`).
 """
 
+import asyncio
 import hashlib
 import hmac
 import ipaddress
 import os
 import secrets
+import time
 from pathlib import Path
 
 from starlette.datastructures import Headers, MutableHeaders
@@ -27,12 +31,29 @@ from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.mcp.signin import CALLBACK_PATH
 from dotagent.server.callback_page import page_style
+from dotagent.server.phones import PairedPhones
 
 API_ROOT: str = "/api"
 API_PREFIX: str = f"{API_ROOT}/"
 PROOF_PATH: str = f"{API_ROOT}/proof"
 PAIR_PATH: str = f"{API_ROOT}/phone/pair"
 PUBLIC_PATHS: frozenset[str] = frozenset({f"{API_ROOT}/health", PROOF_PATH, PAIR_PATH})
+# What answers the installation's token alone, never a phone's key (item 670): what opens or closes a way into Dot.
+# Making a pairing code, and the list of the phones that hold a key, with their removal; switching the iMessage channel
+# and pairing or removing a number of it (item 572). So a phone that is taken cannot open another way in to stay in
+# after it is removed, nor close the owner's.
+PAIRING_PATH: str = f"{API_ROOT}/phone/pairing"
+PHONES_PATH: str = f"{API_ROOT}/phone/phones"
+_WAYS_IN: frozenset[str] = frozenset(
+    {
+        PAIRING_PATH,
+        PHONES_PATH,
+        f"{API_ROOT}/channels/imessage/switch",
+        f"{API_ROOT}/channels/imessage/code",
+        f"{API_ROOT}/channels/imessage/confirm",
+        f"{API_ROOT}/channels/imessage/remove",
+    }
+)
 LOOKS_PREFIX: str = "/looks/"
 
 _PRIVATE_FILE_MODE: int = 0o600
@@ -268,6 +289,12 @@ def has_dot_segment(path: str) -> bool:
     return any(segment in (".", "..") for segment in path.split("/"))
 
 
+def needs_main_token(path: str) -> bool:
+    """Whether ``path`` answers the installation's token alone (item 670): what opens or closes a way into Dot, a phone
+    or a number of the iMessage channel."""
+    return path in _WAYS_IN or path.startswith(f"{PHONES_PATH}/")
+
+
 def check_request(
     path: str,
     host: str | None,
@@ -278,8 +305,10 @@ def check_request(
     token: str,
     port: int,
     reach: frozenset[str],
+    phone: str | None = None,
 ) -> Refusal | None:
-    """Why a request must not be served, or ``None`` when it may be."""
+    """Why a request must not be served, or ``None`` when it may be. ``phone`` is the id of the listed phone whose key
+    the request carries (:meth:`PairedPhones.authenticate`), ``None`` when it carries none."""
     if has_dot_segment(path):
         return Refusal(status=_HTTP_BAD_REQUEST, message="a path with a . or .. segment is refused")
     if not host_is_local(host, port, reach):
@@ -289,7 +318,13 @@ def check_request(
     if navigation_is_foreign(fetch_site, fetch_mode) and not reached_from_other_sites(path):
         return Refusal(status=_HTTP_FORBIDDEN, message="navigations from pages of other sites are refused")
     if needs_token(path) and not token_matches(token, bearer_token(authorization)):
-        return Refusal(status=_HTTP_UNAUTHORIZED, message="a valid bearer token is required")
+        if phone is None:
+            return Refusal(status=_HTTP_UNAUTHORIZED, message="a valid bearer token is required")
+        if needs_main_token(path):
+            return Refusal(
+                status=_HTTP_FORBIDDEN,
+                message="a phone cannot open or close a way into Dot (a phone, a Messages number): do it on your Mac",
+            )
     return None
 
 
@@ -333,14 +368,39 @@ def _secured(send: Send, added: tuple[tuple[str, str], ...]) -> Send:
     return secured_send
 
 
-class LocalGuard:
-    """ASGI middleware that applies :func:`check_request` to every request and adds the security headers."""
+def _ends_when_removed(receive: Receive, removed: asyncio.Event) -> Receive:
+    """``receive`` that tells the app the client went away once ``removed`` is set: a stream a phone's key opened ends
+    as soon as the phone is removed (item 670), the way it ends when the phone goes."""
 
-    def __init__(self, app: ASGIApp, token: str, port: int, reach: frozenset[str]) -> None:
+    async def guarded_receive() -> Message:
+        if removed.is_set():
+            return {"type": "http.disconnect"}
+        message: asyncio.Task[Message] = asyncio.ensure_future(receive())
+        gone: asyncio.Task[bool] = asyncio.ensure_future(removed.wait())
+        try:
+            await asyncio.wait({message, gone}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            gone.cancel()
+        if message.done():
+            return message.result()
+        message.cancel()
+        return {"type": "http.disconnect"}
+
+    return guarded_receive
+
+
+class LocalGuard:
+    """ASGI middleware that applies :func:`check_request` to every request and adds the security headers. ``phones``
+    are the phones that hold a key of their own (item 670); none when it is ``None``."""
+
+    def __init__(
+        self, app: ASGIApp, token: str, port: int, reach: frozenset[str], phones: PairedPhones | None = None
+    ) -> None:
         self._app: ASGIApp = app
         self._token: str = token
         self._port: int = port
         self._reach: frozenset[str] = reach
+        self._phones: PairedPhones | None = phones
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
@@ -352,18 +412,27 @@ class LocalGuard:
         headers: Headers = Headers(scope=scope)
         path: str = scope["path"]
         secured: Send = _secured(send, response_headers(path))
+        authorization: str | None = headers.get("authorization")
+        bearer: str | None = bearer_token(authorization)
+        phone: str | None = None
+        if self._phones is not None and needs_token(path) and not token_matches(self._token, bearer):
+            phone = self._phones.authenticate(bearer)
         refusal: Refusal | None = check_request(
             path,
             headers.get("host"),
             headers.get("origin"),
             headers.get("sec-fetch-site"),
             headers.get("sec-fetch-mode"),
-            headers.get("authorization"),
+            authorization,
             self._token,
             self._port,
             self._reach,
+            phone,
         )
         if refusal is None:
+            if phone is not None and self._phones is not None:
+                await self._phones.used(phone, time.time())
+                receive = _ends_when_removed(receive, self._phones.removed(phone))
             await self._app(scope, receive, secured)
             return
         # Why a request was turned away, for the owner who wonders why a phone's launcher drew no icon (item 410); the

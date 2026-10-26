@@ -166,23 +166,40 @@ window only.
 
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
 that the signed-in address gave Safari, and its sign-in screen asks for a sign-in code instead (item 267): Settings ›
-Phone, on the Mac or in Safari where Dot is open, shows one with **Show code**, eight characters in two groups
-(Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a new code
-takes the place of the one before, and five wrong tries use a code up. The app trades it for the token (`POST
-/api/phone/pair`, the one route besides the health check and the proof that takes no token; the Host and Origin checks
-hold for it as for any other) and proves the daemon with it as with any token. The daemon is not proven before a code
-goes, so the screen sends nothing that cannot be a code: a token pasted into the code's field stays on the phone. A code
-is as good as the token while it lasts: whoever reads it and reaches the port first is let in, so it is asked for when
+Phone, on the Mac or in Safari where Dot is open with the Mac's own key, shows one with **Show code**, eight characters
+in two groups (Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a
+new code takes the place of the one before, and five wrong tries use a code up. The app trades it for a key of the
+phone's own (`POST /api/phone/pair`, the one route besides the health check and the proof that takes no token; the Host
+and Origin checks hold for it as for any other; item 670): `phone.<id>.<secret>`, which the daemon keeps nowhere: it
+keeps the key's SHA-256, the phone's name (iPhone, iPad, Android phone, read from its browser), and when it was paired
+and last used, in `<home>/phones.json`, readable by you only. The phone proves the daemon with its key as with any token
+(the proof is keyed with the key's hash, the one thing the daemon holds of it). The daemon is not proven before a code
+goes, so the screen sends nothing that cannot be a code: a token pasted into the code's field stays on the phone. A
+code is as good as a key while it lasts: whoever reads it and reaches the port first is let in, so it is asked for when
 the phone is at hand, and a phone that the code then refuses means that someone else used it. `POST /api/phone/pairing`
-gives a code, `GET /api/phone` the addresses. Neither the code nor the token is logged. The phone reaches Dot while the
-Mac is on and awake.
+gives a code, `GET /api/phone` the addresses. Neither the code nor a key is logged. Twenty phones at most hold a key;
+the twenty-first pairing is refused until one is removed, and its code stays good. A `phones.json` the daemon cannot
+read keeps it from starting, and says so: a fault is never taken for no phones, which would pass for a removal; deleting
+the file unpairs every phone. The phone reaches Dot while the Mac is on and awake.
 
-A phone that is lost, or that should no longer reach Dot: the token it holds is the installation's own, which does not
-expire (a token of its own for each phone is left for later). Take the phone off your tailnet in Tailscale's admin
-console, which cuts it off at once. To make the token it holds worthless too, delete `<home>/api-token` and run `dotx
-service restart`: the daemon makes a new token, every browser and phone signs in or pairs again (`dotx open` opens the
-web UI signed in), and the desktop app reads the new one from the file. `tailscale serve reset` stops presenting Dot on
-the tailnet, and taking the name out of `[server] reach`, then restarting the daemon, stops it answering to that name.
+Until it is removed, a phone's key is as strong as the Mac's own key, but for the ways into Dot: it cannot make a
+sign-in code, nor see or remove the paired phones, nor switch the iMessage channel or pair or remove a number of it
+(403), so a phone that is taken cannot open another way in, nor close yours. It can still do all the rest, a schedule or
+a mode switched to `yolo` and a run that reads Dot's own key among it, and removing it does not undo what it did: a
+phone that may have been used against you is removed, the installation's key made new as well (below), and what it may
+have changed looked over (schedules, Settings). On a phone, Settings › Phone says so and has no Show code, and Settings
+› Channels says where to pair a number. The paired phones' file is one of Dot's own files, which a run's
+commands and file tools can neither read nor change in every mode but `yolo` ([Safety](safety.md)).
+
+A phone that is lost, or that should no longer reach Dot: **Settings › Phone › Paired phones** lists each phone that
+signed in with a code, with when it was paired and last used, and **Remove** signs it out at once (`DELETE
+/api/phone/phones/{id}`): its key is refused from its next request, the streams it has open end, and it is back at the
+sign-in screen, where a new code is needed. A phone paired before item 670 holds the installation's own token, which
+does not expire, and is not in the list. Take such a phone off your tailnet in Tailscale's admin console, which cuts it
+off at once. To make the token it holds worthless too, delete `<home>/api-token` and run `dotx service restart`: the
+daemon makes a new token, every browser and phone signs in or pairs again (`dotx open` opens the web UI signed in), and
+the desktop app reads the new one from the file. `tailscale serve reset` stops presenting Dot on the tailnet, and taking
+the name out of `[server] reach`, then restarting the daemon, stops it answering to that name.
 
 Added to the home screen, the app carries its manifest: `id` `/`, so that a phone that adds it again keeps one app and
 not two, and the light scheme's own ground, `#f8f7f4`, as its `theme_color` and `background_color` (the bar and the

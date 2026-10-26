@@ -28,7 +28,15 @@ from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
 from dotagent.core.errors import DesktopError, ToolExecutionError, ToolInputError
-from dotagent.core.paths import config_path, dot_home, failsafe_path, skills_dir, token_path, workspace_dir
+from dotagent.core.paths import (
+    config_path,
+    dot_home,
+    failsafe_path,
+    phones_path,
+    skills_dir,
+    token_path,
+    workspace_dir,
+)
 from dotagent.core.types import JsonObject
 from dotagent.launchd import launch_agent_path
 from dotagent.policy.sandbox import Sandbox
@@ -188,6 +196,8 @@ async def test_a_command_of_a_run_neither_reads_nor_changes_dots_own_files_whate
         f"mkdir -p {shlex.quote(str(skill.parent))} && echo planted > {shlex.quote(str(skill))}",
         f"echo 'approval_mode = 1' >> {shlex.quote(str(config_path()))}",
         f"touch {shlex.quote(str(failsafe_path()))}",
+        # A row of the paired phones would be a key the guard takes (item 670).
+        f"echo '[]' > {shlex.quote(str(phones_path()))}",
         f"ln {shlex.quote(str(token_path()))} {shlex.quote(str(linked))}",
         f"echo planted > {shlex.quote(str(code))}",
         f"echo planted > {shlex.quote(str(environment))}",
@@ -203,7 +213,7 @@ async def test_a_command_of_a_run_neither_reads_nor_changes_dots_own_files_whate
     assert _refused(read) and TOKEN not in read, read
     for line, answer in zip(changes, changed, strict=True):
         assert _refused(answer), (line, answer)
-    assert await asyncio.to_thread(_existing, (skill, linked, failsafe_path(), code, environment)) == []
+    assert await asyncio.to_thread(_existing, (skill, linked, failsafe_path(), phones_path(), code, environment)) == []
     # The Python under the environment and the job that starts the daemon are among what Dot runs as well.
     assert await asyncio.to_thread(_run_on) <= set(runtime.dot_paths), runtime.dot_paths
     assert await asyncio.to_thread(config_path().read_text, encoding="utf-8") == settings

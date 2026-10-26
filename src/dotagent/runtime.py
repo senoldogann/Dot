@@ -38,6 +38,7 @@ from dotagent.core.paths import (
     failsafe_path,
     mcp_sign_ins_dir,
     opencode_dir,
+    phones_path,
     playbooks_dir,
     plugins_data_dir,
     run_owners_dir,
@@ -254,7 +255,8 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
 
 
 def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
-    """What the agent must neither read nor change: secrets and the lock of their file, what signing in to an MCP server
+    """What the agent must neither read nor change: secrets and the lock of their file, the paired phones' keys' hashes
+    (item 670: a row written there would be a key the guard takes), what signing in to an MCP server
     gave Dot (its tokens), the browser profiles (Dot's own and the Chrome of the user), the settings that decide what it
     may do (policy, rules, MCP servers), its own database and its copies (item 526: a copy is the whole database, and
     one planted in their folder would be what the owner goes back to), the journals of file changes (``dotx undo``
@@ -264,6 +266,7 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         env_file_path(),
         env_lock_path(env_file_path()),
         token_path(),
+        phones_path(),
         vapid_path(),
         mcp_sign_ins_dir(),
         browser_profile_dir(),
