@@ -9,6 +9,7 @@ opened.
 
 import asyncio
 import io
+import json
 import os
 import re
 import socket
@@ -30,6 +31,7 @@ from pydantic import BaseModel, TypeAdapter
 from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
+from dotagent.browser import ledger
 from dotagent.browser import session as session_module
 from dotagent.browser.attach import DebugEndpoint, parse_port_file
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
@@ -423,6 +425,55 @@ async def test_a_page_is_read_quietly_in_a_tab_behind_the_users_and_the_tab_clos
     finally:
         await session.aclose()
     await wait_for_tabs(chrome.port, [f"{site}/mine"])
+
+
+def _write_ledger(path: Path, entries: dict[str, list[str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(entries), encoding="utf-8")
+
+
+def _read_ledger(path: Path) -> dict[str, list[str]]:
+    loaded: dict[str, list[str]] = json.loads(path.read_text(encoding="utf-8"))
+    return loaded
+
+
+async def _tab_by_hand(port: int, url: str) -> str:
+    """Open a tab through Chrome's own endpoint and return the id Chrome gave it."""
+    async with httpx.AsyncClient() as client:
+        response: httpx.Response = await client.put(f"http://127.0.0.1:{port}/json/new?{url}")
+    response.raise_for_status()
+    return str(response.json()["id"])
+
+
+async def test_the_tabs_a_dot_that_did_not_end_cleanly_left_are_closed_by_the_next_and_no_other(
+    chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 703: the ledger names the tabs each Dot process has open in the user's Chrome. A Dot that attaches closes
+    those of a process that no longer runs, and leaves those of one that still does (the daemon beside ``dotx
+    browser``) and every tab the ledger does not name; its own tabs are in the ledger while they are open."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
+    crashed: str = await _tab_by_hand(chrome.port, f"{site}/crashed")
+    living: str = await _tab_by_hand(chrome.port, f"{site}/living")
+    await _tab_by_hand(chrome.port, f"{site}/users")
+    ended: asyncio.subprocess.Process = await asyncio.create_subprocess_exec("/usr/bin/true")
+    await ended.wait()
+    path: Path = ledger.ledger_path()
+    # pid 1 (launchd) stands for a Dot that still runs.
+    _write_ledger(path, {str(ended.pid): [crashed], "1": [living]})
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
+    others: list[str] = [f"{site}/mine", f"{site}/living", f"{site}/users"]
+    try:
+        await session.open_url("agent", f"{site}/", True)
+        await wait_for_tabs(chrome.port, [*others, f"{site}/"])
+        written: dict[str, list[str]] = _read_ledger(path)
+        assert written["1"] == [living] and str(ended.pid) not in written
+        assert len(written[str(os.getpid())]) == 1
+    finally:
+        await session.aclose()
+    await wait_for_tabs(chrome.port, others)
+    assert _read_ledger(path) == {"1": [living]}
 
 
 async def test_a_tab_the_user_opens_meanwhile_is_not_taken_over(

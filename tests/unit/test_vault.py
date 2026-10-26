@@ -431,6 +431,7 @@ def test_what_was_kept_out_of_addresses_goes_with_the_tab_it_was_typed_into(tmp_
     class _Tab:
         def __init__(self) -> None:
             self.page: _Page = _Page()
+            self.target_id: str = ""
 
     tab, other = _Tab(), _Tab()
     for each in (tab, other):

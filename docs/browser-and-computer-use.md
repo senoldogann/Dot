@@ -72,7 +72,11 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
   and for each quiet read. Dot never minimizes it (a minimized window is throttled); a window covered by others runs
   at full speed.
 - Downloads go to the download folder of Chrome, not to Dot's `downloads/`.
-- Dot closes the tabs it opened when they have been idle for `tab_idle_s`. If Dot itself crashes they stay open.
+- Dot closes the tabs it opened as a chat's do (below). If Dot itself does not end cleanly (a crash, a kill), the next
+  Dot that attaches to that Chrome closes them (item 703): each Dot process writes the ids Chrome gave its tabs to
+  `<home>/browser-tabs.json`, and the tabs of a process that no longer runs are closed when they still have that id in
+  that Chrome. A tab you opened yourself, and a tab of a Dot that still runs (the daemon while `dotx browser`
+  attaches), is not touched; a tab opened from one of Dot's tabs is Dot's, also when you opened it that way.
 - Calls that arrive while Dot waits for the click queue behind it, and each may in turn wait up to `attach_timeout_s` if
   you do not click.
 - Only the stable Google Chrome on its default data directory is supported. `channel`, `headless` and `raise_window`

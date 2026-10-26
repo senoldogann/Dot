@@ -16,6 +16,7 @@ from dotagent.agent.peers import Peers
 from dotagent.agent.sizes import ContextSizes
 from dotagent.assistant import Assistant, mac_first_name
 from dotagent.awake import KeepAwake
+from dotagent.browser.ledger import ledger_files
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import RECONNECT_NOTICE, BrowserSession
 from dotagent.config import AppConfig, McpServerConfig
@@ -260,7 +261,8 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     gave Dot (its tokens), the browser profiles (Dot's own and the Chrome of the user), the settings that decide what it
     may do (policy, rules, MCP servers), its own database and its copies (item 526: a copy is the whole database, and
     one planted in their folder would be what the owner goes back to), the journals of file changes (``dotx undo``
-    writes back what a journal says) and the locks that tell which process drives a run."""
+    writes back what a journal says), the locks that tell which process drives a run, and the ledger of the tabs Dot
+    has open in the Chrome of the user (item 703: Dot writes and reads it outside the sandbox)."""
     database: Path = db_path()
     return (
         env_file_path(),
@@ -281,6 +283,7 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         partial_folder(),
         undo_dir(),
         run_owners_dir(),
+        *ledger_files(),
     )
 
 
