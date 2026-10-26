@@ -458,6 +458,8 @@ class DesktopConfig(FrozenModel):
     keep_awake: bool
     keep_awake_s: int
     max_batch_steps: int = Field(ge=1)
+    # Whether a screenshot comes with the text on it, read on this Mac, and where each line is (item 701).
+    read_screen_text: bool
     launch_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     activate_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     osascript_timeout_s: float = Field(gt=0, allow_inf_nan=False)
