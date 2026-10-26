@@ -62,11 +62,13 @@ _SECRET_FIELDS: tuple[re.Pattern[str], ...] = (
 )
 # The name of a field whose value is a secret whatever it looks like (a JSON object's key).
 _SECRET_FIELD: re.Pattern[str] = re.compile(rf"(?i)-*{_SECRET_NAME}")
-# What a key that names a secret may be given that is no secret: nothing more than a mask, a placeholder (``<token>``,
-# ``${TOKEN}``, ``$TOKEN``, ``{{ token }}``, ``${{ secrets.TOKEN }}``, ``%TOKEN%``, ``...``; an unquoted value stops
-# at a space or a brace, so the start of one is enough) or a word for none.
+# What a key that names a secret may be given that is no secret (item 690): nothing more than a mask or a run of dots,
+# an environment variable's name (``$TOKEN``, ``${TOKEN}``, ``%TOKEN%``: upper case, digits and underscores, so that
+# ``$Tr0ngPass1`` is a password), a hint in angle brackets (``<your key>``: words, no digit, so that ``<abc12345>`` is a
+# value), a template (``{{ token }}``, ``${{ secrets.TOKEN }}``), a run of ``x`` or a word for none. An unquoted value
+# stops at a space or a brace, so the start of a hint or a template is enough.
 _PLACEHOLDER: re.Pattern[str] = re.compile(
-    r"\**|<[^<>]*>?|\$\{[^{}]*\}?|\$\w+|\$?\{\{.*|%\w+%|\.{3}|…"
+    r"[*.…]*|<[A-Za-z _\-]*>?|\$\{[A-Z0-9_]*\}?|\$[A-Z_][A-Z0-9_]*|\$?\{\{.*|%[A-Z0-9_]+%"
     r"|(?i:none|null|nil|true|false|undefined|redacted|hidden|x+)"
 )
 _PASSWORD_NAME: re.Pattern[str] = re.compile(r"(?i)passw(?:or)?d")
@@ -185,9 +187,9 @@ def redact_known(text: str, known: Sequence[str]) -> str:
 
 def secret_value(name: str, value: str, prose: bool) -> bool:
     """Whether ``value``, given to the key ``name`` that names a secret, is one to mask: not a placeholder nor a mask
-    already; a password's whatever it is, another's from :data:`_MIN_VALUE_CHARS` characters on. ``prose``: the value
-    stands where prose does (``key: value``, unquoted), so it is a secret only when it is long or has a digit, a
-    capital beside small letters or a sign in it."""
+    already (:data:`_PLACEHOLDER`); a password's whatever it is, another's from :data:`_MIN_VALUE_CHARS` characters
+    on. ``prose``: the value stands where prose does (``key: value``, unquoted), so it is a secret only when it is
+    long or has a digit, a capital beside small letters or a sign in it."""
     if "***" in value or _PLACEHOLDER.fullmatch(value) is not None:
         return False
     if _PASSWORD_NAME.search(name) is not None:
@@ -281,9 +283,21 @@ def redact_json(value: JsonValue, known: Sequence[str] = ()) -> JsonValue:
         return [redact_json(item, known) for item in value]
     if isinstance(value, dict):
         return {
-            key: "***" if isinstance(item, str) and item and _SECRET_FIELD.fullmatch(key) else redact_json(item, known)
+            key: _mask_whole(item) if _SECRET_FIELD.fullmatch(key) else redact_json(item, known)
             for key, item in value.items()
         }
+    return value
+
+
+def _mask_whole(value: JsonValue) -> JsonValue:
+    """``value``, the value of a field that names a secret, with every string in it masked, however deep a list or an
+    object holds it (``{"token": ["abcdef123456"]}``); an empty string, a number and the rest stay."""
+    if isinstance(value, str):
+        return "***" if value else value
+    if isinstance(value, list):
+        return [_mask_whole(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _mask_whole(item) for key, item in value.items()}
     return value
 
 

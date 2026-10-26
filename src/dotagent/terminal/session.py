@@ -32,8 +32,9 @@ from typing import Protocol
 
 from dotagent.core.errors import TerminalInputFullError, ToolExecutionError, ToolInputError
 from dotagent.core.logs import get_logger
-from dotagent.core.text import duration_text, truncate_middle
+from dotagent.core.text import duration_text, redact_known, truncate_middle
 from dotagent.policy.shell import typed_lines
+from dotagent.secrets import known_secrets
 from dotagent.tools.shell import kill_group
 
 log = get_logger(__name__)
@@ -78,6 +79,12 @@ def ended_notice(session_id: str, command: str, exit_status: int, seconds: float
         f"The command in the background {session_id} ended with exit {exit_status} after {duration_text(seconds)}: "
         f"{shown}\nRead what it printed with terminal_read {session_id}, then go on with what it was started for."
     )
+
+
+async def _loggable(command: str) -> str:
+    """``command`` as a log line may hold it (item 690): a secret Dot holds, a key of a known form and the value given
+    to an option that names a secret masked. The secrets are read from the env file, off the event loop."""
+    return redact_known(command, await asyncio.to_thread(known_secrets, filled=True))
 
 
 def _controlling_terminal() -> None:
@@ -420,7 +427,13 @@ class Terminals:
         self._follows[session.id] = asyncio.create_task(self._follow(thread_id, session))
         if self._reaper is None:
             self._reaper = asyncio.create_task(self._reap())
-        log.info("terminal_opened", thread_id=thread_id, session=session.id, command=command, background=background)
+        log.info(
+            "terminal_opened",
+            thread_id=thread_id,
+            session=session.id,
+            command=await _loggable(command),
+            background=background,
+        )
         await self._changed(thread_id)
         return session
 
@@ -528,7 +541,12 @@ class Terminals:
                     except Exception:
                         log.exception("terminal_idle_close_failed", thread_id=thread_id, session=session.id)
                         continue
-                    log.info("terminal_idle_closed", thread_id=thread_id, session=session.id, command=session.command)
+                    log.info(
+                        "terminal_idle_closed",
+                        thread_id=thread_id,
+                        session=session.id,
+                        command=await _loggable(session.command),
+                    )
                 if idle:
                     await self._changed(thread_id)
 

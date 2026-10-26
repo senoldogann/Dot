@@ -14,6 +14,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from structlog.testing import capture_logs
 
 from dotagent.agent.gate import RunGate
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
@@ -297,6 +298,22 @@ async def test_a_close_cancelled_while_it_waits_still_releases_the_terminal(runt
             await closing
         assert stubborn.finished.is_set() and stubborn.ended
         assert await asyncio.wait_for(stubborn.exit_code(), 5.0) != 0
+    finally:
+        await terminals.aclose()
+
+
+async def test_the_log_line_of_an_opened_terminal_masks_a_key_in_its_command(runtime: Runtime) -> None:
+    """Item 690: the command is logged at info as the session opens, so what it carries (a password given to an option,
+    a token in its environment) is masked there as it is in the events."""
+    terminals: Terminals = Terminals(3, 1.0, runtime.shell_env)
+    try:
+        with capture_logs() as logs:
+            session: TerminalSession = await terminals.open(
+                "chat", "MYSQL_PASSWORD=hunter2hunter2 true --api-key abc123def456", (), workspace_dir(), False
+            )
+        opened: list[str] = [str(line["command"]) for line in logs if line["event"] == "terminal_opened"]
+        assert opened == ["MYSQL_PASSWORD=*** true --api-key ***"]
+        assert session.command.startswith("MYSQL_PASSWORD=hunter2hunter2")
     finally:
         await terminals.aclose()
 

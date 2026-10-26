@@ -29,6 +29,7 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/executor.py:_execute_one": (True,),
     "agent/gate.py:_shown": (True,),
     "agent/loop.py:_compact": (True,),
+    "agent/manager.py:RunManager._record_end": (True,),
     "agent/loop.py:_route_step": (True,),
     "agent/recap.py:_write": (True,),
     "agent/review.py:_attempt": (True,),
@@ -39,6 +40,7 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "opencode/run.py:_Follow.tool": (True,),
     "opencode/run.py:_Follow.step_ended": (True,),
     "server/diagnostics.py:read_tail": (True,),
+    "terminal/session.py:_loggable": (True,),
     "server/routes_runs.py:runs_router.run_changes_view": (True,),
     # What goes to the owner's phone.
     "channels/router.py:ChannelRouter._follow": (True,),

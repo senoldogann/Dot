@@ -1,5 +1,6 @@
 """The ASGI application: the JSON API, the live streams and the browser UI, behind the local guard."""
 
+import asyncio
 import mimetypes
 from pathlib import Path
 
@@ -35,7 +36,9 @@ from dotagent.core.errors import (
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import looks_dir, phones_path
-from dotagent.core.text import redact_secrets, truncate_middle
+from dotagent.core.text import redact_json, redact_secrets, truncate_middle
+from dotagent.core.types import JsonObject
+from dotagent.mcp.masking import masked_context
 from dotagent.previews.quicklook import QuickLook, open_quick_look
 from dotagent.server.compress import GzipExceptEventStreams
 from dotagent.server.context import ServerContext
@@ -117,6 +120,14 @@ def status_for(error: DotError) -> int:
 
 def _error_response(status: int, message: str, context: dict[str, JsonValue]) -> JSONResponse:
     return JSONResponse(ErrorView(message=message, context=context).model_dump(mode="json"), status_code=status)
+
+
+def _masked_error_context(context: JsonObject) -> JsonObject:
+    """``context`` of a :class:`DotError` with the secrets in it masked: an address's key and an argument's
+    (:func:`dotagent.mcp.masking.masked_context`), the secrets Dot holds, the keys of a known form and the value of a
+    field that names a secret. Blocking."""
+    masked: JsonValue = redact_json(masked_context(context))
+    return masked if isinstance(masked, dict) else {}
 
 
 def _fault_response(exc: Exception) -> JSONResponse:
@@ -207,11 +218,13 @@ def create_app(ctx: ServerContext) -> FastAPI:
     @app.exception_handler(DotError)
     async def dot_error(request: Request, exc: DotError) -> JSONResponse:
         status: int = status_for(exc)
+        # An error's context may hold an address with a key in it or an argument that is one (item 690): it is masked
+        # here, for the response and the log alike, so that no route has to. The secrets Dot holds are read from the
+        # env file, off the event loop.
+        masked: JsonObject = await asyncio.to_thread(_masked_error_context, exc.context)
         if status == _SERVER_FAULT:
-            log.error(
-                "request_failed", method=request.method, path=request.url.path, error=exc.message, context=exc.context
-            )
-        return _error_response(status, exc.message, exc.context)
+            log.error("request_failed", method=request.method, path=request.url.path, error=exc.message, context=masked)
+        return _error_response(status, exc.message, masked)
 
     @app.exception_handler(HTTPException)
     async def framework_error(request: Request, exc: HTTPException) -> JSONResponse:
