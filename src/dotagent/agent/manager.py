@@ -761,15 +761,17 @@ class RunManager:
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         carried: tuple[str, ...],
+        skills: tuple[str, ...] = (),
     ) -> RunRecord:
         """Queue the run of a schedule's firing in the chat ``thread_id`` (item 257). ``goal`` is the schedule's, the
         owner's words, which the run keeps, its reviewer takes as the owner's instruction and its chat shows;
         ``opening`` is its first message to the model: the goal, after the note of a late start and the digest of the
         schedule's earlier runs (``scheduler/history.py``). ``carried`` are the earlier runs whose words the run reads,
         in the digest or in its chat: it starts tainted when one of them ended so. Goal mode is asked by the goal
-        alone; fast mode only of a model that has it (item 291). The rest is as for :meth:`start`."""
+        alone; fast mode only of a model that has it (item 291). ``skills`` are the schedule's (item 666): the run
+        starts with them as with a message's picks of skills. The rest is as for :meth:`start`."""
         return await self._launch_firing(
-            goal, opening, mode, model, thread_id, effort, speed, approvals, goal_mode, carried, None
+            goal, opening, mode, model, thread_id, effort, speed, approvals, goal_mode, carried, None, skills
         )
 
     async def start_firing_for_agent(
@@ -785,6 +787,7 @@ class RunManager:
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         carried: tuple[str, ...],
+        skills: tuple[str, ...] = (),
     ) -> RunRecord:
         """Queue the run of the firing of a schedule of ``agent`` (item 462), as :meth:`start_firing` queues one of
         Dot's, within the agent's bounds (:func:`agent_bounds`): the schedule's own model, reasoning level and
@@ -803,6 +806,7 @@ class RunManager:
             goal_mode,
             carried,
             agent.id,
+            skills,
         )
 
     async def _launch_firing(
@@ -818,8 +822,11 @@ class RunManager:
         goal_mode: bool | None,
         carried: tuple[str, ...],
         agent_id: str | None,
+        skills: tuple[str, ...],
     ) -> RunRecord:
-        """The run of a schedule's firing, of Dot (``agent_id`` None) or of one of the owner's agents."""
+        """The run of a schedule's firing, of Dot (``agent_id`` None) or of one of the owner's agents, with the skills
+        of the schedule picked for it."""
+        picks: RunPicks = NO_PICKS if not skills else RunPicks(plugins=(), skills=skills, plan_first=False)
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_speed(ref, speed)
         if effort is not None:
@@ -835,7 +842,7 @@ class RunManager:
             speed,
             approvals,
             goal_mode_asked(goal, mode, goal_mode),
-            RunOpening(text=opening, files=(), resumed=None, once=None, carried=carried, picks=NO_PICKS),
+            RunOpening(text=opening, files=(), resumed=None, once=None, carried=carried, picks=picks),
             None,
             agent_id,
         )

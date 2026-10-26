@@ -979,9 +979,18 @@ def _schedule(row: aiosqlite.Row) -> ScheduleRecord:
             stop_after_failures=row["stop_after_failures"],
             notify=row["notify"],
             agent_id=row["agent_id"],
+            skills=_skills_of(row["skills"]),
         ),
         runs_failed_in_row=row["runs_failed_in_row"],
     )
+
+
+def _skills_of(stored: str | None) -> tuple[str, ...]:
+    """The skills a schedule's runs start with (item 666), from their column: a JSON list of names, or none."""
+    if not stored:
+        return ()
+    names: object = parse_json_value(stored, "a schedule's skills")
+    return tuple(name for name in names if isinstance(name, str)) if isinstance(names, list) else ()
 
 
 type _OptionValues = tuple[
@@ -996,12 +1005,13 @@ type _OptionValues = tuple[
     int | None,
     str | None,
     str | None,
+    str | None,
 ]
 
 
 def _option_values(options: ScheduleOptions) -> _OptionValues:
     """The schedule columns that hold ``options``, in the order model, effort, approvals, goal_mode, timezone,
-    history_runs, same_chat, speed, stop_after_failures, notify, agent_id."""
+    history_runs, same_chat, speed, stop_after_failures, notify, agent_id, skills (a JSON list, or NULL for none)."""
     goal_mode: int | None = None if options.goal_mode is None else int(options.goal_mode)
     same_chat: int | None = None if options.same_chat is None else int(options.same_chat)
     return (
@@ -1016,6 +1026,7 @@ def _option_values(options: ScheduleOptions) -> _OptionValues:
         options.stop_after_failures,
         options.notify,
         options.agent_id,
+        dumps_compact(list(options.skills)) if options.skills else None,
     )
 
 
@@ -1085,6 +1096,7 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("runs_failed_in_row", "INTEGER NOT NULL DEFAULT 0"),
     ("notify", "TEXT"),
     ("agent_id", "TEXT"),
+    ("skills", "TEXT"),
 )
 
 
@@ -4930,8 +4942,8 @@ class Store:
         await self._db.execute(
             "INSERT INTO schedules(id, name, cron, run_at, goal, mode, enabled, created_at, last_run_at, next_run_at,"
             " thread_id, last_status, model, effort, approvals, goal_mode, timezone, history_runs, same_chat, speed,"
-            " stop_after_failures, notify, agent_id)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " stop_after_failures, notify, agent_id, skills)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 name,
@@ -4971,7 +4983,8 @@ class Store:
         await self._db.execute(
             "UPDATE schedules SET name = ?, cron = ?, run_at = ?, goal = ?, mode = ?, model = ?, effort = ?,"
             " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?,"
-            " stop_after_failures = ?, notify = ?, agent_id = ?, enabled = ?, next_run_at = ?, runs_failed_in_row = 0,"
+            " stop_after_failures = ?, notify = ?, agent_id = ?, skills = ?, enabled = ?, next_run_at = ?,"
+            " runs_failed_in_row = 0,"
             " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
             " WHERE id = ?",
             (name, cron, run_at, goal, mode, *_option_values(options), on, next_run_at, on, schedule_id),

@@ -426,6 +426,7 @@ class _OwnerSwitchesTheOtherOff(RunManager):
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         carried: tuple[str, ...],
+        skills: tuple[str, ...] = (),
     ) -> RunRecord:
         self.started.append(goal)
         for other, schedule_id in self._schedule_of.items():
@@ -495,6 +496,7 @@ class _StartsAndEnds(RunManager):
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         carried: tuple[str, ...],
+        skills: tuple[str, ...] = (),
     ) -> RunRecord:
         self.goals.append(goal)
         return await self._runtime.store.create_run(
@@ -540,6 +542,7 @@ class _Starts(_StartsAndEnds):
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         carried: tuple[str, ...],
+        skills: tuple[str, ...] = (),
     ) -> RunRecord:
         self.started.append(opening)
         return await super().start_firing(
@@ -595,6 +598,7 @@ class _FailsThenStarts(_StartsAndEnds):
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         carried: tuple[str, ...],
+        skills: tuple[str, ...] = (),
     ) -> RunRecord:
         if self.failures:
             raise self.failures.pop(0)

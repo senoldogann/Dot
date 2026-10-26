@@ -303,6 +303,10 @@ function scheduleRow(view, handlers) {
         { class: "row" },
         el("span", { class: "row-title" }, record.name),
         view.brief ? el("span", { class: "badge b-info", title: "Dot writes it each morning; the Morning brief under your schedules sets it" }, "Brief") : null,
+        // A task the owner taught and asked to repeat (item 666): its runs start with that skill.
+        (record.options.skills ?? []).length > 0
+          ? el("span", { class: "badge b-info", title: `Its runs start with the skill ${record.options.skills.join(", ")}` }, "Taught task")
+          : null,
       ),
       el("div", { class: "row-meta" }, optionChips(record, agent)),
       goalText(record.goal),

@@ -90,3 +90,27 @@ export function nextFiring(at, now) {
   }
   return DAY_KEY.format(when) === DAY_KEY.format(new Date(now * 1000)) ? time : `${WEEKDAY.format(when)} ${time}`;
 }
+
+// How often a taught task can repeat, as the cron's day-of-week field says it (a week's day is chosen beside it).
+export const REPEAT_RHYTHMS = [
+  { id: "day", label: "Every day", days: "*" },
+  { id: "weekdays", label: "On weekdays", days: "1-5" },
+  { id: "week", label: "Every week", days: null },
+];
+// The days of a week, Monday first, by the cron's numbers.
+export const WEEK_DAYS = [
+  ["1", "Monday"],
+  ["2", "Tuesday"],
+  ["3", "Wednesday"],
+  ["4", "Thursday"],
+  ["5", "Friday"],
+  ["6", "Saturday"],
+  ["0", "Sunday"],
+];
+
+/** The cron of a taught task's repeat (item 666): a rhythm (`REPEAT_RHYTHMS`' id), a day of the week ("1" for Monday) and a time ("09:30"). */
+export function repeatCron(rhythm, day, time) {
+  const [hour, minute] = time.split(":").map(Number);
+  const days = REPEAT_RHYTHMS.find((each) => each.id === rhythm)?.days ?? day;
+  return `${minute} ${hour} * * ${days}`;
+}

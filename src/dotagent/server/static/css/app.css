@@ -10394,6 +10394,46 @@ dialog.teach {
   margin: 0 0 var(--space-1);
 }
 
+/* A saved task repeating by itself (item 666): how often, the day of a weekly one, the time and the button, on one line
+   that wraps on a phone; once it repeats, a line says when and leads to the schedule. */
+.teach-repeat {
+  margin: var(--space-2) 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.teach-repeat h3 {
+  margin: 0 0 var(--space-2);
+}
+
+.teach-repeat-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.teach-repeat-row .select,
+.teach-time {
+  width: auto;
+}
+
+.teach-repeated a {
+  white-space: nowrap;
+}
+
+.teach-repeated {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 .teach-actions {
   display: flex;
   justify-content: flex-end;

@@ -635,8 +635,8 @@ class Scheduler:
         return tuple(dict.fromkeys((*last, *digest.run_ids)))
 
     async def _start(self, record: ScheduleRecord, opening: str, thread_id: str, carried: tuple[str, ...]) -> RunRecord:
-        """Start the run of a firing of ``record`` in the chat ``thread_id`` with the schedule's own choices, as the
-        owner's agent the schedule names, within that agent's bounds (item 462), or as Dot."""
+        """Start the run of a firing of ``record`` in the chat ``thread_id`` with the schedule's own choices and skills
+        (item 666), as the owner's agent the schedule names, within that agent's bounds (item 462), or as Dot."""
         options: ScheduleOptions = record.options
         speed: Speed = "standard" if options.speed is None else options.speed
         if options.agent_id is None:
@@ -651,6 +651,7 @@ class Scheduler:
                 options.approvals,
                 options.goal_mode,
                 carried,
+                options.skills,
             )
         agent: AgentRecord = await self._runtime.store.get_agent(options.agent_id)
         return await self._manager.start_firing_for_agent(
@@ -665,6 +666,7 @@ class Scheduler:
             options.approvals,
             options.goal_mode,
             carried,
+            options.skills,
         )
 
     def _level(self, record: ScheduleRecord) -> NotifyLevel:

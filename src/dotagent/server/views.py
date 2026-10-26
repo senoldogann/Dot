@@ -1280,6 +1280,14 @@ class ScheduleAgent(FrozenModel):
     paused_at: float | None
 
 
+class ScheduleRepeatView(FrozenModel):
+    """The schedule a taught task repeats on (item 666): its id, for the link to it, its name and its rhythm."""
+
+    id: str
+    name: str
+    cron: str
+
+
 class ScheduleView(FrozenModel):
     """A schedule as the UI shows it; the times are in the schedule's own ``zone``. ``run_at_input`` is the one-time
     moment as a ``datetime-local`` field takes it (``2026-10-06T09:30``). ``agent`` is the agent its runs run as,

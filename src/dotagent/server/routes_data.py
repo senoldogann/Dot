@@ -441,12 +441,9 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
 
     @router.patch("/schedules/{schedule_id}")
     async def change_schedule(schedule_id: str, request: ScheduleUpdateRequest) -> ScheduleView:
+        kept: ScheduleOptions = (await store.get_schedule(schedule_id)).options
         # A change that does not name the agent keeps the schedule's (item 462): only an explicit null makes it Dot's.
-        agent_id: str | None = (
-            request.agent_id
-            if "agent_id" in request.model_fields_set
-            else (await store.get_schedule(schedule_id)).options.agent_id
-        )
+        agent_id: str | None = request.agent_id if "agent_id" in request.model_fields_set else kept.agent_id
         plan: ScheduleRequest = ScheduleRequest(
             name=request.name,
             goal=request.goal,
@@ -465,6 +462,8 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 stop_after_failures=request.stop_after_failures,
                 notify=request.notify,
                 agent_id=agent_id,
+                # The form has no field for them: a taught task's skill stays with its schedule (item 666).
+                skills=kept.skills,
             ),
         )
         edited: ScheduleRecord = await edit_schedule(

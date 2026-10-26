@@ -2,12 +2,16 @@
 // which comes to the front on the Mac and is shown here as it is painted; the steps they take are listed as they come,
 // and Stop hands them to the review model, which writes the skill. The owner reads it and keeps it or throws it away.
 //
+// A saved task can repeat (item 666): every day, on weekdays or on a day of the week, at a time, in this chat, its runs
+// starting with the skill picked, as Run it now's does.
+//
 // A recording is the tab's alone and lasts while the panel is open on it: closing the panel stops it and nothing of it
 // is saved. A browser without a window refuses to start one, and the panel says why.
 
 import { api, watchInView } from "./api.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
+import { loopRhythm, REPEAT_RHYTHMS, repeatCron, WEEK_DAYS } from "./rhythm.js";
 import { toast } from "./ui.js";
 
 // How often the panel reads the steps while the owner works: often enough to see one's own click, seldom enough to
@@ -44,6 +48,18 @@ export function openTeachPanel({ threadId, onSaved }) {
   const keep = el("button", { class: "btn primary", type: "button", hidden: true }, "Save it");
   const go = el("button", { class: "btn", type: "button", hidden: true }, "Run it now");
   const close = el("button", { class: "btn ghost", type: "button", "aria-label": "Close" }, icon("x"));
+  const rhythm = el("select", { class: "select", "aria-label": "How often" }, REPEAT_RHYTHMS.map((each) => el("option", { value: each.id }, each.label)));
+  const weekDay = el("select", { class: "select", "aria-label": "Which day", hidden: true }, WEEK_DAYS.map(([value, name]) => el("option", { value }, name)));
+  const time = el("input", { class: "input teach-time", type: "time", value: "09:00", "aria-label": "At what time" });
+  const repeat = el("button", { class: "btn", type: "button" }, "Repeat it");
+  const repeated = el("p", { class: "teach-repeated", hidden: true });
+  const repeating = el(
+    "section",
+    { class: "teach-repeat", hidden: true, "aria-label": "Repeat this task" },
+    el("h3", null, "Repeat it by itself"),
+    el("div", { class: "teach-repeat-row" }, rhythm, weekDay, el("span", { class: "hint" }, "at"), time, repeat),
+    repeated,
+  );
 
   const dialog = el(
     "dialog",
@@ -62,6 +78,7 @@ export function openTeachPanel({ threadId, onSaved }) {
       steps,
       el("label", { class: "teach-label" }, "What is it for?", words),
       draft,
+      repeating,
       el("div", { class: "teach-actions" }, start, stop, make, go, keep),
     ),
   );
@@ -82,6 +99,8 @@ export function openTeachPanel({ threadId, onSaved }) {
     make.hidden = recording || steps.children.length === 0 || skill !== null;
     keep.hidden = skill === null || saved;
     go.hidden = !saved;
+    repeating.hidden = !saved;
+    weekDay.hidden = rhythm.value !== "week";
     start.disabled = recording;
   }
 
@@ -240,6 +259,26 @@ export function openTeachPanel({ threadId, onSaved }) {
     }
   }
 
+  // "Repeat it" makes a schedule of the task in this chat (item 666): the line under it then says when, and leads to it.
+  async function repeatIt() {
+    repeat.disabled = true;
+    try {
+      const cron = repeatCron(rhythm.value, weekDay.value, time.value || "09:00");
+      const made = await api.post(`/teach/${encodeURIComponent(threadId)}/repeat`, { name: saved, cron });
+      const when = loopRhythm(made.cron) ?? "on its schedule";
+      repeated.replaceChildren(
+        icon("calendar"),
+        el("span", null, `It repeats ${when}, in this chat. `),
+        el("a", { href: `#/schedules?schedule=${encodeURIComponent(made.id)}`, onclick: () => finish() }, "See it in Schedules"),
+      );
+      repeated.hidden = false;
+    } catch (error) {
+      toast("error", `It does not repeat: ${error.message}`);
+    } finally {
+      repeat.disabled = false;
+    }
+  }
+
   function finish() {
     stopPolling();
     stopView();
@@ -266,6 +305,8 @@ export function openTeachPanel({ threadId, onSaved }) {
   make.addEventListener("click", () => write());
   keep.addEventListener("click", () => save());
   go.addEventListener("click", () => runIt());
+  repeat.addEventListener("click", () => repeatIt());
+  rhythm.addEventListener("change", () => paint());
   close.addEventListener("click", () => discard());
   dialog.addEventListener("cancel", (event) => {
     event.preventDefault();
