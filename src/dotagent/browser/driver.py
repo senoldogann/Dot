@@ -1169,10 +1169,11 @@ TextWaitEnd = Literal["text", "dialog", "timeout"]
 
 
 async def wait_for_text_or_dialog(page: Page, text: str, timeout_ms: int) -> TextWaitEnd:
-    """What ended a wait of at most ``timeout_ms`` for ``text`` to become visible (in any of its matches: an earlier hidden one, such as a template or a closed menu, does not hold the wait): the text, a
-    dialog that opened in front of the page while none was open when the wait began (item 698; the text would not
-    come until it is answered), or the time. A dialog that brings the text with it is the text. One wait in the page,
-    for either, so nothing is left waiting behind it."""
+    """What ended a wait of at most ``timeout_ms`` for ``text`` to become visible, in any of its matches (an earlier
+    hidden one, such as a template or a closed menu, does not hold the wait): the text, a dialog that opened in front
+    of the page while none was open when the wait began (item 698; the text would not come until it is answered), or
+    the time. A dialog that brings the text with it is the text. One wait in the page, for either, so nothing is left
+    waiting behind it."""
     wanted: Locator = page.get_by_text(text).filter(visible=True)
     dialogs: Locator = page.locator(_MODALS).filter(visible=True)
     try:

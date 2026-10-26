@@ -32,6 +32,9 @@ class BrowserPool:
         self.main: BrowserSession = BrowserSession(
             config, server, browser_data_dir(config.mode, config.profile), downloads_dir, kept
         )
+        # The chats whose run nobody watches (item 699): a schedule's, a watcher's and their helpers'.
+        self._unattended: set[str] = set()
+        self.main.watch_for(self._unattended.__contains__)
         self._others: dict[BrowserMode, BrowserSession] = {}
 
     def session_for(self, mode: BrowserMode | None) -> BrowserSession:
@@ -49,6 +52,7 @@ class BrowserPool:
                 self._downloads,
                 self._kept,
             )
+            found.watch_for(self._unattended.__contains__)
             self._others[mode] = found
         return found
 
@@ -62,6 +66,17 @@ class BrowserPool:
         if other is not None:
             await other.aclose()
             _log.info("browser_session_retired", mode=mode, profile=str(other.profile_dir))
+
+    def unattended(self, thread_id: str, nobody_watches: bool) -> None:
+        """Mark the chat ``thread_id`` as one whose run at work nobody watches, or not (item 699): a call of it does
+        not wait for an Allow nobody clicked a moment ago."""
+        if nobody_watches:
+            self._unattended.add(thread_id)
+        else:
+            self._unattended.discard(thread_id)
+
+    def is_unattended(self, thread_id: str) -> bool:
+        return thread_id in self._unattended
 
     async def end_of_run(self, thread_id: str, *, helper: bool) -> None:
         """Tidy the chat's tabs in every session once its run has ended (item 696, :meth:`BrowserSession.end_of_run`):

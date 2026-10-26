@@ -2740,6 +2740,8 @@ class RunManager:
                 agent: AgentRun = AgentRun(runtime, run, gate, cancel, inbox, self, opening)
                 # The other runs know it from now on, and what it holds (item 301).
                 runtime.peers.begin(run.id, run.thread_id, run.goal)
+                # A run nobody watches does not wait for an Allow of Chrome nobody clicked (item 699).
+                runtime.browsers.unattended(run.thread_id, await self._nobody_watches(run))
                 # A run on one of Zen's free models goes whole to OpenCode's own agent (item 283).
                 in_opencode: bool = parse_model_ref(run.model).provider == OPENCODE_PROVIDER
                 ended: RunEnd = await (run_in_opencode(agent) if in_opencode else run_agent(agent))
@@ -2775,12 +2777,23 @@ class RunManager:
             # The tabs the run left (item 696): a helper's chat closes them all, another keeps its current one for a
             # message that goes on from it. Before the queue moves on, so that the chat's next run starts tidy.
             await runtime.browsers.end_of_run(run.thread_id, helper=run.parent_run_id is not None)
+        runtime.browsers.unattended(run.thread_id, False)
         if recorded and not self._stopping:
             # Nothing awaits a run's task: a queue that cannot be moved on is logged here and stays as it was.
             try:
                 await self._follow_queue(run, "cancelled" if cancel.is_set() else status)
             except Exception:
                 log.exception("queue_not_followed", run_id=run.id, thread_id=run.thread_id)
+
+    async def _nobody_watches(self, run: RunRecord) -> bool:
+        """Whether nobody watches ``run`` (item 699): a schedule's (a campaign's sessions are), a watcher's, or a helper
+        of one."""
+        if run.source in (SCHEDULE_SOURCE, WATCHER_SOURCE):
+            return True
+        if run.parent_run_id is None:
+            return False
+        parent: RunRecord = await self._runtime.store.get_run(run.parent_run_id)
+        return self._runtime.browsers.is_unattended(parent.thread_id)
 
     def _stop_result(self, run_id: str) -> str:
         """Why a run that was cancelled ended: the daemon stopped, the owner's emergency stop, the end of the ``dotx``

@@ -9,7 +9,9 @@ opened.
 
 import asyncio
 import io
+import os
 import re
+import socket
 import threading
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
@@ -28,6 +30,7 @@ from pydantic import BaseModel, TypeAdapter
 from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
+from dotagent.browser import session as session_module
 from dotagent.browser.attach import DebugEndpoint, parse_port_file
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import chrome_arguments
@@ -591,6 +594,53 @@ async def test_a_connection_that_chrome_refuses_is_reported_without_the_secret_p
         await session.aclose()
     assert wrong not in str(raised.value)
     assert raised.value.context["port"] == chrome.port
+
+
+def _silent_chrome(data_dir: Path, port: int, tmp_path: Path) -> BrowserConfig:
+    """A Chrome of the user that holds ``data_dir`` (this process stands in for it) and listens on ``port`` without
+    ever answering, as Chrome does while its Allow waits for a click; and an attach that waits for it one second."""
+    (data_dir / "SingletonLock").symlink_to(f"host-{os.getpid()}")
+    (data_dir / _PORT_FILE).write_text(f"{port}\n/devtools/browser/x\n", encoding="utf-8")
+    settings: Path = tmp_path / "quick.toml"
+    settings.write_text('[browser]\nmode = "attach"\nattach_timeout_s = 1.0\n', encoding="utf-8")
+    return load_config(settings).browser
+
+
+async def test_an_allow_nobody_clicked_is_not_waited_for_again_by_a_run_nobody_watches(
+    data_dir: Path, site: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 699: once a wait for Chrome's Allow ran out, a call of a chat whose run nobody watches (a schedule's) fails
+    at once for ``UNANSWERED_HOLD_S`` instead of waiting ``attach_timeout_s`` again (a schedule with nobody there waited
+    nine minutes in one run). A chat of the owner's still waits, as they may be there to click; after the hold, and
+    after a switch the owner made, the schedule's waits again."""
+    silent: socket.socket = socket.socket()
+    silent.bind(("127.0.0.1", 0))
+    silent.listen()
+    port: int = silent.getsockname()[1]
+    config: BrowserConfig = _silent_chrome(data_dir, port, tmp_path)
+    session: BrowserSession = BrowserSession(config, SERVER, data_dir, tmp_path / "downloads", no_runs_at_work)
+    session.watch_for(lambda thread_id: thread_id == "schedule")
+
+    async def took(thread_id: str, refusal: str) -> float:
+        started: float = time.monotonic()
+        with pytest.raises(BrowserError, match=refusal):
+            await session.open_url(thread_id, f"{site}/", True)
+        return time.monotonic() - started
+
+    waited: str = r"no answer within 1 s"
+    held: str = r"^Chrome's Allow went unanswered \d+ s ago"
+    try:
+        assert await took("schedule", waited) >= 0.9
+        assert await took("schedule", held) < 0.5
+        assert await took("owner", waited) >= 0.9
+        monkeypatch.setattr(session_module, "UNANSWERED_HOLD_S", 0.0)
+        assert await took("schedule", waited) >= 0.9
+        monkeypatch.setattr(session_module, "UNANSWERED_HOLD_S", 300.0)
+        await session.switch(config, data_dir)
+        assert await took("schedule", waited) >= 0.9
+    finally:
+        await session.aclose()
+        silent.close()
 
 
 async def test_a_script_reaches_the_runs_own_tab_every_time_while_three_chromes_run(
