@@ -875,6 +875,9 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals)
   and the stores no program has any use for (`[policy] sealed_paths`: the data and caches of your browsers, their
   cookies, Messages and Mail, item 531), nor change what Dot loads and runs, nor rename a folder above any of them,
+  nor make, change or remove anything in Dot's home or its logs folder but in the workspace, nor remove, move or
+  replace the workspace itself (item 676: the daemon opens and writes files there with your rights, its pid file at
+  each start among them, so a link a command left in their place would have it write where the command may not),
   whatever program does it: a script the run wrote, code that builds the path, a symbolic link, another letter case.
   macOS answers `Operation not permitted`. A hard link is not closed, because the profile names paths: a hard link to
   one of those files that a process outside the sandbox made earlier (a `yolo` run, a run while

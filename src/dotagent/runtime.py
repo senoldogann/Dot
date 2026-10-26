@@ -37,12 +37,15 @@ from dotagent.core.paths import (
     ensure_layout,
     env_file_path,
     failsafe_path,
+    log_dir,
     mcp_sign_ins_dir,
     opencode_dir,
     phones_path,
+    pid_path,
     playbooks_dir,
     plugins_data_dir,
     run_owners_dir,
+    running_mark_path,
     screenshots_dir,
     skills_dir,
     token_path,
@@ -261,8 +264,9 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
     gave Dot (its tokens), the browser profiles (Dot's own and the Chrome of the user), the settings that decide what it
     may do (policy, rules, MCP servers), its own database and its copies (item 526: a copy is the whole database, and
     one planted in their folder would be what the owner goes back to), the journals of file changes (``dotx undo``
-    writes back what a journal says), the locks that tell which process drives a run, and the ledger of the tabs Dot
-    has open in the Chrome of the user (item 703: Dot writes and reads it outside the sandbox)."""
+    writes back what a journal says), the locks that tell which process drives a run, the ledger of the tabs Dot has
+    open in the Chrome of the user (item 703: Dot writes and reads it outside the sandbox), and the daemon's pid file
+    and mark, which it opens and writes at its start (item 676)."""
     database: Path = db_path()
     return (
         env_file_path(),
@@ -284,6 +288,8 @@ def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
         undo_dir(),
         run_owners_dir(),
         *ledger_files(),
+        pid_path(),
+        running_mark_path(),
     )
 
 
@@ -344,13 +350,16 @@ async def _confined_paths(config: AppConfig) -> tuple[tuple[Path, ...], tuple[Pa
 async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> SwitchedSandbox:
     """The sandbox the processes of a run start in outside yolo: a command kept out of Dot's guarded files and of the
     ``[policy] sealed_paths`` (the data of the browsers, Mail and Messages: item 531) and from changing ``dot_paths``, a
-    search out of every ``protected`` location too. It is built whatever [shell] sandbox says, so that Settings can
-    switch it on later, and checked to start when it is on."""
+    search out of every ``protected`` location too, and both from changing anything in Dot's home or its logs but the
+    workspace (item 676). It is built whatever [shell] sandbox says, so that Settings can switch it on later, and
+    checked to start when it is on."""
     sealed: tuple[Path, ...] = await asyncio.to_thread(
         expand_protected, config.policy.sealed_paths, _guarded_files(config)
     )
     launch_agents: Path = Path(await asyncio.to_thread(os.path.realpath, Path.home() / "Library" / "LaunchAgents"))
-    built: Sandbox = build_sandbox(sealed, protected, dot_paths, launch_agents)
+    closed: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], (dot_home(), log_dir()))
+    workspace: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], (workspace_dir(),))
+    built: Sandbox = build_sandbox(sealed, protected, dot_paths, launch_agents, closed, workspace)
     # The profile matches paths: a hard link to a sealed file made outside the sandbox is a path it does not name.
     for linked, names in (await asyncio.to_thread(hard_linked, sealed)).items():
         log.warning("sealed_file_has_other_names", path=str(linked), names=names)

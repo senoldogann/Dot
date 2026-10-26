@@ -4,18 +4,19 @@ own files.
 The shell guard (:mod:`dotagent.policy.shell`) reads a line, not what the programs it starts do: a script a run writes
 and then runs, or code that builds a path, reaches whatever the user's account reaches. So outside yolo the processes of
 a run (a shell command, a terminal session, an AppleScript and what it runs, the search tools' ripgrep) start under
-``sandbox-exec`` with a profile that allows everything but three things: reading or changing Dot's own files (its keys,
+``sandbox-exec`` with a profile that allows everything but four things: reading or changing Dot's own files (its keys,
 token, settings, database, browser profiles and journals) and the stores no program has any use for (``[policy]
 sealed_paths``: the data of the user's browsers, Mail and Messages, item 531), changing what it loads and runs or its
-emergency stop, and renaming or removing a folder above any of them, which would move them away from the paths the
-profile names. The search tools may not read the user's protected locations either: a search has no reason to, while
-the programs a shell runs (ssh, git, a cloud CLI) read their own credentials there, so those stay open to a command and
-are the guard's to keep. macOS refuses such a call with "Operation not permitted",
-whatever path, symbolic link or letter case names the file. A hard link is the exception: the profile matches the path
-a file has, so a hard link that a process outside the sandbox (a yolo run, a run while ``[shell] sandbox = false``)
-made to one of them earlier is another path to it, which the profile does not name; the daemon says so in its log when
-it starts (:func:`hard_linked`, item 561). ``[shell] sandbox = false`` starts them without it, and Settings › Rules
-switches it while the daemon runs (:class:`SwitchedSandbox`).
+emergency stop, changing anything in Dot's home or its logs but the run's workspace (item 676: the daemon opens and
+writes files there with the owner's rights, so a link a command left in their place would have it write elsewhere), and
+renaming or removing a folder above any of them, which would move them away from the paths the profile names. The search
+tools may not read the user's protected locations either: a search has no reason to, while the programs a shell runs
+(ssh, git, a cloud CLI) read their own credentials there, so those stay open to a command and are the guard's to keep.
+macOS refuses such a call with "Operation not permitted", whatever path, symbolic link or letter case names the file. A
+hard link is the exception: the profile matches the path a file has, so a hard link that a process outside the sandbox
+(a yolo run, a run while ``[shell] sandbox = false``) made to one of them earlier is another path to it, which the
+profile does not name; the daemon says so in its log when it starts (:func:`hard_linked`, item 561). ``[shell] sandbox =
+false`` starts them without it, and Settings › Rules switches it while the daemon runs (:class:`SwitchedSandbox`).
 
 A process that has another program act for it would act outside the sandbox, so the profile refuses that too:
 opening an application, a document or an address through Launch Services (``open``, a program's own call), starting the
@@ -113,8 +114,17 @@ def _filters(kind: str, names: Sequence[str | Path]) -> str:
     return " ".join(f"({kind} {_quoted(str(name))})" for name in names)
 
 
-def sandbox_profile(sealed: tuple[Path, ...], unwritable: tuple[Path, ...], launch_agents: Path) -> str:
-    """A profile that allows everything but reading or changing ``sealed``, changing ``unwritable``, and renaming or
+def sandbox_profile(
+    sealed: tuple[Path, ...],
+    unwritable: tuple[Path, ...],
+    launch_agents: Path,
+    closed: tuple[Path, ...] = (),
+    open_folders: tuple[Path, ...] = (),
+) -> str:
+    """A profile that allows everything but reading or changing ``sealed``, changing ``unwritable``, changing anything
+    in ``closed`` but in ``open_folders`` (Dot's home and its logs, but for the run's own workspace, item 676: the
+    daemon opens, writes and moves files there with the owner's rights, so a link a command left in their place would
+    have it write where the command may not), removing, renaming or replacing an open folder itself, and renaming or
     removing a folder above any of them (a file can still be made inside such a folder); and having another program act
     outside it: opening anything through Launch Services, starting :data:`HANDING_PROGRAMS` where macOS installs them or
     the services of :data:`HANDING_SERVICES` they would hand something to, creating a job of launchd, writing into
@@ -125,19 +135,24 @@ def sandbox_profile(sealed: tuple[Path, ...], unwritable: tuple[Path, ...], laun
     ancestors: list[Path] = sorted(
         {
             folder
-            for path in (*sealed, *unwritable, launch_agents)
+            for path in (*sealed, *unwritable, *closed, *open_folders, launch_agents)
             for folder in path.parents
             if folder != Path(folder.anchor)
         }
     )
     rules: list[str] = ["(version 1)", "(allow default)"]
+    # The open folders are allowed back right after what closes them, so every rule below holds inside them too.
+    if closed:
+        rules.append(f"(deny file-write* {_filters('subpath', sorted(set(closed)))})")
+    if open_folders:
+        rules.append(f"(allow file-write* {_filters('subpath', sorted(set(open_folders)))})")
     if sealed:
         rules.append(f"(deny file-read* file-write* {_filters('subpath', sorted(set(sealed)))})")
     if unwritable:
         rules.append(f"(deny file-write* {_filters('subpath', sorted(set(unwritable)))})")
     rules.append(f"(deny file-write* {_filters('subpath', [launch_agents])})")
-    if ancestors:
-        rules.append(f"(deny file-write* {_filters('literal', ancestors)})")
+    if ancestors or open_folders:
+        rules.append(f"(deny file-write* {_filters('literal', sorted(set(ancestors) | set(open_folders)))})")
     rules.append("(deny lsopen)")
     rules.append(f"(deny process-exec {_filters('literal', list(HANDING_PROGRAMS))})")
     rules.append(f"(deny mach-lookup {_filters('global-name', HANDING_SERVICES)})")
@@ -147,14 +162,19 @@ def sandbox_profile(sealed: tuple[Path, ...], unwritable: tuple[Path, ...], laun
 
 
 def build_sandbox(
-    sealed: tuple[Path, ...], protected: tuple[Path, ...], unwritable: tuple[Path, ...], launch_agents: Path
+    sealed: tuple[Path, ...],
+    protected: tuple[Path, ...],
+    unwritable: tuple[Path, ...],
+    launch_agents: Path,
+    closed: tuple[Path, ...] = (),
+    open_folders: tuple[Path, ...] = (),
 ) -> Sandbox:
     """The sandbox of a run's processes: a command may neither read nor change ``sealed`` (Dot's own files) nor change
-    ``unwritable`` (what Dot loads and runs); a search may not read any ``protected`` location either. Neither has
-    another program act for it (:func:`sandbox_profile`)."""
+    ``unwritable`` (what Dot loads and runs) nor anything in ``closed`` but in ``open_folders`` (item 676); a search may
+    not read any ``protected`` location either. Neither has another program act for it (:func:`sandbox_profile`)."""
     return Sandbox(
-        commands=(SANDBOX_EXEC, "-p", sandbox_profile(sealed, unwritable, launch_agents)),
-        search=(SANDBOX_EXEC, "-p", sandbox_profile(protected, unwritable, launch_agents)),
+        commands=(SANDBOX_EXEC, "-p", sandbox_profile(sealed, unwritable, launch_agents, closed, open_folders)),
+        search=(SANDBOX_EXEC, "-p", sandbox_profile(protected, unwritable, launch_agents, closed, open_folders)),
     )
 
 
