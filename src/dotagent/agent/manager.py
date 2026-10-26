@@ -2771,6 +2771,10 @@ class RunManager:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
         if recorded and not self._stopping and playbook_case(runtime.config, run, status) is not None:
             self._distilling[run.id] = asyncio.create_task(self._distil(run, status))
+        if not self._stopping:
+            # The tabs the run left (item 696): a helper's chat closes them all, another keeps its current one for a
+            # message that goes on from it. Before the queue moves on, so that the chat's next run starts tidy.
+            await runtime.browsers.end_of_run(run.thread_id, helper=run.parent_run_id is not None)
         if recorded and not self._stopping:
             # Nothing awaits a run's task: a queue that cannot be moved on is logged here and stays as it was.
             try:

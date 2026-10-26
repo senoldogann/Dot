@@ -227,7 +227,14 @@ Both modes share what follows.
   554). Cookie banners are declined (`decline_cookie_banners`; a click on a banner that goes away under it is no
   error, and one that fails with the banner still there is logged as `consent_decline_failed` with the page's address,
   and why the banner could not be counted when it could not).
-- A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
+- A conversation thread keeps at most `max_tabs` tabs open, and closes the tabs it is done with (item 696): a tab that
+  is not its current one once unused for `background_tab_idle_s` (300 s; 0 keeps it), while its run works as well;
+  when a run ends, the chat's background tabs, keeping the current one for a message that goes on from it until
+  `tab_idle_s`; and every tab of a helper's chat (a delegated run, an agent's) when it ends. `browser_close_tab`
+  without an index closes every tab of the chat but the current one. Only the chat's own tabs are closed: those of a
+  chat at work at the same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a
+  link or a page that opens a new tab) is the chat's, also when you opened it that way (a middle click in a tab of
+  Dot's in your Chrome). The current tab is told which closed.
 - With `idle_close_s` set (seconds; 0, the default, keeps it open until the daemon stops; item 454), Dot's own Chrome
   (`own`) closes, the Playwright driver with it, once nothing used it for that long: no chat's step is under way in it,
   no run at work holds tabs in it, no page is being read in it for the web tools or watched under "Dot's computer", no
