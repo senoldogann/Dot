@@ -4,7 +4,8 @@ The owner works in a tab while :mod:`dotagent.browser.teach` records the steps; 
 review model writes the skill of it, and the owner saves or discards it. A saved one is a skill like a learned one in
 every way a run meets it (a folder under the playbooks, an entry in :mod:`dotagent.agent.playbooks`, offered by the
 ``skill`` tool), but its header says the owner taught it, nothing stands behind it from a run, and it is never retired
-for failures: whether it still fits is the owner's to say.
+for failures: whether it still fits is the owner's to say. A saved one can repeat (item 666): a schedule in the chat it
+was taught in whose runs start with the skill picked, as Run it now's does.
 """
 
 import asyncio
@@ -28,10 +29,14 @@ from dotagent.agent.playbooks import (
 )
 from dotagent.agent.review import PlaybookDraft, PlaybookRequest, PlaybookWriter, playbook_writer_for
 from dotagent.browser.teach import Recording
-from dotagent.core.errors import InvalidValueError
+from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.core.paths import playbooks_dir
+from dotagent.core.text import plain_line
 from dotagent.core.types import FrozenModel
+from dotagent.scheduler.plans import ScheduleRequest, create_schedule
 from dotagent.secrets import known_secrets
+from dotagent.store.models import ChatChoices, RunRecord, ScheduleOptions, ScheduleRecord
+from dotagent.tools.schedule import chat_options
 
 if TYPE_CHECKING:
     from dotagent.runtime import Runtime
@@ -141,3 +146,51 @@ def save_taught_skill(skill: TaughtSkill, written_at: float | None = None) -> st
     )
     write_playbook(root, playbook)
     return name
+
+
+# The longest name a schedule takes, as the schedule tools and the Schedules page keep it.
+_SCHEDULE_NAME_CHARS: int = 80
+
+
+async def repeat_taught_skill(runtime: "Runtime", thread_id: str, name: str, cron: str) -> ScheduleRecord:
+    """Make the task the owner taught as ``name`` repeat on ``cron`` (item 666): a task schedule in the chat
+    ``thread_id`` whose runs start with that skill picked, and with the chat's choices as a schedule a run of it makes
+    has them (:func:`dotagent.tools.schedule.chat_options`), its goal the skill's line of what it does. Only a skill the
+    owner taught repeats this way; a name of none is refused, and so is a rhythm the scheduler refuses."""
+    entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
+    entry: PlaybookEntry | None = next(
+        (each for each in entries if each.skill.name == name and each.meta.taught and not each.retired), None
+    )
+    if entry is None:
+        raise NotFoundError("no task you taught has that name", {"name": name})
+    store = runtime.store
+    latest: list[RunRecord] = await store.list_runs(1, thread_id)
+    choices: ChatChoices | None = await store.chat_choices(thread_id)
+    options: ScheduleOptions = (
+        chat_options(latest[0], choices)
+        if latest
+        else ScheduleOptions(
+            model=None,
+            effort=None,
+            speed=None,
+            approvals=None,
+            goal_mode=None,
+            timezone=None,
+            history_runs=None,
+            same_chat=True,
+            stop_after_failures=None,
+            notify=None,
+            agent_id=None,
+        )
+    ).model_copy(update={"skills": (entry.skill.name,)})
+    request: ScheduleRequest = ScheduleRequest(
+        name=plain_line(entry.skill.description, _SCHEDULE_NAME_CHARS),
+        goal=entry.skill.description,
+        cron=cron,
+        at=None,
+        mode="task",
+        options=options,
+    )
+    return await create_schedule(
+        store, runtime.config.scheduler, runtime.schedule_zone, request, time.time(), thread_id
+    )

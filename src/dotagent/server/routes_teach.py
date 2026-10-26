@@ -4,7 +4,8 @@ same screencast the browser's own page shows, read while the recording goes on.
 
 A recording belongs to one chat and to one tab, and only the last one started is kept (:mod:`dotagent.browser.teach`):
 the panel that opened it reads its steps, and the skill writer reads them when the owner stops it. What is stopped is
-kept here until it is saved or discarded, so that a draft which takes the model a moment still has its steps.
+kept here until it is saved or discarded, so that a draft which takes the model a moment still has its steps. A saved
+one can repeat on a rhythm in the chat (item 666).
 """
 
 import asyncio
@@ -18,7 +19,9 @@ from dotagent.browser.teach import Recording
 from dotagent.core.errors import NotFoundError
 from dotagent.server.context import ServerContext
 from dotagent.server.stream import KEEPALIVE, SSE_HEADERS, SSE_TYPE, encode_frame
-from dotagent.teach import TaughtSkill, draft_taught_skill, save_taught_skill
+from dotagent.server.views import ScheduleRepeatView
+from dotagent.store.models import ScheduleRecord
+from dotagent.teach import TaughtSkill, draft_taught_skill, repeat_taught_skill, save_taught_skill
 
 
 class ThreadRequest(BaseModel):
@@ -38,6 +41,13 @@ class SaveRequest(ThreadRequest):
     choose it."""
 
     skill: TaughtSkill
+
+
+class RepeatRequest(BaseModel):
+    """A task the owner taught (the name its saving gave it) to repeat on ``cron``, read in the Mac's time zone."""
+
+    name: str
+    cron: str
 
 
 def _lines(recording: Recording) -> list[JsonValue]:
@@ -112,6 +122,15 @@ def teach_router(ctx: ServerContext) -> APIRouter:
         name: str = await asyncio.to_thread(save_taught_skill, request.skill)
         stopped.pop(thread_id, None)
         return {"name": name}
+
+    @router.post("/teach/{thread_id}/repeat", status_code=201)
+    async def repeat_skill(thread_id: str, request: RepeatRequest) -> ScheduleRepeatView:
+        """Make the task taught as ``name`` repeat on ``cron`` in this chat (item 666): a schedule whose runs start with
+        the skill picked and with the chat's choices. 404 for a chat or a taught task that is not there, 422 for a
+        rhythm the scheduler refuses."""
+        await ctx.runtime.store.get_thread(thread_id)
+        record: ScheduleRecord = await repeat_taught_skill(ctx.runtime, thread_id, request.name, request.cron)
+        return ScheduleRepeatView(id=record.id, name=record.name, cron=record.cron or request.cron)
 
     @router.delete("/teach/{thread_id}")
     async def discard_teaching(thread_id: str) -> JsonValue:

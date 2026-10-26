@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { loopRhythm, nextFiring } from "../../src/dotagent/server/static/js/rhythm.js";
+import { loopRhythm, nextFiring, repeatCron } from "../../src/dotagent/server/static/js/rhythm.js";
 
 test("the rhythms /loop makes read as they are written", () => {
   assert.equal(loopRhythm("*/30 * * * *"), "every 30 minutes");
@@ -46,4 +46,12 @@ test("the next firing is its time today, else its day's name and time", () => {
   // Also when it fell a moment before midnight: not "Fri 23:58", which reads as next Friday.
   const pastMidnight = new Date(2026, 9, 24, 0, 1).getTime() / 1000;
   assert.equal(nextFiring(new Date(2026, 9, 23, 23, 58).getTime() / 1000, pastMidnight), "23:58");
+});
+
+test("a taught task repeats on the cron of its rhythm, day and time, which the page says in words (item 666)", () => {
+  assert.equal(repeatCron("day", "1", "09:00"), "0 9 * * *");
+  assert.equal(repeatCron("weekdays", "1", "18:30"), "30 18 * * 1-5");
+  assert.equal(repeatCron("week", "0", "07:05"), "5 7 * * 0");
+  assert.equal(loopRhythm(repeatCron("week", "1", "09:00")), "on Mondays at 09:00");
+  assert.equal(loopRhythm(repeatCron("weekdays", "1", "18:30")), "on weekdays at 18:30");
 });

@@ -582,6 +582,9 @@ class ScheduleOptions(FrozenModel):
     stop_after_failures: int | None
     notify: NotifyLevel | None
     agent_id: str | None
+    # The skills its runs start with, as a message's picks of skills do (item 666): a task the owner taught Dot and
+    # asked it to repeat. None for every schedule before.
+    skills: tuple[str, ...] = ()
 
 
 class ScheduleRecord(FrozenModel):

@@ -145,7 +145,7 @@ async def test_the_steps_the_owner_takes_are_recorded_and_the_skill_is_saved(
     monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
     runtime = SimpleNamespace(
         router=None,
-        roles=SimpleNamespace(review=lambda: "test:review"),
+        roles=SimpleNamespace(review=lambda: "test:review", after_review=lambda: ()),
         config=SimpleNamespace(agent=SimpleNamespace(model_call_timeout_s=1.0)),
     )
     skill = await draft_taught_skill(runtime, recording, "Pay this month's invoices")

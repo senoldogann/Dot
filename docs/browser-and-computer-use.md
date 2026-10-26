@@ -316,6 +316,17 @@ by the `skill` tool to later runs like a learned one and listed under Skills, an
 in the chat, with the skill picked. No run stands behind it, so no failure retires it: whether it still fits is the
 owner's to say, and a run of its kind learns a skill of its own rather than rewriting the owner's.
 
+A saved task can do itself from then on (item 666): **Repeat it by itself**, under the skill, takes how often (every
+day, on weekdays, or every week on a day the owner picks) and a time, and **Repeat it** makes a task schedule in the
+chat it was taught in (`POST /api/teach/<chat>/repeat` with the skill's `name` and the `cron`). Its goal is the skill's
+line of what it does, it starts as a schedule a run of that chat makes (the chat's model, reasoning level, speed,
+approvals and goal mode, item 291), and every run of it starts with the taught skill picked, as Run it now's does and as
+a message with the skill picked in the composer does: the skill's instructions are in its first request. The panel then
+says when it repeats ("It repeats on Mondays at 08:30, in this chat") and leads to it on the Schedules page, where its
+row says **Taught task**, and the chat shows each run as any schedule's. The schedule keeps its skill (the `skills` of
+its options) when it is edited there, whose form has no field for it; a name that is no task the owner taught, a chat
+that is not there (404) and a rhythm the scheduler refuses (422) make nothing.
+
 A review model that is not one of the strong ones may give the steps or the parameters as one text instead of a list
 (a JSON array in a string, or a line to each step, numbered or with a bullet), or leave the parameters out (a skill with
 none): Dot reads them as the list they mean (item 543). All the steps run together in one line are no list of them. An
