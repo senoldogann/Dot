@@ -386,7 +386,8 @@
     opacity: 1;
   }
 
-  .side-chat:is(:hover, :focus-within) .side-chat-meta,
+  /* Only a chat's row gives its time to its menu; a run at work drawn as one (item 705) has no menu and keeps it. */
+  .side-chat:has(.side-more):is(:hover, :focus-within) .side-chat-meta,
   .side-chat:has(.side-more[aria-expanded="true"]) .side-chat-meta {
     visibility: hidden;
   }
@@ -878,6 +879,39 @@
   .side-loop .icon {
     animation: none;
   }
+}
+
+/* A campaign's conversation or one of its sessions (item 705): a target at the other foot of its creature, on a disc of
+   orange and pink, cut out of the row's ground as the loop's mark is, and still: a schedule's chat turns, a campaign's
+   aims. */
+.side-campaign {
+  --campaign-ring: var(--sidebar);
+  position: absolute;
+  left: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(150deg, var(--mark-orange), var(--mark-pink));
+  box-shadow:
+    0 0 0 2px var(--campaign-ring),
+    0 0 6px 1px color-mix(in oklab, var(--mark-orange) 40%, transparent);
+  color: var(--mark-on-hue);
+}
+
+.side-run[aria-current="page"] .side-campaign {
+  --campaign-ring: var(--surface);
+}
+
+.side-pick:has(.side-check:checked) .side-campaign {
+  --campaign-ring: color-mix(in srgb, var(--text) 7%, var(--sidebar));
+}
+
+.side-campaign .icon {
+  width: 10px;
+  height: 10px;
 }
 
 .side-chat-text {
