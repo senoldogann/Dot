@@ -67,7 +67,7 @@ def test_a_question_goes_where_the_mode_sends_it(
     assert route_for(Decision(verdict=verdict, source=source, reason="", rule_id=None), mode) == route
 
 
-def _verdict(decision: Literal["achieved", "continue", "blocked"], reason: str) -> GoalVerdict:
+def _verdict(decision: Literal["achieved", "continue", "blocked", "scheduled"], reason: str) -> GoalVerdict:
     return GoalVerdict(decision=decision, reason=reason, unproven_steps=())
 
 
@@ -104,6 +104,20 @@ def test_a_run_that_used_up_its_patience_fails_and_keeps_its_answer() -> None:
     assert outcome.result.startswith(ENDED.result)
     assert f"still not reached after {PATIENCE} rounds" in outcome.result
     assert "the second file is missing" in outcome.result
+
+
+def test_a_goal_whose_rest_waits_on_a_scheduled_run_ends_the_run_as_done_with_the_check_under_it() -> None:
+    """Item 675: an open-ended goal whose rest waits on replies, with a run scheduled in the chat to read them, ended
+    as failed after four rounds; it is done, and says what waits."""
+    for sent_back in (0, PATIENCE):
+        outcome: RunOutcome | SendBack = _after_verdict(
+            _verdict("scheduled", "the replies are read at 19:00"), ENDED, sent_back, PATIENCE
+        )
+        assert isinstance(outcome, RunOutcome)
+        assert outcome.status == "done"
+        assert outcome.result.startswith(ENDED.result)
+        assert "a scheduled run picks it up" in outcome.result
+        assert "the replies are read at 19:00" in outcome.result
 
 
 def test_the_conversation_of_a_run_starts_at_its_goal() -> None:

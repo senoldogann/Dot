@@ -117,6 +117,12 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
   sent back at most `goal_patience` times; after that it ends as failed and keeps its answer.
 - `blocked`: the goal cannot be reached from here (it needs you, a credential or something that does not exist). The run
   ends as failed with its answer and the reason.
+- `scheduled` (item 675): all the run can do now is done, and what is left waits on something only time brings (a reply
+  to what it sent, a payment, a site's review, a moment the goal names), which a run scheduled in the same chat picks
+  up. The run ends as done, with the check's words under its answer. The checker is shown the chat's schedules that are
+  still to run, read by Dot from its own list, not from the answer; with none, Dot takes the verdict as `continue` and
+  tells the run to schedule one with `schedule_create` or do the work now. A campaign's claim is never accepted this
+  way: its sessions are its follow-ups.
 
 A check can only ask for the original goal to be finished: it adds no work and does not clear the untrusted mark. If the
 check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event and a line in the timeline.
@@ -129,8 +135,9 @@ done (whole words such as "don't stop", "keep going", "never stop", "until it is
 kadar", "tamamlanana kadar"; not "don't stop the server", "wait until it is done" or "bitene kadar bekle"), the run is
 in goal mode whatever the switch says, and the facts under the panel's More show "On, asked not to stop". Its goal check
 is told that you asked: it accepts a finish only when every part of the goal is done and the evidence shows it, and a
-stop to report
-progress is `continue`. A delegated run and a campaign's session keep their own setting, and a resumed run, one that an
+stop to report progress is `continue`, unless what is left waits on time and a run scheduled in the chat picks it up
+(`scheduled`): work the run could do now never waits for that run. A run that ends so with no run scheduled is sent back to schedule
+one. A delegated run and a campaign's session keep their own setting, and a resumed run, one that an
 answer starts and a follow-up on the run's page keep the run's. Whatever the model, every task and research run outside
 a campaign is told to keep acting while the goal leaves work it can do, not to stop to report progress or to offer what
 the goal asks for, and to take an ask to keep going at its word. This is not **Keep going** in the composer's **Options**,

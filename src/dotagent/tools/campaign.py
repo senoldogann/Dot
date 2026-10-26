@@ -334,7 +334,7 @@ def _achieved_tool() -> RegisteredTool:
                 "ledger (setback), ask the owner with ask_user how to go on, and finish saying so in needs_from_user: "
                 "the next session waits for their answer."
             )
-        if verdict.decision == "continue":
+        if verdict.decision in ("continue", "scheduled"):
             return fail(f"Not accepted: {reason} The campaign goes on: work on what is missing.")
         accepted: str = f"The goal checker accepted the outcome: {reason}"
         await ctx.runtime.store.achieve_campaign(campaign.id, args.evidence)

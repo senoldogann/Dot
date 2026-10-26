@@ -1316,6 +1316,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         achieved: ["ok", "Goal check: the goal is reached"],
         continue: final ? stops : ["warn", `Goal check ${check} of ${patience}: not reached yet, back to work`],
         blocked: ["bad", "Goal check: nothing more can be done without you"],
+        scheduled: ["ok", "Goal check: all that can be done now is done; a scheduled run picks up the rest"],
         error: ["bad", "Goal check: the check could not run"],
       };
       const [tone, text] = lines[decision];
