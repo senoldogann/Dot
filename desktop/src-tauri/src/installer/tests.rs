@@ -49,9 +49,12 @@ impl Drop for Scratch {
     }
 }
 
-/// `uv --no-config tool install [--reinstall] --python 3.13 dotagent-macos==X`, as a stand-in: it makes the Python of
-/// the tool environment (a stand-in for the package's command, below) and the metadata folder that names the version,
-/// and fails when the test asks it to.
+/// `uv --no-config tool install [--reinstall] [--constraints FILE] --python 3.13 dotagent-macos==X`, as a stand-in: it
+/// makes the Python of the tool environment (a stand-in for the package's command, below) and the metadata folder that
+/// names the version, and fails when the test asks it to: `fail-uv` always, leaving the environment as it was;
+/// `break-uv-once` on the next call only, after it broke the environment (a download that stopped half way: the Python
+/// stand-in then fails to start until an install ends well); `conflict-with-constraints` when it is given a constraints
+/// file.
 const FAKE_UV: &str = r#"#!/bin/sh
 root=$(cd "$(dirname "$0")/.." && pwd)
 echo "uv $*" >> "$root/calls.log"
@@ -59,6 +62,26 @@ if [ -e "$root/fail-uv" ]; then
   echo "error: No solution found when resolving dependencies" >&2
   exit 1
 fi
+if [ -e "$root/break-uv-once" ]; then
+  rm "$root/break-uv-once"
+  : > "$root/broken-env"
+  echo "error: Failed to install: connection reset" >&2
+  exit 1
+fi
+case " $* " in
+  *" --constraints "*)
+    if [ -e "$root/network-down" ]; then
+      echo "error: Failed to fetch: connection reset" >&2
+      exit 1
+    fi
+    if [ -e "$root/conflict-with-constraints" ]; then
+      echo "  × No solution found when resolving dependencies:" >&2
+      echo "  ╰─▶ Because dotagent-macos==0.1.0 depends on fastapi<0.140 and you require fastapi==0.143.0, we can" >&2
+      echo "      conclude that your requirements are unsatisfiable." >&2
+      exit 1
+    fi;;
+esac
+rm -f "$root/broken-env"
 for last; do :; done
 version=${last#dotagent-macos==}
 env="$UV_TOOL_DIR/dotagent-macos"
@@ -71,8 +94,8 @@ chmod 755 "$env/bin/python"
 echo "Installed 1 executable: dotx"
 "#;
 
-/// `python -P -m dotagent setup`, `service install` and `service restart`, as a stand-in: it records what it was run
-/// with and the standard input it was given, writes what the real ones write (the config, the token, the job's
+/// `python -P -m dotagent setup`, `service install`, `service restart`, and the import of the daemon, as a stand-in: it
+/// records what it was run with and the standard input it was given, writes what the real ones write (the config, the token, the job's
 /// property list: the label, and the program arguments the real one has, Dot.app's program and this Python), and
 /// `setup` fails, with the key in what it prints, when the test asks
 /// it to. `service install` fails when the test asks: `fail-service-early` before it made anything (launchctl refused
@@ -82,6 +105,13 @@ const FAKE_PYTHON: &str = r#"#!/bin/sh
 home=$(cd "$(dirname "$0")/../../../.." && pwd)
 root=$(dirname "$home")
 echo "python $*" >> "$root/calls.log"
+if [ "$1 $2 $3" = "-P -c import dotagent.server.daemon" ]; then
+  if [ -e "$root/broken-env" ]; then
+    echo "ModuleNotFoundError: No module named 'fastapi'" >&2
+    exit 1
+  fi
+  exit 0
+fi
 if [ "$1 $2 $3" != "-P -m dotagent" ]; then
   echo "not the package's command: $*" >&2
   exit 64
@@ -1491,12 +1521,214 @@ fn an_upgrade_that_fails_says_so_and_leaves_the_marker_and_the_package_as_they_w
     ctx.version = "0.2.0".to_string();
     let words = keep_in_step(&ctx).expect_err("uv failed");
     assert!(words.contains("could not be updated to 0.2.0"), "{words}");
+    assert!(words.contains("engine is still 0.1.0"), "{words}");
     assert_eq!(installed_version(&ctx.runtime()).as_deref(), Some("0.1.0"));
     assert_eq!(
         fixture.marker().map(|marker| marker.version),
         Some("0.1.0".to_string())
     );
-    assert_eq!(fixture.calls().len(), 1, "no restart was asked for");
+    // The environment was asked whether it starts, and it did: nothing was installed again, and no restart was asked
+    // for.
+    assert_eq!(
+        fixture.calls(),
+        [
+            "uv --no-config tool install --reinstall --python 3.13 dotagent-macos==0.2.0",
+            "python -P -c import dotagent.server.daemon"
+        ]
+    );
+}
+
+/// A fixture whose install of 0.1.0 is done, with the constraints file the app carries (its path is the last of the
+/// three), and the context of the app at 0.2.0: what an upgrade that fails starts from.
+fn upgrade_after_a_failure(test: &str) -> (Fixture, Context, String) {
+    let fixture = Fixture::new(test);
+    let constraints = fixture
+        .scratch
+        .write("constraints.txt", "fastapi==0.143.0\n")
+        .display()
+        .to_string();
+    complete_install(&fixture, "0.1.0");
+    let mut ctx = fixture.ctx.clone();
+    ctx.version = "0.2.0".to_string();
+    (fixture, ctx, constraints)
+}
+
+#[test]
+fn an_upgrade_that_broke_the_environment_installs_the_older_package_again_under_the_same_constraints(
+) {
+    let (fixture, ctx, constraints) = upgrade_after_a_failure("upgrade-breaks");
+    fixture.scratch.write("break-uv-once", "");
+    let words = keep_in_step(&ctx).expect_err("uv failed");
+    assert!(words.contains("could not be updated to 0.2.0"), "{words}");
+    assert!(
+        words.contains("put back at 0.1.0, and Dot works as before"),
+        "{words}"
+    );
+    assert_eq!(
+        fixture.calls(),
+        [
+            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.2.0"),
+            "python -P -c import dotagent.server.daemon".to_string(),
+            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.1.0"),
+            "python -P -c import dotagent.server.daemon".to_string(),
+        ]
+    );
+    // The package is the one that was there, it starts, and the marker never said otherwise.
+    assert_eq!(installed_version(&ctx.runtime()).as_deref(), Some("0.1.0"));
+    assert!(!fixture.scratch.path("broken-env").exists());
+    assert_eq!(
+        fixture.marker().map(|marker| marker.version),
+        Some("0.1.0".to_string())
+    );
+    let log = fs::read_to_string(ctx.log_dir.join(LOG_FILE)).expect("the installer's log");
+    assert!(
+        log.contains("the engine does not start: installing 0.1.0 again"),
+        "{log}"
+    );
+}
+
+#[test]
+fn an_older_package_that_cannot_be_installed_under_the_constraints_is_installed_without_them() {
+    let (fixture, ctx, constraints) = upgrade_after_a_failure("upgrade-conflict");
+    fixture.scratch.write("break-uv-once", "");
+    fixture.scratch.write("conflict-with-constraints", "");
+    let words = keep_in_step(&ctx).expect_err("uv failed");
+    assert!(
+        words.contains("put back at 0.1.0, and Dot works as before"),
+        "{words}"
+    );
+    assert_eq!(
+        fixture.calls(),
+        [
+            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.2.0"),
+            "python -P -c import dotagent.server.daemon".to_string(),
+            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.1.0"),
+            "uv --no-config tool install --reinstall --python 3.13 dotagent-macos==0.1.0".to_string(),
+            "python -P -c import dotagent.server.daemon".to_string(),
+        ]
+    );
+    assert_eq!(installed_version(&ctx.runtime()).as_deref(), Some("0.1.0"));
+}
+
+#[test]
+fn a_put_back_that_failed_for_another_reason_than_the_constraints_does_not_drop_them() {
+    // The security review of item 694: only uv's word that the requirements cannot be met lifts the app's pins; a
+    // download that failed takes the newest of the day no more than the upgrade did.
+    let (fixture, ctx, constraints) = upgrade_after_a_failure("upgrade-network");
+    fixture.scratch.write("break-uv-once", "");
+    fixture.scratch.write("network-down", "");
+    let words = keep_in_step(&ctx).expect_err("uv failed");
+    assert!(
+        words.contains("0.1.0 could not be put back either"),
+        "{words}"
+    );
+    assert_eq!(
+        fixture.calls(),
+        [
+            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.2.0"),
+            "python -P -c import dotagent.server.daemon".to_string(),
+            format!("uv --no-config tool install --reinstall --constraints {constraints} --python 3.13 dotagent-macos==0.1.0"),
+        ]
+    );
+}
+
+#[test]
+fn only_a_release_version_is_handed_to_uv_to_put_back() {
+    for good in [
+        "0.1.0",
+        "1.2",
+        "0.2.0rc1",
+        "0.2.0a3",
+        "1.0.0.post2",
+        "0.3.0.dev4",
+        "2.0.0b1.dev2",
+    ] {
+        assert!(release_version(good), "{good}");
+    }
+    for bad in [
+        "",
+        "0.1.0 ; sys_platform == 'darwin'",
+        "0.1.0,!=0.0.1",
+        "latest",
+        "0.1.",
+        "0.1.0rc",
+        "v1.0",
+    ] {
+        assert!(!release_version(bad), "{bad}");
+    }
+}
+
+#[test]
+fn an_older_package_that_cannot_be_put_back_is_said_and_the_marker_is_left() {
+    let (fixture, ctx, _) = upgrade_after_a_failure("upgrade-lost");
+    // Every `uv` fails now and the environment does not start: nothing can be put back.
+    fixture.scratch.write("fail-uv", "");
+    fixture.scratch.write("broken-env", "");
+    let words = keep_in_step(&ctx).expect_err("uv failed");
+    assert!(words.contains("could not be updated to 0.2.0"), "{words}");
+    assert!(
+        words.contains("0.1.0 could not be put back either"),
+        "{words}"
+    );
+    assert_eq!(
+        fixture.marker().map(|marker| marker.version),
+        Some("0.1.0".to_string())
+    );
+    // The upgrade is tried again at the next start, since the marker still says 0.1.0.
+    assert!(keep_in_step(&ctx).is_err());
+}
+
+#[test]
+fn the_apps_constraints_are_given_to_uv_at_the_install_and_at_the_upgrade() {
+    let fixture = Fixture::new("constraints");
+    let constraints = fixture
+        .scratch
+        .write("constraints.txt", "fastapi==0.143.0\n");
+    let shared = shared_for(choice("ollama", "minimax-m2.7:cloud", None));
+    fixture.run(&shared, &|| fixture.nothing_else_is_here());
+    assert_eq!(shared.with(|inner| inner.phase), Phase::Done);
+    let path = constraints.display();
+    assert_eq!(
+        fixture.calls()[0],
+        format!(
+            "uv --no-config tool install --constraints {path} --python 3.13 dotagent-macos==0.1.0"
+        )
+    );
+    let mut ctx = fixture.ctx.clone();
+    ctx.version = "0.2.0".to_string();
+    keep_in_step(&ctx)
+        .expect("the upgrade works")
+        .expect("there was something to do");
+    assert!(fixture
+        .calls()
+        .contains(&format!(
+            "uv --no-config tool install --reinstall --constraints {path} --python 3.13 dotagent-macos==0.2.0"
+        )));
+}
+
+#[test]
+fn a_build_with_no_constraints_file_installs_as_it_always_did() {
+    // A development build has none, or the empty stand-in `build.rs` makes: no `--constraints`, at either step.
+    let scratch = Scratch::new("no-constraints");
+    let tools = Tools {
+        dir: scratch.path("resources/tools"),
+    };
+    let runtime = Runtime::of(&scratch.path("home"));
+    assert_eq!(tools.constraints(), None);
+    scratch.write("resources/constraints.txt", "");
+    assert_eq!(tools.constraints(), None);
+    scratch.write("resources/constraints.txt", "fastapi==0.143.0\n");
+    assert_eq!(
+        tools.constraints(),
+        Some(scratch.path("resources/constraints.txt"))
+    );
+    fs::remove_file(scratch.path("resources/constraints.txt")).expect("the file");
+    fs::create_dir(scratch.path("resources/constraints.txt")).expect("a folder in its place");
+    assert_eq!(tools.constraints(), None, "a folder is no file to pin by");
+    for reinstall in [false, true] {
+        assert!(!words(&uv_install(&tools, &runtime, "0.1.0", reinstall))
+            .contains(&"--constraints".to_string()));
+    }
 }
 
 // ----------------------------------------------------- what completes the install, and what the next start does with it

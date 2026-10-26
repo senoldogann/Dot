@@ -240,13 +240,30 @@ function loopWords(chat) {
   return next === null ? rhythm : `${rhythm}, next ${nextFiring(next, Date.now() / 1000)}`;
 }
 
+/** What a chat or a row at work says of its campaign (item 705), or null: the conversation of a campaign, or one of its
+ * sessions, which the Campaigns page lists. */
+const CAMPAIGN_CHAT = "A campaign's conversation";
+const CAMPAIGN_SESSION = "A session of a campaign";
+
 /** A chat's creature, with the mark of its loop at its foot (item 580): arrows that turn slowly in a glow, so that a
- * chat that asks again by itself stands out in the list. The row's name says the loop to a screen reader. */
-function loopFace(face, words) {
-  if (words === null) {
+ * chat that asks again by itself stands out in the list; and the mark of its campaign at its other foot (item 705), a
+ * target, so that a campaign's work is told from a schedule's at a glance. The row's name says both to a screen reader. */
+function loopFace(face, words, campaign = null) {
+  if (words === null && campaign === null) {
     return face;
   }
-  return el("span", { class: "side-face" }, face, el("span", { class: "side-loop", title: words, "aria-hidden": "true" }, icon("refresh")));
+  return el(
+    "span",
+    { class: "side-face" },
+    face,
+    campaign === null ? null : el("span", { class: "side-campaign", title: campaign, "aria-hidden": "true" }, icon("target")),
+    words === null ? null : el("span", { class: "side-loop", title: words, "aria-hidden": "true" }, icon("refresh")),
+  );
+}
+
+/** What a chat says of its campaign: the conversation of one (item 705), or null. A daemon from before sends none. */
+function campaignWords(chat) {
+  return chat.campaign_id === null || chat.campaign_id === undefined ? null : CAMPAIGN_CHAT;
 }
 
 /** A chat as a link: it opens on the latest run a person started on it. Its creature (`face`, item 277) stands at its
@@ -262,6 +279,7 @@ function chatLink(chat, onNavigate, face, children) {
     helperWords(children),
     chat.unread === true ? "unread" : undefined,
     loop === null ? undefined : loop.toLowerCase(),
+    campaignWords(chat)?.toLowerCase(),
   ]
     .filter((part) => part !== undefined && part !== "")
     .join(", ");
@@ -275,7 +293,7 @@ function chatLink(chat, onNavigate, face, children) {
       "aria-label": word === "" ? null : `${title} (${word})`,
       onclick: onNavigate,
     },
-    loopFace(face, loop),
+    loopFace(face, loop, campaignWords(chat)),
     chatText(chat, children),
     el(
       "span",
@@ -316,6 +334,40 @@ function activityRow(row, onNavigate, children) {
     ),
     helperFaces(children),
     row.section === "working" && row.run_id !== null && WORKING.has(row.status) ? workingSlot(row.since) : null,
+  );
+}
+
+/** A run at work that is no listed chat's (a session of a campaign after its first, a run whose chat is not listed),
+ * drawn as a chat's row is (item 705): its face, with the mark of its campaign when it is a session of one, its name
+ * over what it does, and at its right Working and for how long. Before, it was an activity row of its own shape. */
+function workRow(row, onNavigate, children) {
+  const detail = [row.channel, row.detail].filter((part) => part !== "");
+  const campaign = row.kind === "campaign" ? CAMPAIGN_SESSION : null;
+  const words = [...detail, helperWords(children)].filter((part) => part !== "").join(", ");
+  const id = row.actor_id ?? row.run_id ?? row.id;
+  const face = actorFace(id, "working", row.actor_id === null ? chatLook(id) : null);
+  const faces = helperFaces(children);
+  return el(
+    "div",
+    { class: "side-chat" },
+    el(
+      "a",
+      {
+        class: "side-run",
+        href: row.href,
+        title: clip(row.title, 240),
+        "aria-label": `${clip(row.title, 120)} (${["working", words].filter(Boolean).join(", ")})`,
+        onclick: onNavigate,
+      },
+      loopFace(face, null, campaign),
+      el(
+        "span",
+        { class: "side-chat-text" },
+        el("span", { class: "side-run-goal" }, clip(row.title, 120)),
+        faces ?? (detail.length === 0 ? null : el("span", { class: "side-chat-last" }, el("span", { class: "side-chat-words" }, detail.join(" · ")))),
+      ),
+      el("span", { class: "side-chat-meta" }, WORKING.has(row.status) ? workingSlot(row.since) : null),
+    ),
   );
 }
 
@@ -363,7 +415,7 @@ function chatPick(chat, checked, onToggle, face) {
     "label",
     { class: "side-run side-pick", title: clip(chat.title, 240) },
     box,
-    loopFace(face, loopWords(chat)),
+    loopFace(face, loopWords(chat), campaignWords(chat)),
     chatText(chat, []),
   );
 }
@@ -811,8 +863,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   // An entry of Working: a chat at work, or a row that is no chat's, each wearing the faces of the runs it delegated.
   function workingEntry(entry) {
-    const node =
-      entry.chat === null ? activityRow(entry.row, onNavigate, entry.children) : chatEntry(entry.chat, entry);
+    const node = entry.chat === null ? workRow(entry.row, onNavigate, entry.children) : chatEntry(entry.chat, entry);
     workingNodes.push({ node });
     return node;
   }

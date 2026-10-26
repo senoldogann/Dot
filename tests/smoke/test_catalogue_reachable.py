@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 import httpx
 import pytest
 
-from dotagent.mcp.catalogue import MCP_SERVICES, McpService
+from dotagent.mcp.catalogue import MCP_SERVICES, McpService, StartedPackage, package_of
 
 pytestmark = pytest.mark.internet
 
@@ -32,8 +32,6 @@ _RESOURCE_METADATA: re.Pattern[str] = re.compile(r'resource_metadata="([^"]+)"')
 # Those whose metadata names no client without a secret, yet registers one: Dot's own client registered with GitLab,
 # Miro and Heroku in item 413, and Supabase's docs say so (the catalogue's docstring).
 _NONE_UNLISTED: frozenset[str] = frozenset({"supabase", "gitlab", "miro", "heroku"})
-# A version or a range written after a package's name (``@latest``, ``@1.2``, ``==1.2``), and a scope before it.
-_PACKAGE_VERSION: re.Pattern[str] = re.compile(r"^(@?[^@=<>]+)(?:@.*|==.*|>=.*)?$")
 
 
 def _origin_and_path(url: str) -> tuple[str, str]:
@@ -87,19 +85,6 @@ def _authorization_metadata(client: httpx.Client, issuer: str) -> dict[str, obje
     raise AssertionError(f"no authorization server metadata for {issuer}: {candidates}")
 
 
-def _package(service: McpService) -> tuple[str, str]:
-    """The registry and the name of the package a service started on this Mac runs: npx's first word that is not an
-    option, uvx's ``--from`` or its first word, without the version written after it."""
-    args: list[str] = list(service.args)
-    if service.command == "uvx" and "--from" in args:
-        word: str = args[args.index("--from") + 1]
-    else:
-        word = next(arg for arg in args if not arg.startswith("-"))
-    matched: re.Match[str] | None = _PACKAGE_VERSION.match(word)
-    assert matched is not None, (service.id, word)
-    return ("npm" if service.command == "npx" else "pypi"), matched.group(1)
-
-
 @pytest.fixture(scope="module")
 def client() -> Iterator[httpx.Client]:
     with httpx.Client(timeout=30, follow_redirects=False) as opened:
@@ -134,14 +119,17 @@ def test_a_service_at_an_address_answers_as_its_entry_says(client: httpx.Client,
 def test_a_service_started_on_this_mac_names_a_package_its_registry_has(
     client: httpx.Client, service: McpService
 ) -> None:
-    registry, name = _package(service)
-    if registry == "npm":
-        answer: httpx.Response = client.get(f"https://registry.npmjs.org/{name.replace('/', '%2F')}/latest")
+    package: StartedPackage | None = package_of(service)
+    assert package is not None and package.version is not None, service.id
+    name: str = package.name
+    # The version the catalogue pins, which is what starts on this Mac (item 695), not the newest.
+    if package.registry == "npm":
+        answer: httpx.Response = client.get(f"https://registry.npmjs.org/{name.replace('/', '%2F')}/{package.version}")
         assert answer.status_code == 200, (service.id, name, answer.status_code)
         latest: dict[str, object] = answer.json()
         assert not latest.get("deprecated"), (service.id, name, latest.get("deprecated"))
         assert latest.get("bin"), (service.id, name, "no program to start")
     else:
-        answer = client.get(f"https://pypi.org/pypi/{name}/json")
-        assert answer.status_code == 200, (service.id, name, answer.status_code)
-        assert answer.json()["info"]["version"], (service.id, name)
+        answer = client.get(f"https://pypi.org/pypi/{name}/{package.version}/json")
+        assert answer.status_code == 200, (service.id, name, package.version, answer.status_code)
+        assert answer.json()["info"]["version"] == package.version, (service.id, name)

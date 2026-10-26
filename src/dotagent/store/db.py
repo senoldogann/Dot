@@ -480,6 +480,7 @@ def _summary(row: aiosqlite.Row) -> ThreadSummary:
         last_role="assistant" if answer != "" else "user",
         loop_cron=row["loop_cron"],
         loop_next_at=row["loop_next_at"],
+        campaign_id=row["campaign_id"],
         team=None
         if row["team_id"] is None
         else ChatTeam(
@@ -1219,6 +1220,8 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await connection.execute("CREATE INDEX IF NOT EXISTS threads_schedule ON threads(schedule_id)")
     # The chats of a team (item 610), which its page and its card list.
     await connection.execute("CREATE INDEX IF NOT EXISTS threads_team ON threads(team_id)")
+    # The campaign whose conversation a chat is, which the list of chats marks (item 705).
+    await connection.execute("CREATE INDEX IF NOT EXISTS campaigns_thread ON campaigns(thread_id, created_at)")
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_status ON approvals(status, created_at)")
     # The steps kept for the owner: the same one once in a chat, and the ones whose time is over (item 482).
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_kept ON approvals(digest, status)")
@@ -1953,7 +1956,9 @@ class Store:
             "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result,"
             f"  (SELECT s.cron FROM schedules AS s WHERE {_CHAT_LOOP}"
             "   ORDER BY s.next_run_at IS NULL, s.next_run_at LIMIT 1) AS loop_cron,"
-            f"  (SELECT MIN(s.next_run_at) FROM schedules AS s WHERE {_CHAT_LOOP}) AS loop_next_at"
+            f"  (SELECT MIN(s.next_run_at) FROM schedules AS s WHERE {_CHAT_LOOP}) AS loop_next_at,"
+            "  (SELECT c.id FROM campaigns AS c WHERE c.thread_id = t.id ORDER BY c.created_at DESC LIMIT 1)"
+            "   AS campaign_id"
             " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
             " JOIN runs AS latest ON latest.id = r.id LEFT JOIN teams AS team ON team.id = t.team_id"
             " ORDER BY t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?",

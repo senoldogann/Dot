@@ -106,15 +106,19 @@ def test_the_property_list_the_installer_reads_as_the_apps_own_job_is_what_the_r
 
 def test_the_app_carries_its_tools_where_the_release_script_puts_them() -> None:
     conf = json.loads((_TAURI / "tauri.conf.json").read_text(encoding="utf-8"))
-    # The three programs are named one by one, never as a glob: a file in the source folder is not in the app.
+    # The three programs and the constraints file are named one by one, never as a glob: a file in the source folder is
+    # not in the app. The constraints file lies beside the tools folder, not in it (that folder holds the three programs
+    # and nothing else), under the name the installer looks for.
     assert conf["bundle"]["resources"] == {
         "resources/tools/uv": "tools/uv",
         "resources/tools/rg": "tools/rg",
         "resources/tools/dot-launcher": "tools/dot-launcher",
+        "resources/constraints.txt": _constant("CONSTRAINTS"),
     }
     assert not any("*" in source for source in conf["bundle"]["resources"])
     build: str = (_TAURI / "build.rs").read_text(encoding="utf-8")
     assert 'const TOOLS: [&str; 3] = ["uv", "rg", "dot-launcher"];' in build
+    assert f'const CONSTRAINTS: &str = "{_constant("CONSTRAINTS")}";' in build
     fetch: str = (_DESKTOP / "fetch-tools.sh").read_text(encoding="utf-8")
     assert "out=$desktop/src-tauri/resources/tools" in fetch
     release: str = (_DESKTOP / "release.sh").read_text(encoding="utf-8")
@@ -138,6 +142,23 @@ def test_the_app_carries_its_tools_where_the_release_script_puts_them() -> None:
         assert re.fullmatch(r"[0-9a-f]{64}", line[3]) and line[4].startswith("https://"), line
         assert re.fullmatch(r"[0-9a-f]{64}", line[6]) and line[6] != line[3], line
         assert line[5].endswith(f"/{line[0]}"), line
+
+
+def test_a_release_bundles_the_versions_uv_lock_pins_and_checks_them_in_the_built_app() -> None:
+    """The app installs the package with every dependency at the version of ``uv.lock`` (item 694): the release writes
+    them into the app's Resources before the app is built and signed, and compares the built app's copy with a fresh
+    export of the lock before it is notarized."""
+    release: str = (_DESKTOP / "release.sh").read_text(encoding="utf-8")
+    made: int = release.index('constraints_to "$desktop/src-tauri/resources/constraints.txt"')
+    built: int = release.index('"$tauri" build --target universal-apple-darwin')
+    checked: int = release.index('constraints_to "$work/constraints.txt"')
+    compared: int = release.index('cmp -s "$work/constraints.txt" "$app/Contents/Resources/constraints.txt"')
+    notarized: int = release.index('notarize "$work/Dot.zip"')
+    assert made < built < checked < compared < notarized
+    # Only the runtime dependencies, from the lock as it is (a lock that pyproject.toml has moved from stops the
+    # release), and no hashes, which `uv tool install` ignores in a constraints file.
+    assert "export --locked --no-dev --no-emit-project" in release and "--no-hashes" in release
+    assert (_ROOT / "uv.lock").is_file()
 
 
 def test_a_release_publishes_the_package_before_the_app() -> None:

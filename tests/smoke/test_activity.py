@@ -249,16 +249,28 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     await expect(sidebar.locator("[data-section=waiting] .side-label")).to_have_text(
                         "Waiting for you 1"
                     )
-                    # Working holds the chat at work (item 202), and the campaign's session as a row of its own: the
-                    # session works in a thread of its own, which is not among the chats.
+                    # Working holds the chat at work (item 202), and the campaign's session, which works in a thread
+                    # of its own that is not among the chats: drawn as a chat's row is, with the mark of its campaign
+                    # at the foot of its face (item 705).
                     await expect(sidebar.locator("[data-section=working] .side-label")).to_have_text("Working 2")
-                    await expect(sidebar.locator("[data-section=working] .side-chat")).to_have_count(1)
-                    session_row = sidebar.locator("[data-section=working] > a.side-activity")
-                    await expect(session_row).to_contain_text("Find leads")
-                    await expect(session_row.locator(".avatar")).to_have_count(1)
+                    await expect(sidebar.locator("[data-section=working] .side-chat")).to_have_count(2)
+                    session_row = sidebar.locator("[data-section=working] .side-chat > a.side-run").filter(
+                        has_text="Find leads"
+                    )
+                    await expect(session_row).to_have_count(1)
+                    await expect(session_row.locator(".side-face .avatar")).to_have_count(1)
+                    await expect(session_row.locator(".side-campaign")).to_have_count(1)
+                    await expect(session_row.locator(".side-chat-meta .side-working")).to_have_count(1)
+                    # A screen reader hears what it is once; with no menu, the row keeps its clock under the pointer.
+                    session_label: str = await session_row.get_attribute("aria-label") or ""
+                    assert session_label.count("a session of the campaign") == 1, session_label
+                    await session_row.hover()
+                    await expect(session_row.locator(".side-chat-meta")).to_be_visible()
                     # The chat's row wears the face of the run it delegated, under its name (item 507), and nothing
                     # hangs under it: the row's name says how many the chat delegated.
-                    working_row = sidebar.locator("[data-section=working] .side-chat > .side-run")
+                    working_row = sidebar.locator("[data-section=working] .side-chat > .side-run").filter(
+                        has_not_text="Find leads"
+                    )
                     await expect(working_row.locator(".side-chat-helpers .side-helper .avatar")).to_have_count(1)
                     await expect(working_row.locator(".side-helper-more")).to_have_count(0)
                     await expect(sidebar.locator("[data-section=working] .side-children")).to_have_count(0)
