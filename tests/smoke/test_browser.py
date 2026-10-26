@@ -26,7 +26,7 @@ from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.render import render_page_view
 from dotagent.browser.safety import parse_element, refuse_secret_field
 from dotagent.browser.session import BrowserSession, no_runs_at_work
-from dotagent.browser.types import ActOutcome, PageView, Step, TextWait
+from dotagent.browser.types import ActOutcome, FindResult, PageView, Step, TextWait
 from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
@@ -106,6 +106,22 @@ _PAGES: dict[str, str] = {
 <button onclick="setTimeout(() => {
   document.getElementById('s').textContent = 'Order placed' }, 800)">Place order</button>
 <p id="s">Working</p>""",
+    # File fields as sites show them (item 704): one moved off the screen under an icon, one hidden in its label, one
+    # next to a button that does not open it, and two behind one button that opens the chooser of the second. Each says
+    # what it got.
+    "/upload": """<!doctype html><title>Upload</title>
+<script>function got(id) { return (e) => { document.getElementById(id).textContent =
+  [...e.target.files].map((f) => f.name).join(',') || 'none' } }</script>
+<div style="position:relative"><span aria-hidden="true" style="position:absolute;left:0;top:0">📎</span>
+<input type="file" aria-label="CV" style="position:absolute;left:-9999px" onchange="got('cv')(event)"></div>
+<p>CV: <span id="cv">none</span></p>
+<label>Attach letter<input type="file" hidden onchange="got('letter')(event)"></label>
+<div><button type="button">Attach note</button><input type="file" hidden onchange="got('note')(event)"></div>
+<p>Note: <span id="note">none</span></p>
+<p>Letter: <span id="letter">none</span></p>
+<div><input type="file" hidden><input type="file" id="second" hidden onchange="got('photo')(event)">
+<button type="button" onclick="document.getElementById('second').click()">Add photo</button></div>
+<p>Photo: <span id="photo">none</span></p>""",
     # A dialog opens 400 ms after the first click, one that says the order is placed after the second (item 698).
     "/asks": """<!doctype html><title>Asks</title>
 <button onclick="setTimeout(() => { const d = document.createElement('div'); d.setAttribute('role', 'dialog');
@@ -564,6 +580,42 @@ async def test_a_wait_for_text_that_does_not_come_fails_and_still_shows_the_page
     assert result.is_error
     assert result.untrusted  # the gate counts no failed result as a read, and this one shows the page
     assert result.text.startswith(f"The text did not appear within {wait.waited_s:.1f} s; the page now · Tab 1 of 1 · ")
+
+
+def _file(path: Path) -> Path:
+    path.write_bytes(b"%PDF-1.4")
+    return path
+
+
+async def test_files_go_into_a_hidden_file_field_and_through_the_chooser_a_button_opens(
+    browser: BrowserSession, site: str, tmp_path: Path
+) -> None:
+    """Item 704: a file field a site moved off the screen, or hid in its label, takes the files without a click (the
+    click on such a field waited eight seconds and failed); a button whose box holds two fields is clicked, and the
+    chooser it opens takes them."""
+    cv: Path = _file(tmp_path / "cv.pdf")
+    view: PageView = await browser.open_url("upload", f"{site}/upload", True)
+    # Off the screen, the field is not in the view: a search names it, as it named the ones that failed.
+    found: FindResult = await browser.find("upload", "CV", 5, True)
+    field: str = ref_of("\n".join(found.hits), "CV")
+    started: float = time.monotonic()
+    after: PageView = await browser.upload("upload", field, [str(cv)], True)
+    assert time.monotonic() - started < 3.0
+    assert "CV: cv.pdf" in after.body or "cv.pdf" in after.body, after.body
+    view = await browser.snapshot("upload", True)
+    label: re.Match[str] | None = re.search(r"\[ref=([^\]]+)\]: Attach letter", view.body)
+    assert label is not None, view.body
+    await browser.upload("upload", label.group(1), [str(cv)], True)
+    assert "Letter: cv.pdf" in (await browser.read_text("upload", None, 0, 2000)).text
+    # A field beside the button is another control's for all Dot knows: the button is clicked, opens no chooser, and
+    # the field gets nothing.
+    view = await browser.snapshot("upload", True)
+    with pytest.raises(BrowserError, match="uploading the files failed"):
+        await browser.upload("upload", ref_of(view.body, 'button "Attach note"'), [str(cv)], True)
+    assert "Note: none" in (await browser.read_text("upload", None, 0, 2000)).text
+    view = await browser.snapshot("upload", True)
+    await browser.upload("upload", ref_of(view.body, 'button "Add photo"'), [str(cv)], True)
+    assert "Photo: cv.pdf" in (await browser.read_text("upload", None, 0, 2000)).text
 
 
 async def test_a_dialog_that_opens_during_a_wait_ends_it_and_one_that_brings_the_text_is_the_text(

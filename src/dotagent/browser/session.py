@@ -3055,7 +3055,8 @@ class BrowserSession:
             raise BrowserError("there is no such tab", {"index": index, "open_tabs": len(thread.tabs)})
 
     async def upload(self, thread_id: str, ref: str, paths: Sequence[str], hide_secrets: bool) -> PageView:
-        """Click the upload control ``ref`` and give the file chooser it opens ``paths``."""
+        """Give ``paths`` to the file field of the upload control ``ref``, or to the file chooser a click on it opens
+        (:func:`upload_files`)."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             await self._enforce_landing(tab)

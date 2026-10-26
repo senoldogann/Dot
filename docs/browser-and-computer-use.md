@@ -248,6 +248,10 @@ Both modes share what follows.
   chat at work at the same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a
   link or a page that opens a new tab) is the chat's, also when you opened it that way (a middle click in a tab of
   Dot's in your Chrome). The current tab is told which closed.
+- `browser_upload` hands the files straight to the file field of the element it is given (item 704): the field
+  itself, which sites move off the screen or put under an icon (a click on such a field waited eight seconds and
+  failed), or the one file field inside it, as in a label that wraps a hidden field. Otherwise the element is clicked
+  and the file chooser it opens takes them; a field beside it is not taken, as it may be another control's.
 - With `idle_close_s` set (seconds; 0, the default, keeps it open until the daemon stops; item 454), Dot's own Chrome
   (`own`) closes, the Playwright driver with it, once nothing used it for that long: no chat's step is under way in it,
   no run at work holds tabs in it, no page is being read in it for the web tools or watched under "Dot's computer", no
