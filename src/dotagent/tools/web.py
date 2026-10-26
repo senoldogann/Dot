@@ -855,10 +855,17 @@ def _local_file(source: str, ctx: ToolContext) -> Path | None:
 
 
 def _source_flags(sources: list[str], ctx: ToolContext) -> tuple[Flag, ...]:
-    """The flags of reading the files among ``sources``. Their text goes to the fast model, so a file in a protected
-    location is a secret's, as it is for read_file."""
-    files: list[Path] = [path for path in (_local_file(source, ctx) for source in sources) if path is not None]
-    return tuple(sorted({flag for path in files for flag in read_flags(path, ctx)}))
+    """The flags of reading ``sources``: a file's are those of read_file (its text goes to the fast model, so a file in
+    a protected location is a secret's), an address's those of web_fetch (:func:`checked_address`: refused where Dot
+    does not go, and ``exfiltration`` for one that is very long or holds a key, item 679)."""
+    flags: set[Flag] = set()
+    for source in sources:
+        path: Path | None = _local_file(source, ctx)
+        if path is not None:
+            flags.update(read_flags(path, ctx))
+        else:
+            flags.update(checked_address(source, ctx.runtime.config)[1])
+    return tuple(sorted(flags))
 
 
 async def _source_text(source: str, ctx: ToolContext) -> str:
@@ -920,7 +927,8 @@ def _extract_tool() -> RegisteredTool:
         return _action(
             "web_extract",
             f"Extract {names} from {len(args.sources)} sources",
-            args.sources[0],
+            # Every source, so that a rule of the owner's reads each of them, not the first alone.
+            "\n".join(args.sources),
             _source_flags(args.sources, ctx),
         )
 
