@@ -1191,10 +1191,31 @@ async def wait_for_text_or_dialog(page: Page, text: str, timeout_ms: int) -> Tex
     return "dialog"
 
 
+async def _file_field_of(trigger: Locator) -> Locator | None:
+    """The file field the files go into for the element ``ref`` names (item 704): the element itself when it is one,
+    else the one file field inside it (a label or a box that wraps a hidden field). ``None`` otherwise, and when it
+    holds several: then the element is clicked, and the file chooser it opens takes the files. A field next to the
+    element is not taken: it may belong to another control than the one the run named."""
+    try:
+        async with asyncio.timeout(_COUNT_TIMEOUT_S):
+            if await trigger.evaluate("e => e instanceof HTMLInputElement && e.type === 'file'"):
+                return trigger
+        inside: Locator = trigger.locator("input[type=file]")
+        return inside if await _count(inside) == 1 else None
+    except TimeoutError:
+        return None
+
+
 async def upload_files(page: Page, ref: str, paths: list[str], timeout_ms: int) -> None:
-    """Click the element ``ref`` and hand the files to the file chooser it opens."""
+    """Hand the files to the file field of the element ``ref`` (:func:`_file_field_of`): straight into it, without a
+    click, since sites hide the field off the screen or under an icon and a click on it waits for nothing; else click
+    the element and hand them to the file chooser it opens."""
     trigger: Locator = await live_locator(page, ref, "upload")
     try:
+        field: Locator | None = await _file_field_of(trigger)
+        if field is not None:
+            await field.set_input_files(paths, timeout=timeout_ms)
+            return
         async with page.expect_file_chooser(timeout=timeout_ms) as chooser_info:
             await trigger.click(timeout=timeout_ms)
         chooser = await chooser_info.value
