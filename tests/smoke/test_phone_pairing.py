@@ -195,6 +195,9 @@ async def test_a_phone_key_is_its_own_and_ends_when_the_phone_is_removed(own_hom
             given: str = (await client.post("/phone/pairing", headers=signed)).json()["code"]
             assert (await client.post("/phone/pair", json={"code": given}, headers=phone)).status_code == 200
         kept: str = (await client.post("/phone/pairing", headers=signed)).json()["code"]
+        # A wrong code is told as a wrong code, full or not: it learns nothing of how many phones are paired.
+        wrong: httpx.Response = await client.post("/phone/pair", json={"code": "0000-0000"}, headers=phone)
+        assert wrong.status_code == 403 and "paired" not in wrong.json()["message"]
         full: httpx.Response = await client.post("/phone/pair", json={"code": kept}, headers=phone)
         assert full.status_code == 422 and "remove one" in full.json()["message"]
         first: str = (await client.get("/phone/phones", headers=signed)).json()["phones"][0]["id"]

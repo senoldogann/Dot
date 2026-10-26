@@ -125,10 +125,12 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
     @router.post("/phone/pair")
     async def pair(request: PairRequest, http: Request) -> PairedView:
         """A key of the phone's own (item 670), for the code that is good now; the code is used up by it. Needs no
-        token."""
+        token. The room for one more phone is asked only of the right code, which stays good when there is none: a
+        wrong one learns nothing of how many phones are paired."""
         nonlocal current
-        phones.check_room()
         outcome: Redeemed = redeem(current, request.code, time.time())
+        if outcome.matched:
+            phones.check_room()
         current = outcome.left
         if not outcome.matched:
             log.warning("phone_pairing_refused", code_left=outcome.left is not None)
