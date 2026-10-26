@@ -185,6 +185,8 @@ class TextWait(FrozenModel):
     appeared: bool
     waited_s: float
     view: PageView
+    # What ended a wait the text did not end before its time (item 698): a dialog that opened in front of the page.
+    ended_by: str | None = None
 
 
 class TextView(FrozenModel):

@@ -1162,16 +1162,32 @@ async def bring_to_front(page: Page) -> None:
         raise _failure("switching to the tab failed", page, {}, error) from error
 
 
-async def wait_for_text(page: Page, text: str, timeout_ms: int) -> bool:
-    """Whether ``text`` became visible on the page within ``timeout_ms`` (in any of its matches: an earlier hidden one,
-    such as a template or a closed menu, does not hold the wait)."""
+# The dialogs of a page that end a wait for a text when one opens during it (item 698): a cookie banner is not one,
+# since the consent handler declines it when it is in the way.
+_MODALS: str = f":is([role='dialog'], [role='alertdialog'], dialog[open], [aria-modal='true']):not({_CONSENT_BANNERS})"
+TextWaitEnd = Literal["text", "dialog", "timeout"]
+
+
+async def wait_for_text_or_dialog(page: Page, text: str, timeout_ms: int) -> TextWaitEnd:
+    """What ended a wait of at most ``timeout_ms`` for ``text`` to become visible (in any of its matches: an earlier hidden one, such as a template or a closed menu, does not hold the wait): the text, a
+    dialog that opened in front of the page while none was open when the wait began (item 698; the text would not
+    come until it is answered), or the time. A dialog that brings the text with it is the text. One wait in the page,
+    for either, so nothing is left waiting behind it."""
+    wanted: Locator = page.get_by_text(text).filter(visible=True)
+    dialogs: Locator = page.locator(_MODALS).filter(visible=True)
     try:
-        await page.get_by_text(text).filter(visible=True).first.wait_for(state="visible", timeout=timeout_ms)
+        watch_dialogs: bool = await _count(dialogs) == 0
+        target: Locator = wanted.or_(dialogs) if watch_dialogs else wanted
+        await target.first.wait_for(state="visible", timeout=timeout_ms)
+        if not watch_dialogs or await _count(wanted) > 0:
+            return "text"
     except PlaywrightTimeoutError:
-        return False
+        return "timeout"
+    except TimeoutError as error:
+        raise BrowserError("the page did not say in time what it shows", {"text": text, "url": page.url}) from error
     except PlaywrightError as error:
         raise _failure("waiting for the text failed", page, {"text": text}, error) from error
-    return True
+    return "dialog"
 
 
 async def upload_files(page: Page, ref: str, paths: list[str], timeout_ms: int) -> None:

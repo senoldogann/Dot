@@ -202,7 +202,9 @@ Both modes share what follows.
   either (item 533); a screenshot shows a page as pixels, so a cookie a script wrote into its text shows there. It takes the place of AppleScript's `execute javascript`, which lands in the front window
   of whichever Chrome macOS picks when several run (item 263).
 - `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
-  call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide.
+  call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A
+  dialog that opens in front of the page during the wait ends it at once, saying so (item 698): the text would not
+  come until the dialog is answered. A dialog that holds the text is the text appearing; a cookie banner ends no wait.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",
   and the line above the page says how many are open. A click that another element takes fails with the name of that
   element and what to do about it (close or answer the box, or press Escape). A page whose script holds it, so that it

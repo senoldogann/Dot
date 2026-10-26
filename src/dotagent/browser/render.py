@@ -120,6 +120,9 @@ def render_text_wait(wait: TextWait, nonce: str, body_budget: int) -> str:
     outcome: str = (
         f"The text appeared after {wait.waited_s:.1f} s"
         if wait.appeared
+        else f"The text has not appeared; the wait ended after {wait.waited_s:.1f} s because {wait.ended_by}: answer "
+        "it first; the page now"
+        if wait.ended_by is not None
         else f"The text did not appear within {wait.waited_s:.1f} s; the page now"
     )
     return f"{outcome} · {render_page_view(wait.view, nonce, body_budget)}"
