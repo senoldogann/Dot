@@ -4,14 +4,17 @@ the end of a run, what a database from before the switches gets, and what the mo
 import asyncio
 import re
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from types import SimpleNamespace
+from typing import Literal, cast
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from dotagent.agent.compact import drop_old_images
-from dotagent.agent.loop import RunOutcome, SendBack, _acts, _after_verdict, _since_goal
+from dotagent.agent.loop import AgentRun, RunOutcome, SendBack, _acts, _after_verdict, _follow_ups, _since_goal
 from dotagent.agent.prompt import (
     build_system_prompt,
     clock_note,
@@ -32,10 +35,11 @@ from dotagent.llm.types import ImageData, Message, ToolCall, assistant_message, 
 from dotagent.policy.engine import route_for
 from dotagent.policy.types import ApprovalMode, Decision, DecisionSource, Route
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.scheduler.plans import UNSET_OPTIONS
 from dotagent.server import UI_SOURCE
 from dotagent.skills.types import Skill
 from dotagent.store.db import Store
-from dotagent.store.models import RunMode, RunRecord
+from dotagent.store.models import RunMode, RunRecord, ScheduleOptions
 from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
@@ -118,6 +122,44 @@ def test_a_goal_whose_rest_waits_on_a_scheduled_run_ends_the_run_as_done_with_th
         assert outcome.result.startswith(ENDED.result)
         assert "a scheduled run picks it up" in outcome.result
         assert "the replies are read at 19:00" in outcome.result
+
+
+async def test_the_follow_ups_of_a_run_are_the_schedules_still_to_run_in_its_own_chat(tmp_path: Path) -> None:
+    """Item 675: the goal check is shown only the schedules whose next run goes on in the run's chat, each with its
+    goal; one whose runs open a chat of their own is left out, even when its last run was in this chat."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "images")
+    try:
+        later: float = time.time() + 3600
+        here: ScheduleOptions = UNSET_OPTIONS.model_copy(update={"same_chat": True})
+        elsewhere: ScheduleOptions = UNSET_OPTIONS.model_copy(update={"same_chat": False})
+        for name, next_run_at, options, thread_id, enabled in (
+            ("Read the replies", later, here, "thr_this", True),
+            ("Own chat", later, elsewhere, "thr_this", True),
+            ("As configured", later, UNSET_OPTIONS, "thr_this", True),
+            ("Other chat", later, here, "thr_other", True),
+            ("Switched off", later, here, "thr_this", False),
+            ("Gone by", time.time() - 60, here, "thr_this", True),
+        ):
+            await store.add_schedule(
+                name, None, next_run_at, f"{name}: the goal.", "task", next_run_at, options, thread_id, enabled
+            )
+        agent: AgentRun = cast(
+            AgentRun,
+            SimpleNamespace(
+                runtime=SimpleNamespace(
+                    store=store,
+                    schedule_zone=ZoneInfo("UTC"),
+                    config=SimpleNamespace(scheduler=SimpleNamespace(same_chat=False)),
+                ),
+                run=SimpleNamespace(thread_id="thr_this"),
+            ),
+        )
+        listed: list[str] = (await _follow_ups(agent)).splitlines()
+    finally:
+        await store.close()
+    assert len(listed) == 1, listed
+    assert listed[0].startswith("- Read the replies: next run ")
+    assert listed[0].endswith("its goal: Read the replies: the goal.")
 
 
 def test_the_conversation_of_a_run_starts_at_its_goal() -> None:
