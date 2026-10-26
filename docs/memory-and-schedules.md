@@ -314,10 +314,14 @@ earlier runs.
   reads first when it was due and when it starts. One whose run could not start stays due and is tried again a minute
   later, then after twice as long each time, an hour at the most. One whose firing a crash cut before its run was under
   way is due again at the time it fired once the scheduler starts, unless its run had been made (item 386).
-- The scheduler goes on past a failure: the schedules, the campaigns and the nightly reflection are each looked at on
-  their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick tries again. Only
-  20 failed ticks in a row (five minutes at the default `tick_s`) end the scheduler, and the daemon with it, with an
-  error, so that schedules never stop firing unseen; the service that `dotx service install` sets up starts it again.
+- The scheduler goes on past a failure: the schedules, the campaigns, the nightly reflection and the harness's step are
+  each looked at on their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick
+  tries again. Only 20 ticks in a row in which the part that fires schedules or the part that starts a campaign's
+  sessions failed (five minutes at the default `tick_s`) end the scheduler, and the daemon with it, with an error, so
+  that schedules never stop firing unseen; the service that `dotx service install` sets up starts it again. The other
+  parts (the reflection, the harness's step, the record of how learning fares) are logged at every tick they fail, by
+  name, and never end it: a record of them that cannot be read does not restart the daemon and mark every long run
+  interrupted (item 688).
 - A repeating schedule whose runs end failed so many times in a row is switched off, says so as its status ("switched
   off: its last 3 tasks failed") and tells you once (item 458): **Switch off after** in its form (3, 5, 10, 20, never),
   else `[scheduler] stop_after_failures` (0, never, by default). Its row says how many failed in a row. A run done sets
