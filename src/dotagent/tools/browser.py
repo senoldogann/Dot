@@ -1034,6 +1034,17 @@ def _fill_login_tool() -> RegisteredTool:
     async def run(args: FillLoginArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         login: LoginChoice = await _login(ctx, args.login)
         parts: list[tuple[VaultFieldKind, str]] = _parts(args)
+        fresh: PageView | None = await ctx.browser.fresh_for_login(
+            ctx.thread_id, lambda address: fills_on(address, login.websites), [kind for kind, _ in parts]
+        )
+        if fresh is not None:
+            # The refs the model gave are of a page that is gone (item 697): nothing is read or filled yet.
+            reset: str = (
+                "Nothing was filled yet: a script of this run had run in this chat's tabs, so Dot closed them and "
+                "opened this page again in a new tab, where none ran. Call browser_fill_login again with the refs of "
+                "the fields below."
+            )
+            return mark_untrusted(ok(f"{reset}\n{render_page_view(fresh, _nonce(), _body_budget(ctx))}"))
         secret: LoginSecret = await _login_secret(ctx, login, any(kind == "otp" for kind, _ in parts))
         fills: list[VaultFill] = [
             VaultFill(ref=ref, kind=kind, value=_value(secret, kind, login)) for kind, ref in parts
@@ -1055,7 +1066,8 @@ def _fill_login_tool() -> RegisteredTool:
             "Fill a login of the owner's 1Password or of their own vault into the current page: give the login "
             "(browser_logins lists them) and the refs of its fields: the username's, the password field's, the "
             "one-time code's (1Password only). Dot reads the values and types them itself; you never see them. It "
-            "fills a login only on its own website, a password only into a password field. " + _REF_HELP
+            "fills a login only on its own website, a password only into a password field. After a script ran in "
+            "this chat it reopens the page in a clean tab first; then fill again with its refs. " + _REF_HELP
         ),
         args_model=FillLoginArgs,
         modes=ACTING_MODES,

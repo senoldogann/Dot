@@ -6,6 +6,7 @@ A real headless Chrome drives pages served by a local fixture server.
 """
 
 import asyncio
+import re
 import threading
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,9 +14,12 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from playwright.async_api import Page
 
+from dotagent.browser.pages import Tab
+from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession
-from dotagent.browser.types import PageView
+from dotagent.browser.types import PageView, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -27,7 +31,9 @@ _IDLE_S: float = 0.3
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         name: str = self.path.strip("/") or "home"
-        body: bytes = f"<!doctype html><title>{name}</title><h1>{name}</h1>".encode()
+        # A page with a button that opens another in a tab of its own.
+        opens: str = "<button onclick=\"window.open('/popped')\">Open</button>" if name == "opens" else ""
+        body: bytes = f"<!doctype html><title>{name}</title><h1>{name}</h1>{opens}".encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -170,3 +176,40 @@ async def test_closing_the_other_tabs_leaves_the_current_one_and_a_tab_no_chat_o
     finally:
         await owners.close()
         await browser.release_thread("closer")
+
+
+async def test_a_popup_on_its_way_while_the_tabs_are_made_new_for_a_login_does_not_join_the_clean_chat(
+    browser: BrowserSession, site: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 697, from the security review: a tab a page opened is taken into its chat once registered. When the chat's
+    tabs are made new for a login meanwhile (a script ran in them), the popup, which that script may have reached, is
+    not taken into the chat that is clean now: it closes, as its opener did."""
+    view: PageView = await browser.open_url("racy", f"{site}/opens", True)
+    await browser.run_script("racy", "1 + 1", 5.0, True)
+    registering = browser._register
+    reset: list[PageView | None] = []
+    done: asyncio.Event = asyncio.Event()
+    popups: list[Page] = []
+
+    async def slowly(tab: Tab) -> None:
+        if not popups:
+            # The chat's tabs are made new while the popup is still being registered.
+            popups.append(tab.page)
+            await asyncio.sleep(1.2)
+            reset.append(await browser.fresh_for_login("racy", lambda address: True, ["username"]))
+            await registering(tab)
+            done.set()
+            return
+        await registering(tab)
+
+    monkeypatch.setattr(browser, "_register", slowly)
+    button: str = re.search(r'button "Open" \[ref=([^\]]+)\]', view.body).group(1)  # type: ignore[union-attr]
+    await browser.act("racy", [Step(action="click", ref=button)], False, refuse_secret_field, True)
+    await asyncio.wait_for(done.wait(), 10)
+    await asyncio.sleep(0.3)
+    after: PageView = await browser.snapshot("racy", True)
+    try:
+        assert [tab.title for tab in after.tabs] == ["opens"]
+        assert reset[0] is not None and popups[0].is_closed()
+    finally:
+        await browser.release_thread("racy")

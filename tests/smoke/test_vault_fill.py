@@ -345,19 +345,23 @@ async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_ge
     with pytest.raises(BrowserError, match="in a frame of another site"):
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["frame"]})
     # A script of the run ran in the page: it may have left a listener that copies what is typed, in its page or in a
-    # tab it opened, so no tab of the chat gets a login until none of them is open.
+    # tab it opened, so no tab of the chat gets a login while one of them is open. The fill makes them new itself
+    # (item 697): every tab of the chat closes, the page opens again in a new tab, and nothing is filled until the
+    # run fills again with the refs of that page.
+    await _call(ctx, gate, "browser_new_tab", {"url": f"http://127.0.0.1:{site.port}/login"})
     await _call(ctx, gate, "browser_eval", {"script": "1 + 1"})
-    with pytest.raises(BrowserError, match="Dot fills a login only where none ran"):
-        await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["pass"]})
-    opened: ToolResult = await _call(ctx, gate, "browser_new_tab", {"url": f"http://127.0.0.1:{site.port}/login"})
-    fresh: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', opened.text)
-    assert fresh is not None, opened.text
-    with pytest.raises(BrowserError, match="Dot fills a login only where none ran"):
-        await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": fresh.group(1)})
-    await _call(ctx, gate, "browser_close_tab", {"index": 2})
-    await _call(ctx, gate, "browser_close_tab", {"index": 1})
-    again: dict[str, str] = await _form(ctx, gate, site)
-    filled: ToolResult = await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": again["pass"]})
+    # A fill that would be refused on that page anyway closes no tab first.
+    with pytest.raises(BrowserError, match="not one of the sites the fill was asked for"):
+        await ctx.browser.fresh_for_login(ctx.thread_id, lambda address: False, ["password"])
+    assert len((await ctx.browser.snapshot(ctx.thread_id, True)).tabs) == 2
+    reset: ToolResult = await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["pass"]})
+    assert reset.text.startswith("Nothing was filled yet"), reset.text
+    assert "Tab 1 of 1" in reset.text and "closed them and opened this page again" in reset.text, reset.text
+    _unseen(reset.text)
+    fresh: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', reset.text)
+    assert fresh is not None, reset.text
+    filled: ToolResult = await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": fresh.group(1)})
+    assert filled.text.startswith("Filled the password"), filled.text
     _unseen(filled.text)
     # A form that sends what is typed in the page's address gets no password: the address would hold it.
     shown: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/get-login"})

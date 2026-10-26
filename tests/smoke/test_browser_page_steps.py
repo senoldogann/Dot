@@ -98,6 +98,9 @@ class _Browser:
     async def upload(self, thread_id: str, ref: str, paths: Sequence[str], hide: bool) -> PageView:
         return _view()
 
+    async def fresh_for_login(self, thread_id: str, fills_on: object, kinds: object) -> PageView | None:
+        return None  # no script ran in the chat's tabs
+
     async def fill_from_vault(self, thread_id: str, fills: object, allowed: object) -> PageView:
         return _view()
 

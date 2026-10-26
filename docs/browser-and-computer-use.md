@@ -220,8 +220,11 @@ Both modes share what follows.
   a field names that field. A form with no method is a form that sends by GET, to a browser, and gets no password. It
   fills only on the login's own site, never a password or a code in your own
   Chrome (`attach`: that Chrome's requests are not held, so nothing would keep a value out of an address), and not in a
-  chat in which a script (`browser_eval`) ran in a tab that is still open; once it filled one, no script runs in the
-  chat's tabs while that tab is open. [Safety](safety.md#safety) has the whole of it. Outside `yolo` the run never reads
+  chat in which a script (`browser_eval`) ran in a tab that is still open: there the fill first closes every tab of the
+  chat and opens the page again in a new tab, with no history, and asks the run to fill again with that page's refs
+  (item 697; outside `yolo` you are asked for each of the two calls, the first of which fills nothing); once it filled
+  one, no script runs in the chat's tabs while that tab is open. [Safety](safety.md#safety) has the whole of it.
+  Outside `yolo` the run never reads
   such a field's value either: the page's lines show `[hidden]` and a screenshot covers the field (item 467). A
   `<select>` that takes a card's expiry (`autocomplete="cc-exp-month"` or `cc-exp-year`) is one of those fields (item
   554). Cookie banners are declined (`decline_cookie_banners`; a click on a banner that goes away under it is no
