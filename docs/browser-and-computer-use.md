@@ -442,6 +442,9 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
   Vision from the picture the model is shown (what is painted black is not read), each with the x, y of its centre
   that `desktop_act` takes (item 701, `read_screen_text`; 50 ms a screen once warm): a window that shows nothing to
   accessibility can be read and clicked by a model that sees no image.
+- When a run that acted on the desktop ends, the application that was in front before its first act comes forward
+  again, if the one the run left in front still is (item 702, `give_front_back`): not when you went to another
+  application meanwhile, not when it quit, and not while another run acts on the desktop.
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields outside `yolo`, where the step is the user's; in `yolo` the run types the field itself (item 443),
   and a step the review sees take a credential keeps that reason in its record (item 429, see

@@ -318,6 +318,20 @@ def _switch_job(config: DesktopConfig, env: StepEnv, state: ThreadDesktop, app: 
     )
 
 
+@dataclass(slots=True)
+class _Front:
+    before: int | None
+    left: int | None = None
+
+
+def _front_or_none() -> int | None:
+    """The application in front, or ``None`` when that cannot be told (worker thread)."""
+    try:
+        return apps.frontmost_pid()
+    except DesktopError:
+        return None
+
+
 class DesktopSession:
     """Looks at and controls the Mac's desktop for the conversation threads of one run."""
 
@@ -343,6 +357,10 @@ class DesktopSession:
         # The command line of each terminal application, by name, as far as Dot typed it since the line was last
         # empty; a terminal whose line cannot be told is not in it, so Return there runs code that is not judged.
         self._lines: dict[str, str] = {}
+        # By chat whose run acts on the desktop (item 702): the application in front before its first act, and the
+        # one its last act left in front. The end of the run gives the front back to the first while the second is
+        # still there.
+        self._fronts: dict[str, _Front] = {}
 
     async def _call[T](self, work: Callable[[], T]) -> T:
         return await asyncio.get_running_loop().run_in_executor(self._pool, work)
@@ -651,7 +669,11 @@ class DesktopSession:
         (item 418)."""
         async with self._turn():
             await self._prepare(self._prepare_acting)
-            opened, fresh = await self._call(lambda: _open_job(self._config, query, self._browser_chrome(), bundle))
+            await self._note_front_before(thread_id)
+            try:
+                opened, fresh = await self._call(lambda: _open_job(self._config, query, self._browser_chrome(), bundle))
+            finally:
+                await self._note_front_left(thread_id)
             _refuse_secrets(opened)
             _log.info("app_opened", app=opened.name, pid=opened.pid, fresh=fresh)
             state: ThreadDesktop = memory.targeting(self._thread(thread_id), opened.pid)
@@ -788,6 +810,7 @@ class DesktopSession:
         fails and stops the batch."""
         async with self._turn():
             await self._prepare(self._prepare_acting)
+            await self._note_front_before(thread_id)
             state: ThreadDesktop = self._thread(thread_id)
             env: StepEnv = await self._call(partial(self._open_env, state, app, steps, secure_field))
             _log.info("desktop_act", thread=thread_id, app=env.app.name, steps=len(steps))
@@ -799,6 +822,7 @@ class DesktopSession:
                 )
             view, note, updated = await self._closing_view(batch.state, batch.env.app, max_chars)
             self._remember(thread_id, updated)
+            await self._note_front_left(thread_id)
             return ActOutcome(steps=batch.reports, stopped=batch.stopped, view=view, view_note=note)
 
     async def preview(self, thread_id: str, app: str | None, steps: Sequence[Step]) -> tuple[StepContext, ...]:
@@ -806,6 +830,47 @@ class DesktopSession:
         async with self._turn():
             await self._prepare(self._prepare_listing)
             return await self._call(partial(self._preview_in_worker, self._thread(thread_id), app, steps, self._lines))
+
+    # -- giving the front back ------------------------------------------------------------------------------------
+
+    async def _note_front_before(self, thread_id: str) -> None:
+        if self._config.give_front_back and thread_id not in self._fronts:
+            self._fronts[thread_id] = _Front(before=await self._call(_front_or_none))
+
+    async def _note_front_left(self, thread_id: str) -> None:
+        front: _Front | None = self._fronts.get(thread_id)
+        if front is not None:
+            front.left = await self._call(_front_or_none)
+
+    def _give_front_job(self, front: _Front) -> str | None:
+        """Bring ``front.before`` forward again when the application the run left in front still is (worker thread);
+        return its name, or ``None`` when nothing was done."""
+        now: int | None = _front_or_none()
+        if front.before is None or front.left is None or now != front.left or now == front.before:
+            return None
+        previous: AppInfo | None = next((app for app in apps.list_apps() if app.pid == front.before), None)
+        if previous is None:
+            return None
+        apps.activate(previous, self._config.activate_timeout_s)
+        return previous.name
+
+    async def end_of_run(self, thread_id: str) -> None:
+        """Give the front of the Mac back once a run that acted on the desktop has ended (item 702): the application
+        that was in front before its first act comes forward again, when the one its last act left in front is still
+        there. Nothing is done when the owner went to another application meanwhile, when that application has quit,
+        while another run's acts on the desktop are under way (it would be pulled from under them), or while a batch
+        waits for the owner's answer. A failure is logged; the run has ended all the same."""
+        front: _Front | None = self._fronts.pop(thread_id, None)
+        if front is None or self._fronts or self._lock.locked():
+            return
+        try:
+            async with self._turn():
+                name: str | None = await self._call(partial(self._give_front_job, front))
+        except DesktopError as error:
+            _log.info("desktop_front_not_given_back", thread=thread_id, error=error.message)
+            return
+        if name is not None:
+            _log.info("desktop_front_given_back", thread=thread_id, app=name)
 
     # -- closing ---------------------------------------------------------------------------------------------------
 

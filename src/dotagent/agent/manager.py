@@ -2777,6 +2777,8 @@ class RunManager:
             # The tabs the run left (item 696): a helper's chat closes them all, another keeps its current one for a
             # message that goes on from it. Before the queue moves on, so that the chat's next run starts tidy.
             await runtime.browsers.end_of_run(run.thread_id, helper=run.parent_run_id is not None)
+            # And the front of the Mac goes back to the application the run took it from (item 702).
+            await runtime.desktop.end_of_run(run.thread_id)
         runtime.browsers.unattended(run.thread_id, False)
         if recorded and not self._stopping:
             # Nothing awaits a run's task: a queue that cannot be moved on is logged here and stays as it was.
