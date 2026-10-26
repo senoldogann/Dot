@@ -82,6 +82,8 @@ async def test_twenty_phones_at_most(tmp_path: Path) -> None:
     for _ in range(MAX_PHONES):
         await phones.pair(None, 1000.0)
     with pytest.raises(ConfigError, match="remove one in Settings › Phone"):
+        phones.check_room()
+    with pytest.raises(ConfigError, match="remove one in Settings › Phone"):
         await phones.pair(None, 1000.0)
     assert len(phones.listed()) == MAX_PHONES
 

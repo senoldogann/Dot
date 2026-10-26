@@ -190,6 +190,17 @@ async def test_a_phone_key_is_its_own_and_ends_when_the_phone_is_removed(own_hom
         assert (await client.delete(f"/phone/phones/{phone_id}", headers=signed)).status_code == 404
         assert (await client.get("/phone/phones", headers=signed)).json()["phones"] == []
 
+        # Twenty phones at most: the twenty-first pairing is refused and its code stays good for after a removal.
+        for _ in range(20):
+            given: str = (await client.post("/phone/pairing", headers=signed)).json()["code"]
+            assert (await client.post("/phone/pair", json={"code": given}, headers=phone)).status_code == 200
+        kept: str = (await client.post("/phone/pairing", headers=signed)).json()["code"]
+        full: httpx.Response = await client.post("/phone/pair", json={"code": kept}, headers=phone)
+        assert full.status_code == 422 and "remove one" in full.json()["message"]
+        first: str = (await client.get("/phone/phones", headers=signed)).json()["phones"][0]["id"]
+        assert (await client.delete(f"/phone/phones/{first}", headers=signed)).status_code == 204
+        assert (await client.post("/phone/pair", json={"code": kept}, headers=phone)).status_code == 200
+
 
 async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["light", "dark"]], shots: Path) -> None:
     width, scheme = size

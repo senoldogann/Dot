@@ -142,14 +142,19 @@ class PairedPhones:
             event.set()
         return event
 
+    def check_room(self) -> None:
+        """Raise when ``MAX_PHONES`` hold a key already: asked before a code is used up, so that a refused pairing
+        leaves its code good."""
+        if len(self._phones) >= MAX_PHONES:
+            raise ConfigError(
+                f"{MAX_PHONES} phones are paired already: remove one in Settings › Phone on your Mac first",
+                {"phones": len(self._phones)},
+            )
+
     async def pair(self, user_agent: str | None, now: float) -> tuple[Phone, str]:
         """A new phone and its key; raises when ``MAX_PHONES`` hold one already."""
         async with self._lock:
-            if len(self._phones) >= MAX_PHONES:
-                raise ConfigError(
-                    f"{MAX_PHONES} phones are paired already: remove one in Settings › Phone on your Mac first",
-                    {"phones": len(self._phones)},
-                )
+            self.check_room()
             phone_id: str = secrets.token_hex(_ID_BYTES)
             while phone_id in self._phones:
                 phone_id = secrets.token_hex(_ID_BYTES)

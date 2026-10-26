@@ -178,7 +178,9 @@ goes, so the screen sends nothing that cannot be a code: a token pasted into the
 code is as good as a key while it lasts: whoever reads it and reaches the port first is let in, so it is asked for when
 the phone is at hand, and a phone that the code then refuses means that someone else used it. `POST /api/phone/pairing`
 gives a code, `GET /api/phone` the addresses. Neither the code nor a key is logged. Twenty phones at most hold a key;
-the twenty-first pairing is refused until one is removed. The phone reaches Dot while the Mac is on and awake.
+the twenty-first pairing is refused until one is removed, and its code stays good. A `phones.json` the daemon cannot
+read keeps it from starting, and says so: a fault is never taken for no phones, which would pass for a removal; deleting
+the file unpairs every phone. The phone reaches Dot while the Mac is on and awake.
 
 Until it is removed, a phone's key is as strong as the Mac's own key, but for the ways into Dot: it cannot make a
 sign-in code, nor see or remove the paired phones, nor switch the iMessage channel or pair or remove a number of it

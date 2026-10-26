@@ -127,6 +127,7 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         """A key of the phone's own (item 670), for the code that is good now; the code is used up by it. Needs no
         token."""
         nonlocal current
+        phones.check_room()
         outcome: Redeemed = redeem(current, request.code, time.time())
         current = outcome.left
         if not outcome.matched:
