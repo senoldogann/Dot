@@ -124,6 +124,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "finish",
         "ask_user",
         "notify",
+        "react",
         "update_plan",
         "mark_plan_step",
         "use_tools",

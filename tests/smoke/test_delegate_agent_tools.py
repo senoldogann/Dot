@@ -30,7 +30,7 @@ INSTRUCTIONS: str = "Only read; never act on the Mac."
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 # What the agent is bound to, and what a bound run has besides: finishing, asking the owner, turning tool groups on.
 _BOUND: frozenset[str] = frozenset({"read_file", "delegate"})
-_CORE: frozenset[str] = frozenset({"finish", "ask_user", "use_tools"})
+_CORE: frozenset[str] = frozenset({"finish", "ask_user", "use_tools", "react"})
 
 
 def _call(tool: str, **arguments: str | bool) -> ScriptedTurn:
@@ -99,6 +99,8 @@ async def test_the_helper_of_an_agents_run_has_the_tools_the_agent_is_bound_to_a
         assert _offered(parent_request) <= _BOUND | _CORE and {"read_file", "delegate"} <= _offered(parent_request)
         assert "read_file" in _offered(helper_request)
         assert _offered(helper_request) <= _BOUND | _CORE, sorted(_offered(helper_request) - _BOUND - _CORE)
+        # A helper was sent no message of the owner's: it has nothing to react to (item 664).
+        assert "react" in _offered(parent_request) and "react" not in _offered(helper_request)
         assert "shell" not in _offered(helper_request) and "write_file" not in _offered(helper_request)
         # It works as the agent's helper: the agent's id and instructions, a delegation's source.
         helpers: list[RunRecord] = [

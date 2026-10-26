@@ -14,7 +14,7 @@ from dotagent.server.routes_agents import changed_agent_tools, new_agent_tools
 from dotagent.server.views import AgentRequest
 from dotagent.store.db import Store
 from dotagent.store.models import AgentLook, AgentRecord, RunRecord, ThreadRecord
-from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, REACT_TOOL, USE_TOOLS_TOOL
 
 
 def _prompt(agent: AgentBrief | None) -> str:
@@ -66,8 +66,9 @@ def test_the_prompt_opens_in_the_agents_voice_and_carries_the_owners_instruction
     assert "The owner's instructions" not in made
 
 
-def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_and_turn_groups_on() -> None:
-    assert set(AGENT_CORE_TOOLS) == {FINISH_TOOL, ASK_USER_TOOL, USE_TOOLS_TOOL}
+def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_react_and_turn_groups_on() -> None:
+    # An agent reacts to the owner's message as Dot does (item 664).
+    assert set(AGENT_CORE_TOOLS) == {FINISH_TOOL, ASK_USER_TOOL, USE_TOOLS_TOOL, REACT_TOOL}
 
 
 async def test_the_store_keeps_agents_and_their_runs_and_a_deleted_agents_runs_become_dots(tmp_path: Path) -> None:

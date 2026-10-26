@@ -4984,6 +4984,46 @@ dialog.modal.versions-dialog {
   background: var(--surface-3);
 }
 
+/* Dot's reaction on your message (item 664): a round badge on the bubble's lower left corner, as a chat shows one, away
+   from the foot at the right; it pops in once, and stands still under reduced motion. */
+.bubble.user:has(.dot-reaction) {
+  position: relative;
+}
+
+.dot-reaction {
+  position: absolute;
+  bottom: -10px;
+  left: -10px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: var(--text-xs);
+  box-shadow: var(--shadow-raised);
+  animation: dot-reaction-in var(--motion-base) var(--ease) both;
+}
+
+@keyframes dot-reaction-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-reaction {
+    animation: none;
+  }
+}
+
 /* Under your message, at the bubble's right edge (item 205): when it was sent, a copy of it and a way to send it again,
    as quiet as the answer's foot. A turn at work keeps them back until its answer is in. */
 .user-message {

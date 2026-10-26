@@ -67,6 +67,24 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
   );
 }
 
+// What each reaction of Dot's on a message of yours says, for its tooltip and a screen reader (item 664).
+const DOT_REACTION_WORDS = { "👍": "understood", "👀": "looking into it" };
+
+/** Dot's reaction `reaction` on the message `message` (a `userMessage`, item 664): a small round badge on the corner of
+ * its bubble, as a chat shows one. A second one takes the first one's place. Its name says what it means, the same on
+ * the run's page and on an earlier turn, whose agent the page may not know by name. */
+export function showDotReaction(message, reaction) {
+  const words = DOT_REACTION_WORDS[reaction];
+  if (words === undefined) {
+    return;
+  }
+  const label = `Reacted ${reaction}: ${words}`;
+  const badge = el("span", { class: "dot-reaction", role: "img", "aria-label": label, title: label }, reaction);
+  const bubble = message.querySelector(".bubble.user");
+  message.querySelector(".dot-reaction")?.remove();
+  bubble?.append(badge);
+}
+
 /** The files that came with the message `message` (a `userMessage`), once they are known: its pictures over its bubble,
  * the other files over its foot. */
 export function showMessageFiles(message, files) {

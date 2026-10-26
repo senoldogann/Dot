@@ -5,7 +5,7 @@ import { api, query } from "./api.js";
 import { el, plural, repeatsAnswer } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
-import { answerMessage, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+import { answerMessage, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
@@ -23,6 +23,8 @@ const EVENTS_PAGE = 2000;
 // Whether the browser keeps the reader's place itself when something above it grows (CSS scroll anchoring).
 const ANCHORS = CSS.supports("overflow-anchor", "auto");
 const FINISH_TOOL = "finish";
+// The calls whose row shows only once they are refused, as on the run's own page: a finish, and a reaction (item 664).
+const QUIET_TOOLS = new Set([FINISH_TOOL, "react"]);
 // A long conversation shows its latest turns and says how many it leaves out.
 const SHOWN_TURNS = 40;
 const FINISHED = new Set(["done", "failed", "cancelled"]);
@@ -151,6 +153,15 @@ function flowNotShown(past, flow, error) {
   flow.hidden = false;
 }
 
+/** A message you sent a turn while it worked, with the reaction `reaction` Dot put on it (null for none). */
+function steerMessage(block, reaction) {
+  const message = userMessage({ text: block.steer.text, sentAt: block.steer.sentAt, files: block.steer.files, editFromHere: null });
+  if (reaction !== null) {
+    showDotReaction(message, reaction);
+  }
+  return message;
+}
+
 /** What a run said and ran, in the order it happened (item 374): its words, the calls of the stretch that followed,
  * its words again — the answer itself is the turn's message, so a line that only repeats it is left out. `events`
  * are all its events, so a call without a result was cut off. The files and picks its message came with go under
@@ -181,6 +192,9 @@ function drawFlow(past, flow, asked, events, reactions) {
   let picks = null;
   // The replies the run's answer restates, by their steps, as its end names them (item 620).
   const restated = new Set(events.find((event) => event.kind === "run_finished")?.data.restated ?? []);
+  // Dot's reaction (item 664) stands on the latest message of yours when it came: the turn's own, or a steer since.
+  let reaction = null;
+  let reactedTo = null;
   for (const event of events) {
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
@@ -208,11 +222,14 @@ function drawFlow(past, flow, asked, events, reactions) {
             ? { kept: event.data.text }
             : { steer: { text: event.data.text, files: event.data.files ?? [], sentAt: event.ts } },
       );
+    } else if (event.kind === "dot_reaction") {
+      reaction = event.data.reaction;
+      reactedTo = [...blocks].reverse().find((block) => block.steer !== undefined) ?? null;
     } else if (event.kind === "page_shown") {
       // A page the run showed (`show_page`, item 193) stands where it came, in its frame, as on the run's own page.
       batch = null;
       blocks.push({ page: { id: event.data.page_id, title: event.data.title } });
-    } else if (event.kind === "tool_call" && event.data.tool === FINISH_TOOL) {
+    } else if (event.kind === "tool_call" && QUIET_TOOLS.has(event.data.tool)) {
       finishing.set(event.data.call_id, event.data.args);
     } else if (event.kind === "tool_call") {
       open.set(event.data.call_id, place(event.data.tool, event.data.args));
@@ -223,7 +240,7 @@ function drawFlow(past, flow, asked, events, reactions) {
         if (event.data.ok) {
           continue;
         }
-        open.set(event.data.call_id, place(FINISH_TOOL, refused));
+        open.set(event.data.call_id, place(event.data.tool ?? FINISH_TOOL, refused));
       }
       const entry = open.get(event.data.call_id);
       if (entry !== undefined) {
@@ -244,7 +261,7 @@ function drawFlow(past, flow, asked, events, reactions) {
     block.page !== undefined
       ? pageCard(block.page.id, block.page.title)
       : block.steer !== undefined
-      ? userMessage({ text: block.steer.text, sentAt: block.steer.sentAt, files: block.steer.files, editFromHere: null })
+      ? steerMessage(block, block === reactedTo ? reaction : null)
       : block.kept !== undefined
       ? el("div", { class: "note" }, icon("hand"), el("span", null, block.kept))
       : block.say === undefined
@@ -257,6 +274,9 @@ function drawFlow(past, flow, asked, events, reactions) {
     }
     if (picks !== null) {
       showMessagePicks(message, picks);
+    }
+    if (reaction !== null && reactedTo === null && message !== null) {
+      showDotReaction(message, reaction);
     }
     flow.replaceChildren(...nodes);
     flow.hidden = nodes.length === 0;
