@@ -250,7 +250,12 @@ so it starts tainted (asking before outward-facing actions) when one of the runs
 the firings since item 257: a firing from before names no schedule. The agent can create schedules too
 (`schedule_create`): such a schedule goes on in the chat it was made in, with that chat's choices as its composer shows
 them (the ones its first run started with until you picked others: its mode, model, reasoning level, speed, approval
-mode and goal mode; item 291). `/loop 30m <message>` in the box of a run or of a new chat makes such a schedule from the
+mode and goal mode; item 291). The conversation says so where it happened, in a quiet line of its own (item 665):
+the calendar, "Made a schedule", its name and when it runs in the words the Schedules page uses ("on Mondays at
+09:00"; a form the page cannot say in words is "on a repeating schedule", and a schedule that runs once says its time),
+in sight when the chat shows only what Dot is doing too, and kept by the turn once the chat goes on. The line leads to
+the Schedules page (`#/schedules?schedule=ID`), whose row of that schedule is marked in the accent's light, fading, and
+scrolled into sight. `/loop 30m <message>` in the box of a run or of a new chat makes such a schedule from the
 composer (items 281 and 400; see [Runs](runs.md)); a chat with such a schedule wears its mark in the sidebar
 (item 580). The scheduler also fires the nightly reflection at
 `[agent] reflection_time` (see Reflection in [Autonomy](autonomy.md)); it is not a schedule and does not count against

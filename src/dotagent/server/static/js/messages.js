@@ -9,6 +9,7 @@ import { icon } from "./icons.js";
 import { sentPicks } from "./picks.js";
 import { prose } from "./prose.js";
 import { readAloudButton } from "./readaloud.js";
+import { loopRhythm } from "./rhythm.js";
 
 const OUTCOMES = {
   done: { label: "Finished", empty: "The task finished without a written answer." },
@@ -64,6 +65,20 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
       copyButton(text, "Copy the message"),
       editFromHere === null ? null : editFromHereButton(editFromHere),
     ),
+  );
+}
+
+/** The line a schedule a run made leaves in the conversation (item 665): the calendar, "Made a schedule", its name and
+ * when it runs ("every Monday at 09:00", "once, 25 Oct 08:00"), a link to it on the Schedules page. `made` is the
+ * `schedule_made` event's data. */
+export function scheduleLine(made) {
+  const rhythm = typeof made.cron === "string" ? loopRhythm(made.cron) : null;
+  const when = rhythm ?? (typeof made.cron === "string" ? "on a repeating schedule" : String(made.when ?? ""));
+  return el(
+    "a",
+    { class: "note schedule-line", href: `#/schedules?schedule=${encodeURIComponent(made.schedule_id)}` },
+    icon("calendar"),
+    el("span", null, el("span", { class: "schedule-made" }, "Made a schedule"), " ", el("strong", null, made.name), when === "" ? null : ` · ${when}`),
   );
 }
 
