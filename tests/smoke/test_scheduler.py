@@ -31,6 +31,8 @@ from dotagent.core.paths import db_path, failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.events import SYSTEM_RUN_ID, EventBus, Subscription
 from dotagent.llm.types import Effort, Speed
+from dotagent.plugins import scout_service
+from dotagent.plugins.scout_types import ScoutState
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
@@ -1117,3 +1119,79 @@ async def test_the_emergency_stop_cancels_the_harness_step_and_the_reflection_un
     finally:
         await asyncio.to_thread(stop.unlink)
     assert stepping.cancelled() and reflecting.cancelled()
+
+
+async def test_the_plugin_scout_starts_at_its_time_once_never_when_off_and_the_stop_cancels_it(
+    runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 711: the scout's night starts once its daily time has passed since the last night, not again while one
+    works or before the next day's time, never with [scout] time off; the emergency stop cancels one under way, as it
+    cancels the reflection."""
+    nights: list[float] = []
+    release: asyncio.Event = asyncio.Event()
+
+    async def night(given: Runtime, now: float) -> ScoutState:
+        nights.append(now)
+        await release.wait()
+        return ScoutState(last_run=now)
+
+    monkeypatch.setattr(scout_service, "night", night)
+    # A scheduler made without the daemon's word never starts a night, whatever its clock says.
+    plain: Scheduler = Scheduler(runtime, _Starts(runtime))
+    plain._scouted_from = 0.0
+    await plain._scout_if_due(time.time() + 86_400)
+    assert plain._scouting is None and nights == []
+    scheduler: Scheduler = Scheduler(runtime, _Starts(runtime), scout=True)
+    zone = runtime.schedule_zone
+    day: datetime = datetime(2026, 10, 26, tzinfo=zone)
+    scheduler._scouted_from = day.replace(hour=1).timestamp()
+    before: float = day.replace(hour=3, minute=29).timestamp()
+    after: float = day.replace(hour=3, minute=31).timestamp()
+    await scheduler._scout_if_due(before)
+    assert nights == []
+    await scheduler._scout_if_due(after)
+    await scheduler._scout_if_due(after + 60)
+    await asyncio.sleep(0)
+    assert nights == [after]
+    scouting: asyncio.Task[None] | None = scheduler._scouting
+    assert scouting is not None and not scouting.done()
+    stop: Path = failsafe_path()
+    await asyncio.to_thread(stop.touch)
+    try:
+        await scheduler._scout_if_due(after + 120)
+        await asyncio.wait({scouting})
+    finally:
+        await asyncio.to_thread(stop.unlink)
+    assert scouting.cancelled()
+    switched_off: Runtime = dataclasses.replace(
+        runtime,
+        config=runtime.config.model_copy(update={"scout": runtime.config.scout.model_copy(update={"time": "off"})}),
+    )
+    off: Scheduler = Scheduler(switched_off, _Starts(switched_off), scout=True)
+    off._scouted_from = day.replace(hour=1).timestamp()
+    await off._scout_if_due(after)
+    assert off._scouting is None and nights == [after]
+    release.set()
+
+
+async def test_a_look_now_under_way_at_the_scouts_time_is_that_nights_look(
+    runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review of the seventh push: at the scout's time the scheduler queued a second whole night behind a Look now
+    the owner had started a minute before, which waited for its lock and then looked at everything again."""
+    nights: list[float] = []
+
+    async def night(given: Runtime, now: float) -> ScoutState:
+        nights.append(now)
+        return ScoutState(last_run=now)
+
+    monkeypatch.setattr(scout_service, "night", night)
+    scheduler: Scheduler = Scheduler(runtime, _Starts(runtime), scout=True)
+    day: datetime = datetime(2026, 10, 26, tzinfo=runtime.schedule_zone)
+    scheduler._scouted_from = day.replace(hour=1).timestamp()
+    after: float = day.replace(hour=3, minute=31).timestamp()
+    async with scout_service._lock(runtime):
+        await scheduler._scout_if_due(after)
+    assert scheduler._scouting is None
+    await scheduler._scout_if_due(after + 600)
+    assert scheduler._scouting is None and nights == []

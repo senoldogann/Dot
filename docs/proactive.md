@@ -40,6 +40,7 @@ in what its chat shows, are Dot's instructions for the brief and Dot's record of
 dated answers of a schedule's earlier runs are:
 
 - what waits for you: the questions and approvals that runs left, and the drafts waiting for you to send them;
+- how many plugins the nightly look proposed wait on Customize › Plugins (only the numbers, item 711);
 - the runs that failed since the last brief, with the first line of what each said;
 - the campaigns at work, with when the next session is and the last note of the ledger;
 - the schedules that fire today, with their times.
