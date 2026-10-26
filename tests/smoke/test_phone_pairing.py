@@ -216,6 +216,10 @@ async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["li
     # The address is the QR code's own once Dot answers to a name (item 565); the code is hidden until it is shown.
     await expect(mac.locator(".phone-address-text")).to_have_text(f"https://{TAILNET_NAME}/")
     await expect(mac.locator("output.pair-code")).to_be_hidden()
+    # No phone holds a key yet on this size's first page (the one before is removed by the end of its turn), and the
+    # note on a phone paired before the list stands under the card (item 672).
+    await expect(mac.get_by_text("No phone paired yet")).to_be_visible()
+    await expect(mac.locator(".phone-paired-note")).to_be_visible()
     await mac.get_by_role("button", name="Show code").click()
     shown: Locator = mac.locator("output.pair-code")
     await expect(shown).to_have_text(CODE)
@@ -253,7 +257,8 @@ async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["li
     assert PHONE_KEY.match(held)
     # The phone's Settings › Phone neither makes a code nor lists the phones; the Mac's lists it, with Remove.
     await phone.goto(f"{address}/#/settings/phone")
-    await expect(phone.get_by_text("Pair or remove phones in Settings › Phone on your Mac")).to_be_visible()
+    await expect(phone.get_by_text("Pair phones on your Mac")).to_be_visible()
+    await expect(phone.locator(".phone-paired-note")).to_be_hidden()
     await expect(phone.get_by_role("button", name="Show code")).to_be_hidden()
     await mac.reload()
     row: Locator = mac.locator(f'[data-phone="{held.split(".")[1]}"]')
