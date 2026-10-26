@@ -1639,6 +1639,11 @@ class RunManager:
         active: list[str] = self.active_run_ids()
         for run_id in active:
             self.end_by_emergency_stop(run_id)
+        # What a run typed into a terminal and the program has not read yet would be typed after the stop, and what a
+        # run left running there would go on (item 683).
+        closed: int = await self._runtime.terminals.close_all()
+        if closed:
+            log.info("emergency_stop_closed_terminals", sessions=closed)
         elsewhere: list[str] = [run_id for run_id in self.elsewhere_run_ids() if run_id not in self._handles]
         await self._ask_to_end_by_emergency_stop(elsewhere)
         return [*active, *elsewhere]

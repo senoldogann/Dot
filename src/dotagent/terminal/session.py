@@ -458,6 +458,23 @@ class Terminals:
         log.info("terminal_closed", thread_id=thread_id, session=session_id)
         await self._changed(thread_id)
 
+    async def close_all(self) -> int:
+        """Close every session of every chat, as the owner's emergency stop does (item 683): what waited to be typed is
+        dropped and the programs end, with what they started. Returns how many were closed; one that fails to close is
+        logged, and the others are closed all the same."""
+        closed: int = 0
+        for thread_id, mine in list(self._sessions.items()):
+            for session_id, session in list(mine.items()):
+                del mine[session_id]
+                try:
+                    await session.close()
+                    closed += 1
+                except OSError as error:
+                    log.warning("terminal_not_closed", thread_id=thread_id, session=session_id, error=str(error))
+            # The chat's page is told once, of all of them.
+            await self._changed(thread_id)
+        return closed
+
     def _untold_ends(self, thread_id: str) -> list[TerminalSession]:
         return [
             session

@@ -408,3 +408,18 @@ async def test_a_chat_keeps_its_limit_of_sessions_and_an_idle_session_is_closed(
             terminals.get("chat", first)
     finally:
         await terminals.aclose()
+
+
+async def test_the_emergency_stop_closes_every_terminal_and_drops_what_waits_to_be_typed(runtime: Runtime) -> None:
+    """Item 683: what a run sent a program that has not read it yet would be typed after the stop, and what it left
+    running would go on; the stop closes every session of every chat."""
+    terminals: Terminals = Terminals(3, 60.0, runtime.shell_env)
+    try:
+        first: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), False)
+        second: TerminalSession = await terminals.open("other", "cat", (), workspace_dir(), False)
+        second.send("x" * 20_000 + "\n")
+        assert await terminals.close_all() == 2
+        assert terminals.sessions("chat") == [] and terminals.sessions("other") == []
+        assert first.ended and second.ended
+    finally:
+        await terminals.aclose()

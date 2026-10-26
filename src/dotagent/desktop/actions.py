@@ -9,6 +9,7 @@ that moves the pointer or presses keys.
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import partial
 from math import hypot
 from pathlib import Path
 
@@ -676,7 +677,8 @@ def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     if step.ref is not None:
         _focus(env, step.ref)
         _require_keyboard(env)
-    hid.post(hid.text_events(env.source, text))
+    # A long text is typed key by key over seconds: the emergency stop ends it between keys (item 683).
+    hid.post(hid.text_events(env.source, text), partial(check_failsafe, env))
     return _effect(f"typed {len(text)} chars into {inspection.target}", None, False)
 
 
@@ -708,7 +710,7 @@ def _scroll(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     remaining: int = amount
     while remaining > 0:
         chunk: int = min(remaining, _WHEEL_CHUNK_PX)
-        hid.post(hid.scroll_events(env.source, point, unit_x * chunk, unit_y * chunk))
+        hid.post(hid.scroll_events(env.source, point, unit_x * chunk, unit_y * chunk), partial(check_failsafe, env))
         remaining -= chunk
     return _effect(f"scrolled {direction} {amount} px over {inspection.target}", point, False)
 
@@ -725,7 +727,7 @@ def _drag(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     moves: int = max(
         _MIN_DRAG_MOVES, min(_MAX_DRAG_MOVES, round(hypot(end.x - start.x, end.y - start.y) / _DRAG_PX_PER_MOVE))
     )
-    hid.post(hid.drag_events(env.source, start, end, moves, _event_number()))
+    hid.post(hid.drag_events(env.source, start, end, moves, _event_number()), partial(check_failsafe, env))
     destination: str = f"({round(end.x * env.scale)}, {round(end.y * env.scale)})"
     return _effect(f"dragged {inspection.target} to {destination}", end, True)
 
@@ -763,6 +765,8 @@ def execute_step(env: StepEnv, step: Step, reviewed: Inspection) -> Effect:
     would touch something else than ``reviewed``, what the review judged and the owner approved, is not performed (item
     555)."""
     check_failsafe(env)
+    # Someone else moving the pointer since the previous step stops the batch, as docs/safety.md says (item 683).
+    check_drift(env)
     # Performing a step does not depend on what Dot typed on a terminal's line, only judging it does.
     inspection: Inspection = inspect_step(env, step, {})
     refuse_secrets(inspection.context)

@@ -58,6 +58,9 @@ from dotagent.vault import shown
 _log = get_logger("dotagent.desktop.session")
 
 _THREAD_CAP: int = 32
+# How long a step's review may take before its answer is taken to have come from the owner, who may have moved the
+# pointer to give it (:meth:`DesktopSession._run_step`).
+_ANSWERED_AT_ONCE_S: float = 1.0
 _WAKE_THRESHOLD: int = 8
 _WAKE_WAIT_S: float = 4.0
 _WAKE_POLL_S: float = 0.15
@@ -733,6 +736,7 @@ class DesktopSession:
         # No terminal line is known while the step is reviewed and runs: one that is refused, taken over or fails
         # halfway may leave any text behind.
         self._lines = {}
+        asked_at: float = time.monotonic()
         await self._ask(
             reviewer,
             StepReview(
@@ -743,7 +747,11 @@ class DesktopSession:
                 target=inspection.target,
             ),
         )
-        # The step goes to what it was reviewed for, not to whatever is there after the wait (item 555).
+        # An answer that took a while may have been given with the mouse, on this Mac: the pointer is not where the step
+        # before left it, and that is no one else at the mouse (item 683's check of it). The step still goes to what it
+        # was reviewed for, not to whatever is there after the wait (item 555).
+        if time.monotonic() - asked_at > _ANSWERED_AT_ONCE_S:
+            env = replace(env, expected_pointer=None)
         effect: Effect = await self._call(partial(actions.execute_step, env, step, inspection))
         self._lines = safety.lines_after(typed, step, inspection.context)
         return effect

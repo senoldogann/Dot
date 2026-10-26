@@ -176,7 +176,7 @@ def test_keys_for_a_ref_go_only_to_its_application_when_it_holds_the_keyboard(
     monkeypatch.setattr(actions, "_focus", lambda env, ref: None)
     monkeypatch.setattr(apps, "frontmost_pid", lambda: front[0])
     monkeypatch.setattr(hid, "text_events", lambda source, text: [text])
-    monkeypatch.setattr(hid, "post", sent.extend)
+    monkeypatch.setattr(hid, "post", lambda events, check=None: sent.extend(events))
     monkeypatch.setattr(hid, "paste_text", lambda source, text, settle_s: sent.append(text))
     step: Step = Step(action="type", ref="a5", text=text)
     inspection: Inspection = Inspection(

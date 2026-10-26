@@ -242,7 +242,8 @@ async def _tell(
     cannot start does not keep the tell back: the line says so."""
     text: str = chosen.item.title + (f" ({chosen.note})" if chosen.note else "")
     started: RunRecord | None = None
-    if watcher.action == "run" and may_run:
+    # No run starts while the emergency stop is engaged, which may have come while the item was judged (item 683).
+    if watcher.action == "run" and may_run and not await emergency_stop_engaged():
         try:
             started = await _start_run(runtime, manager, watcher, chosen.item)
         except DotError as error:
@@ -453,6 +454,9 @@ async def look_due(runtime: Runtime, manager: RunManager, now: float) -> int:
     for watcher in await list_watchers(runtime.store):
         if not watcher.enabled or watcher.state.next_look_at > now:
             continue
+        # A look takes up to minutes: a stop engaged during one keeps the next from starting (item 683).
+        if await emergency_stop_engaged():
+            break
         try:
             await look_at(runtime, manager, watcher.id, now)
         except NotFoundError:

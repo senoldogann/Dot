@@ -390,3 +390,36 @@ async def test_a_run_that_waits_for_a_batch_at_work_is_served_when_it_ends(
     assert await asyncio.wait_for(second, 5.0) == ()
     assert [report.outcome for report in (await asyncio.wait_for(first, 5.0)).steps] == ["done"]
     assert executed == [_reviewed()]
+
+
+@pytest.mark.parametrize(("answered_at_once_s", "second_expects"), [(60.0, Point(x=5.0, y=5.0)), (-1.0, None)])
+async def test_an_answer_that_took_a_while_does_not_count_the_owners_mouse_as_someone_elses(
+    answered_at_once_s: float, second_expects: Point | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The code review of item 683: the owner who approves a step with the mouse moves the pointer; the check that no
+    one else is at the mouse must not stop the step they approved. An answer that came at once keeps the check."""
+    held, _ = _held_session(tmp_path, monkeypatch)
+    seen: list[Point | None] = []
+
+    def execute(env: StepEnv, step: Step, reviewed: Inspection) -> Effect:
+        seen.append(env.expected_pointer)
+        return Effect("clicked", Point(x=5.0, y=5.0), True, None)
+
+    monkeypatch.setattr(actions, "execute_step", execute)
+    monkeypatch.setattr(session, "_ANSWERED_AT_ONCE_S", answered_at_once_s)
+    # Between two steps the session reads which application holds the keyboard.
+    monkeypatch.setattr(apps, "frontmost_pid", lambda: 500)
+
+    async def allow(review: StepReview) -> None:
+        return None
+
+    outcome: ActOutcome = await held.act(
+        "thread",
+        "Mail",
+        [Step(action="click", x=640, y=400), Step(action="click", x=650, y=410)],
+        allow,
+        lambda inspection, what: None,
+        1000,  # type: ignore[arg-type]
+    )
+    assert [report.outcome for report in outcome.steps] == ["done", "done"]
+    assert seen == [None, second_expects]
