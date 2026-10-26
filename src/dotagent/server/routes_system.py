@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
 from dotagent import __version__
@@ -108,7 +108,7 @@ from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
 from dotagent.opencode.server import learns_from_data
 from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
-from dotagent.server.guard import daemon_proof
+from dotagent.server.guard import daemon_proof, refuse_from_a_phone
 from dotagent.server.palette import palette_view
 from dotagent.server.phones import PairedPhones
 from dotagent.server.routes_mcp import service_of
@@ -379,10 +379,13 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         return judge_now()
 
     @router.put("/judge")
-    async def choose_judge(request: JudgeRequest) -> JudgeView:
+    async def choose_judge(request: JudgeRequest, http: Request) -> JudgeView:
         """Have the typed judge answer through TypeSafe, or answer nothing, from the next judgment on (item 255): the
         config file keeps it as ``[judge] provider``. Switching it on without the TypeSafe service (its key was not set
-        when the daemon started) is refused, as is a config file that cannot be changed; nothing changes then."""
+        when the daemon started) is refused, as is a config file that cannot be changed; nothing changes then. Switching
+        it off is done on the Mac (item 678): the clicks no pattern knows would then go through unasked."""
+        if request.provider == "none":
+            refuse_from_a_phone(http.scope, "switch the extra checker off")
         before: JudgeProvider = ctx.runtime.judge.provider
         ctx.runtime.judge.set_provider(request.provider)
         try:
@@ -398,10 +401,13 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         return SandboxView(sandbox=ctx.runtime.sandbox.on)
 
     @router.put("/shell/sandbox")
-    async def switch_sandbox(request: SandboxRequest) -> SandboxView:
+    async def switch_sandbox(request: SandboxRequest, http: Request) -> SandboxView:
         """Start the processes of runs outside yolo in the macOS sandbox, or without it, from the next one on (item
         262): the config file keeps it as ``[shell] sandbox``. Switching it on where its profiles do not start is
-        refused, and so is a config file that cannot be changed: the sandbox is then as it was."""
+        refused, and so is a config file that cannot be changed: the sandbox is then as it was. Switching it off is done
+        on the Mac (item 678)."""
+        if not request.sandbox:
+            refuse_from_a_phone(http.scope, "switch the safe box of Dot's commands off")
         before: bool = ctx.runtime.sandbox.on
         await ctx.runtime.sandbox.switch(request.sandbox)
         try:
@@ -606,11 +612,13 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         return await found_now()
 
     @router.put("/skills/elsewhere")
-    async def change_elsewhere(change: ElsewhereChange) -> FoundElsewhere:
+    async def change_elsewhere(change: ElsewhereChange, http: Request) -> FoundElsewhere:
         """Add a skill or an MCP server found elsewhere to Dot, or take it back: the owner's yes (item 165). A skill is
         copied into Dot's skills folder, offered to runs from their next look at the skills; a server is started from
         Dot's next start. One is taken back by its agent and its name, whether or not the agent still has it. What is
-        found after it."""
+        found after it. A server is added on the Mac (item 678): Dot starts it with its command outside the sandbox."""
+        if change.added and change.kind == "server":
+            refuse_from_a_phone(http.scope, "add a connected app")
         if change.added:
             await add_found(await found_now(), ElsewhereItem(kind=change.kind, agent=change.agent, name=change.name))
         elif change.kind == "skill":
@@ -621,11 +629,13 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         return await found_now()
 
     @router.post("/skills/elsewhere/import")
-    async def import_elsewhere(request: ElsewhereImport) -> ElsewhereImported:
+    async def import_elsewhere(request: ElsewhereImport, http: Request) -> ElsewhereImported:
         """Add several skills and MCP servers found elsewhere at once: the owner's yes to each (item 219). Each is added
         as the one scan before them found it, as ``PUT /skills/elsewhere`` adds one; one that cannot be added (taken by
         an item before it, changed, gone) is told with its reason and the others go on. What it added, what it could
-        not, and what is found after it."""
+        not, and what is found after it. Servers are added on the Mac (item 678)."""
+        if any(item.kind == "server" for item in request.items):
+            refuse_from_a_phone(http.scope, "add a connected app")
         found: FoundElsewhere = await found_now()
         added: list[ElsewhereItem] = []
         refused: list[ElsewhereRefusal] = []

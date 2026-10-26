@@ -6,7 +6,7 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 import regex
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
 from dotagent.agent.learning_health import LearningHealth, quiet_limit, read_learning_health, stall_reason
 from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
@@ -60,6 +60,7 @@ from dotagent.scheduler.plans import (
 )
 from dotagent.scheduler.timing import format_local
 from dotagent.server.context import ServerContext
+from dotagent.server.guard import refuse_from_a_phone
 from dotagent.server.rule_replay import candidate_rule, preview_rule, rules_usage
 from dotagent.server.rule_shadow import rule_views
 from dotagent.server.views import (
@@ -95,6 +96,7 @@ from dotagent.server.views import (
 from dotagent.store.db import Store
 from dotagent.store.models import (
     AgentRecord,
+    Behavior,
     MemoryRecord,
     MemoryScore,
     RuleRecord,
@@ -124,6 +126,8 @@ async def _rule(store: Store, rule_id: str) -> RuleRecord:
 
 # How a ``datetime-local`` input writes a moment.
 _INPUT_MOMENT: str = "%Y-%m-%dT%H:%M"
+# What a rule may answer that lets a step through unasked: such a rule is added or switched on on the Mac (item 678).
+_WIDENING: frozenset[Behavior] = frozenset({"allow", "preapproved"})
 # Tells the pages that a rule was added, switched or deleted (a live event of the lifecycle stream), so that every page
 # that shows the rules reads them again.
 RULES_CHANGED_EVENT: str = "rules_changed"
@@ -165,7 +169,9 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         return rule_views(await store.list_rules())
 
     @router.post("/rules", status_code=201)
-    async def add_rule(request: RuleRequest) -> RuleRecord:
+    async def add_rule(request: RuleRequest, http: Request) -> RuleRecord:
+        if request.behavior in _WIDENING:
+            refuse_from_a_phone(http.scope, "add a rule that lets steps through unasked")
         rule: RuleRecord = await store.add_rule(
             request.behavior, request.tool_glob, _checked_pattern(request.match_regex), request.description
         )
@@ -208,22 +214,29 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         return drafted
 
     @router.patch("/rules/{rule_id}")
-    async def set_rule_enabled(rule_id: str, request: RuleEnabledRequest) -> RuleRecord:
-        await _rule(store, rule_id)
+    async def set_rule_enabled(rule_id: str, request: RuleEnabledRequest, http: Request) -> RuleRecord:
+        rule: RuleRecord = await _rule(store, rule_id)
+        # Switching on a rule that lets steps through, or off one that asks, widens what runs do unasked.
+        if request.enabled == (rule.behavior in _WIDENING):
+            refuse_from_a_phone(http.scope, "switch a rule so that steps go through unasked")
         await store.set_rule_enabled(rule_id, request.enabled)
         await tell_rules_changed()
         return await _rule(store, rule_id)
 
     @router.post("/rules/{rule_id}/move")
-    async def move_rule(rule_id: str, request: RuleMoveRequest) -> list[RuleView]:
-        """Move a rule one place up or down the order the policy reads the rules in (item 449); 422 past either end."""
+    async def move_rule(rule_id: str, request: RuleMoveRequest, http: Request) -> list[RuleView]:
+        """Move a rule one place up or down the order the policy reads the rules in (item 449); 422 past either end.
+        Not from a phone (item 678): a rule that lets steps through moved above one that asks widens what runs do."""
+        refuse_from_a_phone(http.scope, "change the order of the rules")
         await store.move_rule(rule_id, -1 if request.direction == "up" else 1)
         await tell_rules_changed()
         return rule_views(await store.list_rules())
 
     @router.delete("/rules/{rule_id}")
-    async def delete_rule(rule_id: str) -> RuleRecord:
+    async def delete_rule(rule_id: str, http: Request) -> RuleRecord:
         rule: RuleRecord = await _rule(store, rule_id)
+        if rule.behavior not in _WIDENING:
+            refuse_from_a_phone(http.scope, "delete a rule that asks")
         await store.delete_rule(rule_id)
         await tell_rules_changed()
         return rule

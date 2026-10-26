@@ -71,7 +71,7 @@ def vault_items_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api/vault")
 
     def on_the_mac(request: Request) -> None:
-        if not on_this_mac(request.headers.get("host")):
+        if not on_this_mac(request):
             raise VaultRefused(
                 "show it on the Mac itself: a secret of the vault is shown to this Mac's own page alone", {}
             )

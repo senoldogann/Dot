@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from pydantic import JsonValue, ValidationError
 
@@ -43,7 +43,7 @@ from dotagent.plugins.types import Plugin
 from dotagent.secrets import remove_env_value, write_env_value
 from dotagent.server.callback_page import Callback, Subject, account_callback, render, status_of
 from dotagent.server.context import ServerContext
-from dotagent.server.guard import origin_is_local
+from dotagent.server.guard import origin_is_local, refuse_from_a_phone
 from dotagent.server.views import (
     McpAllow,
     McpOfferedTool,
@@ -458,9 +458,11 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         return await listing()
 
     @router.post("/api/mcp/servers")
-    async def add_server(body: McpServerAdd) -> McpServerView:
+    async def add_server(body: McpServerAdd, request: Request) -> McpServerView:
         """Add a service of the catalogue or a server by its address: tried first, signed in to when it asks (the
-        answer's ``link``), kept and offered to runs once it answered with its tools."""
+        answer's ``link``), kept and offered to runs once it answered with its tools. Not from a phone (item 678): a
+        server Dot starts runs its command at each start of the daemon, outside the sandbox."""
+        refuse_from_a_phone(request.scope, "add a connected app")
         page: str = page_origin(body.origin)
         config: McpServerConfig = requested_server(body)
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
