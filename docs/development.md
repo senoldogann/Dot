@@ -246,11 +246,27 @@ program's is `shasum -a 256` of the file you unpack from the archive you checked
 suggested models of the page (`desktop/src-tauri/providers.json`) are the ids the providers' own lists give: look them
 over at each release, since a model a provider retired fails the install with words, not silently.
 
+The app also carries the versions its package's dependencies were built and tested at (item 694): `pyproject.toml`
+declares lower bounds only, so an install with no pin would take the newest release of every dependency on the day it
+runs, on every new Mac, with the daemon that holds the keys. `release.sh` writes `constraints.txt` into the app's
+Resources (beside `tools`, not in it) from `uv.lock` with the `uv` the app carries (`uv export --locked --no-dev
+--no-emit-project --no-hashes`: a `name==version` line for each runtime dependency, with the markers that keep it to
+the Macs it is for), before the app is built and signed, and once the app is built compares its copy with a fresh export
+of the lock: the release stops when `uv.lock` is not what `pyproject.toml` asks for, or the app's file is not the
+lock's.
+The installer gives it to `uv tool install --constraints` at the install and at the upgrade. The file has no hashes
+because `uv tool install` ignores the hashes of a constraints file (checked with uv 0.13.4: a wrong hash installs all
+the same, and the tool command has no `--require-hashes`), so the pin is of versions: a release that PyPI replaces under
+the same version number is not caught. A build with no such file (a development build gets an empty stand-in from
+`build.rs`) installs as it did before.
+
 It stops at the first check that fails, and says which: files not committed, a commit that is not on GitHub's `main`,
 versions that differ, a tag that is on GitHub already, a changelog with no section for the version, a tool that is not
-the pinned one, the app's signature (the Developer ID, the hardened runtime, a secure timestamp, both architectures),
+the pinned one, a `uv.lock` that `pyproject.toml` has moved from, the app's signature (the Developer ID, the hardened
+runtime, a secure timestamp, both architectures),
 the app's reasons for the microphone and speech recognition and its microphone entitlement (item 594), a tools folder
-in the app that does not hold exactly the three programs, the signature of the three in it, and a verdict of Apple's
+in the app that does not hold exactly the three programs, the signature of the three in it, a `constraints.txt` in the
+app that is not what `uv.lock` pins, and a verdict of Apple's
 notary service other than Accepted, with the log of what it found.
 
 Once, on the Mac that builds releases:

@@ -1194,8 +1194,11 @@ the agent itself. On a Mac that has no Dot, the shell installs one first (**Inst
      keeps equal to `CHOICES` of `cli_setup.py`): Ollama, when it answers on 127.0.0.1:11434 (its models are listed; a
      cloud model needs `ollama signin` once), or an API key of OpenAI, Anthropic, OpenRouter or OpenCode Go, in a
      password field.
-  3. **Install**, one button, four steps. `uv --no-config tool install --python 3.13 dotagent-macos==<the app's
-     version>`, with the `uv` the app carries and `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_PYTHON_INSTALL_DIR` and
+  3. **Install**, one button, four steps. `uv --no-config tool install --constraints <constraints.txt in the app's
+     Resources> --python 3.13 dotagent-macos==<the app's version>`, with the `uv` the app carries (the constraints file
+     pins every dependency of the package to the version of the `uv.lock` the release was built and tested with, so a
+     Mac installs the same versions on any day; a development build that carries none installs as it did before the
+     file existed) and `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_PYTHON_INSTALL_DIR` and
      `UV_CACHE_DIR` under `runtime/` of Dot's home, only Pythons that uv downloads (`UV_PYTHON_PREFERENCE =
      only-managed`) and no `uv.toml` read; then `dotx setup --model provider:model --no-service` with the key on
      standard input (`--key-stdin`), never in an argument, an environment variable or a log; then `dotx service install
@@ -1315,16 +1318,23 @@ and Quit. Closing the window keeps the shell in the menu bar.
   never installed twice. The dialogs are the system's, shown by the shell itself: no page can show one. The daemon stays
   as it was installed, from its checkout or from PyPI, with one exception (item 575): in an install the app made, its
   package follows the app. At its start, when the package installed (read from its metadata folder) is older than the
-  app, which has just updated itself, the shell runs `uv --no-config tool install --reinstall
-  dotagent-macos==<the app's version>` and then `dotx service restart --when-idle`, so that the daemon starts again
+  app, which has just updated itself, the shell runs `uv --no-config tool install --reinstall --constraints <the
+  app's constraints.txt> dotagent-macos==<the app's version>` and then `dotx service restart --when-idle`, so that the
+  daemon starts again
   with it once no run works. Only an install the app made and finished (its marker, with the service installed: item 5
   above) is ever upgraded, whether or not the daemon answers at that start, never a checkout or a Dot installed by
   hand, and a package newer than the app is left alone. Nothing is done, and `installer.log` says why, while the app
   runs from where it does not stay (the disk image it came on, or the copy macOS makes of a downloaded app): the links
   to its tools would point into it, and into nothing once it is ejected, and the daemon would lose `rg`. Nothing is
   done either while the service's job is another Dot's (a checkout's `dotx service install` took its place: its
-  daemon is not the app's to restart). A failure is told in a dialog with the log's place (`installer.log`), and the
-  package stays as it was.
+  daemon is not the app's to restart). A failure is told in a dialog with the log's place (`installer.log`). `uv`
+  replaces the environment in place, so a failure part way (a download that stopped) can leave one that does not start:
+  after a failed upgrade the shell starts the environment once (`python -P -c "import dotagent.server.daemon"`, which
+  imports what the daemon is made of), and when it does not start, installs the version that was there before, under the
+  same constraints (without them only when uv says that older version cannot be installed under these, which the log
+  says; a version it cannot read is not installed), and starts it again. The dialog says what is left: the package as it
+  was, put back, or, when even that failed, that Dot will not start until it is installed again. The marker says the
+  older version throughout, so that the next start of the app tries the upgrade again.
 
 Build it on your Mac with the Rust toolchain and Node installed:
 

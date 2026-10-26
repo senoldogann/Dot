@@ -7,9 +7,18 @@
 // whatever else lies in resources/tools does not ship. tauri-build wants each of them to exist, and a build that has
 // not fetched them (a development build, the tests) gets an empty stand-in here: it is no program (it cannot be run),
 // so the shell sees no tools and shows no installer. desktop/fetch-tools.sh puts the real ones in their place.
+//
+// The file that pins the package's dependencies (resources/constraints.txt, which desktop/release.sh makes from uv.lock)
+// is named the same way and has an empty stand-in too: the installer takes an empty file for no constraints.
 const TOOLS: [&str; 3] = ["uv", "rg", "dot-launcher"];
+const CONSTRAINTS: &str = "constraints.txt";
 
 fn main() {
+    let constraints = std::path::Path::new("resources").join(CONSTRAINTS);
+    if constraints.symlink_metadata().is_err() {
+        std::fs::write(&constraints, b"")
+            .expect("an empty stand-in for the constraints this build does not carry");
+    }
     for name in TOOLS {
         let path = std::path::Path::new("resources").join("tools").join(name);
         if path.symlink_metadata().is_err() {
