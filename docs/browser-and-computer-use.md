@@ -158,7 +158,7 @@ Both modes share what follows.
   label or the value of one of them, written as listed; a choice that is not there is refused at once with the options
   that are, the closest first, instead of waiting for the timeout. An option that a script adds within a second of the
   call is still found. A very long list is cut with the number of options left out and the current choice.
-- `browser_act` runs up to `max_batch_steps` steps in one call (5 by default; a longer batch is cut to the first ones
+- `browser_act` runs up to `max_batch_steps` steps in one call (10 by default; a longer batch is cut to the first ones
   and the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`,
   `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a
   step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets the page take one turn of
