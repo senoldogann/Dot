@@ -5,6 +5,7 @@ it while it starts (item 554), so that neither runs under the other."""
 import contextlib
 import fcntl
 import os
+import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -38,6 +39,35 @@ def profile_holder_pid(profile: Path) -> int | None:
     except PermissionError:
         return pid
     return pid
+
+
+# What the command line of Playwright's driver holds: a Chrome it started is a run's (the daemon's, or a dotx
+# command's), not a window opened on the profile (Sign in…, or the owner's).
+_PLAYWRIGHT_DRIVER: str = "playwright/driver"
+_PS_TIMEOUT_S: float = 5.0
+
+
+def _ps(field: str, pid: int) -> str:
+    """The column ``field`` of ``ps`` for ``pid``, empty when the process is gone or ``ps`` cannot say."""
+    try:
+        done: subprocess.CompletedProcess[str] = subprocess.run(
+            ["/bin/ps", "-o", f"{field}=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            timeout=_PS_TIMEOUT_S,
+            check=False,
+            env={"LC_ALL": "C"},
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return done.stdout.strip()
+
+
+def started_by_dot(pid: int) -> bool:
+    """Whether the Chrome ``pid`` is a run's: its parent is Playwright's driver. A window opened on the profile (Sign
+    in…, or the owner's) is not, and neither is a Chrome whose parent cannot be read."""
+    parent: str = _ps("ppid", pid)
+    return parent.isdigit() and _PLAYWRIGHT_DRIVER in _ps("command", int(parent))
 
 
 @contextlib.contextmanager

@@ -313,8 +313,9 @@ def _found_skill(agent: str, skill: Skill, has: DotHas, limit: CopyLimit) -> Fou
 def _skills(agent: str, folder: Path, has: DotHas, limit: CopyLimit) -> _Found:
     """The skills in ``folder``, found as Dot finds its own: the skill folders in it, and those of container folders a
     few levels down (:func:`dotagent.skills.discover.find_skill_files`). As in Dot's own catalog, a file reached again
-    through a link is read once, and a skill named as one before it is left out with the reason: an import names each
-    skill by its agent and its name (item 236)."""
+    through a link is read once, a copy of one before it (the same name, description and instructions in its SKILL.md)
+    is not listed (item 707), and another skill named as one before it is left out with the reason: an import names
+    each skill by its agent and its name (item 236)."""
     if not folder.is_dir():
         return _NOTHING
     try:
@@ -322,6 +323,7 @@ def _skills(agent: str, folder: Path, has: DotHas, limit: CopyLimit) -> _Found:
     except SkillError as error:
         return _only(FoundProblem(path=folder, reason=error.message))
     skills: dict[str, FoundSkill] = {}
+    read: dict[str, Skill] = {}
     seen: set[Path] = set()
     problems: list[FoundProblem] = []
     for file in files:
@@ -339,10 +341,13 @@ def _skills(agent: str, folder: Path, has: DotHas, limit: CopyLimit) -> _Found:
             continue
         taken: FoundSkill | None = skills.get(skill.name)
         if taken is not None:
-            problems.append(
-                FoundProblem(path=file, reason=f"another skill is already called {skill.name}: {taken.folder}")
-            )
+            first: Skill = read[skill.name]
+            if (first.description, first.body) != (skill.description, skill.body):
+                problems.append(
+                    FoundProblem(path=file, reason=f"another skill is already called {skill.name}: {taken.folder}")
+                )
             continue
+        read[skill.name] = skill
         skills[skill.name] = _found_skill(agent, skill, has, limit)
     return _Found(skills=tuple(skills.values()), servers=(), problems=tuple(problems))
 

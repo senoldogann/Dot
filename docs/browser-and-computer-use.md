@@ -143,7 +143,9 @@ storage, IndexedDB, service workers and their caches), the logins and autofill C
 its history, settings and extensions (`POST /api/browser/profiles/<name>/clear`; Dot's own Chrome is let go of when it
 works on it); **Delete** removes an added profile that is not in use (`DELETE
 /api/browser/profiles/<name>`). A profile that a Chrome window has open (Sign in… opens one) is not changed. Sign in…,
-`dotx browser login`, `dotx browser import-chrome` and `dotx doctor` work on the profile in use. Every profile is
+`dotx browser login`, `dotx browser import-chrome` and `dotx doctor` work on the profile in use; the doctor's row says
+whether it is free, open in a run's Chrome (which is as it should be), or open in another Chrome window (Sign in…, or
+one you opened), which keeps a run's from starting and needs a look (item 707). Every profile is
 guarded as Default is: a run neither reads nor changes it. In My Chrome mode the profiles are your Chrome's own.
 
 A profile keeps what a real browser keeps (item 453): its history, its cookies with an expiry, and its session

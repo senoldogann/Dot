@@ -563,6 +563,11 @@ when the gallery installs one or Remove plugin takes one out (item 542); skills 
 MCP servers of a plugin that came while Dot runs start when Dot starts again.
 
 `dotx skills list` shows every plugin and skill found, and anything left out and why; `dotx doctor` has a row for each.
+A copy of a skill (the same name, description and instructions in its `SKILL.md` in another folder, as a sync of the
+same skills leaves in `~/.claude/skills`; the folders' other files are not compared, and the first one's are used)
+counts once and is not listed, in Dot's skills and under Found on this Mac (item 707). A skill another one has the name
+of is listed, and the doctor's row says how many there are without counting them against it: nothing is wrong with them,
+and one is offered.
 
 **Found on this Mac.** Dot also finds, read-only, the skills and MCP servers that the Mac's other agents have set up:
 the skills of Claude Code (`~/.claude/skills`), of the plugins installed in Claude Code (each one's `installPath` in
