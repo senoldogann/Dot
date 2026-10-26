@@ -207,7 +207,9 @@ is its notes file (`write_notes`, below), and it may save memory notes.
 default), the agent has `code_fetch(app, sender, subject, within_minutes)`: it reads the newest message of Mail (through
 AppleScript) or of Messages (its database, read-only; the program that runs Dot needs Full Disk Access, and `dotx
 doctor` says whether the database opens) from a sender or with a subject within the last minutes, and returns the code
-alone, with who sent it and how old the message is; the message never reaches the model. It is a high-risk action of
+alone, with who sent it, its subject (cut to 200 characters) and how old the message is; the message never reaches
+the model. Its sender and its subject are words whoever sent the message wrote, so the run counts from then on as one
+that read content third parties can author (item 684). It is a high-risk action of
 the Mac: the aggressive preset allows it, balanced and cautious ask, a research run has no such tool. Typing the code
 into a field is the run's in `yolo` (item 443) and yours in every other mode (item 429), where Dot hands the field to
 you.
