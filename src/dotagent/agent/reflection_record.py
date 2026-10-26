@@ -36,6 +36,10 @@ class Reflection(FrozenModel):
     purged: int = 0
     # A reflection recorded before item 585 proposed no merge of skills.
     skills_proposed: int = 0
+    # How many runs' lessons could not be drawn or decided in this reflection, and why (the first error, with how many
+    # more there were); a reflection recorded before item 687 has none.
+    lessons_failed: int = 0
+    lessons_error: str | None = None
 
 
 class ReflectionFailure(FrozenModel):
@@ -48,7 +52,8 @@ class ReflectionFailure(FrozenModel):
 def summary_line(reflection: Reflection) -> str:
     """``Reflected on 7 runs: 2 lessons, 1 merged, 1 retired.``, and ``, 2 outdated`` when notes were put aside for
     newer ones, ``, 3 to forget`` when notes wait for the owner to forget or keep them and ``, 1 skill merge
-    proposed`` (``, 3 skill merges proposed``) when a merge of skills waits for their yes."""
+    proposed`` (``, 3 skill merges proposed``) when a merge of skills waits for their yes, and ``, lessons of 2 runs
+    failed`` when the lessons of some could not be drawn (item 687)."""
     runs: str = "1 run" if reflection.runs_read == 1 else f"{reflection.runs_read} runs"
     parts: list[str] = [
         f"{reflection.lessons_written} {'lesson' if reflection.lessons_written == 1 else 'lessons'}",
@@ -59,6 +64,11 @@ def summary_line(reflection: Reflection) -> str:
         *(
             [f"{reflection.skills_proposed} skill {'merge' if reflection.skills_proposed == 1 else 'merges'} proposed"]
             if reflection.skills_proposed
+            else []
+        ),
+        *(
+            [f"lessons of {reflection.lessons_failed} {'run' if reflection.lessons_failed == 1 else 'runs'} failed"]
+            if reflection.lessons_failed
             else []
         ),
     ]

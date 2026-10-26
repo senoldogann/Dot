@@ -2906,6 +2906,20 @@ class Store:
         rows = await self._all("SELECT * FROM runs WHERE finished_at >= ? ORDER BY created_at", (since,))
         return [_run(row) for row in rows]
 
+    async def runs_with_failed_lessons(
+        self, since: float, failed_kind: str, drawn_kinds: Sequence[str]
+    ) -> list[RunRecord]:
+        """The runs that finished at or after ``since`` whose lessons failed (an event of ``failed_kind``) and were
+        never drawn (none of ``drawn_kinds``), oldest first: the ones a later reflection draws again (item 687)."""
+        rows = await self._all(
+            "SELECT * FROM runs WHERE finished_at >= ?"
+            " AND EXISTS (SELECT 1 FROM events WHERE events.run_id = runs.id AND events.kind = ?)"
+            f" AND NOT EXISTS (SELECT 1 FROM events WHERE events.run_id = runs.id"
+            f" AND events.kind IN ({','.join('?' * len(drawn_kinds))})) ORDER BY created_at",
+            (since, failed_kind, *drawn_kinds),
+        )
+        return [_run(row) for row in rows]
+
     # ----- events ----------------------------------------------------------------------------
 
     async def first_event_id_since(self, since: float) -> int:

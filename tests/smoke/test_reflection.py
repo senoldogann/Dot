@@ -24,14 +24,17 @@ from dotagent.agent.learning_health import (
     LEARNED,
     LEARNING_STALLED_EVENT,
     REFLECTION_SILENCE_S,
+    LearningHealth,
+    read_learning_health,
     record_learning,
 )
-from dotagent.agent.lessons import LESSON_TAG, LESSONS_PROPOSED
+from dotagent.agent.lessons import LESSON_TAG, LESSONS_FAILED, LESSONS_PROPOSED
 from dotagent.agent.manager import RunManager
-from dotagent.agent.reflection import last_reflection, reflection_cron
+from dotagent.agent.reflection import MAX_DRAW_FAILURES, last_reflection, reflection_cron, reflection_failure
 from dotagent.agent.reflection_record import REFLECTION_KEY, Reflection, summary_line
 from dotagent.agent.review import LESSONS_TOOL, OWNER_TOOL, VET_TOOL
 from dotagent.config import AppConfig, load_default_config
+from dotagent.core.errors import ProviderTransportError
 from dotagent.core.paths import db_path
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -83,6 +86,8 @@ class RecordingProvider:
     def __init__(self, script: ScriptedProvider) -> None:
         self._script: ScriptedProvider = script
         self.requests: list[ChatRequest] = []
+        # While True, the question about lessons fails as a service that is down does (item 687).
+        self.down: bool = False
 
     @property
     def name(self) -> str:
@@ -90,6 +95,8 @@ class RecordingProvider:
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         self.requests.append(request)
+        if self.down and request.session_key.endswith(":lessons"):
+            raise ProviderTransportError("the review model is down", {"model": request.model})
         return await self._script.complete(request, sink)
 
     async def model_info(self, model: str) -> ModelInfo:
@@ -420,3 +427,78 @@ async def test_the_tick_that_starts_the_reflection_after_a_long_quiet_does_not_t
             assert notices.queue.empty()
         reflection: Reflection | None = await last_reflection(store)
         assert reflection is not None and reflection.at == fire_at + 1
+
+
+async def _night(home: Home, scheduler: Scheduler, after: float) -> float:
+    """The reflection of the next night after ``after``, done; the time it fired at."""
+    fire_at: float | None = next_firing(reflection_cron("03:30"), after, home.runtime.schedule_zone)
+    assert fire_at is not None
+    await scheduler.tick(fire_at + 1)
+    assert scheduler.reflecting()
+    async with asyncio.timeout(_TIME_LIMIT_S):
+        await scheduler.drain()
+    return fire_at + 1
+
+
+_STUMBLE: list[ScriptedTurn] = [
+    _turn(_read(NOTES)),
+    _turn(_write(NOTES)),
+    _turn(_read(NOTES)),
+    _finish("The file holds hello.", True),
+]
+
+
+async def test_a_run_whose_lessons_failed_is_asked_again_by_the_reflection_which_says_it_failed(
+    login_env: dict[str, str],
+) -> None:
+    """Item 687: the loop's draw at the end of a run failed and so did the first night's; the reflection reports it as a
+    failure both times, and the next night, with the model back, draws the lessons and clears it."""
+    turns: list[ScriptedTurn] = [*_STUMBLE, _owner(OWNER_LINE_FILES), _lessons(LESSON_STUMBLE), _kept()]
+    async with _home(login_env, turns) as home:
+        store: Store = home.runtime.store
+        home.model.down = True
+        run: RunRecord = await _ended(home, await _start(home, "Keep hello in notes.txt.", "ask"))
+        assert len(await store.events_of_kind(run.id, LESSONS_FAILED, 10)) == 1
+        scheduler: Scheduler = Scheduler(home.runtime, home.manager)
+
+        first: float = await _night(home, scheduler, time.time())
+        reflection: Reflection | None = await last_reflection(store)
+        assert reflection is not None and (reflection.lessons_written, reflection.lessons_failed) == (0, 1)
+        assert reflection.lessons_error is not None and "could not be drawn" in reflection.lessons_error
+        assert "lessons of 1 run failed" in summary_line(reflection)
+        failure = await reflection_failure(store)
+        assert failure is not None and failure.at == first and failure.error == reflection.lessons_error
+        health: LearningHealth | None = await read_learning_health(store)
+        assert health is not None and health.reflection.failures_in_row == 1
+        assert len(await store.events_of_kind(run.id, LESSONS_FAILED, 10)) == 2
+
+        home.model.down = False
+        await _night(home, scheduler, first)
+        reflection = await last_reflection(store)
+        assert reflection is not None and (reflection.lessons_written, reflection.lessons_failed) == (1, 0)
+        assert await store.last_event(run.id, LESSONS_PROPOSED) is not None
+        assert await reflection_failure(store) is None
+        health = await read_learning_health(store)
+        assert health is not None and health.reflection.failures_in_row == 0
+        assert LESSON_STUMBLE in {note.content for note in await store.memories_with_tag(LESSON_TAG, 50)}
+
+
+async def test_a_run_whose_lessons_keep_failing_is_given_up_after_a_few_tries(login_env: dict[str, str]) -> None:
+    turns: list[ScriptedTurn] = [*_STUMBLE, _owner(OWNER_LINE_FILES)]
+    async with _home(login_env, turns) as home:
+        store: Store = home.runtime.store
+        home.model.down = True
+        run: RunRecord = await _ended(home, await _start(home, "Keep hello in notes.txt.", "ask"))
+        scheduler: Scheduler = Scheduler(home.runtime, home.manager)
+        at: float = time.time()
+        failed: list[int] = []
+        for _ in range(MAX_DRAW_FAILURES + 1):
+            at = await _night(home, scheduler, at)
+            reflection: Reflection | None = await last_reflection(store)
+            assert reflection is not None
+            failed.append(reflection.lessons_failed)
+        # The loop's own draw was the first try, the first two nights the others; after them no night asks again.
+        assert failed == [1, 1, 0, 0]
+        assert len(await store.events_of_kind(run.id, LESSONS_FAILED, 10)) == MAX_DRAW_FAILURES
+        asked: list[ChatRequest] = [r for r in home.model.requests if r.session_key.endswith(":lessons")]
+        assert len(asked) == MAX_DRAW_FAILURES
