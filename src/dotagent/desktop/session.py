@@ -333,7 +333,7 @@ def _front_or_none() -> int | None:
         return None
 
 
-# The steps whose pointer ripples where it lands (item 705).
+# The steps whose pointer ripples where it lands (item 706).
 _CLICKS: frozenset[str] = frozenset({"click", "double_click", "right_click"})
 
 
@@ -349,7 +349,7 @@ class DesktopSession:
     ) -> None:
         self._config: DesktopConfig = config
         self._failsafe_file: Path = failsafe_file
-        # Dot's own pointer on the screen (item 705), which shows where the steps go; it never does a step. A test
+        # Dot's own pointer on the screen (item 706), which shows where the steps go; it never does a step. A test
         # gives its own, or none is drawn: only the daemon's session starts the helper that draws it.
         self._pointer: PointerOverlay = pointer if pointer is not None else PointerOverlay(enabled=False)
         # The chats whose steps moved it since their run began, so that the end of the last one fades it.
@@ -639,11 +639,11 @@ class DesktopSession:
 
     @property
     def pointer(self) -> PointerOverlay:
-        """Dot's own pointer on the screen (item 705), which what else captures the screen takes off it first."""
+        """Dot's own pointer on the screen (item 706), which what else captures the screen takes off it first."""
         return self._pointer
 
     async def _without_pointer(self, capture: Callable[[], ScreenshotView]) -> ScreenshotView:
-        """``capture`` with Dot's pointer off the screen (item 705): the model sees the screen, not Dot's arrow over
+        """``capture`` with Dot's pointer off the screen (item 706): the model sees the screen, not Dot's arrow over
         what it is to read."""
         async with self._pointer.hidden():
             return await self._call(capture)
@@ -810,7 +810,7 @@ class DesktopSession:
                 continue
             reports.append(StepReport(index=index, description=description, outcome="done", detail=effect.detail))
             if effect.pointer is not None and self._config.show_pointer:
-                # Dot's pointer glides to where the step went and ripples there for a click (item 705).
+                # Dot's pointer glides to where the step went and ripples there for a click (item 706).
                 self._pointing.add(thread_id)
                 await self._pointer.move(effect.pointer.x, effect.pointer.y, step.action in _CLICKS)
             side_effects = side_effects or step.has_side_effects()

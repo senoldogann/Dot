@@ -451,7 +451,7 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
   that `desktop_act` takes (item 701, `read_screen_text`; 50 ms a screen once warm): a window that shows nothing to
   accessibility can be read and clicked by a model that sees no image.
 - Dot's own pointer, a glowing violet arrow, glides to where each step of `desktop_act` went and ripples where it
-  clicked, so that you see what Dot does and where (item 705, `show_pointer`, on by default). It only shows: the
+  clicked, so that you see what Dot does and where (item 706, `show_pointer`, on by default). It only shows: the
   step is done as before, through the HID event tap, which moves the Mac's own pointer as it did. A helper process
   draws it (`python -m dotagent.desktop.pointer`, as the flight of SnapShots is drawn; it takes no permission and
   reads nothing of the screen), started with the first act. It is taken off the screen for each of Dot's screenshots

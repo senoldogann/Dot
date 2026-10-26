@@ -1,4 +1,4 @@
-"""Dot's own pointer on the screen (item 705): a glowing arrow that glides to where a step of ``desktop_act`` went
+"""Dot's own pointer on the screen (item 706): a glowing arrow that glides to where a step of ``desktop_act`` went
 and ripples where it clicked, the way another coding agent shows its own, so that the owner sees what Dot does and
 where.
 It only shows: the step itself is done as before, through the HID event tap, which moves the Mac's own pointer.

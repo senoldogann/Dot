@@ -1,4 +1,4 @@
-"""The helper that draws Dot's pointer (item 705), started for real: it draws a moment in the top left of the main
+"""The helper that draws Dot's pointer (item 706), started for real: it draws a moment in the top left of the main
 screen, answers a hide at once once it runs, and stops when its input closes. It reads nothing of the screen.
 """
 

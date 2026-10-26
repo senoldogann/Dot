@@ -363,7 +363,7 @@ class SnapshotService:
         """Take ``taker`` as what captures the window in front and keeps it, ``shower`` as what brings Dot's window to
         the front and ``overlay`` as what draws the flash and the flight, and start watching the keys when SnapShots
         are on (the overlay's helper with them, so the first flash is not late); called once the event loop runs.
-        ``pointer`` is Dot's own on the screen (item 705), taken off it while the window is captured."""
+        ``pointer`` is Dot's own on the screen (item 706), taken off it while the window is captured."""
         self._pointer = pointer
         self._loop = asyncio.get_running_loop()
         self._taker = taker

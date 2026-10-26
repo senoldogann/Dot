@@ -263,7 +263,7 @@ async def test_the_service_starts_without_the_key_watched_while_snapshots_are_of
 
 
 class _Pointer(PointerOverlay):
-    """Dot's pointer (item 705), keeping what it was told instead of drawing, and what the capture saw of it."""
+    """Dot's pointer (item 706), keeping what it was told instead of drawing, and what the capture saw of it."""
 
     def __init__(self) -> None:
         super().__init__(enabled=False)
@@ -279,7 +279,7 @@ class _Pointer(PointerOverlay):
 
 
 async def test_a_capture_takes_dots_pointer_off_the_screen_while_it_captures_and_puts_it_back() -> None:
-    """Item 705's review: the window the owner captures, which goes to the model, is captured without Dot's pointer
+    """Item 706's review: the window the owner captures, which goes to the model, is captured without Dot's pointer
     over it, also when the capture fails."""
     pointer: _Pointer = _Pointer()
     seen: list[list[str]] = []

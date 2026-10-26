@@ -1,4 +1,4 @@
-"""Dot's own pointer (item 705): where it is drawn, what the session tells it, and that it never costs a step.
+"""Dot's own pointer (item 706): where it is drawn, what the session tells it, and that it never costs a step.
 
 The session's steps are stood in for; the helper's protocol runs against a stand-in that draws nothing, and against one
 that never answers. Nothing here looks at or draws on the screen.
@@ -216,7 +216,7 @@ async def test_a_helper_that_cannot_start_costs_only_the_pointer(monkeypatch: py
 
 
 def test_a_pointer_fades_after_its_last_move_also_when_a_capture_hid_and_revealed_it_meanwhile() -> None:
-    """Item 705's review: a hide and a reveal around a screenshot called off the fade the move had set off, and the
+    """Item 706's review: a hide and a reveal around a screenshot called off the fade the move had set off, and the
     arrow stayed until the run ended. They are no moves: the fade of the last move still comes."""
     fades: Fades = Fades()
     first: int = fades.moved()
@@ -237,7 +237,7 @@ def test_a_pointer_fades_after_its_last_move_also_when_a_capture_hid_and_reveale
 async def test_with_two_captures_at_once_the_pointer_comes_back_only_after_the_second(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Item 705's review: a SnapShot while a run takes a screenshot; the first that ends does not put the pointer back
+    """Item 706's review: a SnapShot while a run takes a screenshot; the first that ends does not put the pointer back
     over the other."""
     told: list[str] = []
     _stand_in(
@@ -270,7 +270,7 @@ async def test_with_two_captures_at_once_the_pointer_comes_back_only_after_the_s
 async def test_a_capture_cancelled_while_it_waited_for_the_helper_leaves_no_count_behind(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Item 705's review: a capture cancelled while the helper had not yet said it hid the pointer left the count of
+    """Item 706's review: a capture cancelled while the helper had not yet said it hid the pointer left the count of
     captures raised, and the pointer was never hidden or shown again. The count goes back down however it ends."""
     _stand_in(monkeypatch, "import sys\nfor line in sys.stdin:\n    pass\n")
     overlay: PointerOverlay = PointerOverlay()
@@ -294,7 +294,7 @@ async def test_a_capture_cancelled_while_it_waited_for_the_helper_leaves_no_coun
 async def test_a_capture_cancelled_again_while_it_waits_to_put_the_pointer_back_leaves_no_count_behind(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Item 705's review: the end of a capture counted down only once it held the lock, which another capture's hide
+    """Item 706's review: the end of a capture counted down only once it held the lock, which another capture's hide
     can hold two seconds; cancelled again there, the count stayed up and no later capture hid the pointer."""
     _stand_in(monkeypatch, "import sys\nfor line in sys.stdin:\n    pass\n")
     monkeypatch.setattr(pointer, "HIDE_WITHIN_S", 1.0)
