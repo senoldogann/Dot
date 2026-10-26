@@ -21,6 +21,10 @@
   if (density === "comfortable" || density === "compact") {
     root.dataset.density = density;
   }
+  var work = read("dot.work");
+  if (work === "steps" || work === "status") {
+    root.dataset.work = work;
+  }
   // The theme of the scheme on screen (item 126): the pick for dark while the page is dark, else the pick for light.
   var themeId = /^[a-z0-9][a-z0-9-]{0,47}$/;
   var light = read("dot.theme");

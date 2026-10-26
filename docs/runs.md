@@ -16,7 +16,16 @@ the turn's run showed with `show_page` stands where it came, in its frame
 (item 426). That line opens and folds on a click while the run still works and after it ends,
 and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
 Appearance › *Fold steps* says whether
-those lines start folded (Neutral and the palettes fold them, Paper does not). The short marks at the left of the
+those lines start folded (Neutral and the palettes fold them, Paper does not). Settings › Interface › *Work in a chat* (item 663)
+chooses between **Every step**, the default, and **What it is doing**: the steps and the thoughts of every turn are out
+of the conversation, and one line under it, three of Dot's dots and a few words, says what the run does now, from its
+latest event: "Thinking…" while the model thinks, "Running a command…", "Searching the web…", "Reading a page…",
+"Working on the Mac…", "Asking Scout…" for a message to an agent, and so on, the words for the same work turning every
+four seconds ("Working in the terminal…") so that a long step reads as alive. Nothing is said that the run is not
+doing: while it writes a message, or a card waits for you, the line is not there. Pressed, it shows every step of the
+chat again, and pressed again folds them back; once the run is over it says *Show the steps*. Approvals, questions,
+notes, the changes of the memory and the messages stay in sight either way, and the choice is kept by the browser.
+The short marks at the left of the
 conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
 work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out; the page
 reads the latest 200 runs of a chat, the most the daemon lists at once, so a chat of more says that its earlier runs are

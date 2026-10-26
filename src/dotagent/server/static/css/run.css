@@ -122,6 +122,105 @@
   margin-top: 16px;
 }
 
+/* ---------- the work told in one line (item 663) ---------- */
+
+/* With "What it is doing" chosen, the steps and the thoughts of a run fold out of the conversation until the reader asks
+   for them; the approvals, questions, notes and messages stay. One line under the conversation says what the run does
+   now: three of Dot's dots and a few words that shimmer and change; once the run is over it offers the steps. */
+.work-status {
+  display: none;
+}
+
+:root[data-work="status"] .run-thread:not(.steps-shown) :is(details.steps, details.thought) {
+  display: none;
+}
+
+:root[data-work="status"] .work-status:is([data-state="working"], [data-state="over"]) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+/* A run that is over and took no step has nothing to show. */
+:root[data-work="status"] .run-thread:not(:has(details.steps, details.thought)) .work-status[data-state="over"] {
+  display: none;
+}
+
+.work-status-dots {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.work-status-dots > span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  animation: chat-dot var(--motion-dots) ease-in-out infinite;
+  animation-play-state: var(--endless);
+}
+
+.work-status-dots > span:nth-child(2) {
+  animation-delay: calc(var(--motion-dots) / 8);
+}
+
+.work-status-dots > span:nth-child(3) {
+  animation-delay: calc(var(--motion-dots) / 4);
+}
+
+.work-status-words {
+  background: linear-gradient(90deg, var(--muted) 30%, var(--text) 50%, var(--muted) 70%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: var(--weight-label);
+  animation: shimmer var(--motion-shimmer) linear infinite, fade-in var(--motion-base) var(--ease);
+  animation-play-state: var(--endless);
+}
+
+/* The way to the steps is quiet while the run works and the one thing the line says once it is over. */
+.work-status-more {
+  font-size: var(--text-xs);
+  opacity: 0;
+  transition: opacity var(--motion-quick) var(--ease);
+}
+
+.work-status:is(:hover, :focus-visible) .work-status-more,
+.work-status[data-state="over"] .work-status-more {
+  opacity: 1;
+}
+
+.work-status[data-state="over"] :is(.work-status-dots, .work-status-words) {
+  display: none;
+}
+
+@media (hover: none) {
+  .work-status-more {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-status-dots > span,
+  .work-status-words {
+    animation: none;
+  }
+
+  .work-status-words {
+    color: var(--muted);
+  }
+}
+
 /* ---------- the chat while it is read ---------- */
 
 /* What stands in a chat's place while its run is read (items 502 and 643): three dots of Dot's yellow in the middle of

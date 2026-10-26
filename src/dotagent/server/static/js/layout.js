@@ -8,6 +8,14 @@ const FOLD_KEY = "dot.foldSteps";
 const INSPECTOR_KEY = "dot.inspector";
 const SIDEBAR_KEY = "dot.sidebar";
 const DENSITY_KEY = "dot.density";
+const WORK_KEY = "dot.work";
+// What a chat shows of a run's work (item 663): every step, or one line of what the run does now (workstatus.js); the
+// choice is `data-work` on the page, which run.css reads.
+export const WORK_SHOWN = [
+  { id: "steps", label: "Every step", hint: "Its thoughts, commands and steps, each in its line." },
+  { id: "status", label: "What it is doing", hint: "One line that says what it does now; press it for the steps." },
+];
+const DEFAULT_WORK = "steps";
 // How close the rows, cards and stacks sit (the paddings are tokens in app.css, switched by `data-density` on the page).
 export const DENSITIES = [
   { id: "comfortable", label: "Comfortable", hint: "Room around every row and card." },
@@ -78,6 +86,31 @@ export function chooseDensity(id) {
   }
   document.documentElement.dataset.density = id;
   writePref(DENSITY_KEY, id);
+}
+
+function isWork(id) {
+  return WORK_SHOWN.some((option) => option.id === id);
+}
+
+/** What a chat shows of a run's work now: "steps" or "status". */
+export function currentWork() {
+  const id = document.documentElement.dataset.work;
+  return isWork(id) ? id : DEFAULT_WORK;
+}
+
+/** Put the saved choice of what a chat shows of the work on the page; call it before anything is drawn. */
+export function applyStoredWork() {
+  const stored = readPref(WORK_KEY);
+  document.documentElement.dataset.work = isWork(stored) ? stored : DEFAULT_WORK;
+}
+
+/** Switch what a chat shows of the work and remember the choice. */
+export function chooseWork(id) {
+  if (!isWork(id)) {
+    throw new Error(`unknown choice of the work shown: ${id}`);
+  }
+  document.documentElement.dataset.work = id;
+  writePref(WORK_KEY, id);
 }
 
 /** Whether the sidebar is open on a wide screen; open until the user hides it. */

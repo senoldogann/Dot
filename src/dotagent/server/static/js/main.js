@@ -18,7 +18,7 @@ import { buildShell } from "./shell.js";
 import { requestCompose } from "./shortcuts.js";
 import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
-import { applyStoredDensity, PHONE } from "./layout.js";
+import { applyStoredDensity, applyStoredWork, PHONE } from "./layout.js";
 import { readPref, writePref } from "./prefs.js";
 import { applyStoredScheme, applyStoredTheme, followBarColour } from "./theme.js";
 import { attempt, detailsFold, toast, toastError } from "./ui.js";
@@ -740,6 +740,7 @@ async function boot() {
 applyStoredTheme();
 applyStoredScheme();
 applyStoredDensity();
+applyStoredWork();
 applyStoredSettings();
 followBarColour();
 // The service worker keeps the shell files for when the Mac is out of reach and shows the pushes of the daemon; a
