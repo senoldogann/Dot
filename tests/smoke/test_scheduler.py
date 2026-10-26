@@ -21,6 +21,7 @@ from ollama_live import live_with
 from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
+from dotagent.agent.reflection_record import REFLECTION_KEY
 from dotagent.agent.verify import new_facts
 from dotagent.cli_commands import StatsCommand
 from dotagent.cli_stats import cmd_stats
@@ -1043,6 +1044,41 @@ async def test_a_tick_that_fails_is_tried_again_and_the_loop_goes_on(
         await third.wait()
     assert not loop.done()
     assert scheduler.running()
+
+
+async def test_a_part_of_the_tick_that_only_tends_to_learning_never_ends_the_loop(
+    runtime: Runtime, scheduler: Scheduler, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 688: a reflection record that cannot be read fails at every tick, and past the bound of failed ticks the
+    loop is still running: only the parts that fire schedules and start sessions end it."""
+    ticks: list[float] = []
+    enough: asyncio.Event = asyncio.Event()
+    due_campaigns = runtime.store.due_campaigns
+
+    async def counted(now: float) -> list[CampaignRecord]:
+        ticks.append(now)
+        if len(ticks) == FAILED_TICKS_TO_END + 3:
+            enough.set()
+        return await due_campaigns(now)
+
+    monkeypatch.setattr(runtime.store, "due_campaigns", counted)
+    await runtime.store.kv_set(REFLECTION_KEY, "not a reflection")
+    try:
+        with capture_logs() as logs:
+            loop: asyncio.Task[None] = await scheduler.start()
+            async with asyncio.timeout(30):
+                await enough.wait()
+            assert not loop.done()
+            assert scheduler.running()
+        failed: list[object] = [entry["part"] for entry in logs if entry["event"] == "scheduler_auxiliary_part_failed"]
+        assert failed and set(failed) == {"_reflect_if_due"}
+        assert len(failed) >= FAILED_TICKS_TO_END
+        # The same tick called by hand raises nothing: its scheduling parts went well.
+        await scheduler.tick(time.time())
+    finally:
+        await scheduler.stop()
+        await runtime.store._db.execute("DELETE FROM kv WHERE key = ?", (REFLECTION_KEY,))
+        await runtime.store._db.commit()
 
 
 async def test_a_scheduler_whose_ticks_keep_failing_ends_with_their_error(

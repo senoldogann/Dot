@@ -68,7 +68,9 @@ log = get_logger(__name__)
 _UNFINISHED: frozenset[str] = frozenset({"starting", "running"})
 # How many ticks in a row may fail before the scheduler's loop ends, and the daemon with it (``server/daemon.py``):
 # five minutes at the default ``tick_s``. A failure that lasts so long is not passing, and schedules must not silently
-# stop firing; a shorter one is waited out, so that it does not end the daemon with every run it holds.
+# stop firing; a shorter one is waited out, so that it does not end the daemon with every run it holds. Only the parts
+# that fire schedules and start sessions count (item 688): a record of the reflection or of the harness that cannot be
+# read is logged each tick and ends nothing.
 FAILED_TICKS_TO_END: int = 20
 
 
@@ -198,21 +200,29 @@ class Scheduler:
         the campaign goes on where it stopped. While the owner's emergency stop is engaged, no campaign starts a
         session (each waits for the release; the stop is looked at before each one) and no schedule fires
         (:meth:`_fire`). Learning that has stopped by the clock is told to the owner (:meth:`_check_learning`). The
-        parts are done each on its own: one that fails is logged where it failed and keeps the others from nothing, and
-        the failures are raised together at the end, as an ``ExceptionGroup``."""
+        parts are done each on its own: one that fails is logged where it failed and keeps the others from nothing. The
+        failures of the parts that fire schedules and start sessions are raised together at the end, as an
+        ``ExceptionGroup``, and a tick that raises counts towards the end of the loop (:meth:`_tick_forever`); a
+        failure of the others (the reflection, the harness's step, the record of how learning fares) is logged at each
+        tick with the part's name and never raises (item 688)."""
         failures: list[Exception] = []
-        for part in (
-            self._fire_due,
-            self._start_due_sessions,
-            self._reflect_if_due,
-            self._step_if_due,
-            self._check_learning,
-        ):
+        for part in (self._fire_due, self._start_due_sessions):
             try:
                 await part(now)
             except Exception as exc:
                 log.exception("scheduler_part_failed", part=part.__name__)
                 failures.append(exc)
+        for part in (self._reflect_if_due, self._step_if_due, self._check_learning):
+            try:
+                await part(now)
+            except Exception as exc:
+                log.warning(
+                    "scheduler_auxiliary_part_failed",
+                    part=part.__name__,
+                    error=repr(exc),
+                    note="the loop goes on; this part is tried again at the next tick",
+                    exc_info=True,
+                )
         if failures:
             raise ExceptionGroup("a part of the scheduler's tick failed", failures)
 
@@ -327,8 +337,9 @@ class Scheduler:
             log.error("learning_not_recorded", work="reflection", state=outcome.state, error=error.message)
 
     async def _tick_forever(self) -> None:
-        """Tick every ``tick_s`` seconds. A tick that failed is tried again at the next one; :data:`FAILED_TICKS_TO_END`
-        failed ticks in a row end the loop with the last one's failures."""
+        """Tick every ``tick_s`` seconds. A tick that failed (a part that fires schedules or starts sessions did, see
+        :meth:`tick`) is tried again at the next one; :data:`FAILED_TICKS_TO_END` failed ticks in a row end the loop
+        with the last one's failures."""
         tick_s: float = self._runtime.config.scheduler.tick_s
         failed: int = 0
         while True:
