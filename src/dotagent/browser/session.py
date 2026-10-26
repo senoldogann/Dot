@@ -40,6 +40,7 @@ from playwright.async_api import Frame as PlaywrightFrame
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import JsonValue
 
+from dotagent.browser import ledger
 from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, read_debug_endpoint, redact_endpoint
 from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
@@ -629,6 +630,11 @@ class BrowserSession:
         self._teaching: Recording | None = None
         self._teach_armed: set[Page] = set()
         self._teach_lock: asyncio.Lock = asyncio.Lock()
+        # Chrome's ids of the tabs this session has open in the Chrome of the user, kept in the ledger (item 703) so
+        # that a Dot that did not end cleanly has them closed by the next; the writes go one at a time.
+        self._dot_targets: set[str] = set()
+        self._ledger_lock: asyncio.Lock = asyncio.Lock()
+        self._ledger_writes: set[asyncio.Task[None]] = set()
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -836,6 +842,7 @@ class BrowserSession:
         context: BrowserContext = browser.contexts[0]
         browser.on("disconnected", self._on_browser_disconnected)
         self._browser = browser
+        await self._close_left(browser)
         _log.info("browser_attached", port=endpoint.port, version=browser.version, tabs=len(context.pages))
         return _Opened(context=context, spare_pages=())
 
@@ -892,6 +899,8 @@ class BrowserSession:
         self._lost = True
 
     def _forget_tabs(self) -> None:
+        # The Chrome they were in is gone, and its ids with it.
+        self._dot_targets.clear()
         self._initial_pages = []
         self._chrome_pid = None
         self._refusals.clear()
@@ -1061,6 +1070,8 @@ class BrowserSession:
                 await self._reaper
             self._reaper = None
         await self._let_go()
+        # The ledger says, once its writes have landed, that this process has no tab left open (item 703).
+        await asyncio.gather(*self._ledger_writes, return_exceptions=True)
 
     async def _let_go(self) -> None:
         """Close Dot's own Chrome, or close the tabs Dot opened in the Chrome of the user and drop the connection; then
@@ -1129,6 +1140,46 @@ class BrowserSession:
             _log.info("browser_incognito_held", pid=holder)
             return
         await asyncio.to_thread(empty_incognito)
+
+    async def _write_ledger(self) -> None:
+        """Write the tabs this session has open in the Chrome of the user to the ledger (item 703); a ledger that
+        cannot be written is logged, and only a crash would leave its tabs behind."""
+        async with self._ledger_lock:
+            targets: frozenset[str] = frozenset(self._dot_targets)
+            try:
+                await asyncio.to_thread(ledger.record, ledger.ledger_path(), targets)
+            except OSError as error:
+                _log.warning("browser_ledger_not_written", error=str(error))
+
+    async def _close_left(self, browser: Browser) -> None:
+        """Close the tabs a Dot that no longer runs left in the Chrome of the user (item 703): those the ledger names,
+        and that this Chrome still has under the same id. A tab of the user's, and a tab of a Dot that still runs, is
+        not touched. A close that fails is logged and the connection goes on."""
+        try:
+            left: frozenset[str] = await asyncio.to_thread(ledger.take_left, ledger.ledger_path())
+        except OSError as error:
+            _log.warning("browser_ledger_unreadable", error=str(error))
+            return
+        if not left:
+            return
+        closed: int = 0
+        try:
+            cdp: CDPSession = await browser.new_browser_cdp_session()
+            try:
+                answer: dict[str, object] = await cdp.send("Target.getTargets")
+                infos: object = answer.get("targetInfos")
+                for info in infos if isinstance(infos, list) else []:
+                    target: object = info.get("targetId") if isinstance(info, Mapping) else None
+                    if isinstance(target, str) and target in left and info.get("type") == "page":
+                        await cdp.send("Target.closeTarget", {"targetId": target})
+                        closed += 1
+            finally:
+                with contextlib.suppress(PlaywrightError):
+                    await cdp.detach()
+        except PlaywrightError as error:
+            _log.warning("browser_left_tabs_not_closed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
+            return
+        _log.info("browser_left_tabs_closed", named=len(left), closed=closed)
 
     async def _detach(self, browser: Browser) -> None:
         """Close the tabs Dot opened in the Chrome of the user, then drop the connection (Chrome keeps running)."""
@@ -1435,6 +1486,8 @@ class BrowserSession:
         page.on("close", partial(self._on_page_closed, tab))
         await watch_births(tab)
         if self._config.mode == "attach":
+            self._dot_targets.add(tab.target_id)
+            await self._write_ledger()
             await keep_focused(page)
         else:
             await self._guard_hops(page)
@@ -1442,6 +1495,11 @@ class BrowserSession:
             await install_consent_handler(page)
 
     def _on_page_closed(self, tab: Tab, _page: Page) -> None:
+        if tab.target_id in self._dot_targets:
+            self._dot_targets.discard(tab.target_id)
+            writing: asyncio.Task[None] = asyncio.create_task(self._write_ledger())
+            self._ledger_writes.add(writing)
+            writing.add_done_callback(self._ledger_writes.discard)
         self._refusals.pop(tab.page, None)
         # What was kept out of addresses for this tab goes with it: another tab at the same origin is held to nothing.
         self._kept_out.pop(tab.page, None)
