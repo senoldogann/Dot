@@ -689,7 +689,8 @@ background_tab_idle_s = 300.0
 # cookies across its restarts; Incognito keeps nothing); the chats' tabs go with it. 0, the default, keeps it open until the daemon stops.
 idle_close_s = 0.0
 screenshot_quality = 60
-max_batch_steps = 5
+# The most steps one browser_act runs (item 700: 10 since 2026-10-26, 5 before).
+max_batch_steps = 10
 read_text_chars = 8000
 # Empty allowed_hosts = every site; a host entry also matches its subdomains. Both lists also apply to web_fetch and
 # web_search, and to the addresses a call of the web-research server's tools holds (item 583).

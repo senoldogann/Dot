@@ -341,8 +341,9 @@ class ActArgs(ToolArgs):
         min_length=1,
         description=(
             "Steps run in order against the latest snapshot: every step you can predict without a new look at the "
-            "page (a call with one step costs a model round trip for one click); a batch holds a few steps (5 by "
-            "default), and more are cut to the first ones with the result saying so. The batch stops at the first "
+            "page (a call with one step costs a model round trip for one click); a batch holds up to 10 steps by "
+            "default (a whole form and its submit), and more are cut to the first ones with the result saying so. "
+            "The batch stops at the first "
             "failure or when the page surprises you (new tab, dialog, download, navigation); the remaining steps are "
             "then skipped. Example: "
             '[{"action": "fill", "ref": "e5", "text": "Ada"}, {"action": "select", "ref": "e7", "text": "blue"}, '
