@@ -187,6 +187,12 @@ async def test_the_step_group_folds_and_unfolds_while_the_run_still_works(tmp_pa
                 await expect(first_tool).not_to_have_class(re.compile(r"\brunning\b"))
                 assert await group.evaluate("(node) => node.open") is False
                 await expect(group.locator(".steps-latest")).to_be_visible()
+                # What the folded group holds is not drawn at all, so the browser does not style it at each change of
+                # the page (item 674).
+                assert (
+                    await group.evaluate("(node) => getComputedStyle(node.querySelector('.steps-body')).display")
+                    == "none"
+                )
                 await group.screenshot(path=str(tmp_path / "steps-folded-mid-run.png"))
                 # (3) A click opens it again, the call in sight, and the end of the run keeps it open.
                 await summary.click()

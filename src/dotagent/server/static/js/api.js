@@ -617,6 +617,18 @@ export async function blobUrl(path) {
   return URL.createObjectURL(await response.blob());
 }
 
+/** A `blob:` URL for a frame of a screencast, a JPEG sent in base64, which the caller revokes. A plain loop decodes it
+ * (item 674): `Uint8Array.from` with a mapping function calls it once a byte, twenty times as slow, and a watched
+ * browser sends several frames a second. */
+export function frameUrl(base64) {
+  const text = atob(base64);
+  const bytes = new Uint8Array(text.length);
+  for (let index = 0; index < text.length; index += 1) {
+    bytes[index] = text.charCodeAt(index);
+  }
+  return URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
+}
+
 /** A `blob:` URL for a stored screenshot; images need the token, so they cannot be plain `<img src>` links. */
 export function imageUrl(name) {
   let pending = images.get(name);

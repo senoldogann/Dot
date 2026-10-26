@@ -8,7 +8,7 @@
 // A recording is the tab's alone and lasts while the panel is open on it: closing the panel stops it and nothing of it
 // is saved. A browser without a window refuses to start one, and the panel says why.
 
-import { api, watchInView } from "./api.js";
+import { api, frameUrl, watchInView } from "./api.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { loopRhythm, REPEAT_RHYTHMS, repeatCron, WEEK_DAYS } from "./rhythm.js";
@@ -25,7 +25,7 @@ const POLL_MS = 700;
 export function openTeachPanel({ threadId, onSaved }) {
   let poll = null;
   let view = null;
-  let frameUrl = null;
+  let shownFrame = null;
   let complained = false;
   let skill = null;
   let saved = null;
@@ -111,9 +111,9 @@ export function openTeachPanel({ threadId, onSaved }) {
   function stopView() {
     view?.abort();
     view = null;
-    if (frameUrl !== null) {
-      URL.revokeObjectURL(frameUrl);
-      frameUrl = null;
+    if (shownFrame !== null) {
+      URL.revokeObjectURL(shownFrame);
+      shownFrame = null;
     }
   }
 
@@ -128,12 +128,11 @@ export function openTeachPanel({ threadId, onSaved }) {
           return;
         }
         // The frame's address is the page's, not an image: what is painted is its JPEG beside it.
-        const bytes = Uint8Array.from(atob(message.data.jpeg_b64), (char) => char.charCodeAt(0));
-        const next = URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
-        if (frameUrl !== null) {
-          URL.revokeObjectURL(frameUrl);
+        const next = frameUrl(message.data.jpeg_b64);
+        if (shownFrame !== null) {
+          URL.revokeObjectURL(shownFrame);
         }
-        frameUrl = next;
+        shownFrame = next;
         image.src = next;
         image.hidden = false;
       },

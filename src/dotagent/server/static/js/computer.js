@@ -4,7 +4,7 @@
 // when Watch goes too (there is no page left to watch). On a phone it also opens over the whole page (item 298), and
 // "Use it here" uses the page from this screen while the reader holds the run (item 475).
 
-import { api, watchInView } from "./api.js";
+import { api, frameUrl, watchInView } from "./api.js";
 import { createControl } from "./control.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -102,8 +102,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   }
 
   function show(frame) {
-    const bytes = Uint8Array.from(atob(frame.jpeg_b64), (char) => char.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
+    const url = frameUrl(frame.jpeg_b64);
     if (objectUrl !== null) {
       URL.revokeObjectURL(objectUrl);
     }

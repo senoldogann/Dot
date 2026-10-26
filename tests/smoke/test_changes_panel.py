@@ -156,6 +156,8 @@ async def test_the_changes_tab_counts_the_files_and_opens_each_on_its_diff(
                 await expect(row.locator(".badge")).to_have_text("created")
                 await expect(row.locator(".change-add")).to_have_text("+3")
                 await expect(row.locator(".change-del")).to_have_count(0)
+                # The lines of the diff are drawn once the file is opened (item 674).
+                await expect(row.locator(".diff-line")).to_have_count(0)
                 await row.locator(".change-head").click()
                 await expect(row.locator(".diff-add")).to_have_text(["+one", "+2", "+three"])
                 box = await row.locator(".diff").bounding_box()
