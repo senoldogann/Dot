@@ -465,3 +465,74 @@ async def test_a_chat_of_more_runs_than_the_page_reads_says_so_instead_of_counti
             await page.context.close()
         finally:
             await browser.close()
+
+
+# The earlier turns whose work is read before a chat is drawn (history.js READ_FIRST); the older ones read theirs as
+# they come near what is seen.
+_READ_FIRST: int = 6
+_LONG_CHAT: int = 20
+_TALL_ANSWER: str = "\n\n".join(f"Line {line} of a long answer about the sea and its time." for line in range(30))
+
+
+async def test_a_long_chat_opens_at_its_foot_reading_the_work_of_its_last_turns_only(
+    runtime: Runtime, thread: tuple[str, list[RunRecord]]
+) -> None:
+    """Item 708: on a wide window the conversation's box was taken for the box it scrolls in, which holds every turn,
+    so every older turn read and drew its work in as the chat opened and the page moved for a second. Now the last
+    turns are read before the page is drawn, the others only as the reader scrolls up to them."""
+    address, _ = thread
+    long: ThreadRecord = await runtime.store.create_thread("A tall chat", "test")
+    chat: list[RunRecord] = []
+    for index in range(_LONG_CHAT):
+        made: RunRecord = await runtime.store.create_run(
+            long.id,
+            f"Tall question {index}",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            "high",
+            "standard",
+            None,
+            "yolo",
+            False,
+            None,
+            None,
+            None,
+        )
+        await runtime.store.finish_run(made.id, "done", f"Tall answer {index}.\n\n{_TALL_ANSWER}")
+        chat.append(made)
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url(host, port, TOKEN))
+            read: list[str] = []
+            oldest_read: asyncio.Event = asyncio.Event()
+
+            def on_request(url: str) -> None:
+                if "/events" in url:
+                    read.append(url)
+                    if f"/runs/{chat[0].id}/events" in url:
+                        oldest_read.set()
+
+            page.on("request", lambda request: on_request(request.url))
+            await page.goto(f"{address}/#/runs/{chat[-1].id}")
+            await expect(page.locator(".history .turn")).to_have_count(_LONG_CHAT - 1, timeout=15000)
+            await page.wait_for_timeout(1500)
+            earlier: list[str] = [run.id for run in chat[:-1]]
+            opened: set[str] = {run_id for run_id in earlier if any(f"/runs/{run_id}/events" in url for url in read)}
+            assert opened == set(earlier[-_READ_FIRST:]), sorted(earlier.index(run_id) for run_id in opened)
+            at_foot: bool = await page.evaluate(
+                "() => { const box = document.scrollingElement;"
+                " return box.scrollHeight - box.clientHeight - box.scrollTop < 4; }"
+            )
+            assert at_foot
+            # The oldest turn reads its work once the reader scrolls up to it.
+            await page.evaluate("window.scrollTo(0, 0)")
+            await asyncio.wait_for(oldest_read.wait(), 5)
+            await page.context.close()
+        finally:
+            await browser.close()
