@@ -214,6 +214,11 @@ _SCRIPTED_NOTE: str = (
     "a script of this run ran in this chat's tabs and could have copied what is typed there: when the user took over, "
     "the other tabs were closed and this page was opened again"
 )
+# Why a chat's tabs were made new before a login was filled (item 697).
+_FRESH_FOR_LOGIN_NOTE: str = (
+    "a script of this run ran in this chat's tabs and could copy what is typed there: before the login, Dot closed "
+    "them and opened this page again in a new tab"
+)
 # The title a tab list gives a tab on a URL the rules forbid, which is not read (item 554).
 _UNREAD_TITLE: str = "(not read: a URL that may not be opened; switching to the tab resets it)"
 # The longest address a note on a tab carries whole.
@@ -1304,6 +1309,15 @@ class BrowserSession:
                 return
             if page.is_closed():
                 add_note(opener_tab, closed_popup_note(page.url))
+                return
+            if not any(held is opener_tab for held in thread.tabs) or not any(
+                held is thread for held in self._threads.values()
+            ):
+                # Its opener left the chat while it was registered (item 697): the chat's tabs were made new for a
+                # login, given back clean to the owner or let go of. A page a script of the run may have reached is not
+                # taken into a chat that is clean now; it closes, as its opener did.
+                with contextlib.suppress(PlaywrightError):
+                    await page.close()
                 return
             thread.tabs.append(tab)
             add_note(opener_tab, f"a new tab opened as tab {len(thread.tabs)}")
@@ -2701,6 +2715,55 @@ class BrowserSession:
             await self._enforce_landing(tab)
             return TextWait(appeared=appeared, waited_s=waited_s, view=view)
 
+    def _refuse_fill(self, url: str, fills_on: Callable[[str], bool], kinds: Sequence[VaultFieldKind]) -> None:
+        """Raise when a fill of ``kinds`` into the page at ``url`` is refused whatever the tabs: the page is not one of
+        the login's sites, or a password or a code would go into the owner's Chrome."""
+        if not fills_on(url):
+            raise BrowserError(
+                "this page is not one of the sites the fill was asked for: Dot fills a login only on its own site",
+                {"url": url},
+            )
+        if self._config.mode == "attach" and any(kind != "username" for kind in kinds):
+            # The owner's Chrome sends its requests unguarded: nothing would keep a value out of an address.
+            raise BrowserError(
+                "in your own Chrome Dot fills no password or code, since it does not guard what that Chrome sends: "
+                "your password manager fills them there, or switch to Dot's own Chrome in Settings › Browser",
+                {"url": url},
+            )
+
+    async def fresh_for_login(
+        self, thread_id: str, fills_on: Callable[[str], bool], kinds: Sequence[VaultFieldKind]
+    ) -> PageView | None:
+        """Make the chat's tabs ones a login may be filled into (item 697), or say they are already: ``None`` when no
+        script of the run ran in a tab of the chat. Else every tab of the chat closes and the current one's address is
+        opened in a new tab, as a new document with no history, where no script of the run ran and none can come back
+        from Chrome's cache of pages; the page is returned, its refs the ones a fill goes on with. A page that was the
+        answer of a form is asked for again by its address, and the form is not sent again. A fill that would be refused
+        on that page anyway (another site, a password in the owner's Chrome) is refused first, with no tab closed."""
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        if thread is None or not thread.scripted:
+            return None
+        async with self._locked(thread_id) as thread:
+            if not thread.scripted or not thread.tabs:
+                return None
+            address: str = thread.tabs[thread.active].page.url
+            self._refuse_fill(address, fills_on, kinds)
+            old: list[Tab] = list(thread.tabs)
+            fresh: Tab = await self._create_tab(thread)
+            for tab in old:
+                await self._close_tab_object(thread, tab)
+            thread.scripted = False
+            add_note(fresh, _FRESH_FOR_LOGIN_NOTE)
+            if address not in _BLANK_URLS and not address.startswith("about:blank"):
+                try:
+                    fresh.status = await self._navigate_checked(fresh.page, address, self._config.navigation_attempts)
+                except BrowserError as error:
+                    add_note(fresh, f"the page could not be opened again: {error.message}")
+            await self._settle(fresh)
+            await self._enforce_landing(fresh)
+            capture: _Capture = await self._capture_loaded(fresh, True)
+            return await self._assemble(thread, fresh, capture, capture.rendered, "full")
+
     async def fill_from_vault(
         self, thread_id: str, fills: Sequence[VaultFill], fills_on: Callable[[str], bool]
     ) -> PageView:
@@ -2718,18 +2781,7 @@ class BrowserSession:
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             await self._enforce_landing(tab)
-            if not fills_on(tab.page.url):
-                raise BrowserError(
-                    "this page is not one of the sites the fill was asked for: Dot fills a login only on its own site",
-                    {"url": tab.page.url},
-                )
-            if self._config.mode == "attach" and any(fill.kind != "username" for fill in fills):
-                # The owner's Chrome sends its requests unguarded: nothing would keep a value out of an address.
-                raise BrowserError(
-                    "in your own Chrome Dot fills no password or code, since it does not guard what that Chrome sends: "
-                    "your password manager fills them there, or switch to Dot's own Chrome in Settings › Browser",
-                    {"url": tab.page.url},
-                )
+            self._refuse_fill(tab.page.url, fills_on, [fill.kind for fill in fills])
             if thread.scripted:
                 # A script may have left a listener that copies what is typed: in its page, in a tab it opened, in a
                 # page Chrome brings back from its cache.
