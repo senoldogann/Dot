@@ -42,7 +42,11 @@ password, and a service asks the page for secrets alone, which Dot keeps in its 
 words appear (``localhost`` among them): they wait for settings of the catalogue that are not secrets, and can be
 added by hand under ``[[mcp]]`` until then. Square lets Dot register now too, but its tools take payments, and no flag
 marks a payment made through an MCP tool yet: it waits for that flag, so that a call of it stops as the money rule
-says whatever the server declares."""
+says whatever the server declares.
+
+Each package started on this Mac by ``npx`` or ``uvx`` is written with one exact version (item 695), the newest on its
+registry on 2026-10-26: ``npx`` and ``uvx`` otherwise run whatever is newest at each start, with the owner's rights.
+``scripts/catalogue_versions.py`` lists each pin beside the newest version, and a test keeps every package pinned."""
 
 import re
 from typing import Literal, Self
@@ -98,6 +102,71 @@ class McpService(FrozenModel):
             differ: str = ", ".join(sorted(names ^ used))
             raise ValueError(f"the secrets a service names and the ones its headers and env refer to differ: {differ}")
         return self
+
+
+type Registry = Literal["npm", "pypi"]
+
+# A version written out whole: numbers with dots, then a pre-release or build part if the release has one (``1.4.2``,
+# ``2026.10.24``, ``4.0.0-beta.3``, ``0.0.1a8``). ``latest``, a range (``1.2.x``, ``^1.2.0``) and an empty version are
+# not: npm's pre-release and build parts follow a dash and a plus, PyPI's are ``a``, ``b``, ``rc``, ``.post`` and
+# ``.dev`` with their numbers.
+_EXACT_VERSION: re.Pattern[str] = re.compile(
+    r"^\d+(?:\.\d+)+(?:(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?|(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?)$"
+)
+# A version or a tag written after a package's name, which ``unversioned`` drops: not another source of the package
+# (``npm:other``, ``github:fork``, an address), which is another package under the name.
+_VERSION_OR_TAG: re.Pattern[str] = re.compile(r"^[0-9A-Za-z.+-]*$")
+
+
+# An npm package's word: the name (a scope's ``@`` begins it), then ``@`` and the version or tag if there is one.
+_NPM_WORD: re.Pattern[str] = re.compile(r"^(@?[^@]+)(?:@(.*))?$")
+# The name at the start of a package's word, before the first ``@`` after it or ``=`` (a scope's ``@`` is part of it).
+_NAME: re.Pattern[str] = re.compile(r"^@?[^@=]+")
+
+
+class StartedPackage(FrozenModel):
+    """The package a service started on this Mac runs, as its ``args`` write it: the ``registry`` it comes from (npm
+    for ``npx``, PyPI for ``uvx``), its ``name`` and the ``version`` written after it (``None`` when none is)."""
+
+    registry: Registry
+    name: str
+    version: str | None
+
+    @property
+    def pinned(self) -> bool:
+        """Whether the version is one exact release, and so the same on every start."""
+        return self.version is not None and _EXACT_VERSION.match(self.version) is not None
+
+
+def package_of(service: McpService) -> StartedPackage | None:
+    """The package ``service`` starts with ``npx`` or ``uvx``: npx's first word that is not an option
+    (``name@version``), uvx's word after ``--from`` or else its first word (``name==version``). ``None`` for a service
+    at an address and for a program of this Mac (``xcrun``)."""
+    if service.command not in ("npx", "uvx"):
+        return None
+    args: list[str] = list(service.args)
+    if service.command == "uvx" and "--from" in args:
+        word: str = args[args.index("--from") + 1]
+    else:
+        word = next(arg for arg in args if not arg.startswith("-"))
+    if service.command == "npx":
+        matched: re.Match[str] | None = _NPM_WORD.match(word)
+        assert matched is not None, (service.id, word)
+        return StartedPackage(registry="npm", name=matched.group(1), version=matched.group(2))
+    name, equals, version = word.partition("==")
+    return StartedPackage(registry="pypi", name=name.partition("@")[0], version=version if equals else None)
+
+
+def unversioned(word: str) -> str:
+    """``word`` without the version or the tag written after a package's name (``name@1.2``, ``name@latest``,
+    ``name==1.2``), as a configured server's arguments and the catalogue's compare: a server added when the catalogue
+    wrote ``@latest`` or no version is still the service's after the catalogue pins one. A word whose part after the
+    name is another source (``name@npm:other``, ``name@github:fork``) is kept whole: it is another package."""
+    matched: re.Match[str] | None = _NAME.match(word)
+    if matched is None:
+        return word
+    after: str = word[matched.end() :].removeprefix("==").removeprefix("@")
+    return matched.group(0) if _VERSION_OR_TAG.match(after) else word
 
 
 MCP_SERVICES: tuple[McpService, ...] = (
@@ -259,7 +328,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Brave Search",
         does="Search the web, news, images and places with Brave's index.",
         command="npx",
-        args=("-y", "@brave/brave-search-mcp-server"),
+        args=("-y", "@brave/brave-search-mcp-server@2.1.4"),
         env={"BRAVE_API_KEY": "${BRAVE_API_KEY}"},
         secrets=(ServiceSecret(name="BRAVE_API_KEY", label="Key", help="https://brave.com/search/api/"),),
     ),
@@ -268,21 +337,21 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Memory",
         does="A web of facts the model keeps across its tasks, on this Mac.",
         command="npx",
-        args=("-y", "@modelcontextprotocol/server-memory"),
+        args=("-y", "@modelcontextprotocol/server-memory@2.0.0"),
     ),
     McpService(
         id="sequential-thinking",
         name="Sequential Thinking",
         does="A scratchpad for the model to think a hard problem through step by step.",
         command="npx",
-        args=("-y", "@modelcontextprotocol/server-sequential-thinking"),
+        args=("-y", "@modelcontextprotocol/server-sequential-thinking@2.0.0"),
     ),
     McpService(
         id="fetch",
         name="Fetch",
         does="Fetch a web page as Markdown, from this Mac.",
         command="uvx",
-        args=("mcp-server-fetch",),
+        args=("mcp-server-fetch==2026.10.24",),
     ),
     McpService(
         id="playwright",
@@ -291,7 +360,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         command="npx",
         # The tools a page registers through WebMCP, which the server offers by default, are the words and code of
         # whatever page it opens: they stay out of a run's tools (item 514).
-        args=("-y", "@playwright/mcp@latest", "--no-webmcp"),
+        args=("-y", "@playwright/mcp@0.0.83", "--no-webmcp"),
     ),
     McpService(
         id="gitlab",
@@ -389,7 +458,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Figma",
         does="Read your Figma files: their frames, components, styles and layout, with a key from your Figma account.",
         command="npx",
-        args=("-y", "figma-developer-mcp", "--stdio"),
+        args=("-y", "figma-developer-mcp@0.13.2", "--stdio"),
         env={"FIGMA_API_KEY": "${FIGMA_API_KEY}"},
         secrets=(
             ServiceSecret(
@@ -407,7 +476,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
             "own connection in."
         ),
         command="uvx",
-        args=("mcp-atlassian",),
+        args=("mcp-atlassian==0.23.1",),
         env={
             "JIRA_URL": "${ATLASSIAN_SITE}",
             "JIRA_USERNAME": "${ATLASSIAN_EMAIL}",
@@ -431,14 +500,14 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Chrome DevTools",
         does="Look into web pages with Chrome's DevTools from this Mac: performance traces, the network, the console.",
         command="npx",
-        args=("-y", "chrome-devtools-mcp@latest"),
+        args=("-y", "chrome-devtools-mcp@1.12.0"),
     ),
     McpService(
         id="perplexity",
         name="Perplexity",
         does="Search the web and research a question with Perplexity's Sonar models.",
         command="npx",
-        args=("-y", "@perplexity-ai/mcp-server"),
+        args=("-y", "@perplexity-ai/mcp-server@1.3.0"),
         env={"PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}"},
         secrets=(ServiceSecret(name="PERPLEXITY_API_KEY", label="Key", help="https://www.perplexity.ai/settings/api"),),
     ),
@@ -447,7 +516,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="ElevenLabs",
         does="Turn text into speech, voices and sound effects with ElevenLabs.",
         command="uvx",
-        args=("elevenlabs-mcp",),
+        args=("elevenlabs-mcp==0.12.2",),
         env={"ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"},
         secrets=(
             ServiceSecret(name="ELEVENLABS_API_KEY", label="Key", help="https://elevenlabs.io/app/settings/api-keys"),
@@ -458,7 +527,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Mapbox",
         does="Search places, turn addresses into coordinates and plan routes with Mapbox.",
         command="npx",
-        args=("-y", "@mapbox/mcp-server"),
+        args=("-y", "@mapbox/mcp-server@0.16.0"),
         env={"MAPBOX_ACCESS_TOKEN": "${MAPBOX_ACCESS_TOKEN}"},
         secrets=(
             ServiceSecret(
@@ -471,14 +540,14 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="AWS Documentation",
         does="Search and read the AWS documentation.",
         command="uvx",
-        args=("awslabs.aws-documentation-mcp-server@latest",),
+        args=("awslabs.aws-documentation-mcp-server==1.2.3",),
     ),
     McpService(
         id="grafana",
         name="Grafana",
         does="Query your Grafana dashboards, data sources, alerts and incidents.",
         command="uvx",
-        args=("mcp-grafana",),
+        args=("mcp-grafana==2.1.1",),
         env={"GRAFANA_URL": "${GRAFANA_URL}", "GRAFANA_SERVICE_ACCOUNT_TOKEN": "${GRAFANA_SERVICE_ACCOUNT_TOKEN}"},
         secrets=(
             ServiceSecret(name="GRAFANA_URL", label="Grafana's address", help=None),
@@ -1017,49 +1086,49 @@ MCP_SERVICES: tuple[McpService, ...] = (
         # alone). A query reads and writes the files it names (COPY ... TO overwrites one) and may ATTACH another
         # database: its query tool is declared as one that acts, and the policy weighs each query so. The server's
         # own tool to switch databases is left out (--allow-switch-databases).
-        args=("mcp-server-motherduck", "--db-path", ":memory:", "--read-write"),
+        args=("mcp-server-motherduck==1.1.0", "--db-path", ":memory:", "--read-write"),
     ),
     McpService(
         id="markitdown",
         name="MarkItDown",
         does="Turn PDF, Word, Excel, PowerPoint, HTML and other files into Markdown, on this Mac.",
         command="uvx",
-        args=("markitdown-mcp",),
+        args=("markitdown-mcp==0.0.1a8",),
     ),
     McpService(
         id="time",
         name="Time",
         does="Tell the time in any time zone and convert a time from one zone to another.",
         command="uvx",
-        args=("mcp-server-time",),
+        args=("mcp-server-time==2026.10.19",),
     ),
     McpService(
         id="shadcn",
         name="shadcn/ui",
         does="Browse, search and add shadcn/ui components to a project.",
         command="npx",
-        args=("-y", "shadcn@latest", "mcp"),
+        args=("-y", "shadcn@4.22.1", "mcp"),
     ),
     McpService(
         id="magic-ui",
         name="Magic UI",
         does="Find Magic UI's animated React components and their code.",
         command="npx",
-        args=("-y", "@magicuidesign/mcp@latest"),
+        args=("-y", "@magicuidesign/mcp@2.0.0"),
     ),
     McpService(
         id="nextjs",
         name="Next.js DevTools",
         does="Read Next.js's docs, and look into a Next.js app running on this Mac: its errors, routes and logs.",
         command="npx",
-        args=("-y", "next-devtools-mcp@latest"),
+        args=("-y", "next-devtools-mcp@0.4.0"),
     ),
     McpService(
         id="shopify-dev",
         name="Shopify Dev",
         does="Search Shopify's developer documentation, and check the code written for it.",
         command="npx",
-        args=("-y", "@shopify/dev-mcp@latest"),
+        args=("-y", "@shopify/dev-mcp@1.17.0"),
     ),
     McpService(
         id="xcode",
@@ -1073,49 +1142,49 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="XcodeBuildMCP",
         does="Build, run and test iOS and macOS apps on simulators and devices with Xcode's own commands.",
         command="npx",
-        args=("-y", "xcodebuildmcp@latest", "mcp"),
+        args=("-y", "xcodebuildmcp@2.7.0", "mcp"),
     ),
     McpService(
         id="kubernetes",
         name="Kubernetes",
         does="Look into and manage the clusters of your kubeconfig: pods, deployments, logs and events.",
         command="npx",
-        args=("-y", "kubernetes-mcp-server@latest"),
+        args=("-y", "kubernetes-mcp-server@0.0.69"),
     ),
     McpService(
         id="azure",
         name="Azure",
         does="Work with your Azure resources, signed in with Azure's command line (az login).",
         command="npx",
-        args=("-y", "@azure/mcp@latest", "server", "start"),
+        args=("-y", "@azure/mcp@4.0.0-beta.3", "server", "start"),
     ),
     McpService(
         id="aws-api",
         name="AWS",
         does="Run commands on your AWS account, signed in as this Mac's AWS settings say.",
         command="uvx",
-        args=("awslabs.aws-api-mcp-server@latest",),
+        args=("awslabs.aws-api-mcp-server==1.5.6",),
     ),
     McpService(
         id="firebase",
         name="Firebase",
         does="Work with your Firebase projects: their apps, Firestore, authentication and rules.",
         command="npx",
-        args=("-y", "firebase-tools@latest", "mcp"),
+        args=("-y", "firebase-tools@15.34.1", "mcp"),
     ),
     McpService(
         id="convex",
         name="Convex",
         does="Look into your Convex deployments: their tables, data, functions and logs.",
         command="npx",
-        args=("-y", "convex@latest", "mcp", "start"),
+        args=("-y", "convex@1.48.0", "mcp", "start"),
     ),
     McpService(
         id="snyk",
         name="Snyk",
         does="Scan code, dependencies, containers and infrastructure files for vulnerabilities with Snyk.",
         command="npx",
-        args=("-y", "snyk@latest", "mcp", "-t", "stdio"),
+        args=("-y", "snyk@1.1308.3", "mcp", "-t", "stdio"),
     ),
     # Item 535: started on this Mac with a key, each started by `dotx mcp list` with a placeholder, listing its tools.
     McpService(
@@ -1123,7 +1192,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="MongoDB",
         does="Query and manage your MongoDB databases and collections, and your Atlas clusters.",
         command="npx",
-        args=("-y", "mongodb-mcp-server@latest"),
+        args=("-y", "mongodb-mcp-server@3.1.0"),
         env={"MDB_MCP_CONNECTION_STRING": "${MONGODB_CONNECTION_STRING}"},
         secrets=(
             ServiceSecret(
@@ -1138,7 +1207,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Pinecone",
         does="Search and manage your Pinecone indexes and the records in them, and read Pinecone's docs.",
         command="npx",
-        args=("-y", "@pinecone-database/mcp"),
+        args=("-y", "@pinecone-database/mcp@0.3.0"),
         env={"PINECONE_API_KEY": "${PINECONE_API_KEY}"},
         secrets=(ServiceSecret(name="PINECONE_API_KEY", label="Key", help="https://app.pinecone.io/"),),
     ),
@@ -1147,7 +1216,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="PagerDuty",
         does="Look up and work on PagerDuty incidents, services, schedules and on-call.",
         command="uvx",
-        args=("pagerduty-mcp",),
+        args=("pagerduty-mcp==1.1.0",),
         env={"PAGERDUTY_USER_API_KEY": "${PAGERDUTY_API_KEY}"},
         secrets=(
             ServiceSecret(
@@ -1162,7 +1231,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="HubSpot",
         does="Find and update the contacts, companies, deals and tickets of your HubSpot CRM.",
         command="npx",
-        args=("-y", "@hubspot/mcp-server"),
+        args=("-y", "@hubspot/mcp-server@0.4.0"),
         env={"PRIVATE_APP_ACCESS_TOKEN": "${HUBSPOT_TOKEN}"},
         secrets=(
             ServiceSecret(
@@ -1177,7 +1246,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Mailgun",
         does="Send e-mail and look into your Mailgun domains, events and statistics.",
         command="npx",
-        args=("-y", "@mailgun/mcp-server"),
+        args=("-y", "@mailgun/mcp-server@2.1.3"),
         env={"MAILGUN_API_KEY": "${MAILGUN_API_KEY}"},
         secrets=(
             ServiceSecret(
@@ -1192,7 +1261,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Kagi",
         does="Search the web with Kagi, and summarize a page or a video.",
         command="uvx",
-        args=("kagimcp",),
+        args=("kagimcp==1.0.2",),
         env={"KAGI_API_KEY": "${KAGI_API_KEY}"},
         secrets=(ServiceSecret(name="KAGI_API_KEY", label="Key", help="https://kagi.com/settings?p=api"),),
     ),
@@ -1201,7 +1270,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Alibaba Cloud",
         does="Look into and manage your Alibaba Cloud instances, databases, storage and monitoring.",
         command="uvx",
-        args=("alibaba-cloud-ops-mcp-server@latest",),
+        args=("alibaba-cloud-ops-mcp-server==0.9.27",),
         env={
             "ALIBABA_CLOUD_ACCESS_KEY_ID": "${ALIBABA_CLOUD_ACCESS_KEY_ID}",
             "ALIBABA_CLOUD_ACCESS_KEY_SECRET": "${ALIBABA_CLOUD_ACCESS_KEY_SECRET}",
@@ -1224,7 +1293,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="DingTalk",
         does="Read your DingTalk contacts and calendar, and send messages and work notices.",
         command="npx",
-        args=("-y", "dingtalk-mcp@latest"),
+        args=("-y", "dingtalk-mcp@1.1.21"),
         env={"DINGTALK_Client_ID": "${DINGTALK_CLIENT_ID}", "DINGTALK_Client_Secret": "${DINGTALK_CLIENT_SECRET}"},
         secrets=(
             ServiceSecret(

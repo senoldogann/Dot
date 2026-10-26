@@ -4,8 +4,9 @@ over streamable HTTP or SSE, a command line), with the names and lines it refuse
 import pytest
 
 from dotagent.config import McpServerConfig
+from dotagent.connections.directory import PLUGINS
 from dotagent.core.errors import ConfigError, McpError, NotFoundError
-from dotagent.mcp.catalogue import MCP_SERVICES, McpService
+from dotagent.mcp.catalogue import MCP_SERVICES, McpService, StartedPackage, package_of, unversioned
 from dotagent.mcp.launch import referenced_secrets
 from dotagent.mcp.signin import checked_link
 from dotagent.server.routes_mcp import (
@@ -67,6 +68,75 @@ def test_each_service_of_the_catalogue_is_a_server_dot_can_have() -> None:
         assert set(referenced_secrets(config)) == kept, service.id
 
 
+def test_each_server_started_on_this_mac_runs_the_one_version_the_catalogue_pins() -> None:
+    """Item 695: ``npx`` and ``uvx`` run what the registry has newest at each start, with the owner's rights, so each
+    package the catalogue starts is written with its exact version (``name@x.y.z``, ``name==x.y.z``): a release that is
+    compromised or breaks lands only when someone bumps the number (``scripts/catalogue_versions.py`` shows which)."""
+    started: list[McpService] = [service for service in MCP_SERVICES if service.command in ("npx", "uvx")]
+    assert len(started) > 30
+    for service in started:
+        package: StartedPackage | None = package_of(service)
+        assert package is not None, service.id
+        assert package.pinned, (service.id, package)
+        assert "latest" not in " ".join(service.args), service.id
+        # The version is written where its program reads it: after npm's ``@``, after PyPI's ``==``.
+        word: str = next(arg for arg in service.args if not arg.startswith("-"))
+        assert word == (
+            f"{package.name}@{package.version}" if package.registry == "npm" else f"{package.name}=={package.version}"
+        )
+    # What else is started has no registry to pin by (Xcode's own bridge), and a service at an address starts nothing.
+    assert [service.id for service in MCP_SERVICES if service.command not in (None, "npx", "uvx")] == ["xcode"]
+    assert all(package_of(service) is None for service in MCP_SERVICES if service.command not in ("npx", "uvx"))
+    # The directory names its ways by the catalogue's ids: each way started on this Mac is one of those pinned.
+    for listing in PLUGINS:
+        for way in listing.ways:
+            if way.kind == "mcp":
+                service: McpService = next(one for one in MCP_SERVICES if one.id == way.ref)
+                assert service.command not in ("npx", "uvx") or service in started, way.ref
+
+
+def test_a_package_word_is_read_as_its_registry_writes_it_and_a_server_added_before_the_pin_is_still_the_services() -> (
+    None
+):
+    npm: McpService = McpService(id="a", name="A", does="d", command="npx", args=("-y", "@scope/pkg@1.2.3", "serve"))
+    assert package_of(npm) == StartedPackage(registry="npm", name="@scope/pkg", version="1.2.3")
+    unpinned: McpService = npm.model_copy(update={"args": ("-y", "pkg", "serve")})
+    assert package_of(unpinned) == StartedPackage(registry="npm", name="pkg", version=None)
+    assert not StartedPackage(registry="npm", name="pkg", version="latest").pinned
+    assert not StartedPackage(registry="pypi", name="pkg", version=">=1.2").pinned
+    assert StartedPackage(registry="pypi", name="pkg", version="0.0.1a8").pinned
+    # uvx's own word after --from names the package, the command after it does not.
+    moved: McpService = McpService(id="b", name="B", does="d", command="uvx", args=("--from", "pkg==2.0.1", "tool"))
+    assert package_of(moved) == StartedPackage(registry="pypi", name="pkg", version="2.0.1")
+    assert [unversioned(word) for word in ("@a/b@latest", "@a/b", "p==1.2", "p@1.2", "p", ":memory:")] == [
+        "@a/b",
+        "@a/b",
+        "p",
+        "p",
+        "p",
+        ":memory:",
+    ]
+    # A server that was added while the catalogue wrote ``@latest`` or no version at all is the service's all the same.
+    for word, service_id in (("@playwright/mcp@latest", "playwright"), ("@playwright/mcp", "playwright")):
+        assert service_of(McpServerConfig(name="mine", command="npx", args=["-y", word])) == service_id
+    assert service_of(McpServerConfig(name="mine", command="uvx", args=["mcp-server-time"])) == "time"
+    assert service_of(McpServerConfig(name="mine", command="uvx", args=["mcp-server-time==1.0.0"])) == "time"
+    assert service_of(McpServerConfig(name="mine", command="uvx", args=["mcp-server-time-other"])) is None
+    # Another source under the service's name is another package (the code and security reviews of item 695); a range
+    # is no pin.
+    for word in (
+        "@playwright/mcp@npm:other-package",
+        "@playwright/mcp@github:someone/fork",
+        "@playwright/mcp@https://x",
+    ):
+        assert unversioned(word) == word
+        assert service_of(McpServerConfig(name="mine", command="npx", args=["-y", word])) is None
+    for loose in ("1.2.x", "^1.2.0", "~1.2", "1.2.3 || 2", "1.2.3a"):
+        assert not StartedPackage(registry="npm", name="pkg", version=loose).pinned, loose
+    for exact in ("4.0.0-beta.3", "1.2.3+build.5", "2026.10.24", "1.0.0rc2", "1.0.0.post1", "0.3.0.dev4"):
+        assert StartedPackage(registry="npm", name="pkg", version=exact).pinned, exact
+
+
 def test_the_try_that_adds_a_server_of_this_mac_waits_for_its_package_and_the_server_kept_does_not() -> None:
     """Item 535: npx and uvx fetch a server's package on its first start, which took from 52 seconds to more than five
     minutes on a cold cache; the try that adds it is given FIRST_START_S, the server kept keeps its own limit, which a
@@ -101,11 +171,12 @@ def test_a_service_s_secrets_are_asked_for_by_name_and_kept_under_dot_s_own_name
     assert unknown.value.context["unknown"] == ["OTHER"]
     brave: McpService = next(service for service in MCP_SERVICES if service.id == "brave-search")
     local: McpServerConfig = service_config(brave)
-    assert (local.command, local.args, local.env) == (
+    assert (local.command, local.args[0], local.env) == (
         "npx",
-        ["-y", "@brave/brave-search-mcp-server"],
+        "-y",
         {"BRAVE_API_KEY": "${MCP_BRAVE_SEARCH_BRAVE_API_KEY}"},
     )
+    assert local.args[1].startswith("@brave/brave-search-mcp-server@")
     # A server added by hand with the service's address or command wears the service's name.
     assert service_of(McpServerConfig(name="mine", url="https://mcp.notion.com/mcp")) == "notion"
     assert (
@@ -113,7 +184,7 @@ def test_a_service_s_secrets_are_asked_for_by_name_and_kept_under_dot_s_own_name
     )
     # Item 514: Dot's own Playwright server keeps a page's WebMCP tools out of a run, and is still the service's.
     playwright: McpService = next(service for service in MCP_SERVICES if service.id == "playwright")
-    assert playwright.args == ("-y", "@playwright/mcp@latest", "--no-webmcp")
+    assert playwright.args[0] == "-y" and playwright.args[2:] == ("--no-webmcp",)
     assert service_of(McpServerConfig(name="mine", command="npx", args=list(playwright.args))) == "playwright"
     assert service_of(McpServerConfig(name="mine", command="npx", args=["-y", "something-else"])) is None
 
