@@ -13,6 +13,7 @@ its run is told with the brief's own words, the first line of its answer (:func:
 import asyncio
 import math
 import re
+import time
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Literal
@@ -24,11 +25,15 @@ from dotagent.agent.manager import thread_title
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import plugins_dir
 from dotagent.core.types import FrozenModel
 from dotagent.evals import EVAL_SOURCE
 from dotagent.events import EventBus
 from dotagent.notify.owner import tell_owner
 from dotagent.oauth.tokens import Account
+from dotagent.plugins import scout_service
+from dotagent.plugins.scout_types import Candidate, ScoutState, retired
+from dotagent.plugins.scout_types import waiting as is_waiting
 from dotagent.proactive.text import one_line, quoted
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -370,6 +375,24 @@ async def _waiting(store: Store) -> Quoted:
     )
 
 
+async def _plugins(store: Store) -> Quoted:
+    """How many plugins the scout proposed wait for the owner on Customize › Plugins (item 711): only the numbers,
+    since a plugin's name and what the review wrote of it are a stranger's words, which the brief does not quote."""
+    state: ScoutState = await scout_service.load(store)
+    now: float = time.time()
+    # As the page counts them: an update that no longer applies to its plugin waits for nobody (item 712).
+    shown: ScoutState = await asyncio.to_thread(retired, state, plugins_dir())
+    waiting: list[Candidate] = [candidate for candidate in shown.candidates if is_waiting(candidate, now)]
+    if not waiting:
+        return Quoted(lines=("Plugins proposed by Dot's nightly look: none waiting.",), run_ids=())
+    new: int = sum(1 for candidate in waiting if candidate.kind == "new")
+    line: str = (
+        f"Plugins proposed by Dot's nightly look, waiting for the owner on Customize › Plugins: {len(waiting)} "
+        f"({new} new, {len(waiting) - new} updates)."
+    )
+    return Quoted(lines=(line,), run_ids=())
+
+
 def _why_it_failed(run: RunRecord) -> str:
     """The first line of what a failed run said, or that it said none."""
     return next((line for line in run.result.splitlines() if line.strip()), "it gave no reason")
@@ -510,6 +533,7 @@ async def prepare(runtime: Runtime, record: ScheduleRecord, now: float, zone: Zo
     accounts: list[Account] = await runtime.accounts.accounts()
     parts: list[Quoted] = [
         await _waiting(store),
+        await _plugins(store),
         await _failed(store, since),
         await _campaigns(store, zone),
         await _today(store, record, now, zone),

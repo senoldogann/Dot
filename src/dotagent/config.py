@@ -850,6 +850,25 @@ class SkillsConfig(FrozenModel):
     builtin: bool = True
 
 
+class ScoutConfig(FrozenModel):
+    """The plugin scout (item 711, docs/extending.md): when it looks each night for plugins worth proposing and for
+    updates of those installed, and how much one night may read. It installs nothing: each proposal waits for the
+    owner."""
+
+    time: str
+    leads_per_night: int = Field(ge=0, le=200)
+    updates_per_night: int = Field(ge=0, le=100)
+    minutes: int = Field(ge=1, le=240)
+    review_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+
+    @field_validator("time")
+    @classmethod
+    def _time_of_day(cls, value: str) -> str:
+        if value != "off" and _TIME_OF_DAY.fullmatch(value) is None:
+            raise ValueError('[scout] time is a time of day as "03:30" (24-hour) or "off"')
+        return value
+
+
 class PluginsConfig(FrozenModel):
     """Where plugins are looked for besides ``<home>/plugins`` (``[plugins]``). Each entry is a directory whose children
     are plugins in the Claude Code layout (``.claude-plugin/plugin.json``), or one such plugin itself; ``~`` expands."""
@@ -907,6 +926,7 @@ class AppConfig(FrozenModel):
     watchers: WatchersConfig
     skills: SkillsConfig
     plugins: PluginsConfig
+    scout: ScoutConfig
 
     @field_validator("mcp")
     @classmethod

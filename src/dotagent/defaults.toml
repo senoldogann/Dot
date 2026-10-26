@@ -1004,3 +1004,17 @@ builtin = true
 # is one plugin itself; ~ expands). Plugins are read when Dot starts, skills at the start of every run.
 dirs = []
 
+[scout]
+# The plugin scout (docs/extending.md): each night, at time (HH:MM in [scheduler] timezone, or "off"), it looks for plugins
+# worth proposing on Customize › Plugins (Anthropic's marketplaces, the makers' own repositories, GitHub's topics for
+# agent skills) and for updates of the plugins installed from the gallery or from a proposal. Each is checked by the rules (an MIT or
+# Apache-2.0 licence, a repository at least 90 days old and kept up), downloaded at a pinned commit, scanned and read by
+# the review model ([models] review), then kept for you: nothing is installed until you say so. leads_per_night and
+# updates_per_night bound what one night reads (GitHub answers 60 requests an hour without the token of Customize ›
+# Connectors), minutes how long it may take.
+time = "03:30"
+leads_per_night = 25
+updates_per_night = 20
+minutes = 30
+review_timeout_s = 120.0
+

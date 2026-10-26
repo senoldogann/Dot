@@ -267,7 +267,7 @@ async def run_daemon(config: AppConfig) -> int:
             if config.server.keep_awake:
                 await runtime.awake.start()
             manager: RunManager = RunManager(runtime)
-            scheduler: Scheduler = Scheduler(runtime, manager)
+            scheduler: Scheduler = Scheduler(runtime, manager, scout=True)
             cleanup.push_async_callback(scheduler.drain)
             cleanup.push_async_callback(manager.shutdown)
             cleanup.push_async_callback(scheduler.stop)

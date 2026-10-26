@@ -26,6 +26,9 @@ from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.probe import probe_apart
 from dotagent.harness.step import run_step
 from dotagent.llm.types import Speed
+from dotagent.plugins import scout_service
+from dotagent.plugins.scout import ScoutStopped
+from dotagent.plugins.scout_types import ScoutState
 from dotagent.proactive.brief import BriefFiring, is_brief, prepare, tell_brief
 from dotagent.runtime import Runtime
 from dotagent.scheduler import (
@@ -114,8 +117,12 @@ class Scheduler:
     own, so the schedules due at the same time wait for nothing. A night the daemon slept through is caught up once.
     """
 
-    def __init__(self, runtime: Runtime, manager: RunManager) -> None:
+    def __init__(self, runtime: Runtime, manager: RunManager, scout: bool = False) -> None:
+        """``scout`` lets the plugin scout's night start (item 711): the daemon's scheduler alone, since a night
+        reads GitHub and calls the review model, which a scheduler made elsewhere (a test ticking its own clock) must
+        not."""
         self._runtime: Runtime = runtime
+        self._may_scout: bool = scout
         self._manager: RunManager = manager
         self._zone: ZoneInfo = runtime.schedule_zone
         self._in_flight: dict[str, str] = {}
@@ -128,6 +135,9 @@ class Scheduler:
         # The step of the harness (item 391), timed like the reflection.
         self._stepped_from: float = time.time()
         self._stepping: asyncio.Task[None] | None = None
+        # The plugin scout's night (item 711), timed like the reflection.
+        self._scouted_from: float = time.time()
+        self._scouting: asyncio.Task[None] | None = None
 
     async def start(self) -> asyncio.Task[None]:
         """Begin ticking in the background; what an earlier process left unfinished (a schedule starting or running a
@@ -172,6 +182,9 @@ class Scheduler:
         stepping: asyncio.Task[None] | None = self._stepping
         if stepping is not None:
             stepping.cancel()
+        scouting: asyncio.Task[None] | None = self._scouting
+        if scouting is not None:
+            scouting.cancel()
         loop: asyncio.Task[None] | None = self._loop
         if loop is None:
             return
@@ -189,6 +202,8 @@ class Scheduler:
             await asyncio.wait({self._reflecting})
         if self._stepping is not None:
             await asyncio.wait({self._stepping})
+        if self._scouting is not None:
+            await asyncio.wait({self._scouting})
 
     def reflecting(self) -> bool:
         """Whether a reflection is under way."""
@@ -212,7 +227,7 @@ class Scheduler:
             except Exception as exc:
                 log.exception("scheduler_part_failed", part=part.__name__)
                 failures.append(exc)
-        for part in (self._reflect_if_due, self._step_if_due, self._check_learning):
+        for part in (self._reflect_if_due, self._step_if_due, self._scout_if_due, self._check_learning):
             try:
                 await part(now)
             except Exception as exc:
@@ -282,6 +297,49 @@ class Scheduler:
             return
         self._stepped_from = now
         self._stepping = asyncio.create_task(self._step(now), name="harness-step")
+
+    async def _scout_if_due(self, now: float) -> None:
+        """Start the plugin scout's night (item 711) in a task when its daily time has passed since its last night
+        (or the last attempt); never while one is under way (the scheduler's, or a Look now, which then counts as the
+        night's), never with ``[scout] time`` off, and none while the
+        emergency stop is engaged, which also cancels one under way: it stores nothing until its end, so the next
+        night looks at the same plugins again."""
+        if await _emergency_stop_engaged():
+            if self._scouting is not None and not self._scouting.done():
+                self._scouting.cancel()
+                log.info("scout_stopped_by_emergency_stop")
+            return
+        if not self._may_scout or (self._scouting is not None and not self._scouting.done()):
+            return
+        scout_time: str = self._runtime.config.scout.time
+        if scout_time == REFLECTION_OFF:
+            return
+        # The cheap check first: a night is not due before its time since the last attempt, whatever the state says.
+        if not reflection_due(scout_time, self._scouted_from, now, self._zone):
+            return
+        last: ScoutState = await scout_service.load(self._runtime.store)
+        anchor: float = max(self._scouted_from, last.last_run or 0.0)
+        if not reflection_due(scout_time, anchor, now, self._zone):
+            return
+        self._scouted_from = now
+        if scout_service.running(self._runtime):
+            # A look the owner started (Look now) is under way: it is tonight's, not one to queue behind it.
+            log.info("scout_night_taken_by_look_now")
+            return
+        self._scouting = asyncio.create_task(self._scout(now), name="plugin-scout")
+
+    async def _scout(self, now: float) -> None:
+        """Task body of the scout's night, and the one place its errors end: logged, and the next night tries again."""
+        try:
+            state: ScoutState = await scout_service.night(self._runtime, now)
+        except ScoutStopped as exc:
+            log.info("scout_stopped", reason=exc.message)
+        except DotError as exc:
+            log.error("scout_failed", error=exc.message, context=exc.context)
+        except Exception:
+            log.exception("scout_crashed")
+        else:
+            log.info("scout_fired", summary=state.last_summary)
 
     async def _step(self, now: float) -> None:
         """Task body of a step of the harness, and the one place its errors end: its outcome is logged and kept in the

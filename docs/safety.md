@@ -187,6 +187,13 @@ run needs, sent where the configuration points:
 - **To GitHub, when you install a plugin of the gallery: the request for its archive.** It names the plugin's
   repository and the commit the gallery pins, and carries nothing of yours (see
   [Customize › Plugins](extending.md#customize--plugins)).
+- **To GitHub, each night, for the plugins proposed to you: the requests of the look (item 711).** The catalogues of
+  Anthropic's marketplaces, what GitHub says of a repository, its topics' search and the archive of a pinned commit,
+  with the token of Customize › Connectors when there is one; nothing of yours is in them. What a plugin's skills say
+  (each `SKILL.md` and the text of its scripts and other files) goes to the review model (`[models] review`, the
+  provider your runs already use) as a stranger's text in a fence, never as instructions, with five of the goals you
+  gave Dot lately so that it writes in your language; no plugin is installed without your click (see [the nightly
+  look](extending.md#the-nightly-look-plugins-proposed-for-you)).
 
 The record of the runs, the notes, the logs and the screenshots stay on this Mac in Dot's folders (see
 [Configuration](configuration.md#configuration)), and a key goes only to its own service. To keep a run's conversation here too, give
@@ -1109,12 +1116,13 @@ event and approval.
   ends (item 683); the page shows a banner with a button that releases it
 - `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way, without ending a run; delete the
   file to allow it again
-- while the `STOP` file exists, no schedule fires (a firing due then is skipped to its next time, saying why; a
-  one-time schedule, which has no next time, waits and fires once the stop is released) and no campaign starts a
-  session (it starts once the stop is released); a run that a schedule or a campaign was starting when the file
-  appeared ends as an emergency stop as soon as it exists; the reflection and the harness's step neither start nor go
-  on (one under way is cancelled, as at the daemon's stop, and the harness's probe ends with the commands it started,
-  item 683)
+- while the `STOP` file exists, no schedule fires (a firing due then is skipped to its next time, saying why; a one-time
+  schedule, which has no next time, waits and fires once the stop is released) and no campaign starts a session (it
+  starts once the stop is released); a run that a schedule or a campaign was starting when the file appeared ends as an
+  emergency stop as soon as it exists; the reflection and the harness's step neither start nor go on (one under way is
+  cancelled, as at the daemon's stop, and the harness's probe ends with the commands it started, item 683); nor does the
+  nightly look for plugins (one under way ends at its next plugin and stores nothing, and Look now answers 409, items
+  711 and 712)
 - while the `STOP` file exists, no watcher looks (a stop engaged while one looks keeps the next from looking and the
   one at work from starting a run, item 683), and **a message on a channel** (iMessage, [Channels](channels.md),
   item 611) starts no run and is not queued either: a message queued starts its run when the one at work ends, stop or
