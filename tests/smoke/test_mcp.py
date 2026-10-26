@@ -585,21 +585,23 @@ server.run("stdio")
 """
 
 
-async def test_a_server_whose_tool_has_a_schema_dot_cannot_use_is_left_out_and_the_others_serve(
+async def test_a_server_whose_tool_has_a_schema_that_refers_to_itself_serves_with_that_part_cut(
     login_env: dict[str, str],
 ) -> None:
-    """Item 175: the schema is checked when the server starts, so the server is left out with the reason, and the tools
-    of the others are registered; before, registering them failed and Dot did not start."""
+    """Item 671: a tool whose schema is a tree (a node holding nodes) is handed to the model with the part past the
+    depth Dot follows cut to a loose one that says so, and its server serves beside the others. Before (item 175), the
+    schema left the whole server out, as Vercel's ``update_flag`` left Vercel out."""
     marker: str = f"dot-kept-{uuid.uuid4().hex}"
     good: McpServerConfig = McpServerConfig(name="good", command=sys.executable, args=[str(FIXTURE), marker])
     hub: McpHub = await open_hub([good, _python_server("tree", _TREE_SERVER, 30.0)], login_env)
     try:
-        assert {tool.server for tool in hub.tools} == {"good"}
-        (failure,) = hub.failures
-        assert failure.server == "tree"
-        assert failure.error == "the input schema of an MCP tool cannot be used"
-        assert (failure.detail["tool"], failure.detail["hint"]) == ("count", "leave it out with `allow`")
-        assert len(build_mcp_tools(hub)) == len(hub.tools)
+        assert {tool.server for tool in hub.tools} == {"good", "tree"}
+        assert hub.failures == ()
+        (count,) = (tool for tool in hub.tools if tool.server == "tree")
+        assert count.remote_name == "count"
+        built = {tool.spec.name: tool.spec for tool in build_mcp_tools(hub)}
+        assert "nest deeper than shown here" in str(built[count.exposed_name].parameters)
+        assert len(built) == len(hub.tools)
     finally:
         await hub.close()
     await _assert_gone(marker)
