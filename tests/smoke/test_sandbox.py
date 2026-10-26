@@ -199,6 +199,8 @@ async def test_a_command_of_a_run_neither_reads_nor_changes_dots_own_files_whate
         # A row of the paired phones would be a key the guard takes (item 670).
         f"echo '[]' > {shlex.quote(str(phones_path()))}",
         f"ln {shlex.quote(str(token_path()))} {shlex.quote(str(linked))}",
+        # A link in place of the daemon's pid file would have the daemon empty and write the token (item 676).
+        f"ln -s {shlex.quote(str(token_path()))} {shlex.quote(str(dot_home() / 'daemon.pid'))}",
         f"echo planted > {shlex.quote(str(code))}",
         f"echo planted > {shlex.quote(str(environment))}",
         f"mv {shlex.quote(str(dot_home()))} {shlex.quote(str(moved))}",
@@ -213,7 +215,16 @@ async def test_a_command_of_a_run_neither_reads_nor_changes_dots_own_files_whate
     assert _refused(read) and TOKEN not in read, read
     for line, answer in zip(changes, changed, strict=True):
         assert _refused(answer), (line, answer)
-    assert await asyncio.to_thread(_existing, (skill, linked, failsafe_path(), phones_path(), code, environment)) == []
+    planted: tuple[Path, ...] = (
+        skill,
+        linked,
+        failsafe_path(),
+        phones_path(),
+        dot_home() / "daemon.pid",
+        code,
+        environment,
+    )
+    assert await asyncio.to_thread(_existing, planted) == []
     # The Python under the environment and the job that starts the daemon are among what Dot runs as well.
     assert await asyncio.to_thread(_run_on) <= set(runtime.dot_paths), runtime.dot_paths
     assert await asyncio.to_thread(config_path().read_text, encoding="utf-8") == settings

@@ -98,6 +98,62 @@ def test_macos_holds_a_command_to_its_profile(tmp_path: Path) -> None:
     assert UNSANDBOXED.commands == UNSANDBOXED.search == ()
 
 
+def test_macos_closes_dots_home_to_a_command_but_for_the_workspace(tmp_path: Path) -> None:
+    """Item 676: the daemon opens and writes files in its home and its logs with the owner's rights, so a command may
+    leave nothing there, not even a link in place of the daemon's pid file, which the daemon would empty and write at
+    its next start; in the workspace it works as before, but may not remove, move or replace the workspace itself."""
+    home: Path = Path(os.path.realpath(tmp_path)) / "home"
+    workspace: Path = home / "workspace"
+    logs: Path = Path(os.path.realpath(tmp_path)) / "logs"
+    for folder in (workspace, logs):
+        folder.mkdir(parents=True)
+    token: Path = home / "api-token"
+    token.write_text("secret", encoding="utf-8")
+    pid: Path = home / "daemon.pid"
+    pid.write_text("1\n", encoding="utf-8")
+    agents: Path = home / "Library" / "LaunchAgents"
+    words: tuple[str, ...] = build_sandbox((token,), (token,), (), agents, (home, logs), (workspace,)).commands
+
+    def run(line: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([*words, "/bin/zsh", "-c", line], capture_output=True, text=True, check=False)
+
+    refused: list[subprocess.CompletedProcess[str]] = [
+        run(f"rm -f {pid}"),
+        run(f"ln -s {token} {home}/daemon.running"),
+        run(f"echo planted > {home}/looks.txt"),
+        run(f"ln -s {token} {logs}/opencode.log"),
+        run(f"mv {workspace} {home}/elsewhere"),
+        run(f"rmdir {workspace}"),
+    ]
+    allowed: subprocess.CompletedProcess[str] = run(
+        f"cd {workspace} && mkdir -p a/b && echo note > a/b/note.txt && ln -s a/b/note.txt link && mv a c && "
+        "cat link c/b/note.txt; rm -r c link && echo done"
+    )
+    assert [(done.returncode != 0, "not permitted" in done.stderr) for done in refused] == [(True, True)] * 6
+    assert pid.read_text(encoding="utf-8") == "1\n" and not pid.is_symlink()
+    assert sorted(path.name for path in home.iterdir()) == ["api-token", "daemon.pid", "workspace"]
+    assert list(logs.iterdir()) == []
+    assert allowed.returncode == 0 and allowed.stdout.endswith("done\n"), allowed.stderr
+    assert list(workspace.iterdir()) == []
+
+
+def test_the_open_folders_are_allowed_back_before_every_other_rule(tmp_path: Path) -> None:
+    rules: list[str] = sandbox_profile(
+        (Path("/home/api-token"),),
+        (Path("/home/skills"),),
+        Path("/home/Library/LaunchAgents"),
+        (Path("/home"), Path("/logs")),
+        (Path("/home/workspace"),),
+    ).splitlines()
+    assert rules[2:5] == [
+        '(deny file-write* (subpath "/home") (subpath "/logs"))',
+        '(allow file-write* (subpath "/home/workspace"))',
+        '(deny file-read* file-write* (subpath "/home/api-token"))',
+    ]
+    kept: str = next(rule for rule in rules if rule.startswith("(deny file-write* (literal "))
+    assert '(literal "/home/workspace")' in kept and '(literal "/home")' in kept
+
+
 def test_macos_refuses_the_service_that_would_run_what_a_program_hands_it(tmp_path: Path) -> None:
     """Item 418: what the profile refuses is not the program but the service behind it, so a program a run wrote is held
     to it too. ``shortcuts`` reaches the Shortcuts service, which runs a shortcut outside the sandbox ("Run Shell

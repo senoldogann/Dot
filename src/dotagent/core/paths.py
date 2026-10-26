@@ -1,7 +1,10 @@
 """Filesystem layout. Everything Dot owns lives under one home directory (``DOT_HOME`` overrides)."""
 
 import os
+import stat
 from pathlib import Path
+
+_PRIVATE_DIR_MODE: int = 0o700
 
 
 def dot_home() -> Path:
@@ -216,4 +219,6 @@ def ensure_layout() -> None:
         plugins_dir(),
     ):
         directory.mkdir(parents=True, exist_ok=True)
-    os.chmod(dot_home(), 0o700)
+    # Set only when it is not so already: a command of a run (``dotx`` in its sandbox) may not change Dot's home.
+    if stat.S_IMODE(dot_home().stat().st_mode) != _PRIVATE_DIR_MODE:
+        os.chmod(dot_home(), _PRIVATE_DIR_MODE)

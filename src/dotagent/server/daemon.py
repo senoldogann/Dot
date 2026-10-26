@@ -7,6 +7,7 @@ import functools
 import os
 import signal
 import socket
+import stat
 import time
 from collections.abc import Iterator
 from contextlib import AsyncExitStack
@@ -111,10 +112,29 @@ def bind_listener(host: str, port: int) -> socket.socket:
     return listener
 
 
+def _opened_file(path: Path, access: int) -> int:
+    """A descriptor of the regular file at ``path``, made private when it is not there; a link there is not followed
+    and anything but a regular file is refused (item 676)."""
+    try:
+        descriptor: int = os.open(path, access | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, _PRIVATE_FILE_MODE)
+    except OSError as exc:
+        raise ConfigError(
+            "a file of the daemon in Dot's home is a link or cannot be opened; remove it and start again",
+            {"path": str(path), "error": str(exc)},
+        ) from exc
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        os.close(descriptor)
+        raise ConfigError(
+            "a file of the daemon in Dot's home is not a regular file; remove it and start again", {"path": str(path)}
+        )
+    return descriptor
+
+
 @contextlib.contextmanager
 def instance_lock(path: Path) -> Iterator[None]:
-    """Hold the daemon's pid file for as long as the daemon runs; a second daemon is refused."""
-    descriptor: int = os.open(path, os.O_RDWR | os.O_CREAT, _PRIVATE_FILE_MODE)
+    """Hold the daemon's pid file for as long as the daemon runs; a second daemon is refused. A link at ``path`` is not
+    followed, nor is anything but a file written (item 676): the daemon would else empty what the link names."""
+    descriptor: int = _opened_file(path, os.O_RDWR)
     try:
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -133,10 +153,11 @@ def running_mark(path: Path) -> Iterator[bool]:
     """Leave a mark at ``path`` for as long as the daemon runs, and remove it only when the daemon ends without an
     error. Yields whether the daemon before this one left its mark: it did not end cleanly (it was killed, it crashed,
     or it ended with an error, such as a scheduler loop that failed)."""
-    left: bool = path.exists()
-    path.touch(_PRIVATE_FILE_MODE)
+    left: bool = os.path.lexists(path)
+    os.close(_opened_file(path, os.O_WRONLY))
     yield left
-    path.unlink()
+    # Gone already (removed by hand) is as good as removed: a clean end must not become an error here.
+    path.unlink(missing_ok=True)
 
 
 def _end_with_scheduler(server: DotServer, scheduler_loop: asyncio.Task[None]) -> None:

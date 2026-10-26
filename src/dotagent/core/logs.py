@@ -136,11 +136,14 @@ def configure_logging(level: str, json_output: bool, log_file: Path | None) -> N
         if (json_output or log_file is not None)
         else structlog.dev.ConsoleRenderer(colors=sys.stderr.isatty())
     )
-    factory: Callable[..., object] = (
-        structlog.PrintLoggerFactory(file=sys.stderr)
-        if log_file is None
-        else _handing(RotatingLog(log_file, LOG_LIMIT_BYTES))
-    )
+    factory: Callable[..., object] = structlog.PrintLoggerFactory(file=sys.stderr)
+    if log_file is not None:
+        # A process that may not write the file (``dotx`` run by a command of a run, whose sandbox closes Dot's logs,
+        # item 676) logs to stderr instead, and says so once, with why: a full disk or a link in the file's place.
+        try:
+            factory = _handing(RotatingLog(log_file, LOG_LIMIT_BYTES))
+        except OSError as error:
+            sys.stderr.write(f"dot: the log file {log_file} cannot be opened ({error}); logging to stderr\n")
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
