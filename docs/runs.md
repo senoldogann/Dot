@@ -427,6 +427,20 @@ other reactions, what it does after the run it is on has ended: **Start a follow
 `config.toml`. `follow_ups_per_hour` and `hold_minutes` are set in the file. The routes are in [the daemon
 page](daemon.md#the-daemon-the-web-ui-and-the-service).
 
+### Dot's reactions on your messages
+
+A run may react to your message as people do in a chat (item 664), with the `react` tool: 👍 when what you asked is
+done or being done and no more words are needed ("Send it." gets 👍 and "Done."), 👀 when it starts on something that
+takes a while. Those two are all it may put, once a run, and never in place of an answer to a question. The reaction
+stands on your latest message when it comes, the one that started the run or one you sent it since: a small round badge
+on the lower left corner of the bubble, which pops in once (still under reduced motion), its name for a screen reader
+"Reacted 👍: understood". It stays there when the chat goes on, on the earlier turn. Its call is no step of the
+conversation, nor of the progress messages a channel sends; a refused one (a second reaction) shows as a step. A run
+another run handed its work to (`delegate`, `message_agent`) was sent no message of yours and is not offered the tool,
+nor is a run no message of yours started (a schedule's firing, a watcher's look, the nightly reflection, a resumed run,
+a background command's note), whose 👍 would stand on words you never wrote; an agent's own run keeps it as it keeps
+`finish` and `ask_user`.
+
 ## Tools
 
 | Area            | Tools                                                                                                              |
@@ -439,7 +453,7 @@ page](daemon.md#the-daemon-the-web-ui-and-the-service).
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete` |
-| Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `finish`, `use_tools`                          |
+| Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `react`, `finish`, `use_tools`                 |
 | Team            | `create_agent`, `message_agent`                                                                                    |
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Pages           | `show_page`                                                                                                        |

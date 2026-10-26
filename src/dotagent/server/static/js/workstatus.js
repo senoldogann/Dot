@@ -27,6 +27,8 @@ const PHRASES = {
 };
 // The tools whose call hands work to another run: the agent's name, when the call names one, is said.
 const HANDOFF_TOOLS = new Set(["message_agent", "delegate"]);
+// The calls the line says nothing of: the answer and the reaction on your message say them (item 664).
+const UNSAID_TOOLS = new Set(["finish", "react"]);
 // The events after which the run is no longer at work in a way the line should tell: a card or the message says it.
 const QUIET = new Set(["approval_requested", "question_left"]);
 
@@ -109,7 +111,7 @@ export function createWorkStatus({ rootRunId, active, onToggle }) {
       quiet = true;
       restart();
       paint();
-    } else if (record.kind === "tool_call" && typeof data.tool === "string") {
+    } else if (record.kind === "tool_call" && typeof data.tool === "string" && !UNSAID_TOOLS.has(data.tool)) {
       const agent = typeof data.args?.agent === "string" ? data.args.agent : "";
       become(HANDOFF_TOOLS.has(data.tool) ? "helper" : callKind(data.tool), HANDOFF_TOOLS.has(data.tool) ? agent : "");
     } else if (QUIET.has(record.kind)) {

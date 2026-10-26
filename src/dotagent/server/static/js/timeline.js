@@ -34,6 +34,9 @@ const REVEAL_MOST_FRAMES = 120;
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 // The tool that ends a run. Its answer is shown as the answer, so the call itself stays out of the steps unless it failed.
 const FINISH_TOOL = "finish";
+// The calls whose row shows only once they are refused: the answer stands for a finish, and the badge on your message
+// for a reaction of Dot's (item 664).
+const QUIET_TOOLS = new Set([FINISH_TOOL, "react"]);
 const VERDICT_TEXT = { ask: "Needs approval", handoff: "Handed to you", deny: "Blocked by Dot's safety rules" };
 // The ways a model turn ends that need no word of their own.
 const ORDINARY_ENDS = new Set(["stop", "tool_calls", ""]);
@@ -356,7 +359,7 @@ function buildFlock() {
  * it said in its steps (item 586); null where the timeline shows none. `onReactionHold(held)` says that the owner holds
  * the run with a ✋, which waits for what they write next, or that the hold is over.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere, reactions = null, onReactionHold = (/** @type {boolean} */ _held) => undefined }) {
+export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere, onDotReaction = (/** @type {string} */ _reaction) => undefined, reactions = null, onReactionHold = (/** @type {boolean} */ _held) => undefined }) {
   const element = el("div", { class: "timeline" });
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
@@ -947,7 +950,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         scope.panel.steps = Math.max(scope.panel.steps, data.step);
         // A turn that calls a tool has its line painted by its first call, so the tool's name does not go and come back
         // at every step (item 310).
-        if (!data.tool_calls.some((name) => name !== FINISH_TOOL)) {
+        if (!data.tool_calls.some((name) => !QUIET_TOOLS.has(name))) {
           paintChild(scope, record.ts, [`step ${scope.panel.steps}`]);
         }
       }
@@ -1051,7 +1054,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
     tool_call(scope, record) {
       const data = record.data;
-      if (data.tool === FINISH_TOOL) {
+      if (QUIET_TOOLS.has(data.tool)) {
         scope.finishing.set(data.call_id, data.args);
         return;
       }
@@ -1234,6 +1237,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         return;
       }
       place(scope, userMessage({ text, sentAt: record.ts, files, editFromHere: null }), record.ts);
+    },
+
+    // Dot's reaction on your latest message (item 664): it stands on that message, which the page finds.
+    dot_reaction(scope, record) {
+      if (scope.runId === rootRunId) {
+        onDotReaction(record.data.reaction);
+      }
     },
 
     // The files that came with the goal; they sit under the goal's bubble.

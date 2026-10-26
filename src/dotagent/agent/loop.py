@@ -125,7 +125,7 @@ from dotagent.agent.prompt import (
 )
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.restating import restates
-from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
+from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
     GoalChecker,
     GoalRequest,
@@ -224,6 +224,7 @@ from dotagent.mcp.types import McpPurpose
 from dotagent.memory.lifecycle import Gone, notes_gone
 from dotagent.memory.render import render_note
 from dotagent.memory.service import (
+    REFLECTION_SOURCE,
     LiveNotes,
     Remembered,
     live_memories,
@@ -234,7 +235,9 @@ from dotagent.memory.service import (
     words_only,
 )
 from dotagent.oauth.tokens import Account
+from dotagent.proactive import NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.runtime import Runtime
+from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
@@ -276,6 +279,7 @@ from dotagent.tools.meta import (
     ASK_USER_TOOL,
     FINISH_TOOL,
     MARK_PLAN_STEP_TOOL,
+    REACT_TOOL,
     UPDATE_PLAN_TOOL,
     USE_TOOLS_TOOL,
     AskUserArgs,
@@ -294,9 +298,14 @@ EMBEDDING_FAILED: str = "embedding_failed"
 
 # A delegated run reports to its parent: it neither delegates again nor asks the user, and its parent asks the helpers.
 # The tools every agent keeps whatever its list says (item 86): the ones that end a run, ask, and turn groups on.
-AGENT_CORE_TOOLS: tuple[str, ...] = (FINISH_TOOL, ASK_USER_TOOL, USE_TOOLS_TOOL)
+AGENT_CORE_TOOLS: tuple[str, ...] = (FINISH_TOOL, ASK_USER_TOOL, USE_TOOLS_TOOL, REACT_TOOL)
 _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
     {DELEGATE_TOOL, ASK_USER_TOOL, CONSULT_TOOL, MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL}
+)
+# The sources of runs no message of the owner's started (item 664). "background" is agent/manager.py's
+# BACKGROUND_SOURCE, which imports this module.
+_UNASKED_SOURCES: frozenset[str] = frozenset(
+    {SCHEDULE_SOURCE, WATCHER_SOURCE, NOTICE_SOURCE, REFLECTION_SOURCE, RESUME_SOURCE, "background"}
 )
 
 _SUMMARY_ATTEMPTS: int = 3
@@ -1802,6 +1811,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         picked_before: frozenset[str] = await runtime.store.picked_servers(run.thread_id, PICKS_EVENT)
         owner_servers: frozenset[str] = owner_server_groups(opening.picks, picked_before)
         specs = tuple(spec for spec in specs if spec.name in agent_tools or group_of(spec.name) in owner_servers)
+    # A run another run handed its work to, and one no message of the owner's started (a schedule's firing, a watcher's
+    # look, the nightly reflection, a resumed run, a background command's note), has no message of theirs to react to
+    # (item 664): its 👍 would stand on words they never wrote.
+    if run.parent_run_id is not None or run.source in _UNASKED_SOURCES:
+        specs = tuple(spec for spec in specs if spec.name != REACT_TOOL)
     # Settings › Browser may keep every run off the browser (item 354).
     if not runtime.browser.config.enabled:
         specs = tuple(spec for spec in specs if group_of(spec.name) != BROWSER_GROUP)

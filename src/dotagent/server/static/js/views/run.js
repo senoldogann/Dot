@@ -25,7 +25,7 @@ import { createInspector } from "../inspector.js";
 import { chatLoops, LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
 import { createQueue } from "../queue.js";
 import { recapSection } from "../recap.js";
-import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
+import { showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
 import { PAGE_ANSWER_EVENT } from "../pageframe.js";
@@ -1530,6 +1530,14 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     },
     onGoalFiles: goalMessage === null ? null : (files) => showMessageFiles(goalMessage, files),
     onGoalPicks: goalMessage === null ? null : (picks) => showMessagePicks(goalMessage, picks),
+    // Dot's reaction stands on the latest message of yours on the page as the event comes (item 664): the run's own or one
+    // you sent it since.
+    onDotReaction: (reaction) => {
+      const mine = threadBox?.querySelectorAll(".user-message") ?? [];
+      if (mine.length > 0) {
+        showDotReaction(mine[mine.length - 1], reaction);
+      }
+    },
     reactions,
     onReactionHold: (held) => {
       holding = held;

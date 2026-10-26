@@ -35,10 +35,21 @@ _STEPS_KEPT: int = 200
 COMMAND_MARK: str = "$ "
 THOUGHT_MARK: str = "💭 "
 _SENTENCE_END: str = ".!?…"
-# The tools whose steps say nothing a phone needs: the end of the run is its answer, a question has its own line, and
-# the plan, the groups of tools, the help and the reading of a terminal are the run's own housekeeping.
+# The tools whose steps say nothing a phone needs: the end of the run is its answer, a question has its own line, a
+# reaction stands on the owner's message (item 664), and the plan, the groups of tools, the help and the reading of a
+# terminal are the run's own housekeeping.
 _SKIPPED: frozenset[str] = frozenset(
-    {"finish", "ask_user", "update_plan", "mark_plan_step", "use_tools", "find_help", "terminal_read", "terminal_close"}
+    {
+        "finish",
+        "ask_user",
+        "react",
+        "update_plan",
+        "mark_plan_step",
+        "use_tools",
+        "find_help",
+        "terminal_read",
+        "terminal_close",
+    }
 )
 # What a tool is said to have done where its arguments add nothing to say.
 _PLAIN: dict[str, str] = {

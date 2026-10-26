@@ -1,6 +1,7 @@
-"""Meta tools: finishing a run, asking the user, notifying them, keeping a visible plan and turning on a tool group."""
+"""Meta tools: finishing a run, asking the user, notifying them, reacting to their message, keeping a visible plan and
+turning on a tool group."""
 
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self, get_args
 
 from pydantic import AfterValidator, Field, StringConstraints, model_validator
 
@@ -34,6 +35,12 @@ ASK_USER_TOOL: str = "ask_user"
 UPDATE_PLAN_TOOL: str = "update_plan"
 MARK_PLAN_STEP_TOOL: str = "mark_plan_step"
 USE_TOOLS_TOOL: str = "use_tools"
+REACT_TOOL: str = "react"
+# The event of a reaction of Dot's on the owner's message (item 664), which the conversation draws on that message.
+DOT_REACTION_EVENT: str = "dot_reaction"
+# What Dot may put on the owner's message: understood and done or doing, and looking into it.
+type DotReaction = Literal["👍", "👀"]
+DOT_REACTIONS: tuple[str, ...] = get_args(DotReaction.__value__)
 # A chat turn ends with a plain reply. A model that is offered both that and finish tends to write the call out as text.
 _FINISH_MODES: frozenset[RunMode] = frozenset({"task", "research"})
 _TARGETS_MAX_CHARS: int = 600
@@ -187,6 +194,44 @@ def _notify_tool() -> RegisteredTool:
         modes=ALL_MODES,
         parallel_safe=True,
         timeout_s=30.0,
+        classify=classify,
+        run=run,
+    )
+
+
+class ReactArgs(ToolArgs):
+    reaction: DotReaction
+
+
+def _react_tool() -> RegisteredTool:
+    """React to the owner's message (item 664), as people do in a chat: 👍 when what it asks is done or being done and
+    no more words are needed, 👀 when it starts work that takes a while. The reaction stands on their latest message,
+    the one that started the run or the one they sent since; once a run, as a second one would say nothing new (two
+    calls of one step run one after the other, so the second sees the first). A
+    delegated run, or one answering another agent, has no message of the owner's to react to."""
+
+    def classify(args: ReactArgs, ctx: ToolContext) -> ActionInfo:
+        return _meta_action(REACT_TOOL, f"React {args.reaction} to the owner's message")
+
+    async def run(args: ReactArgs, ctx: ToolContext) -> ToolResult:
+        # A run another run handed its work to (`delegate`, `message_agent`) was sent no message of the owner's.
+        if (await ctx.runtime.store.get_run(ctx.run_id)).parent_run_id is not None:
+            return fail("this run was handed its work by another run: there is no message of the owner's to react to")
+        if await ctx.runtime.store.events_of_kind(ctx.run_id, DOT_REACTION_EVENT, 1):
+            return fail("you reacted to their message already; say what is left in words")
+        await ctx.runtime.bus.emit(ctx.run_id, DOT_REACTION_EVENT, {"reaction": args.reaction}, True)
+        return ok(f"Your {args.reaction} stands on their message. Keep the reply to what the reaction does not say.")
+
+    return make_tool(
+        name=REACT_TOOL,
+        description=(
+            "React to the user's latest message: 👍 done or under way, nothing more to say; 👀 starting something "
+            "long. Once a run, never instead of an answer."
+        ),
+        args_model=ReactArgs,
+        modes=ALL_MODES,
+        parallel_safe=False,
+        timeout_s=10.0,
         classify=classify,
         run=run,
     )
@@ -375,6 +420,7 @@ def build_meta_tools() -> tuple[RegisteredTool, ...]:
         _finish_tool(),
         _ask_user_tool(),
         _notify_tool(),
+        _react_tool(),
         _update_plan_tool(),
         _mark_plan_step_tool(),
         _use_tools_tool(),
