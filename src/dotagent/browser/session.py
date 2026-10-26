@@ -215,6 +215,9 @@ _SCRIPTED_NOTE: str = (
     "a script of this run ran in this chat's tabs and could have copied what is typed there: when the user took over, "
     "the other tabs were closed and this page was opened again"
 )
+# How long after an Allow nobody clicked the Chrome of the user is not asked again (item 699): a run of a schedule
+# that fires with nobody there waited attach_timeout_s at each of its browser calls, nine minutes in one run.
+UNANSWERED_HOLD_S: float = 300.0
 # What ended a wait for a text that a dialog interrupted (item 698).
 _DIALOG_OPENED: str = "a dialog opened in front of the page"
 # Why a chat's tabs were made new before a login was filled (item 697).
@@ -427,6 +430,11 @@ def idle_background_tabs(thread: ThreadTabs, cutoff: float) -> list[Tab]:
     return [tab for index, tab in enumerate(thread.tabs) if index != thread.active and tab.last_used < cutoff]
 
 
+def _none_unattended(thread_id: str) -> bool:
+    """No chat is taken for one whose run nobody watches, unless the pool says so (:meth:`BrowserSession.watch_for`)."""
+    return False
+
+
 def no_runs_at_work() -> frozenset[str]:
     """The chats a session works for when no run does (``dotx browser``): none, so every idle chat is released."""
     return frozenset()
@@ -607,6 +615,11 @@ class BrowserSession:
         # and Dot waits now for its Allow (item 341): what the browser card and a call that meets the loss say.
         self._lost: bool = False
         self._waiting_allow: bool = False
+        # When a wait for that Allow last ran out (item 699): for ``UNANSWERED_HOLD_S`` from then a connection for a
+        # chat whose run nobody watches (``_unattended``, a schedule's or a watcher's) fails at once instead of waiting
+        # ``attach_timeout_s`` again.
+        self._unanswered_at: float | None = None
+        self._unattended: Callable[[str], bool] = _none_unattended
         # Told when Dot connects again to a Chrome of the user that went away, before Chrome asks for its Allow, and the
         # tellings under way: the connection does not wait for them.
         self._on_reconnect: Callable[[], Awaitable[None]] | None = None
@@ -640,14 +653,15 @@ class BrowserSession:
             self._playwright = await async_playwright().start()
         return self._playwright
 
-    async def _ensure_context(self) -> BrowserContext:
+    async def _ensure_context(self, unattended: bool = False) -> BrowserContext:
+        """The browser context, connected or started first; ``unattended`` says the call is of a run nobody watches."""
         async with self._launch_lock:
             if self._closed:
                 raise BrowserError("the browser session was closed", {})
             if self._context is not None:
                 return self._context
             try:
-                opened: _Opened = await self._open()
+                opened: _Opened = await self._open(unattended)
             except Exception as error:
                 lost: Playwright | None = self._playwright
                 if lost is None or not driver_lost(error):
@@ -656,12 +670,12 @@ class BrowserSession:
                 raise connection_broke(error) from error
             return self._arm(opened)
 
-    async def _open(self) -> _Opened:
+    async def _open(self, unattended: bool) -> _Opened:
         match self._config.mode:
             case "own":
                 return await self._launch_own()
             case "attach":
-                return await self._attach()
+                return await self._attach(unattended)
 
     async def _launch_own(self) -> _Opened:
         """Start Dot's own Chrome (:meth:`_start_own`) with the profile held for the start (item 554): an import of
@@ -763,10 +777,21 @@ class BrowserSession:
             raise
         return _Opened(context=context, spare_pages=tuple(context.pages))
 
-    async def _attach(self) -> _Opened:
+    async def _attach(self, unattended: bool) -> _Opened:
         """Connect to the Chrome the user has open and work in the browser context it already has. Chrome asks the
-        user to click Allow; the connection waits for the answer for ``attach_timeout_s``."""
+        user to click Allow; the connection waits for the answer for ``attach_timeout_s``. A call of a run nobody
+        watches (``unattended``) fails at once instead while an Allow nobody clicked is recent (item 699)."""
         config: BrowserConfig = self._config
+        unanswered: float | None = self._unanswered_at
+        if unattended and unanswered is not None and time.monotonic() - unanswered < UNANSWERED_HOLD_S:
+            # Nobody clicked Allow a moment ago: a run of a schedule or a watcher does not wait for it again at every
+            # call. A run the owner started still waits, as they may be there to click; after the hold, so does this.
+            raise BrowserError(
+                f"Chrome's Allow went unanswered {time.monotonic() - unanswered:.0f} s ago, and Dot asks again only "
+                f"after {UNANSWERED_HOLD_S:g} s: nobody may be at the Mac. Go on without the browser where you can "
+                "(the web tools read pages), or try the browser again later",
+                {"data_dir": str(self._profile), "hold_s": UNANSWERED_HOLD_S},
+            )
         endpoint: DebugEndpoint = await asyncio.to_thread(read_debug_endpoint, self._profile)
         playwright: Playwright = await self._driver()
         again: bool = self._lost
@@ -783,11 +808,10 @@ class BrowserSession:
             )
         except PlaywrightError as error:
             # A wait that ran out says so: Chrome's Allow was not clicked in time, or Chrome did not answer.
-            waited: str = (
-                f" (no answer within {config.attach_timeout_s:g} s)"
-                if isinstance(error, PlaywrightTimeoutError)
-                else ""
-            )
+            timed_out: bool = isinstance(error, PlaywrightTimeoutError)
+            if timed_out:
+                self._unanswered_at = time.monotonic()
+            waited: str = f" (no answer within {config.attach_timeout_s:g} s)" if timed_out else ""
             raise BrowserError(
                 (CHROME_RESTARTED if again else "Chrome did not accept the connection")
                 + waited
@@ -803,6 +827,7 @@ class BrowserSession:
         finally:
             self._waiting_allow = False
         self._lost = False
+        self._unanswered_at = None
         if not browser.contexts:
             await browser.close()
             raise BrowserError(
@@ -953,6 +978,11 @@ class BrowserSession:
         self._config = self._config.model_copy(update={"raise_window": raise_window})
         _log.info("browser_raise_window", raise_window=raise_window)
 
+    def watch_for(self, unattended: Callable[[str], bool]) -> None:
+        """Tell the session which chats have a run nobody watches (item 699): a schedule's, a watcher's and their
+        helpers'."""
+        self._unattended = unattended
+
     def set_remote_input(self, remote_input: bool) -> None:
         """Whether the owner may use a held run's page from the screen (item 470), from the next input on."""
         self._config = self._config.model_copy(update={"remote_input": remote_input})
@@ -1002,6 +1032,8 @@ class BrowserSession:
             await self._let_go()
             self._config = config
             self._profile = profile_dir
+            # The owner switched, so the owner is there to click Allow (item 699).
+            self._unanswered_at = None
             _log.info("browser_switched", mode=config.mode, profile=str(profile_dir))
 
     async def let_go_of_chrome(self) -> None:
@@ -1479,7 +1511,7 @@ class BrowserSession:
             thread = ThreadTabs()
             self._threads[thread_id] = thread
         async with thread.lock:
-            await self._ensure_context()
+            await self._ensure_context(self._unattended(thread_id))
             await self._note_front()
             playwright: Playwright | None = self._playwright
             thread.last_used = time.monotonic()

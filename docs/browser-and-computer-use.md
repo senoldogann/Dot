@@ -60,7 +60,11 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
   the click, or that was under way when Chrome went, says in one line that Chrome was closed or restarted and that
   Allow is to be clicked (item 341). Settings › Browser reads how Chrome stands every 3 seconds while it is open:
   connected, waiting for Allow, Chrome closed, remote debugging off, or Chrome restarted, each with what to do. A
-  schedule that fires with nobody there waits `attach_timeout_s` for the click and then fails.
+  schedule that fires with nobody there waits `attach_timeout_s` for the click and then fails; for the five minutes
+  after an Allow nobody clicked, a call of a run nobody watches (a schedule's or a watcher's, a campaign's sessions
+  and their helpers) fails at once, saying so, instead of waiting again (item 699: a schedule's run had waited a
+  minute at each of nine calls). A run you started still waits for your click, and a switch made in Settings asks at
+  once.
 - A tab that Dot opens is opened in a window of its own, made behind the window you work in, also when Chrome is the
   app in front (item 340): the app in front stays in front and your windows and tabs are not touched. Its page runs
   at full speed, as any tab of Dot's does: Dot emulates focus for it, without which Chrome draws no frame of a tab in
