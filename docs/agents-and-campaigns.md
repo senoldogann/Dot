@@ -174,7 +174,15 @@ of its approvals and the sender's, so an agent set to `yolo` asks when a run tha
 sender's conversation, and the reply comes back as the tool's result, the way a delegated run's report does. The prompt
 lists the team by name and role under "Team" whenever there is another agent to message; an agent does not message
 itself, and an answering run messages no one further. The sender's chat shows the exchange as a delegated row wearing
-the agent's face. **Handoffs** (a button on the Agents page, `#/team`) lists today's messages: who to whom, the
+the agent's face. While the message is on its way, until the agent's run starts and its row takes over, the conversation
+shows Dot's three dots and "Sending to Scout…" (item 668), gone once the agent's run starts (the one part on its way
+when the model wrote the agent's name otherwise than the agent has it), or at once if the call ends without a run (an
+agent not found, a refusal). The agent's answer then stands in the conversation as its message: under one quiet head, "Message
+from Scout" with its face, which the next agent's answer joins ("Messages from Scout and Editor"), a bubble with the
+agent's face and name over its words, cut at 1,200 characters with **Read it all** leading to its run's page. Only the
+answer of a run that ended done is shown so; it stays in sight when the chat shows only what Dot is doing (item 663).
+The run that answers a message names the agent in its `run_queued` event (`agent_name`), which the page reads; a
+helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (a button on the Agents page, `#/team`) lists today's messages: who to whom, the
 message, the reply, the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
 gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
 which older tool output is shortened, once, to 700 characters; a step's request to Anthropic also marks the end of the

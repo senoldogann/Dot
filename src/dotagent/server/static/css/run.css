@@ -221,6 +221,110 @@
   }
 }
 
+/* ---------- the agents' words in the conversation (item 668) ---------- */
+
+/* A part on its way to an agent: Dot's three dots and "Sending to Scout…", in a pill of the lane, until the agent's run
+   starts and its row takes over. */
+.agent-handoff {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  animation: fade-in var(--motion-base) var(--ease);
+}
+
+.agent-handoff-dots {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.agent-handoff-dots > span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  animation: chat-dot var(--motion-dots) ease-in-out infinite;
+  animation-play-state: var(--endless);
+}
+
+.agent-handoff-dots > span:nth-child(2) {
+  animation-delay: calc(var(--motion-dots) / 8);
+}
+
+.agent-handoff-dots > span:nth-child(3) {
+  animation-delay: calc(var(--motion-dots) / 4);
+}
+
+/* What the agents answered: one quiet head in the middle, "Messages from Scout and Editor" with their faces, and a
+   bubble for each, its face and name over its words. */
+.agent-said {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.agent-said-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.agent-said-who,
+.agent-message-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.agent-said-who .avatar {
+  width: 16px;
+  height: 16px;
+}
+
+.agent-message {
+  align-self: flex-start;
+  max-width: 85%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.agent-message-name {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.agent-message-name .avatar {
+  width: 20px;
+  height: 20px;
+}
+
+.agent-message-more {
+  display: inline-block;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-handoff,
+  .agent-handoff-dots > span {
+    animation: none;
+  }
+}
+
 /* ---------- the chat while it is read ---------- */
 
 /* What stands in a chat's place while its run is read (items 502 and 643): three dots of Dot's yellow in the middle of
