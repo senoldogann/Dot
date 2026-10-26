@@ -12,6 +12,8 @@
 //!   Python of the environment `uv` made, running `-m dotagent` (that is `dotx`), and `/usr/bin/open`, with the
 //!   arguments the functions below build; the version is the app's own. The sandbox keeps a run's commands from
 //!   writing the runtime folder (`_own_code` in `runtime.py`), so that what the app runs at its start is not theirs.
+//!   The package's dependencies are the versions of the release's own `uv.lock`, not the newest of the day: the app
+//!   carries them as a constraints file (`Tools::constraints`) that `uv` is given at the install and at the upgrade.
 //! - The key goes to `dotx setup --key-stdin` on its standard input and nowhere else: it is a `Secret`, and every line
 //!   a step prints is masked before it is kept, shown or written to the log.
 //! - It never installs over another Dot (`foreign`, `decide`), and it resumes an install of its own that stopped, from
@@ -63,6 +65,14 @@ const TOOLS_FOLDER: &str = "app-tools";
 /// What of the app's tools goes on the service's `PATH`: the search and uv. The launcher is copied, not run from there.
 const ON_PATH: [&str; 2] = ["rg", "uv"];
 const PACKAGE: &str = "dotagent-macos";
+/// What uv says when the requirements cannot be met together, the one failure the put-back retries without the app's
+/// constraints (`put_back`).
+const UNRESOLVABLE: &str = "No solution found";
+/// What the daemon imports at its start, which a failed upgrade's environment must still import (`dotx_starts`).
+const ENGINE_IMPORT: &str = "import dotagent.server.daemon";
+/// The file of the app's Resources (beside the tools folder, not in it) that pins every dependency of the package to
+/// the version its release was built and tested with (`desktop/release.sh` makes it from `uv.lock`).
+const CONSTRAINTS: &str = "constraints.txt";
 const PYTHON: &str = "3.13";
 const LAUNCH_AGENT: &str = "dev.dotagent.dot.plist";
 /// The label of the service's launchd job, which `LAUNCH_AGENT` is the property list of (`launchd.py` `LABEL`).
@@ -287,6 +297,17 @@ impl Tools {
 
     fn launcher(&self) -> PathBuf {
         self.dir.join("dot-launcher")
+    }
+
+    /// The file that pins the package's dependencies, in the app's Resources beside the tools folder, when this build
+    /// carries one: a release does (`desktop/release.sh`), and a development build has an empty stand-in (`build.rs`)
+    /// or none, which is no file to pin by. Without it `uv` takes the newest version each dependency allows, which is
+    /// what an install did before the file existed.
+    fn constraints(&self) -> Option<PathBuf> {
+        let file = self.dir.parent()?.join(CONSTRAINTS);
+        fs::metadata(&file)
+            .is_ok_and(|meta| meta.is_file() && meta.len() > 0)
+            .then_some(file)
     }
 
     fn present(&self) -> bool {
@@ -621,6 +642,36 @@ pub fn found(home: &Path, user_home: &Path, daemon_answers: bool) -> Found {
     }
 }
 
+/// Whether `version` is a release's version as PEP 440 writes the package's: numbers joined by dots, then at most a
+/// pre-release, a post-release and a development part, nothing else (no marker, no second requirement).
+pub fn release_version(version: &str) -> bool {
+    fn digits(text: &str) -> usize {
+        text.bytes().take_while(u8::is_ascii_digit).count()
+    }
+    let mut rest = version;
+    loop {
+        let count = digits(rest);
+        if count == 0 {
+            return false;
+        }
+        rest = &rest[count..];
+        match rest.strip_prefix('.') {
+            Some(after) if digits(after) > 0 => rest = after,
+            _ => break,
+        }
+    }
+    for tag in ["a", "b", "rc", ".post", ".dev"] {
+        if let Some(after) = rest.strip_prefix(tag) {
+            let count = digits(after);
+            if count == 0 {
+                return false;
+            }
+            rest = &after[count..];
+        }
+    }
+    rest.is_empty()
+}
+
 /// Whether `version` is older than `app`: both read as `x.y.z` (a release has no other form), a pre-release suffix
 /// (`rc1`, `.dev3`) ranks below the same numbers without one. A version that does not read is never the older: the
 /// app upgrades only what it can compare.
@@ -804,11 +855,33 @@ fn environment_of(
 
 /// `uv tool install` of the package at the app's own version: `reinstall` for an upgrade. `--no-config` keeps uv from
 /// reading a `uv.toml` (the person's own, under `~/.config/uv`, which a command of a run could write): where the package
-/// comes from is the app's to say, not a file's.
+/// comes from is the app's to say, not a file's. The app's constraints file (`Tools::constraints`) goes with it, so
+/// that every dependency is the version the release was built and tested with and not the newest one of that day.
 fn uv_install(tools: &Tools, runtime: &Runtime, version: &str, reinstall: bool) -> Plan {
+    uv_install_pinned(
+        tools,
+        runtime,
+        version,
+        reinstall,
+        tools.constraints().as_deref(),
+    )
+}
+
+/// `uv_install` with the constraints file named, or none: only the way back from a failed upgrade installs the package
+/// of an older version with none, when that version cannot be installed under this app's constraints.
+fn uv_install_pinned(
+    tools: &Tools,
+    runtime: &Runtime,
+    version: &str,
+    reinstall: bool,
+    constraints: Option<&Path>,
+) -> Plan {
     let mut args: Vec<OsString> = vec!["--no-config".into(), "tool".into(), "install".into()];
     if reinstall {
         args.push("--reinstall".into());
+    }
+    if let Some(file) = constraints {
+        args.extend(["--constraints".into(), file.into()]);
     }
     args.extend([
         "--python".into(),
@@ -868,6 +941,20 @@ fn dotx_service(tools: &Tools, runtime: &Runtime) -> Plan {
 fn dotx_restart(tools: &Tools, runtime: &Runtime) -> Plan {
     let words = vec!["service".into(), "restart".into(), "--when-idle".into()];
     dotx(tools, runtime, words, None)
+}
+
+/// `python -P -c "import dotagent.server.daemon"`: the Python of the package's environment imports the daemon, and
+/// with it what the daemon is made of (its web server, its MCP client, its models' clients), where `dotx --help`
+/// would import the command line alone. It is what tells, after an upgrade that failed, whether the environment `uv`
+/// left still starts the daemon.
+fn dotx_starts(tools: &Tools, runtime: &Runtime) -> Plan {
+    Plan {
+        program: runtime.python(),
+        args: vec!["-P".into(), "-c".into(), ENGINE_IMPORT.into()],
+        env: child_env(runtime, tools),
+        stdin: None,
+        limit: DOTX_LIMIT,
+    }
 }
 
 /// Remove what is at `path`, whatever it is: a link is removed, never followed; a folder goes with what it holds.
@@ -1949,7 +2036,8 @@ pub fn wanted(ctx: &Context) -> bool {
 /// place it does not stay in (a disk image, the copy macOS makes of a downloaded app: the links would point into it, and
 /// into nothing once it is gone) and while the service is another Dot's (a job of a checkout that took its place: its
 /// daemon is not the app's to restart). `Ok(None)` when there was nothing to do. A failure is the words for the person;
-/// the package stays as it was.
+/// the package stays as it was, or, when the failed upgrade left an environment that does not start, is installed again
+/// (`put_back`).
 pub fn keep_in_step(ctx: &Context) -> Result<Option<String>, String> {
     let runtime = ctx.runtime();
     let seen = found(&ctx.home, &ctx.user_home, false);
@@ -2010,7 +2098,15 @@ pub fn keep_in_step(ctx: &Context) -> Result<Option<String>, String> {
             Ended::Exited(0) => Ok(()),
             ended => {
                 let last = ran.lines.last().cloned().unwrap_or_default();
-                Err(format!("{what} did not end well ({ended:?}): {last}"))
+                // uv says the requirements cannot be met on the first of several lines, which `put_back` reads
+                // (`UNRESOLVABLE`): the error carries it whatever line came last.
+                if says(&ran.lines, &[&UNRESOLVABLE.to_lowercase()]) {
+                    Err(format!(
+                        "{what} did not end well ({ended:?}): {UNRESOLVABLE}: {last}"
+                    ))
+                } else {
+                    Err(format!("{what} did not end well ({ended:?}): {last}"))
+                }
             }
         }
     };
@@ -2019,8 +2115,9 @@ pub fn keep_in_step(ctx: &Context) -> Result<Option<String>, String> {
         &uv_install(&ctx.tools, &runtime, &ctx.version, true),
     )
     .map_err(|error| {
+        let after = put_back(ctx, &runtime, &installed, &log, &attempt);
         format!(
-            "Dot's engine could not be updated to {}: {error}. Its log is {}.",
+            "Dot's engine could not be updated to {}: {error}. {after} Its log is {}.",
             ctx.version,
             log.path.display()
         )
@@ -2046,6 +2143,69 @@ pub fn keep_in_step(ctx: &Context) -> Result<Option<String>, String> {
             ctx.version,
             log.path.display()
         )),
+    }
+}
+
+/// What the app does after `uv` failed to upgrade the package from `installed`: `uv` replaces the environment in place,
+/// so a failure in the middle of it (a download that stopped, a package that would not install) can leave one that
+/// does not start, and the daemon would be down at its next start. So the environment is started once (`dotx_starts`);
+/// when it does not start, `installed` is installed again, under this app's constraints, and without them only when uv
+/// says they cannot be met (an older version may ask for a dependency at a version the new pins do not have; a download
+/// that failed is no reason to take the newest of the day), and started once more. `installed` is read from a folder's
+/// name, so a version that is not one (`release_version`) is not handed to uv at all. The words say what is left, for
+/// the person.
+fn put_back(
+    ctx: &Context,
+    runtime: &Runtime,
+    installed: &str,
+    log: &Log,
+    attempt: &dyn Fn(&str, &Plan) -> Result<(), String>,
+) -> String {
+    let starts = || attempt("import the daemon", &dotx_starts(&ctx.tools, runtime));
+    if starts().is_ok() {
+        log.line(&format!(
+            "the upgrade failed, and the engine {installed} still starts: it is left as it is"
+        ));
+        return format!("Dot's engine is still {installed}.");
+    }
+    if !release_version(installed) {
+        log.line(&format!(
+            "the upgrade failed and the engine does not start; {installed:?} is no version to install again"
+        ));
+        return "Dot's engine does not start, and the version it had cannot be told. Dot will not start until it is installed again.".to_string();
+    }
+    log.line(&format!(
+        "the upgrade failed and the engine does not start: installing {installed} again"
+    ));
+    let mut installed_again = attempt(
+        "uv tool install",
+        &uv_install(&ctx.tools, runtime, installed, true),
+    );
+    let unresolvable = installed_again
+        .as_ref()
+        .is_err_and(|error| error.contains(UNRESOLVABLE));
+    if unresolvable && ctx.tools.constraints().is_some() {
+        log.line(&format!(
+            "{installed} did not install under this app's constraints: installing it without them"
+        ));
+        installed_again = attempt(
+            "uv tool install",
+            &uv_install_pinned(&ctx.tools, runtime, installed, true, None),
+        );
+    }
+    match installed_again.and_then(|()| starts()) {
+        Ok(()) => {
+            log.line(&format!("the engine {installed} is back and starts"));
+            format!("Dot's engine was put back at {installed}, and Dot works as before.")
+        }
+        Err(error) => {
+            log.line(&format!(
+                "the engine {installed} could not be put back: {error}"
+            ));
+            format!(
+                "Dot's engine does not start, and {installed} could not be put back either ({error}). Dot will not start until it is installed again."
+            )
+        }
     }
 }
 

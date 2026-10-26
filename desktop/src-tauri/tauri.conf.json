@@ -30,7 +30,8 @@
     "resources": {
       "resources/tools/uv": "tools/uv",
       "resources/tools/rg": "tools/rg",
-      "resources/tools/dot-launcher": "tools/dot-launcher"
+      "resources/tools/dot-launcher": "tools/dot-launcher",
+      "resources/constraints.txt": "constraints.txt"
     },
     "macOS": {
       "minimumSystemVersion": "13.0",

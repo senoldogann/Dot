@@ -11,6 +11,9 @@
 # anyone. The app also carries uv, ripgrep and the launcher of Dot.app (desktop/fetch-tools.sh, pinned in
 # desktop/tools.lock): they are signed here, before the app is, since Apple's notary service asks it of every program
 # inside an app. `release.sh --check-tools [--lock FILE]` only checks that the pinned archives are still the ones pinned.
+# The app installs the package with every dependency at the version uv.lock pins (item 694), not the newest of the day:
+# the release makes that list from uv.lock into the app's Resources before the app is signed, and checks the app's copy
+# against uv.lock again once the app is built.
 set -euo pipefail
 
 if [ "${1:-}" = --check-tools ]; then
@@ -59,6 +62,18 @@ notarize() {
 # version_in FILE PATTERN: the version a file states, the first line PATTERN (sed, its group the version) matches.
 version_in() {
   sed -n "s/$2/\1/p" "$root/$1" | head -1
+}
+
+# constraints_to FILE: write to FILE the versions uv.lock pins for the package's runtime dependencies (not the
+# development group, not the package itself), a `name==version` line each, with the markers that keep an entry to the
+# Macs it is for. It is the uv the app carries that writes it (the one tools.lock pins, so that the file is the same
+# whoever releases), and --locked stops it when uv.lock is not what pyproject.toml asks for. No hashes: `uv tool
+# install` takes a constraints file's versions and ignores its hashes (item 694).
+constraints_to() {
+  (cd "$root" && "$desktop/src-tauri/resources/tools/uv" --no-config export --locked --no-dev --no-emit-project \
+    --no-hashes --no-header --no-annotate --format requirements-txt --output-file "$1") ||
+    fail "uv could not write the versions uv.lock pins to $1"
+  [ -s "$1" ] || fail "uv.lock pins no dependency of the package: $1 is empty"
 }
 
 [ "$(uname -s)" = Darwin ] || fail "a release is built on a Mac"
@@ -115,7 +130,9 @@ rm -rf "$out"
 mkdir -p "$out"
 printf '%s\n' "$notes" >"$out/notes.md"
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
+# The release's pins leave the checkout however the release ends, so that a development build made after it carries the
+# empty stand-in build.rs makes (desktop/src-tauri/build.rs), not these pins; the app holds its own copy.
+trap 'rm -rf "$work"; rm -f "$desktop/src-tauri/resources/constraints.txt"' EXIT
 name=Dot_${version}_universal
 
 echo "release: building Dot $version, signed by $identity"
@@ -123,6 +140,9 @@ cd "$desktop"
 # The tools the app carries, fetched against their pinned SHA-256s and signed with the Developer ID, the hardened
 # runtime and a secure timestamp before the app, which then holds them in its Resources, is signed.
 ./fetch-tools.sh --sign "$identity"
+# The versions of the package's dependencies, which the app bundles in its Resources (constraints.txt, beside tools) for
+# the installer to give uv; made here, before the app is built, so that the signature covers it.
+constraints_to "$desktop/src-tauri/resources/constraints.txt"
 npm ci --no-audit --no-fund
 # Tauri notarizes only with an Apple ID or an API key in its environment: the notary service is asked below with the
 # saved profile, so the bundle Tauri makes is only signed.
@@ -167,6 +187,12 @@ for tool in uv rg dot-launcher; do
   archs=$(lipo -archs "$program")
   [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]] || fail "$tool in the app is built for $archs only"
 done
+
+# The versions in the app are the ones uv.lock pins now: a lock changed, or a file in the app that is not the one made
+# above, stops the release.
+constraints_to "$work/constraints.txt"
+cmp -s "$work/constraints.txt" "$app/Contents/Resources/constraints.txt" ||
+  fail "the constraints.txt in the app is not what uv.lock pins: the installer would install untested versions"
 
 ditto -c -k --keepParent "$app" "$work/Dot.zip"
 notarize "$work/Dot.zip"
