@@ -146,13 +146,18 @@ class PointerOverlay:
         if self._process is not None and self._process.returncode is not None:
             log.warning("pointer_helper_ended", returncode=self._process.returncode)
         if self._process is None or self._process.returncode is not None:
-            self._process = await asyncio.create_subprocess_exec(
+            started: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
                 sys.executable,
                 "-m",
                 "dotagent.desktop.pointer",
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
             )
+            self._process = started
+            if self._capturing > 0 and started.stdin is not None:
+                # Started while a capture holds the pointer off the screen (a helper that died is started again by a
+                # step of another run): the new helper begins hidden, and the capture's end puts it back.
+                started.stdin.write((PointerCommand(op="hide").model_dump_json() + "\n").encode("utf-8"))
         return self._process
 
     async def _send(self, command: PointerCommand, start: bool) -> asyncio.subprocess.Process | None:
@@ -205,10 +210,13 @@ class PointerOverlay:
             yield
         finally:
             if counted:
-                async with self._sending:
-                    self._capturing -= 1
-                    if self._capturing == 0:
-                        await self._send(PointerCommand(op="reveal"), start=False)
+                # Counted down at once, with nothing awaited first: a task cancelled again while it waits for the lock
+                # below leaves no count behind. The pointer comes back only if no capture began meanwhile.
+                self._capturing -= 1
+                if self._capturing == 0:
+                    async with self._sending:
+                        if self._capturing == 0:
+                            await self._send(PointerCommand(op="reveal"), start=False)
 
     async def _hide_now(self) -> None:
         """Ask the helper to hide the pointer and wait until it says it did. A helper that is not running has nothing

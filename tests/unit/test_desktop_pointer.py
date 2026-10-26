@@ -289,3 +289,58 @@ async def test_a_capture_cancelled_while_it_waited_for_the_helper_leaves_no_coun
         assert overlay._capturing == 0 and overlay._enabled
     finally:
         await overlay.aclose()
+
+
+async def test_a_capture_cancelled_again_while_it_waits_to_put_the_pointer_back_leaves_no_count_behind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Item 705's review: the end of a capture counted down only once it held the lock, which another capture's hide
+    can hold two seconds; cancelled again there, the count stayed up and no later capture hid the pointer."""
+    _stand_in(monkeypatch, "import sys\nfor line in sys.stdin:\n    pass\n")
+    monkeypatch.setattr(pointer, "HIDE_WITHIN_S", 1.0)
+    overlay: PointerOverlay = PointerOverlay()
+    entered: asyncio.Event = asyncio.Event()
+
+    async def capture() -> None:
+        async with overlay.hidden():
+            entered.set()
+            await asyncio.sleep(10)
+
+    try:
+        await overlay.move(1.0, 2.0, False)
+        # The first capture finds no helper answering yet: give it one that answers, then hold the lock as a slow
+        # hide would, and cancel the capture twice while its end waits for it.
+        overlay._enabled = True
+        overlay._capturing = 1  # the capture under way, whose hide is done
+        first: asyncio.Task[None] = asyncio.create_task(capture())
+        await entered.wait()
+        async with overlay._sending:
+            first.cancel()
+            await asyncio.sleep(0)
+            first.cancel()
+            await asyncio.sleep(0)
+        with pytest.raises(asyncio.CancelledError):
+            await first
+        assert overlay._capturing == 1  # only the capture set up by hand is left
+    finally:
+        await overlay.aclose()
+
+
+def _ops_in(path: Path) -> list[str]:
+    """The commands a stand-in helper wrote down, by their op."""
+    return [command.op for line in path.read_text(encoding="utf-8").splitlines() if (command := read_command(line))]
+
+
+async def test_a_helper_started_while_a_capture_holds_the_pointer_off_the_screen_begins_hidden(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    told: Path = tmp_path / "told"
+    _stand_in(
+        monkeypatch,
+        f"import sys\nwith open({str(told)!r}, 'w') as out:\n    for line in sys.stdin:\n        out.write(line)\n",
+    )
+    overlay: PointerOverlay = PointerOverlay()
+    overlay._capturing = 1
+    await overlay.move(5.0, 6.0, False)
+    await overlay.aclose()
+    assert _ops_in(told) == ["hide", "move"]
