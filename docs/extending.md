@@ -61,6 +61,97 @@ skill is text the run's model reads as instructions: the gallery takes repositor
 so what is installed is what was looked at, and a skill acts only through the run's tools, under the same rules and the
 same asks as anything else the run does ([Safety](safety.md)).
 
+### The nightly look: plugins proposed for you
+
+**Proposed for you** (items 710-712) stands at the top of Customize › Plugins: each night, at `[scout] time` (03:30, in
+`[scheduler] timezone`; `"off"` stops it), Dot looks for plugins worth having and for updates of those it installed,
+checks each, and keeps what passes for you. **Nothing is installed by itself**: each proposal waits for your Install (or
+Update) or Skip. **Look now** starts a look at once. The line under the title says when Dot last looked and what it
+found; what its review refused is folded under the cards with the review's reason.
+
+**Where it looks**, by how far Dot trusts the source before reading a line: Anthropic's own marketplaces
+(`anthropics/claude-plugins-official`, `anthropics/skills`, `anthropics/knowledge-work-plugins`; their catalogue,
+`.claude-plugin/marketplace.json`, pins the commit of each plugin kept elsewhere) and the repositories of the makers the
+gallery already takes from (Apollo, Cloudflare, Hugging Face, MongoDB, Redis, Supabase; from those, the skills the
+gallery does not hold yet) are trusted ("Anthropic or its maker"); Anthropic's community marketplace and the
+repositories GitHub lists under the topics agent skills are published under (`agent-skills`, `claude-skills`,
+`claude-code-skills`, `claude-code-plugin`) are "Community". Marketplaces nobody reviews (ClawHub, where an audit of
+2026 found 341 malicious skills of 2,857) are never read, and skills.sh, which ranks skills by installs, has no
+interface to read. A plugin of the gallery, one installed, one already proposed, skipped or refused by the review (at
+any commit after; Dot keeps the last 5,000 it declined), and one looked at under the same commit are left out, and so
+are the skills of a repository one of those holds already; of the rest, the trusted come first, then those nearest your
+work.
+
+**What each one goes through**, in this order, so that a plugin that fails a step costs nothing more:
+
+1. **The rules**, on what GitHub says of its repository: an MIT or Apache-2.0 licence, at least 90 days old (a skill
+   from a new account is the commonest attack), not archived, pushed to within a year, and for a community plugin at
+   least 200 stars. A plugin the rules refuse is not downloaded.
+2. **The files**: the archive of the pinned commit is downloaded and its skill folders unpacked as Install unpacks them
+   (no link, nothing outside the plugin, within the size limit), and the hash of the files taken. A skill folder inside
+   another skill is the outer skill's; a catalogue that names a skill folder without a `SKILL.md` has it left out.
+3. **The scan** of exactly those files: invisible or direction-changing characters and long base64, where an instruction
+   can hide from you and still reach a model, text that tells a model to set aside its instructions or to keep something
+   from you, services that collect what anyone sends them, binaries, and text in a file named as an image, a document or
+   a font are **high** (a file is text by what it holds, not by its name); scripts, a shell fed from the network, the
+   places credentials are kept, chat webhooks, tunnels, switches of safety and "without asking the user" (unless the
+   sentence forbids it) are **medium**, weighed in their context by the review. The rules were tuned on Anthropic's,
+   Hugging Face's, Supabase's and Superpowers' skills, which they leave with at most one high finding (a packed archive
+   of Anthropic's own).
+4. **The review**: the review model (`[models] review`) reads the skills in fences of their own, as text a stranger
+   wrote that says nothing to it: each `SKILL.md` and the text of the files beside it, the scripts first, which a run
+   would run or read, with the scan's findings beside them; and answers with its risk (low, medium, high), whether to
+   refuse the plugin, what it lets Dot do and why the risk is what it is, in the language of your own words. A file too
+   long for the review (more than 8,000 characters, or past 24,000 for a skill or 80,000 for the plugin) is named to it
+   as not shown, and is an **unread** finding on the card. The risk is never lower than the scan's: a high finding or an
+   unread file makes it at least medium, a refusal high. A review that does not come, or comes without a verdict, leaves
+   the plugin for the next night: nothing is proposed unreviewed.
+5. **The fit**: how near the plugin's skills are to the goals you gave Dot lately (by meaning with the memory's
+   embeddings on, by shared words otherwise), shown as "Fits your work".
+
+**A proposal's card** shows whether it is new or an update, who publishes it and how far that source is trusted, its
+risk (its reason on the badge), its fit, what it does and why in the review's words, and under **Details** where it
+comes from (the repository at the commit checked), its licence and stars, its skills, the files an update changes and
+everything the scan found. **Install** (`POST /api/plugin-scout/{id}/install`) installs exactly the commit and the files
+that were checked, through the gallery's own install: files that differ install nothing. The plugin then joins the
+gallery's list, and one you remove there installs again from it, at the same commit and files. **Skip** (`POST
+/api/plugin-scout/{id}/skip`) takes it away, and the look does not propose that plugin again, whichever source names it
+(a plugin is its repository and its folder there; a skipped update: not that commit). An Install under way holds the
+proposal, so a Skip or an Install of another tab meanwhile finds none waiting.
+
+**Updates**: each night Dot also looks at the newest commit of the plugins it installed from the gallery or from a
+proposal, those looked at longest ago first (at most `updates_per_night`). When the files of its skills changed there,
+the new files are scanned and reviewed as above, and the card says which files change; an update passes the rules a new
+plugin passes, of the tier it was installed from (a repository whose licence changed, that was archived, or a community
+one under 200 stars has none proposed), and one whose review did not come is looked at again the next night. **Update**
+(`?kind=update`) keeps the version it replaces in `<home>/plugins/.previous/<id>`, which Dot does not read as a plugin,
+and is refused when the installed version is no longer the one the update was found against. The plugin's card then
+reads **Updated**, with **Revert** (`POST /api/plugin-gallery/{id}/revert`), which puts the earlier version back and
+moves the updated one to the Trash; only while the version installed is the update Dot took (a plugin removed and
+installed again has none, and Revert answers 409). An update whose plugin is no longer installed at the version it was
+found against (reverted, removed, or installed again at another) can no longer be taken: it is not shown or counted, the
+night's end marks it failed, and the next night looks for one from the version installed.
+
+**The morning brief** says how many proposals wait (only the numbers: a plugin's name is a stranger's words, which the
+brief does not quote). `GET /api/plugin-scout` lists the proposals, the refused ones, the last look and whether one is
+under way; `POST /api/plugin-scout/look` starts one.
+
+**Limits** (`[scout]`): `leads_per_night` (25) plugins and `updates_per_night` (20) updates a night, `minutes` (30) for
+the whole look, `review_timeout_s` (120) for each review. Without the GitHub token of Customize › Connectors, GitHub
+answers 60 requests an hour: an update looked for takes two, a plugin one, or two when no catalogue pins its commit (a
+look of five took 17 requests and 10 seconds), so a night with many plugins installed can spend them. It reads how many
+are left from each answer and ends when two are, before GitHub refuses one (its summary says "out of GitHub's
+requests"): what it did not reach comes first the next night. With the token, 5,000 an hour. A plugin a catalogue pins
+at a commit already looked at is left out before any request, and of the rest a night takes first those taken longest
+ago, so the plugins one night has no room for come first the next ones. A look runs one at a time. The emergency stop
+ends one under way at its next plugin, keeps the next from starting and refuses Look now (409), and a look that was cut
+off stores nothing, so the next one looks at the same plugins again. A look stores what it found over the proposals as
+they are when it ends: an Install, Skip or Revert you made while it looked stays as you made it. One plugin whose files
+cannot be read is counted as failed, and the others go on.
+
+Not done: MCP servers (Connectors) are not looked for yet, as they run programs on this Mac; and no update is ever
+installed without you.
+
 ## Customize › Connectors
 
 **Connectors** lists 156 services with a search, **Connected** and **All** (each with its count) and **Check again** in
