@@ -247,7 +247,12 @@ def _turn_on_action(tool: str, group: str) -> ActionInfo:
 
 
 async def _execute_one(
-    call: ToolCall, registry: ToolRegistry, hidden: Mapping[str, str], ctx: ToolContext, gate: RunGate
+    call: ToolCall,
+    registry: ToolRegistry,
+    hidden: Mapping[str, str],
+    ctx: ToolContext,
+    gate: RunGate,
+    refused: str | None = None,
 ) -> ToolOutcome:
     started: float = time.monotonic()
     # The secrets Dot holds, masked in the step's events as the forms of keys are.
@@ -263,10 +268,12 @@ async def _execute_one(
     waited_s: float = 0.0
     decision: StepDecision | None = None
     group: str | None = hidden.get(call.name)
-    if group is not None:
+    if refused is not None:
+        result: ToolResult = fail(refused)
+    elif group is not None:
         # The model could not know the tool's parameters: it was not in the tool list. The run turns its group on.
         action = _turn_on_action(call.name, group)
-        result: ToolResult = fail(
+        result = fail(
             f"{call.name} did not run: it is in the tool group {group}, which was off. The group is on now: call "
             f"{call.name} again."
         )
@@ -323,8 +330,13 @@ async def _execute_one(
     return ToolOutcome(call=call, result=clipped, seconds=seconds, action=action)
 
 
-def _skipped(call: ToolCall) -> ToolOutcome:
-    return ToolOutcome(call=call, result=fail("Skipped: the run already finished."), seconds=0.0, action=None)
+def _finish_before_calls(after: Sequence[ToolCall]) -> str:
+    """What a ``finish`` before other calls is told: it ended nothing, and the calls after it ran."""
+    names: str = ", ".join(dict.fromkeys(call.name for call in after))
+    return (
+        f"finish must be the last call of a reply, so it did not end the run. The calls after it ({names}) were run: "
+        "read their results, and call finish again, as the last call of its reply, once the goal is reached."
+    )
 
 
 def _group_calls(calls: Sequence[ToolCall], registry: ToolRegistry) -> list[list[ToolCall]]:
@@ -355,14 +367,19 @@ async def execute_calls(
     each is clipped to the run's ``ctx.output_chars``. ``hidden`` maps the tools of the tool groups that are off to
     their group: a call of one of them does not run, and its result says to call it again now that its group is on.
     ``ended`` is told each outcome as its call ends, so that a step cut part way still has the calls that had ended
-    (item 159)."""
-    finish_index: int | None = next((index for index, call in enumerate(calls) if call.name == FINISH_TOOL), None)
-    runnable: Sequence[ToolCall] = calls if finish_index is None else calls[: finish_index + 1]
-    skipped: list[ToolOutcome] = [] if finish_index is None else [_skipped(call) for call in calls[finish_index + 1 :]]
+    (item 159). A ``finish`` with calls after it does not end the run: it gets an error result, and the calls run
+    (item 685)."""
+    # A finish with calls after it is not taken: they were meant to run, and the run ends only on a finish that is last.
+    # Known by the call itself, not its id, which a provider may leave empty or repeat.
+    refused: dict[int, str] = {
+        id(call): _finish_before_calls(calls[index + 1 :])
+        for index, call in enumerate(calls[:-1])
+        if call.name == FINISH_TOOL
+    }
     slots: asyncio.Semaphore = asyncio.Semaphore(parallelism)
 
     async def one(call: ToolCall) -> ToolOutcome:
-        outcome: ToolOutcome = await _execute_one(call, registry, hidden, ctx, gate)
+        outcome: ToolOutcome = await _execute_one(call, registry, hidden, ctx, gate, refused.get(id(call)))
         ended(outcome)
         return outcome
 
@@ -371,12 +388,12 @@ async def execute_calls(
             return await one(call)
 
     outcomes: list[ToolOutcome] = []
-    for group in _group_calls(runnable, registry):
+    for group in _group_calls(calls, registry):
         if len(group) == 1:
             outcomes.append(await one(group[0]))
         else:
             outcomes.extend(await _together([bounded(call) for call in group]))
-    return [*outcomes, *skipped]
+    return outcomes
 
 
 async def _together(calls: Sequence[Coroutine[object, object, ToolOutcome]]) -> list[ToolOutcome]:
