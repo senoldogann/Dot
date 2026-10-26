@@ -32,6 +32,7 @@ from dotagent.desktop import actions, apps, ax, memory, perms, safety, screen, s
 from dotagent.desktop import input as hid
 from dotagent.desktop.actions import Effect, Inspection, SecureFieldCheck, StepEnv
 from dotagent.desktop.memory import AppMemory, ThreadDesktop
+from dotagent.desktop.pointer import PointerOverlay
 from dotagent.desktop.render import describe_step
 from dotagent.desktop.safety import StepContext
 from dotagent.desktop.types import (
@@ -335,14 +336,27 @@ def _front_or_none() -> int | None:
         return None
 
 
+# The steps whose pointer ripples where it lands (item 706).
+_CLICKS: frozenset[str] = frozenset({"click", "double_click", "right_click"})
+
+
 class DesktopSession:
     """Looks at and controls the Mac's desktop for the conversation threads of one run."""
 
     def __init__(
-        self, config: DesktopConfig, failsafe_file: Path, browser_chrome: Callable[[], frozenset[int]]
+        self,
+        config: DesktopConfig,
+        failsafe_file: Path,
+        browser_chrome: Callable[[], frozenset[int]],
+        pointer: PointerOverlay | None = None,
     ) -> None:
         self._config: DesktopConfig = config
         self._failsafe_file: Path = failsafe_file
+        # Dot's own pointer on the screen (item 706), which shows where the steps go; it never does a step. A test
+        # gives its own, or none is drawn: only the daemon's session starts the helper that draws it.
+        self._pointer: PointerOverlay = pointer if pointer is not None else PointerOverlay(enabled=False)
+        # The chats whose steps moved it since their run began, so that the end of the last one fades it.
+        self._pointing: set[str] = set()
         # The pids of the Chromes Dot's browser works in (item 343), asked on the worker thread when a name is resolved.
         self._browser_chrome: Callable[[], frozenset[int]] = browser_chrome
         # The applications as the preview of a batch listed them, and when: the act that follows at once uses them
@@ -618,13 +632,24 @@ class DesktopSession:
     async def screenshot(self) -> ScreenshotView:
         async with self._turn():
             await self._prepare(self._prepare_screenshot)
-            return await self._call(partial(shots.take_screen, self._config))
+            return await self._without_pointer(partial(shots.take_screen, self._config))
 
     async def zoom(self, region: Rect) -> ScreenshotView:
         """A screenshot of ``region`` (model units) at the display's own sharpness."""
         async with self._turn():
             await self._prepare(self._prepare_screenshot)
-            return await self._call(partial(shots.take_region, self._config, region))
+            return await self._without_pointer(partial(shots.take_region, self._config, region))
+
+    @property
+    def pointer(self) -> PointerOverlay:
+        """Dot's own pointer on the screen (item 706), which what else captures the screen takes off it first."""
+        return self._pointer
+
+    async def _without_pointer(self, capture: Callable[[], ScreenshotView]) -> ScreenshotView:
+        """``capture`` with Dot's pointer off the screen (item 706): the model sees the screen, not Dot's arrow over
+        what it is to read."""
+        async with self._pointer.hidden():
+            return await self._call(capture)
 
     async def read(self, thread_id: str, app: str | None, ref: int, offset: int, max_chars: int) -> TextRead:
         """The text of one element, ``max_chars`` of it from ``offset``."""
@@ -757,7 +782,7 @@ class DesktopSession:
         return effect
 
     async def _run_steps(
-        self, state: ThreadDesktop, env: StepEnv, steps: Sequence[Step], reviewer: StepReviewer
+        self, thread_id: str, state: ThreadDesktop, env: StepEnv, steps: Sequence[Step], reviewer: StepReviewer
     ) -> _Batch:
         """Run the steps in order until one fails, is refused or is taken over by the user."""
         reports: list[StepReport] = []
@@ -792,6 +817,10 @@ class DesktopSession:
                 stopped = "a step failed"
                 continue
             reports.append(StepReport(index=index, description=description, outcome="done", detail=effect.detail))
+            if effect.pointer is not None and self._config.show_pointer:
+                # Dot's pointer glides to where the step went and ripples there for a click (item 706).
+                self._pointing.add(thread_id)
+                await self._pointer.move(effect.pointer.x, effect.pointer.y, step.action in _CLICKS)
             side_effects = side_effects or step.has_side_effects()
             pointer = effect.pointer if effect.pointer is not None else env.expected_pointer
             env = replace(env, expected_pointer=pointer)
@@ -819,10 +848,13 @@ class DesktopSession:
         async with self._turn():
             await self._prepare(self._prepare_acting)
             await self._note_front_before(thread_id)
+            if self._config.show_pointer:
+                # Started now, the helper is ready to draw by the time the first step has gone somewhere.
+                await self._pointer.warm()
             state: ThreadDesktop = self._thread(thread_id)
             env: StepEnv = await self._call(partial(self._open_env, state, app, steps, secure_field))
             _log.info("desktop_act", thread=thread_id, app=env.app.name, steps=len(steps))
-            batch: _Batch = await self._run_steps(memory.targeting(state, env.app.pid), env, steps, reviewer)
+            batch: _Batch = await self._run_steps(thread_id, memory.targeting(state, env.app.pid), env, steps, reviewer)
             if batch.side_effects:
                 quiet_s: float = self._config.settle_quiet_ms / 1000
                 await self._call(
@@ -868,6 +900,10 @@ class DesktopSession:
         there. Nothing is done when the owner went to another application meanwhile, when that application has quit,
         while another run's acts on the desktop are under way (it would be pulled from under them), or while a batch
         waits for the owner's answer. A failure is logged; the run has ended all the same."""
+        if thread_id in self._pointing:
+            self._pointing.discard(thread_id)
+            if not self._pointing:
+                await self._pointer.rest()
         front: _Front | None = self._fronts.pop(thread_id, None)
         if front is None or self._fronts or self._lock.locked():
             return
@@ -891,5 +927,6 @@ class DesktopSession:
         """Let go of everything: applications woken for accessibility rest, the wake-lock ends, the thread stops."""
         woken: dict[int, AXElement] = dict(self._woken)
         self._woken = {}
+        await self._pointer.aclose()
         await self._call(partial(self._shutdown_job, woken))
         self._pool.shutdown(wait=False, cancel_futures=True)

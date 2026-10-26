@@ -295,6 +295,7 @@ async def run_daemon(config: AppConfig) -> int:
                 stored_taker(config.desktop, runtime.workspace),
                 dot_shower(addresses, ui_url(host, port, token)),
                 FlightOverlay(),
+                runtime.desktop.pointer,
             )
             cleanup.push_async_callback(runtime.snapshots.stop)
             recovered: int = await manager.recover()

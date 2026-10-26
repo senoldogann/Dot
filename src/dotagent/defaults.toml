@@ -732,6 +732,11 @@ read_screen_text = true
 # again, if the one the run left in front still is (item 702): not when you went to another one meanwhile, nor while
 # another run acts on the desktop.
 give_front_back = true
+# Dot's own pointer, a glowing violet arrow, glides to where each step of desktop_act goes and ripples where it clicks,
+# so that you see what Dot does and where (item 706). It only shows: the step is done as before, with the Mac's own
+# pointer. It is drawn by a helper process, kept out of what Dot's screenshots show, and fades once the run ends; a
+# helper that fails only costs the arrow.
+show_pointer = true
 launch_timeout_s = 20.0
 activate_timeout_s = 3.0
 osascript_timeout_s = 30.0

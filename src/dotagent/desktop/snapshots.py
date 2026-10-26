@@ -9,6 +9,7 @@ never which. Dot's own window and a password manager's are never captured. Setti
 parts (``[snapshots]``)."""
 
 import asyncio
+import contextlib
 import threading
 import time
 from collections.abc import Callable
@@ -24,6 +25,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.desktop import apps, ax, capture, perms, render, safety, screen
 from dotagent.desktop.flight import FlightCommand, Frame
+from dotagent.desktop.pointer import PointerOverlay
 from dotagent.desktop.show_dot import Shower
 from dotagent.desktop.types import AppInfo, AXElement, WindowInfo
 from dotagent.events import SNAPSHOT_EVENT, SNAPSHOT_FAILED_EVENT, SYSTEM_RUN_ID, EventBus
@@ -330,6 +332,7 @@ class SnapshotService:
         self._taker: Taker | None = None
         self._shower: Shower | None = None
         self._overlay: Overlay | None = None
+        self._pointer: PointerOverlay | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._watcher: SnapshotWatcher | None = None
         self._pending: list[SnapshotTaken] = []
@@ -354,10 +357,14 @@ class SnapshotService:
             return watcher.problem
         return _SLOW if self._slow else None
 
-    async def start(self, taker: Taker, shower: Shower, overlay: Overlay) -> None:
+    async def start(
+        self, taker: Taker, shower: Shower, overlay: Overlay, pointer: PointerOverlay | None = None
+    ) -> None:
         """Take ``taker`` as what captures the window in front and keeps it, ``shower`` as what brings Dot's window to
         the front and ``overlay`` as what draws the flash and the flight, and start watching the keys when SnapShots
-        are on (the overlay's helper with them, so the first flash is not late); called once the event loop runs."""
+        are on (the overlay's helper with them, so the first flash is not late); called once the event loop runs.
+        ``pointer`` is Dot's own on the screen (item 706), taken off it while the window is captured."""
+        self._pointer = pointer
         self._loop = asyncio.get_running_loop()
         self._taker = taker
         self._shower = shower
@@ -440,7 +447,8 @@ class SnapshotService:
         overlay: Overlay = self._overlay
         async with self._taking:
             try:
-                kept: Kept = await asyncio.to_thread(taker, self.app_text)
+                async with self._pointer.hidden() if self._pointer is not None else contextlib.nullcontext():
+                    kept: Kept = await asyncio.to_thread(taker, self.app_text)
             except (DesktopError, InvalidValueError, OSError) as error:
                 # Refused (Dot's own window, a password manager, no window, no permission) or the files could not be
                 # stored: the pages hear why, and the caller.

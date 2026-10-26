@@ -56,6 +56,7 @@ from dotagent.core.paths import (
     web_research_dir,
     workspace_dir,
 )
+from dotagent.desktop.pointer import PointerOverlay
 from dotagent.desktop.session import DesktopSession
 from dotagent.desktop.snapshots import SnapshotService
 from dotagent.dot_app import app_path, build_path, runtime_path
@@ -532,7 +533,9 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             typesafe=typesafe,
             browser=browsers.main,
             browsers=browsers,
-            desktop=DesktopSession(config.desktop, failsafe_path(), browsers.chrome_pids),
+            desktop=DesktopSession(
+                config.desktop, failsafe_path(), browsers.chrome_pids, PointerOverlay(config.desktop.show_pointer)
+            ),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
             search_keys=search_keys,
