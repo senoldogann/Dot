@@ -86,6 +86,7 @@ from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdi
 from dotagent.browser.snapshot import (
     HIDDEN_VALUE,
     SnapshotLine,
+    controls_near,
     count_refs,
     diff_views,
     find_lines,
@@ -3076,6 +3077,14 @@ class BrowserSession:
         if thread is None or not thread.tabs:
             return None
         return line_for_ref(thread.tabs[thread.active].lines, ref)
+
+    def peek_near(self, thread_id: str, ref: str) -> tuple[str, ...]:
+        """The snapshot lines of the buttons near the field ``ref`` in the thread's current tab, which Enter in it may
+        press (:func:`dotagent.browser.snapshot.controls_near`), for judging a step before it runs (item 682)."""
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        if thread is None or not thread.tabs:
+            return ()
+        return controls_near(thread.tabs[thread.active].lines, ref)
 
     def current_url(self, thread_id: str) -> str | None:
         thread: ThreadTabs | None = self._threads.get(thread_id)
