@@ -219,3 +219,28 @@ async def test_the_search_for_the_first_event_of_a_time_is_not_led_astray_by_the
         assert await store.first_event_id_since(2_000.0) == await _id(store, "SELECT MAX(id) + 1 FROM events")
     finally:
         await store.close()
+
+
+async def test_a_prune_keeps_the_drafts_the_owner_has_not_sent_or_discarded(tmp_path: Path) -> None:
+    """A draft that waits, failed or is being sent is still the owner's to answer (item 686); one decided goes."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        thread = await store.create_thread("t", "test")
+        run: RunRecord = await _ended_run(store, thread.id, "old")
+        waiting = await store.add_draft(run.id, "mail", ["a@example.com"], [], "Waiting", "w")
+        failed = await store.add_draft(run.id, "mail", ["a@example.com"], [], "Failed", "f")
+        sending = await store.add_draft(run.id, "mail", ["a@example.com"], [], "Sending", "s")
+        sent = await store.add_draft(run.id, "mail", ["a@example.com"], [], "Sent", "t")
+        discarded = await store.add_draft(run.id, "mail", ["a@example.com"], [], "Discarded", "d")
+        for draft in (failed, sending, sent):
+            await store.claim_draft(draft.id, ["a@example.com"], [], draft.subject, draft.body)
+        await store.settle_draft(failed.id, "no network")
+        await store.settle_draft(sent.id, None)
+        await store.discard_draft(discarded.id)
+        await store.delete_events_of_runs_ended_before(time.time() + 60, TAINT_EVENTS)
+        for status, draft in (("waiting", waiting), ("failed", failed), ("sending", sending)):
+            assert [kept.id for kept in await store.list_drafts(status, 10)] == [draft.id]
+        assert await store.list_drafts("sent", 10) == []
+        assert await store.list_drafts("discarded", 10) == []
+    finally:
+        await store.close()
