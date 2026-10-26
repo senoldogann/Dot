@@ -9,13 +9,16 @@ const ITEM = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(.*)$/;
 const TASK = /^\[([ xX])\]\s+(.*)$/;
 const QUOTE = /^\s*>\s?(.*)$/;
 const RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
-// The line under a table's head: a dash in each cell at least, with a colon at an end of it to align the column.
-const TABLE_SEPARATOR = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+// The line under a table's head: a dash in each cell at least, with a colon at an end of it to align the column. No two
+// stretches of white space stand side by side with nothing between them that must match, so that a line of spaces
+// that fails at its end is read once and not once from each of its spaces (item 692).
+const TABLE_SEPARATOR = /^\s*(?:\|\s*)?:?-+:?(?:\s*\|\s*:?-+:?)*(?:\s*\|)?\s*$/;
 // A bare address, or one between angle brackets (its brackets are no part of it).
 const BARE_URL = /<(https?:\/\/[^\s<>]+)>|https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"\]]/g;
 const SAFE_URL = /^https?:\/\/[^\s]+$/;
 // How deep lists and quotes nest in what is read: a text of nothing but nested marks cannot take the page down.
 const MOST_NESTING = 6;
+const WHITE_SPACE = /\s/;
 
 /**
  * What a line that opens a block of code says (``` or ~~~, then what the writer called the code): the width of its
@@ -68,7 +71,63 @@ function linkParts(text) {
 // strikethrough (`~~`), in this order of groups.
 const EMPHASIS =
   /\*\*(?=\S)([^*]+?)(?<=\S)\*\*|(?<![\w*])\*(?=[^\s*])([^*\n]+?)(?<=[^\s*])\*(?![\w*])|~~(?=\S)([^~\n]+?)(?<=\S)~~|(?<![\w_])__(?=\S)([^_\n]+?)(?<=\S)__(?![\w_])|(?<![\w_])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w_])/g;
-const LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
+const LINK_HEAD = /\]\(https?:\/\//y;
+const ADDRESS_RUN = /[^\s)]*/y;
+
+/**
+ * The links `[words](https://address)` of `text`, in order, each `{ index, text, words, href }` (`index` and `text`
+ * with the `!` of a picture written as a link when `withPicture`): what `/!?\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g`
+ * finds, in one pass. A pattern that reads the words of each `[` to the next `]` and the address after it again from
+ * every `[` of a line made of `[a` took a time that grew with the square of its length (item 692): here the closing
+ * bracket and the end of the line are looked up once for all the `[` before them, and an address whose run of
+ * characters ended at a space or at the end is known to fail for every `](` inside that run.
+ */
+function linkMatches(text, withPicture) {
+  const found = [];
+  let open = text.indexOf("[");
+  let close = -1;
+  let lineEnd = -1;
+  let deadUntil = 0;
+  let last = 0;
+  while (open !== -1) {
+    if (close <= open) {
+      close = text.indexOf("]", open + 1);
+      if (close === -1) {
+        break;
+      }
+    }
+    if (lineEnd <= open) {
+      const at = text.indexOf("\n", open + 1);
+      lineEnd = at === -1 ? text.length : at;
+    }
+    if (lineEnd < close) {
+      // The line ends before this bracket closes: only a `[` after the line's end can be closed by it.
+      open = text.indexOf("[", lineEnd + 1);
+      continue;
+    }
+    if (close > open + 1 && close >= deadUntil) {
+      LINK_HEAD.lastIndex = close;
+      const head = LINK_HEAD.exec(text);
+      if (head !== null) {
+        ADDRESS_RUN.lastIndex = close + head[0].length;
+        const end = close + head[0].length + ADDRESS_RUN.exec(text)[0].length;
+        if (end > close + head[0].length && text[end] === ")") {
+          const href = text.slice(close + 2, end);
+          const start = withPicture && open > last && text[open - 1] === "!" ? open - 1 : open;
+          found.push({ index: start, text: text.slice(start, end + 1), words: text.slice(open + 1, close), href });
+          last = end + 1;
+          open = text.indexOf("[", last);
+          continue;
+        }
+        deadUntil = end;
+      }
+    }
+    // Every `[` of the line before this `]` fails the same way: the next one that can start a link is after it.
+    open = text.indexOf("[", close + 1);
+  }
+  return found;
+}
 
 function emphasisParts(text) {
   const parts = [];
@@ -93,22 +152,21 @@ function emphasisParts(text) {
 }
 
 // A link, or a picture written as one (`![words](address)`): the picture is not drawn (nothing is fetched for a
-// message), its words are the link.
-const MARKDOWN_LINK = /!?\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+// message), its words are the link (`linkMatches`).
 
 function markdownLinkParts(text) {
   const parts = [];
   let last = 0;
-  for (const match of text.matchAll(MARKDOWN_LINK)) {
+  for (const match of linkMatches(text, true)) {
     if (match.index > last) {
       parts.push(...emphasisParts(text.slice(last, match.index)));
     }
-    if (SAFE_URL.test(match[2])) {
-      parts.push({ type: "link", value: match[1], href: match[2] });
+    if (SAFE_URL.test(match.href)) {
+      parts.push({ type: "link", value: match.words, href: match.href });
     } else {
-      parts.push({ type: "text", value: match[0] });
+      parts.push({ type: "text", value: match.text });
     }
-    last = match.index + match[0].length;
+    last = match.index + match.text.length;
   }
   if (last < text.length) {
     parts.push(...emphasisParts(text.slice(last)));
@@ -338,6 +396,23 @@ export function parseBlocks(text) {
   return parseSourcedBlocks(text).map((sourced) => sourced.block);
 }
 
+/** A heading's words without the closing marks (`## Title ##`): white space and hashes at its end, when white space stands before the hashes. */
+function withoutClosingMarks(text) {
+  let end = text.length;
+  while (end > 0 && WHITE_SPACE.test(text[end - 1])) {
+    end -= 1;
+  }
+  let marks = end;
+  while (marks > 0 && text[marks - 1] === "#") {
+    marks -= 1;
+  }
+  let start = marks;
+  while (start > 0 && WHITE_SPACE.test(text[start - 1])) {
+    start -= 1;
+  }
+  return marks === end || start === marks ? text : text.slice(0, start);
+}
+
 /**
  * The blocks of a text, each with the lines it was read from as its `source` (item 274). A block is read from its own
  * lines alone, so two texts whose first blocks were read from the same lines have the same first blocks. A `list` has
@@ -361,7 +436,7 @@ export function parseSourcedBlocks(text, depth = 0) {
     } else if (HEADING.test(line)) {
       const match = HEADING.exec(line);
       read = {
-        block: { type: "heading", level: match[1].length, inline: parseInline(match[2].replace(/\s+#+\s*$/, "")) },
+        block: { type: "heading", level: match[1].length, inline: parseInline(withoutClosingMarks(match[2])) },
         next: index + 1,
       };
     } else if (RULE.test(line)) {
@@ -426,14 +501,14 @@ function sourceEmphasis(text) {
 function sourceLinks(text) {
   const pieces = [];
   let last = 0;
-  for (const match of text.matchAll(LINK)) {
+  for (const match of linkMatches(text, false)) {
     pieces.push(...sourceEmphasis(text.slice(last, match.index)));
-    if (SAFE_URL.test(match[2])) {
-      pieces.push(piece("mark", "["), piece("link", match[1]), piece("mark", "]("), piece("address", match[2]), piece("mark", ")"));
+    if (SAFE_URL.test(match.href)) {
+      pieces.push(piece("mark", "["), piece("link", match.words), piece("mark", "]("), piece("address", match.href), piece("mark", ")"));
     } else {
-      pieces.push(piece("text", match[0]));
+      pieces.push(piece("text", match.text));
     }
-    last = match.index + match[0].length;
+    last = match.index + match.text.length;
   }
   pieces.push(...sourceEmphasis(text.slice(last)));
   return pieces;

@@ -1,5 +1,8 @@
 """The page and search parsers on fixed samples: what stays, what is left out and how the text is laid out."""
 
+import time
+
+from dotagent.browser.snapshot import link_lines, parse_snapshot
 from dotagent.web.search import parse_duckduckgo
 from dotagent.web.text import html_to_text
 
@@ -88,3 +91,45 @@ def test_a_page_that_announces_no_results_has_no_hits() -> None:
     page = parse_duckduckgo('<html><body><div class="no-results">No  results.</div></body></html>')
     assert page.hits == ()
     assert page.announced_no_results
+
+
+# A page of a hostile site, or a very long line, is read in a moment (item 692). The readers took a time that grew with
+# the square of the page: the bound is far above what they take now (a fraction of a second) and far below what they
+# took (ten seconds and more).
+_MOST_S: float = 3.0
+
+
+def test_nested_links_are_read_in_a_moment_and_a_link_without_words_is_dropped() -> None:
+    started: float = time.monotonic()
+    page = html_to_text("<a href='/a'>t" * 12_000 + "</a>" * 12_000, _BASE)
+    assert time.monotonic() - started < _MOST_S
+    assert page.text.count("](https://docs.test/a)") == 12_000
+    nested = html_to_text(
+        "<a href='/a'>x<a href='/b'>y</a></a><a href='/c'> </a><a href='/d'><a href='/e'> </a></a>", _BASE
+    )
+    assert nested.text == "[x[y](https://docs.test/b)](https://docs.test/a)"
+
+
+def test_a_page_of_skipped_elements_and_stray_end_tags_is_read_in_a_moment() -> None:
+    started: float = time.monotonic()
+    page = html_to_text("<nav>" + "<div>" * 20_000 + "</x>" * 20_000 + "</nav>after", _BASE)
+    assert time.monotonic() - started < _MOST_S
+    assert page.text == "after"
+    # An end tag closes the skipped element it names and those opened inside it, and no more: "e" is in the nav still.
+    assert html_to_text("a<nav>b<div>c<span>d</div>e</nav>f<p>g", _BASE).text == "af\n\ng"
+
+
+def test_the_links_of_a_page_of_many_are_listed_in_a_moment() -> None:
+    snapshot: str = "".join(f'- link "l{i}" [ref=e{i}]:\n  - /url: /p{i}\n' for i in range(20_000))
+    lines = parse_snapshot(snapshot)
+    started: float = time.monotonic()
+    found: tuple[str, ...] = link_lines(lines, "https://docs.test/", "", 100_000)
+    assert time.monotonic() - started < _MOST_S
+    assert len(found) == 20_000 and found[7] == "e7  l7 -> https://docs.test/p7"
+    nested: str = (
+        '- link "outer" [ref=e1]:\n  - generic:\n    - link "inner" [ref=e2]:\n      - /url: /in\n  - /url: /out\n'
+    )
+    assert link_lines(parse_snapshot(nested), "https://docs.test/", "", 10) == (
+        "e1  outer -> https://docs.test/out",
+        "e2  inner -> https://docs.test/in",
+    )

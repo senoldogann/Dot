@@ -387,25 +387,29 @@ def find_lines(lines: Sequence[SnapshotLine], needle: str, limit: int) -> tuple[
     return tuple(hits)
 
 
-def _link_target(lines: Sequence[SnapshotLine], index: int) -> str | None:
-    """The ``/url`` property of the link at ``index``: one of its direct children."""
-    depth: int = lines[index].depth
-    for child in lines[index + 1 :]:
-        if child.depth <= depth:
-            return None
-        if child.depth == depth + 1 and child.role == _URL_ROLE:
-            return child.inline
-    return None
+def _link_targets(lines: Sequence[SnapshotLine]) -> dict[int, str | None]:
+    """The ``/url`` property of each link, by the link's index: the first of its direct children that has one, found in
+    one pass over the lines (item 692)."""
+    parents: list[int | None] = _parents(lines)
+    targets: dict[int, str | None] = {}
+    for index, line in enumerate(lines):
+        parent: int | None = parents[index]
+        if parent is None or line.role != _URL_ROLE or line.depth != lines[parent].depth + 1 or parent in targets:
+            continue
+        if lines[parent].role == "link":
+            targets[parent] = line.inline
+    return targets
 
 
 def link_lines(lines: Sequence[SnapshotLine], base_url: str, needle: str, limit: int) -> tuple[str, ...]:
     """Links of the whole page as ``ref  text -> absolute URL``; ``needle`` filters on text and URL (any case)."""
     lowered: str = needle.lower()
     hits: list[str] = []
+    targets: dict[int, str | None] = _link_targets(lines)
     for index, line in enumerate(lines):
         if line.role != "link" or line.ref is None:
             continue
-        href: str | None = _link_target(lines, index)
+        href: str | None = targets.get(index)
         if href is None or href.lower().startswith(_HIDDEN_SCHEMES):
             continue
         target: str = urljoin(base_url, href)
