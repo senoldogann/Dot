@@ -1338,15 +1338,24 @@ async def _ask_checker(
 async def _follow_ups(agent: AgentRun) -> str:
     """The schedules that will start runs in the run's chat, one line each with the start of their goal, for the goal
     check (item 675): what is left of a goal that waits on time is picked up by one of them. A schedule whose runs go
-    in a chat of their own is not one, even when its last run was in this chat. Empty when there is none."""
+    in a chat of their own is not one, even when its last run was in this chat, and neither is the schedule whose
+    firing the run is: its next firing would make a run that fails each time end done each time. Empty when there is
+    none."""
     now: float = time.time()
     zone: ZoneInfo = agent.runtime.schedule_zone
     same_chat: bool = agent.runtime.config.scheduler.same_chat
+    # A firing's chat is marked as its schedule's before its run starts (``SchedulerRunner._firing_chat``).
+    firing_of: str | None = (
+        await agent.runtime.store.schedule_of_thread(agent.run.thread_id)
+        if agent.run.source == SCHEDULE_SOURCE
+        else None
+    )
     lines: list[str] = [
         f"- {record.name}: next run {format_local(record.next_run_at, zone)} ({schedule_timing(record, zone)}); "
         f"its goal: {truncate_middle(' '.join(record.goal.split()), _FOLLOW_UP_GOAL_CHARS)}"
         for record in await agent.runtime.store.list_schedules()
         if record.enabled
+        and record.id != firing_of
         and record.thread_id == agent.run.thread_id
         and (same_chat if record.options.same_chat is None else record.options.same_chat)
         and record.next_run_at is not None

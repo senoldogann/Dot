@@ -39,7 +39,7 @@ from dotagent.scheduler.plans import UNSET_OPTIONS
 from dotagent.server import UI_SOURCE
 from dotagent.skills.types import Skill
 from dotagent.store.db import Store
-from dotagent.store.models import RunMode, RunRecord, ScheduleOptions
+from dotagent.store.models import RunMode, RunRecord, ScheduleOptions, ScheduleRecord
 from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
@@ -124,42 +124,56 @@ def test_a_goal_whose_rest_waits_on_a_scheduled_run_ends_the_run_as_done_with_th
         assert "the replies are read at 19:00" in outcome.result
 
 
+def _run_in(store: Store, thread_id: str, source: str) -> AgentRun:
+    """A run of ``source`` in the chat ``thread_id``, with only what :func:`_follow_ups` reads."""
+    return cast(
+        AgentRun,
+        SimpleNamespace(
+            runtime=SimpleNamespace(
+                store=store,
+                schedule_zone=ZoneInfo("UTC"),
+                config=SimpleNamespace(scheduler=SimpleNamespace(same_chat=False)),
+            ),
+            run=SimpleNamespace(thread_id=thread_id, source=source),
+        ),
+    )
+
+
 async def test_the_follow_ups_of_a_run_are_the_schedules_still_to_run_in_its_own_chat(tmp_path: Path) -> None:
     """Item 675: the goal check is shown only the schedules whose next run goes on in the run's chat, each with its
-    goal; one whose runs open a chat of their own is left out, even when its last run was in this chat."""
+    goal; one whose runs open a chat of their own is left out, even when its last run was in this chat, and so is the
+    schedule whose firing the run is."""
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "images")
     try:
+        chat: str = (await store.create_thread("the chat", UI_SOURCE)).id
         later: float = time.time() + 3600
         here: ScheduleOptions = UNSET_OPTIONS.model_copy(update={"same_chat": True})
         elsewhere: ScheduleOptions = UNSET_OPTIONS.model_copy(update={"same_chat": False})
-        for name, next_run_at, options, thread_id, enabled in (
-            ("Read the replies", later, here, "thr_this", True),
-            ("Own chat", later, elsewhere, "thr_this", True),
-            ("As configured", later, UNSET_OPTIONS, "thr_this", True),
-            ("Other chat", later, here, "thr_other", True),
-            ("Switched off", later, here, "thr_this", False),
-            ("Gone by", time.time() - 60, here, "thr_this", True),
-        ):
+        made: list[ScheduleRecord] = [
             await store.add_schedule(
                 name, None, next_run_at, f"{name}: the goal.", "task", next_run_at, options, thread_id, enabled
             )
-        agent: AgentRun = cast(
-            AgentRun,
-            SimpleNamespace(
-                runtime=SimpleNamespace(
-                    store=store,
-                    schedule_zone=ZoneInfo("UTC"),
-                    config=SimpleNamespace(scheduler=SimpleNamespace(same_chat=False)),
-                ),
-                run=SimpleNamespace(thread_id="thr_this"),
-            ),
-        )
-        listed: list[str] = (await _follow_ups(agent)).splitlines()
+            for name, next_run_at, options, thread_id, enabled in (
+                ("Read the replies", later, here, chat, True),
+                ("Own chat", later, elsewhere, chat, True),
+                ("As configured", later, UNSET_OPTIONS, chat, True),
+                ("Other chat", later, here, "thr_other", True),
+                ("Switched off", later, here, chat, False),
+                ("Gone by", time.time() - 60, here, chat, True),
+            )
+        ]
+        listed: list[str] = (await _follow_ups(_run_in(store, chat, UI_SOURCE))).splitlines()
+        # The schedule fired in the chat and its run asks: its own next firing is no follow-up.
+        await store.link_schedule_thread(chat, made[0].id)
+        firing: str = await _follow_ups(_run_in(store, chat, SCHEDULE_SOURCE))
+        followed: list[str] = (await _follow_ups(_run_in(store, chat, UI_SOURCE))).splitlines()
     finally:
         await store.close()
     assert len(listed) == 1, listed
     assert listed[0].startswith("- Read the replies: next run ")
     assert listed[0].endswith("its goal: Read the replies: the goal.")
+    assert firing == ""
+    assert followed == listed
 
 
 def test_the_conversation_of_a_run_starts_at_its_goal() -> None:

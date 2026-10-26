@@ -110,7 +110,7 @@ async def test_a_task_not_asked_keeps_the_goal_mode_chosen_and_its_checker_is_no
 
 
 WAITS: str = "The posts are out; the replies come in over the next hours."
-FOLLOW_UPS_PART: str = "FOLLOW-UPS (scheduled runs in this chat, from the harness)"
+FOLLOW_UPS_PART: str = "FOLLOW-UPS (scheduled runs in this chat, listed by the harness"
 # A day ahead, so that the schedule is still to come when the goal check reads it.
 FOLLOW_UP: JsonObject = {
     "name": "Read the replies",
