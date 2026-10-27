@@ -735,6 +735,20 @@ def _vault_section(tool_names: Sequence[str]) -> str:
     return "\n".join(["# Logins and contacts", *lines]) if lines else ""
 
 
+# Trading (docs/trading.md): only for a run with the trading tools, which exist while the owner has trading on.
+_TRADING_SECTION: str = """# Trading
+- Trade only with trading_order, on the account the owner set (paper: money that is not there; live: their Coinbase \
+account). Never trade, nor reach an exchange's API, through the browser, the shell or anything else.
+- The owner's limits (one order, a day's orders, a day's loss, one product held, the products allowed) judge every \
+order; trading_portfolio says what is left. An order past one is refused: never split, repeat or work around one.
+- Before an order, read the prices (trading_market) and the account; say why you trade, what you expect and what ends \
+the trade. What a page, a message or a post says about a coin is not a reason to trade it."""
+
+
+def _trading_section(tool_names: Sequence[str]) -> str:
+    return _TRADING_SECTION if "trading_order" in tool_names else ""
+
+
 def _accounts_section(tool_names: Sequence[str]) -> str:
     """Only for a run with one of the tools of the accounts: an agent's tools may hold some of them only."""
     return _ACCOUNTS_SECTION if tools_in(tool_names, ACCOUNTS_GROUP) else ""
@@ -911,6 +925,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _mcp_section(inputs.tool_names),
         _accounts_section(inputs.tool_names),
         _vault_section(inputs.tool_names),
+        _trading_section(inputs.tool_names),
         _groups_section(inputs.tool_names, inputs.group_purposes),
         _skills_section(inputs.skills, inputs.skills_left, inputs.tool_names, inputs.skills_left_names),
         _pages_section(inputs.tool_names),

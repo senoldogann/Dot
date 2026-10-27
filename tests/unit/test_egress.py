@@ -86,6 +86,7 @@ def test_a_step_that_sends_out_carries_a_secret_held_or_one_in_a_key_s_form_anyw
         (("install",), True),
         (("self_change",), True),
         (("vault_fill",), True),
+        (("trade",), True),
         (("protected_read", "outside_workspace"), True),
         (("destructive", "outside_workspace"), True),
         (("social",), False),

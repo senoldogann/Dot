@@ -73,6 +73,7 @@ from dotagent.server.routes_teach import teach_router
 from dotagent.server.routes_teams import teams_router
 from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
+from dotagent.server.routes_trading import trading_router
 from dotagent.server.routes_vault import vault_router
 from dotagent.server.routes_vaultitems import vault_items_router
 from dotagent.server.routes_voice import voice_router
@@ -186,6 +187,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(runs_router(ctx))
     app.include_router(queue_router(ctx))
     app.include_router(reactions_router(ctx))
+    app.include_router(trading_router(ctx))
     app.include_router(threads_router(ctx))
     app.include_router(rules_router(ctx))
     app.include_router(memories_router(ctx))

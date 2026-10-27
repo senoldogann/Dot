@@ -49,6 +49,7 @@ type ConfigTable = Literal[
     "server",
     "shell",
     "snapshots",
+    "trading",
     "web",
 ]
 type AgentSetting = Literal["resume"]
@@ -76,6 +77,9 @@ type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
 type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
 type WebSetting = Literal["search_order"]
+type TradingSetting = Literal[
+    "mode", "products", "max_order", "max_day", "max_day_loss", "max_position", "paper_start", "paper_fee_rate"
+]
 type SettingKey = (
     AgentSetting
     | AssistantSetting
@@ -89,10 +93,12 @@ type SettingKey = (
     | ServerSetting
     | ShellSetting
     | SnapshotsSetting
+    | TradingSetting
     | WebSetting
 )
-# A list of names is ``[server] reach`` (item 271), ``[models] standby`` (item 478) or ``[web] search_order``.
-type SettingValue = str | bool | int | list[str]
+# A list of names is ``[server] reach`` (item 271), ``[models] standby`` (item 478), ``[web] search_order`` or
+# ``[trading] products``; a number with decimals is one of ``[trading]``'s amounts.
+type SettingValue = str | bool | int | float | list[str]
 
 
 def _basic_string(text: str) -> str:
@@ -114,6 +120,8 @@ def _literal(value: SettingValue) -> str:
         return "true" if value else "false"
     if isinstance(value, list):
         return "[" + ", ".join(_literal(item) for item in value) + "]"
+    if isinstance(value, float):
+        return repr(value)
     return str(value) if isinstance(value, int) else _basic_string(value)
 
 

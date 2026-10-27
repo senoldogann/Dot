@@ -677,6 +677,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "croniter" },
+    { name = "cryptography" },
     { name = "dotagent-web-research" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -715,6 +716,7 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "croniter", specifier = ">=6.2.4" },
+    { name = "cryptography", specifier = ">=50.0.2" },
     { name = "dotagent-web-research", specifier = "==1.4.9" },
     { name = "fastapi", specifier = ">=0.143.0" },
     { name = "httpx", specifier = ">=0.28.1" },

@@ -176,6 +176,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Memory and schedules](docs/memory-and-schedules.md)
 - [Dot comes to you](docs/proactive.md): the morning brief and the watchers
 - [Agents and campaigns](docs/agents-and-campaigns.md)
+- [Trading](docs/trading.md): crypto on Coinbase, paper or live, under limits no run can change
 - [Apps, MCP servers, skills and plugins](docs/extending.md)
 - [Configuration](docs/configuration.md)
 - [Development](docs/development.md): the tests, the gate, measuring the agent
