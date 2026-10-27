@@ -183,9 +183,10 @@ itself, and an answering run messages no one further. The sender's chat shows th
 the agent's face. While the message is on its way, until the agent's run starts and its row takes over, the conversation
 shows Dot's three dots and "Sending to Scout…" (item 668), gone once the agent's run starts (the one part on its way
 when the model wrote the agent's name otherwise than the agent has it), or at once if the call ends without a run (an
-agent not found, a refusal). The agent's answer then stands in the conversation as its message: under one quiet head, "Message
-from Scout" with its face, which the next agent's answer joins ("Messages from Scout and Editor"), a bubble with the
-agent's face and name over its words, cut at 1,200 characters with **Read it all** leading to its run's page. Only the
+agent not found, a refusal). The agent's answer then stands in the conversation as its message, folded under one line (item 733): "Message
+from Scout" with its face, which the next agent's answer joins ("Messages from Scout and Editor" and how many), so that
+Dot's own answer keeps the conversation; a tap opens it, each message as wide as Dot's answers, the agent's face and
+name over its words, cut at 1,200 characters with **Read it all** leading to its run's page. Only the
 answer of a run that ended done is shown so; it stays in sight when the chat shows only what Dot is doing (item 663).
 The run that answers a message names the agent in its `run_queued` event (`agent_name`), which the page reads; a
 helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (a button on the Agents page, `#/team`) lists today's messages: who to whom, the
