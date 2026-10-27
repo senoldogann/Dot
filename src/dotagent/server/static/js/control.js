@@ -205,7 +205,7 @@ export function createControl({ runId, screen, image, onRefused }) {
       return;
     }
     const point = pointOf(event);
-    if (pinch !== null && pinch.points.has(event.pointerId)) {
+    if (pinch?.points.has(event.pointerId)) {
       const [a, b] = pinch.ids;
       const from = { a: pinch.points.get(a), b: pinch.points.get(b) };
       pinch.points.set(event.pointerId, point);
@@ -250,7 +250,7 @@ export function createControl({ runId, screen, image, onRefused }) {
     if (touch.timer !== null) {
       clearTimeout(touch.timer);
     }
-    if (pinch !== null && pinch.points.has(event.pointerId)) {
+    if (pinch?.points.has(event.pointerId)) {
       // The other finger stays out of it until it lifts too.
       pinch = null;
       return;
@@ -282,7 +282,7 @@ export function createControl({ runId, screen, image, onRefused }) {
       touches.delete(event.pointerId);
       cancelTouch(touch);
     }
-    if (pinch !== null && pinch.points.has(event.pointerId)) {
+    if (pinch?.points.has(event.pointerId)) {
       pinch = null;
     }
   }

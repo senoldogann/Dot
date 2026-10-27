@@ -290,7 +290,7 @@ export function mount(root, ctx) {
     const isConnected = catalogue.connected(plugin);
     const step = isConnected ? null : catalogue.firstStep(plugin);
     let action = null;
-    if (step !== null && step.page) {
+    if (step?.page) {
       // A service whose step is its page (1Password, item 493): its button leads there.
       action = el("a", { class: "btn sm plugin-add", href: `#/customize/connectors/${plugin.id}`, title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` }, step.label);
     } else if (step !== null && step.link !== undefined) {

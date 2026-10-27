@@ -224,7 +224,7 @@ export function createCatalogue(onChange) {
 
   /** Whether 1Password is connected and its vaults were read (item 493). */
   function vaultReady() {
-    return vault !== null && vault.connected && vault.error === null && vault.vaults.length > 0;
+    return vault?.connected === true && vault.error === null && vault.vaults.length > 0;
   }
 
   function connected(plugin) {
