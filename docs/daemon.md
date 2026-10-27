@@ -729,7 +729,7 @@ behind a filter; see [Models and providers](models.md#models-and-providers)), **
 search; see [Runs](runs.md)), **Browser** (which Chrome Dot browses with
 and what Chrome has to allow first; see [Browser
 use](browser-and-computer-use.md#browser-use)), **Vault** (the logins, cards and contact details you give Dot; below),
-**Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
+**Trading** (whether Dot may trade crypto on Coinbase; see [Settings › Trading](#settings--trading)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
 what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, the
 versions, fifty at a time, with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
 harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a sign-in code for its home-screen app; see
@@ -754,6 +754,34 @@ a phone they are a list in groups whose rows open each tab as a page of its own 
 phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
+
+### Settings › Trading
+
+**Trading** (`#/settings/trading`, in the group This Mac, item 764) is where you decide whether Dot may trade crypto on Coinbase,
+with what limits, and see what it did. The page shows, top to bottom:
+
+- **Mode**: Off (Dot has no trading tools), Paper (an account of Dot's own, at Coinbase's real prices, with money that is
+  not there) or Live (your Coinbase account, real money), each with a line saying what it means. Switching to Live asks
+  first and says that a run in yolo mode places orders without asking, within the limits. When trading is on but runs
+  do not have the trading tools yet, the page says they get them after Dot restarts and offers **Restart Dot**.
+- **Limits**: the most for one order, the most traded and the most lost in a day, the most held of one product, all in
+  the quote currency, and what the paper account starts with (in Paper). The products a run may trade are a list of ids
+  such as `BTC-EUR`, each with a remove button, and a field that allows another. **Save limits** sends only what changed;
+  a reason the daemon gives (a limit past another, an id not priced in the quote, a phone asked to widen) shows under
+  the button. Like the config file's `[trading]` table, these hold from the next order.
+- **Coinbase key** (when trading is on, or a key is kept): whether a key is kept and the end of its name, **Remove
+  key**, and a form for its name and its private key, which is sent to the Keychain and never shown again. Make the
+  key in the Coinbase Developer Platform with the ECDSA signature algorithm and the permissions View and Trade, never
+  Transfer; a key that may transfer money is refused.
+- **Account** (Paper and Live): what the account is worth, today's change in green or red with its sign, what was
+  traded today against the day's limit and the holdings; a reason the account could not be read stands above them. In
+  Paper, **Start again** (after a question) resets the account to its starting money.
+- **Orders**: the latest fifty, newest first, each with its side, product, worth, status, time, size, price, fee and
+  the note the run left.
+
+A phone's key narrows trading (off, paper, a lower limit, a product dropped, the key removed, the paper account started
+again) and is refused anything that widens it, with the reason shown. The endpoints are `GET|PATCH /api/trading`,
+`PUT|DELETE /api/trading/key` and `POST /api/trading/paper/reset`.
 
 ### Settings › Vault
 

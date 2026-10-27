@@ -404,6 +404,8 @@ const SHAPES = {
   lockOpen: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2 }], ["path", { d: "M7 11V7a5 5 0 0 1 9.9-1" }]],
   // For the vault (item 621): a card, and a contact's card with a head on it.
   creditCard: [["rect", { width: 20, height: 14, x: 2, y: 5, rx: 2 }], ["path", { d: "M2 10h20" }]],
+  // For Settings › Trading: a line that climbs, with its arrowhead.
+  trendingUp: [["polyline", { points: "22 7 13.5 15.5 8.5 10.5 2 17" }], ["polyline", { points: "16 7 22 7 22 13" }]],
   contact: [
     ["path", { d: "M16 2v2" }],
     ["path", { d: "M17.915 22a6 6 0 0 0-12 0" }],

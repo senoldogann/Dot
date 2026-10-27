@@ -1,0 +1,214 @@
+"""Settings › Trading in a real browser (docs/daemon.md): trading is switched from off to paper, a limit is changed and
+kept in the config file, a limit the settings refuse says why, Live asks first, a key the Keychain stand-in never
+receives is refused with its reason, and an order of the record is listed; wide and light, and on a phone and dark,
+where the page keeps inside the screen. The Keychain is a stand-in, and no price and no account is read from Coinbase:
+the paper account holds only euros, which need no price."""
+
+import asyncio
+import time
+import tomllib
+from collections.abc import AsyncIterator
+from pathlib import Path
+from typing import Any, Literal
+
+import pytest
+import pytest_asyncio
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from vault_stand_ins import MemorySecretStore
+
+from dotagent.agent.manager import RunManager
+from dotagent.config import load_config, load_default_config
+from dotagent.core.paths import config_path
+from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.server.app import create_app
+from dotagent.server.context import ServerContext
+from dotagent.server.daemon import DotServer, bind_listener, serving_config
+from dotagent.server.links import ui_url
+from dotagent.store.models import TradingOrderRecord
+
+pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
+
+TOKEN: str = "trading-settings-page-token"
+_OVERFLOW: str = "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
+_SIZES: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
+
+
+@pytest_asyncio.fixture(loop_scope="module")
+async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
+    """A runtime in a throw-away home with trading off and a Keychain that is a dictionary."""
+    home: Path = tmp_path_factory.mktemp("home")
+    (home / "config.toml").write_text(
+        "[browser]\nheadless = true\n\n[builtin_mcp]\nweb_research = false\n", encoding="utf-8"
+    )
+    patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
+    patch.setenv("DOT_HOME", str(home))
+    patch.setenv("DOT_LOG_DIR", str(tmp_path_factory.mktemp("logs")))
+    patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
+    built: Runtime = await build_runtime(load_config(home / "config.toml"))
+    built.trading.key_store = MemorySecretStore()
+    try:
+        yield built
+    finally:
+        await close_runtime(built)
+        patch.undo()
+
+
+@pytest_asyncio.fixture(loop_scope="module")
+async def served(runtime: Runtime) -> AsyncIterator[str]:
+    manager: RunManager = RunManager(runtime)
+    try:
+        stopping: asyncio.Event = asyncio.Event()
+        listener = bind_listener("127.0.0.1", 0)
+        port: int = listener.getsockname()[1]
+        context: ServerContext = ServerContext(
+            runtime=runtime,
+            manager=manager,
+            scheduler=None,
+            token=TOKEN,
+            host="127.0.0.1",
+            port=port,
+            started_at=time.time(),
+            stopping=stopping,
+        )
+        server: DotServer = DotServer(serving_config(create_app(context)), stopping)
+        serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
+        while not server.started:
+            assert not serving.done(), "the server stopped while starting"
+            await asyncio.sleep(0.05)
+        try:
+            yield f"http://127.0.0.1:{port}"
+        finally:
+            server.should_exit = True
+            stopping.set()
+            await serving
+    finally:
+        await manager.shutdown()
+
+
+async def _fail_an_order(runtime: Runtime) -> None:
+    """An order of the paper account that did nothing, after the account's start: it is listed and moves no balance."""
+    await runtime.store.add_trading_order(
+        TradingOrderRecord(
+            id=f"ord_page_{time.time_ns()}",
+            mode="paper",
+            product="ETH-EUR",
+            side="sell",
+            notional=10.0,
+            size=0.0,
+            price=0.0,
+            fee=0.0,
+            status="failed",
+            ts=time.time(),
+            run_id="",
+            exchange_id="",
+            note="The price moved",
+        )
+    )
+
+
+async def _held(page: Page, served: str) -> dict[str, Any]:
+    """What the daemon holds of trading, asked as the page asks it."""
+    answer = await page.request.get(f"{served}/api/trading", headers={"Authorization": f"Bearer {TOKEN}"})
+    assert answer.ok, await answer.text()
+    return dict(await answer.json())
+
+
+def _mode(page: Page, name: str) -> Locator:
+    return page.get_by_role("group", name="Trading").get_by_role("button", name=name, exact=True)
+
+
+async def test_the_page_switches_trading_keeps_a_limit_and_asks_before_live(
+    runtime: Runtime, served: str, tmp_path: Path
+) -> None:
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(
+            channel=load_default_config().browser.channel, headless=True
+        )
+        try:
+            for width, scheme in _SIZES:
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+                )
+                await page.goto(ui_url("127.0.0.1", int(served.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{served}/#/settings/trading")
+                await expect(page.locator(".trading")).to_be_visible()
+                if width == 1280:
+                    await _wide(page, runtime, served)
+                else:
+                    # Paper, the key's form, the limits, the account and an order (the account was started again
+                    # after the first): the page keeps inside the screen.
+                    await _fail_an_order(runtime)
+                    await page.reload()
+                    await expect(_mode(page, "Paper")).to_have_attribute("aria-pressed", "true")
+                    await expect(page.locator(".trading [data-order]")).to_contain_text("Sell ETH-EUR")
+                    assert await page.evaluate(_OVERFLOW) <= 1
+                await page.screenshot(path=str(tmp_path / f"trading-{width}-{scheme}.png"), full_page=True)
+                await page.close()
+        finally:
+            await browser.close()
+
+
+async def _wide(page: Page, runtime: Runtime, served: str) -> None:
+    held: dict[str, Any] = await _held(page, served)
+    assert held["settings"]["mode"] == "off" and held["tools_on"] is False
+    # Off: the limits and what each mode means; no key, no account, no orders.
+    await expect(_mode(page, "Off")).to_have_attribute("aria-pressed", "true")
+    await expect(page.locator(".trading-modes [data-mode]")).to_have_count(3)
+    await expect(page.get_by_role("heading", name="Coinbase key")).to_have_count(0)
+    await expect(page.get_by_role("heading", name="Orders")).to_have_count(0)
+    # Paper: the account opens with its euros, the paper start joins the limits, the key's form appears, and runs are
+    # told they get the tools after a restart.
+    await _mode(page, "Paper").click()
+    await expect(_mode(page, "Paper")).to_have_attribute("aria-pressed", "true")
+    await expect(page.locator('[data-figure="equity"]')).to_have_text("1,000.00 EUR")
+    await expect(page.locator('[data-figure="day"]')).to_have_text("0.00 EUR")
+    await expect(page.locator('[data-figure="traded"]')).to_have_text("0.00 EUR of 100.00 EUR")
+    await expect(page.locator('[data-limit="paper_start"]')).to_be_visible()
+    await expect(page.get_by_role("heading", name="Coinbase key")).to_be_visible()
+    await expect(page.get_by_text("Runs get the trading tools after Dot restarts.")).to_be_visible()
+    await expect(page.get_by_text("No orders yet")).to_be_visible()
+    assert (await _held(page, served))["settings"]["mode"] == "paper"
+    assert runtime.trading.config().mode == "paper"
+    await _fail_an_order(runtime)
+    await page.reload()
+    await expect(page.locator(".trading [data-order]")).to_contain_text("The price moved")
+    # A limit is changed and saved: only it is sent, and the config file keeps it.
+    save: Locator = page.get_by_role("button", name="Save limits")
+    await expect(save).to_be_disabled()
+    await page.locator('[data-limit="max_order"]').fill("20")
+    await expect(save).to_be_enabled()
+    await page.locator('[data-limit="max_order"]').fill("12x")
+    await expect(save).to_be_disabled()
+    await page.locator('[data-limit="max_order"]').fill("20")
+    await page.get_by_label("Product to allow").fill("xrp-eur")
+    await page.get_by_role("button", name="Allow").click()
+    await expect(page.locator('[data-product="XRP-EUR"]')).to_be_visible()
+    await save.click()
+    await expect(save).to_be_disabled()
+    held = await _held(page, served)
+    assert held["settings"]["max_order"] == 20.0 and held["settings"]["products"][-1] == "XRP-EUR"
+    kept: dict[str, object] = tomllib.loads(config_path().read_text(encoding="utf-8"))["trading"]
+    assert kept["max_order"] == 20.0 and kept["mode"] == "paper"
+    # A limit the settings refuse says why, and changes nothing.
+    await page.locator('[data-limit="max_order"]').fill("150")
+    await save.click()
+    await expect(page.get_by_role("alert").filter(has_text="max_order is more than max_day")).to_be_visible()
+    assert runtime.trading.config().max_order == 20.0
+    # Live asks first; Cancel leaves Paper.
+    await _mode(page, "Live").click()
+    dialog: Locator = page.get_by_role("dialog")
+    await expect(dialog).to_contain_text("yolo")
+    await dialog.get_by_role("button", name="Cancel").click()
+    await expect(_mode(page, "Paper")).to_have_attribute("aria-pressed", "true")
+    assert runtime.trading.config().mode == "paper"
+    # A key that is no key is refused with its reason, and the Keychain stand-in never takes one.
+    await page.get_by_label("Key name").fill("organizations/o/apiKeys/k")
+    await page.get_by_label("Private key").fill("not a key " * 12)
+    await page.get_by_role("button", name="Save key").click()
+    await expect(page.locator(".trading-keyform .trading-problem")).to_be_visible()
+    store = runtime.trading.key_store
+    assert isinstance(store, MemorySecretStore) and store.kept == {}
+    # The paper account starts again, after a question.
+    await page.get_by_role("button", name="Start again").click()
+    await page.get_by_role("dialog").get_by_role("button", name="Start again").click()
+    await expect(page.locator('[data-figure="equity"]')).to_have_text("1,000.00 EUR")

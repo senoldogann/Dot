@@ -7,7 +7,7 @@ can change them.
 
 ## Switching it on
 
-Settings › Trading (or `[trading]` in `config.toml`, [Configuration](configuration.md)):
+[Settings › Trading](daemon.md#settings--trading) (or `[trading]` in `config.toml`, [Configuration](configuration.md)):
 
 - **Mode**: `off` (the default: runs have no trading tool at all), `paper` or `live`. A switch from `off` gives runs the
   trading tools from Dot's next start; one between `paper` and `live` holds from the next order.
