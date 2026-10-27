@@ -8,7 +8,7 @@ what it did, and the probes run apart from the daemon."""
 import asyncio
 import json
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 
 from pydantic import JsonValue, TypeAdapter
 
@@ -41,6 +41,7 @@ from dotagent.harness.contrast import (
     contrast_detail,
     contrast_text,
 )
+from dotagent.harness.headroom import Attempt, ScoringPlan, plan_scoring, records_of
 from dotagent.harness.probe import (
     BASE,
     CONFIRM_BASE,
@@ -77,8 +78,9 @@ log = get_logger(__name__)
 COMPOSER: str = "composer"
 # What the owner did with the survivor of a step while it ran, in the words of its decision (item 588).
 _OWNER_WORDS: dict[str, str] = {"adopted": "in use", "retired": "set aside"}
-# How far back the step looks for a run to learn from when no step came before.
-_LOOKBACK_S: float = 24 * 3600.0
+# How far back the step looks for a run to learn from at most: from the last step that took one, or this far when none
+# did since (item 719: nights that only try the pool take none, and the runs meanwhile wait for the next that proposes).
+_LOOKBACK_S: float = 7 * 24 * 3600.0
 _DAY_S: float = 86400.0
 _SESSION: str = "harness:step"
 # What the roles answer under `dotx harness step --scripted` (:func:`scripted_role_turns`): the proposer proposes this
@@ -199,7 +201,16 @@ async def _retire(store: Store, versions: Sequence[HarnessVersion], now: float, 
             await store.set_harness_notes(version.id, notes_with(current.notes, {"retired": why}))
 
 
-async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober: Prober, now: float) -> _Outcome:
+async def _carry_out(
+    runtime: Runtime,
+    step: HarnessStep,
+    plan: StepPlan,
+    base: HarnessVersion | None,
+    scoring: ScoringPlan,
+    prober: Prober,
+    now: float,
+) -> _Outcome:
+    """The step ``step`` under ``base``, the version in use when it began, which ``scoring`` was planned for."""
     store: Store = runtime.store
     config: HarnessConfig = runtime.config.harness
     # The values Dot holds, which a probe's own home cannot know: a stored text is played, or shown to a role, only as
@@ -207,17 +218,55 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
     # (The values filled into a page are not among them: a gate refuses by a value, item 621. A text is given with
     # them masked, :func:`given_text`.)
     held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-    base: HarnessVersion | None = await adopted(store)
     base_text: GivenText = NO_HARNESS if base is None else given_text(base, held)
+    errors: list[str] = []
+    # Probe: the base first, then each candidate within what is left of the budget; a probe with nothing left plays
+    # nothing, and its candidate comes out unclear.
+    started: float = time.monotonic()
+    spent: int = 0
+
+    async def played(
+        label: str, version: HarnessVersion | None, tasks: tuple[str, ...], repeats: int = plan.repeats
+    ) -> ProbeReport:
+        """``version`` (``None``: Dot's own text alone) played as ``label`` ``repeats`` times on each of ``tasks``,
+        within what is left of the budget. What is played is its text as :func:`given_text` leaves it, never the text
+        as stored: this is the only way a version reaches a probe in a step."""
+        nonlocal spent
+        ask: ProbeAsk = ProbeAsk(
+            label=label,
+            text=NO_HARNESS if version is None else given_text(version, held),
+            tasks=tasks,
+            repeats=repeats,
+            model=plan.model,
+            scripted=plan.scripted,
+            max_minutes=max(0.0, plan.minutes - (time.monotonic() - started) / 60.0),
+            max_tokens=max(0, plan.tokens - spent),
+        )
+        report: ProbeReport = nothing_played(ask) if over_budget(ask, 0, 0.0, 0) is not None else await prober(ask)
+        spent += report.tokens
+        # An attempt that never started is the probe's failure, not the text's (item 717): the step says so and fails.
+        lost: list[Scorecard] = [card for card in report.cards if not card.started]
+        if lost:
+            errors.append(f"{len(lost)} attempt(s) of {label} did not start: {lost[0].failure}")
+        await store.add_harness_probes(
+            step.id, None if version is None else version.id, label, _cards(report), time.time()
+        )
+        return report
+
+    # Until enough tasks have headroom (item 719), the base alone tries a few tasks of the pool it knows least and
+    # nothing is proposed.
+    if not scoring.ready:
+        return await _calibrate(scoring, config, lambda tasks: played(BASE, base, tasks), errors)
     from_run: str | None = step.from_run
     if from_run is None:
         return _Outcome(
-            state="skipped", facts={"reason": "no run of the owner's ended since the last step"}, error=None
+            state="skipped",
+            facts={"reason": "no run of the owner's ended since the last step that took one, a week back at most"},
+            error=None,
         )
     # Propose. A proposer whose answer is no proposal in one scope (the review module asked it twice already) leaves the
     # other scopes to be proposed and played (item 718): on 2026-10-24 one such answer lost the night. The step is
     # recorded failed all the same, with the error, and adopts nothing.
-    errors: list[str] = []
     candidates: list[HarnessVersion] = []
     for scope in plan.scopes:
         try:
@@ -240,43 +289,13 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
             log.warning("harness_experience_failed", step=step.id, error=exc.message)
             errors.append(f"the experience writer failed: {exc.message}")
 
-    # Probe: the base first, then each candidate within what is left of the budget; a probe with nothing left plays
-    # nothing, and its candidate comes out unclear.
-    started: float = time.monotonic()
-    spent: int = 0
-
-    async def played(label: str, version: HarnessVersion | None, repeats: int = plan.repeats) -> ProbeReport:
-        """``version`` (``None``: Dot's own text alone) played as ``label`` ``repeats`` times on each task, within what
-        is left of the budget. What is played is its text as :func:`given_text` leaves it, never the text as stored:
-        this is the only way a version reaches a probe in a step."""
-        nonlocal spent
-        ask: ProbeAsk = ProbeAsk(
-            label=label,
-            text=NO_HARNESS if version is None else given_text(version, held),
-            tasks=plan.tasks,
-            repeats=repeats,
-            model=plan.model,
-            scripted=plan.scripted,
-            max_minutes=max(0.0, plan.minutes - (time.monotonic() - started) / 60.0),
-            max_tokens=max(0, plan.tokens - spent),
-        )
-        report: ProbeReport = nothing_played(ask) if over_budget(ask, 0, 0.0, 0) is not None else await prober(ask)
-        spent += report.tokens
-        # An attempt that never started is the probe's failure, not the text's (item 717): the step says so and fails.
-        lost: list[Scorecard] = [card for card in report.cards if not card.started]
-        if lost:
-            errors.append(f"{len(lost)} attempt(s) of {label} did not start: {lost[0].failure}")
-        await store.add_harness_probes(
-            step.id, None if version is None else version.id, label, _cards(report), time.time()
-        )
-        return report
-
-    base_report: ProbeReport = await played(BASE, base)
+    scored: tuple[str, ...] = scoring.scored
+    base_report: ProbeReport = await played(BASE, base, scored)
     contrasts: list[Contrast] = []
     by_label: dict[str, HarnessVersion] = {}
 
     async def contrasted(candidate: HarnessVersion) -> Contrast:
-        found: Contrast = contrast(base_report, await played(candidate.id, candidate), config.step_margin)
+        found: Contrast = contrast(base_report, await played(candidate.id, candidate, scored), config.step_margin)
 
         contrasts.append(found)
         by_label[candidate.id] = candidate
@@ -296,6 +315,7 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
             "tokens": spent,
             "tainted": case.tainted,
             "errors": list(errors),
+            "scored_on": list(scored),
         }
 
     # Select; when two candidates both did better, the composer merges them and the merge is probed in its turn.
@@ -376,8 +396,8 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
         own: luck gave a text that changes nothing a better score in a step in six to twenty-seven, and gives it twice
         in a row in one in fifty. Recorded in the survivor's notes (the owner reads the tasks there) and in the step."""
         again: int = plan.repeats * CONFIRM_FACTOR
-        base_again: ProbeReport = await played(CONFIRM_BASE, base, again)
-        survivor_again: ProbeReport = await played(confirm_label(probed.id), probed, again)
+        base_again: ProbeReport = await played(CONFIRM_BASE, base, scored, again)
+        survivor_again: ProbeReport = await played(confirm_label(probed.id), probed, scored, again)
         found: Contrast = confirm_contrast(base_again, survivor_again, config.step_margin)
         current: HarnessVersion = await store.get_harness_version(probed.id)
         await store.set_harness_notes(probed.id, notes_with(current.notes, {"confirmation": contrast_detail(found)}))
@@ -418,6 +438,52 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
     if adopted_now:
         facts["adopted"] = True
     return _Outcome(state="done", facts=facts, error="; ".join(errors) or None)
+
+
+async def scoring_of(store: Store, config: HarnessConfig, base: HarnessVersion | None) -> ScoringPlan:
+    """Where a step under ``base`` (``None``: Dot's own text alone) scores and what its base tries (item 719), from the
+    attempts of that version that started."""
+    attempts: list[Attempt] = [
+        Attempt(task_id=probe.task_id, passed=probe.passed, at=probe.created_at)
+        for probe in await store.started_attempts_of(None if base is None else base.id)
+    ]
+    return plan_scoring(config, records_of(attempts, config.headroom_window))
+
+
+async def _calibrate(
+    scoring: ScoringPlan,
+    config: HarnessConfig,
+    tries: Callable[[tuple[str, ...]], Awaitable[ProbeReport]],
+    errors: list[str],
+) -> _Outcome:
+    """A step with too few tasks with headroom known for a candidate to be judged (item 719): no proposer is asked, and
+    the base tries the tasks of the pool it knows least; or nothing at all when every task of the pool is known and
+    too few have headroom, which the decision says."""
+    known: str = (
+        f"{len(scoring.headroom)} task(s) with headroom known, {config.headroom_least} needed to judge a candidate"
+    )
+    if not scoring.calibrated:
+        return _Outcome(
+            state="keep",
+            facts={
+                "headroom": list(scoring.headroom),
+                "decision": f"nothing to learn on the pool: {known}, and every task of it is known",
+            },
+            error=None,
+        )
+    await tries(scoring.calibrated)
+    return _Outcome(
+        state="calibrating",
+        facts={
+            "calibrated": list(scoring.calibrated),
+            "headroom": list(scoring.headroom),
+            "decision": (
+                f"trying the pool before proposing: {known}; {len(scoring.calibrated)} tried tonight, "
+                f"{scoring.untried} not tried yet"
+            ),
+        },
+        error="; ".join(errors) or None,
+    )
 
 
 async def _compose(
@@ -579,17 +645,21 @@ async def _write_experience(
     log.info("harness_experience_written", step=step.id, entry=draft.entry is not None)
 
 
-# How many of the newest steps are read for the one that counts (not a scripted check) when the window is set.
+# How many of the newest steps that took a run are read for the one that counts (not a scripted check).
 _RECENT_STEPS: int = 20
 
 
 async def _since_last_step(store: Store, now: float) -> float:
-    """When the newest step that counts began, or the lookback from ``now``: a scripted check (`--scripted`) is recorded
-    like any step but does not move the window the next step learns from."""
-    for earlier in await store.list_harness_steps(_RECENT_STEPS):
+    """When the newest step that learned from a run began, and never further back than :data:`_LOOKBACK_S` from
+    ``now``: a scripted check (`--scripted`) is recorded like any step but does not move the window the next step
+    learns from, nor does a step that took no run (item 719: one that only tried the pool, whatever it came to, or
+    found none to learn from), so that the run that went worst meanwhile is still there for the next step that
+    proposes. One rule bounds it: a week, whether the last step that took a run was longer ago or there was none."""
+    oldest: float = now - _LOOKBACK_S
+    for earlier in await store.harness_steps_with_run(oldest, _RECENT_STEPS):
         if step_facts(earlier).get("scripted") is not True:
             return earlier.started_at
-    return now - _LOOKBACK_S
+    return oldest
 
 
 async def _prune(store: Store, config: HarnessConfig, now: float) -> None:
@@ -614,15 +684,34 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
     cost. The step is recorded whatever happens; a failure is raised after it is."""
     store: Store = runtime.store
     plan: StepPlan = plan_of(runtime.config.harness, runtime.config.models.main, scripted)
-    if from_run is None:
+    base: HarnessVersion | None = await adopted(store)
+    # Where the texts are scored (item 719): the guards, the tasks the version in use still fails sometimes and a few it
+    # passes. A scripted check scores on the guards alone, since the references pass everything and no task would ever
+    # have headroom. A store that cannot be read for it still leaves the step recorded, as failed.
+    try:
+        scoring: ScoringPlan = (
+            ScoringPlan(scored=plan.tasks, calibrated=(), headroom=(), untried=0, ready=True)
+            if plan.scripted
+            else await scoring_of(store, runtime.config.harness, base)
+        )
+    except Exception as exc:
+        unplanned: HarnessStep = await store.create_harness_step(now, None, None if base is None else base.id)
+        why: str = exc.message if isinstance(exc, DotError) else f"{type(exc).__name__}: {exc}"
+        await store.finish_harness_step(unplanned.id, time.time(), "failed", "{}", why)
+        raise
+    # A step that only tries the pool learns from no run and takes none, not even one named by hand, which its decision
+    # says: the run that went worst is left to the first step that proposes (item 719, pre-push review rounds 1 to 3).
+    left_for_later: str | None = None
+    if not scoring.ready:
+        left_for_later, from_run = from_run, None
+    elif from_run is None:
         since: float = await _since_last_step(store, now)
         picked: RunRecord | None = await pick_run(store, since)
         from_run = None if picked is None else picked.id
-    base: HarnessVersion | None = await adopted(store)
     step: HarnessStep = await store.create_harness_step(now, from_run, None if base is None else base.id)
     log.info("harness_step_started", step=step.id, from_run=from_run, tasks=len(plan.tasks), repeats=plan.repeats)
     try:
-        outcome: _Outcome = await _carry_out(runtime, step, plan, prober, now)
+        outcome: _Outcome = await _carry_out(runtime, step, plan, base, scoring, prober, now)
     except DotError as exc:
         await store.finish_harness_step(step.id, time.time(), "failed", "{}", exc.message)
         raise
@@ -630,6 +719,9 @@ async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: P
         await store.finish_harness_step(step.id, time.time(), "failed", "{}", f"{type(exc).__name__}: {exc}")
         raise
     facts: dict[str, JsonValue] = {**outcome.facts, **({"scripted": True} if plan.scripted else {})}
+    if left_for_later is not None:
+        facts["decision"] = f"{facts.get('decision', '')}; {left_for_later} is left for a step that proposes"
+        facts["left_for_later"] = left_for_later
     finished: HarnessStep = await store.finish_harness_step(
         step.id,
         time.time(),

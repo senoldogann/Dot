@@ -14,12 +14,13 @@ import { codeText } from "./memory.js";
 const STATE_TONE = { adopted: "b-ok", probed: "b-warn", candidate: "b-info", retired: "b-muted" };
 // A version's state and a night's outcome in the words of the page; the API's own words stay in the docs.
 const STATE_WORDS = { adopted: "in use", probed: "tried", candidate: "new", retired: "set aside" };
-const STEP_TONE = { done: "b-ok", keep: "b-muted", skipped: "b-muted", failed: "b-bad" };
-const STEP_WORDS = { done: "done", keep: "no change", skipped: "skipped", failed: "failed" };
+const STEP_TONE = { done: "b-ok", keep: "b-muted", skipped: "b-muted", failed: "b-bad", calibrating: "b-info" };
+// A night that tried test tasks to find the ones a version can do better on, and proposed nothing (item 719).
+const STEP_WORDS = { done: "done", keep: "no change", skipped: "skipped", failed: "failed", calibrating: "trying tasks" };
 // The nights the strip of the overview shows, the newest at its right end.
 const STRIP_STEPS = 14;
 // A night's cell in the strip, by its outcome: a change made, none, or a failure; each is named in the legend too.
-const STRIP_KIND = { done: "done", keep: "quiet", skipped: "quiet", failed: "failed" };
+const STRIP_KIND = { done: "done", keep: "quiet", skipped: "quiet", failed: "failed", calibrating: "quiet" };
 const MADE_BY = { owner: "written by you", proposer: "proposed by Dot", composer: "combined by Dot" };
 const SUMMARY_CHARS = 200;
 // How many versions the list shows at first and each time **Show older versions** is pressed (the daemon pages them).
@@ -213,7 +214,13 @@ function stepRow(step) {
           "div",
           { class: "harness-meta" },
           ...joined([
-            step.from_run === null ? "no task to learn from" : el("a", { href: `#/runs/${step.from_run}` }, "the task it learned from"),
+            // A night that only tried the pool (its record names what has headroom) takes no task, whatever it came to:
+            // tried, failed or nothing left to learn (item 719).
+            step.from_run === null && (step.state === "calibrating" || facts.headroom !== undefined)
+              ? "tried test tasks, learned from no task"
+              : step.from_run === null
+                ? "no task to learn from"
+                : el("a", { href: `#/runs/${step.from_run}` }, "the task it learned from"),
             `${plural(candidates, "version", "versions")} proposed`,
           ]),
         ),
@@ -354,6 +361,20 @@ function followBody(view, handlers) {
   );
 }
 
+/**
+ * Where a new version is tried (item 719): on the tasks the version in use still fails sometimes, the only ones where
+ * another can do better, or none yet while Dot tries the pool of test tasks a few a night to find them.
+ */
+function testTasks(view) {
+  const each = `${plural(view.step_repeats, "time", "times")} each`;
+  const tried = `${view.pool_size - view.untried} of ${view.pool_size} tried`;
+  if (view.headroom.length >= view.headroom_least) {
+    return `the ones the version in use still fails sometimes: ${view.headroom.join(", ")} (${each}; ${tried}), and a few it passes, so that a version that breaks them loses`;
+  }
+  const found = view.headroom.length === 0 ? "none so far" : `so far ${view.headroom.join(", ")}`;
+  return `none yet. Dot tries a few tasks of its pool a night, ${each}, to find ${view.headroom_least} the version in use fails sometimes (${found}; ${tried}): nothing is proposed until then, since no version could be better on tasks that pass already`;
+}
+
 /** The nightly learning: when it runs and what it does, and under that the nights it ran, the newest first. */
 function nightlyBody(view, steps) {
   const on = view.step_time !== "off";
@@ -407,7 +428,8 @@ function howItLearns(view) {
     actions: null,
     openByDefault: false,
     body: [
-      fact("Test tasks", `${view.scoring_tasks.join(", ")} (${plural(view.step_repeats, "time", "times")} each), on which each new version is tried`),
+      fact("Guards", `${view.scoring_tasks.join(", ")}, played every night: a version that claims what it did not do, or does what a file says, loses`),
+      fact("Test tasks", testTasks(view)),
       fact("Final check", `${view.final_tasks.join(", ")}, played once after a version is in use (in Terminal: dotx harness final), never to choose one`),
       fact(
         "Better",

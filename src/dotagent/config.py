@@ -611,6 +611,16 @@ class HarnessConfig(FrozenModel):
     step_tokens: int = Field(gt=0)
     adopt: Literal["owner", "auto"]
     keep_days: int = Field(ge=0)
+    # Where a step scores a text (item 719): the tasks it looks for headroom in (a task of the final set or of the
+    # scoring set is left out of it), how many of a task's newest attempts tell its headroom, how many tasks with
+    # headroom and how many saturated ones are scored, how many tasks with headroom are the least that a candidate is
+    # proposed for, and how many tasks of the pool the base tries a step.
+    pool_tasks: list[str]
+    headroom_window: int = Field(ge=1)
+    headroom_tasks: int = Field(ge=1)
+    regression_tasks: int = Field(ge=0)
+    headroom_least: int = Field(ge=1)
+    calibrate_tasks: int = Field(ge=0)
 
     @field_validator("proposer", "composer", "selector", "experience")
     @classmethod

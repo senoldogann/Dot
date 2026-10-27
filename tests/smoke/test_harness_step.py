@@ -21,6 +21,7 @@ from dotagent.core.paths import db_path
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, play, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import EvalTask, ScriptedCall, ScriptedTurn
+from dotagent.harness import step as harness_step
 from dotagent.harness.components import NO_HARNESS, GivenText, HarnessText
 from dotagent.harness.probe import (
     BASE,
@@ -730,6 +731,106 @@ async def test_a_proposer_that_fails_in_one_scope_leaves_the_other_scope_played(
         run = await _run(manager)
         step = await run_step(runtime, 1.0, run.id, _scored(frozenset()), True)
         assert step.state == "failed" and json.loads(step.outcome)["reason"] == "the proposer failed"
+
+
+_POOL: list[str] = ["bump-version", "sum-column", "count-errors", "sorted-unique-names"]
+_HEADROOM: dict[str, object] = {
+    "pool_tasks": _POOL,
+    "headroom_window": 2,
+    "headroom_tasks": 2,
+    "regression_tasks": 1,
+    "headroom_least": 2,
+    "calibrate_tasks": 4,
+}
+
+
+def _base_not_starting(inner: Prober) -> Prober:
+    """``inner``, but every attempt of the base ends as a run that never started (item 717)."""
+
+    async def play(ask: ProbeAsk) -> ProbeReport:
+        report: ProbeReport = await inner(ask)
+        lost: tuple[Scorecard, ...] = tuple(
+            card.model_copy(
+                update={"passed": False, "status": "failed", "steps": 0, "input_tokens": 0, "output_tokens": 0}
+                | {"started": False, "failure": "the model is not available"}
+            )
+            for card in report.cards
+        )
+        return report.model_copy(update={"cards": lost, "tokens": 0})
+
+    return play
+
+
+async def test_a_step_tries_the_pool_until_tasks_have_headroom_then_scores_on_them(login_env: dict[str, str]) -> None:
+    """Item 719: the scoring set was passed under any text, so no candidate could ever be better. With nothing known
+    the step proposes nothing and the base tries the pool; once two tasks failed under it, the next step proposes and
+    scores the candidate on the guards and on those two."""
+    turns: list[ScriptedTurn] = [_FINISH, _habit(), _KEEP, _effects(1)]
+    asked: list[ProbeAsk] = []
+    hard: frozenset[str] = frozenset({"bump-version", "sum-column"})
+    async with _session(login_env, turns, _HEADROOM) as (runtime, manager):
+        run: RunRecord = await _run(manager)
+        ended: float | None = (await runtime.store.get_run(run.id)).finished_at
+        assert ended is not None
+        # A night whose tries never started fails, and takes no run either (pre-push review round 2).
+        lost: HarnessStep = await run_step(runtime, ended + 10.0, None, _base_not_starting(_scored(hard)), False)
+        assert lost.state == "failed" and lost.from_run is None, lost
+        # Nor does one asked by hand to learn from the run (`dotx harness step --run`): it is left for later.
+        named: HarnessStep = await run_step(runtime, ended + 15.0, run.id, _scored(frozenset()), False)
+        assert named.state == "calibrating" and named.from_run is None, named
+        named_facts: dict[str, object] = json.loads(named.outcome)
+        assert named_facts["left_for_later"] == run.id
+        assert str(named_facts["decision"]).endswith(f"; {run.id} is left for a step that proposes")
+        first: HarnessStep = await run_step(runtime, ended + 20.0, None, _recording(_scored(hard), asked), False)
+        assert first.state == "calibrating", first
+        # It learns from no run and takes none: the next step that proposes still finds the run that ended before both.
+        assert first.from_run is None
+        facts: dict[str, object] = json.loads(first.outcome)
+        assert facts["calibrated"] == _POOL and facts["headroom"] == []
+        assert "0 task(s) with headroom known, 2 needed" in str(facts["decision"])
+        assert [(ask.label, ask.tasks) for ask in asked] == [(BASE, tuple(_POOL))]
+        assert await runtime.store.list_harness_versions(10) == [], "a candidate was proposed with nothing to judge it"
+        asked.clear()
+        second: HarnessStep = await run_step(runtime, ended + 30.0, None, _recording(_scored(hard), asked), False)
+        assert second.from_run == run.id
+        facts = json.loads(second.outcome)
+        assert second.state == "done", second
+        # The guards, the two tasks the base failed, and one it passed in all of its window (the two nights that tried
+        # the pool played it twice), so that a text that breaks it loses.
+        assert facts["scored_on"] == [*TASKS, "bump-version", "sum-column", "count-errors"]
+        assert [ask.tasks for ask in asked] == [(*TASKS, "bump-version", "sum-column", "count-errors")] * 2
+        assert "did better on 2" in str(facts["decision"])
+
+
+async def test_a_step_whose_scoring_cannot_be_planned_is_recorded_failed(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 719, pre-push review round 4: the plan of the scoring is read before the step is, and a fault there still
+    leaves the step recorded, as failed, whatever the fault."""
+
+    async def broken(store: object, config: object, base: object) -> object:
+        raise ValueError("the attempts could not be read")
+
+    monkeypatch.setattr(harness_step, "scoring_of", broken)
+    async with _session(login_env, [_FINISH], _HEADROOM) as (runtime, _manager):
+        with pytest.raises(ValueError, match="could not be read"):
+            await run_step(runtime, 1.0, None, _scored(frozenset()), False)
+        (failed,) = await runtime.store.list_harness_steps(5)
+        assert failed.state == "failed" and failed.error == "ValueError: the attempts could not be read"
+
+
+async def test_a_pool_known_whole_with_too_little_headroom_says_there_is_nothing_to_learn(
+    login_env: dict[str, str],
+) -> None:
+    """Item 719: once every task of the pool is known and too few have headroom, the step plays nothing and says so."""
+    async with _session(login_env, [_FINISH], {**_HEADROOM, "calibrate_tasks": 4}) as (runtime, manager):
+        run: RunRecord = await _run(manager)
+        for at in (1.0, 2.0):
+            step: HarnessStep = await run_step(runtime, at, run.id, _scored(frozenset()), False)
+            assert step.state == "calibrating"
+        last: HarnessStep = await run_step(runtime, 3.0, run.id, _scored(frozenset()), False)
+        assert last.state == "keep", last
+        assert str(json.loads(last.outcome)["decision"]).startswith("nothing to learn on the pool")
 
 
 async def test_a_step_recorded_as_failed_adopts_nothing(login_env: dict[str, str]) -> None:
