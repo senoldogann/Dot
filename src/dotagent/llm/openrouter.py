@@ -6,7 +6,9 @@ and whether it takes a temperature. The level goes as OpenRouter's ``reasoning``
 the ``reasoning_details`` it came with back to the same model, unchanged, as OpenRouter asks beside tool calls. A model
 whose id ends in ``:free``, or whose prices are both zero, is free. A variant of a listed model (``:nitro``, ``:floor``,
 ``:online``, which choose how OpenRouter routes it and are not listed themselves) can do what the model can.
-``GET /key`` tells what the key has spent and may spend, and costs nothing. An answer of either that is not shaped as
+``[providers.openrouter] routing`` gives a model, by its id, how OpenRouter chooses its provider: the request carries it
+as OpenRouter's ``provider`` object, a variant's request its model's (item 737). ``GET /key`` tells what the key has
+spent and may spend, and costs nothing. An answer of either that is not shaped as
 OpenRouter documents it is a :class:`ProviderProtocolError`, not an empty list or nothing spent.
 """
 
@@ -18,8 +20,8 @@ import httpx
 from pydantic import JsonValue
 
 from dotagent import __version__
-from dotagent.config import OpenRouterConfig
-from dotagent.core.errors import ProviderCreditError, ProviderProtocolError
+from dotagent.config import OpenRouterConfig, OpenRouterRouting
+from dotagent.core.errors import ProviderCreditError, ProviderHttpError, ProviderProtocolError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.retry import RetryPolicy
@@ -27,7 +29,12 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.codec_chat import ChatOptions, build_chat_body, chat_codec
 from dotagent.llm.connector import get_json, retry_with_reset, stream_model_reply
 from dotagent.llm.http import build_client, request_context
-from dotagent.llm.provider_errors import classify_generic, classify_openrouter
+from dotagent.llm.provider_errors import (
+    StatusClassifier,
+    WireError,
+    classify_generic,
+    classify_openrouter,
+)
 from dotagent.llm.traits import ModelTraits, info_from_traits, is_known_label
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, StreamDelta
 from dotagent.llm.wire import get_float, get_int, get_list, get_obj, get_str
@@ -153,6 +160,29 @@ def listed_for(catalog: Mapping[str, ListedModel], model: str) -> ListedModel | 
     return None if found is None else catalog[found]
 
 
+def routing_for(routing: Mapping[str, OpenRouterRouting], model: str) -> OpenRouterRouting | None:
+    """The routing set for ``model``, or for the model a variant id routes to (:func:`listed_id`); ``None`` for none."""
+    found: str | None = listed_id(routing.keys(), model)
+    return None if found is None else routing[found]
+
+
+def with_routing(body: JsonObject, routing: OpenRouterRouting) -> JsonObject:
+    """``body`` with ``routing`` as OpenRouter's ``provider`` object (the fields set alone), ``stream`` still its
+    last key."""
+    routed: JsonObject = {key: value for key, value in body.items() if key != "stream"}
+    routed["provider"] = routing.model_dump(exclude_none=True)
+    if "stream" in body:
+        routed["stream"] = body["stream"]
+    return routed
+
+
+def classify_routed(
+    status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
+) -> ProviderHttpError:
+    """:func:`classify_openrouter` for a request that carried a routing, which a 404 that left no provider names."""
+    return classify_openrouter(status, wire, retry_after_s, detail, routed=True)
+
+
 def model_info_of(model: str, listed: ListedModel) -> ModelInfo:
     free: bool = listed.free or model.endswith(_FREE_SUFFIX)
     return info_from_traits(model, listed.traits, free).model_copy(update={"tools": listed.tools})
@@ -274,14 +304,19 @@ class OpenRouterProvider:
     async def _complete_once(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         traits: ModelTraits = await self._traits(request.model)
         body: JsonObject = build_chat_body(request, traits, _CHAT_OPTIONS, f"openrouter:{request.model}")
+        routing: OpenRouterRouting | None = routing_for(self._config.routing, request.model)
+        classify: StatusClassifier = classify_openrouter
+        if routing is not None:
+            body = with_routing(body, routing)
+            classify = classify_routed
         url: str = self._url("/chat/completions")
         payload: str = dumps_compact(body)
         context: JsonObject = request_context(url, body)
-        codec = chat_codec(classify_openrouter, _CHAT_OPTIONS)
+        codec = chat_codec(classify, _CHAT_OPTIONS)
 
         async def attempt() -> ModelReply:
             return await stream_model_reply(
-                self._client, url, payload, self._headers, context, classify_openrouter, codec, request.model, sink
+                self._client, url, payload, self._headers, context, classify, codec, request.model, sink
             )
 
         async with self._slots:

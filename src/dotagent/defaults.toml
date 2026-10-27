@@ -156,6 +156,11 @@ max_concurrent = 4
 [providers.openrouter]
 base_url = "https://openrouter.ai/api/v1"
 api_key_env = "OPENROUTER_API_KEY"
+# Model id -> how OpenRouter chooses its provider (its `provider` object): sort ("price" | "throughput" | "latency"),
+# order, only and ignore (provider slugs), allow_fallbacks, quantizations, and max_price (dollars per million tokens,
+# prompt and completion). A variant (":nitro", ":floor") takes its model's. Left out: OpenRouter's own defaults. E.g.
+# routing = { "deepseek/deepseek-v4.1-flash-1017" = { sort = "throughput", max_price = { prompt = 0.3, completion = 1.2 } } }
+routing = {}
 # How long OpenRouter's list of its models (what each can do: images, tools, reasoning levels, limits) is kept before
 # it is read again.
 models_ttl_s = 3600.0
