@@ -112,7 +112,7 @@ from dotagent.llm.types import ONE_MESSAGE_LEVELS, Effort, ModelInfo, OneMessage
 from dotagent.memory.service import SavedMemory
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
-from dotagent.proactive import NOTICE_SOURCE, WATCHER_SOURCE
+from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
@@ -193,6 +193,11 @@ _RESULT_CHARS: int = 20_000
 _REFUSED_RESULT_CHARS: int = 200
 # The earlier runs of a thread whose goals count as the user's instructions to a reviewer.
 _THREAD_INSTRUCTION_RUNS: int = 30
+# The sources of runs whose goals are not the owner's words, which no reviewer takes as an instruction, in the run or in
+# a later run of its chat: the notice of a command in the background (item 229), a run of Dot's own initiative (item
+# 715), and a resumed run, whose goal is the goal of the run it resumes, which counts or not as that run's does (the
+# code review of item 715: a resume of Dot's own run made its words the owner's).
+_NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset({BACKGROUND_SOURCE, INITIATIVE_SOURCE, RESUME_SOURCE})
 # The approval modes from the strictest to the loosest: the user answers before every change, the user answers, the
 # review model answers, no one is asked.
 _APPROVALS_STRICTEST_FIRST: tuple[ApprovalMode, ...] = ("supervised", "ask", "auto", "yolo")
@@ -869,6 +874,29 @@ class RunManager:
             None,
             None,
             RunOpening(text=opening, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS, tainted=True),
+            None,
+            None,
+        )
+        return run
+
+    async def start_own(self, goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool) -> RunRecord:
+        """Queue a run Dot starts on its own initiative (item 715), in the chat ``thread_id``: ``goal`` is Dot's words,
+        which the chat shows and no reviewer takes as the owner's instruction (:meth:`_instructions_for` gives none),
+        and ``opening`` its first message to the model. Nobody watches it (:data:`INITIATIVE_SOURCE`); it takes the
+        configured model and approvals; it starts tainted when what it was given came from a run that had read content
+        third parties can author (``tainted``)."""
+        run, _ = await self._launch(
+            goal,
+            mode,
+            None,
+            thread_id,
+            INITIATIVE_SOURCE,
+            None,
+            None,
+            "standard",
+            None,
+            None,
+            RunOpening(text=opening, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS, tainted=tainted),
             None,
             None,
         )
@@ -1809,6 +1837,12 @@ class RunManager:
             # The page went away or does not answer: the hold is over all the same, and nobody waits on it.
             log.warning("screen_input_release_failed", run_id=run_id, error=error.message)
 
+    def instructions_of(self, run_id: str) -> tuple[str, ...]:
+        """What the reviewer of the run ``run_id`` under way takes as the owner's instructions; none for a run that
+        is not under way."""
+        handle: RunHandle | None = self._handles.get(run_id)
+        return () if handle is None else handle.gate.instructions
+
     async def wait(self, run_id: str) -> RunRecord:
         """Block until the run is over (returns immediately for runs that already ended)."""
         handle: RunHandle | None = self._handles.get(run_id)
@@ -2463,6 +2497,10 @@ class RunManager:
             entry.meta.name in names and entry.meta.tainted is not False for entry in entries if not entry.retired
         )
 
+    async def ended_tainted(self, run_id: str) -> bool:
+        """Whether the run ``run_id`` ended having read content third parties can author (:meth:`_ended_tainted`)."""
+        return await self._ended_tainted(run_id)
+
     async def _ended_tainted(self, run_id: str) -> bool:
         """Whether the run ``run_id`` was tainted when it ended, from its events (:func:`tainted_after`), or, when
         ``dotx prune`` deleted them, from what it recorded of them first (item 556)."""
@@ -2493,8 +2531,8 @@ class RunManager:
         runtime: Runtime = self._runtime
         asked_level: Effort = level if opening.once is None else ONE_MESSAGE_LEVELS[opening.once]
         parent: RunHandle | None = None if parent_run_id is None else self._handles.get(parent_run_id)
-        # The goal of a run that tells its chat of a command in the background is Dot's, not the owner's (item 229).
-        own: tuple[str, ...] = () if source == BACKGROUND_SOURCE else (goal,)
+        # A goal that is not the owner's words is no instruction (:data:`_NOT_THE_OWNERS_WORDS`).
+        own: tuple[str, ...] = () if source in _NOT_THE_OWNERS_WORDS else (goal,)
         instructions: tuple[str, ...] = (
             await self._instructions_for(own, thread_id, parent_run_id, parent)
             if campaign_id is None
@@ -2665,15 +2703,16 @@ class RunManager:
     ) -> tuple[str, ...]:
         """What the user has told a run that is about to start, which is all a reviewer takes as authority: the goals
         of the thread's earlier runs and the run's ``own`` words (its goal), or, for a delegated run, what its parent
-        was told (its own goal was written by the parent and is not an instruction). The goal of a run that told its
-        chat of a command in the background is Dot's words, and none (item 229)."""
+        was told (its own goal was written by the parent and is not an instruction). The goals of the runs of
+        :data:`_NOT_THE_OWNERS_WORDS` are none: Dot's words, or the goal of the run a resume goes on from, which the
+        thread holds already."""
         if parent_run_id is not None:
             return () if parent is None else parent.gate.instructions
         recent: list[RunRecord] = await self._runtime.store.list_runs(_THREAD_INSTRUCTION_RUNS, thread_id)
         earlier: list[str] = [
             record.goal
             for record in reversed(recent)
-            if record.parent_run_id is None and record.source != BACKGROUND_SOURCE
+            if record.parent_run_id is None and record.source not in _NOT_THE_OWNERS_WORDS
         ]
         return (*earlier, *own)
 
@@ -2796,7 +2835,7 @@ class RunManager:
     async def _nobody_watches(self, run: RunRecord) -> bool:
         """Whether nobody watches ``run`` (item 699): a schedule's (a campaign's sessions are), a watcher's, or a helper
         of one."""
-        if run.source in (SCHEDULE_SOURCE, WATCHER_SOURCE):
+        if run.source in (SCHEDULE_SOURCE, WATCHER_SOURCE, INITIATIVE_SOURCE):
             return True
         if run.parent_run_id is None:
             return False

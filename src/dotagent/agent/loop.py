@@ -240,7 +240,7 @@ from dotagent.memory.service import (
     words_only,
 )
 from dotagent.oauth.tokens import Account
-from dotagent.proactive import NOTICE_SOURCE, WATCHER_SOURCE
+from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import schedule_timing
@@ -312,7 +312,7 @@ _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
 # The sources of runs no message of the owner's started (item 664). "background" is agent/manager.py's
 # BACKGROUND_SOURCE, which imports this module.
 _UNASKED_SOURCES: frozenset[str] = frozenset(
-    {SCHEDULE_SOURCE, WATCHER_SOURCE, NOTICE_SOURCE, REFLECTION_SOURCE, RESUME_SOURCE, "background"}
+    {SCHEDULE_SOURCE, WATCHER_SOURCE, NOTICE_SOURCE, REFLECTION_SOURCE, RESUME_SOURCE, INITIATIVE_SOURCE, "background"}
 )
 
 _SUMMARY_ATTEMPTS: int = 3

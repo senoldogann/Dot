@@ -87,6 +87,8 @@ from dotagent.store.models import (
     TeamRecord,
     ThreadRecord,
     ThreadSummary,
+    TodoRecord,
+    TodoStatus,
     ToolStep,
     TrashedMemory,
     UnattendedCount,
@@ -141,6 +143,13 @@ CREATE TABLE IF NOT EXISTS approvals (
 );
 CREATE INDEX IF NOT EXISTS approvals_run ON approvals(run_id, status);
 CREATE INDEX IF NOT EXISTS approvals_decided ON approvals(decided_at);
+CREATE TABLE IF NOT EXISTS todos (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, title_key TEXT NOT NULL, why TEXT NOT NULL, source TEXT NOT NULL,
+    source_run_id TEXT, tainted INTEGER NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL, run_id TEXT,
+    note TEXT NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS todos_status ON todos(status, created_at);
+CREATE INDEX IF NOT EXISTS todos_title_key ON todos(title_key, updated_at);
 CREATE TABLE IF NOT EXISTS drafts (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL, channel TEXT NOT NULL, recipients TEXT NOT NULL, cc TEXT NOT NULL,
     subject TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, decided_at REAL,
@@ -801,6 +810,23 @@ def _addresses(value: object) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise StoreError("a stored draft has recipients that are not a list of addresses", {"recipients": repr(value)})
     return tuple(value)
+
+
+def _todo(row: aiosqlite.Row) -> TodoRecord:
+    return TodoRecord(
+        id=row["id"],
+        title=row["title"],
+        why=row["why"],
+        source=row["source"],
+        source_run_id=row["source_run_id"],
+        tainted=bool(row["tainted"]),
+        status=row["status"],
+        attempts=row["attempts"],
+        run_id=row["run_id"],
+        note=row["note"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
 
 
 def _draft(row: aiosqlite.Row) -> DraftRecord:
@@ -3564,6 +3590,85 @@ class Store:
         )
         await self._db.commit()
         return record
+
+    @_writing
+    async def add_todo(
+        self, title: str, title_key: str, why: str, source: str, source_run_id: str | None, tainted: bool
+    ) -> TodoRecord:
+        """Put a thing on Dot's own list (item 715), to do; ``title_key`` is its title as it is compared with others
+        (:meth:`same_todo`)."""
+        now: float = time.time()
+        record: TodoRecord = TodoRecord(
+            id=new_id("todo"),
+            title=title,
+            why=why,
+            source=source,
+            source_run_id=source_run_id,
+            tainted=tainted,
+            status="open",
+            attempts=0,
+            run_id=None,
+            note="",
+            created_at=now,
+            updated_at=now,
+        )
+        await self._db.execute(
+            "INSERT INTO todos(id, title, title_key, why, source, source_run_id, tainted, status, attempts, run_id,"
+            " note, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, 'open', 0, NULL, '', ?, ?)",
+            (record.id, title, title_key, why, source, source_run_id, int(tainted), now, now),
+        )
+        await self._db.commit()
+        return record
+
+    async def count_runs(self, source: str, since: float) -> int:
+        """How many runs of ``source`` were made since ``since`` (seconds since the epoch)."""
+        row = await self._one("SELECT COUNT(*) AS made FROM runs WHERE source = ? AND created_at >= ?", (source, since))
+        return 0 if row is None else int(row["made"])
+
+    async def same_todo(self, title_key: str, since: float) -> TodoRecord | None:
+        """The thing of the list with ``title_key`` that is to do or being done, or that was done or let go since
+        ``since``: a thing is not listed twice, however long the list grew (the code review of item 715)."""
+        row = await self._one(
+            "SELECT * FROM todos WHERE title_key = ? AND (status IN ('open', 'doing') OR updated_at >= ?)"
+            " ORDER BY status IN ('open', 'doing') DESC, updated_at DESC LIMIT 1",
+            (title_key, since),
+        )
+        return None if row is None else _todo(row)
+
+    async def get_todo(self, todo_id: str) -> TodoRecord:
+        row = await self._one("SELECT * FROM todos WHERE id = ?", (todo_id,))
+        if row is None:
+            raise NotFoundError("no such thing on Dot's list", {"todo_id": todo_id})
+        return _todo(row)
+
+    async def list_todos(self, statuses: Sequence[TodoStatus], limit: int) -> list[TodoRecord]:
+        """The things of Dot's list in ``statuses``, the oldest first, ``limit`` at most."""
+        marks: str = ", ".join("?" for _ in statuses)
+        rows = await self._all(
+            f"SELECT * FROM todos WHERE status IN ({marks}) ORDER BY created_at, rowid LIMIT ?", (*statuses, limit)
+        )
+        return [_todo(row) for row in rows]
+
+    async def recent_todos(self, since: float, limit: int) -> list[TodoRecord]:
+        """The things of Dot's list changed since ``since`` (done, let go, or still to do), the newest change first."""
+        rows = await self._all(
+            "SELECT * FROM todos WHERE updated_at >= ? ORDER BY updated_at DESC, rowid DESC LIMIT ?", (since, limit)
+        )
+        return [_todo(row) for row in rows]
+
+    @_writing
+    async def set_todo(
+        self, todo_id: str, status: TodoStatus, attempts: int, run_id: str | None, note: str
+    ) -> TodoRecord:
+        """Where a thing of Dot's list stands now, the runs that tried it and what came of it."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE todos SET status = ?, attempts = ?, run_id = ?, note = ?, updated_at = ? WHERE id = ?",
+            (status, attempts, run_id, note, time.time(), todo_id),
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("no such thing on Dot's list", {"todo_id": todo_id})
+        return await self.get_todo(todo_id)
 
     async def get_draft(self, draft_id: str) -> DraftRecord:
         row = await self._one("SELECT * FROM drafts WHERE id = ?", (draft_id,))

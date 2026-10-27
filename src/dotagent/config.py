@@ -741,6 +741,18 @@ class WatchersConfig(FrozenModel):
     judged_per_look: int = Field(ge=1, le=200)
 
 
+class InitiativeConfig(FrozenModel):
+    """Dot's own initiative (item 715, docs/proactive.md): the owner switches it on in Schedules; these say when the Mac
+    counts as idle, how far apart Dot's own runs start, how often it looks for work, how many runs try one thing, and
+    how many of its own runs start in a day (0: no limit)."""
+
+    idle_minutes: float = Field(ge=0, le=1440, allow_inf_nan=False)
+    gap_minutes: float = Field(ge=0, le=1440, allow_inf_nan=False)
+    look_every_hours: float = Field(gt=0, le=168, allow_inf_nan=False)
+    attempts: int = Field(ge=1, le=10)
+    runs_per_day: int = Field(ge=0, le=1000)
+
+
 type McpTransport = Literal["stdio", "http", "sse"]
 
 # A lower-case letter, then lower-case letters, digits and hyphens; at most 24 characters. Plugin servers follow it too.
@@ -925,6 +937,7 @@ class AppConfig(FrozenModel):
     harness: HarnessConfig
     scheduler: SchedulerConfig
     watchers: WatchersConfig
+    initiative: InitiativeConfig
     skills: SkillsConfig
     plugins: PluginsConfig
     scout: ScoutConfig

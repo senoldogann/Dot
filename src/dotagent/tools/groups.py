@@ -44,6 +44,8 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "show_page": "pages",
     # The owner's saved contact details (item 621).
     "vault_contacts": "vault",
+    # Dot's own list of work for later (item 715).
+    "todo_add": "todos",
 }
 _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
@@ -56,6 +58,7 @@ _PURPOSES: dict[str, str] = {
     "pages": "showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views",
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
+    "todos": "your own list of work to do for the owner later, on your own, while the Mac is idle",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
 LISTED_TOOLS: int = 16

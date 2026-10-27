@@ -14,7 +14,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.harness.components import GivenText
 from dotagent.mcp.types import McpPurpose
 from dotagent.policy.types import ApprovalMode, Preset
-from dotagent.proactive import WATCHER_SOURCE
+from dotagent.proactive import INITIATIVE_SOURCE, WATCHER_SOURCE
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import SKILL_TOOL, Skill
@@ -646,7 +646,7 @@ def _environment(inputs: PromptInputs) -> str:
     # Only a run that can delegate is told to split: a delegated run cannot delegate again.
     if inputs.split and DELEGATE_TOOL in inputs.tool_names:
         lines.append(f"- {_SPLIT_TEXT}")
-    if inputs.source in (SCHEDULE_SOURCE, WATCHER_SOURCE):
+    if inputs.source in (SCHEDULE_SOURCE, WATCHER_SOURCE, INITIATIVE_SOURCE):
         lines.append(f"- {_UNATTENDED_LEAVING if inputs.questions == 'leave' else _UNATTENDED}")
     if inputs.source == DELEGATE_SOURCE:
         lines.append(f"- {_DELEGATED}")

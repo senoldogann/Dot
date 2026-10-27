@@ -163,6 +163,47 @@ keep the default approvals for a watcher that starts runs unless you want it to 
 The watchers' settings are in `[watchers]` of `defaults.toml`: `enabled`, `tick_s`, `tells_per_hour`, `runs_per_hour`
 and `judged_per_look`.
 
+## On its own
+
+**Dot works for you on its own while the Mac is idle** (item 715, an idea of makecindy/cindy's companions). The **On its
+own** card under the watchers on Schedules has its switch (off until you switch it on) and Dot's own list: the things it
+means to do for you, each with why it helps you, where it stands (to do, doing now, done, let go) and how many runs
+tried it; a row opens the chat of the run that did it. A run puts a thing on the list with the tool `todo_add` (a
+follow-up its work calls for, something you asked to be done later, a chore it noticed); you put one on it with the box
+at the card's foot; **Remove** takes a thing to do off it, **Again** puts back one that was let go.
+
+**When it works.** The scheduler looks at every tick. Switched on, it starts one of its runs when none of the Mac's runs
+works, nobody touched the keyboard, the mouse or the trackpad for `idle_minutes` (10), `gap_minutes` (15) have passed
+since its last run ended, the emergency stop is not engaged and fewer than `runs_per_day` of its runs started in the
+last day (0, the default, sets no limit; counted from the runs the database holds, so a restart of the daemon does not
+count from none). One of its runs works at a time. When macOS cannot say how long the Mac has been idle, nothing starts,
+and the card says so. It does the oldest thing to do, in a chat of its own named after it; with nothing to do, it looks
+for work every `look_every_hours` (6) with a research run, which reads what it remembers of you, the record the morning
+brief reads (what waits for you, the runs that failed since the last look, the campaigns at work), the titles of your
+newest chats and the list, and puts at most three things on it. That run is a research run: it writes nothing but its
+list, its notes and Dot's memory, as any research run may. Its record quotes no words a third party wrote unless it
+starts untrusted: the chats it names are the ones a person started (a watcher's, whose title carries a mail's subject,
+and Dot's own are left out), and a thing on the list that came from such content is counted, not quoted; the runs whose
+words the record does quote give it their taint, as the brief's do.
+
+**How it does a thing.** The run is a task in your approval mode, nobody watches it (a question it has is left for you,
+as a schedule's is), and its goal is Dot's words, "On my own initiative: …": the review model takes none of it as your
+instruction, in that run or in a later one of its chat, a resume too (`auto` asks you what reaches others), and a thing
+that a run put on the list after reading content third parties can author (a mail, a page) is done by a run that starts
+untrusted, so that in `yolo` too the review model refuses a message, a post, a payment or an upload that no word of
+yours calls for (item 525). A thing is not put on the list twice: not while it is to do or being done, nor for 30 days
+after it was done or let go. Done, it is marked so with the first line of the run's answer and you are told ("Dot did on
+its own", the push, the desktop, iMessage when it is on). A run that failed leaves it to do, up to `attempts` (3) runs;
+then it is let go and you are told. A run you stopped lets it go at once; one the daemon's stop or the emergency stop
+ended leaves it to do; one the daemon was doing when it shut down is to do again when it starts, and one it was doing
+when it stopped without shutting down (a crash) counts that try, so a thing that brings Dot down is let go after
+`attempts` tries. A thing tried as often as `attempts` allows, after the limit was lowered, is let go. A thing whose run
+the owner resumed is left to that resume while it works, and done once it ended done; another message in its chat is no
+sign it was done.
+
+The settings are in `[initiative]` of `defaults.toml`: `idle_minutes`, `gap_minutes`, `look_every_hours`, `attempts`
+and `runs_per_day`; the switch and the time of the last look are kept in the database.
+
 ## Telling you
 
 What Dot tells you on its own, the brief and the watchers, goes through one function, `tell_owner(bus, title, text,
@@ -198,4 +239,8 @@ it.
 | `PATCH /api/watchers/{id}` | change the whole of its choices, as for a new one; what it handled is kept unless its kind or its account changed, and one switched on again looks at once (404 for none) |
 | `DELETE /api/watchers/{id}` | delete it; answers what was deleted; the chats of the runs it started stay (404 for none) |
 | `POST /api/watchers/{id}/try` | Check now: one look at once, whatever its time: `{"outcome": {"first", "found", "told", "summary", "error"}, "watcher": …}`; a look that fails answers 200 with the failure in `outcome.error`, and `found` and `told` say how far it came (404 for none; 409 for a watcher switched off, while `[watchers] enabled` is false and while the emergency stop is engaged) |
+| `GET /api/initiative` | Dot's own initiative (item 715): `enabled`, `looked_at` (its last look for work), `idle_readable` (whether macOS says how long the Mac has been idle; without it nothing starts, and the card says so) and `todos`, what is being done and to do, then what was done or let go in the last two weeks, each with `id`, `title`, `why`, `source` (`owner` or `run`), `status`, `attempts`, `run_id`, `note` and `updated_at` |
+| `PUT /api/initiative` | switch it: `{"enabled": true}`; a run of it under way goes on until its end or a stop |
+| `POST /api/initiative/todos` | put a thing of yours on the list, 201: `{"title", "why"}`; 422 when it is on it, or was done or let go in the last 30 days |
+| `POST /api/initiative/todos/{id}/drop`, `.../again` | take a thing to do off the list; put one that was let go back, its tries from none (404 for none) |
 | `PUT /api/brief` | set it: `{"enabled": true, "time": "08:00", "days": "every" \| "weekdays", "lines": [...]}`; 422 for a time that is not `HH:MM`, a line over 300 characters, more than 20 lines, and what the scheduler refuses (too many schedules switched on) |

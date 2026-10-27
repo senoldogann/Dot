@@ -109,6 +109,7 @@ from dotagent.tools.shell import build_shell_tool, child_env, read_login_env
 from dotagent.tools.skill import build_skill_tool
 from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
+from dotagent.tools.todos import build_todo_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.vault.items import VaultItems
 from dotagent.vault.onepassword import OnePassword
@@ -240,6 +241,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_web_tools(),
         build_notes_tools(),
         build_memory_tools(),
+        build_todo_tools(),
         (build_draft_tool(),),
         build_mail_calendar_tools(),
         build_schedule_tools(),
