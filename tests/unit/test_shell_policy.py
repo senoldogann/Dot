@@ -158,7 +158,7 @@ _EVERYDAY: list[str] = [
     "npx eslint src/*.js",
     "npx -y eslint src/*.js",
     "bundle exec rspec spec/*_spec.rb",
-    "uv run twine upload dist/*",
+    "uv run twine check dist/*",
     "uv run ruff format .",
     "uv run --frozen ruff format .",
     "uvx ruff format .",
