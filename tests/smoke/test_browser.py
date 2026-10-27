@@ -139,6 +139,22 @@ _PAGES: dict[str, str] = {
 <p>Resume: <span id="resume-name">none</span></p>
 <p>Cover: <span id="cover-name">none</span></p>""",
     # A button under a layer that takes a click of its own: the forced click is not made, so the layer is not pressed.
+    # Item 754: a see-through file field laid over the button it looks like (beside another field, so that it is not
+    # the page's only one), and a button of a web component that names its field inside the component's shadow root.
+    "/upload-overlay": """<!doctype html><title>Overlay</title><input type="file" hidden>
+<div style="position:relative;width:200px;height:40px">
+<button type="button" style="width:200px;height:40px">Add CV</button>
+<input type="file" style="position:absolute;inset:0;opacity:0"
+  onchange="document.getElementById('cv').textContent = event.target.files[0].name"></div>
+<p>CV: <span id="cv">none</span></p>""",
+    "/upload-shadow": """<!doctype html><title>Shadow</title><input type="file" hidden><cv-picker></cv-picker>
+<p>CV: <span id="cv">none</span></p>
+<script>customElements.define('cv-picker', class extends HTMLElement { connectedCallback() {
+  const root = this.attachShadow({mode: 'open'});
+  root.innerHTML = '<button type="button" aria-controls="f">Pick CV</button><input type="file" id="f" hidden>';
+  root.getElementById('f').addEventListener('change', (e) => {
+    document.getElementById('cv').textContent = e.target.files[0].name; });
+} });</script>""",
     "/upload-covered": """<!doctype html><title>Covered</title>
 <input type="file" id="a" hidden><input type="file" id="b" hidden>
 <button type="button" onclick="document.getElementById('a').click()">Choose file</button>
@@ -670,6 +686,10 @@ async def test_a_control_that_names_its_field_or_never_holds_still_or_opens_noth
     with pytest.raises(BrowserError, match="uploading the files failed"):
         await browser.upload("upload2", ref_of(view.body, 'button "Next step"'), [str(cv)], True)
     assert "CV: none" in (await browser.read_text("upload2", None, 0, 2000)).text
+    for path, button in (("/upload-overlay", "Add CV"), ("/upload-shadow", "Pick CV")):
+        view = await browser.open_url("upload2", f"{site}{path}", True)
+        await browser.upload("upload2", ref_of(view.body, f'button "{button}"'), [str(cv)], True)
+        assert "CV: cv.pdf" in (await browser.read_text("upload2", None, 0, 2000)).text, path
     view = await browser.open_url("upload2", f"{site}/upload-covered", True)
     with pytest.raises(BrowserError, match="uploading the files failed"):
         await browser.upload("upload2", ref_of(view.body, 'button "Choose file"'), [str(cv)], True)

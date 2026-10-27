@@ -1439,14 +1439,23 @@ async def wait_for_text_or_dialog(page: Page, text: str, timeout_ms: int) -> Tex
 # The file field that a control named by label or by ``aria-controls`` hands its files to, which a custom "choose file"
 # button, a label drawn as a button or a dropzone that wraps nothing are made of (item 745): the field of the label the
 # element is in (its ``for``, or the field inside it) or the one an id in its ``aria-controls`` names.
+# Item 754: or the file field a click at the element's middle reaches, a field made see-through and laid over the button
+# it looks like (the one a person's click there opens); ids and points are looked up in the element's own root, a
+# shadow root's for a control of a web component.
 _CONTROLLED_FIELD_SCRIPT: str = """(element) => {
   const field = (node) => (node instanceof HTMLInputElement && node.type === 'file' ? node : null);
+  const root = element.getRootNode();
   const label = element.closest('label');
   const labelled = label && label.control ? field(label.control) : null;
   if (labelled) return labelled;
   for (const id of (element.getAttribute('aria-controls') || '').split(/\\s+/)) {
-    const controlled = id ? field(element.ownerDocument.getElementById(id)) : null;
+    const controlled = id && root.getElementById ? field(root.getElementById(id)) : null;
     if (controlled) return controlled;
+  }
+  const box = element.getBoundingClientRect();
+  if (box.width > 0 && box.height > 0 && root.elementFromPoint) {
+    const over = field(root.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+    if (over) return over;
   }
   return null;
 }"""
@@ -1531,7 +1540,7 @@ _FORCED_CLICK_TIMEOUT_MS: int = 2000
 # Whether the element is what a click at its middle reaches: itself or an element inside it is the topmost there.
 _ON_TOP_SCRIPT: str = """(el) => {
   const box = el.getBoundingClientRect();
-  const hit = el.ownerDocument.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+  const hit = el.getRootNode().elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
   return !!hit && (hit === el || el.contains(hit));
 }"""
 
