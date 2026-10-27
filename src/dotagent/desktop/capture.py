@@ -6,6 +6,7 @@ Capturing and encoding are separate so that the output size can follow the densi
 import io
 import platform
 import threading
+import time
 from collections.abc import Callable, Sequence
 from typing import Protocol
 
@@ -18,6 +19,7 @@ from dotagent.desktop.types import Rect
 
 _USER_DECLINED: int = -3801  # SCStreamErrorUserDeclined: Screen Recording is not granted
 _BITS_PER_PIXEL: int = 32
+_ATTEMPTS: int = 2
 # ScreenCaptureKit only has the capture of a rectangle from macOS 15.2 on.
 _RECT_CAPTURE: bytes = b"captureImageInRect:completionHandler:"
 
@@ -33,8 +35,9 @@ class NSErrorLike(Protocol):
 type Completion = Callable[[object | None, NSErrorLike | None], None]
 
 
-def _await_image(start: Callable[[Completion], None], timeout_s: float, what: str) -> object:
-    """Run a completion-handler API from plain Python (no run loop needed) and wait for its answer."""
+def _ask_once(
+    start: Callable[[Completion], None], timeout_s: float, what: str
+) -> tuple[object | None, NSErrorLike | None]:
     done: threading.Event = threading.Event()
     box: list[tuple[object | None, NSErrorLike | None]] = []
 
@@ -45,20 +48,37 @@ def _await_image(start: Callable[[Completion], None], timeout_s: float, what: st
     start(completion)
     if not done.wait(timeout_s):
         raise DesktopError(f"{what}: ScreenCaptureKit did not answer in time", {"api": what, "timeout_s": timeout_s})
-    image, error = box[0]
-    if error is not None:
-        context: dict[str, str | int] = {
+    return box[0]
+
+
+def _await_image(start: Callable[[Completion], None], timeout_s: float, what: str) -> object:
+    """Run a completion-handler API from plain Python (no run loop needed) and wait for its answer. An answer of neither
+    an image nor an error is asked for once more; when it stays so, the error says how long it took and whether Screen
+    Recording is granted (item 751)."""
+    began: float = time.monotonic()
+    for _ in range(_ATTEMPTS):
+        image, error = _ask_once(start, timeout_s, what)
+        if error is not None:
+            context: dict[str, str | int] = {
+                "api": what,
+                "domain": str(error.domain()),
+                "code": int(error.code()),
+                "description": str(error.localizedDescription()),
+            }
+            if int(error.code()) == _USER_DECLINED:
+                raise DesktopPermissionError("macOS has not granted Screen Recording to the app that runs Dot", context)
+            raise DesktopError(f"{what} failed", context)
+        if image is not None:
+            return image
+    raise DesktopError(
+        f"{what} returned neither an image nor an error, {_ATTEMPTS} times",
+        {
             "api": what,
-            "domain": str(error.domain()),
-            "code": int(error.code()),
-            "description": str(error.localizedDescription()),
-        }
-        if int(error.code()) == _USER_DECLINED:
-            raise DesktopPermissionError("macOS has not granted Screen Recording to the app that runs Dot", context)
-        raise DesktopError(f"{what} failed", context)
-    if image is None:
-        raise DesktopError(f"{what} returned neither an image nor an error", {"api": what})
-    return image
+            "attempts": _ATTEMPTS,
+            "elapsed_s": round(time.monotonic() - began, 3),
+            "screen_recording_granted": bool(Quartz.CGPreflightScreenCaptureAccess()),
+        },
+    )
 
 
 def _to_picture(cg_image: object) -> Image.Image:

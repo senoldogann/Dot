@@ -301,10 +301,14 @@ def _peek_ref(env: StepEnv, raw: str, presses_return: bool = False) -> Target:
 
 
 def _to_points(env: StepEnv, x: float, y: float) -> Point:
+    """The point of the screen a model coordinate stands for. A screenshot shows the main display only, so a coordinate
+    stands for a point of that display: one that falls on another display, or on none, is refused (item 751)."""
     point: Point = Point(x / env.scale, y / env.scale)
-    if not any(display.bounds.contains(point) for display in env.displays):
+    shown: tuple[DisplayInfo, ...] = tuple(display for display in env.displays if display.main) or env.displays
+    if not any(display.bounds.contains(point) for display in shown):
         raise DesktopError(
-            f"({x:g}, {y:g}) is outside the screen; take a desktop_screenshot to see the coordinates",
+            f"({x:g}, {y:g}) is outside the screen a screenshot shows (the main display); "
+            "take a desktop_screenshot to see the coordinates",
             {"x": x, "y": y},
         )
     return point
