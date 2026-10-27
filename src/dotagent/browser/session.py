@@ -44,6 +44,7 @@ from dotagent.browser import ledger
 from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, read_debug_endpoint, redact_endpoint
 from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
+    Pulse,
     TextWaitEnd,
     bring_to_front,
     capture_lines,
@@ -51,12 +52,14 @@ from dotagent.browser.driver import (
     document_of,
     fill_login_field,
     go_back,
+    holds_field_focus,
     holds_secret_field,
     install_consent_handler,
     keep_focused,
     let_page_turn,
     measure_viewport,
     navigate,
+    page_pulse,
     page_title,
     run_script,
     run_step,
@@ -486,6 +489,19 @@ class _Capture:
     offscreen: int
     overlay: str
     overlays: int
+
+
+# How long a step that should change the page is watched for a change after it (item 739), and how often: only a
+# step that changed nothing waits that long.
+_EFFECT_WAIT_S: float = 0.5
+_EFFECT_POLL_S: float = 0.1
+# The steps that are meant to change the page: a click, or Enter, which sends a form.
+_MOVING_ACTIONS: frozenset[str] = frozenset({"click", "double_click", "click_at"})
+
+
+def _moves_the_page(step: Step) -> bool:
+    """Whether ``step`` is meant to change the page, so that a step that does not is told (item 739)."""
+    return step.action in _MOVING_ACTIONS or (step.action == "press" and (step.key or "").lower() == "enter")
 
 
 def describe_surprise(before: _Watch, after: _Watch) -> str | None:
@@ -2711,6 +2727,8 @@ class BrowserSession:
                 reports.append(StepReport(index=index, description=description, outcome="skipped", detail=""))
                 continue
             before: _Watch = self._watch(thread, tab)
+            pulse: Pulse | None = await page_pulse(tab.page) if _moves_the_page(step) else None
+            requests: int = tab.requests
             try:
                 await run_step(tab.page, step, _ms(config.action_timeout_s), secret_field)
             except BrowserError as error:
@@ -2746,11 +2764,59 @@ class BrowserSession:
             opening: bool = False
             if step.has_side_effects():
                 opening = await self._let_events_land(tab)
-            reports.append(StepReport(index=index, description=description, outcome="done", detail=""))
+            effect: str = ""
+            if pulse is not None and not tab.page.is_closed():
+                # Only a click is meant to focus a field; Enter pressed in one leaves it there whatever it did.
+                clicked: str | None = step.ref if step.action in _MOVING_ACTIONS else None
+                effect = await self._effect(thread, tab, before, pulse, requests, clicked)
+            reports.append(StepReport(index=index, description=description, outcome="done", detail=effect))
             stopped = describe_surprise(before, self._watch(thread, tab))
             if stopped is None and opening:
                 stopped = _TAB_OPENING
         return reports, stopped
+
+    async def _effect(
+        self, thread: ThreadTabs, tab: Tab, before: _Watch, pulse: Pulse, requests: int, ref: str | None
+    ) -> str:
+        """What a step that should change the page did (item 739), as its report says it: nothing when the page
+        changed and shows nothing new to read; what it shows new (an alert, a field it marks invalid) when it did; and,
+        when nothing changed within :data:`_EFFECT_WAIT_S` (no change to its documents, no box ticked or field typed
+        in, no request, no new address, tab or dialog, and the element clicked took no focus as a field), that it did
+        not, with what the page marks invalid, so that the run does not take a click that
+        did nothing for one that worked. A page that could not be read counts as changed."""
+        after: Pulse = pulse
+        moved: bool = False
+        waited: float = 0.0
+        while True:
+            after = await page_pulse(tab.page)
+            moved = (
+                after.changes is None
+                or pulse.changes is None
+                or after.changes != pulse.changes
+                or tab.requests != requests
+                or describe_surprise(before, self._watch(thread, tab)) is not None
+            )
+            if moved or waited >= _EFFECT_WAIT_S or tab.page.is_closed():
+                break
+            await asyncio.sleep(_EFFECT_POLL_S)
+            waited += _EFFECT_POLL_S
+        if not moved and ref is not None and await holds_field_focus(tab.page, ref):
+            return ""
+        if not moved:
+            invalid: str = f"; fields it marks invalid: {'; '.join(after.invalid)}" if after.invalid else ""
+            return (
+                "but the page did not change (no new content, request or address)"
+                f"{invalid}. Something in front may have taken the click, or the control may wait for another event: "
+                "look at the page, close what is in front, or reach the element with browser_eval and its ref"
+            )
+        said: list[str] = [one for one in after.alerts if one not in pulse.alerts]
+        marked: list[str] = [one for one in after.invalid if one not in pulse.invalid]
+        parts: list[str] = []
+        if said:
+            parts.append(f"the page says: {' | '.join(said)}")
+        if marked:
+            parts.append(f"it marks invalid: {'; '.join(marked)}")
+        return "; ".join(parts)
 
     def _watch(self, thread: ThreadTabs, tab: Tab) -> _Watch:
         return _Watch(url=tab.page.url, tabs=len(thread.tabs), events=tab.events, closed=tab.page.is_closed())

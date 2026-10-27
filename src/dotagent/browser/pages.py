@@ -69,6 +69,8 @@ class Tab:
     last_used: float = field(default_factory=time.monotonic)
     # The calls its page's scripts made in the background, newest last (item 714): what browser_requests lists.
     calls: deque[Fetched] = field(default_factory=lambda: deque(maxlen=KEPT_CALLS))
+    # How many requests the page has started, of any kind: a step that started one did something (item 739).
+    requests: int = 0
 
 
 @dataclass(slots=True)
@@ -176,6 +178,7 @@ def _is_main_navigation(tab: Tab, request: Request) -> bool:
 
 
 def _on_request(tab: Tab, request: Request) -> None:
+    tab.requests += 1
     if _is_main_navigation(tab, request):
         tab.nav_inflight += 1
         tab.nav_idle.clear()
