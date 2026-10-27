@@ -149,6 +149,44 @@ function templateTools(template, known) {
   );
 }
 
+/**
+ * The schedules its template suggests, for each of `pairs` (`{ agent, template }`) whose template has one, switched off
+ * until the owner has read the goal (item 464), unless the agent has that schedule already (its agent and its goal):
+ * an agent the owner had before, which Use team keeps, gets its schedule too, and a second Use adds none twice (item
+ * 722). Returns the names of the agents given a schedule now, of those that had theirs, and why one was not added.
+ */
+async function addSuggestedSchedules(pairs) {
+  const suggesting = pairs.filter(({ template }) => template.cron !== "");
+  const added = [];
+  const had = [];
+  const missed = [];
+  if (suggesting.length === 0) {
+    return { added, had, missed };
+  }
+  let schedules;
+  try {
+    schedules = await api.get("/schedules");
+  } catch (error) {
+    // The agents are made all the same: the toast says that their schedules were not added, and why.
+    const why = error.message.replace(/\.$/, "");
+    return { added, had, missed: suggesting.map(({ agent }) => `${agent.name}: ${why}`) };
+  }
+  for (const { agent, template } of suggesting) {
+    if (schedules.some((view) => view.record.options.agent_id === agent.id && view.record.goal === template.task)) {
+      had.push(agent.name);
+      continue;
+    }
+    try {
+      await api.post("/schedules", { name: agent.name, goal: template.task, cron: template.cron, agent_id: agent.id, enabled: false });
+      added.push(agent.name);
+    } catch (error) {
+      // The toast ends the list with its own full stop, so a message's own is taken off.
+      missed.push(`${agent.name}: ${error.message.replace(/\.$/, "")}`);
+    }
+  }
+  return { added, had, missed };
+}
+
 /** A template's card (item 315): its face, name and role, what it needs of the Mac, the schedule it suggests and the
     tools its agent may use. One that suggests a schedule offers to add it with the agent (item 464), switched off until
     the owner has read its goal; `onUse(template, alsoSchedule)` makes them. */
@@ -157,7 +195,7 @@ function templateCard(template, onUse, known) {
   const alsoWords = "Also add this schedule, switched off until you read its goal";
   const also = template.cron === "" ? null : el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords });
   also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
-  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Add its schedule too, switched off")), also);
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Also add its schedule; you switch it on on the Schedules page after reading its goal")), also);
   const use = el(
     "button",
     { class: "btn sm template-use", type: "button", "aria-label": `Use the template ${template.name}` },
@@ -206,7 +244,7 @@ function teamCard(team, templates, onUse, owned, added) {
     ? el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords })
     : null;
   also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
-  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Add their schedules too, switched off")), also);
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Also add their schedules; you switch them on on the Schedules page after reading their goals")), also);
   const use = el(
     "button",
     { class: "btn sm template-use", type: "button", "aria-label": `Use the team ${team.name}` },
@@ -655,11 +693,11 @@ function mountList(root, ctx) {
     if (!alsoSchedule) {
       toast("ok", `${saved.name} is ready.`);
     } else {
-      try {
-        await api.post("/schedules", { name: saved.name, goal: template.task, cron: template.cron, agent_id: saved.id, enabled: false });
+      const { missed } = await addSuggestedSchedules([{ agent: saved, template }]);
+      if (missed.length > 0) {
+        toast("error", `${saved.name} is ready, but its schedule was not added: ${missed[0]}.`);
+      } else {
         toast("ok", `${saved.name} is ready, with its schedule switched off: read its goal, then switch it on.`);
-      } catch (error) {
-        toast("error", `${saved.name} is ready, but its schedule was not added: ${error.message}`);
       }
     }
     ctx.navigate(`/agents/${saved.id}`);
@@ -674,17 +712,13 @@ function mountList(root, ctx) {
     for (const record of [...used.made, ...used.kept]) {
       rememberLook(record.id, record.look);
     }
-    const scheduled = alsoSchedules ? used.made.filter((record) => members.find((member) => member.name === record.name).cron !== "") : [];
-    const missed = [];
-    for (const record of scheduled) {
-      const template = members.find((member) => member.name === record.name);
-      try {
-        await api.post("/schedules", { name: record.name, goal: template.task, cron: template.cron, agent_id: record.id, enabled: false });
-      } catch (error) {
-        // The toast ends the list with its own full stop, so a message's own is taken off.
-        missed.push(`${record.name}: ${error.message.replace(/\.$/, "")}`);
-      }
-    }
+    // Every member gets the schedule its template suggests when asked for, the agents the owner had too (item 722:
+    // they were left without, and the switch read as if it had not taken); one that has it already is left as it is.
+    const memberOf = (record) => members.find((member) => member.name.toLowerCase() === record.name.trim().toLowerCase());
+    const pairs = alsoSchedules
+      ? [...used.made, ...used.kept].map((agent) => ({ agent, template: memberOf(agent) })).filter(({ template }) => template !== undefined)
+      : [];
+    const { added, had: scheduledAlready, missed } = await addSuggestedSchedules(pairs);
     const made = AND_LIST.format(used.made.map((record) => record.name));
     const had = used.kept.length === 0 ? "" : ` Already yours and kept as they were: ${AND_LIST.format(used.kept.map((record) => record.name))}.`;
     // A kept agent that named its tools was given message_agent, to hand its teammates their parts (item 512).
@@ -695,13 +729,18 @@ function mountList(root, ctx) {
       : used.added.length === 0
         ? ""
         : ` ${AND_LIST.format(used.added)} ${used.added.length === 1 ? "is" : "are"} back in ${used.team.name}.`;
-    if (used.made.length === 0) {
-      toast("ok", `You have every agent of the ${team.name} already.${placed}${joined}`);
-    } else if (missed.length > 0) {
-      toast("error", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not every schedule was added: ${missed.join("; ")}.${had}${placed}${joined}`);
+    const off =
+      added.length === 0
+        ? ""
+        : ` ${plural(added.length, "schedule was", "schedules were")} added, switched off: read ${added.length === 1 ? "its goal" : "their goals"} on the Schedules page, then switch ${added.length === 1 ? "it" : "them"} on.`;
+    const already = scheduledAlready.length === 0 ? "" : ` ${AND_LIST.format(scheduledAlready)} had ${scheduledAlready.length === 1 ? "its schedule" : "their schedules"} already.`;
+    if (missed.length > 0) {
+      const ready = used.made.length === 0 ? " not" : ` ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not`;
+      toast("error", `${team.name}:${ready} every schedule was added: ${missed.join("; ")}.${had}${placed}${joined}${off}${already}`);
+    } else if (used.made.length === 0) {
+      toast("ok", `You have every agent of the ${team.name} already.${placed}${joined}${off}${already}`);
     } else {
-      const off = scheduled.length === 0 ? "" : " Their schedules are switched off: read their goals, then switch them on.";
-      toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${placed}${joined}${off}`);
+      toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${placed}${joined}${off}${already}`);
     }
     // The list shows the team and the agents, and the cards mark them Yours; the team that was made is brought into view.
     await Promise.all([reload(), reloadTeams(), loadTemplates()]);
@@ -1062,6 +1101,25 @@ function agentScheduleRow(view, onToggle) {
   );
 }
 
+/**
+ * The schedule an agent's template suggests and the agent lacks (item 722): an agent made before the switch was asked
+ * for, or kept by Use team, had no way to get it. `onAdd()` adds it, switched off.
+ */
+function suggestedScheduleRow(template, onAdd) {
+  return el(
+    "div",
+    { class: "list-row", dataset: { suggestedSchedule: template.id } },
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row-title" }, "Suggested by its template"),
+      el("div", { class: "agent-schedule-goal" }, template.task),
+      el("div", { class: "row-meta" }, el("span", { title: "When it would run" }, template.schedule), el("span", { class: "badge b-muted" }, "not added")),
+    ),
+    el("div", { class: "row-actions" }, el("button", { class: "btn sm", type: "button", title: "Add it switched off: you switch it on once you have read its goal", onclick: onAdd }, "Add it")),
+  );
+}
+
 /** A lesson the agent learned: the note, how the agent's own runs fared after it, and Forget. */
 function lessonRow(record, score, onForget) {
   const forget = el("button", { class: "btn ghost sm", type: "button" }, "Forget");
@@ -1211,6 +1269,17 @@ function mountPage(root, ctx, agentId) {
     }
   }
 
+  /** Add the schedule the agent's template suggests, switched off until its goal is read (item 722). */
+  async function addSuggested(record, template) {
+    const { added, missed } = await addSuggestedSchedules([{ agent: record, template }]);
+    if (missed.length > 0) {
+      toast("error", `Its schedule was not added: ${missed[0]}.`);
+    } else if (added.length > 0) {
+      toast("ok", "Its schedule is added, switched off: read its goal, then switch it on.");
+    }
+    await refresh();
+  }
+
   /** Switch one of the agent's schedules on or off, then show the lists as the daemon has them. */
   async function switchSchedule(record) {
     await api.post(`/schedules/${record.id}/${record.enabled ? "disable" : "enable"}`, null);
@@ -1238,9 +1307,20 @@ function mountPage(root, ctx, agentId) {
   async function load() {
     const mine = ++ticket;
     try {
-      const [detail, schedules] = await Promise.all([api.get(`/agents/${agentId}`), api.get("/schedules")]);
+      const [detail, schedules, templates] = await Promise.all([
+        api.get(`/agents/${agentId}`),
+        api.get("/schedules"),
+        // The template of its name, for the schedule it suggests (item 722); a list that cannot be read offers none.
+        api.get("/agent-templates").catch((error) => {
+          console.warn("the templates could not be listed", error);
+          return [];
+        }),
+      ]);
       const own = schedules.filter((view) => view.record.options.agent_id === agentId);
-      return disposed || mine !== ticket ? null : { ...detail, schedules: own };
+      const name = detail.record.name.trim().toLowerCase();
+      const template = templates.find((each) => each.name.toLowerCase() === name && each.cron !== "") ?? null;
+      const suggested = template !== null && !own.some((view) => view.record.goal === template.task) ? template : null;
+      return disposed || mine !== ticket ? null : { ...detail, schedules: own, suggested };
     } catch (error) {
       if (!disposed && mine === ticket) {
         page.replaceChildren(errorPanel(error, () => attempt(reload)));
@@ -1274,7 +1354,10 @@ function mountPage(root, ctx, agentId) {
       homeSection(
         "schedules",
         "Schedules",
-        detail.schedules.map((view) => agentScheduleRow(view, (record) => attempt(() => switchSchedule(record)))),
+        [
+          ...detail.schedules.map((view) => agentScheduleRow(view, (record) => attempt(() => switchSchedule(record)))),
+          ...(detail.suggested === null ? [] : [suggestedScheduleRow(detail.suggested, () => attempt(() => addSuggested(detail.record, detail.suggested)))]),
+        ],
         folds,
         toggleFold,
       ),
