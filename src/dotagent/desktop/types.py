@@ -223,6 +223,8 @@ class ScreenshotView(FrozenModel):
     redacted: int
     # The text on the picture with where to click it (item 701); empty when ``[desktop] read_screen_text`` is off.
     text_lines: tuple[ScreenText, ...] = ()
+    # What was cut off a zoomed region that left the screen (item 744); empty when the region was whole on it.
+    clipped: str = ""
 
 
 class StepReport(FrozenModel):
