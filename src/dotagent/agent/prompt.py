@@ -19,7 +19,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
-from dotagent.tools.browser import FILL_LOGIN_TOOL
+from dotagent.tools.browser import CREATE_LOGIN_TOOL, FILL_LOGIN_TOOL
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.contacts import CONTACTS_TOOL
 from dotagent.tools.context import AskMode
@@ -715,8 +715,15 @@ _CONTACTS_LINE: str = (
     "- vault_contacts lists the user's saved contact details (name, address, phone, email, and the billing address of "
     "their cards) as their own words: type them where a form asks, instead of asking the user for them."
 )
+# A new account (item 740): the run never makes up its password, so that none is chosen by a model or recorded.
+_CREATE_LOGIN_LINE: str = (
+    "- When you make an account on a site, let browser_create_login make its password: it fills the password field "
+    "(and the one that repeats it) and keeps the login in the user's vault, where browser_fill_login finds it later. "
+    "Never make up, type or write a password yourself."
+)
 _VAULT_LINES: tuple[tuple[str, str], ...] = (
     (FILL_LOGIN_TOOL, _LOGINS_LINE),
+    (CREATE_LOGIN_TOOL, _CREATE_LOGIN_LINE),
     (CONTACTS_TOOL, _CONTACTS_LINE),
 )
 

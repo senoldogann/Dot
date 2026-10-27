@@ -631,10 +631,11 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   As every refusal of the review, that one is waived in `yolo`, which may read any file: the fill itself still shows
   the model no value.
 - **Dot's own vault** (item 621, Settings › Vault) keeps the logins, cards and contact details you give it. A run can
-  have a login typed into a page and can read contact details; a card is kept, shown to you by the eye, and filled into
-  no page (that is another item's, and what it needs is in roadmap 621). Dot's tools never show a run a password, a
-  card number, an expiry or a security code; what a program that the run writes and starts can reach is under **What
-  keeps a value from a run, and what does not**.
+  have a login typed into a page and can read contact details; a run that makes an account on a site keeps its login
+  there with `browser_create_login` (item 740), whose password Dot makes, fills and keeps without a model ever reading
+  it, asking you first as a fill does in every mode but `yolo`; a card is kept, shown to you by the eye, and filled into no page (that is another item's, and what it needs is in
+  roadmap 621). Dot's tools never show a run a password, a card number, an expiry or a security code; what a program
+  that the run writes and starts can reach is under **What keeps a value from a run, and what does not**.
   - **Where they are kept.** A login's password and notes and a card's number, expiry, security code and name are in
     your macOS login Keychain and nowhere else: one generic password item for each, of the service `dot-vault`, named
     by the item's id. They are written through `security -i`, whose commands come from its standard input, so that no
