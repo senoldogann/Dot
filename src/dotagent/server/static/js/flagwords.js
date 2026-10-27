@@ -21,7 +21,7 @@ const FLAG_WORDS = {
   persistence: "leaves something that stays after the task",
   upload: "uploads a file",
   self_change: "changes Dot's own files",
-  vault_fill: "fills in a login from your password manager",
+  vault_fill: "fills in a login of your vault or password manager, or makes one",
 };
 
 // What each kind of action says of what Dot is about to do, as a chip's words.

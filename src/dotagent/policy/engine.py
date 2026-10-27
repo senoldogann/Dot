@@ -40,7 +40,9 @@ _GUARD_FLAGS: frozenset[Flag] = frozenset({"message_send", "public_post"})
 # A login filled from the owner's password manager (item 493) waits for the owner's own yes in every mode that asks,
 # whatever their rules say, as a message does; and, as money and credentials, it is never a review model's to answer.
 _VAULT_FLAGS: frozenset[Flag] = frozenset({"vault_fill"})
-_VAULT_REASON: str = "Dot asks before it fills a login from your password manager, whatever your rules say"
+_VAULT_REASON: str = (
+    "Dot asks before it fills a login from your vault or password manager, or makes one, whatever your rules say"
+)
 # The sources of a question that only the owner answers, whatever the approval mode.
 _OWNERS_SOURCES: frozenset[str] = frozenset({"own_files", "vault"})
 _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset(
