@@ -784,6 +784,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     setText(scope.panel.time, duration(Math.max(ts - scope.began, 0)));
   }
 
+  /** Whether `scope` is a delegated run whose row shows it at work: an event of a run its record says has ended (the
+   * store's, put over a replay, item 734) paints neither its line nor its state. */
+  function atWork(scope) {
+    return scope.panel !== null && liveChildren.has(scope);
+  }
+
   /** The row of the delegated run of `scope` shows that the run ended with `status` at `ts` after `steps` steps, its
    * answer `result`. */
   function endChild(scope, status, steps, ts, result) {
@@ -963,6 +969,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       onRunStatus({ status: waiting ? "blocked" : "running", model: null, endedAt: null });
       return;
     }
+    if (!atWork(scope)) {
+      return;
+    }
     scope.panel.helper.status = waiting ? "blocked" : "running";
     paintRing(scope.panel.status, scope.panel.helper.status);
     paintFlock(scope.panel.flock, ts);
@@ -1049,8 +1058,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       if (scope.panel !== null) {
         scope.panel.steps = Math.max(scope.panel.steps, data.step);
         // A turn that calls a tool has its line painted by its first call, so the tool's name does not go and come back
-        // at every step (item 310).
-        if (!data.tool_calls.some((name) => !QUIET_TOOLS.has(name))) {
+        // at every step (item 310). The row of a run that ended keeps how it ended (item 734).
+        if (atWork(scope) && !data.tool_calls.some((name) => !QUIET_TOOLS.has(name))) {
           paintChild(scope, record.ts, [`step ${scope.panel.steps}`]);
         }
       }
@@ -1165,7 +1174,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         browserSeen = true;
         onBrowserStep();
       }
-      if (scope.panel !== null) {
+      if (atWork(scope)) {
         // The tool in the words the steps use ("Write file", "Web Research · Web scrape").
         paintChild(scope, record.ts, [`step ${scope.panel.steps}`, toolWords(data.tool)]);
         scope.panel.helper.action = describeCall(data.tool, data.args);

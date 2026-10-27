@@ -356,7 +356,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     @router.get("/runs/{run_id}/stream")
     async def run_stream(run_id: str, query: Annotated[StreamQuery, Query()]) -> StreamingResponse:
         await store.get_run(run_id)
-        return event_stream(follow_run(ctx, run_id, query.after))
+        return event_stream(follow_run(ctx, run_id, query.after, query.stored))
 
     @router.post("/runs/{run_id}/steer", status_code=202)
     async def steer_run(run_id: str, request: SteerRequest) -> RunDetail:

@@ -1710,8 +1710,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       timeline.tick(Date.now() / 1000);
     }
   };
-  // What was read of the stream (before the page left, or whole for a run that is over) goes in at once; the stream goes
-  // on after its last message. An event the page fails to show is told, as on the stream, and the next one goes in.
+  // What was read of the stream (before the page left, or whole up to now when it opened, item 734) goes in at once; the
+  // stream goes on after its last message. An event the page fails to show is told, as on the stream, and the next one
+  // goes in.
   replaying = true;
   for (const message of kept.messages) {
     try {
@@ -1873,8 +1874,11 @@ export function mount(root, ctx) {
     let messages = [];
     try {
       detail = await api.get(`/runs/${runId}`);
-      // A run that is over is read whole before it is drawn (item 454), not filled in as its stream comes.
-      if (kept === undefined && !detail.active && !detail.elsewhere) {
+      // A run is read whole before it is drawn (item 454), not filled in as its stream comes; one at work up to now
+      // (item 734), so that its record, put over what was read, has the last word: a chat opened again while its
+      // helpers worked drew their rows from thousands of earlier events as they came, steps behind and a helper that
+      // had ended still at work, and nothing set them right.
+      if (kept === undefined) {
         messages = await storedMessages();
       }
     } catch (error) {
@@ -1913,11 +1917,11 @@ export function mount(root, ctx) {
     shown();
   }
 
-  /** The stored events of the run, that is over, and of the runs it delegated to: read whole before the chat is drawn,
-   * so a finished chat opens as it ended instead of filling in as its stream is read (the stream ends after them). */
+  /** The stored events of the run and of the runs it delegated to: read whole before the chat is drawn, so a chat opens
+   * as it stands instead of filling in as its stream is read (the stream ends after them, item 734). */
   async function storedMessages() {
     const read = [];
-    for await (const message of sse(`/runs/${runId}/stream${query({ after: 0 })}`, controller.signal, () => undefined)) {
+    for await (const message of sse(`/runs/${runId}/stream${query({ after: 0, stored: true })}`, controller.signal, () => undefined)) {
       read.push(message);
     }
     return read;

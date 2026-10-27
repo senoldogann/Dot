@@ -164,11 +164,14 @@ def event_stream(body: AsyncIterator[bytes]) -> StreamingResponse:
     return StreamingResponse(_opened(body), media_type=SSE_TYPE, headers=SSE_HEADERS)
 
 
-async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterator[bytes]:
+async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: bool = False) -> AsyncIterator[bytes]:
     """The events of ``run_id`` and of the runs it delegated to: the stored ones after ``after``, then live ones, those
     of a run a ``dotx`` command drives as the daemon relays them (``RunManager.relay_elsewhere``).
 
-    Ends after the run's last event, immediately when the run is over already, and when the daemon starts to stop.
+    Ends after the run's last event, immediately when the run is over already, and when the daemon starts to stop; with
+    ``stored_only``, after the events stored when it was asked for (item 734): the page of a run at work reads them
+    whole, draws them, puts the run's record over them and follows the stream on from the last one, as it does for a
+    run that is over.
     """
     store: Store = ctx.runtime.store
     family: set[str] = {run_id}
@@ -207,7 +210,7 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterat
         frames, ended = await stored(True)
         if frames:
             yield frames
-        if ended:
+        if ended or stored_only:
             return
         dropped: int = 0
         while True:
