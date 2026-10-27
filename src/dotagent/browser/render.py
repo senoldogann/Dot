@@ -145,6 +145,8 @@ def render_script_run(run: ScriptRun, waited_s: float, nonce: str, body_budget: 
     body: str = shown if run.text else "(no value)"
     if run.surprise is not None:
         body = f"{body}\n[then: {_clip(run.surprise, _NOTE_CHARS)}]"
+    if run.sent:
+        body = f"{body}\n[the page sent, while it ran: {'; '.join(run.sent)}]"
     return "\n".join((header, fence_untrusted(run.url, body, nonce)))
 
 

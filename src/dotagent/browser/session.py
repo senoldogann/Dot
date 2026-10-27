@@ -15,6 +15,7 @@ import math
 import re
 import secrets
 import time
+from collections import Counter
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -491,6 +492,10 @@ class _Capture:
     overlays: int
 
 
+# The methods of a request that only reads, and how much of what a script's page sent its value says (item 741).
+_READ_METHODS: frozenset[str] = frozenset({"GET", "HEAD", "OPTIONS"})
+_SENT_LINES: int = 10
+_SENT_CHARS: int = 200
 # How long a step that should change the page is watched for a change after it (item 739), and how often: only a
 # step that changed nothing waits that long.
 _EFFECT_WAIT_S: float = 0.5
@@ -3100,10 +3105,20 @@ class BrowserSession:
                 )
             thread.scripted = True
             address: str = tab.page.url
+            # What the page sends while the script runs and the page settles (item 741): the run's record and the
+            # value say where a script may have sent something; nothing is held back for it.
+            sent: Counter[str] = Counter()
+
+            def seen(request: Request) -> None:
+                if request.method.upper() not in _READ_METHODS:
+                    parts = urlsplit(request.url)
+                    sent[f"{request.method.upper()} {parts.hostname or ''}{parts.path}"[:_SENT_CHARS]] += 1
+
             if hide_secrets:
                 # The cookies of the page the script runs in: held before it runs as well as after, so that one it
                 # deletes or overwrites is hidden too, and for the rest of the chat (item 533).
                 self._cookie_values.setdefault(thread_id, set()).update(await cookie_secrets(tab.page, address))
+            tab.page.on("request", seen)
             try:
                 before: _Watch = self._watch(thread, tab)
                 started: float = time.monotonic()
@@ -3128,13 +3143,26 @@ class BrowserSession:
                 # What the script led the tab to may be an address that carries a cookie: the refusal names it.
                 self.mask_held(thread_id, error)
                 raise
+            finally:
+                tab.page.remove_listener("request", seen)
             told: str | None = _TAB_OPENING if surprise is None and opening else surprise
+            lines: tuple[str, ...] = tuple(
+                self.held_back(thread_id, line if count == 1 else f"{line} (×{count})")
+                for line, count in sent.most_common(_SENT_LINES)
+            )
+            if sent:
+                _log.info(
+                    "browser_script_sent",
+                    requests=sum(sent.values()),
+                    hosts=", ".join(sorted({line.split(" ", 1)[1].split("/", 1)[0] for line in sent})),
+                )
             return ScriptRun(
                 end=end,
                 text=self.held_back(thread_id, text),
                 url=self.held_back(thread_id, current.page.url),
                 surprise=None if told is None else self.held_back(thread_id, told),
                 seconds=seconds,
+                sent=lines,
             )
 
     async def back(self, thread_id: str, hide_secrets: bool) -> PageView:

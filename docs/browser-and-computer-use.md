@@ -234,16 +234,18 @@ Both modes share what follows.
   page's text and makes the run untrusted. As an action it is a click of medium risk on the tab's page: the aggressive
   and balanced presets allow it, the cautious preset asks, a research run does not have it and a `yolo` run does it
   without asking. What the script does inside the page is not checked or paced action by action, as `browser_act`'s
-  steps are; its words are read for a secret, as a command line's are: in a run that read outside content, a script that
-  carries a key or a secret Dot holds is refused in every mode, `yolo` too (item 561, *No secret out* in
-  [Safety](safety.md#safety)). Outside `yolo` it is refused on a page that holds a password, one-time-code or card
-  field, in any frame (a script reads a field's value whole, one Chrome filled in too), and from then on no text a
-  browser tool of that chat gives back shows the values of the site's cookies, the ones long enough to be a session (a
-  plain word such as `dismissed` is no session): they read `[hidden]` in the script's value, in its error, in where it
-  led the tab and in what a later tool reads, and the judges and the log lines that name a refused address do not have
-  them either (item 533); a screenshot shows a page as pixels, so a cookie a script wrote into its text shows there. It
-  takes the place of AppleScript's `execute javascript`, which lands in the front window of whichever Chrome macOS picks
-  when several run (item 263).
+  steps are; what its page sends meanwhile other than reads (a request that is not GET, HEAD or OPTIONS: a form, a
+  site's API called with the page's session) is said with its value and in the run's log (`browser_script_sent`), its
+  method, host and path and how many times (item 741), and nothing of it is held back or asked about; its words are read
+  for a secret, as a command line's are: in a run that read outside content, a script that carries a key or a secret Dot
+  holds is refused in every mode, `yolo` too (item 561, *No secret out* in [Safety](safety.md#safety)). Outside `yolo`
+  it is refused on a page that holds a password, one-time-code or card field, in any frame (a script reads a field's
+  value whole, one Chrome filled in too), and from then on no text a browser tool of that chat gives back shows the
+  values of the site's cookies, the ones long enough to be a session (a plain word such as `dismissed` is no session):
+  they read `[hidden]` in the script's value, in its error, in where it led the tab and in what a later tool reads, and
+  the judges and the log lines that name a refused address do not have them either (item 533); a screenshot shows a page
+  as pixels, so a cookie a script wrote into its text shows there. It takes the place of AppleScript's `execute
+  javascript`, which lands in the front window of whichever Chrome macOS picks when several run (item 263).
 - `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
   call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A
   dialog that opens in front of the page during the wait ends it at once, saying so (item 698): the text would not

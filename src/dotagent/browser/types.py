@@ -176,6 +176,9 @@ class ScriptRun(FrozenModel):
     url: str
     surprise: str | None
     seconds: float
+    # The requests other than reads (not GET, HEAD or OPTIONS) the page sent while the script ran and the page settled
+    # after it, as method, host and path, each with how many times (item 741): what a script may have sent away.
+    sent: tuple[str, ...] = ()
 
 
 class TextWait(FrozenModel):
