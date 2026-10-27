@@ -1214,6 +1214,20 @@ def collect_stuck(database: Path) -> StuckWork:
         raise StoreError("the store could not be read", {"database": str(database), "error": str(error)}) from error
 
 
+def read_context_parts(database: Path, since: float, limit: int) -> list[str]:
+    """The ``context_parts`` events of the newest ``limit`` runs since ``since`` (item 735), their data as stored, read
+    on a read-only connection. Blocking."""
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
+            rows = connection.execute(
+                "SELECT data FROM events WHERE kind = 'context_parts' AND ts >= ? ORDER BY id DESC LIMIT ?",
+                (since, limit),
+            ).fetchall()
+    except sqlite3.Error as error:
+        raise StoreError("the store could not be read", {"database": str(database), "error": str(error)}) from error
+    return [str(row[0]) for row in rows]
+
+
 def read_kv(database: Path, key: str) -> str | None:
     """The value the store keeps under ``key`` (the last reflection, the last that failed), read on a read-only
     connection, or ``None``. Blocking."""
