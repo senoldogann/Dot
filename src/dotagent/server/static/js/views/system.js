@@ -1334,7 +1334,7 @@ function standbySetting({ choose }) {
 
   function row(ref, at, providers) {
     const provider = providers.find((one) => one.provider === providerOf(ref)) ?? null;
-    const listed = provider !== null && provider.models.some((model) => model.ref === ref);
+    const listed = provider?.models.some((model) => model.ref === ref) === true;
     const keyless = provider !== null && provider.problem === "no_key";
     return el(
       "li",

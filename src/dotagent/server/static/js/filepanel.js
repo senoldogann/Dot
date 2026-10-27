@@ -386,7 +386,7 @@ const CODE_KEYWORDS = new Set(
 const CODE_COMMENT_LANGUAGES = new Set(["python", "ruby", "shell", "yaml", "toml", "ini"]);
 
 function codeTokenClass(token, language) {
-  if (/^[\"'`]/.test(token)) {
+  if (/^["'`]/.test(token)) {
     return "file-code-string";
   }
   if (token.startsWith("//") || token.startsWith("/*") || (token.startsWith("#") && CODE_COMMENT_LANGUAGES.has(language))) {
