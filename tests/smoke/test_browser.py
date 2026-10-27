@@ -123,6 +123,33 @@ _PAGES: dict[str, str] = {
 <div><input type="file" hidden><input type="file" id="second" hidden onchange="got('photo')(event)">
 <button type="button" onclick="document.getElementById('second').click()">Add photo</button></div>
 <p>Photo: <span id="photo">none</span></p>""",
+    # Upload controls whose click does not simply open the chooser (item 745): a button that only names its field by
+    # aria-controls (two fields, so none is the page's only one), a button that never stops moving (a click waits for it
+    # to hold still) and opens the chooser of the second field, and, on /upload-one, a button beside the page's only
+    # field that opens nothing.
+    "/upload-aria": """<!doctype html><title>Upload by name</title>
+<script>function got(id) { return (e) => { document.getElementById(id).textContent =
+  [...e.target.files].map((f) => f.name).join(',') || 'none' } }</script>
+<style>@keyframes drift { from { transform: translateX(0) } to { transform: translateX(4px) } }
+#moving { animation: drift 40ms infinite alternate; width: 200px; height: 40px }</style>
+<div role="button" tabindex="0" aria-controls="resume">Choose resume</div>
+<input type="file" id="resume" hidden onchange="got('resume-name')(event)">
+<input type="file" id="cover" hidden onchange="got('cover-name')(event)">
+<button type="button" id="moving" onclick="document.getElementById('cover').click()">Choose cover letter</button>
+<p>Resume: <span id="resume-name">none</span></p>
+<p>Cover: <span id="cover-name">none</span></p>""",
+    # A button under a layer that takes a click of its own: the forced click is not made, so the layer is not pressed.
+    "/upload-covered": """<!doctype html><title>Covered</title>
+<input type="file" id="a" hidden><input type="file" id="b" hidden>
+<button type="button" onclick="document.getElementById('a').click()">Choose file</button>
+<div style="position:fixed;inset:0;opacity:0.01" onclick="document.getElementById('layer').textContent = 'pressed'">
+</div><p>Layer: <span id="layer">untouched</span></p>""",
+    # A button that leaves for a page with one file field: that page's field is not the one the upload was for.
+    "/upload-leaves": """<!doctype html><title>Leaves</title><input type="file" hidden><input type="file" hidden>
+<button type="button" onclick="location.href = '/upload-one'">Next step</button>""",
+    "/upload-one": """<!doctype html><title>One field</title>
+<button type="button">Attach CV</button><input type="file" hidden onchange="document.getElementById('one').textContent =
+  event.target.files[0].name"><p>CV: <span id="one">none</span></p>""",
     # A dialog opens 0.9 s after the first click (past the watch of its effect, item 739), one that says the order is
     # placed after the second (item 698).
     "/asks": """<!doctype html><title>Asks</title>
@@ -619,6 +646,34 @@ async def test_files_go_into_a_hidden_file_field_and_through_the_chooser_a_butto
     view = await browser.snapshot("upload", True)
     await browser.upload("upload", ref_of(view.body, 'button "Add photo"'), [str(cv)], True)
     assert "Photo: cv.pdf" in (await browser.read_text("upload", None, 0, 2000)).text
+
+
+async def test_a_control_that_names_its_field_or_never_holds_still_or_opens_nothing_still_uploads(
+    browser: BrowserSession, site: str, tmp_path: Path
+) -> None:
+    """Item 745: files reach the field a button names with aria-controls (no click); a button that keeps moving is
+    clicked without waiting for it to hold still, and its chooser takes them; a button that opens nothing on a page
+    with one file field gives them to that field."""
+    cv: Path = _file(tmp_path / "cv.pdf")
+    view: PageView = await browser.open_url("upload2", f"{site}/upload-aria", True)
+    started: float = time.monotonic()
+    await browser.upload("upload2", ref_of(view.body, 'button "Choose resume"'), [str(cv)], True)
+    assert time.monotonic() - started < 3.0
+    assert "Resume: cv.pdf" in (await browser.read_text("upload2", None, 0, 2000)).text
+    view = await browser.snapshot("upload2", True)
+    await browser.upload("upload2", ref_of(view.body, 'button "Choose cover letter"'), [str(cv)], True)
+    assert "Cover: cv.pdf" in (await browser.read_text("upload2", None, 0, 2000)).text
+    view = await browser.open_url("upload2", f"{site}/upload-one", True)
+    await browser.upload("upload2", ref_of(view.body, 'button "Attach CV"'), [str(cv)], True)
+    assert "CV: cv.pdf" in (await browser.read_text("upload2", None, 0, 2000)).text
+    view = await browser.open_url("upload2", f"{site}/upload-leaves", True)
+    with pytest.raises(BrowserError, match="uploading the files failed"):
+        await browser.upload("upload2", ref_of(view.body, 'button "Next step"'), [str(cv)], True)
+    assert "CV: none" in (await browser.read_text("upload2", None, 0, 2000)).text
+    view = await browser.open_url("upload2", f"{site}/upload-covered", True)
+    with pytest.raises(BrowserError, match="uploading the files failed"):
+        await browser.upload("upload2", ref_of(view.body, 'button "Choose file"'), [str(cv)], True)
+    assert "Layer: untouched" in (await browser.read_text("upload2", None, 0, 2000)).text
 
 
 async def test_a_dialog_that_opens_during_a_wait_ends_it_and_one_that_brings_the_text_is_the_text(
