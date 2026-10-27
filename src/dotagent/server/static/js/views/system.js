@@ -856,8 +856,8 @@ function sizeOptions(context) {
   ];
 }
 
-/** Dot's default context size for a model (items 250 and 396): the most its window allows, unless [agent]
- * context_tokens sets one number for every model. */
+/** Dot's default context size for a model (items 250, 396 and 732): the most its window allows up to [agent]
+ * context_most_tokens, unless [agent] context_tokens sets one number for every model. */
 function defaultFacts(context) {
   if (context.configured !== null) {
     const cut = context.default < context.configured ? `; three quarters of what this model can take in cut it to ${tokens(context.default)}` : "";
@@ -865,6 +865,9 @@ function defaultFacts(context) {
   }
   if (context.ceiling === null) {
     return `${tokens(context.default)} tokens, as the model's service does not say how much it can take in. `;
+  }
+  if (context.most !== null && context.default === context.most && context.default < context.ceiling) {
+    return `${tokens(context.default)} tokens, Dot's working size for every model without a size of its own: a longer chat makes every step slower to answer. This model can take in up to ${tokens(context.ceiling)}. `;
   }
   return `The most this model can take in, ${tokens(context.default)} tokens, as for every model without a size of its own. `;
 }
@@ -910,7 +913,12 @@ function contextFacts(model) {
           : `${tokens(context.ceiling)} tokens, three quarters of what the model can take in: the rest is room for the reply and for the small error in Dot's count.`,
       ),
       el("dt", null, "Dot's default"),
-      el("dd", null, defaultFacts(context), el("span", { class: "faint" }, 'In the settings file: [agent] context_tokens, "most" or one number for every model.')),
+      el(
+        "dd",
+        null,
+        defaultFacts(context),
+        el("span", { class: "faint" }, 'In the settings file: [agent] context_tokens, "most" or one number for every model, and [agent] context_most_tokens, the most "most" gives.'),
+      ),
       el("dt", null, "Smallest size"),
       el("dd", null, `${tokens(context.floor)} tokens: a task's first step alone sends its instructions, its actions and the request.`),
     ),

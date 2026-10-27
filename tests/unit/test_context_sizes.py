@@ -11,6 +11,8 @@ from dotagent.config import AgentConfig, load_config, load_default_config
 from dotagent.config_edit import set_context_size, with_context_size
 from dotagent.core.errors import ConfigError
 from dotagent.llm.types import ModelInfo
+from dotagent.server.routes_system import _context_choice
+from dotagent.server.views import ContextChoice
 from dotagent.store.stats import ContextCall, InputBucket, ModelProfile, context_evidence
 
 # The packaged defaults: context_tokens "most", context_summarise_share 0.85, tool_output_chars 12 000.
@@ -50,8 +52,21 @@ def _profile() -> ModelProfile:
 
 
 def test_settings_offers_the_sizes_from_the_floor_to_three_quarters_of_the_window_besides_the_default() -> None:
-    # The default is the most, three quarters of the window (item 396): the others are the steps under it.
+    # The default is three quarters of the window up to 200,000 (items 396 and 732): the others are the steps from the
+    # floor and the most, three quarters of the window.
     assert context_choices(DEFAULTS, 1_000_000, None) == (
+        48_000,
+        64_000,
+        96_000,
+        128_000,
+        192_000,
+        256_000,
+        384_000,
+        512_000,
+        750_000,
+    )
+    # With [agent] context_most_tokens = 0 the default is the most, and the others are the steps under it.
+    assert context_choices(DEFAULTS.model_copy(update={"context_most_tokens": 0}), 1_000_000, None) == (
         48_000,
         64_000,
         96_000,
@@ -173,3 +188,16 @@ def test_the_evidence_of_a_models_runs_counts_its_steps_their_input_and_their_se
     assert [(bucket.above, bucket.up_to) for bucket in apart.buckets] == [(32_000, 64_000), (96_000, 192_000)]
     nothing = context_evidence(MODEL, 30, [], [], 0, 0)
     assert (nothing.steps, nothing.input_median, nothing.cached_share, nothing.buckets) == (0, None, None, ())
+
+
+def test_settings_are_told_the_bound_that_set_the_default_never_under_what_it_gives() -> None:
+    """Item 732: Settings › Models says the default is Dot's working size when the bound set it, with the bound as it
+    holds: one under 96,000 gives 96,000, and the page compares the default with that."""
+    window: ModelInfo = _info(1_000_000)
+    bounded: ContextChoice = _context_choice(DEFAULTS, window, None)
+    assert (bounded.default, bounded.most, bounded.ceiling) == (200_000, 200_000, 750_000)
+    low: ContextChoice = _context_choice(DEFAULTS.model_copy(update={"context_most_tokens": 50_000}), window, None)
+    assert (low.default, low.most, low.ceiling) == (96_000, 96_000, 750_000)
+    unbounded: ContextChoice = _context_choice(DEFAULTS.model_copy(update={"context_most_tokens": 0}), window, None)
+    assert (unbounded.default, unbounded.most) == (750_000, None)
+    assert _context_choice(NUMBERED, window, None).most is None

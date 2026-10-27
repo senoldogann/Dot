@@ -13,6 +13,7 @@ import pytest_asyncio
 from dotagent.agent.scaffold import (
     Scaffold,
     choose_tier,
+    most_bound,
     output_budget,
     reminder_due,
     require_room,
@@ -76,12 +77,19 @@ def test_the_budget_follows_a_small_window_and_the_tool_output_shrinks_with_it()
     # Tool output never shrinks below 2000 characters.
     tiny: Scaffold = scaffold_for(DEFAULTS, _info(8192), quiet, None)
     assert (tiny.context_tokens, tiny.tool_output_chars) == (6144, 2000)
-    # A large window gives a run three quarters of it (item 396), and none reported 96,000; the tool output keeps its
-    # most, and no window cut the budget.
-    for window, budget in ((128_000, 96_000), (1_048_576, 786_432), (None, 96_000)):
+    # A large window gives a run three quarters of it (item 396) up to [agent] context_most_tokens, 200,000 (item
+    # 732), and none reported 96,000; the tool output keeps its most, and no window cut the budget.
+    for window, budget in ((128_000, 96_000), (200_000, 150_000), (1_048_576, 200_000), (None, 96_000)):
         roomy: Scaffold = scaffold_for(DEFAULTS, _info(window), quiet, None)
         assert (roomy.context_tokens, roomy.tool_output_chars) == (budget, 12000)
         assert scaffold_event(roomy, DEFAULTS)["cut_to_window"] is False
+    # Without that bound, the most of the window; a bound under 96,000 gives 96,000, the budget the tool output is
+    # sized for, and says so.
+    whole: AgentConfig = DEFAULTS.model_copy(update={"context_most_tokens": 0})
+    assert scaffold_for(whole, _info(1_048_576), quiet, None).context_tokens == 786_432
+    assert (most_bound(DEFAULTS), most_bound(whole), most_bound(NUMBERED)) == (200_000, None, None)
+    low: AgentConfig = DEFAULTS.model_copy(update={"context_most_tokens": 50_000})
+    assert (most_bound(low), scaffold_for(low, _info(1_048_576), quiet, None).context_tokens) == (96_000, 96_000)
     # A number in [agent] context_tokens is every model's budget, and the small window cuts it as "most" is cut.
     assert scaffold_for(NUMBERED, _info(1_048_576), quiet, None).context_tokens == 96_000
     assert scaffold_event(scaffold_for(NUMBERED, _info(32768), quiet, None), NUMBERED) == scaffold_event(

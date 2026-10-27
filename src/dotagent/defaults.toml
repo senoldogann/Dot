@@ -248,6 +248,12 @@ tool_output_chars = 12000
 # if the tokens weigh more than the summaries. tool_output_chars is meant for a budget of 96000 (or of the number set
 # here), and shrinks in proportion when a window cuts a budget under that.
 context_tokens = "most"
+# While context_tokens is "most", the most a model gets without a size of its own (item 732); 0 leaves it the most its
+# window allows. Every step sends the whole conversation again, and a long one is slow to read: measured on DeepSeek
+# V4.1 Flash over 7 days of the owner's runs, the first token came after 2.4 s under 50,000 tokens, 4.2 s at 200,000
+# and 9 to 13 s past 400,000; 2,944 steps past 200,000 waited 144 minutes more than at 200,000. A model whose window
+# is smaller keeps three quarters of it; Settings › Models gives one model a larger size.
+context_most_tokens = 200000
 # Where in the budget the harness acts (item 87, after arXiv 2609.20804): past context_elide_share of the run's budget
 # older tool output is shortened; past context_summarise_share of the model's context size the older part of the run is
 # summarised into a note (a model whose window cuts the budget under that point summarises when its budget is full).

@@ -591,7 +591,7 @@ settles a task unless a message's words ask only to look). They are not kept in 
 Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
 next follow-up. Beside the send, a ring (**Chat size**) shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
-window, item 396); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows
+window up to 200 000, items 396 and 732); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows
 the figures, the point past which Dot summarizes the older part of the run, the model's window, and why the budget is
 smaller than the window (each step sends the model the whole run again, so a run kept within it is answered sooner and
 costs less) and where it is set (items 239 and 250): `[agent] context_tokens`, or the size chosen for the model in

@@ -277,6 +277,9 @@ class AgentConfig(FrozenModel):
     tool_output_chars: int = Field(ge=2000)
     # The context size of every model without one of its own in [models.context] (dotagent.agent.scaffold).
     context_tokens: ContextTokens
+    # While context_tokens is "most": the most a model gets without a size of its own (item 732); 0 leaves it the most
+    # its window allows.
+    context_most_tokens: int = Field(ge=0)
     # The harness lessons of arXiv 2609.20804 (item 87): past context_elide_share of the budget older tool output is
     # shortened, past context_summarise_share the older part of the run is summarised; plan_each_turn puts the open
     # plan at the end of the system prompt of every step.

@@ -1323,7 +1323,9 @@ class ContextChoice(FrozenModel):
     of its next run; ``chosen`` the size chosen for it, ``None`` when its runs have the default; ``default`` the budget
     it has without a choice: three quarters of its window while ``[agent] context_tokens`` is ``"most"`` (item 396),
     96,000 when its provider does not say its window, else ``configured``, cut to three quarters of its window when that
-    is less; ``configured`` the number ``[agent] context_tokens`` sets, ``None`` while it is ``"most"``; ``floor`` and
+    is less; ``configured`` the number ``[agent] context_tokens`` sets, ``None`` while it is ``"most"``; ``most`` the
+    bound ``[agent] context_most_tokens`` sets on "most" (item 732), never under 96,000, ``None`` while it is a number
+    or 0; ``floor`` and
     ``ceiling`` the least and the most it may be given (``ceiling`` is three quarters of its window, ``None`` when its
     provider does not say); ``sizes`` the sizes besides the default that it may be given, smallest first, none when its
     window allows none; ``summarise_at`` the estimated prompt past which its next run summarises its older part."""
@@ -1332,6 +1334,7 @@ class ContextChoice(FrozenModel):
     chosen: int | None
     default: int
     configured: int | None
+    most: int | None
     floor: int
     ceiling: int | None
     sizes: list[int]

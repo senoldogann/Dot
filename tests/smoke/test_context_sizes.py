@@ -54,9 +54,20 @@ _MODELS_TABLE: str = (
     f'[models]\nmain = "{SCRIPTED_MODEL}"\n# mine: keep this\nfast = "{SCRIPTED_MODEL}"\n'
     f'review = "{SCRIPTED_MODEL}"\nvision = "{_OPUS}"\n'
 )
-# Dot's default is the most of the window (item 396), then the smaller sizes.
-_SIZES: list[str] = ["", "48000", "64000", "96000", "128000", "192000", "256000", "384000", "512000"]
-_SIZE_TEXTS: list[str] = ["750k (default)", "48k", "64k", "96k", "128k", "192k", "256k", "384k", "512k"]
+# Dot's default is the most of the window up to 200,000 (items 396 and 732), then the other sizes up to the most.
+_SIZES: list[str] = ["", "48000", "64000", "96000", "128000", "192000", "256000", "384000", "512000", "750000"]
+_SIZE_TEXTS: list[str] = [
+    "200k (default)",
+    "48k",
+    "64k",
+    "96k",
+    "128k",
+    "192k",
+    "256k",
+    "384k",
+    "512k",
+    "750k (most)",
+]
 
 
 def _model(name: str, window: int, own: int | None, source: WindowSource, vision: bool) -> ModelInfo:
@@ -249,14 +260,15 @@ async def test_the_api_sets_a_models_context_size_in_the_file_and_for_its_next_r
         listed: JsonObject = await _listed(http, SCRIPTED_MODEL)
         assert (listed["context_length"], listed["window_source"]) == (1_000_000, "provider")
         assert listed["context"] == {
-            "tokens": 750_000,
+            "tokens": 200_000,
             "chosen": None,
-            "default": 750_000,
+            "default": 200_000,
             "configured": None,
+            "most": 200_000,
             "floor": 48_000,
             "ceiling": 750_000,
             "sizes": [int(size) for size in _SIZES[1:]],
-            "summarise_at": 637_500,
+            "summarise_at": 170_000,
         }
         # Below the floor, past three quarters of the window, and any size of a window that holds none: refused.
         for model, tokens in ((SCRIPTED_MODEL, 47_999), (SCRIPTED_MODEL, 750_001), (_TINY, 48_000)):
@@ -311,8 +323,8 @@ async def test_the_api_sets_a_models_context_size_in_the_file_and_for_its_next_r
         }
 
         # A run started after a choice has that size, and one started after it was taken out has Dot's default, the
-        # most of its window: a model with no steps in the history, so that the numbers above stay the scripted
-        # model's.
+        # most of its window up to 200,000 (item 732): a model with no steps in the history, so that the numbers above
+        # stay the scripted model's.
         opus: httpx.Response = await http.put("/api/models/context", json={"model": _OPUS, "tokens": 128_000})
         assert opus.status_code == 200, opus.text
         sized: JsonObject = await _run_scaffold(http, runtime, _OPUS)
@@ -320,7 +332,7 @@ async def test_the_api_sets_a_models_context_size_in_the_file_and_for_its_next_r
         unsized: httpx.Response = await http.put("/api/models/context", json={"model": _OPUS, "tokens": None})
         assert unsized.status_code == 200, unsized.text
         default: JsonObject = await _run_scaffold(http, runtime, _OPUS)
-        assert (default["chosen"], default["context_tokens"], default["summarise_at"]) == (None, 750_000, 637_500)
+        assert (default["chosen"], default["context_tokens"], default["summarise_at"]) == (None, 200_000, 170_000)
 
 
 async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_numbers(
@@ -386,8 +398,10 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                         "1,000,000 tokens. Ollama gives it for the model.",
                         "750,000 tokens, three quarters of what the model can take in: the rest is room for the reply "
                         "and for the small error in Dot's count.",
-                        "The most this model can take in, 750,000 tokens, as for every model without a size of its "
-                        'own. In the settings file: [agent] context_tokens, "most" or one number for every model.',
+                        "200,000 tokens, Dot's working size for every model without a size of its own: a longer chat "
+                        "makes every step slower to answer. This model can take in up to 750,000. In the settings "
+                        'file: [agent] context_tokens, "most" or one number for every model, and [agent] '
+                        'context_most_tokens, the most "most" gives.',
                         "48,000 tokens: a task's first step alone sends its instructions, its actions and the request.",
                     ]
                 )
@@ -425,7 +439,7 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                 await why.click()
                 await expect(row).to_have_count(0)
                 await page.close()
-            # Back to Dot's default: the key leaves the file and the next run has the most of the window.
+            # Back to Dot's default: the key leaves the file and the next run has the most of the window up to 200,000.
             page = await browser.new_page(viewport={"width": 1280, "height": 800})
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"{served}/#/settings/models")

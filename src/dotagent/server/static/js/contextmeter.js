@@ -69,7 +69,9 @@ export function createContextMeter({ frame }) {
             "p",
             { class: "context-meter-text" },
             "Each step makes the model read the whole chat again, so a shorter chat is answered sooner and costs less. ",
-            "The limit is three quarters of the most the model can take in. Settings › Models lets you set a size for a model.",
+            modelWindow !== null && budget < Math.round(modelWindow * 0.75)
+              ? `The limit, ${budget.toLocaleString("en-GB")}, is set below the most the model can take in: a longer chat makes every step slower to answer. Settings › Models lets you set a larger size for a model.`
+              : "The limit is three quarters of the most the model can take in. Settings › Models lets you set a size for a model.",
           )
         : el(
             "p",
