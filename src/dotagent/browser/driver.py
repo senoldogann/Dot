@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import re
+import time
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from dataclasses import dataclass
 from typing import Literal, NamedTuple
@@ -608,12 +609,32 @@ async def page_title(page: Page) -> str:
 
 
 async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:
+    """The document parsed, then quiet for ``quiet_ms`` (at most ``max_ms``). A tab whose page answers nothing at all
+    within ``timeout_ms`` is told apart from one still parsing (item 753): a page stuck in a script, or a Chrome that
+    stopped answering, was reported as a document not yet parsed. A page busy for a while (a heavy app starting on a
+    loaded Mac) has the whole ``timeout_ms`` to answer, as before; the parse has what is left of it."""
+    started: float = time.monotonic()
     try:
         async with asyncio.timeout(timeout_ms / 1000):
+            await page.evaluate("1")
+    except TimeoutError as error:
+        raise PlaywrightTimeoutError(
+            f"the tab did not answer within {timeout_ms / 1000:g} s: its page is stuck, or Chrome is overloaded. Close "
+            "this tab (browser_close_tab) and open the page in a new one"
+        ) from error
+    try:
+        async with asyncio.timeout(max(timeout_ms / 1000 - (time.monotonic() - started), 0.001)):
             await page.evaluate(_PARSED_SCRIPT)
     except TimeoutError as error:
         raise PlaywrightTimeoutError(f"the document was not parsed within {timeout_ms} ms") from error
-    await page.evaluate(_QUIET_SCRIPT, [quiet_ms, max_ms])
+    try:
+        # The script ends itself after max_ms; the bound is for a page that stops answering while it waits.
+        async with asyncio.timeout((max_ms + timeout_ms) / 1000):
+            await page.evaluate(_QUIET_SCRIPT, [quiet_ms, max_ms])
+    except TimeoutError as error:
+        raise PlaywrightTimeoutError(
+            f"the tab stopped answering while the page settled ({max_ms} ms at most)"
+        ) from error
 
 
 async def wait_dom_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:

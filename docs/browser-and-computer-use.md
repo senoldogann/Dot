@@ -306,13 +306,16 @@ Both modes share what follows.
   still there is logged as `consent_decline_failed` with the page's address, and why the banner could not be counted
   when it could not).
 - A conversation thread keeps at most `max_tabs` tabs open, and closes the tabs it is done with (item 696): a tab that
-  is not its current one once unused for `background_tab_idle_s` (300 s; 0 keeps it), while its run works as well;
-  when a run ends, the chat's background tabs, keeping the current one for a message that goes on from it until
-  `tab_idle_s`; and every tab of a helper's chat (a delegated run, an agent's) when it ends. `browser_close_tab`
-  without an index closes every tab of the chat but the current one. Only the chat's own tabs are closed: those of a
-  chat at work at the same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a
-  link or a page that opens a new tab) is the chat's, also when you opened it that way (a middle click in a tab of
-  Dot's in your Chrome). The current tab is told which closed.
+  is not its current one once unused for `background_tab_idle_s` (300 s; 0 keeps it), while its run works as well; when
+  a run ends, the chat's background tabs, keeping the current one for a message that goes on from it until `tab_idle_s`;
+  and every tab of a helper's chat (a delegated run, an agent's) when it ends. `browser_close_tab` without an index
+  closes every tab of the chat but the current one. Only the chat's own tabs are closed: those of a chat at work at the
+  same time, and a tab you opened yourself, are not. A tab opened from one of the chat's tabs (a link or a page that
+  opens a new tab) is the chat's, also when you opened it that way (a middle click in a tab of Dot's in your Chrome).
+  The current tab is told which closed. A tab whose page does not answer a script as simple as `1` within the navigation
+  timeout (`navigation_timeout_s`; a page stuck in a loop of its own, a Chrome too loaded to answer) fails saying so,
+  and that it is to be closed and the page opened in a new tab (item 753): it was told as a document not yet parsed. A
+  page busy for a while (a heavy app starting) has that whole time to answer.
 - `browser_upload` hands the files straight to the file field of the element it is given (item 704): the field itself,
   which sites move off the screen or put under an icon (a click on such a field waited eight seconds and failed), the
   one file field inside it, as in a label that wraps a hidden field, or (item 745) the field its label (`for`) or its
