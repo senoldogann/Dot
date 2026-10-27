@@ -136,7 +136,10 @@ note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama serve
 shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved later cannot change what
 runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and when asked,
 `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for `uv.lock`,
-cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). It exports the whole of
+cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). The advisories
+`desktop/src-tauri/.cargo/audit.toml` ignores are of crates that are not in the Mac build, the only one Dot makes
+(item 766: `zip`, which `tauri-plugin-updater` pulls for Windows alone), and `desktop/src-tauri/tests/mac_build.rs`
+fails the desktop checks the day one of them reaches it. It exports the whole of
 `uv.lock`, `dotagent-web-research` with it, since PyPI has it and the lock holds its hashes (item 623; while uv got it
 from its repository, item 583, it was left out, as `pip-audit --disable-pip` refuses a requirement with no hash).
 When something under
