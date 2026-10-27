@@ -4583,3 +4583,158 @@
 .initiative-idle {
   margin: var(--space-2) var(--space-4) 0;
 }
+
+/* ---------- Settings › Trading: a choice of three over what each means, the limits as rows of a number and its currency,
+   the products as chips, the key's form, the account's figures and the orders as rows. Nothing here is a table, so that a
+   phone's width holds it. ---------- */
+
+.trading-modes {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.trading-modes .hint {
+  margin: 0;
+}
+
+.trading-modes .hint strong {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.trading-modes + .trading-notice {
+  margin-top: var(--space-3);
+}
+
+.trading-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-control);
+  background: var(--warn-weak);
+  color: var(--warn);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.trading-notice .grow {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.trading-problem {
+  margin: var(--space-2) 0 0;
+  color: var(--bad);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  overflow-wrap: anywhere;
+}
+
+.trading-unit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.trading-amount {
+  width: 9rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.trading-amount[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+.trading-products {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.trading-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.trading-chip {
+  padding-block: 0;
+  padding-inline: var(--space-2) 0;
+}
+
+.trading-add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 24rem;
+}
+
+.trading-add .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.trading-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.trading-save .trading-problem {
+  margin: 0;
+}
+
+.trading-keyform {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  max-width: 40rem;
+}
+
+.trading-secret {
+  min-height: 6rem;
+}
+
+.trading-figure {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-md);
+  font-weight: var(--weight-label);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.trading-change.up {
+  color: var(--ok);
+}
+
+.trading-change.down {
+  color: var(--bad);
+}
+
+.trading-change.flat {
+  color: var(--muted);
+}
+
+.trading-order-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.trading-note {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  /* The limit's field is narrower, so that its row's text keeps room beside it. */
+  .trading-amount {
+    width: 7.5rem;
+  }
+}
