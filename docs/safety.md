@@ -246,9 +246,12 @@ trading tools, in every mode, `yolo`'s too, and no run can change them (a run's 
 Dot's other keys, below: [Trading](trading.md) says what bounds that); the `STOP` file stops every order. A `live`
 order, on your Coinbase account, carries `trade`: it waits for your yes in every mode but `yolo`, never the review
 model's or a rule's to answer, and Dot places it on your yes; a `yolo` run that read outside content has the review
-model check it (item 525). A `paper` order moves no money. The Coinbase key, which may view and trade and never
-transfer, is kept in your login Keychain; switching to live, raising a limit, allowing a product and saving a key are
-done on the Mac only, and a phone can always switch trading off.
+model check it (item 525). A `paper` order moves no money. An exit's sell (item 770), on the paper account only, is the
+one order no limit holds: Dot's daemon places it with no run once the bid reaches the stop or the target the buy named,
+and it sells what that buy bought; trading off or switched to live, the `STOP` file and Coinbase not taking orders of
+the product hold it, the exit open. On your Coinbase account Dot keeps no exit and sells nothing by itself. The Coinbase
+key, which may view and trade and never transfer, is kept in your login Keychain; switching to live, raising a limit,
+allowing a product and saving a key are done on the Mac only, and a phone can always switch trading off.
 
 **Decision order**, strictest first:
 

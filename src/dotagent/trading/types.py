@@ -89,6 +89,12 @@ class OrderRequest(FrozenModel):
     base_amount: float | None
     # Why the run trades, in its words (item 765): kept with the order, shown with it.
     reason: str = ""
+    # A buy's exit (item 770): the price at or under which Dot sells what it bought, and the one at or over which it
+    # takes the gain; watched by the daemon, not by a run (:mod:`dotagent.trading.watch`).
+    stop: float | None = None
+    target: float | None = None
+    # The exit a sell closes, when the watch places it: never held by the limits, as it lowers what is at stake.
+    closing: str | None = None
 
 
 class Fill(FrozenModel):

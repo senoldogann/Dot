@@ -90,6 +90,7 @@ from dotagent.store.models import (
     TodoRecord,
     TodoStatus,
     ToolStep,
+    TradingExitRecord,
     TradingOrderRecord,
     TrashedMemory,
     UnattendedCount,
@@ -254,6 +255,12 @@ CREATE TABLE IF NOT EXISTS trading_orders (
     run_id TEXT NOT NULL, exchange_id TEXT NOT NULL, note TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS trading_orders_ts ON trading_orders(mode, ts);
+CREATE TABLE IF NOT EXISTS trading_exits (
+    id TEXT PRIMARY KEY, mode TEXT NOT NULL, product TEXT NOT NULL, size REAL NOT NULL, stop REAL NOT NULL,
+    target REAL, ts REAL NOT NULL, order_id TEXT NOT NULL, run_id TEXT NOT NULL, status TEXT NOT NULL, closed_ts REAL,
+    sell_id TEXT NOT NULL, note TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS trading_exits_open ON trading_exits(status, mode, product);
 CREATE TABLE IF NOT EXISTS harness_versions (
     id TEXT PRIMARY KEY, parent_id TEXT, made_by TEXT NOT NULL, state TEXT NOT NULL, summary TEXT NOT NULL,
     habits TEXT NOT NULL, tool_guidance TEXT NOT NULL, notes TEXT NOT NULL, created_at REAL NOT NULL,
@@ -5962,6 +5969,43 @@ class Store:
             "SELECT * FROM trading_orders WHERE mode = ? AND ts > ? ORDER BY ts DESC LIMIT ?", (mode, since, limit)
         )
         return [TradingOrderRecord.model_validate(dict(row)) for row in rows]
+
+    @_writing
+    async def put_trading_exit(self, exit_: TradingExitRecord) -> None:
+        """Keep an exit as it stands now: a new one, or one whose stop, target, size or status changed."""
+        await self._db.execute(
+            "INSERT INTO trading_exits(id, mode, product, size, stop, target, ts, order_id, run_id, status, closed_ts, "
+            "sell_id, note) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
+            "size = excluded.size, stop = excluded.stop, target = excluded.target, status = excluded.status, "
+            "closed_ts = excluded.closed_ts, sell_id = excluded.sell_id, note = excluded.note",
+            (
+                exit_.id,
+                exit_.mode,
+                exit_.product,
+                exit_.size,
+                exit_.stop,
+                exit_.target,
+                exit_.ts,
+                exit_.order_id,
+                exit_.run_id,
+                exit_.status,
+                exit_.closed_ts,
+                exit_.sell_id,
+                exit_.note,
+            ),
+        )
+        await self._db.commit()
+
+    async def trading_exits(self, status: str, limit: int) -> list[TradingExitRecord]:
+        """The exits of ``status``, oldest first, ``limit`` at most."""
+        rows = await self._all("SELECT * FROM trading_exits WHERE status = ? ORDER BY ts LIMIT ?", (status, limit))
+        return [TradingExitRecord.model_validate(dict(row)) for row in rows]
+
+    async def get_trading_exit(self, exit_id: str) -> TradingExitRecord:
+        row: aiosqlite.Row | None = await self._one("SELECT * FROM trading_exits WHERE id = ?", (exit_id,))
+        if row is None:
+            raise NotFoundError("no such exit", {"exit_id": exit_id})
+        return TradingExitRecord.model_validate(dict(row))
 
     async def trading_traded_since(self, mode: str, since: float) -> float:
         """What the orders of ``mode`` after ``since`` were worth, but those that surely did nothing (``failed``)."""

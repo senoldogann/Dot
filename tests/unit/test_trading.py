@@ -219,6 +219,7 @@ async def test_a_live_order_is_money_to_the_policy_and_one_judged_for_paper_neve
         "product": "BTC-EUR",
         "side": "buy",
         "quote_amount": 10.0,
+        "stop_price": 49000.0,
         "reason": "The hour's candles closed above the SMA20 with RSI 55; a small buy, sold under 49,000.",
     }
     paper: PreparedCall = await order_tool.prepare(raw, ctx)
@@ -241,9 +242,12 @@ async def test_a_live_order_is_money_to_the_policy_and_one_judged_for_paper_neve
         await order_tool.prepare({"product": "BTC-EUR", "side": "buy", "quote_amount": 10.0}, ctx)
     with pytest.raises(ToolInputError):
         await order_tool.prepare({**raw, "reason": "ok" + " " * 30}, ctx)
-    # A sell must say how much; a buy says what to spend.
+    # A sell must say how much; a buy says what to spend, and where it is sold if wrong (item 770).
     with pytest.raises(ToolInputError):
         await order_tool.prepare({**raw, "quote_amount": None, "base_amount": 0.1}, ctx)
+    with pytest.raises(ToolInputError, match="a buy gives stop_price"):
+        await order_tool.prepare({**raw, "stop_price": None}, ctx)
+    assert "sold at 49000 or under" in paper.action.summary
 
 
 def test_a_live_order_is_asked_of_the_owner_in_every_mode_that_asks_and_dot_places_it_on_their_yes() -> None:
@@ -512,3 +516,449 @@ async def test_the_overview_stands_when_coinbases_sum_of_the_day_cannot_be_read(
     market = {tool.spec.name: tool for tool in build_trading_tools()}["trading_market"]
     shown: ToolResult = await (await market.prepare({}, ctx)).run(ctx)
     assert not shown.is_error and "BTC-EUR: bid 50000" in shown.text and "no change given" in shown.text
+
+
+# ----- exits (item 770) ------------------------------------------------------------------------------------------
+
+
+def _exit_buy(quote_amount: float = 20.0, stop: float = 49000.0, target: float | None = 52000.0) -> OrderRequest:
+    return OrderRequest(
+        product="BTC-EUR", side="buy", quote_amount=quote_amount, base_amount=None, reason="x" * 20, stop=stop,
+        target=target,
+    )  # fmt: skip
+
+
+async def test_a_buy_with_a_stop_is_watched_and_sold_at_its_stop_past_every_limit(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """Item 770: Dot's own reply to the owner named it: no stop existed, so a stop waited for the next hourly run. A
+    buy now carries one, kept as an exit, and the daemon's look sells at it, past one order's cap and the day's: a
+    stop a limit could hold would protect nothing."""
+    trading: Trading = _trading(store, TradingSettings(_config(max_order=25.0, max_day=25.0)), clock, tmp_path)
+    with pytest.raises(TradingRefused, match="the stop, 51000, must be under the bid"):
+        await trading.place(_exit_buy(stop=51000.0), "run_a", "paper")
+    with pytest.raises(TradingRefused, match="must be over the ask"):
+        await trading.place(_exit_buy(target=50000.0), "run_a", "paper")
+    bought: TradingOrderRecord = await trading.place(_exit_buy(quote_amount=25.0), "run_a", "paper")
+    (watched,) = await trading.open_exits()
+    assert (watched.size, watched.stop, watched.target, watched.order_id) == (bought.size, 49000.0, 52000.0, bought.id)
+    # Nothing reached: nothing sold.
+    assert await trading.check_exits() == []
+    # The price rises: what the buy holds is now worth more than one order may be, and the day's cap is used up.
+    _PRICES["BTC-EUR"] = ("51990.00", "52000.00", "51995.00")
+    try:
+        assert await trading.check_exits() == []
+        _PRICES["BTC-EUR"] = ("48900.00", "48910.00", "48905.00")
+        (end,) = await trading.check_exits()
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+    assert end.exit.status == "stopped" and end.order is not None and end.order.side == "sell"
+    assert end.order.size == bought.size and end.order.price == 48900.0
+    assert end.order.note.startswith(f"Exit {watched.id}: the bid 48900 reached its stop 49000")
+    assert await trading.open_exits() == []
+    assert [h.currency for h in (await trading.portfolio()).holdings] == ["EUR"]
+
+
+async def test_a_target_takes_the_gain_and_a_sell_by_hand_takes_from_the_exits(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    trading: Trading = _trading(store, TradingSettings(_config()), clock, tmp_path)
+    first: TradingOrderRecord = await trading.place(_exit_buy(), "run_a", "paper")
+    second: TradingOrderRecord = await trading.place(_exit_buy(), "run_a", "paper")
+    # A sell by hand of half the first takes from the oldest exit; selling the rest of it closes it.
+    await trading.place(
+        OrderRequest(product="BTC-EUR", side="sell", quote_amount=None, base_amount=first.size / 2, reason="x" * 20),
+        "run_a",
+        "paper",
+    )
+    older, newer = await trading.open_exits()
+    assert older.size == pytest.approx(first.size / 2) and newer.size == pytest.approx(second.size)
+    await trading.place(
+        OrderRequest(product="BTC-EUR", side="sell", quote_amount=None, base_amount=first.size / 2, reason="x" * 20),
+        "run_a",
+        "paper",
+    )
+    (left,) = await trading.open_exits()
+    assert left.order_id == second.id
+    _PRICES["BTC-EUR"] = ("52100.00", "52110.00", "52105.00")
+    try:
+        (end,) = await trading.check_exits()
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+    assert end.exit.status == "targeted" and end.order is not None and end.order.price == 52100.0
+
+
+async def test_an_exit_is_never_sold_on_another_account_nor_while_the_stop_is_engaged(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """While the other account is in use, an exit waits, open, and sells once its own is in use again (the pre-push
+    review of item 770: marked stale, a live stop died for good when the owner switched to paper and back)."""
+    settings: TradingSettings = TradingSettings(_config())
+    trading: Trading = _trading(store, settings, clock, tmp_path)
+    await trading.place(_exit_buy(), "run_a", "paper")
+    _PRICES["BTC-EUR"] = ("48000.00", "48010.00", "48005.00")
+    try:
+        # The emergency stop: nothing is sold, and the exit stays watched for when it is released.
+        (tmp_path / "STOP").write_text("")
+        assert await trading.check_exits() == []
+        (still,) = await trading.open_exits()
+        assert still.status == "open"
+        (tmp_path / "STOP").unlink()
+        # The account switched to live: the paper exit is not sold there; it waits.
+        settings.value = settings.value.model_copy(update={"mode": "live"})
+        assert await trading.check_exits() == []
+        assert (await store.get_trading_exit(still.id)).status == "open"
+        assert await store.trading_orders("live", 0.0, 10) == []
+        # Back on paper, it sells.
+        settings.value = settings.value.model_copy(update={"mode": "paper"})
+        (end,) = await trading.check_exits()
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+    assert end.exit.status == "stopped" and end.order is not None and end.order.mode == "paper"
+
+
+async def test_an_exit_is_moved_within_the_prices_now(store: Store, clock: _Clock, tmp_path: Path) -> None:
+    trading: Trading = _trading(store, TradingSettings(_config()), clock, tmp_path)
+    await trading.place(_exit_buy(target=None), "run_a", "paper")
+    (watched,) = await trading.open_exits()
+    moved = await trading.move_exit(watched.id, 49500.0, 53000.0)
+    assert (moved.stop, moved.target) == (49500.0, 53000.0)
+    with pytest.raises(TradingRefused, match="must be under the bid"):
+        await trading.move_exit(watched.id, 50500.0, None)
+    (kept,) = await trading.open_exits()
+    assert kept.stop == 49500.0
+
+
+async def test_an_exit_whose_sell_never_went_out_stays_open_and_the_others_are_looked_at(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """The pre-push review of item 770: an error before the sell went out (Coinbase's product out of reach) failed the
+    exit for good, the position left without its stop, and a price that could not be read ended the look at the other
+    exits. Only a sell kept as sent, perhaps, is not tried again; one held at every look for five minutes is told."""
+    from dotagent.trading.market import MarketError
+    from dotagent.trading.service import HELD_TOLD_S
+
+    trading: Trading = _trading(store, TradingSettings(_config(max_day=500.0)), clock, tmp_path)
+    _PRICES["ETH-EUR"] = ("2000.00", "2001.00", "2000.50")
+    real_rules = trading.market.rules
+    down: list[bool] = [True]
+
+    async def rules(product: str) -> ProductRules:
+        if product == "BTC-EUR" and down[0]:
+            raise MarketError("Coinbase's market data could not be reached", {"error": "ConnectError"})
+        return await real_rules(product)
+
+    try:
+        await trading.place(_exit_buy(), "run_a", "paper")
+        await trading.place(
+            OrderRequest(product="ETH-EUR", side="buy", quote_amount=20.0, base_amount=None, reason="x" * 20,
+                         stop=1950.0),
+            "run_a",
+            "paper",
+        )  # fmt: skip
+        trading.market.rules = rules  # type: ignore[method-assign]
+        _PRICES["BTC-EUR"] = ("48000.00", "48010.00", "48005.00")
+        _PRICES["ETH-EUR"] = ("1900.00", "1901.00", "1900.50")
+        # BTC's sell cannot go out: its exit stays open, and ETH's is sold all the same.
+        (eth,) = await trading.check_exits()
+        assert (eth.exit.product, eth.exit.status) == ("ETH-EUR", "stopped")
+        (btc,) = await trading.open_exits()
+        assert btc.product == "BTC-EUR"
+        # Held at every look for five minutes, it is told, once.
+        clock.now += HELD_TOLD_S
+        (held,) = await trading.check_exits()
+        assert held.exit.id == btc.id and "could not go out" in held.held
+        assert await trading.check_exits() == []
+        down[0] = False
+        (sold,) = await trading.check_exits()
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+        _PRICES.pop("ETH-EUR", None)
+    assert sold.exit.status == "stopped" and sold.order is not None and sold.order.size == btc.size
+
+
+async def test_a_live_buy_keeps_no_exit_and_says_its_stop_is_not_watched_yet(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """Item 770 keeps exits on the paper account only: what Dot sells by itself on the owner's Coinbase account is a
+    later item's, reviewed on its own (the owner's choice after eight pre-push reviews). A live buy's question and its
+    answer say so."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    from dotagent.tools.base import PreparedCall, ToolResult
+    from dotagent.tools.context import ToolContext
+    from dotagent.tools.trading import build_trading_tools
+    from dotagent.trading.types import Fill, Quote
+
+    class _Live:
+        async def balances(self) -> dict[str, float]:
+            return {"EUR": 100.0}
+
+        async def execute(self, order_id: str, request: OrderRequest, quote: Quote, rules: ProductRules) -> Fill:
+            return Fill(
+                order_id="cb", product=request.product, side=request.side, size=0.0002, price=quote.ask, fee=0.0,
+                ts=clock(),
+            )  # fmt: skip
+
+    trading: Trading = _trading(store, TradingSettings(_config(mode="live")), clock, tmp_path)
+    trading.live = _Live
+    ctx: ToolContext = cast(ToolContext, SimpleNamespace(runtime=SimpleNamespace(trading=trading), run_id="run_a"))
+    order_tool = {tool.spec.name: tool for tool in build_trading_tools()}["trading_order"]
+    raw: dict[str, object] = {
+        "product": "BTC-EUR", "side": "buy", "quote_amount": 10.0, "stop_price": 49000.0,
+        "reason": "The hour's candles closed above the SMA20; a small buy, wrong under 49,000.",
+    }  # fmt: skip
+    prepared: PreparedCall = await order_tool.prepare(raw, ctx)
+    assert "Dot does not sell at it on your Coinbase account yet" in prepared.action.summary
+    placed: ToolResult = await prepared.run(ctx)
+    assert not placed.is_error and "Dot does not watch stops on the owner's Coinbase account yet" in placed.text
+    assert await trading.open_exits() == [] and await store.trading_exits("open", 10) == []
+
+
+async def test_an_exit_sells_what_it_holds_when_its_turn_comes_and_starting_paper_again_closes_them(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """Found while making item 772: an exit is read before its sell waits for the lock, and a sell by hand in the
+    meantime took from it or closed it, so the exit sold what was no longer its own; and the paper account started
+    again kept its exits open, to sell a later buy's holding at an old stop."""
+    from dotagent.trading.types import Quote
+
+    trading: Trading = _trading(store, TradingSettings(_config(max_day=500.0)), clock, tmp_path)
+    bought: TradingOrderRecord = await trading.place(_exit_buy(), "run_a", "paper")
+    (read,) = await trading.open_exits()
+    half: OrderRequest = OrderRequest(
+        product="BTC-EUR", side="sell", quote_amount=None, base_amount=bought.size / 2, reason="x" * 20
+    )
+    await trading.place(half, "run_a", "paper")
+    fallen: Quote = Quote(product="BTC-EUR", bid=48900.0, ask=48910.0, last=48905.0, ts=clock())
+    taken = await trading._close(read.id, fallen)
+    assert taken is not None and taken.order is not None and taken.order.size == pytest.approx(bought.size / 2)
+    assert taken.exit.status == "stopped" and taken.exit.size == pytest.approx(bought.size / 2)
+    # Closed by a sell by hand before its turn came: nothing is sold, nothing is told, and it stays closed.
+    again: TradingOrderRecord = await trading.place(_exit_buy(), "run_a", "paper")
+    (fresh,) = await trading.open_exits()
+    whole: OrderRequest = OrderRequest(
+        product="BTC-EUR", side="sell", quote_amount=None, base_amount=again.size, reason="x" * 20
+    )
+    await trading.place(whole, "run_a", "paper")
+    placed: int = len(await store.trading_orders("paper", 0.0, 50))
+    assert await trading._close(fresh.id, fallen) is None
+    assert len(await store.trading_orders("paper", 0.0, 50)) == placed
+    assert (await store.get_trading_exit(fresh.id)).status == "closed"
+    # Starting the paper account again closes its exits: a later buy's holding is not theirs to sell.
+    await trading.place(_exit_buy(stop=49500.0), "run_a", "paper")
+    await trading.reset_paper()
+    assert await trading.open_exits() == []
+    clock.now += 1.0
+    await trading.place(_exit_buy(stop=48000.0), "run_a", "paper")
+    _PRICES["BTC-EUR"] = ("49000.00", "49010.00", "49005.00")
+    try:
+        assert await trading.check_exits() == []
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+    (kept,) = await trading.open_exits()
+    assert kept.stop == 48000.0
+
+
+async def test_a_move_and_a_sell_of_one_exit_wait_for_each_other_and_a_sold_exit_is_never_reopened(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """The pre-push review of item 770: a move read the exit, waited for the prices, and wrote it back over the sell
+    the watch made meanwhile, the exit open again to sell a later buy's holding. Every change of an exit is made under
+    the order lock, from the exit as it stands then."""
+    import asyncio
+
+    from dotagent.trading.types import Quote
+
+    trading: Trading = _trading(store, TradingSettings(_config()), clock, tmp_path)
+    await trading.place(_exit_buy(target=None), "run_a", "paper")
+    (watched,) = await trading.open_exits()
+    real_quote = trading.market.quote
+    gate: asyncio.Event = asyncio.Event()
+    # Set once the quote that waits for the gate is read, by whoever holds the lock then.
+    entered: asyncio.Event = asyncio.Event()
+    calls: list[int] = [0, 1]  # the quotes read so far, and which of them waits for the gate
+
+    async def slow_quote(product: str) -> Quote:
+        calls[0] += 1
+        if calls[0] == calls[1]:
+            entered.set()
+            await gate.wait()
+        return await real_quote(product)
+
+    trading.market.quote = slow_quote  # type: ignore[method-assign]
+    _PRICES["BTC-EUR"] = ("48000.00", "48010.00", "48005.00")
+    try:
+        # The move reads the prices first; the watch's sell waits for it, then finds the stop moved under the bid.
+        moving = asyncio.create_task(trading.move_exit(watched.id, 47000.0, None))
+        await entered.wait()
+        looking = asyncio.create_task(trading.check_exits())
+        await asyncio.sleep(0.01)
+        gate.set()
+        assert (await moving).stop == 47000.0
+        assert await looking == []
+        assert len(await store.trading_orders("paper", 0.0, 10)) == 1
+        # The sell first, its prices read inside the lock: the move waits for it, then finds the exit sold.
+        _PRICES["BTC-EUR"] = ("46000.00", "46010.00", "46005.00")
+        gate.clear()
+        entered.clear()
+        calls[:] = [0, 2]
+        looking = asyncio.create_task(trading.check_exits())
+        # The sell holds the lock, waiting for its prices, before the move is asked for.
+        await entered.wait()
+        moving = asyncio.create_task(trading.move_exit(watched.id, 45000.0, None))
+        await asyncio.sleep(0.01)
+        gate.set()
+        (end,) = await looking
+        with pytest.raises(TradingRefused, match="is not one watched now"):
+            await moving
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+    assert end.exit.status == "stopped" and end.exit.stop == 47000.0
+    assert (await store.get_trading_exit(watched.id)).status == "stopped"
+
+
+async def test_an_exit_whose_sell_is_held_by_what_holds_every_order_stays_open_and_sells_after(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """The pre-push review of item 770: the emergency stop engaged, trading switched off or the account switched while
+    the watch read the prices failed the exit for good, never watched again once the owner released the stop. Those,
+    and Coinbase not taking orders of the product, hold the sell: the exit stays open and sells at a later look."""
+    from dotagent.trading.types import Quote
+
+    settings: TradingSettings = TradingSettings(_config())
+    trading: Trading = _trading(store, settings, clock, tmp_path)
+    await trading.place(_exit_buy(), "run_a", "paper")
+    (watched,) = await trading.open_exits()
+    real_quote = trading.market.quote
+    real_rules = trading.market.rules
+    meanwhile: list[object] = []
+
+    async def quote_then(product: str) -> Quote:
+        # What the owner does while the watch reads the prices, before the sell's turn.
+        for act in meanwhile:
+            if callable(act):
+                act()
+        meanwhile.clear()
+        return await real_quote(product)
+
+    trading.market.quote = quote_then  # type: ignore[method-assign]
+    _PRICES["BTC-EUR"] = ("48000.00", "48010.00", "48005.00")
+    try:
+        for held_by in (
+            lambda: (tmp_path / "STOP").write_text(""),
+            lambda: setattr(settings, "value", settings.value.model_copy(update={"mode": "off"})),
+            # The account switched: held now, and waiting while the other account is in use (another test).
+            lambda: setattr(settings, "value", settings.value.model_copy(update={"mode": "live"})),
+        ):
+            meanwhile.append(held_by)
+            assert await trading.check_exits() == []
+            assert (await store.get_trading_exit(watched.id)).status == "open"
+            (tmp_path / "STOP").unlink(missing_ok=True)
+            settings.value = settings.value.model_copy(update={"mode": "paper"})
+        # Coinbase not taking orders of the product now: held too.
+        halted: ProductRules = (await real_rules("BTC-EUR")).model_copy(update={"trading": False})
+
+        async def halted_rules(product: str) -> ProductRules:
+            return halted
+
+        trading.market.rules = halted_rules  # type: ignore[method-assign]
+        assert await trading.check_exits() == []
+        assert (await store.get_trading_exit(watched.id)).status == "open"
+        trading.market.rules = real_rules  # type: ignore[method-assign]
+        # Nothing holds it any more: it sells.
+        (end,) = await trading.check_exits()
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+    assert end.exit.status == "stopped" and end.order is not None and end.order.side == "sell"
+
+
+async def test_the_watch_tells_a_held_exit_once_it_has_lasted_five_minutes(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """The pre-push review of item 770: a sell that could not go out was tried again in silence, a stop passed and
+    nothing sold for hours with no word to the owner. Held at every look for five minutes, it is told once."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    from dotagent.runtime import Runtime
+    from dotagent.trading.service import HELD_TOLD_S
+    from dotagent.trading.watch import TradingWatch
+
+    trading: Trading = _trading(store, TradingSettings(_config()), clock, tmp_path)
+    await trading.place(_exit_buy(), "run_a", "paper")
+    told: list[dict[str, object]] = []
+
+    class _Bus:
+        async def emit(self, run_id: str, kind: str, data: dict[str, object], persist: bool) -> None:
+            told.append({"kind": kind, **data})
+
+    real_rules = trading.market.rules
+    halted: ProductRules = (await real_rules("BTC-EUR")).model_copy(update={"trading": False})
+
+    async def halted_rules(product: str) -> ProductRules:
+        return halted
+
+    trading.market.rules = halted_rules  # type: ignore[method-assign]
+    watch: TradingWatch = TradingWatch(cast(Runtime, SimpleNamespace(trading=trading, bus=_Bus())))
+    _PRICES["BTC-EUR"] = ("48000.00", "48010.00", "48005.00")
+    try:
+        for second in range(0, int(HELD_TOLD_S) + 120, 15):
+            clock.now += 15.0
+            await watch.tick(1000.0 + second)
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+    (message,) = told
+    assert message["title"] == "Exit of BTC-EUR cannot sell yet"
+    assert "Coinbase does not take orders of BTC-EUR now" in str(message["text"])
+    # Released, then held again for as long: told again.
+    trading.market.rules = real_rules  # type: ignore[method-assign]
+    _PRICES["BTC-EUR"] = ("49500.00", "49510.00", "49505.00")
+    try:
+        clock.now += 15.0
+        await watch.tick(5000.0)
+        trading.market.rules = halted_rules  # type: ignore[method-assign]
+        _PRICES["BTC-EUR"] = ("48000.00", "48010.00", "48005.00")
+        for second in range(0, int(HELD_TOLD_S) + 120, 15):
+            clock.now += 15.0
+            await watch.tick(6000.0 + second)
+        assert len(told) == 2
+        # The emergency stop engaged and released: held anew, and told anew once that lasts.
+        (tmp_path / "STOP").write_text("")
+        clock.now += 15.0
+        await watch.tick(7000.0)
+        (tmp_path / "STOP").unlink()
+        for second in range(0, int(HELD_TOLD_S) + 120, 15):
+            clock.now += 15.0
+            await watch.tick(8000.0 + second)
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+    assert len(told) == 3
+
+
+async def test_the_watch_tells_the_owner_what_an_exit_came_to(store: Store, clock: _Clock, tmp_path: Path) -> None:
+    from types import SimpleNamespace
+    from typing import cast
+
+    from dotagent.runtime import Runtime
+    from dotagent.trading.watch import TradingWatch
+
+    trading: Trading = _trading(store, TradingSettings(_config()), clock, tmp_path)
+    await trading.place(_exit_buy(), "run_a", "paper")
+    told: list[dict[str, object]] = []
+
+    class _Bus:
+        async def emit(self, run_id: str, kind: str, data: dict[str, object], persist: bool) -> None:
+            told.append({"kind": kind, **data})
+
+    watch: TradingWatch = TradingWatch(cast(Runtime, SimpleNamespace(trading=trading, bus=_Bus())))
+    _PRICES["BTC-EUR"] = ("48000.00", "48010.00", "48005.00")
+    try:
+        await watch.tick(1000.0)
+        # The next tick comes before its time: nothing is looked at.
+        await watch.tick(1001.0)
+    finally:
+        _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
+    (message,) = told
+    assert message["title"] == "Stop reached: BTC-EUR sold" and "on paper" in str(message["text"])

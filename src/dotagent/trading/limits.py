@@ -23,13 +23,24 @@ def refusal(
     cash: float,
     held: float,
     held_value: float,
+    closing: bool = False,
 ) -> str | None:
     """Why the order of ``side`` worth ``notional`` (in the quote) of ``product`` may not be placed, or ``None`` when it
     may. ``cash`` is the quote the account holds, ``held`` the base of ``product`` it holds and ``held_value`` what that
-    is worth at the bid. A sell is never held back by the day's loss or the position: it lowers what is at stake."""
+    is worth at the bid. A sell is never held back by the day's loss or the position: it lowers what is at stake. The
+    sell of an exit (``closing``, item 770) is held back by none of the limits: a stop that one order's cap or the day's
+    could keep from selling would protect nothing; the product need not be allowed any more either."""
     quote: str = config.quote
     if config.mode == "off":
         return "trading is off ([trading] mode); only the owner switches it on, in Settings › Trading"
+    if closing:
+        if side != "sell":
+            return "an exit only sells"
+        if not rules.trading:
+            return f"Coinbase does not take orders of {product} now"
+        if held <= 0 or not notional > 0:
+            return f"the account holds no {product.split('-')[0]} to sell"
+        return None
     if product not in config.products:
         return f"{product} is not among the products the owner allows ({', '.join(config.products)})"
     if not rules.trading:
