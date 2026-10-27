@@ -6,6 +6,7 @@ minutes between the two, refuses a step whose target is no longer the one that w
 that moves the pointer or presses keys.
 """
 
+import threading
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -172,8 +173,22 @@ def check_stop(config: DesktopConfig, failsafe_file: Path) -> None:
         raise FailSafeTriggered("the pointer is in the top-left corner of the screen", {})
 
 
+# The stop of the call the desktop's worker thread is running (item 747): set when the run that made the call stopped
+# or its tool timed out, which cancels the call's coroutine but not the thread, so that a long text typed key by key, a
+# drag or a scroll stops there instead of going on into whatever has the keyboard.
+_call_stop: threading.local = threading.local()
+
+
+def set_call_stop(stop: threading.Event | None) -> None:
+    """Name the stop of the call the current (worker) thread runs; ``None`` once it is done."""
+    _call_stop.event = stop
+
+
 def check_failsafe(env: StepEnv) -> None:
     check_stop(env.config, env.failsafe_file)
+    stop: threading.Event | None = getattr(_call_stop, "event", None)
+    if stop is not None and stop.is_set():
+        raise FailSafeTriggered("the run stopped, or its step ran out of time, while the step was under way", {})
 
 
 def check_drift(env: StepEnv) -> None:

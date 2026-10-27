@@ -1144,7 +1144,8 @@ event and approval.
 - with `[desktop] failsafe_corner = true` (the default), moving the pointer into the top-left corner of the screen
   aborts the desktop step in progress, and Dot never clicks that corner: a text typed key by key, a scroll and a drag
   look at the corner and at the `STOP` file between their events, while no key or button is held down, and end there
-  (item 683)
+  (item 683); they look too at whether the run that asked for them stopped, or its tool ran out of time, and end there
+  as well: stopping a run cancels its call to the desktop, but not the thread that types, which went on before item 747
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is
   moving the mouse, the rest of the batch is not run (a check that was written but called nowhere before item 683). A
   step whose review took longer than a second (your answer, which you may give with the mouse, or the review model's)
