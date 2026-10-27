@@ -26,6 +26,10 @@ _PRICES: dict[str, tuple[str, str, str]] = {"BTC-EUR": ("50000.00", "50010.00", 
 def _market_answer(request: httpx.Request) -> httpx.Response:
     path: str = request.url.path
     product: str = path.split("/products/")[1].split("/")[0]
+    if product not in _PRICES:
+        # A product Coinbase is down for, against one it does not have.
+        status, body = (503, b"unavailable") if product.startswith("DOWN") else (404, b'{"error": "NOT_FOUND"}')
+        return httpx.Response(status, content=body)
     bid, ask, last = _PRICES[product]
     if path.endswith("/ticker"):
         body: dict[str, object] = {"trades": [{"price": last}], "best_bid": bid, "best_ask": ask}
@@ -202,6 +206,7 @@ async def test_a_live_order_is_money_to_the_policy_and_one_judged_for_paper_neve
     from types import SimpleNamespace
     from typing import cast
 
+    from dotagent.core.errors import ToolInputError
     from dotagent.tools.base import PreparedCall, ToolResult
     from dotagent.tools.context import ToolContext
     from dotagent.tools.trading import build_trading_tools
@@ -210,7 +215,12 @@ async def test_a_live_order_is_money_to_the_policy_and_one_judged_for_paper_neve
     trading: Trading = _trading(store, settings, clock, tmp_path)
     ctx: ToolContext = cast(ToolContext, SimpleNamespace(runtime=SimpleNamespace(trading=trading), run_id="run_a"))
     order_tool = {tool.spec.name: tool for tool in build_trading_tools()}["trading_order"]
-    raw: dict[str, object] = {"product": "BTC-EUR", "side": "buy", "quote_amount": 10.0}
+    raw: dict[str, object] = {
+        "product": "BTC-EUR",
+        "side": "buy",
+        "quote_amount": 10.0,
+        "reason": "The hour's candles closed above the SMA20 with RSI 55; a small buy, sold under 49,000.",
+    }
     paper: PreparedCall = await order_tool.prepare(raw, ctx)
     assert (paper.action.flags, paper.action.risk) == ((), "low")
     settings.value = settings.value.model_copy(update={"mode": "live"})
@@ -223,11 +233,17 @@ async def test_a_live_order_is_money_to_the_policy_and_one_judged_for_paper_neve
     assert await store.trading_orders("paper", 0.0, 10) == [] and await store.trading_orders("live", 0.0, 10) == []
     placed: ToolResult = await paper.run(ctx)
     assert not placed.is_error and "paper account" in placed.text, placed.text
-    # A sell must say how much; a buy says what to spend.
-    from dotagent.core.errors import ToolInputError
-
+    # The reason is kept with the order and shown with it (item 765).
+    (kept,) = await store.trading_orders("paper", 0.0, 10)
+    assert kept.note.startswith("The hour's candles closed above the SMA20")
+    # An order with no reason, or with spaces for one, is not placed.
     with pytest.raises(ToolInputError):
-        await order_tool.prepare({"product": "BTC-EUR", "side": "buy", "base_amount": 0.1}, ctx)
+        await order_tool.prepare({"product": "BTC-EUR", "side": "buy", "quote_amount": 10.0}, ctx)
+    with pytest.raises(ToolInputError):
+        await order_tool.prepare({**raw, "reason": "ok" + " " * 30}, ctx)
+    # A sell must say how much; a buy says what to spend.
+    with pytest.raises(ToolInputError):
+        await order_tool.prepare({**raw, "quote_amount": None, "base_amount": 0.1}, ctx)
 
 
 def test_a_live_order_is_asked_of_the_owner_in_every_mode_that_asks_and_dot_places_it_on_their_yes() -> None:
@@ -325,3 +341,174 @@ async def test_an_order_is_judged_against_the_account_it_goes_to_whatever_is_swi
             OrderRequest(product="BTC-EUR", side="buy", quote_amount=10.0, base_amount=None), "run_a", "live"
         )
     assert _Live.placed == 0
+
+
+async def test_every_currency_held_is_priced_and_a_days_start_waits_for_a_whole_look(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """The pre-push review of item 764: the account was worth only its allowed products, so a product allowed while it
+    was already held read as a gain of the day before, which loosened the day's loss limit by its worth. Every holding
+    is priced now (item 765); one Coinbase has no price of is said and counted as nothing, and no day starts from a
+    worth with a hole in it."""
+    from dotagent.trading.types import Fill, ProductRules, Quote
+
+    class _Held:
+        async def balances(self) -> dict[str, float]:
+            return {"EUR": 100.0, "BTC": 0.001, "DOGE": 5.0, "DOWN": 1.0}
+
+        async def execute(self, order_id: str, request: OrderRequest, quote: Quote, rules: ProductRules) -> Fill:
+            return Fill(
+                order_id="cb", product=request.product, side=request.side, size=0.005, price=quote.ask, fee=0.0,
+                ts=clock(),
+            )  # fmt: skip
+
+    settings: TradingSettings = TradingSettings(_config(mode="live", products=["ETH-EUR"]))
+    trading: Trading = _trading(store, settings, clock, tmp_path)
+    trading.live = _Held
+    # ETH, the allowed product, has a price; BTC has one though it is not allowed; DOGE has none in the stand-in.
+    _PRICES["ETH-EUR"] = ("2000.00", "2001.00", "2000.50")
+    try:
+        await _priced_holdings(store, trading)
+    finally:
+        _PRICES.pop("ETH-EUR", None)
+        _PRICES.pop("DOWN-EUR", None)
+
+
+async def _priced_holdings(store: Store, trading: Trading) -> None:
+    seen: Portfolio = await trading.portfolio()
+    # BTC is priced though it is not allowed; DOGE has no EUR product in the stand-in, which is no hole in the worth;
+    # DOWN's price could not be read this time, which is one.
+    assert seen.equity == pytest.approx(100.0 + 0.001 * 50000.0)
+    assert (seen.unpriceable, seen.unpriced) == (("DOGE",), ("DOWN",))
+    assert await store.kv_get(f"trading_day:live:{trading.day_start()[0]}") is None
+    # Until a whole look, today's loss cannot be counted: no buy is placed (the pre-push review: a start taken from
+    # each look read every loss as none), a sell still is.
+    assert seen.day_start_known is False
+    with pytest.raises(TradingRefused, match="no buy until it can"):
+        await trading.place(
+            OrderRequest(product="ETH-EUR", side="buy", quote_amount=10.0, base_amount=None), "run_a", "live"
+        )
+    _PRICES["DOWN-EUR"] = ("1.00", "1.10", "1.00")
+    whole: Portfolio = await trading.portfolio()
+    # DOGE is still worth nothing, every look alike: that is no hole, and the day starts.
+    assert (whole.unpriceable, whole.unpriced) == (("DOGE",), ()) and whole.day_start_known
+    assert whole.equity == pytest.approx(150.0 + 1.0)
+    assert await store.kv_get(f"trading_day:live:{trading.day_start()[0]}") == repr(whole.equity)
+    await trading.place(
+        OrderRequest(product="ETH-EUR", side="buy", quote_amount=10.0, base_amount=None, reason="x" * 20),
+        "run_a",
+        "live",
+    )
+
+
+async def test_candles_asked_for_with_no_product_get_the_overview_and_what_the_candles_need(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """The first paper shift asked for candles with a count and no product four times, getting the overview each time
+    (item 765): the overview now says what the candles need."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    from dotagent.tools.base import ToolResult
+    from dotagent.tools.context import ToolContext
+    from dotagent.tools.trading import build_trading_tools
+
+    trading: Trading = _trading(store, TradingSettings(_config(products=["BTC-EUR"])), clock, tmp_path)
+    ctx: ToolContext = cast(ToolContext, SimpleNamespace(runtime=SimpleNamespace(trading=trading), run_id="run_a"))
+    market = {tool.spec.name: tool for tool in build_trading_tools()}["trading_market"]
+    shown: ToolResult = await (await market.prepare({"count": 30}, ctx)).run(ctx)
+    assert "BTC-EUR: bid 50000" in shown.text and "give product and granularity" in shown.text
+    with_product: ToolResult = await (await market.prepare({"product": "BTC-EUR", "count": 30}, ctx)).run(ctx)
+    assert "give product and granularity" in with_product.text
+    plain: ToolResult = await (await market.prepare({}, ctx)).run(ctx)
+    assert "give product and granularity" not in plain.text and "last 24 h" in plain.text
+
+
+async def test_currencies_past_the_priced_count_are_said_unpriced_and_the_quote_is_never_one(
+    store: Store, clock: _Clock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pre-push review of item 765: the currencies past the count were cut from the wrong list, so one of them was
+    priced at nothing without being said, and the quote currency could be reported unpriced."""
+    from dotagent.trading import service
+    from dotagent.trading.types import Fill, ProductRules, Quote
+
+    monkeypatch.setattr(service, "_PRICED_AT_MOST", 1)
+    _PRICES["ETH-EUR"] = ("2000.00", "2001.00", "2000.50")
+
+    class _Many:
+        async def balances(self) -> dict[str, float]:
+            return {"BTC": 0.001, "ETH": 1.0, "EUR": 100.0, "SOL": 2.0}
+
+        async def execute(self, order_id: str, request: OrderRequest, quote: Quote, rules: ProductRules) -> Fill:
+            raise AssertionError("not reached")
+
+    trading: Trading = _trading(store, TradingSettings(_config(mode="live")), clock, tmp_path)
+    trading.live = _Many
+    try:
+        seen: Portfolio = await trading.portfolio()
+    finally:
+        del _PRICES["ETH-EUR"]
+    assert seen.unpriced == ("ETH", "SOL") and seen.unpriceable == ()
+    assert seen.equity == pytest.approx(100.0 + 0.001 * 50000.0)
+
+
+# The longest reason the order tool takes: 300 characters.
+_LONG_REASON: str = (
+    "Hourly close over the SMA20, RSI 55, the day's trend up; a small buy, sold under 49,000 or at 52,000. " * 3
+)[:300]
+assert len(_LONG_REASON) == 300
+
+
+async def test_a_refused_or_unknown_order_keeps_the_runs_reason_with_what_happened(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """The pre-push review of item 765: what went wrong replaced the reason in the order's note, on the orders the
+    owner looks at most."""
+    from dotagent.trading.types import Fill, ProductRules, Quote
+
+    class _Refusing:
+        async def balances(self) -> dict[str, float]:
+            return {"EUR": 500.0}
+
+        async def execute(self, order_id: str, request: OrderRequest, quote: Quote, rules: ProductRules) -> Fill:
+            raise TradingRefused("Coinbase did not take the order: Insufficient balance", {})
+
+    trading: Trading = _trading(store, TradingSettings(_config(mode="live")), clock, tmp_path)
+    trading.live = _Refusing
+    buy: OrderRequest = OrderRequest(
+        product="BTC-EUR", side="buy", quote_amount=20.0, base_amount=None, reason=_LONG_REASON
+    )
+    with pytest.raises(TradingRefused):
+        await trading.place(buy, "run_a", "live")
+    (kept,) = await store.trading_orders("live", 0.0, 10)
+    assert (
+        kept.status == "failed"
+        and kept.note == f"{_LONG_REASON} — Coinbase did not take the order: Insufficient balance"
+    )
+
+
+async def test_the_overview_stands_when_coinbases_sum_of_the_day_cannot_be_read(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """The pre-push review of item 765: the last day's change failing to read failed the whole overview."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    from dotagent.tools.base import ToolResult
+    from dotagent.tools.context import ToolContext
+    from dotagent.tools.trading import build_trading_tools
+
+    def no_day(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/ticker"):
+            return _market_answer(request)
+        return httpx.Response(503, content=b"unavailable")
+
+    trading: Trading = Trading(
+        store=store, settings=TradingSettings(_config(products=["BTC-EUR"])),
+        market=CoinbaseMarket(5.0, httpx.MockTransport(no_day)), zone=_ZONE, failsafe_file=tmp_path / "STOP",
+        clock=clock,
+    )  # fmt: skip
+    ctx: ToolContext = cast(ToolContext, SimpleNamespace(runtime=SimpleNamespace(trading=trading), run_id="run_a"))
+    market = {tool.spec.name: tool for tool in build_trading_tools()}["trading_market"]
+    shown: ToolResult = await (await market.prepare({}, ctx)).run(ctx)
+    assert not shown.is_error and "BTC-EUR: bid 50000" in shown.text and "no change given" in shown.text

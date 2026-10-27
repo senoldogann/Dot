@@ -40,17 +40,33 @@ lower a limit, drop a product, remove the key. Switching to live checks the key 
 
 With trading on, a run has the `trading` tool group:
 
-- `trading_market`: Coinbase's best bid and ask of the allowed products now, or a product's candles (one minute to one
-  day). Coinbase's public market data, with no key: paper and live read the same prices.
-- `trading_portfolio`: the account (paper or yours), what it holds and is worth at the bids, today's change and what
-  the limits leave today.
+- `trading_market`: Coinbase's best bid and ask of the allowed products now with the last day's change and volume, or
+  a product's candles (one minute to one day) with what they come to (item 765): the change over the window, its high
+  and low, the averages of the last 20 and 50 closes and where the last close stands against them, the RSI of the
+  last 14 moves, and how wide a candle is. Coinbase's public market data, with no key: paper and live read the same
+  prices.
+- `trading_portfolio`: the account (paper or yours), what it holds and is worth at the bids (every currency held is
+  priced, not only the allowed products; one Coinbase has no product of in the quote is said and worth nothing to the
+  account; one whose price could not be read this time is said too, counted as nothing, and holds buys until the day's
+  first whole look, below), today's change and what the limits leave today.
 - `trading_order`: a market order: a buy spends `quote_amount`; a sell sells `base_amount` or what brings
-  `quote_amount`.
-- `trading_history`: the account's orders, newest first.
+  `quote_amount`. Each carries its `reason`, in the run's words (what the prices and the account showed, what it
+  expects, what ends the trade), kept with the order and shown in Settings › Trading and in `trading_history`.
+- `trading_history`: the account's orders, newest first, each with its reason.
 
 The system prompt tells the run to trade only with `trading_order`, never through the browser or the shell, to read the
 prices and the account first, to say why it trades and what ends the trade, never to take what a page or a post says
 of a coin as a reason, and never to split or repeat an order to get around a limit.
+
+## Trying it: the paper shift
+
+The way to see what Dot's trading comes to before any money is on it: a schedule on the paper account (the owner's runs
+have one every hour, "Kağıt trading vardiyası") whose goal says the order of work — read the account and today's
+limits, read the prices, the last day and the hourly and daily candles of the allowed products, check the news of the
+day when something moved, check the exit conditions of the positions opened before, then at most one order with its
+reason and its exit (a stop and a target), or none and why — and ends in a four-line summary for the next shift. Its
+runs go on in one chat with the last three summaries in view. After a couple of weeks, Settings › Trading shows what it
+made of the paper account against simply holding; that, not a feeling, is what a switch to live rests on.
 
 ## What holds, and what only asks
 
@@ -62,6 +78,10 @@ Held in code for every order of Dot's trading tools, in every approval mode, yol
   refused before any market sees it;
 - every order is judged and placed under one lock, so two runs never judge against the same day, and it is kept before
   it reaches the market, so it counts at once; an order sent with no answer of what it did stays counted (`unknown`);
+- a day's start, which the day's loss is counted from, is the account's worth at its first whole look of the day: while
+  the price of a currency held cannot be read (Coinbase out of reach for it, or more than 100 currencies held), no buy
+  is placed, a sell still is, and the account says so; a currency Coinbase has no product of in the quote is worth
+  nothing to the account at every look alike and holds nothing;
 - the `STOP` file stops every order, as it stops the desktop;
 - an order is placed on the account it was approved for and judged against that account's day and holdings, the
   settings read once: one approved while the account was paper is not placed if you switched to live while it waited,

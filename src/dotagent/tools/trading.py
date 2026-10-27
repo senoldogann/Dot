@@ -9,9 +9,10 @@ order is placed in the account it was judged for: one approved for paper never g
 switched to live while it waited.
 """
 
+import asyncio
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from dotagent.config import TradingConfig
 from dotagent.policy.types import ActionInfo
@@ -28,9 +29,10 @@ from dotagent.tools.base import (
     ok,
 )
 from dotagent.tools.context import ToolContext
-from dotagent.trading.market import granularities, when
+from dotagent.trading.indicators import Indicators, indicator_text, indicators
+from dotagent.trading.market import MarketError, granularities, when
 from dotagent.trading.service import Trading, TradingRefused, holdings_text
-from dotagent.trading.types import Candle, OrderRequest, Portfolio, Quote
+from dotagent.trading.types import Candle, OrderRequest, Portfolio, ProductDay, Quote
 
 MARKET_TOOL: str = "trading_market"
 PORTFOLIO_TOOL: str = "trading_portfolio"
@@ -40,6 +42,7 @@ HISTORY_TOOL: str = "trading_history"
 # [trading] timeout_s: the tool's own bound leaves room for all of them.
 _TIMEOUT_S: float = 120.0
 _HISTORY_DEFAULT: int = 20
+_CANDLES_DEFAULT: int = 48
 
 
 def _trading(ctx: ToolContext) -> Trading:
@@ -61,7 +64,7 @@ class MarketArgs(ToolArgs):
     granularity: Literal["ONE_MINUTE", "FIVE_MINUTE", "FIFTEEN_MINUTE", "ONE_HOUR", "SIX_HOUR", "ONE_DAY"] | None = (
         Field(default=None, description="With a product: its candles of this period, oldest first.")
     )
-    count: int = Field(default=48, ge=1, le=300, description="How many candles (with granularity).")
+    count: int = Field(default=_CANDLES_DEFAULT, ge=1, le=300, description="How many candles (with granularity).")
 
 
 def _quote_line(quote: Quote, currency: str) -> str:
@@ -70,6 +73,20 @@ def _quote_line(quote: Quote, currency: str) -> str:
         f"{quote.product}: bid {quote.bid:.8g}, ask {quote.ask:.8g} {currency} (spread {spread:.3f} %), last trade "
         f"{quote.last:.8g}"
     )
+
+
+async def _day_of(trading: Trading, product: str) -> ProductDay:
+    """The product's last day, or one with no numbers when Coinbase's sum of it cannot be read: the prices stand."""
+    try:
+        return await trading.market.day(product)
+    except MarketError:
+        return ProductDay(product=product, change_24h_pct=None, quote_volume_24h=None)
+
+
+def _day_text(day: ProductDay, currency: str) -> str:
+    change: str = f"{day.change_24h_pct:+.2f} %" if day.change_24h_pct is not None else "no change given"
+    volume: str = f"{day.quote_volume_24h:,.0f} {currency}" if day.quote_volume_24h is not None else "no volume given"
+    return f"last 24 h {change}, volume {volume}"
 
 
 def _candle_lines(candles: tuple[Candle, ...]) -> str:
@@ -93,22 +110,34 @@ def _market_tool() -> RegisteredTool:
             return fail(f"{args.product} is not among the allowed products: {', '.join(config.products)}")
         if args.product is None or args.granularity is None:
             products: list[str] = [args.product] if args.product else list(config.products)
-            quotes: list[str] = []
+            lines: list[str] = []
             for product in products:
-                quotes.append(_quote_line(await trading.market.quote(product), config.quote))
-            return ok("Best prices now (a buy pays the ask, a sell gets the bid):\n" + "\n".join(quotes))
-        candles: tuple[Candle, ...] = await trading.market.candles(args.product, args.granularity, args.count)
-        quote: Quote = await trading.market.quote(args.product)
+                quote, day = await asyncio.gather(trading.market.quote(product), _day_of(trading, product))
+                lines.append(f"{_quote_line(quote, config.quote)}; {_day_text(day, config.quote)}")
+            # Candles asked for with no product (the first paper shift asked four times, item 765): the overview
+            # says what the candles need, rather than cost another step.
+            hint: str = (
+                "\nFor candles give product and granularity, as product=BTC-EUR granularity=ONE_HOUR count=48."
+                if (args.product is None and args.granularity is not None) or args.count != _CANDLES_DEFAULT
+                else ""
+            )
+            return ok("Best prices now (a buy pays the ask, a sell gets the bid):\n" + "\n".join(lines) + hint)
+        candles, quote = await asyncio.gather(
+            trading.market.candles(args.product, args.granularity, args.count), trading.market.quote(args.product)
+        )
+        found: Indicators | None = indicators(candles)
+        summary: str = indicator_text(found) if found is not None else "Coinbase gave no candles of this period."
         return ok(
-            f"{_quote_line(quote, config.quote)}\n{len(candles)} candles of {args.granularity}:\n"
+            f"{_quote_line(quote, config.quote)}\n{summary}\n{len(candles)} candles of {args.granularity}:\n"
             + _candle_lines(candles)
         )
 
     return make_tool(
         name=MARKET_TOOL,
         description=(
-            "Coinbase's prices of the products you may trade: the best bid and ask now, or with a product and a "
-            f"granularity ({', '.join(granularities())}) its candles. Read only."
+            "Coinbase's prices of the products you may trade: the best bid and ask now with the last day's change, or "
+            f"with a product and a granularity ({', '.join(granularities())}) its candles with their averages, RSI "
+            "and range. Read only."
         ),
         args_model=MarketArgs,
         modes=ALL_MODES,
@@ -150,7 +179,21 @@ def _portfolio_tool() -> RegisteredTool:
         return ok(
             f"Account: {account}. Worth {portfolio.equity:.2f} {config.quote} at the bids; today "
             f"{portfolio.day_change:+.2f} {config.quote} since {portfolio.day_start_equity:.2f}.\n"
-            f"Holdings: {holdings_text(portfolio.holdings, config.quote)}.\n{_limits_text(config, portfolio)}"
+            f"Holdings: {holdings_text(portfolio.holdings, config.quote)}."
+            + (
+                f"\nCoinbase has no product in {config.quote} of {', '.join(portfolio.unpriceable)}: worth nothing "
+                "to the account."
+                if portfolio.unpriceable
+                else ""
+            )
+            + (
+                f"\nThe price in {config.quote} of {', '.join(portfolio.unpriced)} could not be read: counted as "
+                "nothing"
+                + ("; today's start is not known yet, so no buy is placed." if not portfolio.day_start_known else ".")
+                if portfolio.unpriced
+                else ""
+            )
+            + f"\n{_limits_text(config, portfolio)}"
         )
 
     return make_tool(
@@ -175,6 +218,20 @@ class OrderArgs(ToolArgs):
         default=None, gt=0, description="A buy: how much of the quote currency to spend. A sell: what it should bring."
     )
     base_amount: float | None = Field(default=None, gt=0, description="A sell: how much of the base to sell.")
+    reason: str = Field(
+        min_length=20,
+        max_length=300,
+        description=(
+            "Why, in a sentence or two: what the prices and the account showed, what you expect, what ends the trade. "
+            "Kept with the order and shown to the owner."
+        ),
+    )
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _stripped(cls, value: object) -> object:
+        # The floor on the reason's length is on its words, not on spaces around them.
+        return value.strip() if isinstance(value, str) else value
 
     @model_validator(mode="after")
     def _one_amount(self) -> "OrderArgs":
@@ -223,7 +280,11 @@ def _order_tool() -> RegisteredTool:
                 "placed. Look at the portfolio and order again"
             )
         request: OrderRequest = OrderRequest(
-            product=args.product, side=args.side, quote_amount=args.quote_amount, base_amount=args.base_amount
+            product=args.product,
+            side=args.side,
+            quote_amount=args.quote_amount,
+            base_amount=args.base_amount,
+            reason=args.reason,
         )
         try:
             order: TradingOrderRecord = await _trading(ctx).place(request, ctx.run_id, config.mode)
@@ -240,8 +301,8 @@ def _order_tool() -> RegisteredTool:
         name=ORDER_TOOL,
         description=(
             "Place a market order on the trading account (paper or the owner's Coinbase, as the owner set it): a buy "
-            "spends quote_amount, a sell sells base_amount or what brings quote_amount. The owner's limits judge it "
-            "first and refuse what is past them. No withdrawal or transfer exists."
+            "spends quote_amount, a sell sells base_amount or what brings quote_amount, each with its reason. The "
+            "owner's limits judge it first and refuse what is past them. No withdrawal or transfer exists."
         ),
         args_model=OrderArgs,
         modes=ACTING_MODES,

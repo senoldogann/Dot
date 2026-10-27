@@ -21,14 +21,25 @@ from zoneinfo import ZoneInfo
 
 from dotagent.config import TradingConfig
 from dotagent.core.errors import ToolExecutionError
+from dotagent.core.logs import get_logger
 from dotagent.store.db import Store
 from dotagent.store.models import TradingOrderRecord
 from dotagent.trading import limits
-from dotagent.trading.market import CoinbaseMarket
+from dotagent.trading.market import CoinbaseMarket, MarketError
 from dotagent.trading.types import Fill, Holding, OrderRequest, Portfolio, ProductRules, Quote
 from dotagent.vault.secretstore import SecretStore
 
+_log = get_logger("dotagent.trading")
 _PAPER_SINCE_KEY: str = "trading_paper_since"
+# What an order's note holds: the run's reason (300 characters at most, the tool's bound) and, once something went
+# wrong, what happened, which keeps its room (the pre-push review: a long reason cut it off).
+_REASON_CHARS: int = 300
+_HAPPENED_CHARS: int = 200
+_NOTE_CHARS: int = _REASON_CHARS + 3 + _HAPPENED_CHARS
+# How many currencies held are priced for the account's worth: a key limited to a portfolio of Dot's own holds few;
+# past the count the rest are unread, which holds buys (docs/trading.md says so).
+_PRICED_AT_MOST: int = 100
+_PRICED_AT_ONCE: int = 6
 # Orders a portfolio and the history read back at most.
 _ORDERS_READ: int = 10_000
 
@@ -42,6 +53,16 @@ class TradingSettings:
 
     def current(self) -> TradingConfig:
         return self.value
+
+
+@dataclass(frozen=True)
+class _Priced:
+    """What pricing the currencies held came to: the quotes found, the currencies Coinbase has no product of in the
+    quote, and those whose price could not be read this time."""
+
+    quotes: dict[str, Quote]
+    unpriceable: tuple[str, ...]
+    unread: tuple[str, ...]
 
 
 class TradingRefused(ToolExecutionError):
@@ -157,12 +178,39 @@ class Trading:
         midnight: datetime = now.replace(hour=0, minute=0, second=0, microsecond=0)
         return midnight.date().isoformat(), midnight.timestamp()
 
-    async def _quotes(self, config: TradingConfig, currencies: Sequence[str]) -> dict[str, Quote]:
-        """The quotes of the products of ``currencies`` among those the owner allows, by base currency."""
-        wanted: list[str] = [f"{currency}-{config.quote}" for currency in currencies if currency != config.quote]
-        products: list[str] = [product for product in wanted if product in config.products]
-        quotes: list[Quote] = list(await asyncio.gather(*(self.market.quote(product) for product in products)))
-        return {quote.product.split("-")[0]: quote for quote in quotes}
+    async def _quotes(self, config: TradingConfig, currencies: Sequence[str]) -> _Priced:
+        """The quotes of ``currencies`` in the quote currency, by base currency, with the currencies Coinbase has no
+        product of in the quote (no price to be had, now or later: worth nothing to the account, every time alike) and
+        those whose price could not be read this time (a hole in the worth). Every currency held is priced, not only
+        the products the owner allows (item 765): a product allowed while it was already held read as a gain of the
+        day before, which loosened the day's loss limit by its worth."""
+        others: list[str] = [currency for currency in currencies if currency != config.quote]
+        held: list[str] = others[:_PRICED_AT_MOST]
+
+        # A few at a time: a burst of one request a currency could meet Coinbase's rate limit, and a 429 would read
+        # as a price that could not be read, holding the day's buys.
+        at_once: asyncio.Semaphore = asyncio.Semaphore(_PRICED_AT_ONCE)
+
+        async def priced(currency: str) -> Quote | MarketError:
+            try:
+                async with at_once:
+                    return await self.market.quote(f"{currency}-{config.quote}")
+            except MarketError as error:
+                _log.info("trading_holding_unpriced", currency=currency, error=error.message)
+                return error
+
+        answers: list[Quote | MarketError] = list(await asyncio.gather(*(priced(currency) for currency in held)))
+        found: dict[str, Quote] = {}
+        unpriceable: list[str] = []
+        unread: list[str] = list(others[_PRICED_AT_MOST:])
+        for currency, answer in zip(held, answers, strict=True):
+            if isinstance(answer, Quote):
+                found[currency] = answer
+            elif answer.no_such_product:
+                unpriceable.append(currency)
+            else:
+                unread.append(currency)
+        return _Priced(found, tuple(unpriceable), tuple(unread))
 
     async def portfolio(self) -> Portfolio:
         """The account of the mode now, what it is worth at the bids, and its day so far."""
@@ -175,7 +223,8 @@ class Trading:
         a day keeps what the account was worth then, which the day's loss is counted from."""
         mode: Literal["paper", "live"] = "paper" if broker is self.paper else "live"
         balances: dict[str, float] = await broker.balances()
-        quotes: dict[str, Quote] = await self._quotes(config, list(balances))
+        priced: _Priced = await self._quotes(config, sorted(balances))
+        quotes: dict[str, Quote] = priced.quotes
         holdings: list[Holding] = []
         for currency, amount in sorted(balances.items()):
             if currency == config.quote:
@@ -186,7 +235,17 @@ class Trading:
         equity: float = sum(holding.value for holding in holdings)
         day, since = self.day_start()
         key: str = f"trading_day:{mode}:{day}"
-        kept: str = await self.store.kv_update(key, lambda value: value if value is not None else repr(equity))
+        if priced.unread:
+            # A worth with a hole in it is not what a day starts from: the first whole look of the day is. Until there
+            # is one, the day's start is not known, and no buy is placed (:meth:`place`): a start taken from each look
+            # would read every loss as none (the pre-push review of item 765). A currency Coinbase has no product of
+            # is no hole: it is worth nothing to the account at every look alike.
+            start: str | None = await self.store.kv_get(key)
+            kept: str = start if start is not None else repr(equity)
+            known: bool = start is not None
+        else:
+            kept = await self.store.kv_update(key, lambda value: value if value is not None else repr(equity))
+            known = True
         traded: float = await self.store.trading_traded_since(mode, since)
         return Portfolio(
             mode=mode,
@@ -195,6 +254,9 @@ class Trading:
             equity=equity,
             day_start_equity=float(kept),
             day_traded=traded,
+            unpriceable=priced.unpriceable,
+            unpriced=priced.unread,
+            day_start_known=known,
         )
 
     async def place(self, request: OrderRequest, run_id: str, approved: str) -> TradingOrderRecord:
@@ -235,6 +297,13 @@ class Trading:
                 raise TradingRefused(f"the account holds {held:g} {base}, less than the order sells", {})
             if request.side == "sell" and request.quote_amount is not None and request.quote_amount > held * quote.bid:
                 raise TradingRefused(f"the account's {base} is worth {held * quote.bid:.2f} {config.quote}, less", {})
+            if request.side == "buy" and not portfolio.day_start_known:
+                raise TradingRefused(
+                    f"the account's worth cannot be read whole today (the price in {config.quote} of "
+                    f"{', '.join(portfolio.unpriced)} could not be read), so today's loss cannot be counted: no buy "
+                    "until it can; a sell is still placed",
+                    {"unpriced": ", ".join(portfolio.unpriced)},
+                )
             why: str | None = limits.refusal(
                 config, request.product, request.side, notional, portfolio, rules, cash, held, held * quote.bid
             )
@@ -253,7 +322,7 @@ class Trading:
                 ts=self.clock(),
                 run_id=run_id,
                 exchange_id="",
-                note="",
+                note=request.reason[:_NOTE_CHARS],
             )
             await self.store.add_trading_order(order)
             try:
@@ -262,14 +331,15 @@ class Trading:
                     raise TradingRefused("the emergency stop is on: no order is placed until the owner releases it", {})
                 fill: Fill = await broker.execute(order.id, request, quote, rules)
             except TradingRefused as refused:
-                failed = order.model_copy(update={"status": "failed", "note": refused.message[:300]})
+                failed = order.model_copy(update={"status": "failed", "note": _noted(request.reason, refused.message)})
                 await self.store.settle_trading_order(failed)
                 raise
             except BaseException as error:
                 # Sent, perhaps (an error, the tool's timeout, a stopped run): what it did is not known, so it stays
                 # counted against the day, and its record says so instead of staying pending.
-                note: str = str(error)[:300] or type(error).__name__
-                unknown = order.model_copy(update={"status": "unknown", "note": note})
+                unknown = order.model_copy(
+                    update={"status": "unknown", "note": _noted(request.reason, str(error) or type(error).__name__)}
+                )
                 await asyncio.shield(self.store.settle_trading_order(unknown))
                 raise
             filled: TradingOrderRecord = order.model_copy(
@@ -299,6 +369,12 @@ class Trading:
         await self.store.kv_set(_PAPER_SINCE_KEY, repr(self.clock()))
         day, _ = self.day_start()
         await self.store.kv_set(f"trading_day:paper:{day}", repr(self.config().paper_start))
+
+
+def _noted(reason: str, happened: str) -> str:
+    """An order's note once something went wrong: the run's reason, kept, and what happened, which keeps its room."""
+    said: str = happened[:_HAPPENED_CHARS]
+    return f"{reason[:_REASON_CHARS]} — {said}" if reason else said
 
 
 def holdings_text(holdings: Sequence[Holding], quote: str) -> str:
