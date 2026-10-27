@@ -1405,35 +1405,132 @@ async def wait_for_text_or_dialog(page: Page, text: str, timeout_ms: int) -> Tex
     return "dialog"
 
 
-async def _file_field_of(trigger: Locator) -> Locator | None:
+# The file field that a control named by label or by ``aria-controls`` hands its files to, which a custom "choose file"
+# button, a label drawn as a button or a dropzone that wraps nothing are made of (item 745): the field of the label the
+# element is in (its ``for``, or the field inside it) or the one an id in its ``aria-controls`` names.
+_CONTROLLED_FIELD_SCRIPT: str = """(element) => {
+  const field = (node) => (node instanceof HTMLInputElement && node.type === 'file' ? node : null);
+  const label = element.closest('label');
+  const labelled = label && label.control ? field(label.control) : null;
+  if (labelled) return labelled;
+  for (const id of (element.getAttribute('aria-controls') || '').split(/\\s+/)) {
+    const controlled = id ? field(element.ownerDocument.getElementById(id)) : null;
+    if (controlled) return controlled;
+  }
+  return null;
+}"""
+
+
+async def _file_field_of(trigger: Locator) -> Locator | ElementHandle | None:
     """The file field the files go into for the element ``ref`` names (item 704): the element itself when it is one,
-    else the one file field inside it (a label or a box that wraps a hidden field). ``None`` otherwise, and when it
-    holds several: then the element is clicked, and the file chooser it opens takes the files. A field next to the
-    element is not taken: it may belong to another control than the one the run named."""
+    else the one file field inside it (a label or a box that wraps a hidden field), else the field its label or its
+    ``aria-controls`` names (item 745). ``None`` otherwise, and when it holds several: then the element is clicked, and
+    the file chooser it opens takes the files. A field next to the element is not taken: it may belong to another
+    control than the one the run named."""
     try:
         async with asyncio.timeout(_COUNT_TIMEOUT_S):
             if await trigger.evaluate("e => e instanceof HTMLInputElement && e.type === 'file'"):
                 return trigger
         inside: Locator = trigger.locator("input[type=file]")
-        return inside if await _count(inside) == 1 else None
+        if await _count(inside) == 1:
+            return inside
+        async with asyncio.timeout(_COUNT_TIMEOUT_S):
+            controlled: JSHandle = await trigger.evaluate_handle(_CONTROLLED_FIELD_SCRIPT)
+        element: ElementHandle | None = controlled.as_element()
+        if element is None:
+            await controlled.dispose()
+        return element
     except TimeoutError:
         return None
+
+
+async def _only_file_field(page: Page, document: object) -> Locator | None:
+    """The file field of the page when it has exactly one: then no other control can be the one the files are for. Only
+    while the page is still the document ``document`` marked (:data:`_DOCUMENT_MARK_SCRIPT`): a click that sent a form
+    or followed a link has put another page there, perhaps of another site, which the upload was not allowed for."""
+    try:
+        async with asyncio.timeout(_COUNT_TIMEOUT_S):
+            if document is None or await page.evaluate(_DOCUMENT_MARK_SCRIPT) != document:
+                return None
+        every: Locator = page.locator("input[type=file]")
+        return every if await _count(every) == 1 else None
+    except TimeoutError:
+        return None
+
+
+# A mark of the document a page holds: the same while it holds that document, another once it holds a new one.
+_DOCUMENT_MARK_SCRIPT: str = "() => (window.__dotDocument = window.__dotDocument || crypto.randomUUID())"
+
+
+async def _document_mark(page: Page) -> object:
+    """The mark of the document ``page`` holds (:data:`_DOCUMENT_MARK_SCRIPT`), ``None`` when it cannot be read."""
+    try:
+        async with asyncio.timeout(_COUNT_TIMEOUT_S):
+            return await page.evaluate(_DOCUMENT_MARK_SCRIPT)
+    except (TimeoutError, PlaywrightError):
+        return None
+
+
+async def _chooser_files(page: Page, trigger: Locator, paths: list[str], timeout_ms: int) -> None:
+    """Click ``trigger`` and hand the files to the file chooser it opens. A click that waits for the element to hold
+    still and does not get it within ``timeout_ms`` is made once more without that wait, which a custom button that a
+    script keeps redrawing never passes (item 745), but only when the element itself is what lies at its middle
+    (:data:`_ON_TOP_SCRIPT`): a forced click lands on whatever is there, and a layer over the button (a bar that sends a
+    form, a cookie banner) is never clicked in its place."""
+    try:
+        async with page.expect_file_chooser(timeout=timeout_ms) as chooser_info:
+            await trigger.click(timeout=timeout_ms)
+    except PlaywrightTimeoutError as error:
+        if "filechooser" in str(error):
+            raise  # the click went through and opened no chooser: a second click would not
+        try:
+            async with asyncio.timeout(_COUNT_TIMEOUT_S):
+                on_top: object = await trigger.evaluate(_ON_TOP_SCRIPT)
+        except TimeoutError:
+            on_top = False
+        if on_top is not True:
+            raise  # something else lies over it, and a forced click would land on that
+        async with page.expect_file_chooser(timeout=_FORCED_CLICK_TIMEOUT_MS * 2) as chooser_info:
+            await trigger.click(timeout=_FORCED_CLICK_TIMEOUT_MS, force=True)
+    chooser = await chooser_info.value
+    await chooser.set_files(paths)
+
+
+_FORCED_CLICK_TIMEOUT_MS: int = 2000
+# Whether the element is what a click at its middle reaches: itself or an element inside it is the topmost there.
+_ON_TOP_SCRIPT: str = """(el) => {
+  const box = el.getBoundingClientRect();
+  const hit = el.ownerDocument.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+  return !!hit && (hit === el || el.contains(hit));
+}"""
 
 
 async def upload_files(page: Page, ref: str, paths: list[str], timeout_ms: int) -> None:
     """Hand the files to the file field of the element ``ref`` (:func:`_file_field_of`): straight into it, without a
     click, since sites hide the field off the screen or under an icon and a click on it waits for nothing; else click
-    the element and hand them to the file chooser it opens."""
+    the element and hand them to the file chooser it opens (:func:`_chooser_files`); when that opens none, the only
+    file field of the page takes them (item 745)."""
     trigger: Locator = await live_locator(page, ref, "upload")
     try:
-        field: Locator | None = await _file_field_of(trigger)
+        field: Locator | ElementHandle | None = await _file_field_of(trigger)
+        if isinstance(field, ElementHandle):
+            try:
+                await field.set_input_files(paths, timeout=timeout_ms)
+            finally:
+                await field.dispose()
+            return
         if field is not None:
             await field.set_input_files(paths, timeout=timeout_ms)
             return
-        async with page.expect_file_chooser(timeout=timeout_ms) as chooser_info:
-            await trigger.click(timeout=timeout_ms)
-        chooser = await chooser_info.value
-        await chooser.set_files(paths)
+        document: object = await _document_mark(page)
+        try:
+            await _chooser_files(page, trigger, paths, timeout_ms)
+        except PlaywrightError as chooser_error:
+            only: Locator | None = await _only_file_field(page, document)
+            if only is None:
+                raise
+            _log.info("browser_upload_by_only_field", url=page.url, error=truncate_middle(str(chooser_error), 300))
+            await only.set_input_files(paths, timeout=timeout_ms)
     except PlaywrightError as error:
         raise _failure("uploading the files failed", page, {"ref": ref}, error) from error
 
