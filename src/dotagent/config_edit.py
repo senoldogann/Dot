@@ -20,6 +20,7 @@ from typing import Literal
 
 from dotagent.config import JudgeProvider, ResumeMode
 from dotagent.core.errors import ConfigError
+from dotagent.core.files import link_target
 from dotagent.core.types import JsonObject
 from dotagent.llm.roles import ModelRole
 from dotagent.store.models import BrowserMode
@@ -410,13 +411,15 @@ def _edit(
             raise _by_hand(by_hand, path, "the edited file does not hold the new value")
         if _without(new_settings, keys) != _without(old_settings, keys):
             raise _by_hand(by_hand, path, "the edit changed another setting")
-        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+        # A config.toml that is a link (to a dotfiles repository) is written where it leads, and stays a link.
+        target: Path = link_target(path)
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
                 handle.write(after)
-            os.chmod(temporary, path.stat().st_mode & 0o777 if path.exists() else _FILE_MODE)
-            os.replace(temporary, path)
+            os.chmod(temporary, target.stat().st_mode & 0o777 if target.exists() else _FILE_MODE)
+            os.replace(temporary, target)
         except OSError:
             Path(temporary).unlink(missing_ok=True)
             raise

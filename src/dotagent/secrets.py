@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotagent.core.errors import ConfigError, MissingSecretError
+from dotagent.core.files import link_target
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import env_file_path
 from dotagent.core.text import KNOWN_SECRET_MIN_CHARS, mask_known
@@ -118,13 +119,15 @@ def _changing(path: Path) -> Iterator[None]:
 
 def _write_env_file(path: Path, text: str) -> None:
     """Write the env file whole or not at all, readable by the owner alone from its first byte: into a new file that
-    ``mkstemp`` makes with mode 0600 beside it, then moved over it (item 116)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    ``mkstemp`` makes with mode 0600 beside it, then moved over it (item 116). An env file that is a link is written
+    where it leads, and stays a link (item 728)."""
+    target: Path = link_target(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             handle.write(text)
-        os.replace(temporary, path)
+        os.replace(temporary, target)
     except OSError:
         Path(temporary).unlink(missing_ok=True)
         raise
