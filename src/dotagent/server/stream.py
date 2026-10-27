@@ -175,14 +175,22 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterat
     sent: set[int] = set()
     async with ctx.runtime.bus.subscribe(None) as feed:
 
-        async def stored() -> list[tuple[bytes, EventRecord]]:
-            """Frames of the stored events that have not gone out yet."""
+        async def stored(upto_end: bool) -> tuple[bytes, bool]:
+            """The frames of the stored events that have not gone out yet (with ``upto_end``, those up to the run's
+            end), in one piece, and whether the end is among them. One piece, not a write for each: WebKit (Safari, the
+            iPhone, Dot.app) took the first frames of such a burst of writes and then handed the page nothing more
+            until the next keepalive, 15 s on, so that a chat at work opened without its steps on about every other
+            try (item 716)."""
             await _widen(store, family)
             fresh: list[EventRecord] = [
                 event for event in await _stored_events(store, family, after) if event.id not in sent
             ]
-            sent.update(event.id for event in fresh)
-            return [(encode_event(event), event) for event in fresh]
+            ends: list[int] = [
+                at for at, event in enumerate(fresh) if event.kind == _FINISHED and event.run_id == run_id
+            ]
+            told: list[EventRecord] = fresh[: ends[0] + 1] if ends and upto_end else fresh
+            sent.update(event.id for event in told)
+            return b"".join(encode_event(event) for event in told), bool(ends)
 
         def live(event: EventRecord) -> bytes | None:
             """The frame of an event from the subscription, or ``None`` for one that is not for this client."""
@@ -196,16 +204,18 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterat
                 sent.add(event.id)
             return encode_event(event)
 
-        for frame, event in await stored():
-            yield frame
-            if event.kind == _FINISHED and event.run_id == run_id:
-                return
+        frames, ended = await stored(True)
+        if frames:
+            yield frames
+        if ended:
+            return
         dropped: int = 0
         while True:
             if run_id not in ctx.manager.active_run_ids() and run_id not in ctx.manager.elsewhere_run_ids():
                 # The run is over; whatever it stored since is still in the database.
-                for frame, _ in await stored():
-                    yield frame
+                frames, _ = await stored(False)
+                if frames:
+                    yield frames
                 return
             incoming: EventRecord | None = await _next_event(feed.queue, ctx.stopping)
             if incoming is None:
@@ -215,8 +225,9 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterat
                 continue
             if feed.dropped != dropped:
                 dropped = feed.dropped
-                for frame, _ in await stored():
-                    yield frame
+                frames, _ = await stored(False)
+                if frames:
+                    yield frames
             pending: bytes | None = live(incoming)
             if pending is not None:
                 yield pending
