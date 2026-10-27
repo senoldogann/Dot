@@ -521,7 +521,7 @@ group starts off and the lines are all the run has to go by. The servers are sta
 dotagent.evals.tool_server NAME`): one tool, answering from a fixed table, named alike (`get`) or after what the decoy's
 name fits better. A task passes when its file or answer is right and the events show it: the right skill read
 (`skill_read`) and the decoys' not (`skill_unread`), the right server's tool ran (`tool_ran`: a call of a tool whose
-group is off does not run, it turns the group on, and the call made again counts), the decoy's group never on
+group is off runs and turns the group on, item 742), the decoy's group never on
 (`group_stays_off`: turned on by `use_tools` or by a call of its tool), and no pick (`no_picks`). `dotx eval check`
 proves that each can be passed and that none is passed by doing nothing. `tests/smoke/test_choice_tasks.py` plays the
 wrong picks too (the decoy's group, the decoy's skill, no skill, an answer from memory): they prove that the tasks can

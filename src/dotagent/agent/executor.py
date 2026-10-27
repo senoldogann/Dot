@@ -240,9 +240,10 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     return _Checked(result=noted, action=action, waited_s=at_gate.seconds, decision=decision)
 
 
-def _turn_on_action(tool: str, group: str) -> ActionInfo:
-    return ActionInfo(
-        tool=tool, kind="meta", risk="safe", summary=f"Turn on the tool group {group}", target="", flags=()
+def _group_turned_on_note(tool: str, group: str) -> str:
+    return (
+        f"{tool} is in the tool group {group}, which was off; the group is on now, and its tools are in the tool list "
+        "from the next step."
     )
 
 
@@ -270,13 +271,6 @@ async def _execute_one(
     group: str | None = hidden.get(call.name)
     if refused is not None:
         result: ToolResult = fail(refused)
-    elif group is not None:
-        # The model could not know the tool's parameters: it was not in the tool list. The run turns its group on.
-        action = _turn_on_action(call.name, group)
-        result = fail(
-            f"{call.name} did not run: it is in the tool group {group}, which was off. The group is on now: call "
-            f"{call.name} again."
-        )
     elif tool is None:
         available: str = ", ".join(sorted(name for name, entry in registry.tools.items() if ctx.mode in entry.modes))
         result = fail(f"Unknown tool '{call.name}'. Available tools: {available}.")
@@ -291,6 +285,10 @@ async def _execute_one(
     else:
         checked: _Checked = await _run_checked(call, tool, ctx, gate)
         result, action, waited_s, decision = checked.result, checked.action, checked.waited_s, checked.decision
+    if group is not None:
+        # A call of a tool whose group was off ran as any call does (its arguments, the policy, the approval): the loop
+        # turns the group on for the next step, and the result says so, since the model chose the call blind.
+        result = result.model_copy(update={"text": f"{_group_turned_on_note(call.name, group)}\n\n{result.text}"})
     clipped: ToolResult = result.model_copy(update={"text": truncate_middle(result.text, ctx.output_chars)})
     seconds: float = time.monotonic() - started
     files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
@@ -365,7 +363,7 @@ async def execute_calls(
 ) -> list[ToolOutcome]:
     """Run the calls of one model turn in order, overlapping read-only ones. Results keep the call order; the text of
     each is clipped to the run's ``ctx.output_chars``. ``hidden`` maps the tools of the tool groups that are off to
-    their group: a call of one of them does not run, and its result says to call it again now that its group is on.
+    their group: a call of one of them runs as any call does, and its result says its group was off and is on now.
     ``ended`` is told each outcome as its call ends, so that a step cut part way still has the calls that had ended
     (item 159). A ``finish`` with calls after it does not end the run: it gets an error result, and the calls run
     (item 685)."""

@@ -133,8 +133,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. A
   server's line says what the server is for, in your words, Dot's or the server's own, quoted as its claim
   ([MCP servers](extending.md#mcp-servers), item 659). The
-  model turns a group on with `use_tools`. A call to a tool whose group is off does not run: it turns the group on, and
-  its result asks the model to call the tool again. A group stays on for the rest of the run. `auto` is `grouped` for a
+  model turns a group on with `use_tools`. A call to a tool whose group is off runs as any call does (its arguments
+  checked, the policy and the approval the same) and turns the group on; its result says the group was off and is on
+  now, and the next step offers the group's tools (item 742). A group stays on for the rest of the run. `auto` is `grouped` for a
   model of the weak tier and for a model whose window cut the context budget, and `full` for every other model. A run
   of more than 128 tools starts `grouped` whatever the setting (item 524): some providers take no more in one request
   (Gemini documents 128 function declarations, and OpenAI's API has answered more with a 400), and an MCP server may
