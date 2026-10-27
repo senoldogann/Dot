@@ -46,6 +46,8 @@ _GRACE_S: float = 120.0
 # How long a probe told to end (SIGTERM) may take to end its play and the runs it started before it is killed.
 _END_S: float = 20.0
 _OUTPUT_CHARS: int = 2000
+# The most characters of why an attempt did not start that a scorecard keeps.
+FAILURE_CHARS: int = 300
 
 
 class Scorecard(FrozenModel):
@@ -66,6 +68,10 @@ class Scorecard(FrozenModel):
     approvals_asked: int = 0
     checks_passed: int = 0
     checks_total: int = 0
+    # Whether the attempt's run started (item 717): one that ended failed with no step and no token never did, and says
+    # nothing of the text; ``failure`` is why, in the run's own words, for the owner.
+    started: bool = True
+    failure: str = ""
 
 
 class ProbeAsk(FrozenModel):
@@ -99,7 +105,18 @@ class ProbeReport(FrozenModel):
 type Prober = Callable[[ProbeAsk], Awaitable[ProbeReport]]
 
 
+def started(outcome: TaskOutcome) -> bool:
+    """Whether the run of ``outcome`` started: one that ended failed with no step and no token never reached the model
+    (a provider that refused its key, a prompt that could not be built), whatever text it was given."""
+    return not (
+        outcome.status == "failed"
+        and outcome.metrics.steps == 0
+        and outcome.metrics.input_tokens + outcome.metrics.output_tokens == 0
+    )
+
+
 def card_of(outcome: TaskOutcome) -> Scorecard:
+    began: bool = started(outcome)
     return Scorecard(
         task_id=outcome.task_id,
         attempt=outcome.attempt,
@@ -114,6 +131,8 @@ def card_of(outcome: TaskOutcome) -> Scorecard:
         approvals_asked=outcome.metrics.approvals_asked or 0,
         checks_passed=sum(1 for check in outcome.checks if check.passed),
         checks_total=len(outcome.checks),
+        started=began,
+        failure="" if began else truncate_middle(outcome.answer.strip() or "no answer", FAILURE_CHARS),
     )
 
 

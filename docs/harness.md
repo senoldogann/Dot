@@ -317,7 +317,10 @@ survivor is written as `probed`, with its contrast and the decisions in its note
 theirs. The experience writer then says what each edit did, and an experience is kept when an edit helped or hurt with
 evidence. The step stops before the attempt that would pass `step_minutes` or `step_tokens` of the model under test (the
 next attempt is taken to cost what the earlier ones did; a probe with nothing left plays nothing, one that outlives its
-budget is ended, and a probe cut short leaves its candidate `unclear`, which never survives), records what it did (`dotx
+budget is ended, and a probe cut short leaves its candidate `unclear`, which never survives). An attempt whose run
+never started (it ended failed with no step and no token: a provider that refused, a prompt that could not be built) is
+no evidence for or against a text (item 717): it is left out of the scores, its task is `unclear`, the candidate is set
+aside as *not judged*, and the step is `failed` with the first reason in the run's words. It records what it did (`dotx
 harness step` prints it), and counts in how learning fares with the reflection. `adopt = "auto"` adopts the survivor on
 its own when it did better (above) with `step_repeats` of at least 2 and was confirmed on new attempts (`step_repeats` ×
 2 attempts of each task, for the base and for the survivor, under the labels `confirm-base` and `confirm-<id>`; the

@@ -47,6 +47,7 @@ from dotagent.harness.probe import (
     ProbeAsk,
     Prober,
     ProbeReport,
+    Scorecard,
     confirm_label,
     nothing_played,
     over_budget,
@@ -255,6 +256,10 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
         )
         report: ProbeReport = nothing_played(ask) if over_budget(ask, 0, 0.0, 0) is not None else await prober(ask)
         spent += report.tokens
+        # An attempt that never started is the probe's failure, not the text's (item 717): the step says so and fails.
+        lost: list[Scorecard] = [card for card in report.cards if not card.started]
+        if lost:
+            errors.append(f"{len(lost)} attempt(s) of {label} did not start: {lost[0].failure}")
         await store.add_harness_probes(
             step.id, None if version is None else version.id, label, _cards(report), time.time()
         )
@@ -290,7 +295,20 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
     # Select; when two candidates both did better, the composer merges them and the merge is probed in its turn.
     chosen: Contrast | None = choose(contrasts)
     if chosen is None:
-        await _retire(store, candidates, time.time(), "no better than the base on the scoring set")
+        # A candidate whose attempts did not start was not judged, and is set aside saying so (item 717).
+        unjudged: set[str] = {found.label for found in contrasts if found.not_started}
+        await _retire(
+            store,
+            [candidate for candidate in candidates if candidate.id not in unjudged],
+            time.time(),
+            "no better than the base on the scoring set",
+        )
+        await _retire(
+            store,
+            [candidate for candidate in candidates if candidate.id in unjudged],
+            time.time(),
+            "not judged: attempts of the probe did not start",
+        )
         await write_experience(None)
         # A candidate that could not be told from a lucky attempt, or whose probe was cut short, says why (item 589).
         unclear: str = "; ".join(f"{found.label} is unclear: {found.why}" for found in contrasts if found.why)
