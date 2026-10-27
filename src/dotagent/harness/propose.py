@@ -68,8 +68,9 @@ def notes_of(
 
 def withheld_tasks(config: HarnessConfig) -> tuple[str, ...]:
     """The tasks no model that writes a candidate is shown (item 588): the scoring set, which judges the candidates,
-    and the final set, which is played once after a version is in use."""
-    return (*config.scoring_tasks, *config.final_tasks)
+    the pool, any task of which may judge them (item 719), and the final set, which is played once after a version is
+    in use."""
+    return tuple(dict.fromkeys((*config.scoring_tasks, *config.pool_tasks, *config.final_tasks)))
 
 
 async def experience_lines(store: Store, limit: int, task_ids: Sequence[str] = ()) -> tuple[str, ...]:

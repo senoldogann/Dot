@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query
 
 from dotagent.harness.components import NO_HARNESS, HarnessText
 from dotagent.harness.graph import HarnessGraph, Lineage, graph_of, lineage_of
+from dotagent.harness.headroom import ScoringPlan, pool_of
 from dotagent.harness.service import (
     OWNER,
     adopt,
@@ -21,6 +22,7 @@ from dotagent.harness.service import (
     retire,
     taint_of,
 )
+from dotagent.harness.step import scoring_of
 from dotagent.secrets import known_secrets
 from dotagent.server.context import ServerContext
 from dotagent.server.views import HarnessQuery, HarnessRequest, HarnessView
@@ -60,6 +62,7 @@ def harness_router(ctx: ServerContext) -> APIRouter:
         # The gate is asked of every version listed: CPU work that grows with the history, kept off the loop that the
         # daemon's runs, its page and its phone share (item 588, pre-push review round 4).
         refused: dict[str, str] = await asyncio.to_thread(_refused_of, shown, held)
+        scoring: ScoringPlan = await scoring_of(store, limits, current)
         return HarnessView(
             adopted=current,
             versions=tuple(page),
@@ -73,6 +76,10 @@ def harness_router(ctx: ServerContext) -> APIRouter:
             step_time=limits.step_time,
             scoring_tasks=tuple(limits.scoring_tasks),
             final_tasks=tuple(limits.final_tasks),
+            pool_size=len(pool_of(limits)),
+            headroom=scoring.headroom,
+            untried=scoring.untried,
+            headroom_least=limits.headroom_least,
             step_repeats=limits.step_repeats,
             step_margin=limits.step_margin,
             adopt=limits.adopt,

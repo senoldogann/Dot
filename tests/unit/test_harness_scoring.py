@@ -23,16 +23,21 @@ def _changed(**more: object) -> dict[str, object]:
 
 def test_the_scoring_set_holds_a_task_of_honesty_and_one_that_hides_an_instruction() -> None:
     """Item 589 (M5): a set of tasks that all end done, none with a page or a file that asks for something else, cannot
-    see a candidate that overclaims or follows an injection; the set has one of each, as the final set has."""
+    see a candidate that overclaims or follows an injection; the set has one of each, as the final set has. Since item
+    719 they are the guards, played every step, and the tasks of files and the shell they stood beside are in the pool,
+    where a step scores the ones the version in use still fails."""
     scoring = select_tasks(list(DEFAULT.scoring_tasks))
-    assert len(scoring) == 10
     honest = [task for task in scoring if task.category == "honesty"]
     assert [task.id for task in honest] == ["impossible-missing-file"] and honest[0].ending == "failed"
     lured = [task for task in scoring if task.injection_checks]
     assert [task.id for task in lured] == ["injection-in-invoice"] and lured[0].category == "safety"
-    # The rest are the tasks of files and the shell it always held, each ending done.
-    rest = [task for task in scoring if task not in (*honest, *lured)]
-    assert {task.category for task in rest} == {"files", "shell"} and {task.ending for task in rest} == {"done"}
+    assert len(scoring) == 2
+    pool = select_tasks(list(DEFAULT.pool_tasks))
+    assert len(pool) == len(DEFAULT.pool_tasks)
+    assert {"files", "shell"} <= {task.category for task in pool}
+    # Nothing of the pool reads the web, and nothing of it is of the final set or a guard.
+    assert not [task.id for task in pool if task.category == "research"]
+    assert set(DEFAULT.pool_tasks).isdisjoint({*DEFAULT.final_tasks, *DEFAULT.scoring_tasks})
 
 
 def test_no_task_is_in_the_scoring_set_and_the_final_set() -> None:
@@ -60,13 +65,9 @@ def test_a_task_the_owner_names_in_one_set_leaves_the_default_of_the_other(tmp_p
     """Item 589, review round 1 (N13): ``injection-in-invoice`` and ``impossible-missing-file`` are in the default
     scoring set, so a config that names one of them in ``final_tasks`` alone could not be loaded, and Dot did not
     start. What the owner writes wins over a default that grew a task since: it leaves the other set's default."""
-    final: HarnessConfig = _loaded(
-        tmp_path, '[harness]\nfinal_tasks = ["injection-in-invoice", "fix-add-bug", "impossible-missing-file"]\n'
-    )
-    assert final.final_tasks == ["injection-in-invoice", "fix-add-bug", "impossible-missing-file"]
-    assert final.scoring_tasks == [
-        task for task in DEFAULT.scoring_tasks if task not in ("injection-in-invoice", "impossible-missing-file")
-    ]
+    final: HarnessConfig = _loaded(tmp_path, '[harness]\nfinal_tasks = ["injection-in-invoice", "fix-add-bug"]\n')
+    assert final.final_tasks == ["injection-in-invoice", "fix-add-bug"]
+    assert final.scoring_tasks == [task for task in DEFAULT.scoring_tasks if task != "injection-in-invoice"]
     scoring: HarnessConfig = _loaded(tmp_path, '[harness]\nscoring_tasks = ["fix-add-bug", "sum-column"]\n')
     assert scoring.scoring_tasks == ["fix-add-bug", "sum-column"]
     assert scoring.final_tasks == [task for task in DEFAULT.final_tasks if task != "fix-add-bug"]

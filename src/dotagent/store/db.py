@@ -1683,6 +1683,16 @@ class Store:
         rows = await self._all("SELECT * FROM harness_steps ORDER BY started_at DESC, id DESC LIMIT ?", (limit,))
         return [_harness_step(row) for row in rows]
 
+    async def harness_steps_with_run(self, since: float, limit: int) -> list[HarnessStep]:
+        """The newest ``limit`` steps that began at or after ``since`` and took a run to learn from, the newest first
+        (item 719)."""
+        rows = await self._all(
+            "SELECT * FROM harness_steps WHERE from_run IS NOT NULL AND started_at >= ?"
+            " ORDER BY started_at DESC, id DESC LIMIT ?",
+            (since, limit),
+        )
+        return [_harness_step(row) for row in rows]
+
     async def count_harness_steps(self) -> int:
         """How many steps there are in all, nightly and by hand (item 527), past the newest a list shows."""
         row = await self._one("SELECT COUNT(*) AS n FROM harness_steps", ())
@@ -1704,6 +1714,17 @@ class Store:
 
     async def harness_probes_of(self, step_id: str) -> list[HarnessProbe]:
         rows = await self._all("SELECT * FROM harness_probes WHERE step_id = ? ORDER BY id", (step_id,))
+        return [_harness_probe(row) for row in rows]
+
+    async def started_attempts_of(self, version_id: str | None) -> list[HarnessProbe]:
+        """The attempts played under the version ``version_id`` (``None``: Dot's own text alone) in every step and
+        under every label, newest first, but those whose run never started (item 717: failed with no step and no
+        token), which say nothing of the text (item 719)."""
+        rows = await self._all(
+            "SELECT * FROM harness_probes WHERE version_id IS ?"
+            " AND NOT (status = 'failed' AND steps = 0 AND input_tokens + output_tokens = 0) ORDER BY id DESC",
+            (version_id,),
+        )
         return [_harness_probe(row) for row in rows]
 
     async def harness_probes_of_version(self, version_id: str) -> list[HarnessProbe]:

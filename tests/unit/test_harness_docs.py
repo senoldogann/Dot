@@ -62,7 +62,10 @@ def test_the_default_budget_covers_a_step_and_not_the_confirmation_of_a_composed
     budget is the owner's money): the page and the comment say what it covers, and this pins the arithmetic they
     give."""
     config = load_default_config().harness
-    runs_a_text: int = len(config.scoring_tasks) * config.step_repeats
+    # A text is scored on the guards, the tasks with headroom and the saturated ones that check nothing breaks (item
+    # 719): at most as many tasks as the ten of the scoring set before it.
+    scored: int = len(config.scoring_tasks) + config.headroom_tasks + config.regression_tasks
+    runs_a_text: int = scored * config.step_repeats
     # The base and a candidate in each scope, then the composition of two winners, then the confirmation: the base and
     # the survivor again on CONFIRM_FACTOR times the attempts.
     before_composing: int = (1 + len(config.step_candidates)) * runs_a_text

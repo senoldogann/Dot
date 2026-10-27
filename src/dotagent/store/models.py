@@ -775,7 +775,7 @@ class HarnessVersion(FrozenModel):
     retired_at: float | None
 
 
-type HarnessStepState = Literal["done", "keep", "skipped", "failed"]
+type HarnessStepState = Literal["done", "keep", "skipped", "failed", "calibrating"]
 
 
 class HarnessStep(FrozenModel):

@@ -890,7 +890,9 @@ class HarnessView(FrozenModel):
     can author and why (``from_outside``, by version id: the notes of a version and of the ones it was composed of,
     item 588) and which hold a text the gate for learned texts refuses now (``refused``, by version id, in words: such a
     version is not adopted and a prompt leaves the component out, item 587), the bounds a component keeps to, and how
-    the nightly step is set (item 393): when it runs ("off" never), the scoring and final sets, the repeats, the margin
+    the nightly step is set (item 393): when it runs ("off" never), the scoring set (the guards, item 719), how many
+    tasks the pool holds, which of them the version in use still fails (``headroom``) and how many it has not tried
+    (``untried``), how many tasks with headroom a candidate needs to be judged, the final set, the repeats, the margin
     of passes a candidate needs to count as better, who adopts a version the probe showed better and how many days the
     loop's records are kept (item 589); and how many steps and experiences there are in all (item 527), as their lists
     stop at the newest."""
@@ -907,6 +909,10 @@ class HarnessView(FrozenModel):
     step_time: str
     scoring_tasks: tuple[str, ...]
     final_tasks: tuple[str, ...]
+    pool_size: int
+    headroom: tuple[str, ...]
+    untried: int
+    headroom_least: int
     step_repeats: int
     step_margin: int
     adopt: Literal["owner", "auto"]
