@@ -15,10 +15,11 @@ from pathlib import Path
 from playwright.async_api import CDPSession, Dialog, Download, FileChooser, Page, Request, Response
 from playwright.async_api import Error as PlaywrightError
 
+from dotagent.browser.console import KEPT_MESSAGES, ConsoleEntry, note_message, note_page_error
 from dotagent.browser.network import KEPT_CALLS, Fetched, note_call
 from dotagent.browser.safety import dialog_is_financial, safe_download_name
 from dotagent.browser.snapshot import SnapshotLine
-from dotagent.browser.types import HeldValue
+from dotagent.browser.types import HeldValue, Viewport
 from dotagent.core.errors import BrowserError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -73,6 +74,13 @@ class Tab:
     calls: deque[Fetched] = field(default_factory=lambda: deque(maxlen=KEPT_CALLS))
     # How many requests the page has started, of any kind: a step that started one did something (item 739).
     requests: int = 0
+    # What its page wrote to the console and the errors it did not catch, since the page was loaded, newest last
+    # (item 746): what browser_console lists.
+    console: deque[ConsoleEntry] = field(default_factory=lambda: deque(maxlen=KEPT_MESSAGES))
+    # The size the run gave the tab (``browser_viewport``, item 746), and the DevTools session that lays it over the
+    # tab's own; both None while the tab has the size of every tab.
+    viewport: Viewport | None = None
+    sizing: CDPSession | None = None
 
 
 @dataclass(slots=True)
@@ -196,6 +204,9 @@ def _on_request_end(tab: Tab, request: Request) -> None:
 def _on_response(tab: Tab, response: Response) -> None:
     if _is_main_navigation(tab, response.request):
         tab.status = response.status
+        # A new document is on its way: the console of the page starts again (item 746). A route of a page's own
+        # scripts (pushState, a fragment) makes no request, and keeps what the page wrote before it.
+        tab.console.clear()
     note_call(tab.calls, response)
 
 
@@ -265,3 +276,5 @@ def attach_handlers(tab: Tab, downloads: Path) -> None:
     page.on("requestfinished", partial(_on_request_end, tab))
     page.on("requestfailed", partial(_on_request_end, tab))
     page.on("response", partial(_on_response, tab))
+    page.on("console", partial(note_message, tab.console))
+    page.on("pageerror", partial(note_page_error, tab.console))

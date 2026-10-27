@@ -223,6 +223,22 @@ Both modes share what follows.
   not there; a field that takes a secret (a password, a one-time code, a card) reads `[hidden]` in every mode, and
   outside `yolo` so does an attribute whose name, or whose element's name or id, says it holds a secret (a CSRF token in
   a meta tag, a session in a hidden field).
+- `browser_console` and `browser_viewport` let a run check a page it built (item 746, as Chrome DevTools' console and
+  device size do), in every mode, a research run's too; both are reads that change nothing in the page and run under
+  the URL rules every read of a tab holds (item 554). `browser_console` lists what the current tab's page wrote to its
+  console (`error`, `warning`, `info`, `log`, `debug`) and the errors its scripts did not catch (listed as `error
+  uncaught`), newest first, the last 100 of the page since it was loaded (a page loaded again starts the list again; a
+  route of the page's own scripts, `pushState` or a fragment, keeps it), `level` only those of one level (`error` has
+  the uncaught ones too), `limit` at most (30 by default), each cut to 400 characters with the script line that wrote
+  it. The list is fenced as the page's text and makes the run untrusted;
+  outside `yolo` a secret named in a message or an address (`access_token=…`) reads `[hidden]`, as in
+  `browser_requests`, and what a login from the password manager filled in is held back in every mode. `browser_viewport`
+  gives the current tab a width (`width`, 200 to 3000 CSS pixels, 390 being a phone's) and a height (`height`, 844 by
+  default) with a DevTools size laid over the tab's own, so that the page lays itself out for it, as at a phone's width; a
+  snapshot or a screenshot then shows it, and the tab keeps the size across pages it loads, other tabs keep theirs. With
+  no `width` the tab goes back to the size every tab has (that of Settings › Browser, or its window's where pages fill
+  it). It is a size alone: no touch, no phone's user agent, no zoom. In the
+  open Chrome of the owner (`attach`) it fails saying so: the window is theirs, and Playwright puts no emulation on it.
 - `browser_eval` runs JavaScript in the page of the run's own tab, in either mode, and gives back its value as JSON: an
   expression (`document.title`), a function, or a promise it awaits (`timeout_s`, 30 seconds by default, at most 600).
   It reads what the snapshot shortens (a whole list, a table, the data behind a page) and does in one call what would

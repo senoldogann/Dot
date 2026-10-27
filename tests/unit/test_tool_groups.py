@@ -212,8 +212,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
     assert section[2:] == [
         "- browser: Chrome, for pages that need JavaScript, a log-in or clicking (browser_open, browser_new_tab, "
         "browser_snapshot, browser_find, browser_links, browser_act, browser_eval, browser_scroll, browser_read_text, "
-        "browser_requests, browser_extract, browser_screenshot, browser_wait_text, browser_back, browser_switch_tab, "
-        "browser_close_tab and 4 more)",
+        "browser_requests, browser_extract, browser_console, browser_viewport, browser_screenshot, "
+        "browser_wait_text, browser_back and 6 more)",
         "- memory_admin: correcting or forgetting saved notes (memory_update, memory_forget)",
         "- todos: your own list of work to do for the owner later, on your own, while the Mac is idle (todo_add)",
         "- drafts: an email or a message you write for the owner, who sends it from the conversation (draft_message)",

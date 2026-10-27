@@ -64,6 +64,7 @@ from dotagent.browser.types import (
     TextWait,
     VaultFieldKind,
     VaultFill,
+    Viewport,
 )
 from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import DotError, ToolExecutionError, ToolInputError
@@ -124,6 +125,8 @@ _DEFAULT_LINKS_LIMIT: int = 40
 # How many background calls browser_requests lists, and how many records browser_extract reads, unless asked (item 714).
 _DEFAULT_REQUESTS_LIMIT: int = 20
 _DEFAULT_EXTRACT_LIMIT: int = 50
+# How many console messages browser_console lists, unless asked (item 746).
+_DEFAULT_CONSOLE_LIMIT: int = 30
 _DEFAULT_WAIT_S: float = 10.0
 _QUICK_TIMEOUT_S: float = 45.0
 _SLOW_TIMEOUT_S: float = 120.0
@@ -761,6 +764,78 @@ def _requests_tool() -> RegisteredTool:
             "data of a list or a search in one call. Read only; secrets are hidden."
         ),
         args_model=RequestsArgs,
+        modes=ALL_MODES,
+        parallel_safe=False,
+        timeout_s=_QUICK_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
+class ConsoleArgs(ToolArgs):
+    level: Literal["error", "warning", "info", "log", "debug"] | None = Field(
+        default=None, description="Only messages of this level; 'error' includes the errors the page did not catch."
+    )
+    limit: int | None = Field(default=None, ge=1, le=100, description="Most messages listed (default 30).")
+
+
+def _console_tool() -> RegisteredTool:
+    def classify(args: ConsoleArgs, ctx: ToolContext) -> ActionInfo:
+        return _observe_action("browser_console", "Read the page's console", ctx)
+
+    async def run(args: ConsoleArgs, ctx: ToolContext) -> ToolResult:
+        found: FindResult = await ctx.browser.console_messages(
+            ctx.thread_id, args.level, args.limit or _DEFAULT_CONSOLE_LIMIT, hides_secrets(ctx.approvals)
+        )
+        if not found.hits:
+            of: str = f" of level {args.level}" if args.level else ""
+            return ok(f"The page wrote no console message{of} since it was loaded, and threw no uncaught error.")
+        heading: str = f"{len(found.hits)} console messages, newest first (level, text, where it was written)"
+        listed: str = fence_untrusted(found.url, "\n".join(found.hits), _nonce())
+        return mark_untrusted(ok(f"{heading}\n{listed}"))
+
+    return make_tool(
+        name="browser_console",
+        description=(
+            "The page's console messages and uncaught errors since it loaded, newest first: why a page does not "
+            "work. Read only."
+        ),
+        args_model=ConsoleArgs,
+        modes=ALL_MODES,
+        parallel_safe=False,
+        timeout_s=_QUICK_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
+class ViewportArgs(ToolArgs):
+    width: int | None = Field(
+        default=None, ge=200, le=3000, description="Page width in CSS pixels, e.g. 390 for a phone; none: go back."
+    )
+    height: int | None = Field(default=None, ge=200, le=3000, description="Page height (default 844, a phone's).")
+
+
+def _viewport_tool() -> RegisteredTool:
+    def classify(args: ViewportArgs, ctx: ToolContext) -> ActionInfo:
+        what: str = "Give the tab its size back" if args.width is None else f"Size the tab {args.width} wide"
+        return _observe_action("browser_viewport", what, ctx)
+
+    async def run(args: ViewportArgs, ctx: ToolContext) -> ToolResult:
+        size: Viewport = await ctx.browser.set_viewport(ctx.thread_id, args.width, args.height)
+        what: str = "back to its size" if args.width is None else "to the size asked"
+        return ok(
+            f"The current tab is {what}: {size.width}x{size.height} CSS pixels. The page lays itself out for it; "
+            "browser_snapshot or browser_screenshot shows it, and click_at uses these coordinates."
+        )
+
+    return make_tool(
+        name="browser_viewport",
+        description=(
+            "Size the current tab like a phone (width 390) to see the page's phone layout; no width: back to its "
+            "size. Dot's own Chrome only."
+        ),
+        args_model=ViewportArgs,
         modes=ALL_MODES,
         parallel_safe=False,
         timeout_s=_QUICK_TIMEOUT_S,
@@ -1466,6 +1541,8 @@ def _browser_tools() -> tuple[RegisteredTool, ...]:
         _read_text_tool(),
         _requests_tool(),
         _extract_tool(),
+        _console_tool(),
+        _viewport_tool(),
         _screenshot_tool(),
         _wait_text_tool(),
         _back_tool(),
