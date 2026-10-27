@@ -263,7 +263,10 @@ class EventsQuery(FrozenModel):
 
 
 class StreamQuery(FrozenModel):
+    """``stored``: end after the events stored when the stream was asked for, as for a run that is over (item 734)."""
+
     after: int = Field(default=0, ge=0)
+    stored: bool = False
 
 
 class ApprovalsQuery(FrozenModel):

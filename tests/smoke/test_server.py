@@ -966,6 +966,34 @@ async def test_the_stored_events_of_a_stream_go_out_in_one_piece(runtime: Runtim
     ]
 
 
+async def test_the_stream_of_a_run_at_work_asked_for_what_is_stored_ends_after_it(
+    runtime: Runtime, manager: RunManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Item 734: the page of a run at work reads what is stored whole, then puts the run's record over it and follows
+    # the stream on from the last event; without `stored` the stream of a run at work waits for its next event.
+    run: RunRecord = await _stored_run(runtime, None)
+    child: RunRecord = await _stored_run(runtime, run.id)
+    told: list[EventRecord] = await _tell(
+        runtime,
+        [
+            (run.id, "run_queued", _queued(None)),
+            (run.id, "run_started", {}),
+            (child.id, "run_queued", _queued(run.id)),
+            (child.id, "assistant", {"text": "a helper's step"}),
+        ],
+    )
+    monkeypatch.setattr(manager, "active_run_ids", lambda: {run.id, child.id})
+    context: ServerContext = _context(runtime, manager, PORT, asyncio.Event())
+    async with asyncio.timeout(5.0), aclosing(follow_run(context, run.id, 0, True)) as stream:
+        pieces: list[bytes] = [piece async for piece in stream]
+    assert [item.id for item in parse_sse(b"".join(pieces).decode())] == [event.id for event in told]
+    waiting = aclosing(follow_run(context, run.id, told[-1].id))
+    async with waiting as stream:
+        with pytest.raises(TimeoutError):
+            async with asyncio.timeout(0.5):
+                await anext(stream)
+
+
 async def test_the_stream_of_a_run_that_nothing_is_running_ends_after_what_it_stored(
     client: httpx.AsyncClient, runtime: Runtime
 ) -> None:

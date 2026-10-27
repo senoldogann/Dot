@@ -238,3 +238,42 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                 await page.close()
             finally:
                 await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_chat_at_work_opened_again_shows_its_helpers_as_the_store_has_them(login_env: dict[str, str]) -> None:
+    """Item 734: a chat opened again while its helpers worked drew their rows from its earlier events as they came, in
+    WebKit on the owner's iPhone thousands of them, and nothing put the store's record over them: a helper that had
+    ended stood at work and the steps lagged hundreds behind. The page reads what is stored whole and puts the record
+    over it; here the record of the helper at work counts more steps than its events say."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
+            parent: RunRecord = await manager.start(
+                "Count the books on the shelves",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                "test",
+                None,
+                None,
+                "standard",
+                None,
+                "ask",
+                False,
+                (),
+            )
+            working: RunRecord = await _working_helper(runtime, parent.id)
+            await runtime.store.set_run_steps(working.id, 40)
+            browser: Browser = await playwright.webkit.launch(headless=True)
+            try:
+                page: Page = await _open_run(browser, address, parent.id, 390, "light")
+                await expect(page.locator(".helpers .helpers-state")).to_have_text("1 working · 3 done")
+                await expect(_row(page, working.id).locator(".child-progress")).to_have_text("step 40")
+                # The steps it takes from here on come by the stream, which goes on after what was read.
+                manager.cancel(working.id)
+                await expect(page.locator(".helpers .helpers-state")).to_have_text("3 done · 1 stopped")
+                await page.close()
+            finally:
+                await browser.close()
+                if manager.active_run_ids():
+                    manager.cancel(parent.id)

@@ -455,7 +455,11 @@ in the same way (item 366), a few words a frame for two seconds at most, into th
 on it as it will stand and the words come in sight, its foot once it is all in; a run opened after it ended, a reply
 that streamed already and reduced motion show it at once. A chat whose run is over opens drawn whole (item 454): its
 events, those of the runs it delegated to, and the work of the turn before it are read before the page is drawn, so
-nothing fills in as the stream comes. A message sent from a chat that is over starts the next run in the same chat
+nothing fills in as the stream comes. A chat at work opens the same way with what is stored so far (item 734; the
+stream's `stored=true` ends after it), and the run's record is put over it: the rows of its helpers say how each stands
+and its steps as the store counts them, and the stream goes on from the last event read. Before, such a chat drew its
+helpers' rows from their earlier events as they came and nothing set them right: on the iPhone, a helper that had ended
+stood at work, steps hundreds behind. A message sent from a chat that is over starts the next run in the same chat
 without a jump: the chat stands where it was, at its foot, inert, until the next run's page is drawn in its place,
 never lifted to its top and dropped back. The answer of the run is the last message, with a copy button
 (its icon turns to a check once the answer is on the clipboard) and, where the browser can speak, a speaker (item 574),
@@ -1085,7 +1089,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window, of its own window for an Ollama model whose own is larger than the one Dot asks for, item 520) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610) |
-| `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
+| `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs (`stored=true`: only those stored so far, item 734); lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `GET\|POST /runs/{id}/messages/{message}/reactions`, `DELETE /runs/{id}/messages/{message}/reactions/{reaction}` | the reactions on a message of Dot's (item 586; `message` is `answer` or `step-<n>`, `n` written as the number it is, from 1: `step-01` and `step-0` are 422, so that a message has one key; item 612): list them; put one on (`{"reaction": "good"}`, one of `good`, `love`, `wrong`, `again`, `remember`, `explain`, `hold`) and do what it says, 201, or 200 when it was there (the reply has `reactions`, `effect`, `said` and `run_id`; 404 for no run or a step it did not say, 422 for a message with no words, for the answer of a run that works, or for a 📌 on a message that holds a secret); take one back |
