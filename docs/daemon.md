@@ -770,9 +770,11 @@ with what limits, and see what it did. The page shows, top to bottom:
   do not have the trading tools yet, the page says they get them after Dot restarts and offers **Restart Dot**.
 - **Limits**: the most for one order, the most traded and the most lost in a day, the most held of one product, all in
   the quote currency, and what the paper account starts with (in Paper). The products a run may trade are a list of ids
-  such as `BTC-EUR`, each with a remove button, and a field that allows another. **Save limits** sends only what changed;
-  a reason the daemon gives (a limit past another, an id not priced in the quote, a phone asked to widen) shows under
-  the button. Like the config file's `[trading]` table, these hold from the next order.
+  such as `BTC-EUR`, each with a remove button, and a field that allows another; `*` allows the whole market, every
+  product in the quote that trades `[trading] min_volume` a day, and its chip says so in words (item 771). **Save
+  limits** sends only what changed; a reason the daemon gives (a limit past another, an id not priced in the quote, a
+  phone asked to widen) shows under the button. Like the config file's `[trading]` table, these hold from the next
+  order.
 - **Coinbase key** (when trading is on, or a key is kept): whether a key is kept and the end of its name, **Remove
   key**, and a form for its name and its private key, which is sent to the Keychain and never shown again. Make the
   key in the Coinbase Developer Platform with the ECDSA signature algorithm and the permissions View and Trade, never

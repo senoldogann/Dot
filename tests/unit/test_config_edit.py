@@ -336,3 +336,20 @@ def test_progress_is_written_under_channels_beside_the_switch_of_the_channel_and
     fresh: Path = tmp_path / "fresh.toml"
     set_setting(fresh, "channels", "progress", "off")
     assert fresh.read_text(encoding="utf-8") == '[channels]\nprogress = "off"\n'
+
+
+def test_an_amount_with_decimals_changed_twice_is_replaced_whole_and_the_comment_stays(tmp_path: Path) -> None:
+    """Item 771: an amount of ``[trading]`` is a number with decimals; read as its integer part, the decimals stayed
+    behind the new value, and a limit changed a second time made the file no TOML."""
+    config: Path = tmp_path / "config.toml"
+    config.write_text('[trading]\nmode = "paper"\nmax_order = 25.0  # mine\nmin_volume = 1e6\n', encoding="utf-8")
+    set_setting(config, "trading", "max_order", 20.0)
+    set_setting(config, "trading", "max_order", 30.5)
+    set_setting(config, "trading", "min_volume", 5_000_000.0)
+    set_setting(config, "trading", "min_volume", 2_500_000.0)
+    assert tomllib.loads(config.read_text(encoding="utf-8"))["trading"] == {
+        "mode": "paper",
+        "max_order": 30.5,
+        "min_volume": 2_500_000.0,
+    }
+    assert "max_order = 30.5  # mine" in config.read_text(encoding="utf-8")

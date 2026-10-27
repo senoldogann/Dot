@@ -25,6 +25,17 @@ _PRICES: dict[str, tuple[str, str, str]] = {"BTC-EUR": ("50000.00", "50010.00", 
 
 def _market_answer(request: httpx.Request) -> httpx.Response:
     path: str = request.url.path
+    if path.endswith("/market/products"):
+        # Coinbase's list of what it trades: the products the stand-in has a price of.
+        listed: list[dict[str, object]] = [
+            {
+                "product_id": product, "quote_currency_id": product.split("-")[1], "status": "online",
+                "trading_disabled": False, "is_disabled": False, "cancel_only": False, "limit_only": False,
+                "price": last, "approximate_quote_24h_volume": "1000000",
+            }
+            for product, (_, _, last) in _PRICES.items()
+        ]  # fmt: skip
+        return httpx.Response(200, content=json.dumps({"products": listed}).encode())
     product: str = path.split("/products/")[1].split("/")[0]
     if product not in _PRICES:
         # A product Coinbase is down for, against one it does not have.
@@ -403,6 +414,52 @@ async def _priced_holdings(store: Store, trading: Trading) -> None:
         "run_a",
         "live",
     )
+
+
+async def test_a_404_of_a_product_coinbase_trades_is_a_price_not_read(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """The pre-push review of item 765: a 404 at the day's first look took a holding for one Coinbase has no product
+    of, the day started without its worth, and that worth then read as the day's gain. A 404 is checked against
+    Coinbase's list of what it trades; without the list, no 404 is taken at its word."""
+    from dotagent.trading.types import Fill, Quote
+
+    class _Held:
+        async def balances(self) -> dict[str, float]:
+            return {"EUR": 100.0, "BTC": 0.001}
+
+        async def execute(self, order_id: str, request: OrderRequest, quote: Quote, rules: ProductRules) -> Fill:
+            raise AssertionError("no order is placed here")
+
+    answers: dict[str, int] = {"ticker": 404, "list": 503}
+
+    def blinking(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/BTC-EUR/ticker") and answers["ticker"] != 200:
+            return httpx.Response(answers["ticker"], content=b'{"error": "NOT_FOUND"}')
+        if request.url.path.endswith("/market/products") and answers["list"] != 200:
+            return httpx.Response(answers["list"], content=b"unavailable")
+        return _market_answer(request)
+
+    trading: Trading = Trading(
+        store=store, settings=TradingSettings(_config(mode="live")),
+        market=CoinbaseMarket(5.0, httpx.MockTransport(blinking)), zone=_ZONE, failsafe_file=tmp_path / "STOP",
+        clock=clock,
+    )  # fmt: skip
+    trading.live = _Held
+    day: str = f"trading_day:live:{trading.day_start()[0]}"
+    # The list cannot be read: BTC's 404 is not taken at its word, and the day waits for a whole look.
+    unlisted: Portfolio = await trading.portfolio()
+    assert (unlisted.unpriceable, unlisted.unpriced, unlisted.day_start_known) == ((), ("BTC",), False)
+    # BTC-EUR is on Coinbase's list: its 404 is a price not read this time.
+    answers["list"] = 200
+    listed: Portfolio = await trading.portfolio()
+    assert (listed.unpriceable, listed.unpriced, listed.day_start_known) == ((), ("BTC",), False)
+    assert await store.kv_get(day) is None
+    # Read again, BTC is priced and the day starts from the whole worth.
+    answers["ticker"] = 200
+    whole: Portfolio = await trading.portfolio()
+    assert (whole.unpriceable, whole.unpriced, whole.day_start_known) == ((), (), True)
+    assert await store.kv_get(day) == repr(100.0 + 0.001 * 50000.0)
 
 
 async def test_candles_asked_for_with_no_product_get_the_overview_and_what_the_candles_need(
@@ -962,3 +1019,112 @@ async def test_the_watch_tells_the_owner_what_an_exit_came_to(store: Store, cloc
         _PRICES["BTC-EUR"] = ("50000.00", "50010.00", "50005.00")
     (message,) = told
     assert message["title"] == "Stop reached: BTC-EUR sold" and "on paper" in str(message["text"])
+
+
+# ----- the whole market (item 771) -------------------------------------------------------------------------------
+
+_VOLUMES: dict[str, str] = {"BTC-EUR": "12000000", "ETH-EUR": "5000000", "XRP-EUR": "800000"}
+
+
+def _whole_market(request: httpx.Request) -> httpx.Response:
+    """A stand-in of Coinbase's product list and products, each with its day's volume."""
+    path: str = request.url.path
+    if path.endswith("/market/products"):
+        listed: list[dict[str, object]] = [
+            {
+                "product_id": product, "quote_currency_id": "EUR", "status": "online", "trading_disabled": False,
+                "is_disabled": False, "cancel_only": False, "limit_only": False, "price": price,
+                "best_bid_price": price, "best_ask_price": price, "price_percentage_change_24h": change,
+                "high_24h": high, "low_24h": low, "approximate_quote_24h_volume": _VOLUMES[product],
+            }
+            for product, price, change, high, low in (
+                ("BTC-EUR", "50000", "1.5", "50500", "48000"),
+                ("ETH-EUR", "2000", "-4.0", "2150", "1990"),
+                ("XRP-EUR", "1.2", "9.0", "1.21", "1.0"),
+            )
+        ]  # fmt: skip
+        listed.append({"product_id": "BTC-USDC", "quote_currency_id": "USDC", "status": "online", "price": "1"})
+        return httpx.Response(200, content=json.dumps({"products": listed}).encode())
+    product: str = path.split("/products/")[1].split("/")[0]
+    answer: httpx.Response = _market_answer(request)
+    if path.endswith("/ticker") or answer.status_code != 200:
+        return answer
+    body: dict[str, object] = json.loads(answer.content)
+    return httpx.Response(200, content=json.dumps({**body, "approximate_quote_24h_volume": _VOLUMES[product]}).encode())
+
+
+async def test_with_any_product_an_order_is_of_a_product_that_trades_enough_a_day(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """Item 771: the owner asked why Dot does not look across the market. "*" among the products allows every product
+    of the quote that trades at least min_volume of it a day: a market thinner than that is one a small order moves."""
+    from dotagent.trading.limits import not_allowed
+
+    config: TradingConfig = _config(products=["*"], min_volume=1_000_000.0)
+    _PRICES["ETH-EUR"] = ("2000.00", "2001.00", "2000.50")
+    _PRICES["XRP-EUR"] = ("1.20", "1.21", "1.20")
+    trading: Trading = Trading(
+        store=store, settings=TradingSettings(config), market=CoinbaseMarket(5.0, httpx.MockTransport(_whole_market)),
+        zone=_ZONE, failsafe_file=tmp_path / "STOP", clock=clock,
+    )  # fmt: skip
+    try:
+        bought: TradingOrderRecord = await trading.place(
+            OrderRequest(product="ETH-EUR", side="buy", quote_amount=10.0, base_amount=None, reason="x" * 20,
+                         stop=1900.0),
+            "run_a",
+            "paper",
+        )  # fmt: skip
+        assert bought.status == "filled"
+        with pytest.raises(TradingRefused, match=r"under the 1000000\.00 EUR the owner allows"):
+            await trading.place(
+                OrderRequest(product="XRP-EUR", side="buy", quote_amount=10.0, base_amount=None, reason="x" * 20,
+                             stop=1.1),
+                "run_a",
+                "paper",
+            )  # fmt: skip
+    finally:
+        del _PRICES["ETH-EUR"], _PRICES["XRP-EUR"]
+    assert not_allowed(config, "BTC-USDC", None) == "BTC-USDC is not priced in EUR, the currency of the owner's limits"
+    # A product whose day Coinbase did not sum is not taken to trade enough.
+    assert "traded an unknown amount" in str(not_allowed(config, "ADA-EUR", None))
+    named: TradingConfig = _config(products=["BTC-EUR"])
+    assert not_allowed(named, "ETH-EUR", None) is not None and not_allowed(named, "BTC-EUR", None) is None
+
+
+async def test_the_scan_ranks_what_the_owner_allows_of_the_whole_market(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    from types import SimpleNamespace
+    from typing import cast
+
+    from dotagent.tools.base import ToolResult
+    from dotagent.tools.context import ToolContext
+    from dotagent.tools.trading import build_trading_tools
+
+    trading: Trading = Trading(
+        store=store, settings=TradingSettings(_config(products=["*"], min_volume=1_000_000.0)),
+        market=CoinbaseMarket(5.0, httpx.MockTransport(_whole_market)), zone=_ZONE, failsafe_file=tmp_path / "STOP",
+        clock=clock,
+    )  # fmt: skip
+    ctx: ToolContext = cast(ToolContext, SimpleNamespace(runtime=SimpleNamespace(trading=trading), run_id="run_a"))
+    scan = {tool.spec.name: tool for tool in build_trading_tools()}["trading_scan"]
+    movers: ToolResult = await (await scan.prepare({"sort": "movers"}, ctx)).run(ctx)
+    rows: list[str] = movers.text.splitlines()[2:]
+    # XRP moved most but trades under the floor: not listed; ETH's fall comes before BTC's rise.
+    assert movers.text.startswith("2 products you may trade") and [row.split(" |")[0] for row in rows] == [
+        "ETH-EUR",
+        "BTC-EUR",
+    ]
+    lows: ToolResult = await (await scan.prepare({"sort": "lows"}, ctx)).run(ctx)
+    assert lows.text.splitlines()[2].startswith("ETH-EUR") and "6 %" in lows.text.splitlines()[2]
+    for sort, first in (("volume", "BTC-EUR"), ("highs", "BTC-EUR")):
+        ranked: ToolResult = await (await scan.prepare({"sort": sort}, ctx)).run(ctx)
+        assert ranked.text.splitlines()[2].startswith(first), sort
+    # The overview of "*" alone is the busiest products past the floor, not XRP under it.
+    market = {tool.spec.name: tool for tool in build_trading_tools()}["trading_market"]
+    _PRICES["ETH-EUR"] = ("2000.00", "2001.00", "2000.50")
+    try:
+        overview: ToolResult = await (await market.prepare({}, ctx)).run(ctx)
+    finally:
+        del _PRICES["ETH-EUR"]
+    assert "BTC-EUR" in overview.text and "ETH-EUR" in overview.text and "XRP-EUR" not in overview.text

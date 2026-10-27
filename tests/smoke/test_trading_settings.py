@@ -60,3 +60,27 @@ async def test_a_phone_narrows_trading_and_only_the_mac_widens_it(own_home: Path
         )
         assert saved.status_code == 403
         assert (await client.delete("/trading/key", headers=phone)).status_code == 200
+
+
+async def test_a_phone_cannot_open_the_whole_market_nor_lower_its_floor(own_home: Path) -> None:  # noqa: F811
+    """Item 771: "*" among the products, or a lower min_volume, lets runs trade more products: the Mac's alone, even
+    while "*" is not allowed, as the Mac's "*" would take the lower floor up unseen."""
+    async with _served(own_home) as (client, _, runtime):
+        typed: Runtime = runtime
+        typed.trading.key_store = MemorySecretStore()
+        key: str = await _phone_key(client)
+        phone: dict[str, str] = {"Authorization": f"Bearer {key}"}
+        mac: dict[str, str] = {"Authorization": f"Bearer {TOKEN}"}
+        refused: httpx.Response = await client.patch("/trading", json={"products": ["*"]}, headers=phone)
+        assert refused.status_code == 403 and "allow another product" in refused.json()["message"]
+        floor: httpx.Response = await client.patch("/trading", json={"min_volume": 0.0}, headers=phone)
+        assert floor.status_code == 403 and "products that trade less" in floor.json()["message"]
+        opened: httpx.Response = await client.patch(
+            "/trading", json={"products": ["*"], "min_volume": 2_000_000.0}, headers=mac
+        )
+        assert opened.status_code == 200, opened.text
+        lower: httpx.Response = await client.patch("/trading", json={"min_volume": 500_000.0}, headers=phone)
+        assert lower.status_code == 403 and "products that trade less" in lower.json()["message"]
+        higher: httpx.Response = await client.patch("/trading", json={"min_volume": 5_000_000.0}, headers=phone)
+        assert higher.status_code == 200, higher.text
+        assert typed.trading.config().min_volume == 5_000_000.0

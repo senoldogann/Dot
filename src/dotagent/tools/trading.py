@@ -14,7 +14,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from dotagent.config import TradingConfig
+from dotagent.config import ANY_PRODUCT, TradingConfig
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import TradingExitRecord, TradingOrderRecord
 from dotagent.tools.base import (
@@ -32,7 +32,7 @@ from dotagent.tools.context import ToolContext
 from dotagent.trading.indicators import Indicators, indicator_text, indicators
 from dotagent.trading.market import MarketError, granularities, when
 from dotagent.trading.service import Trading, TradingRefused, holdings_text
-from dotagent.trading.types import Candle, OrderRequest, Portfolio, ProductDay, Quote
+from dotagent.trading.types import Candle, MarketRow, OrderRequest, Portfolio, ProductDay, Quote
 
 MARKET_TOOL: str = "trading_market"
 PORTFOLIO_TOOL: str = "trading_portfolio"
@@ -44,6 +44,9 @@ HISTORY_TOOL: str = "trading_history"
 _TIMEOUT_S: float = 120.0
 _HISTORY_DEFAULT: int = 20
 _CANDLES_DEFAULT: int = 48
+# The busiest products the overview of trading_market reads when "*" is all the owner allows, one request each.
+_OVERVIEW_AT_MOST: int = 8
+SCAN_TOOL: str = "trading_scan"
 
 
 def _trading(ctx: ToolContext) -> Trading:
@@ -60,7 +63,8 @@ def _read(tool: str, summary: str) -> ActionInfo:
 
 class MarketArgs(ToolArgs):
     product: str | None = Field(
-        default=None, description="A product of the allowed list, as BTC-EUR; none: the best prices of every one."
+        default=None,
+        description="A product priced in the quote, as BTC-EUR; none: the best prices of the products you may trade.",
     )
     granularity: Literal["ONE_MINUTE", "FIVE_MINUTE", "FIFTEEN_MINUTE", "ONE_HOUR", "SIX_HOUR", "ONE_DAY"] | None = (
         Field(default=None, description="With a product: its candles of this period, oldest first.")
@@ -107,10 +111,16 @@ def _market_tool() -> RegisteredTool:
     async def run(args: MarketArgs, ctx: ToolContext) -> ToolResult:
         config: TradingConfig = _config(ctx)
         trading: Trading = _trading(ctx)
-        if args.product is not None and args.product not in config.products:
-            return fail(f"{args.product} is not among the allowed products: {', '.join(config.products)}")
+        if args.product is not None and not args.product.endswith(f"-{config.quote}"):
+            return fail(f"{args.product} is not priced in {config.quote}, the currency of the owner's limits")
         if args.product is None or args.granularity is None:
-            products: list[str] = [args.product] if args.product else list(config.products)
+            products: list[str] = [args.product] if args.product else [p for p in config.products if p != ANY_PRODUCT]
+            if not products:
+                # Only "*": the overview is the busiest products of the quote; trading_scan ranks the rest.
+                rows = await trading.market.whole_market(config.quote)
+                products = [row.product for row in rows if row.quote_volume_24h >= config.min_volume][
+                    :_OVERVIEW_AT_MOST
+                ]
             lines: list[str] = []
             for product in products:
                 quote, day = await asyncio.gather(trading.market.quote(product), _day_of(trading, product))
@@ -136,11 +146,87 @@ def _market_tool() -> RegisteredTool:
     return make_tool(
         name=MARKET_TOOL,
         description=(
-            "Coinbase's prices of the products you may trade: the best bid and ask now with the last day's change, or "
+            "Coinbase's prices of a product priced in the quote: the best bid and ask now with the last day's change "
+            "(none: the allowed products; with * alone, the eight busiest), or "
             f"with a product and a granularity ({', '.join(granularities())}) its candles with their averages, RSI "
             "and range. Read only."
         ),
         args_model=MarketArgs,
+        modes=ALL_MODES,
+        parallel_safe=True,
+        timeout_s=_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
+class ScanArgs(ToolArgs):
+    sort: Literal["movers", "volume", "highs", "lows"] = Field(
+        default="movers",
+        description=(
+            "movers: the biggest moves of the last day, up or down; volume: the busiest; highs: those nearest their "
+            "day's high; lows: nearest their day's low."
+        ),
+    )
+    limit: int = Field(default=15, ge=1, le=60, description="How many products.")
+
+
+def _place_in_range(row: MarketRow) -> float | None:
+    """Where the price stands in the day's range, 0 at the low and 100 at the high."""
+    if row.high_24h is None or row.low_24h is None or row.high_24h <= row.low_24h:
+        return None
+    return (row.price - row.low_24h) / (row.high_24h - row.low_24h) * 100.0
+
+
+def _scan_tool() -> RegisteredTool:
+    def classify(args: ScanArgs, ctx: ToolContext) -> ActionInfo:
+        return _read(SCAN_TOOL, f"Scan Coinbase's market by {args.sort}")
+
+    async def run(args: ScanArgs, ctx: ToolContext) -> ToolResult:
+        config: TradingConfig = _config(ctx)
+        rows: tuple[MarketRow, ...] = await _trading(ctx).market.whole_market(config.quote)
+        allowed: list[MarketRow] = [
+            row
+            for row in rows
+            if row.product in config.products
+            or (ANY_PRODUCT in config.products and row.quote_volume_24h >= config.min_volume)
+        ]
+        keys = {
+            "movers": lambda row: -abs(row.change_24h_pct or 0.0),
+            "volume": lambda row: -row.quote_volume_24h,
+            "highs": lambda row: -(_place_in_range(row) or 0.0),
+            "lows": lambda row: _place_in_range(row) if _place_in_range(row) is not None else 100.0,
+        }
+        chosen: list[MarketRow] = sorted(allowed, key=keys[args.sort])[: args.limit]
+        if not chosen:
+            return ok(f"No product of the market the owner allows trades in {config.quote} now.")
+        lines: list[str] = ["product | price | 24 h | place in the day's range | volume (24 h)"]
+        for row in chosen:
+            place: float | None = _place_in_range(row)
+            lines.append(
+                f"{row.product} | {row.price:.8g} | "
+                + (f"{row.change_24h_pct:+.2f} %" if row.change_24h_pct is not None else "?")
+                + " | "
+                + (f"{place:.0f} %" if place is not None else "?")
+                + f" | {row.quote_volume_24h:,.0f} {config.quote}"
+            )
+        universe: str = (
+            f"every product in {config.quote} trading at least {config.min_volume:,.0f} a day"
+            if ANY_PRODUCT in config.products
+            else ", ".join(config.products)
+        )
+        return ok(
+            f"{len(allowed)} products you may trade ({universe}), by {args.sort}; read one's candles with "
+            f"trading_market before an order:\n" + "\n".join(lines)
+        )
+
+    return make_tool(
+        name=SCAN_TOOL,
+        description=(
+            "Scan the whole of Coinbase's market you may trade in one look: the biggest movers of the last day, the "
+            "busiest, those at their day's high or low. Where to look first. Read only."
+        ),
+        args_model=ScanArgs,
         modes=ALL_MODES,
         parallel_safe=True,
         timeout_s=_TIMEOUT_S,
@@ -225,7 +311,7 @@ def _portfolio_tool() -> RegisteredTool:
 
 
 class OrderArgs(ToolArgs):
-    product: str = Field(description="A product of the allowed list, as BTC-EUR.")
+    product: str = Field(description="A product you may trade, as BTC-EUR (trading_scan lists them).")
     side: Literal["buy", "sell"]
     quote_amount: float | None = Field(
         default=None, gt=0, description="A buy: how much of the quote currency to spend. A sell: what it should bring."
@@ -463,4 +549,4 @@ def _exit_levels(exit_: TradingExitRecord) -> str:
 
 
 def build_trading_tools() -> tuple[RegisteredTool, ...]:
-    return (_market_tool(), _portfolio_tool(), _order_tool(), _exit_tool(), _history_tool())
+    return (_market_tool(), _scan_tool(), _portfolio_tool(), _order_tool(), _exit_tool(), _history_tool())

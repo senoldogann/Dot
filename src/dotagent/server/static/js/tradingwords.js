@@ -19,8 +19,10 @@ export const MODE_LINES = {
 
 const MONEY = new Intl.NumberFormat("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const AMOUNT = new Intl.NumberFormat("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+const WHOLE = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 0 });
 // As the daemon reads a product id (config.py, _PRODUCT): the page refuses what the daemon would.
 const PRODUCT = /^[A-Z0-9]{2,10}-[A-Z]{3,5}$/;
+const ANY_PRODUCT = "*";
 const MINUS = "−";
 
 /** "1,234.50 EUR": an amount of the quote currency to the cent. */
@@ -72,7 +74,16 @@ export function parseAmount(text) {
  */
 export function parseProduct(text, quote) {
   const id = text.trim().toUpperCase();
+  // "*": every product of the quote that trades the daemon's min_volume a day (item 771).
+  if (id === ANY_PRODUCT) {
+    return id;
+  }
   return PRODUCT.test(id) && id.endsWith(`-${quote}`) ? id : null;
+}
+
+/** What a product's chip says: its id, or for "*" the whole market down to the daemon's min_volume (item 771). */
+export function productLabel(id, minVolume, quote) {
+  return id === ANY_PRODUCT ? `Every product trading ${WHOLE.format(minVolume)} ${quote} a day` : id;
 }
 
 /**

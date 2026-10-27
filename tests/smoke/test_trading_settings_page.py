@@ -183,10 +183,14 @@ async def _wide(page: Page, runtime: Runtime, served: str) -> None:
     await page.get_by_label("Product to allow").fill("xrp-eur")
     await page.get_by_role("button", name="Allow").click()
     await expect(page.locator('[data-product="XRP-EUR"]')).to_be_visible()
+    # "*" is the whole market, said in words (item 771).
+    await page.get_by_label("Product to allow").fill("*")
+    await page.get_by_role("button", name="Allow").click()
+    await expect(page.locator('[data-product="*"]')).to_have_text("Every product trading 1,000,000 EUR a day")
     await save.click()
     await expect(save).to_be_disabled()
     held = await _held(page, served)
-    assert held["settings"]["max_order"] == 20.0 and held["settings"]["products"][-1] == "XRP-EUR"
+    assert held["settings"]["max_order"] == 20.0 and held["settings"]["products"][-2:] == ["XRP-EUR", "*"]
     kept: dict[str, object] = tomllib.loads(config_path().read_text(encoding="utf-8"))["trading"]
     assert kept["max_order"] == 20.0 and kept["mode"] == "paper"
     # A limit the settings refuse says why, and changes nothing.
