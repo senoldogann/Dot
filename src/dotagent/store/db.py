@@ -90,6 +90,7 @@ from dotagent.store.models import (
     TodoRecord,
     TodoStatus,
     ToolStep,
+    TradingOrderRecord,
     TrashedMemory,
     UnattendedCount,
     UnattendedRun,
@@ -247,6 +248,12 @@ CREATE TABLE IF NOT EXISTS spends (
     host TEXT NOT NULL, amount REAL NOT NULL, currency TEXT NOT NULL, ts REAL NOT NULL, run_id TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS spends_host ON spends(host, ts);
+CREATE TABLE IF NOT EXISTS trading_orders (
+    id TEXT PRIMARY KEY, mode TEXT NOT NULL, product TEXT NOT NULL, side TEXT NOT NULL, notional REAL NOT NULL,
+    size REAL NOT NULL, price REAL NOT NULL, fee REAL NOT NULL, status TEXT NOT NULL, ts REAL NOT NULL,
+    run_id TEXT NOT NULL, exchange_id TEXT NOT NULL, note TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS trading_orders_ts ON trading_orders(mode, ts);
 CREATE TABLE IF NOT EXISTS harness_versions (
     id TEXT PRIMARY KEY, parent_id TEXT, made_by TEXT NOT NULL, state TEXT NOT NULL, summary TEXT NOT NULL,
     habits TEXT NOT NULL, tool_guidance TEXT NOT NULL, notes TEXT NOT NULL, created_at REAL NOT NULL,
@@ -5912,6 +5919,58 @@ class Store:
             (host, amount, currency, ts, run_id),
         )
         await self._db.commit()
+
+    # ----- trading (docs/trading.md) ---------------------------------------------------------------------------
+
+    @_writing
+    async def add_trading_order(self, order: TradingOrderRecord) -> None:
+        """Keep an order as it is placed: before it reaches a market, so that it counts against the day at once."""
+        await self._db.execute(
+            "INSERT INTO trading_orders(id, mode, product, side, notional, size, price, fee, status, ts, run_id, "
+            "exchange_id, note) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                order.id,
+                order.mode,
+                order.product,
+                order.side,
+                order.notional,
+                order.size,
+                order.price,
+                order.fee,
+                order.status,
+                order.ts,
+                order.run_id,
+                order.exchange_id,
+                order.note,
+            ),
+        )
+        await self._db.commit()
+
+    @_writing
+    async def settle_trading_order(self, order: TradingOrderRecord) -> None:
+        """Write what an order did: its status, what it filled at, the market's id of it and a note."""
+        await self._db.execute(
+            "UPDATE trading_orders SET notional = ?, size = ?, price = ?, fee = ?, status = ?, exchange_id = ?, "
+            "note = ? WHERE id = ?",
+            (order.notional, order.size, order.price, order.fee, order.status, order.exchange_id, order.note, order.id),
+        )
+        await self._db.commit()
+
+    async def trading_orders(self, mode: str, since: float, limit: int) -> list[TradingOrderRecord]:
+        """The orders of ``mode`` after ``since``, newest first, ``limit`` at most."""
+        rows = await self._all(
+            "SELECT * FROM trading_orders WHERE mode = ? AND ts > ? ORDER BY ts DESC LIMIT ?", (mode, since, limit)
+        )
+        return [TradingOrderRecord.model_validate(dict(row)) for row in rows]
+
+    async def trading_traded_since(self, mode: str, since: float) -> float:
+        """What the orders of ``mode`` after ``since`` were worth, but those that surely did nothing (``failed``)."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT COALESCE(SUM(notional), 0) AS total FROM trading_orders WHERE mode = ? AND ts > ? "
+            "AND status != 'failed'",
+            (mode, since),
+        )
+        return float(row["total"]) if row is not None else 0.0
 
     async def spent_since(self, host: str, since: float) -> float:
         """What the pre-approved spends on ``host`` after ``since`` add up to."""

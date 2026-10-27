@@ -928,6 +928,57 @@ class PluginsConfig(FrozenModel):
     dirs: list[str] = Field(default_factory=list)
 
 
+# Whether runs trade, and with what money (docs/trading.md): no trading tools at all, an account of Dot's own that
+# trades at the market's real prices with money that is not there, or the owner's Coinbase account.
+TradingMode = Literal["off", "paper", "live"]
+_PRODUCT: re.Pattern[str] = re.compile(r"[A-Z0-9]{2,10}-[A-Z]{3,5}")
+_CURRENCY: re.Pattern[str] = re.compile(r"[A-Z]{3,5}")
+
+
+class TradingConfig(FrozenModel):
+    """Trading on Coinbase (``[trading]``, docs/trading.md). The limits are in ``quote``, the currency every product of
+    ``products`` is priced in, and no run can raise them: a run cannot change this file, and an order past one of them
+    is refused before it reaches any market, in every mode, yolo's too. ``max_order`` is the most one order may be
+    worth, ``max_day`` the most the orders of a day (the owner's day, ``[scheduler] timezone``) may add up to, buys and
+    sells, ``max_day_loss`` how much the account may lose in a day before no buy is placed until the next (a sell still
+    is), ``max_position`` the most one product held may be worth after a buy. ``paper_start`` is what the paper account
+    starts with, ``paper_fee_rate`` the share of an order its fills pay, as Coinbase's taker fee does."""
+
+    mode: TradingMode
+    quote: str
+    products: list[str] = Field(min_length=1, max_length=50)
+    max_order: float = Field(gt=0, allow_inf_nan=False)
+    max_day: float = Field(gt=0, allow_inf_nan=False)
+    max_day_loss: float = Field(gt=0, allow_inf_nan=False)
+    max_position: float = Field(gt=0, allow_inf_nan=False)
+    paper_start: float = Field(gt=0, allow_inf_nan=False)
+    paper_fee_rate: float = Field(ge=0, lt=0.1, allow_inf_nan=False)
+    timeout_s: float = Field(gt=0, le=120, allow_inf_nan=False)
+
+    @field_validator("quote")
+    @classmethod
+    def _currency(cls, value: str) -> str:
+        if _CURRENCY.fullmatch(value) is None:
+            raise ValueError('[trading] quote is a currency code in capitals, as "EUR"')
+        return value
+
+    @model_validator(mode="after")
+    def _products_in_quote(self) -> Self:
+        wrong: list[str] = [
+            product
+            for product in self.products
+            if _PRODUCT.fullmatch(product) is None or not product.endswith(f"-{self.quote}")
+        ]
+        if wrong:
+            raise ValueError(
+                f"[trading] products are Coinbase product ids priced in {self.quote}, as BTC-{self.quote}: "
+                + ", ".join(wrong)
+            )
+        if self.max_order > self.max_day:
+            raise ValueError("[trading] max_order is more than max_day, which every order counts against")
+        return self
+
+
 # Who the typed judge asks: nobody, or TypeSafe's System One API.
 JudgeProvider = Literal["none", "typesafe"]
 
@@ -980,6 +1031,7 @@ class AppConfig(FrozenModel):
     skills: SkillsConfig
     plugins: PluginsConfig
     scout: ScoutConfig
+    trading: TradingConfig
 
     @field_validator("mcp")
     @classmethod

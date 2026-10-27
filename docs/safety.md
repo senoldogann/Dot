@@ -110,6 +110,9 @@ run needs, sent where the configuration points:
   for each new mail or notification, with your words: a mail's sender, recipients, subject and first lines, or a
   notification's repository, kind, reason and title, in the fence of the mail tools. A calendar watcher, and a GitHub
   watcher without words, ask no model. A mail that cannot be judged is told to you, so it is not dropped.
+- **To Coinbase, while trading is on: the requests of its market data and, for `live`, of your account.** Prices and
+  candles of the products allowed come from Coinbase's public market data, with no key; a `live` account's balances and
+  orders are requests signed with your key ([Trading](trading.md)). Nothing else of yours goes to Coinbase.
 - **To GitHub, for a GitHub watcher: the request for your notifications.** `api.github.com/notifications` with your
   personal access token, every few minutes, as a conditional request; it carries nothing else of yours.
 - **To the search engines and the sites of web-research, the MCP server that comes with Dot: the queries and the pages
@@ -237,6 +240,16 @@ the money hand-off holds where the modes ask; a `yolo` run pays it and what it s
 (item 443). The caps are plain numbers compared with the number on the page, whatever its
 currency, so list sites that bill in one currency. Empty by default.
 
+**Trading** (items 763 and 764, [Trading](trading.md)), off by default. Its limits (`[trading]`: one order, a day's
+orders, a day's loss, one product held, the products allowed) are held in code before any market sees an order of Dot's
+trading tools, in every mode, `yolo`'s too, and no run can change them (a run's own program can reach the key as it can
+Dot's other keys, below: [Trading](trading.md) says what bounds that); the `STOP` file stops every order. A `live`
+order, on your Coinbase account, carries `trade`: it waits for your yes in every mode but `yolo`, never the review
+model's or a rule's to answer, and Dot places it on your yes; a `yolo` run that read outside content has the review
+model check it (item 525). A `paper` order moves no money. The Coinbase key, which may view and trade and never
+transfer, is kept in your login Keychain; switching to live, raising a limit, allowing a product and saving a key are
+done on the Mac only, and a phone can always switch trading off.
+
 **Decision order**, strictest first:
 
 1. *Auto-review* denies actions that read secrets or send data out (`secret_access`, `exfiltration`), whatever else is
@@ -272,8 +285,9 @@ currency, so list sites that bill in one currency. Empty by default.
    your rules say: yours in `supervised` and `ask`, the review model's in `auto`, where it answers the policy's
    questions; only a rule that hands the step to you is stricter. A rule that allows it does not answer for you. A login
    filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, except that in `auto` you answer
-   it, not the review model, and so is one of Dot's own vault (item 621, below). A `yolo` run asks nothing and makes
-   the step, its record keeping the reason it would have asked for (item 443).
+   it, not the review model, and so is one of Dot's own vault (item 621, below), and an order with real money on your
+   trading account (`trade`, item 763, [Trading](trading.md)), which Dot places on your yes. A `yolo` run asks nothing
+   and makes the step, its record keeping the reason it would have asked for (item 443).
    What the policy cannot tell for a message is not guarded: a key that sends in a web page's chat box, a page's own script
    (`browser_eval`), a program of the shell that talks to a mail server or a chat's API itself (`curl`, a script).
    For an AppleScript or JXA script (the tool `apple_script`, and `osascript` in a command line) the guard reads the
@@ -520,8 +534,8 @@ instructions.
 stranger wrote. Two checks hold for such a run, and neither asks you:
 
 - *The taint check.* Before a yolo run marked untrusted does a step an instruction planted in what it read would be
-  after (a message, a post, an upload or data sent out, a payment, a credential, a login filled from your password
-  manager, privilege or system settings, a schedule or a note it saves, an install, a change of Dot's own files, a read
+  after (a message, a post, an upload or data sent out, a payment, an order with real money on your trading account
+  (item 763), a credential, a login filled from your password manager, privilege or system settings, a schedule or a note it saves, an install, a change of Dot's own files, a read
   of your secrets, a deletion outside the workspace), the review model (`[models] review`) judges it against your own
   instructions, as it does in `auto`, with the run marked untrusted. A step it refuses is refused: the run is told why
   and goes on with the rest, and the record names the review model. Any other answer, `escalate` too, lets the step run

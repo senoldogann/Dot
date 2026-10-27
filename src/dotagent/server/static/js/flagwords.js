@@ -22,6 +22,7 @@ const FLAG_WORDS = {
   upload: "uploads a file",
   self_change: "changes Dot's own files",
   vault_fill: "fills in a login of your vault or password manager, or makes one",
+  trade: "places an order with real money on your trading account",
 };
 
 // What each kind of action says of what Dot is about to do, as a chip's words.

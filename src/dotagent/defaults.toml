@@ -1077,3 +1077,21 @@ updates_per_night = 20
 minutes = 30
 review_timeout_s = 120.0
 
+
+[trading]
+# Trading on Coinbase (docs/trading.md). mode is "off" (no trading tools at all), "paper" (an account of Dot's own that
+# trades at Coinbase's real prices with money that is not there: what to try a way of trading with) or "live" (your
+# Coinbase account, with the key of Settings › Trading, which may view and trade and never transfer). The limits are in
+# quote, the currency of every product in products, and hold in every mode, yolo's too: max_order the most one order may
+# be worth, max_day the most a day's orders may add up to, max_day_loss how much the account may lose in a day before no
+# buy is placed until the next, max_position the most one product held may be worth. No run can change them.
+mode = "off"
+quote = "EUR"
+products = ["BTC-EUR", "ETH-EUR", "SOL-EUR"]
+max_order = 25.0
+max_day = 100.0
+max_day_loss = 25.0
+max_position = 200.0
+paper_start = 1000.0
+paper_fee_rate = 0.006
+timeout_s = 15.0

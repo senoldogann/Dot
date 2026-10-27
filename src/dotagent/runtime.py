@@ -9,6 +9,8 @@ from functools import partial
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from pydantic import SecretStr
+
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import SiteLocks
 from dotagent.agent.judge import SwitchedJudge, TypeSafeService, judge_for
@@ -110,7 +112,11 @@ from dotagent.tools.skill import build_skill_tool
 from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.todos import build_todo_tools
+from dotagent.tools.trading import build_trading_tools
 from dotagent.tools.web import build_web_tools
+from dotagent.trading.coinbase import CoinbaseBroker, kept_key
+from dotagent.trading.market import CoinbaseMarket
+from dotagent.trading.service import Trading, TradingSettings
 from dotagent.vault.items import VaultItems
 from dotagent.vault.onepassword import OnePassword
 from dotagent.vault.secretstore import LoginKeychain
@@ -218,6 +224,8 @@ class Runtime:
     notify: Notifier
     # The runs at work in this process and what each holds (item 301), so that they leave each other's alone.
     peers: Peers
+    # Trading on Coinbase (docs/trading.md): the paper account or the owner's, under the limits of [trading].
+    trading: Trading
 
     @property
     def search_key_present(self) -> bool:
@@ -256,10 +264,33 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),
         *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
+        # The trading tools exist only while the owner has trading on (docs/trading.md).
+        *((build_trading_tools(),) if config.trading.mode != "off" else ()),
     )
     if not config.desktop.enabled:
         return core
     return (*core, build_desktop_tools(), (build_apple_tool(),))
+
+
+def _trading(config: AppConfig, store: Store, zone: ZoneInfo) -> Trading:
+    """Trading of this installation (docs/trading.md): the paper account, and the owner's Coinbase account with the key
+    Settings › Trading keeps in the login Keychain."""
+    trading: Trading = Trading(
+        store=store,
+        settings=TradingSettings(config.trading),
+        market=CoinbaseMarket(config.trading.timeout_s),
+        zone=zone,
+        failsafe_file=failsafe_path(),
+        key_store=LoginKeychain(keychain_file()),
+    )
+
+    async def key() -> tuple[str, SecretStr] | None:
+        # Read from the trading's store as it stands, so that a test's stand-in for the Keychain is the one read.
+        return None if trading.key_store is None else await kept_key(trading.key_store)
+
+    live: CoinbaseBroker = CoinbaseBroker(key=key, timeout_s=config.trading.timeout_s)
+    trading.live = lambda: live
+    return trading
 
 
 def _guarded_files(config: AppConfig) -> tuple[Path, ...]:
@@ -560,6 +591,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             undo_dir=undo_dir(),
             notify=show_notification,
             peers=peers,
+            trading=_trading(config, store, schedule_zone),
         )
         # Chrome asks for its Allow again when Dot connects again to the Chrome of the user it lost, maybe behind
         # another window while a step waits on it: the owner is told on the Mac (item 341).

@@ -32,6 +32,8 @@ _PREFIX_GROUPS: tuple[tuple[str, str], ...] = (
     # The mail and the calendars of the accounts the owner signed in (item 424).
     ("mail_", ACCOUNTS_GROUP),
     ("calendar_", ACCOUNTS_GROUP),
+    # Trading on Coinbase (docs/trading.md), while the owner has it on.
+    ("trading_", "trading"),
 )
 _GROUP_OF_TOOL: dict[str, str] = {
     "apple_script": "desktop",
@@ -59,6 +61,7 @@ _PURPOSES: dict[str, str] = {
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
     "todos": "your own list of work to do for the owner later, on your own, while the Mac is idle",
+    "trading": "trading crypto on Coinbase under the owner's limits: prices, the account, orders",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
 LISTED_TOOLS: int = 16

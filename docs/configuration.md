@@ -10,8 +10,9 @@ scheduler's tick of 0 or less, a port outside 1 to 65535, a browser page smaller
 2,000 characters, a default shell timeout above `max_timeout_s`. So is a value no run could use: an address of a
 provider or of the judge that is not `http://` or `https://` with a host, a model that is not `<provider>:<model>` with
 a provider Dot knows (`[models] search` an Anthropic one), a site under `[policy.spend]` that is not a bare host in
-lower case without `www.`, such as `example.com`. The error names each setting; for a key this version of Dot does not
-have it says that a newer Dot may add it (a daemon that runs an older checkout than the one that wrote the file refuses
+lower case without `www.`, such as `example.com`, a `[trading]` product not priced in its `quote` or a `max_order` over
+its `max_day` ([Trading](trading.md)). The error names each setting; for a key this version of Dot does not have it says
+that a newer Dot may add it (a daemon that runs an older checkout than the one that wrote the file refuses
 it). Two environment variables of the process move things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
 
 | Path (under `~/Library/Application Support/Dot`) | Content                                                              |

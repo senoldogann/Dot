@@ -286,6 +286,27 @@ def chat_team(team: TeamRecord | None) -> ChatTeam | None:
     return None if team is None else ChatTeam(id=team.id, name=team.name, agents=team.agents)
 
 
+class TradingOrderRecord(FrozenModel):
+    """An order of trading (docs/trading.md): ``notional`` is what it was worth in the quote currency (asked, then
+    filled), ``size`` the base it bought or sold, ``price`` the average fill and ``fee`` what it paid. ``status`` is
+    ``pending`` while it is under way, ``filled``, ``failed`` (it surely did nothing) or ``unknown`` (it was sent and
+    no answer said what it did: it counts against the day). ``exchange_id`` is Coinbase's id of a live order."""
+
+    id: str
+    mode: Literal["paper", "live"]
+    product: str
+    side: Literal["buy", "sell"]
+    notional: float
+    size: float
+    price: float
+    fee: float
+    status: Literal["pending", "filled", "failed", "unknown"]
+    ts: float
+    run_id: str
+    exchange_id: str
+    note: str
+
+
 class EventRecord(FrozenModel):
     id: int
     run_id: str
