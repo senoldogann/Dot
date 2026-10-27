@@ -45,10 +45,11 @@ from dotagent.browser import ledger
 from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, read_debug_endpoint, redact_endpoint
 from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
+    PageLines,
     Pulse,
     TextWaitEnd,
     bring_to_front,
-    capture_lines,
+    capture_page,
     cookie_secrets,
     document_of,
     fill_login_field,
@@ -490,6 +491,8 @@ class _Capture:
     offscreen: int
     overlay: str
     overlays: int
+    # Says that the page was read only in part (item 743); empty for a whole read.
+    partial: str = ""
 
 
 # The methods of a request that only reads, and how much of what a script's page sent its value says (item 741).
@@ -1658,15 +1661,15 @@ class BrowserSession:
         """The page as the model reads it, under the URL rules (:meth:`_read_held`)."""
         config: BrowserConfig = self._config
 
-        async def read() -> tuple[Viewport, tuple[SnapshotLine, ...]]:
+        async def read() -> tuple[Viewport, PageLines]:
             # The window's size is read alongside the snapshot, not before it (item 342): in the Chrome of the user it
             # is one more round trip to the page on every capture, and the two reads do not depend on each other.
             return await asyncio.gather(
                 self._viewport(tab),
-                capture_lines(tab.page, _ms(config.action_timeout_s), hide_secrets, tab.vault_held, tab.filled_values),
+                capture_page(tab.page, _ms(config.action_timeout_s), hide_secrets, tab.vault_held, tab.filled_values),
             )
 
-        viewport, lines = await self._read_held(tab, read)
+        viewport, (lines, part_note) = await self._read_held(tab, read)
         kept: tuple[SnapshotLine, ...] = viewport_filter(
             lines, viewport.width, viewport.height, config.viewport_margin_px
         )
@@ -1678,6 +1681,7 @@ class BrowserSession:
             offscreen=max(0, count_refs(lines) - count_refs(kept)),
             overlay=render_lines(overlay),
             overlays=overlays,
+            partial=part_note,
         )
 
     async def _capture_loaded(self, tab: Tab, hide_secrets: bool) -> _Capture:
@@ -1729,12 +1733,13 @@ class BrowserSession:
             overlays=capture.overlays,
             offscreen_refs=capture.offscreen,
             tabs=await self._summaries(thread),
-            notes=tuple(tab.notes),
+            notes=(*tab.notes, capture.partial) if capture.partial else tuple(tab.notes),
         )
         tab.notes.clear()
         tab.lines = capture.lines
         tab.rendered = capture.rendered
         tab.rendered_url = url
+        tab.rendered_partial = bool(capture.partial)
         return view
 
     async def _full_view(self, thread: ThreadTabs, tab: Tab, hide_secrets: bool) -> PageView:
@@ -1751,7 +1756,9 @@ class BrowserSession:
         capture: _Capture = await self._capture(tab, hide_secrets)
         if tab.rendered and tab.rendered_url == tab.page.url:
             diff = diff_views(tab.rendered, capture.rendered)
-            if prefer_diff(diff, capture.rendered):
+            # A part of the page is not compared with a whole one, either way: what it leaves out would read as gone,
+            # or as new.
+            if prefer_diff(diff, capture.rendered) and not capture.partial and not tab.rendered_partial:
                 return await self._assemble(thread, tab, capture, render_diff(diff), "delta")
         return await self._assemble(thread, tab, capture, capture.rendered, "full")
 

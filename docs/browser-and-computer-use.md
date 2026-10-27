@@ -158,7 +158,11 @@ that run. Incognito keeps nothing, as before. **Clear** still deletes them all.
 Both modes share what follows.
 
 - The page is observed as an accessibility snapshot in which every element has a ref (`e12`). It covers the viewport
-  plus `viewport_margin_px`, and `browser_find`, `browser_links` and `browser_read_text` reach what is outside.
+  plus `viewport_margin_px`, and `browser_find`, `browser_links` and `browser_read_text` reach what is outside. A page
+  too heavy to be read whole within `action_timeout_s` (Slack, LinkedIn, a webmail) is not a failed call: the snapshot is
+  taken of the biggest part of it around the middle of the window that holds at most 3 000 elements, and the view's notes
+  say it is a partial view and which part. Its refs work; the next view is a whole one, not a change against it (item
+  743). A page for which no part smaller than the page can be named still fails with the timeout.
 - A collapsed dropdown lists its options on its own line, for example
   `combobox "Shipping" [ref=e3]: options "Standard (3-5 days)" [selected], "Express (next day)"`. `select` takes the
   label or the value of one of them, written as listed; a choice that is not there is refused at once with the options
