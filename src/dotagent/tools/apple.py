@@ -139,7 +139,13 @@ def build_apple_tool() -> RegisteredTool:
         # The environment a run's commands have, without the variables that look like secrets: what the script starts
         # (`do shell script`) would otherwise sign with the owner's SSH agent and print their exported keys (item 555).
         result: str = await run_osascript(
-            language, args.script, (), run_sandbox(ctx).commands, timeout_s, ctx.runtime.shell_env
+            language,
+            args.script,
+            (),
+            run_sandbox(ctx).commands,
+            timeout_s,
+            ctx.runtime.shell_env,
+            script_apps(args.script),
         )
         header: str = f"Script result · {len(result)} characters"
         body: str = result if result else "(the script returned nothing)"

@@ -515,7 +515,14 @@ every mode but `yolo` (item 433).
   fails and tells the run to take a snapshot, which wakes the accessibility of an application that builds it on demand,
   and press or click by ref, or to try again. An application that has nothing to say there (it does not implement
   accessibility, or gives no value) is a click on nothing, as before, since coordinates are for what accessibility
-  does not show.
+  does not show. A coordinate is a point of the main display, the one every screenshot shows: one that falls on
+  another display, or on none, is refused with the advice to take a screenshot (item 751).
+- Failures say what happened (item 751). The hint to grant a permission says "the app that runs Dot" when macOS does
+  not name the program, and never replaces the error it belongs to. An AppleScript that times out says which
+  application it names shows a window on screen, with its title, that may wait for an answer (Microsoft Word's own
+  "Grant File Access" sheet for a file outside its sandbox is one), the Automation approval dialog staying one
+  possibility. A screen capture that comes back empty is asked for once more, and a second empty answer says how long
+  it took and whether Screen Recording is granted.
 - A step the owner was asked about is read again before it goes (item 555): when the application, the kind of window,
   the control, its name or the default button is no longer what the question was about (a page put a "Buy now" where
   the "Send" was while they decided), the step is not done and the run is told to look again. While a batch waits for

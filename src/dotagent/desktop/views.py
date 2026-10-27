@@ -94,6 +94,17 @@ def has_window(pid: int, windows: Sequence[WindowInfo]) -> bool:
     return any(window.pid == pid and _is_app_window(window) for window in windows)
 
 
+def titles_of_windows_shown_by(owners: Sequence[str], windows: Sequence[WindowInfo]) -> tuple[tuple[str, str], ...]:
+    """The on-screen windows of the applications named ``owners`` (read without case), each as the application's name
+    and the window's title (``""`` for one without a title), in the order the window list has them, front first."""
+    wanted: frozenset[str] = frozenset(owner.casefold() for owner in owners)
+    return tuple(
+        (window.owner, window.title)
+        for window in windows
+        if window.owner.casefold() in wanted and window.on_screen and _is_app_window(window)
+    )
+
+
 def _window_views(pid: int, windows: Sequence[WindowInfo], scale: float) -> tuple[WindowView, ...]:
     return tuple(
         WindowView(

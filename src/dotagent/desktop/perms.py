@@ -12,7 +12,10 @@ import ApplicationServices as AS
 import Quartz
 
 from dotagent.core.errors import DesktopError, DesktopPermissionError
+from dotagent.core.logs import get_logger
 from dotagent.desktop.types import Permissions
+
+_log = get_logger("dotagent.desktop.perms")
 
 type Pane = Literal["accessibility", "screen_recording", "input_monitoring", "automation", "full_disk_access"]
 
@@ -127,10 +130,17 @@ def missing_panes(permissions: Permissions) -> tuple[Pane, ...]:
 
 
 def grant_hint(pane: Pane) -> str:
-    """What to switch on, and where, naming the program macOS asks for (``responsible_program``)."""
+    """What to switch on, and where, naming the program macOS asks for (``responsible_program``), or "the app that runs
+    Dot" when macOS does not say. It never raises: it is part of the message of another error and runs in a listener
+    thread that a raise would end (item 751)."""
+    try:
+        who: str = program_name(responsible_program())
+    except Exception as error:  # noqa: BLE001 - the hint only names a program; the error it explains must still come out
+        _log.warning("responsible_program_unknown", error=str(error))
+        who = "the app that runs Dot"
     return (
         f"Open System Settings > Privacy & Security > {PANE_TITLES[pane]} and switch on "
-        f"{program_name(responsible_program())}, then start it again. Settings › System › Permissions in the web UI "
+        f"{who}, then start it again. Settings › System › Permissions in the web UI "
         "asks macOS, opens the pane and starts the service again; `dotx desktop setup` opens the pane in a terminal, "
         "`dotx service permissions` for the service."
     )
