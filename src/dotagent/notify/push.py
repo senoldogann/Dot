@@ -17,7 +17,6 @@ from typing import Literal
 import structlog
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from py_vapid import Vapid, b64urlencode
-from pywebpush import WebPushException, webpush
 
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT, CampaignEnded
@@ -236,6 +235,10 @@ def notice_message(event: EventRecord) -> PushMessage | None:
 
 
 def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) -> None:
+    # pywebpush loads aiohttp and requests, about 25 MB: the first notification sent loads it, not the daemon's start
+    # (item 729).
+    from pywebpush import WebPushException, webpush
+
     try:
         webpush(
             subscription_info={

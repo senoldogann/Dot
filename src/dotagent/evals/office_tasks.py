@@ -11,15 +11,16 @@ import re
 import sys
 from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Literal
-
-from docx import Document
-from docx.document import Document as DocumentObject
-from docx.text.paragraph import Paragraph as DocxParagraph
-from openpyxl import load_workbook
-from openpyxl.workbook.workbook import Workbook
+from typing import TYPE_CHECKING, Literal
 
 from dotagent.evals.ooxml import Formula, Paragraph, Run, Sheet, Table, document, workbook
+
+# python-docx and openpyxl, about 60 MB with numpy, are loaded by the checks, which run in a process of their own; the
+# catalog of tasks the daemon reads needs only the files this module writes itself (item 729).
+if TYPE_CHECKING:
+    from docx.document import Document as DocumentObject
+    from docx.text.paragraph import Paragraph as DocxParagraph
+    from openpyxl.workbook.workbook import Workbook
 
 # The months of the Data sheet before the task: name, units and price.
 SALES_MONTHS: tuple[tuple[str, int, float], ...] = (
@@ -116,7 +117,7 @@ def reaches(formula: str, row: int) -> bool:
     return False
 
 
-def sales_problems(book: Workbook) -> list[str]:
+def sales_problems(book: "Workbook") -> list[str]:
     """What is wrong with the sales workbook after the task: the seven months as they were, August after them, and
     each total of the Summary sheet a formula that reads August's row."""
     data = book["Data"]
@@ -137,7 +138,7 @@ def sales_problems(book: Workbook) -> list[str]:
     return problems
 
 
-def _every_paragraph(letter: DocumentObject) -> Iterator[DocxParagraph]:
+def _every_paragraph(letter: "DocumentObject") -> Iterator["DocxParagraph"]:
     """The paragraphs of the body, of its tables and of the headers."""
     yield from letter.paragraphs
     for table in letter.tables:
@@ -148,7 +149,9 @@ def _every_paragraph(letter: DocumentObject) -> Iterator[DocxParagraph]:
         yield from section.header.paragraphs
 
 
-def _formatting_problem(paragraphs: Sequence[DocxParagraph], start: str, kind: Literal["bold", "italic"]) -> str | None:
+def _formatting_problem(
+    paragraphs: Sequence["DocxParagraph"], start: str, kind: Literal["bold", "italic"]
+) -> str | None:
     """What is wrong with the formatting of the new name in the body paragraph that begins with ``start``: the name
     has to be ``kind`` and the words around it not."""
     paragraph: DocxParagraph | None = next((entry for entry in paragraphs if entry.text.startswith(start)), None)
@@ -163,7 +166,7 @@ def _formatting_problem(paragraphs: Sequence[DocxParagraph], start: str, kind: L
     return f"in {paragraph.text!r} the new name is not {kind} as the old one was, or the words around it became {kind}"
 
 
-def letter_problems(letter: DocumentObject) -> list[str]:
+def letter_problems(letter: "DocumentObject") -> list[str]:
     """What is wrong with the letter after the task: the old name anywhere, the new one not in each place the old one
     was, the formatting of the two places that had one, and the paragraphs of the body that did not hold it."""
     texts: list[str] = [paragraph.text for paragraph in _every_paragraph(letter)]
@@ -187,6 +190,9 @@ def main(arguments: Sequence[str]) -> int:
     if len(arguments) != 2 or arguments[0] not in ("sales", "letter"):
         print("usage: python -m dotagent.evals.office_tasks sales|letter <path>")
         return 2
+    from docx import Document
+    from openpyxl import load_workbook
+
     path: Path = Path(arguments[1])
     problems: list[str] = (
         sales_problems(load_workbook(path)) if arguments[0] == "sales" else letter_problems(Document(str(path)))
