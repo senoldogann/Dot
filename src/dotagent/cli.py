@@ -380,8 +380,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--run",
         dest="run_id",
         default=None,
-        help="the run to learn from, the newest by default; a step that only tries the pool leaves it for the next that"
-        " proposes",
+        help="the run to learn from, the one that went worst by default; a step that only tries the pool leaves it"
+        " for the next that proposes",
     )
     harness_step.add_argument(
         "--scripted", action="store_true", help="play the references through the scripted model: a check, no model cost"

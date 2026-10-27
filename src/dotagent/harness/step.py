@@ -1,9 +1,9 @@
-"""One step of the improvement loop (item 391, docs/harness.md): from the newest run of the owner's that ended, the
-proposer writes a candidate in each scope; the scoring set is played under the adopted texts and under each candidate,
-within a budget the step stops before passing; the candidate that did better on a task and worse on none survives, two
-that both did are merged by the composer and the merge is played in its turn; what each edit did is written as
-experience; the probed version waits for the owner, or is adopted when ``[harness] adopt`` says so. The step records
-what it did, and the probes run apart from the daemon."""
+"""One step of the improvement loop (item 391, docs/harness.md): from the run of the owner's that went worst (item 720),
+the proposer writes a candidate in each scope; the scoring set is played under the adopted texts and under each
+candidate, within a budget the step stops before passing; the candidate that did better on a task and worse on none
+survives, two that both did are merged by the composer and the merge is played in its turn; what each edit did is
+written as experience; the probed version waits for the owner, or is adopted when ``[harness] adopt`` says so. The step
+records what it did, and the probes run apart from the daemon."""
 
 import asyncio
 import json
@@ -140,11 +140,27 @@ async def _why_not_adopted(store: Store, version_id: str, held: Sequence[str]) -
     return "left to you: what is in use changed while the step ran"
 
 
+# How many of the newest runs a step may learn from are weighed for the one that went worst (item 720).
+RUNS_WEIGHED: int = 30
+# How badly a run ended, worst highest: one that failed, then one that was stopped or held, then the rest.
+_ENDED_BADLY: dict[str, int] = {"failed": 2, "cancelled": 1, "blocked": 1}
+
+
 async def pick_run(store: Store, since: float) -> RunRecord | None:
-    """The newest run of the owner's that ended after ``since`` and that a step may learn from (:func:`learns_from`),
-    or ``None``."""
-    runs: list[RunRecord] = [run for run in await store.runs_finished_since(since) if learns_from(run)]
-    return max(runs, key=lambda run: run.finished_at or 0.0, default=None)
+    """Of the newest :data:`RUNS_WEIGHED` runs of the owner's that ended after ``since`` and that a step may learn from
+    (:func:`learns_from`), the one that went worst (item 720): one that failed before one that was stopped or held,
+    before the rest, then the one with the most tool calls that failed, then the newest. A run that went well teaches
+    little, and the proposer kept the harness or wrote a habit nothing tested. ``None`` when there is none."""
+    runs: list[RunRecord] = sorted(
+        (run for run in await store.runs_finished_since(since) if learns_from(run)),
+        key=lambda run: run.finished_at or 0.0,
+    )[-RUNS_WEIGHED:]
+    errors: dict[str, int] = await store.tool_errors_of([run.id for run in runs])
+    return max(
+        runs,
+        key=lambda run: (_ENDED_BADLY.get(run.status, 0), errors.get(run.id, 0), run.finished_at or 0.0),
+        default=None,
+    )
 
 
 def _cards(report: ProbeReport) -> list[tuple[object, ...]]:
@@ -678,9 +694,9 @@ async def _prune(store: Store, config: HarnessConfig, now: float) -> None:
 
 
 async def run_step(runtime: Runtime, now: float, from_run: str | None, prober: Prober, scripted: bool) -> HarnessStep:
-    """One step at ``now``, learning from ``from_run`` or from the newest run of the owner's that ended since the last
-    step, its probes played by ``prober`` (apart from the daemon, or in this process for a process that runs nothing
-    else); ``scripted`` plays the references through the scripted model, which checks the step without a model's
+    """One step at ``now``, learning from ``from_run`` or from the run of the owner's that went worst (item 720) since
+    the last step, its probes played by ``prober`` (apart from the daemon, or in this process for a process that runs
+    nothing else); ``scripted`` plays the references through the scripted model, which checks the step without a model's
     cost. The step is recorded whatever happens; a failure is raised after it is."""
     store: Store = runtime.store
     plan: StepPlan = plan_of(runtime.config.harness, runtime.config.models.main, scripted)

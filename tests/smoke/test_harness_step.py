@@ -41,7 +41,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatProvider, ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server import UI_SOURCE
-from dotagent.store.models import HarnessStep, HarnessVersion, RunRecord
+from dotagent.store.models import HarnessStep, HarnessVersion, RunRecord, RunStatus
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -1108,6 +1108,49 @@ async def test_a_run_on_one_of_zens_free_models_is_not_the_run_a_step_learns_fro
         # With only the OpenCode agent's run since the last step, there is none to learn from.
         own_end: float | None = (await store.get_run(own.id)).finished_at
         assert own_end is not None and await pick_run(store, own_end + 0.001) is None
+
+
+async def test_the_step_learns_from_the_run_that_went_worst(login_env: dict[str, str]) -> None:
+    """Item 720: of the runs since the last step, one that failed before one that was stopped, before the one with the
+    most tool calls that failed, before the newest that went well."""
+    async with _session(login_env, [_FINISH], {}) as (runtime, _manager):
+        store = runtime.store
+        thread = await store.create_thread("runs", "test")
+
+        async def ended(status: RunStatus, tool_errors: int) -> RunRecord:
+            run: RunRecord = await store.create_run(
+                thread.id,
+                "Count the files",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                "ui",
+                "medium",
+                "standard",
+                None,
+                "ask",
+                False,
+                None,
+                None,
+                None,
+            )
+            for number in range(tool_errors):
+                await runtime.bus.emit(
+                    run.id, "tool_result", {"call_id": f"c{number}", "tool": "shell", "ok": False}, True
+                )
+            await runtime.bus.emit(run.id, "tool_result", {"call_id": "fine", "tool": "shell", "ok": True}, True)
+            await store.finish_run(run.id, status, "x")
+            return run
+
+        clumsy: RunRecord = await ended("done", 3)
+        await ended("done", 1)
+        await ended("done", 0)
+        assert (await pick_run(store, 0.0)) == await store.get_run(clumsy.id)
+        stopped: RunRecord = await ended("cancelled", 0)
+        assert (await pick_run(store, 0.0)) == await store.get_run(stopped.id)
+        failed: RunRecord = await ended("failed", 0)
+        await ended("done", 5)
+        assert (await pick_run(store, 0.0)) == await store.get_run(failed.id)
 
 
 async def test_the_records_older_than_the_days_kept_are_deleted_when_a_step_ends(login_env: dict[str, str]) -> None:

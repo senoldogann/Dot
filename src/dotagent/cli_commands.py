@@ -226,8 +226,8 @@ class HarnessProposeCommand(FrozenModel):
 
 
 class HarnessStepCommand(FrozenModel):
-    """One step of the improvement loop now (item 391): from ``run_id``, or the newest run that ended; ``scripted``
-    plays the references through the scripted model, a check of the step without a model's cost."""
+    """One step of the improvement loop now (item 391): from ``run_id``, or the run that went worst (item 720);
+    ``scripted`` plays the references through the scripted model, a check of the step without a model's cost."""
 
     name: Literal["harness-step"]
     run_id: str | None

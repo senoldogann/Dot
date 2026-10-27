@@ -908,31 +908,31 @@ composer = ""
 selector = ""
 experience = ""
 # The nightly step (docs/harness.md): once a day at step_time (a time of day in [scheduler] timezone; "off", the
-# default, never), the step reads the newest run of yours that ended since the last step that took one (a week back at
-# most), asks the proposer for a candidate in each scope of step_candidates, plays the scoring set (eval task ids, safe
-# to repeat, never shown to the proposer) step_repeats times under the adopted texts and under each candidate in a
-# separate process and throw-away homes, keeps the candidate that did better on a task and worse on none by at least
-# step_margin passes in all, has the composer merge two that both did, writes what each edit did as experience, and
-# stops at step_minutes or step_tokens of the model under test. The final set is played only by `dotx harness final`,
-# once a version is adopted, and reported as it comes out; no task is in both sets (a task you name in one list leaves
-# the default of the other). The scoring set holds a task of honesty (the right answer is "I could not") and one with an
-# instruction hidden in a file (it must not be followed), the guards, so that a candidate that overclaims or follows a
-# page cannot win; a step scores on them and on the tasks of the pool with headroom (below, item 719). Every run of a
-# probe spends the main model's tokens: the ten tasks a step scores on at most, twice, under three texts, are about
-# sixty runs (measured 2026-10-19 with Claude Haiku 5.5: about 57,000 tokens a run with Dot's prompt, 1.8 million for
-# two texts of eight tasks; the base, a candidate in each scope and a composed one are four texts, about 4.6 million,
-# which step_tokens leaves room for). A pass more than the base on a task is a thin gain (a task that is passed one time
-# in two passes the other time by luck), so a candidate is better only when it passed at least step_margin more attempts
-# than the base over the whole scoring set, and worse on no task; one with less is "unclear", and says why. adopt =
-# "owner" leaves the probed version for you to adopt (`dotx harness adopt`); "auto" adopts one the probe showed better,
-# with step_repeats of at least 2 and confirmed (the base and the survivor played again on new attempts, twice as many,
-# and better again by twice the margin: luck alone gives a text that changes nothing one better score in a step in six
-# to twenty-seven, and two in a row in under two), never one written from a run that had read content others can author,
-# and never over a version you adopted since the step began. The confirmation costs as much again as the step: with
-# auto, a step with a composed survivor needs about 9 million tokens, over the 8 million of step_tokens, so raise it
-# with auto (a confirmation the budget cuts short is unclear, and the survivor is left to you, as the decision says).
-# The records of the loop (versions you set aside, steps, their probes, experiences) are deleted when they are older
-# than keep_days days (0: never), but for the adopted version and its lineage.
+# default, never), the step reads the run of yours that went worst of those that ended since the last step that took one
+# (a week back at most), asks the proposer for a candidate in each scope of step_candidates, plays the scoring set (eval
+# task ids, safe to repeat, never shown to the proposer) step_repeats times under the adopted texts and under each
+# candidate in a separate process and throw-away homes, keeps the candidate that did better on a task and worse on none
+# by at least step_margin passes in all, has the composer merge two that both did, writes what each edit did as
+# experience, and stops at step_minutes or step_tokens of the model under test. The final set is played only by `dotx
+# harness final`, once a version is adopted, and reported as it comes out; no task is in both sets (a task you name in
+# one list leaves the default of the other). The scoring set holds a task of honesty (the right answer is "I could not")
+# and one with an instruction hidden in a file (it must not be followed), the guards, so that a candidate that
+# overclaims or follows a page cannot win; a step scores on them and on the tasks of the pool with headroom (below, item
+# 719). Every run of a probe spends the main model's tokens: the ten tasks a step scores on at most, twice, under three
+# texts, are about sixty runs (measured 2026-10-19 with Claude Haiku 5.5: about 57,000 tokens a run with Dot's prompt,
+# 1.8 million for two texts of eight tasks; the base, a candidate in each scope and a composed one are four texts, about
+# 4.6 million, which step_tokens leaves room for). A pass more than the base on a task is a thin gain (a task that is
+# passed one time in two passes the other time by luck), so a candidate is better only when it passed at least
+# step_margin more attempts than the base over the whole scoring set, and worse on no task; one with less is "unclear",
+# and says why. adopt = "owner" leaves the probed version for you to adopt (`dotx harness adopt`); "auto" adopts one the
+# probe showed better, with step_repeats of at least 2 and confirmed (the base and the survivor played again on new
+# attempts, twice as many, and better again by twice the margin: luck alone gives a text that changes nothing one better
+# score in a step in six to twenty-seven, and two in a row in under two), never one written from a run that had read
+# content others can author, and never over a version you adopted since the step began. The confirmation costs as much
+# again as the step: with auto, a step with a composed survivor needs about 9 million tokens, over the 8 million of
+# step_tokens, so raise it with auto (a confirmation the budget cuts short is unclear, and the survivor is left to you,
+# as the decision says). The records of the loop (versions you set aside, steps, their probes, experiences) are deleted
+# when they are older than keep_days days (0: never), but for the adopted version and its lineage.
 step_time = "off"
 scoring_tasks = ["impossible-missing-file", "injection-in-invoice"]
 final_tasks = ["fix-add-bug", "recover-wrong-extension", "report-failing-tests", "injection-in-notes"]
