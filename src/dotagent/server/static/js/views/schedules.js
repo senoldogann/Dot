@@ -61,6 +61,9 @@ function lastStatusBadge(status) {
     tone = "b-info";
   } else if (status.startsWith("skipped")) {
     tone = "b-warn";
+  } else if (status.startsWith("failed to start")) {
+    // A firing that started nothing is a failure (item 723): it read grey, as a status of no weight.
+    tone = "b-bad";
   }
   return el("span", { class: `badge ${tone}`, title: status }, clip(status, 60));
 }
@@ -247,13 +250,17 @@ function scheduleRow(view, handlers) {
     },
     "History",
   );
+  // A one-time schedule that ran at its moment, as the daemon says (item 723): it read "switched off", as one the owner
+  // had switched off, and switching it on was refused.
+  const done = view.ran_once === true;
   const toggle = el("button", {
     class: "switch",
     type: "button",
     role: "switch",
     "aria-checked": String(record.enabled),
     "aria-label": `${record.enabled ? "Switch off" : "Switch on"} ${record.name}`,
-    title: record.enabled ? "Switch this schedule off" : "Switch this schedule on",
+    title: done ? "It ran once and has no run left: Edit gives it a new time" : record.enabled ? "Switch this schedule off" : "Switch this schedule on",
+    disabled: done,
     onclick: () => handlers.onToggle(record),
   });
   const edit = el(
@@ -279,7 +286,10 @@ function scheduleRow(view, handlers) {
     icon("trash"),
   );
   let next = null;
-  if (!record.enabled) {
+  if (done) {
+    // Grey, as it says nothing of how the run went: the badge of its last status beside it says that.
+    next = el("span", { class: "badge b-muted", title: "A one-time schedule: it ran at its time, and waits for nothing more" }, "ran once");
+  } else if (!record.enabled) {
     next = el("span", { class: "badge b-muted" }, "switched off");
   } else if (view.next_local !== null) {
     next = el("span", null, `Next ${view.next_local}`);
@@ -604,7 +614,11 @@ function scheduleForm({ view }) {
   cronField.hidden = startsOnce;
   atField.hidden = !startsOnce;
   const enabled = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": String(record === null || record.enabled), "aria-label": "Switched on" });
+  // Whether the owner moved the form's switch: an edit that leaves it alone keeps the schedule on or off as it is then,
+  // not as it was when the form opened (item 723).
+  let enabledTouched = false;
   enabled.addEventListener("click", () => {
+    enabledTouched = true;
     enabled.setAttribute("aria-checked", String(enabled.getAttribute("aria-checked") !== "true"));
   });
   if (record !== null) {
@@ -659,7 +673,7 @@ function scheduleForm({ view }) {
       await api.post("/schedules", body);
       toast("ok", "Schedule added.");
     } else {
-      await api.patch(`/schedules/${record.id}`, { ...body, enabled: enabled.getAttribute("aria-checked") === "true" });
+      await api.patch(`/schedules/${record.id}`, enabledTouched ? { ...body, enabled: enabled.getAttribute("aria-checked") === "true" } : body);
       toast("ok", "Schedule saved.");
     }
     return true;

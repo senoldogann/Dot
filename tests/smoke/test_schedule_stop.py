@@ -21,6 +21,7 @@ from dotagent.events import SYSTEM_RUN_ID
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_STOPPED_EVENT
+from dotagent.scheduler.plans import ScheduleRequest, edit_schedule
 from dotagent.scheduler.runner import Scheduler
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -282,3 +283,117 @@ async def test_the_row_says_how_many_runs_failed_in_a_row_and_the_form_offers_th
                 await page.close()
         finally:
             await browser.close()
+
+
+async def test_an_edit_that_leaves_the_switch_alone_keeps_the_schedule_on_or_off_as_it_is(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 723: the form sent the switch as it was when it opened, so a schedule switched on in the list meanwhile was
+    switched off again by a save of its goal, and one switched off for its failures was switched on by one. Left out,
+    on or off stays as it is."""
+    created: ScheduleRecord = await _schedule(client, {"name": "kept", "goal": "Look.", "cron": "0 9 * * *"})
+    whole: JsonObject = {"name": "kept", "goal": "Look again.", "cron": "0 9 * * *", "at": None, "mode": "task"}
+    whole |= dict.fromkeys(("model", "effort", "speed", "approvals", "goal_mode", "timezone"), None)
+    for switched in (False, True):
+        side: str = "enable" if switched else "disable"
+        assert (await client.post(f"/api/schedules/{created.id}/{side}")).status_code == 200
+        saved: httpx.Response = await client.patch(f"/api/schedules/{created.id}", json=whole)
+        assert saved.status_code == 200, saved.text
+        assert (saved.json()["record"]["enabled"], saved.json()["record"]["goal"]) == (switched, "Look again.")
+    # Named, it is as the form says.
+    off: httpx.Response = await client.patch(f"/api/schedules/{created.id}", json={**whole, "enabled": False})
+    assert off.json()["record"]["enabled"] is False
+
+
+async def test_a_one_time_schedule_due_and_waiting_can_have_its_goal_edited(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 723: a one-time schedule whose moment passed while it waited (its agent paused, the emergency stop, a start
+    tried again) was refused an edit of its goal as having no run left; it keeps waiting, due."""
+    at: datetime = datetime.now(runtime.schedule_zone).replace(microsecond=0) + timedelta(hours=1)
+    created: ScheduleRecord = await _schedule(
+        client, {"name": "waits", "goal": "Once.", "at": at.strftime("%Y-%m-%dT%H:%M")}
+    )
+    assert created.next_run_at is not None
+    edited: ScheduleRecord = await edit_schedule(
+        runtime.store,
+        runtime.config.scheduler,
+        runtime.schedule_zone,
+        created.id,
+        ScheduleRequest(
+            name="waits",
+            goal="Once, said better.",
+            cron=None,
+            at=at.strftime("%Y-%m-%dT%H:%M"),
+            mode="task",
+            options=created.options,
+        ),
+        True,
+        created.next_run_at + 60,
+    )
+    assert (edited.enabled, edited.next_run_at, edited.goal) == (True, created.next_run_at, "Once, said better.")
+
+
+@pytest.mark.browser
+async def test_a_one_time_schedule_that_ran_reads_ran_once_not_switched_off(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 723: a one-time schedule that fired read "switched off", as one the owner had switched off, and its switch,
+    pressed, was refused ("no run left"). It reads "ran once" and has no switch to press; one switched off by hand
+    before its time still reads "switched off"."""
+    at: datetime = datetime.now(runtime.schedule_zone).replace(microsecond=0) + timedelta(hours=1)
+    when: str = at.strftime("%Y-%m-%dT%H:%M")
+    ran: ScheduleRecord = await _schedule(client, {"name": "ran", "goal": "Once.", "at": when})
+    held: ScheduleRecord = await _schedule(client, {"name": "held", "goal": "Once.", "at": when})
+    assert ran.next_run_at is not None
+    await runtime.store.record_schedule_fire(ran.id, ran.next_run_at, None, "thr_ran", "done")
+    assert (await client.post(f"/api/schedules/{held.id}/disable")).status_code == 200
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 390, "height": 844}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            done: Locator = page.locator(f'[data-schedule="{ran.id}"]')
+            await expect(done.locator(".badge", has_text="ran once")).to_be_visible()
+            await expect(done.get_by_role("switch")).to_be_disabled()
+            off: Locator = page.locator(f'[data-schedule="{held.id}"]')
+            await expect(off.locator(".badge", has_text="switched off")).to_be_visible()
+            await expect(off.get_by_role("switch")).to_be_enabled()
+            await page.screenshot(path=str(tmp_path / "ran-once-390.png"), full_page=True)
+        finally:
+            await browser.close()
+
+
+async def test_only_a_one_time_schedule_that_ran_at_its_moment_reads_ran_once(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 723, pre-push review round 1: "ran once" was guessed by the page from a firing having happened, so a
+    schedule given a new time after it fired, or one whose start failed, read "ran once" once switched off by hand, and
+    could not be switched on. The daemon says it, from a firing at its moment that started its run."""
+    at: datetime = datetime.now(runtime.schedule_zone).replace(microsecond=0) + timedelta(hours=1)
+    when: str = at.strftime("%Y-%m-%dT%H:%M")
+
+    async def ran_once(schedule_id: str) -> bool:
+        view: httpx.Response = await client.get(f"/api/schedules/{schedule_id}")
+        return bool(view.json()["ran_once"])
+
+    ran: ScheduleRecord = await _schedule(client, {"name": "fired", "goal": "Once.", "at": when})
+    assert ran.next_run_at is not None
+    await runtime.store.record_schedule_fire(ran.id, ran.next_run_at, None, "thr_fired", "done")
+    assert await ran_once(ran.id)
+    # Given a later time, then switched off by hand before it: an earlier firing is not this moment's.
+    later: str = (at + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
+    whole: JsonObject = {"name": "fired", "goal": "Once.", "cron": None, "at": later, "mode": "task", "enabled": True}
+    whole |= dict.fromkeys(("model", "effort", "speed", "approvals", "goal_mode", "timezone"), None)
+    assert (await client.patch(f"/api/schedules/{ran.id}", json=whole)).status_code == 200
+    assert (await client.post(f"/api/schedules/{ran.id}/disable")).status_code == 200
+    assert not await ran_once(ran.id)
+    # A start that failed, then switched off by hand.
+    failed: ScheduleRecord = await _schedule(client, {"name": "unstarted", "goal": "Once.", "at": when})
+    assert failed.next_run_at is not None
+    await runtime.store.record_schedule_fire(failed.id, failed.next_run_at, None, "thr_un", "starting")
+    await runtime.store.set_schedule_status(failed.id, "failed to start: the model is not available")
+    assert not await ran_once(failed.id)

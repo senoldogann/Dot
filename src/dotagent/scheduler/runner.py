@@ -105,6 +105,11 @@ async def _emergency_stop_engaged() -> bool:
     return await asyncio.to_thread(failsafe_path().exists)
 
 
+def _chat_busy(error: DotError) -> bool:
+    """Whether a firing's start was refused because a run works in the chat it goes on in (item 723)."""
+    return isinstance(error, RunConflict) and "thread_id" in error.context
+
+
 class Scheduler:
     """Looks for due schedules every ``tick_s`` seconds and starts a run for each, in the chat a firing goes in
     (:meth:`_firing_chat`).
@@ -593,6 +598,13 @@ class Scheduler:
         try:
             started = await self._start(record, firing_opening(told, digest), thread_id, carried)
         except DotError as exc:
+            if _chat_busy(exc) and not one_time:
+                # A run going on in a recurring schedule's own chat (the owner's message in it, item 257) is no
+                # failure: the firing is skipped, as one under the emergency stop is, and nobody is told of a fault
+                # (item 723). A one-time schedule's is kept as a failure, whose wait spaces its next try.
+                log.info("schedule_skipped_chat_busy", schedule_id=record.id, error=exc.message)
+                await store.set_schedule_status(record.id, f"skipped: {exc.message}")
+                return
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             failed: str = f"failed to start: {exc.message}"
             await store.set_schedule_status(record.id, failed)

@@ -328,6 +328,17 @@ earlier runs.
   the row to 0, a run cancelled (stopped by you, the emergency stop or the daemon) counts neither way, a run started
   by hand counts as one at its time, and a firing that started no run counts not at all. A one-time schedule is never
   switched off by it. Switching a schedule on again, or changing it, starts its row afresh.
+- A one-time schedule that fired has no run left: its row says **ran once**, in grey beside how its run ended, and has
+  no switch to press (item 723); it read "switched off", as one you had switched off, and switching it on was refused.
+  **Edit** gives it a new time. One you switched off before its time still says "switched off". A one-time schedule due
+  and still waiting (its agent paused, the emergency stop, a start tried again) can have its goal or name edited, and
+  keeps waiting.
+- Saving a schedule's form keeps it switched on or off as it is then, unless you moved the form's own switch (item
+  723): the form sent the switch as it was when it opened, so a schedule switched on in the list meanwhile went off
+  again (`PATCH /api/schedules/{id}` without `enabled` keeps it as it is).
+- A repeating schedule whose chat is busy when it comes due (with "the same chat", your message in it still being
+  worked on) skips that firing, saying "skipped: a run is already active on this thread" in amber, and counts no
+  failure (item 723). A firing that started no run for another reason says "failed to start", in red.
 - How the end of a schedule's run is told on your phone and desktop (item 461): **Notifications** in its form, else
   `[scheduler] notify` (`always`, every end, by default). **Only when it fails or needs me** (`problems`) tells a run
   that ends with something it needs from you, failed or not, and of the other failed runs the first of a row, not the
