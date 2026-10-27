@@ -448,8 +448,11 @@ async def test_a_step_asked_again_on_the_standby_model_keeps_the_tools_a_progres
 
 
 async def test_without_a_standby_model_the_run_fails_with_the_error_of_its_model(login_env: dict[str, str]) -> None:
+    """With no wait for a spent quota (``[agent] quota_wait_s`` 0; item 713 waits for one by default)."""
     spent: SpendingProvider = _spent()
-    async with _session(_config([], [], 5), login_env, {"anthropic": spent}) as (runtime, runs):
+    config: AppConfig = _config([], [], 5)
+    config = config.model_copy(update={"agent": config.agent.model_copy(update={"quota_wait_s": 0.0})})
+    async with _session(config, login_env, {"anthropic": spent}) as (runtime, runs):
         played: Played = await _play(runtime, runs, SPENT_MAIN, None)
     assert played.record.status == "failed"
     assert played.record.result.startswith("credit balance is too low")

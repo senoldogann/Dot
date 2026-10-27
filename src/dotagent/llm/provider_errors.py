@@ -20,6 +20,7 @@ from dotagent.core.errors import (
     ProviderQuotaError,
     ProviderRateLimitError,
     ProviderRunnerError,
+    ProviderWindowError,
 )
 from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel, JsonObject
@@ -48,9 +49,10 @@ _OPENAI_QUOTA: frozenset[str] = frozenset(
         "organization_usage_limit_exceeded",
     }
 )
-_OPENCODE_QUOTA: frozenset[str] = frozenset(
-    {"GoUsageLimitError", "CreditsError", "MonthlyLimitError", "UserLimitError"}
-)
+_OPENCODE_QUOTA: frozenset[str] = frozenset({"MonthlyLimitError", "UserLimitError"})
+# OpenCode Go's usage limit of a rolling window (five hours, a week), which comes back by itself.
+_OPENCODE_WINDOW: str = "GoUsageLimitError"
+_OPENCODE_CREDITS: str = "CreditsError"
 _ANTHROPIC_QUOTA: frozenset[str] = frozenset({"billing_error"})
 # How ollama.com words a plan whose included usage is spent ("You used all included … usage"), with HTTP 429.
 _OLLAMA_PLAN_SPENT: str = "used all included"
@@ -203,7 +205,17 @@ def classify_openai(
 def classify_opencode(
     status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
 ) -> ProviderHttpError:
-    """OpenCode Go: quota and credit errors are terminal whatever their status; ``RateLimitError`` is a burst."""
+    """OpenCode Go: quota and credit errors are terminal whatever their status; ``RateLimitError`` is a burst. Spent
+    credits are :class:`ProviderCreditError`: the owner buys them, and no run waits for them (item 713), as a run waits
+    for the window of a spent usage limit."""
+    if wire is not None and wire.kind == _OPENCODE_CREDITS:
+        return ProviderCreditError(
+            error_message(status, wire), status, retry_after_s, {**detail, "limit_name": wire.limit_name}, None
+        )
+    if wire is not None and wire.kind == _OPENCODE_WINDOW:
+        return ProviderWindowError(
+            error_message(status, wire), status, retry_after_s, {**detail, "limit_name": wire.limit_name}
+        )
     if wire is not None and wire.kind in _OPENCODE_QUOTA:
         return ProviderQuotaError(
             error_message(status, wire), status, retry_after_s, {**detail, "limit_name": wire.limit_name}
@@ -215,11 +227,12 @@ def classify_anthropic(
     status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
 ) -> ProviderHttpError:
     """Anthropic: a billing problem (402, ``billing_error``) and a spent prepaid balance (a 400 that says so) are
-    terminal; an overloaded API (529) is retried."""
+    terminal; an overloaded API (529) is retried. The spent balance is :class:`ProviderCreditError`, which no run waits
+    for (item 713): the owner buys credits."""
     if status == 402 or (wire is not None and wire.kind in _ANTHROPIC_QUOTA):
         return ProviderQuotaError(error_message(status, wire), status, retry_after_s, detail)
     if status == 400 and wire is not None and _ANTHROPIC_NO_CREDIT in wire.message.lower():
-        return ProviderQuotaError(error_message(status, wire), status, retry_after_s, detail)
+        return ProviderCreditError(error_message(status, wire), status, retry_after_s, detail, None)
     return classify_generic(status, wire, retry_after_s, detail)
 
 

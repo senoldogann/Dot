@@ -79,6 +79,11 @@ class ProviderQuotaError(ProviderHttpError):
         self.retry_after_s: float | None = retry_after_s
 
 
+class ProviderWindowError(ProviderQuotaError):
+    """A subscription's usage window is spent (OpenCode Go's usage limit): it comes back by itself within hours, which a
+    run waits for (item 713), as for a quota whose provider named when it comes back."""
+
+
 class ProviderCreditError(ProviderQuotaError):
     """OpenRouter's 402 for an account whose credits do not pay for the request. The price of a request counts the
     longest answer it allows, which is the model's own limit when it names none, so the account may pay for a shorter

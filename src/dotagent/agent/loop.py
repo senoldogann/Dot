@@ -186,7 +186,10 @@ from dotagent.core.errors import (
     NotFoundError,
     ProviderError,
     ProviderFilterError,
+    ProviderQuotaError,
+    ProviderRateLimitError,
     ProviderTransportError,
+    ProviderWindowError,
     RunCancelled,
     RunHoldLapsed,
     StoreError,
@@ -324,6 +327,12 @@ MODEL_BACK_EVENT: str = "model_back"
 _RETRY_FIRST_S: float = 10.0
 _RETRY_LONGEST_S: float = 60.0
 _RETRY_LEAST: int = 4
+# A run whose model's rate limit or usage window is spent waits for it instead of ending (item 713, [agent]
+# quota_wait_s): what makes it wait, and how far apart it asks again: when the provider said they come back, within
+# these bounds, else every _QUOTA_RETRY_S.
+_QUOTA_RETRY_S: float = 600.0
+_QUOTA_RETRY_LEAST_S: float = 60.0
+_QUOTA_RETRY_MOST_S: float = 1800.0
 # A summary is never asked for in more words than this, whatever the budget: a longer one costs the writer's seconds
 # at every compaction and fills the note that every later step carries (item 55).
 _SUMMARY_MAX_WORDS: int = 1500
@@ -1649,6 +1658,33 @@ def _connection_broke(error: Exception) -> bool:
     return is_retryable_provider_error(error) and unavailable_reason(error) is None
 
 
+def _spent(error: Exception) -> str | None:
+    """Why the model cannot answer for a while that waiting mends (item 713): a rate limit, or a subscription's usage
+    window (:class:`ProviderWindowError`), both of which come back by themselves. ``None`` for every other quota, spent
+    credits, a spend or monthly limit, a refused key or access, a missing key or any other error, whatever time their
+    provider names: the run ends saying so at once (the code reviews of item 713 found quotas whose named time a gateway
+    puts on every answer)."""
+    if isinstance(error, ProviderWindowError):
+        return "usage window spent"
+    if isinstance(error, ProviderQuotaError):
+        return None
+    if isinstance(error, ProviderRateLimitError):
+        return "rate limited"
+    return None
+
+
+def _quota_retry(error: Exception, left_s: float) -> float:
+    """The seconds before a step whose model's quota is spent (``error``) is asked again: the wait its provider named,
+    within :data:`_QUOTA_RETRY_LEAST_S` and :data:`_QUOTA_RETRY_MOST_S`, else :data:`_QUOTA_RETRY_S`; never past the
+    end of the wait (``left_s``). The router's pause is not read: it holds a cooldown of its own when nothing was
+    named."""
+    named: float | None = (
+        error.retry_after_s if isinstance(error, ProviderQuotaError | ProviderRateLimitError) else None
+    )
+    wait: float = _QUOTA_RETRY_S if named is None or not named > 0 else named
+    return min(max(wait, _QUOTA_RETRY_LEAST_S), _QUOTA_RETRY_MOST_S, left_s)
+
+
 def _unreachable_reason(error: DotError) -> str:
     """Why the model could not be reached, in a few words for the run's page: what the broken connection raised (its
     type and text, as :func:`~dotagent.llm.http.wrap_transport_error` keeps them), else the error's own message (the
@@ -2200,6 +2236,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     route_skip: bool = False
     # Since when (monotonic seconds) the run's model could not be reached, and how often the step was asked again since.
     unreachable_since: float | None = None
+    # When the run began to wait for a spent quota (item 713): a connection that breaks while it waits counts towards
+    # that wait, not towards model_wait_s from the start of the whole wait (the code review of item 713).
+    spent_since: float | None = None
     asked_again: int = 0
 
     async def show(delta: StreamDelta) -> None:
@@ -2376,18 +2415,35 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 agent, ref, error, left, bool(specs), estimate_tokens([system], specs), steps
             )
             if standby is None:
-                if config.model_wait_s <= 0 or not _connection_broke(error):
+                # A spent quota or rate waits for [agent] quota_wait_s (item 713), a model out of reach for
+                # model_wait_s; spent credits and any other error end the run.
+                spent: str | None = _spent(error)
+                if not (spent is not None or _connection_broke(error)):
                     raise
                 now: float = time.monotonic()
                 if unreachable_since is None:
                     unreachable_since, asked_again = now, 0
-                left_s: float = config.model_wait_s - (now - unreachable_since)
+                if spent is not None and spent_since is None:
+                    spent_since = now
+                # A wait for a spent quota goes on through a broken connection (a Mac that wakes, a network that drops).
+                waiting_since: float = unreachable_since if spent_since is None else spent_since
+                wait_s: float = config.model_wait_s if spent_since is None else config.quota_wait_s
+                if wait_s <= 0:
+                    raise
+                left_s: float = wait_s - (now - waiting_since)
                 if left_s <= 0:
+                    if spent is not None:
+                        # Still spent once the wait is over: the run ends with the provider's own words.
+                        raise
                     raise ProviderTransportError(
-                        f"the model could not be reached for {config.model_wait_s:g} s: {_unreachable_reason(error)}",
-                        {**error.context, "model": ref.label, "waited_s": round(now - unreachable_since, 1)},
+                        f"the model could not be reached for {wait_s:g} s: {_unreachable_reason(error)}",
+                        {**error.context, "model": ref.label, "waited_s": round(now - waiting_since, 1)},
                     ) from error
-                retry_in: float = _retry_delay(asked_again, config.model_wait_s, left_s)
+                retry_in: float = (
+                    _quota_retry(error, left_s)
+                    if spent is not None
+                    else _retry_delay(asked_again, config.model_wait_s, left_s)
+                )
                 asked_again += 1
                 log.warning(
                     "model_unreachable",
@@ -2406,6 +2462,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                         "step": steps,
                         "retry_in_s": round(retry_in, 1),
                         "until": time.time() + left_s,
+                        "spent": spent,
                     },
                     True,
                 )
@@ -2415,6 +2472,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 steps -= 1
                 continue
             unreachable_since = None
+            spent_since = None
             history.append(
                 await _stored_note(
                     standby.agent, _SWITCH_NOTE.format(to=standby.ref.label, old=ref.label, reason=standby.reason)
@@ -2447,6 +2505,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 run.id, MODEL_BACK_EVENT, {"model": step_ref.label, "waited_s": waited_s, "step": steps}, True
             )
             unreachable_since = None
+            spent_since = None
         allowed = None
         step_seconds: float = time.monotonic() - asked_at
         if reply.usage.input_tokens > 0 and estimated > 0:
