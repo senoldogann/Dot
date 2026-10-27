@@ -98,6 +98,7 @@ const KNOWN_TOOLS = new Map(
     browser_open: { verb: "open a web page", object: true },
     browser_act: { verb: "work on a web page (click, type, press keys, drag)" },
     browser_fill_login: { verb: "fill in a login on a web page" },
+    browser_create_login: { verb: "make the login of a new account on a web page" },
     browser_upload: { verb: "upload a file on a web page" },
     browser_eval: { verb: "run a script on a web page" },
     "desktop_*": { verb: "work with apps and the screen of this Mac" },

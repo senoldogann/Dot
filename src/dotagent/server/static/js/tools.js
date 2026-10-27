@@ -212,6 +212,7 @@ const TOOL_WORDS = {
   browser_close_tab: "Close tab",
   browser_upload: "Upload file",
   browser_fill_login: "Fill in login",
+  browser_create_login: "Make a new login",
   browser_logins: "List logins",
   desktop_apps: "List apps",
   desktop_open_app: "Open app",

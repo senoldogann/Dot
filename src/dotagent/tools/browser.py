@@ -102,8 +102,8 @@ from dotagent.tools.groups import group_of
 from dotagent.tools.meta import USE_TOOLS_TOOL
 from dotagent.tools.pages import PAGE_SUFFIXES, SHOW_PAGE_TOOL
 from dotagent.vault.choices import LoginChoice, find_login, login_choices
-from dotagent.vault.hosts import fills_on
-from dotagent.vault.items import LoginFill
+from dotagent.vault.hosts import fills_on, site_label
+from dotagent.vault.items import LoginDraft, LoginFill
 from dotagent.vault.onepassword import Login, LoginSecret, VaultError, kept_token
 
 _log = get_logger(__name__)
@@ -1039,6 +1039,8 @@ def _upload_tool() -> RegisteredTool:
 # while it holds a contact or a billing address.
 LOGINS_TOOL: str = "browser_logins"
 FILL_LOGIN_TOOL: str = "browser_fill_login"
+# A new account's login, made and kept by Dot (item 740): offered whenever the browser is, as it needs no saved login.
+CREATE_LOGIN_TOOL: str = "browser_create_login"
 LOGIN_TOOLS: frozenset[str] = frozenset({LOGINS_TOOL, FILL_LOGIN_TOOL})
 # Every tool :func:`withheld_vault_tools` may withhold.
 VAULT_TOOLS: frozenset[str] = LOGIN_TOOLS | {CONTACTS_TOOL}
@@ -1188,6 +1190,148 @@ async def _login_secret(ctx: ToolContext, login: LoginChoice, otp: bool) -> Logi
     return LoginSecret(username=filled.username, password=filled.password, otp=None)
 
 
+# A new account's password (item 740): Dot makes it, so that no model chooses, sees or records one, and keeps it with
+# the account's username in the owner's vault. Its letters, from each of which one at least: the signs are those most
+# sites take.
+_NEW_PASSWORD_CHARS: int = 20
+_PASSWORD_SETS: tuple[str, ...] = (
+    "abcdefghijkmnopqrstuvwxyz",
+    "ABCDEFGHJKLMNPQRSTUVWXYZ",
+    "23456789",
+    "-_.!@#%",
+)
+
+
+def new_password(length: int = _NEW_PASSWORD_CHARS) -> str:
+    """A password of ``length`` characters drawn by :mod:`secrets`, with one of each set of :data:`_PASSWORD_SETS` at
+    least, in an order drawn too."""
+    every: str = "".join(_PASSWORD_SETS)
+    chars: list[str] = [secrets.choice(one) for one in _PASSWORD_SETS]
+    chars += [secrets.choice(every) for _ in range(length - len(chars))]
+    for index in range(len(chars) - 1, 0, -1):
+        other: int = secrets.randbelow(index + 1)
+        chars[index], chars[other] = chars[other], chars[index]
+    return "".join(chars)
+
+
+def website_of(url: str) -> str | None:
+    """The website a login made on the page ``url`` is for: its scheme, host and port; ``None`` for a page a login
+    would not be filled on again (:func:`fills_on`: over https, or http on this Mac itself), where Dot makes none."""
+    parts = urlsplit(url)
+    if not parts.scheme or not parts.netloc:
+        return None
+    website: str = f"{parts.scheme.lower()}://{parts.netloc.lower()}"
+    return website if fills_on(url, (website,)) else None
+
+
+class CreateLoginArgs(ToolArgs):
+    password: str = Field(min_length=1, description="The ref of the new account's password field.")
+    confirm: str | None = Field(default=None, description="The ref of the field that asks for the password again.")
+    username: str = Field(
+        min_length=1, max_length=320, description="The account's username or email, as you typed or will type it."
+    )
+    username_field: str | None = Field(default=None, description="The ref of the username field, to fill it too.")
+
+
+def _create_login_tool() -> RegisteredTool:
+    async def classify(args: CreateLoginArgs, ctx: ToolContext) -> ActionInfo:
+        url: str = ctx.browser.current_url(ctx.thread_id) or ""
+        website: str | None = website_of(url)
+        if website is None:
+            raise ToolInputError(
+                "Dot makes a password only for a page over https (or one of this Mac itself), and this one is "
+                f"{_clip(url, 120) or 'no page'}",
+                {"url": url},
+            )
+        summary: str = (
+            f"Make a password for a new account of {args.username} on {site_label(website)}, fill it into this page "
+            "and keep the login in your vault"
+        )
+        # Its login is kept in the owner's vault and typed into a page as a vault login is: it asks as a fill does.
+        return _action("browser_create_login", "browser_input", "high", summary, url, ("vault_fill",))
+
+    async def run(args: CreateLoginArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        website: str | None = website_of(ctx.browser.current_url(ctx.thread_id) or "")
+        if website is None:
+            raise ToolInputError("the page is no longer over https: nothing was made or filled", {})
+        if website != website_of(authorized.target):
+            # The page went to another site while the call waited: what was allowed was a login for the one before.
+            raise ToolInputError(
+                f"the page is on another site than the one asked for ({site_label(website)}): nothing was made or "
+                "filled; look at the page and call again",
+                {"asked": authorized.target, "now": website},
+            )
+        kept: str = website
+
+        def on_site(address: str) -> bool:
+            return fills_on(address, (kept,))
+
+        asked: list[tuple[VaultFieldKind, str | None]] = [
+            ("username", args.username_field),
+            ("password", args.password),
+            ("password", args.confirm),
+        ]
+        parts: list[tuple[VaultFieldKind, str]] = [(kind, ref) for kind, ref in asked if ref is not None]
+        fresh: PageView | None = await ctx.browser.fresh_for_login(ctx.thread_id, on_site, [kind for kind, _ in parts])
+        if fresh is not None:
+            reset: str = (
+                "Nothing was made or filled yet: a script of this run had run in this chat's tabs, so Dot closed them "
+                "and opened this page again in a new tab, where none ran. Call browser_create_login again with the "
+                "refs of the fields below."
+            )
+            return mark_untrusted(ok(f"{reset}\n{render_page_view(fresh, _nonce(), _body_budget(ctx))}"))
+        password: SecretStr = SecretStr(new_password())
+        # From now on the password is a secret Dot holds: masked wherever it would stand (item 551).
+        hold_filled(password.get_secret_value())
+        made: str = time.strftime("%Y-%m-%d")
+        record: VaultRecord = await ctx.runtime.vault_items.create(
+            LoginDraft(
+                kind="login",
+                website=website,
+                username=args.username,
+                password=password,
+                notes=SecretStr(f"Made by Dot for a new account on {made}."),
+            )
+        )
+        values: dict[VaultFieldKind, SecretStr] = {"username": SecretStr(args.username), "password": password}
+        fills: list[VaultFill] = [VaultFill(ref=ref, kind=kind, value=values[kind]) for kind, ref in parts]
+        try:
+            view: PageView = await ctx.browser.fill_from_vault(ctx.thread_id, fills, on_site)
+        except Exception as error:
+            # Not filled, so no account holds it: the vault does not keep a login that was never used. A field may hold
+            # part of it already, and a form sent so would make an account with a password kept nowhere.
+            await ctx.runtime.vault_items.remove(record.id)
+            raise ToolExecutionError(
+                "filling the new login failed and Dot did not keep it: do not send this form, whose fields may hold "
+                f"part of it; open the page again and call {CREATE_LOGIN_TOOL} again. The failure: {error}",
+                {},
+            ) from error
+        except BaseException:
+            await ctx.runtime.vault_items.remove(record.id)
+            raise
+        filled: str = "and the confirmation field " if args.confirm is not None else ""
+        said: str = (
+            f"Made a password of {_NEW_PASSWORD_CHARS} characters for {args.username} on {site_label(website)}, filled "
+            f"it into the password field {filled}and kept the login in the user's vault (Settings › Vault). You never "
+            "see it and need not: send the form now, and sign in later with browser_fill_login and this login."
+        )
+        return mark_untrusted(ok(f"{said}\n{render_page_view(view, _nonce(), _body_budget(ctx))}"))
+
+    return make_reviewed_tool(
+        name=CREATE_LOGIN_TOOL,
+        description=(
+            "On a sign-up form: Dot makes a strong password you never see, fills it in and keeps the login in the "
+            "user's vault. Never make up a password yourself. Over https only (or this Mac). " + _REF_HELP
+        ),
+        args_model=CreateLoginArgs,
+        modes=ACTING_MODES,
+        parallel_safe=False,
+        timeout_s=_SLOW_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
 def _fill_login_tool() -> RegisteredTool:
     async def classify(args: FillLoginArgs, ctx: ToolContext) -> ActionInfo:
         login: LoginChoice = await _login(ctx, args.login)
@@ -1330,4 +1474,5 @@ def _browser_tools() -> tuple[RegisteredTool, ...]:
         _upload_tool(),
         _logins_tool(),
         _fill_login_tool(),
+        _create_login_tool(),
     )

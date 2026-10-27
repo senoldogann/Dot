@@ -71,6 +71,13 @@ _LOGIN: str = """<!doctype html><title>Sign in</title><h1>Sign in</h1>
 <label>Email <input name="user" autocomplete="username"></label>
 <label>Password <input name="pass" type="password" autocomplete="current-password"></label>
 <button type="submit">Sign in</button></form>{extra}"""
+# A sign-up form (item 740): its password and the field that repeats it, which Dot fills with the password it makes.
+_SIGNUP: str = """<!doctype html><title>Sign up</title><h1>Sign up</h1>
+<form action="/received" method="post">
+<label>Email <input name="user" autocomplete="username"></label>
+<label>Password <input name="pass" type="password" autocomplete="new-password"></label>
+<label>Repeat <input name="again" type="password" autocomplete="new-password"></label>
+<button type="submit">Create account</button></form>"""
 # A page that gives the fields back what they held when it is loaded again, as a site's own script may (it keeps them in
 # the window's name, which is in no file of the profile's but its session's), and a link away.
 _RESTORING: str = """<!doctype html><title>Restoring</title><h1>Restoring</h1>
@@ -251,6 +258,7 @@ class _Sites:
         near: str = f"https://b.example.localhost:{self.shop.port}/widget"
         self.shop.pages = {
             "/signin": _LOGIN.format(extra=""),
+            "/signup": _SIGNUP,
             "/signin-widget": _LOGIN.format(extra=f'<iframe title="A third party" src="{widget}"></iframe>'),
             "/signin-frames": _LOGIN.format(extra=f'<iframe title="Another host" src="{near}"></iframe>'),
             "/widget": _WIDGET,
@@ -1236,3 +1244,99 @@ async def test_no_event_approval_message_log_line_or_file_of_the_runs_holds_the_
     needles: list[bytes] = [PASSWORD.encode(), PASSWORD.encode("utf-16-le"), json.dumps(PASSWORD).encode()]
     assert await asyncio.to_thread(_holding, home, needles) == []
     assert await asyncio.to_thread(_holding, home, [b"vault_item_kept"]), "the log is where it was looked for"
+
+
+async def test_a_new_accounts_password_is_made_filled_and_kept_in_the_vault_and_no_model_sees_it(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
+) -> None:
+    """Item 740: the owner wants the logins of the accounts a run makes in their vault, and no password a model made
+    up. Dot makes it, fills the field and the one that repeats it, keeps the login, and holds it as a secret."""
+    runtime, keychain, _ = parts
+    vault: VaultItems = await _vault(runtime)
+    ctx, gate = await _context(runtime, "yolo")
+    url: str = f"https://shop.example.localhost:{sites.shop.port}/signup"
+    refs: dict[str, str] = await _refs(ctx, gate, url, {"user": "Email", "pass": "Password", "again": "Repeat"})
+    made: ToolResult = await _call(
+        ctx,
+        gate,
+        "browser_create_login",
+        {
+            "password": refs["pass"],
+            "confirm": refs["again"],
+            "username": "ada@example.com",
+            "username_field": refs["user"],
+        },
+    )
+    # The username went in as a value of the vault too, so the chat's views hide it as they hide the password.
+    assert made.text.startswith("Made a password of 20 characters for [filled from your vault] on "), made.text
+    (login,) = [item for item in await vault.of_kind("login") if item.username == "ada@example.com"]
+    assert login.website == f"https://shop.example.localhost:{sites.shop.port}"
+    password: str = keychain.kept[login.id]["password"]
+    assert len(password) == 20 and any(char.isdigit() for char in password) and any(char.isupper() for char in password)
+    assert password not in made.text and password in known_secrets(filled=True)
+    seen: ToolResult = await _call(ctx, gate, "browser_snapshot", {})
+    assert seen.text.count("[hidden]") >= 2 and password not in seen.text
+    await _call(ctx, gate, "browser_act", {"steps": [{"action": "click", "ref": _button(seen.text, "Create account")}]})
+    sent: str = sites.shop.submissions[-1]
+    assert sent.count(quote(password, safe="")) == 2 or sent.count(password) == 2, sent
+
+
+async def test_a_new_accounts_login_waits_for_the_owners_yes_outside_yolo_as_a_fill_does(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
+) -> None:
+    """Item 740: making a login writes the owner's vault and types a password into a page, as a fill does, so outside
+    yolo it waits for the owner's own yes, whatever their rules say; refused, it keeps nothing."""
+    runtime, _, _ = parts
+    vault: VaultItems = await _vault(runtime)
+    url: str = f"https://shop.example.localhost:{sites.shop.port}/signup"
+    model: _Reading = _Reading(
+        [
+            lambda shown: _turn("browser_open", url=url),
+            lambda shown: _turn(
+                "browser_create_login",
+                password=_ref_of(shown, "Password"),
+                username="grace@example.com",
+            ),
+            lambda shown: _turn(FINISH_TOOL, answer="The owner said no.", success=False),
+        ]
+    )
+    # The runtime is the module's, and a model given to the router stays in service: a test before this one may have
+    # given its own, which this one takes the place of.
+    if _PROVIDER in runtime.router._providers:
+        runtime.router._providers[_PROVIDER] = model
+    else:
+        await runtime.router.register(_PROVIDER, model)
+    manager: RunManager = RunManager(runtime)
+    try:
+        run: RunRecord = await manager.start(
+            "Make an account.", "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "ask", False, ()
+        )
+        asked: ApprovalRecord = await _asked(runtime, run.id)
+        assert asked.tool == "browser_create_login" and "vault_fill" in asked.args["flags"]  # type: ignore[operator]
+        await runtime.approvals.resolve(asked.id, False, UI_SOURCE, "")
+        async with asyncio.timeout(_ANSWER_WITHIN_S):
+            await manager.wait(run.id)
+    finally:
+        await manager.shutdown()
+    assert [item for item in await vault.of_kind("login") if item.username == "grace@example.com"] == []
+
+
+async def test_a_new_login_is_made_only_for_the_site_it_was_allowed_for(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
+) -> None:
+    """Item 740: a page that went to another site while the call waited for its yes gets no login: what was allowed
+    was a login for the site before."""
+    runtime, _, _ = parts
+    vault: VaultItems = await _vault(runtime)
+    ctx, gate = await _context(runtime, "yolo")
+    refs: dict[str, str] = await _refs(
+        ctx, gate, f"https://shop.example.localhost:{sites.shop.port}/signup", {"pass": "Password"}
+    )
+    prepared: PreparedCall = await ctx.runtime.registry.tools["browser_create_login"].prepare(
+        {"password": refs["pass"], "username": "lin@example.com"}, ctx
+    )
+    await gate.authorize_recorded(prepared.action, {})
+    await _call(ctx, gate, "browser_open", {"url": f"https://127.0.0.1:{sites.shop.port}/signup"})
+    with pytest.raises(ToolInputError, match="another site than the one asked for"):
+        await prepared.run(ctx)
+    assert [item for item in await vault.of_kind("login") if item.username == "lin@example.com"] == []
