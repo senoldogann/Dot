@@ -310,6 +310,17 @@ def _remeasure(env: StepEnv) -> StepEnv:
     return replace(env, expected_front=front, running=running)
 
 
+def _front_taken_by(before: StepEnv, after: StepEnv) -> str | None:
+    """The name of the application that came to the front during a step, when it is neither the one that was in front
+    nor the one the batch works in (which a click may well bring forward); ``None`` when the front did not change or
+    cannot be told. An unknown front before the step is no change to speak of: nothing is known to have been taken."""
+    front: int | None = after.expected_front
+    if front is None or before.expected_front is None or front in (before.expected_front, after.app.pid):
+        return None
+    taker: AppInfo | None = next((app for app in after.running if app.pid == front), None)
+    return "another application" if taker is None else taker.name
+
+
 def _switch_job(config: DesktopConfig, env: StepEnv, state: ThreadDesktop, app: AppInfo) -> StepEnv:
     """The environment for the steps that follow an ``activate`` step (worker thread)."""
     return replace(
@@ -847,7 +858,14 @@ class DesktopSession:
             if index < len(steps):
                 pause: float = self._config.settle_ms / 3000 if effect.opens_ui else _STEP_GAP_S
                 await asyncio.sleep(pause)
-                env = await self._call(partial(_remeasure, env))
+                remeasured: StepEnv = await self._call(partial(_remeasure, env))
+                # A step that brought another application forward (a link opened in the browser, a dialog of another
+                # program) leaves the next keys with it: the batch stops where the model can look (item 749). An
+                # ``activate`` step chose the front itself.
+                taker: str | None = None if effect.switched_to is not None else _front_taken_by(env, remeasured)
+                env = remeasured
+                if taker is not None:
+                    stopped = f"{taker} came to the front after step {index}; look at the screen before going on"
         return _Batch(reports=tuple(reports), stopped=stopped, env=env, state=state, side_effects=side_effects)
 
     async def act(
