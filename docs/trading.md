@@ -51,12 +51,42 @@ With trading on, a run has the `trading` tool group:
   first whole look, below), today's change and what the limits leave today.
 - `trading_order`: a market order: a buy spends `quote_amount`; a sell sells `base_amount` or what brings
   `quote_amount`. Each carries its `reason`, in the run's words (what the prices and the account showed, what it
-  expects, what ends the trade), kept with the order and shown in Settings › Trading and in `trading_history`.
+  expects, what ends the trade), kept with the order and shown in Settings › Trading and in `trading_history`. A buy
+  names its `stop_price` (a buy without one is refused) and may name a `target_price`: its exit on the paper account,
+  below; a sell names neither.
+- `trading_exit` (item 770): moves an open exit's stop or target, judged against the prices now as a buy's are.
 - `trading_history`: the account's orders, newest first, each with its reason.
 
 The system prompt tells the run to trade only with `trading_order`, never through the browser or the shell, to read the
 prices and the account first, to say why it trades and what ends the trade, never to take what a page or a post says
 of a coin as a reason, and never to split or repeat an order to get around a limit.
+
+## Exits: the stop and the target, watched day and night
+
+A buy names its `stop_price`, the price at or under which the trade is wrong, and may name a `target_price`, at or over
+which it takes the gain (item 770). The stop must be under the bid when the buy is placed, the target over the ask. On
+the paper account, the buy's fill is kept as an **exit**, and Dot's daemon looks at the open exits every fifteen seconds
+or so, with no model and no run: once the bid is at the stop or the target, it sells what the exit holds at the market
+and tells you (your phone, the desktop). A run sees the open exits in `trading_portfolio` and moves one with
+`trading_exit` (a stop raised under a rising price keeps a gain); a sell by hand takes from the product's exits, oldest
+first.
+
+On your Coinbase account (`live`), Dot keeps no exit yet: a live buy still names its stop, which its question shows you
+with the words that Dot does not sell at it, and the answer of the order says so to the run. What Dot sells by itself
+with real money comes as an item of its own, reviewed on its own, before you switch to live; until then, set a stop on
+Coinbase yourself if one should hold.
+
+An exit's sell is held back by none of the limits: a stop that one order's cap or the day's could keep from selling
+would protect nothing, and it lowers what is at stake; it counts against the day's orders like any other. What holds it
+back, for as long as it lasts, even when it comes while the watch is reading the prices: trading off or switched to
+live, your emergency stop, and Coinbase not taking orders of the product; nothing is sold and every exit stays as it
+is, sold at the first look once nothing holds it, and starting the paper account again closes its exits. A sell that
+may have gone out but did not say what it did is not tried again, so that it cannot sell twice: the exit is marked
+failed and you are told. One that never went out (Coinbase's prices could not be read first) leaves the exit open,
+tried again at the next look, and the other exits are looked at all the same; held at every look for five minutes, it
+is told to you once, and Dot keeps trying. An exit sells what it holds when its sell's turn comes: a sell by hand that
+took from it in the meantime leaves it less to sell, or nothing, never what is not its own. The watch runs while the
+daemon does: a Mac asleep or off sells nothing until it wakes.
 
 ## Trying it: the paper shift
 
@@ -82,7 +112,8 @@ Held in code for every order of Dot's trading tools, in every approval mode, yol
   the price of a currency held cannot be read (Coinbase out of reach for it, or more than 100 currencies held), no buy
   is placed, a sell still is, and the account says so; a currency Coinbase has no product of in the quote is worth
   nothing to the account at every look alike and holds nothing;
-- the `STOP` file stops every order, as it stops the desktop;
+- the `STOP` file stops every order, an exit's sell too, as it stops the desktop;
+- every buy of a run names its stop, kept as an exit the daemon sells at (above);
 - an order is placed on the account it was approved for and judged against that account's day and holdings, the
   settings read once: one approved while the account was paper is not placed if you switched to live while it waited,
   nor the reverse; and an order Coinbase took stays counted even when what it did cannot be read afterwards (the key

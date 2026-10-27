@@ -67,6 +67,7 @@ from dotagent.store.models import (
     ScheduleRecord,
     ThreadRecord,
 )
+from dotagent.trading.watch import TradingWatch
 
 log = get_logger(__name__)
 
@@ -147,6 +148,8 @@ class Scheduler:
         self._scouting: asyncio.Task[None] | None = None
         # Dot's own initiative (item 715): its runs while the Mac is idle, started from the tick.
         self._initiative: Initiative = Initiative(runtime, manager)
+        # The watch of trading's exits (item 770): sells at a stop or a target, with no model, between runs.
+        self._trading_watch: TradingWatch = TradingWatch(runtime)
 
     async def start(self) -> asyncio.Task[None]:
         """Begin ticking in the background; what an earlier process left unfinished (a schedule starting or running a
@@ -243,6 +246,7 @@ class Scheduler:
             self._scout_if_due,
             self._check_learning,
             self._initiative.tick,
+            self._trading_watch.tick,
         ):
             try:
                 await part(now)

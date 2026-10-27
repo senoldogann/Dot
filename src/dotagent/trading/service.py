@@ -9,6 +9,7 @@ ask and sells at the bid, and the owner may start it again (:meth:`Trading.reset
 """
 
 import asyncio
+import contextlib
 import math
 import secrets
 import time
@@ -23,7 +24,7 @@ from dotagent.config import TradingConfig
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.logs import get_logger
 from dotagent.store.db import Store
-from dotagent.store.models import TradingOrderRecord
+from dotagent.store.models import TradingExitRecord, TradingOrderRecord
 from dotagent.trading import limits
 from dotagent.trading.market import CoinbaseMarket, MarketError
 from dotagent.trading.types import Fill, Holding, OrderRequest, Portfolio, ProductRules, Quote
@@ -36,6 +37,13 @@ _PAPER_SINCE_KEY: str = "trading_paper_since"
 _REASON_CHARS: int = 300
 _HAPPENED_CHARS: int = 200
 _NOTE_CHARS: int = _REASON_CHARS + 3 + _HAPPENED_CHARS
+# The open exits read at a look; a key limited to a portfolio of Dot's own has few.
+_EXITS_READ: int = 500
+# The orders read back to tell whether an order was kept (:meth:`Trading.order_kept`): those since it was tried.
+_SELLS_READ: int = 50
+# How long an exit's sell may be held at every look (no working key, Coinbase not taking orders of the product, out of
+# reach) before the owner is told, once (the pre-push review of item 770: it was tried again in silence).
+HELD_TOLD_S: float = 300.0
 # How many currencies held are priced for the account's worth: a key limited to a portfolio of Dot's own holds few;
 # past the count the rest are unread, which holds buys (docs/trading.md says so).
 _PRICED_AT_MOST: int = 100
@@ -56,6 +64,29 @@ class TradingSettings:
 
 
 @dataclass(frozen=True)
+class ExitEnd:
+    """What an exit came to at a look of the watch: the exit as it stands now, and the sell that closed it, if any; or,
+    with ``held``, why its sell could not go out at this look, the exit still open (the watch tells the owner once it
+    lasts)."""
+
+    exit: TradingExitRecord
+    order: TradingOrderRecord | None
+    held: str = ""
+
+
+def _exit_problem(request: OrderRequest, quote: Quote) -> str | None:
+    """Why a buy's exit cannot stand against the prices now (item 770): a stop must be under the bid, or the buy would
+    be sold at once; a target over the ask, or it would be taken at once."""
+    if request.side != "buy" or request.stop is None:
+        return None
+    if not 0 < request.stop < quote.bid:
+        return f"the stop, {request.stop:.8g}, must be under the bid now, {quote.bid:.8g}"
+    if request.target is not None and not request.target > quote.ask:
+        return f"the target, {request.target:.8g}, must be over the ask now, {quote.ask:.8g}"
+    return None
+
+
+@dataclass(frozen=True)
 class _Priced:
     """What pricing the currencies held came to: the quotes found, the currencies Coinbase has no product of in the
     quote, and those whose price could not be read this time."""
@@ -67,6 +98,23 @@ class _Priced:
 
 class TradingRefused(ToolExecutionError):
     """An order the limits, the mode or the emergency stop do not let through; nothing reached a market."""
+
+
+class ExitGone(TradingRefused):
+    """An exit's sell that found the exit closed when its turn came: a sell by hand took what it held, or the paper
+    account started again, while the sell waited for the lock. Nothing is sold, and nothing is told."""
+
+
+class ExitHeld(TradingRefused):
+    """An exit's sell that may not go now, for what holds every order and passes (the emergency stop, trading off, the
+    account switched, Coinbase not taking orders of the product): the exit stays open and is tried again at the next
+    look (the pre-push review of item 770: failed for good, it was never watched again once the owner released the
+    stop)."""
+
+
+def _refusal(request: OrderRequest, message: str) -> TradingRefused:
+    """The refusal of ``request`` for what holds every order: for an exit's sell, :class:`ExitHeld`."""
+    return ExitHeld(message, {}) if request.closing is not None else TradingRefused(message, {})
 
 
 class Broker(Protocol):
@@ -150,6 +198,9 @@ class Trading:
     key_store: SecretStore | None = None
     clock: Callable[[], float] = time.time
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # Since when each exit's sell has been held at every look, and the exits whose held sell the owner was told of.
+    _held_since: dict[str, float] = field(default_factory=dict)
+    _told_held: set[str] = field(default_factory=set)
 
     def config(self) -> TradingConfig:
         return self.settings.value
@@ -259,31 +310,58 @@ class Trading:
             day_start_known=known,
         )
 
-    async def place(self, request: OrderRequest, run_id: str, approved: str) -> TradingOrderRecord:
+    async def place(
+        self, request: OrderRequest, run_id: str, approved: str, *, lock_held: bool = False
+    ) -> TradingOrderRecord:
         """Judge ``request`` against the limits and place it on the account ``approved`` names (the mode its action was
         approved for): the order as it ended. Refused with why (:class:`TradingRefused`) before anything reaches a
         market when a limit, the mode or the stop holds it, or when the account is no longer the one approved: an
         order approved for paper waits here behind another, and the owner switched to live meanwhile (the security
         review of item 763). The settings are read once, inside the lock, and the order is judged against the account
-        it goes to."""
-        async with self._lock:
+        it goes to. ``lock_held``: the caller holds the lock already (an exit's sell, :meth:`_close`)."""
+        guard: contextlib.AbstractAsyncContextManager[object] = contextlib.nullcontext() if lock_held else self._lock
+        async with guard:
             if self.failsafe_file.exists():
-                raise TradingRefused("the emergency stop is on: no order is placed until the owner releases it", {})
+                raise _refusal(request, "the emergency stop is on: no order is placed until the owner releases it")
+            if request.closing is not None:
+                # The exit was read before its sell waited here: a sell by hand may have taken from it meanwhile, or
+                # the paper account started again. It sells what the exit holds now, or nothing: never what is not
+                # its own.
+                kept: TradingExitRecord = await self.store.get_trading_exit(request.closing)
+                if kept.status != "open" or kept.size <= 0:
+                    raise ExitGone(f"exit {kept.id} was {kept.status} before its sell", {"exit_id": kept.id})
+                request = request.model_copy(update={"base_amount": min(request.base_amount or kept.size, kept.size)})
             config: TradingConfig = self.config()
             if config.mode != approved:
-                raise TradingRefused(
-                    f"the trading account is now {config.mode}, not the {approved} one this order was approved for", {}
+                raise _refusal(
+                    request,
+                    f"the trading account is now {config.mode}, not the {approved} one this order was approved for",
                 )
-            broker: Broker = self._broker(config)
+            try:
+                broker: Broker = self._broker(config)
+            except TradingRefused as refused:
+                raise _refusal(request, refused.message) from refused
             mode: Literal["paper", "live"] = "paper" if broker is self.paper else "live"
-            if request.product not in config.products:
+            if request.closing is None and request.product not in config.products:
                 raise TradingRefused(
                     f"{request.product} is not among the products the owner allows ({', '.join(config.products)})", {}
                 )
             quote, rules = await asyncio.gather(self.market.quote(request.product), self.market.rules(request.product))
-            portfolio: Portfolio = await self._portfolio(config, broker)
+            exit_problem: str | None = _exit_problem(request, quote)
+            if exit_problem is not None:
+                raise TradingRefused(exit_problem, {"product": request.product, "bid": quote.bid, "ask": quote.ask})
+            if request.closing is not None and not rules.trading:
+                raise ExitHeld(f"Coinbase does not take orders of {request.product} now", {})
+            try:
+                portfolio: Portfolio = await self._portfolio(config, broker)
+            except TradingRefused as refused:
+                # The live key refused (expired, removed): what holds every order.
+                raise _refusal(request, refused.message) from refused
             base: str = request.product.split("-")[0]
             held: float = next((holding.amount for holding in portfolio.holdings if holding.currency == base), 0.0)
+            if request.closing is not None and (request.base_amount or 0.0) > held:
+                # The owner sold some by hand on Coinbase: the exit sells what is left, which it still protects.
+                request = request.model_copy(update={"base_amount": held})
             cash: float = next(
                 (holding.amount for holding in portfolio.holdings if holding.currency == config.quote), 0.0
             )
@@ -305,7 +383,16 @@ class Trading:
                     {"unpriced": ", ".join(portfolio.unpriced)},
                 )
             why: str | None = limits.refusal(
-                config, request.product, request.side, notional, portfolio, rules, cash, held, held * quote.bid
+                config,
+                request.product,
+                request.side,
+                notional,
+                portfolio,
+                rules,
+                cash,
+                held,
+                held * quote.bid,
+                closing=request.closing is not None,
             )
             if why is not None:
                 raise TradingRefused(why, {"product": request.product, "side": request.side, "notional": notional})
@@ -328,7 +415,7 @@ class Trading:
             try:
                 if self.failsafe_file.exists():
                     # Engaged while the account was read: the order goes nowhere.
-                    raise TradingRefused("the emergency stop is on: no order is placed until the owner releases it", {})
+                    raise _refusal(request, "the emergency stop is on: no order is placed until the owner releases it")
                 fill: Fill = await broker.execute(order.id, request, quote, rules)
             except TradingRefused as refused:
                 failed = order.model_copy(update={"status": "failed", "note": _noted(request.reason, refused.message)})
@@ -353,7 +440,207 @@ class Trading:
                 }
             )
             await self.store.settle_trading_order(filled)
+            if request.side == "buy" and request.stop is not None and mode == "paper":
+                # Exits are the paper account's in this item: what Dot sells by itself on the owner's Coinbase account
+                # is a later item's, with a review of its own (the owner's choice after eight pre-push reviews).
+                await self.store.put_trading_exit(
+                    TradingExitRecord(
+                        id=f"ext_{secrets.token_hex(8)}",
+                        mode=mode,
+                        product=request.product,
+                        size=fill.size,
+                        stop=request.stop,
+                        target=request.target,
+                        ts=self.clock(),
+                        order_id=order.id,
+                        run_id=run_id,
+                        status="open",
+                        closed_ts=None,
+                        sell_id="",
+                        note="",
+                    )
+                )
+            elif request.side == "sell" and request.closing is None:
+                await self._shrink_exits(mode, request.product, fill.size, order.id)
             return filled
+
+    async def _shrink_exits(self, mode: str, product: str, sold: float, sell_id: str) -> None:
+        """A sell by hand of ``sold`` of ``product`` takes it from the open exits of the product, oldest first: what it
+        sold is no longer there for them to sell (item 770). An exit left with nothing is ``closed``."""
+        left: float = sold
+        for exit_ in await self.store.trading_exits("open", _EXITS_READ):
+            if left <= 0:
+                break
+            if exit_.mode != mode or exit_.product != product:
+                continue
+            taken: float = min(left, exit_.size)
+            left -= taken
+            remaining: float = exit_.size - taken
+            if remaining <= exit_.size * 1e-9:
+                await self.store.put_trading_exit(
+                    exit_.model_copy(
+                        update={"size": 0.0, "status": "closed", "closed_ts": self.clock(), "sell_id": sell_id,
+                                "note": "sold by an order of a run"}
+                    )
+                )  # fmt: skip
+            else:
+                await self.store.put_trading_exit(exit_.model_copy(update={"size": remaining}))
+
+    async def open_exits(self) -> list[TradingExitRecord]:
+        """The exits watched now: those of the account in use, oldest first."""
+        mode: str = self.config().mode
+        return [exit_ for exit_ in await self.store.trading_exits("open", _EXITS_READ) if exit_.mode == mode]
+
+    async def move_exit(self, exit_id: str, stop: float | None, target: float | None) -> TradingExitRecord:
+        """Move an open exit's stop or target (item 770), each judged against the prices now as a buy's is: the stop
+        under the bid, the target over the ask. Under the order lock, from the exit as it stands then, as every change
+        of an exit is made: one written from a copy read before could reopen an exit sold meanwhile, or give back what
+        a sell by hand took from it (the pre-push review of item 770)."""
+        async with self._lock:
+            exit_: TradingExitRecord = await self.store.get_trading_exit(exit_id)
+            if exit_.status != "open" or exit_.mode != self.config().mode:
+                raise TradingRefused(f"the exit {exit_id} is not one watched now ({exit_.status}, {exit_.mode})", {})
+            quote: Quote = await self.market.quote(exit_.product)
+            moved: OrderRequest = OrderRequest(
+                product=exit_.product,
+                side="buy",
+                quote_amount=None,
+                base_amount=None,
+                stop=exit_.stop if stop is None else stop,
+                target=exit_.target if target is None else target,
+            )
+            problem: str | None = _exit_problem(moved, quote)
+            if problem is not None:
+                raise TradingRefused(problem, {"product": exit_.product, "bid": quote.bid, "ask": quote.ask})
+            updated: TradingExitRecord = exit_.model_copy(update={"stop": moved.stop, "target": moved.target})
+            await self.store.put_trading_exit(updated)
+            return updated
+
+    async def check_exits(self) -> list[ExitEnd]:
+        """Sell what an exit of the paper account holds once the bid is at its stop or its target (item 770): the
+        daemon's watch calls this every few seconds, with no model and no run. While trading is off or live, the exits
+        wait, open, watched again once the paper account is in use (the pre-push review of item 770: marked stale, a
+        stop died for good when the owner switched accounts and back); a sell refused leaves the exit ``failed``, as
+        does one that may have gone out
+        without saying what it did; prices or an account that could not be read, before anything went out, and what
+        holds every order for a while (:class:`ExitHeld`) leave it open for the next look, and the other exits are
+        looked at all the same. What each exit came to is returned, for the owner to be told, a sell held at every look
+        once it has lasted :data:`HELD_TOLD_S`."""
+        config: TradingConfig = self.config()
+        ends: list[ExitEnd] = []
+        watched: list[TradingExitRecord] = []
+        if config.mode != "paper" or self.failsafe_file.exists():
+            # Off, live, or the owner's emergency stop: nothing is sold, and every exit stays as it is, watched again
+            # once the paper account is in use and the stop released; a sell held before is held, and told, anew.
+            self._held_since.clear()
+            self._told_held.clear()
+            return ends
+        for exit_ in await self.store.trading_exits("open", _EXITS_READ):
+            if exit_.mode == config.mode:
+                watched.append(exit_)
+        quotes: dict[str, Quote] = {}
+        for product in sorted({exit_.product for exit_ in watched}):
+            try:
+                quotes[product] = await self.market.quote(product)
+            except MarketError as error:
+                _log.info("trading_exit_unpriced", product=product, error=error.message)
+        for exit_ in watched:
+            quote: Quote | None = quotes.get(exit_.product)
+            if quote is None or _reached(exit_, quote) is None:
+                continue
+            end: ExitEnd | None = await self._close(exit_.id, quote)
+            if end is not None:
+                ends.append(end)
+        return self._told_once_held(ends)
+
+    def _told_once_held(self, ends: list[ExitEnd]) -> list[ExitEnd]:
+        """``ends`` but the held sells that have not lasted :data:`HELD_TOLD_S` at every look yet, or were told before:
+        a look that reads the account a moment late is no news, and a sell held for long is told once."""
+        now: float = self.clock()
+        held_now: set[str] = {end.exit.id for end in ends if end.held}
+        # An exit held no more is forgotten: held again later, it is told again once that lasts.
+        self._held_since = {exit_id: since for exit_id, since in self._held_since.items() if exit_id in held_now}
+        self._told_held &= held_now
+        told: list[ExitEnd] = []
+        for end in ends:
+            if end.held:
+                since: float = self._held_since.setdefault(end.exit.id, now)
+                if now - since < HELD_TOLD_S or end.exit.id in self._told_held:
+                    continue
+                self._told_held.add(end.exit.id)
+            told.append(end)
+        return told
+
+    async def _close(self, exit_id: str, quote: Quote) -> ExitEnd | None:
+        """Sell what the exit ``exit_id`` holds, at the market, on the account it was made on, and write what came of
+        it: under the order lock, from the exit as it stands then (the pre-push review of item 770: written from a copy
+        read before, a change could reopen an exit sold meanwhile, or sell what a sell by hand took from it). None when
+        nothing is to be told: the exit closed or moved out of reach before its turn, or its sell never went out."""
+        async with self._lock:
+            exit_: TradingExitRecord = await self.store.get_trading_exit(exit_id)
+            reached: Literal["stopped", "targeted"] | None = _reached(exit_, quote)
+            if exit_.status != "open" or reached is None:
+                return None
+            word: str = "stop" if reached == "stopped" else "target"
+            level: float = exit_.stop if reached == "stopped" else exit_.target or 0.0
+            sell: OrderRequest = OrderRequest(
+                product=exit_.product,
+                side="sell",
+                quote_amount=None,
+                base_amount=exit_.size,
+                reason=f"Exit {exit_.id}: the bid {quote.bid:.8g} reached its {word} {level:.8g}.",
+                closing=exit_.id,
+            )
+            started: float = self.clock()
+            try:
+                order: TradingOrderRecord = await self.place(sell, f"exit:{exit_.id}", exit_.mode, lock_held=True)
+            except ExitGone:
+                return None
+            except ExitHeld as held:
+                _log.info("trading_exit_held", exit_id=exit_.id, why=held.message)
+                return ExitEnd(exit=exit_, order=None, held=held.message)
+            except TradingRefused as refused:
+                return await self._ended(exit_.id, "failed", note=refused.message)
+            except Exception as error:  # noqa: BLE001 - told apart by what was kept of the sell, below
+                if not await self.order_kept(exit_.mode, f"exit:{exit_.id}", started):
+                    # Nothing reached Coinbase: its prices or the account could not be read before the sell was kept.
+                    # The exit stays open and the next look tries again, the other exits are looked at meanwhile (the
+                    # pre-push review of item 770: it was failed for good, and the position left without its stop).
+                    _log.info("trading_exit_sell_not_sent", exit_id=exit_.id, error=str(error)[:200])
+                    return ExitEnd(exit=exit_, order=None, held=f"its sell could not go out: {str(error)[:200]}")
+                # Sent, perhaps: a second sell could sell twice, so the exit is not tried again; the owner is told.
+                return await self._ended(
+                    exit_.id, "failed", note=f"its sell may have gone through, look at the account: {error}"
+                )
+            return await self._ended(exit_.id, reached, sell_id=order.id, order=order)
+
+    async def _ended(
+        self,
+        exit_id: str,
+        status: Literal["stopped", "targeted", "failed"],
+        note: str = "",
+        sell_id: str = "",
+        order: TradingOrderRecord | None = None,
+    ) -> ExitEnd | None:
+        """Write how the exit ``exit_id`` ended over the exit as it stands now, the caller holding the order lock; None
+        when it is no longer open (another change ended it first)."""
+        exit_: TradingExitRecord = await self.store.get_trading_exit(exit_id)
+        if exit_.status != "open":
+            return None
+        changes: dict[str, object] = {"status": status, "closed_ts": self.clock()}
+        if note:
+            changes["note"] = note[:_NOTE_CHARS]
+        if sell_id:
+            changes["sell_id"] = sell_id
+        ended: TradingExitRecord = exit_.model_copy(update=changes)
+        await self.store.put_trading_exit(ended)
+        return ExitEnd(exit=ended, order=order)
+
+    async def order_kept(self, mode: str, run_id: str, since: float) -> bool:
+        """Whether an order of ``run_id`` tried from ``since`` was kept as one that went out, or may have (pending,
+        unknown or filled): an order is kept before it is sent, so none kept means nothing reached Coinbase."""
+        recent: list[TradingOrderRecord] = await self.store.trading_orders(mode, since - 1.0, _SELLS_READ)
+        return any(order.run_id == run_id and order.ts >= since and order.status != "failed" for order in recent)
 
     async def history(self, limit: int) -> list[TradingOrderRecord]:
         """The orders of the mode, newest first: the paper account's since its start."""
@@ -365,10 +652,30 @@ class Trading:
     async def reset_paper(self) -> None:
         """Start the paper account again with ``paper_start``: its orders before stay in the record, outside it, and
         today's loss is counted from the start again (the pre-push review of item 763: kept from before, the day showed
-        the start as a loss or a gain, and could lift the day's loss limit or hold every buy for nothing)."""
-        await self.store.kv_set(_PAPER_SINCE_KEY, repr(self.clock()))
-        day, _ = self.day_start()
-        await self.store.kv_set(f"trading_day:paper:{day}", repr(self.config().paper_start))
+        the start as a loss or a gain, and could lift the day's loss limit or hold every buy for nothing). Its open
+        exits close with it: what they would sell is gone, and a later buy's holding is not theirs to sell (item 770).
+        Under the lock orders are placed under, so that no sell is judged across the start."""
+        async with self._lock:
+            now: float = self.clock()
+            await self.store.kv_set(_PAPER_SINCE_KEY, repr(now))
+            day, _ = self.day_start()
+            await self.store.kv_set(f"trading_day:paper:{day}", repr(self.config().paper_start))
+            for exit_ in await self.store.trading_exits("open", _EXITS_READ):
+                if exit_.mode == "paper":
+                    await self.store.put_trading_exit(
+                        exit_.model_copy(
+                            update={"status": "closed", "closed_ts": now, "note": "the paper account started again"}
+                        )
+                    )
+
+
+def _reached(exit_: TradingExitRecord, quote: Quote) -> Literal["stopped", "targeted"] | None:
+    """Whether the bid of ``quote`` is at the exit's stop or its target."""
+    if quote.bid <= exit_.stop:
+        return "stopped"
+    if exit_.target and quote.bid >= exit_.target:
+        return "targeted"
+    return None
 
 
 def _noted(reason: str, happened: str) -> str:
