@@ -133,6 +133,8 @@ _DEFAULT_SCRIPT_S: float = 30.0
 _MAX_SCRIPT_S: float = 600.0
 _SCRIPT_CHARS: int = 100_000
 _SCRIPT_SUMMARY_CHARS: int = 160
+# The elements one script may be given, by their refs (item 738).
+_SCRIPT_REFS: int = 20
 
 _REF_HELP: str = "Refs (e12, f2e7, …) come from the latest snapshot and stay valid until the page changes."
 
@@ -609,6 +611,15 @@ class EvalArgs(ToolArgs):
         le=_MAX_SCRIPT_S,
         description="Seconds to wait for the value (default 30); the script runs on after it.",
     )
+    refs: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=_SCRIPT_REFS,
+        description=(
+            "Refs from the latest snapshot. The script must then be a function; it gets their elements as its "
+            "arguments, in this order: (el) => el.click()."
+        ),
+    )
 
 
 def _eval_tool() -> RegisteredTool:
@@ -616,13 +627,14 @@ def _eval_tool() -> RegisteredTool:
         # A script may click, type and send whatever the page lets it, which no pattern can tell from its text: medium,
         # as the shell guard rates the same script sent to Chrome through AppleScript.
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
-        summary: str = f"Run a script in the page: {_clip(args.script, _SCRIPT_SUMMARY_CHARS)}"
+        on: str = f" on {', '.join(args.refs)}" if args.refs else ""
+        summary: str = f"Run a script in the page{on}: {_clip(args.script, _SCRIPT_SUMMARY_CHARS)}"
         return _action("browser_eval", "browser_click", "medium", summary, target, ())
 
     async def run(args: EvalArgs, ctx: ToolContext) -> ToolResult:
         waited_s: float = args.timeout_s or _DEFAULT_SCRIPT_S
         script_run: ScriptRun = await ctx.browser.run_script(
-            ctx.thread_id, args.script, waited_s, hides_secrets(ctx.approvals)
+            ctx.thread_id, args.script, waited_s, hides_secrets(ctx.approvals), tuple(args.refs or ())
         )
         rendered: str = render_script_run(script_run, waited_s, _nonce(), _body_budget(ctx))
         # The value is the page's: the run reads it as untrusted, whatever it says.
@@ -632,8 +644,10 @@ def _eval_tool() -> RegisteredTool:
         name="browser_eval",
         description=(
             "Run JavaScript in your tab's page, with its session, and get the value as JSON: read a whole list or the "
-            "data behind the page, or do many like actions in one call. A thrown error fails the call. It is refused "
-            "on a page that holds a password, code or card field, and cookie values come back as [hidden]."
+            "data behind the page, or do many like actions in one call. With refs, the script gets those elements: "
+            "reach a control a click of browser_act did not move (el.click(), or the events it listens for) without "
+            "guessing a selector. A thrown error fails the call. It is refused on a page that holds a password, code "
+            "or card field, and cookie values come back as [hidden]."
         ),
         args_model=EvalArgs,
         modes=ACTING_MODES,
