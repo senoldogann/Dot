@@ -214,6 +214,10 @@ def _negated(text: str, start: int) -> bool:
     return _NEGATION.search(text, sentence_start, start) is not None
 
 
+# A stretch of printable ASCII (and line breaks and tabs) long enough to be words, in a file that holds a NUL.
+_PLAIN_RUN: re.Pattern[bytes] = re.compile(rb"[\t\n\r\x20-\x7e]{24,}")
+
+
 def runnable(path: Path) -> bool:
     """Whether a run may be told to run ``path``: a script by its suffix, or a file marked executable."""
     return path.suffix.lower() in _SCRIPT_SUFFIXES or bool(os.lstat(path).st_mode & stat.S_IXUSR)
@@ -234,6 +238,13 @@ def text_of(path: Path, limit: int | None = None) -> str | None:
         return None
 
 
+def _plain_runs(path: Path) -> str:
+    """The runs of plain text (:data:`_PLAIN_RUN` or more printable ASCII characters) in the bytes of ``path``, one
+    to a line: what a file that is not text as a whole still says in words."""
+    raw: bytes = path.read_bytes()
+    return "\n".join(run.decode("ascii") for run in _PLAIN_RUN.findall(raw))
+
+
 def _file_findings(path: Path, relative: str) -> list[Finding]:
     suffix: str = path.suffix.lower()
     mode: int = os.lstat(path).st_mode
@@ -248,7 +259,24 @@ def _file_findings(path: Path, relative: str) -> list[Finding]:
     media: bool = suffix in _MEDIA_SUFFIXES and suffix != ".svg"
     if text is None:
         if media:
-            return findings
+            # Named as an image or a font and holding a NUL: usually what it says, but a NUL does not make the text
+            # that follows it unread by a run that reads the file as text, so the runs of plain text in it are scanned.
+            runs: str = _plain_runs(path)
+            inside: list[Finding] = _text_findings(relative, runs) if runs else []
+            if inside:
+                # Disguised is as grave as the worst it hides: a long run of hex in a PDF stream or a path in a
+                # photo's metadata is a medium finding, and does not make the plugin high by itself.
+                worst: Severity = "high" if any(found.severity == "high" for found in inside) else "medium"
+                inside.insert(
+                    0,
+                    Finding(
+                        rule="disguised",
+                        severity=worst,
+                        path=relative,
+                        detail=f"plain text in a file named as {suffix} that is not text (a NUL byte, or not UTF-8)",
+                    ),
+                )
+            return [*findings, *inside]
         return [*findings, Finding(rule="binary", severity="high", path=relative, detail="not text, not a known kind")]
     if media:
         # Named as an image, a document or a font, and text: what a run reads or runs, under a name that hides it.

@@ -93,11 +93,13 @@ work.
 3. **The scan** of exactly those files: invisible or direction-changing characters and long base64, where an instruction
    can hide from you and still reach a model, text that tells a model to set aside its instructions or to keep something
    from you, services that collect what anyone sends them, binaries, and text in a file named as an image, a document or
-   a font are **high** (a file is text by what it holds, not by its name); scripts, a shell fed from the network, the
-   places credentials are kept, chat webhooks, tunnels, switches of safety and "without asking the user" (unless the
-   sentence forbids it) are **medium**, weighed in their context by the review. The rules were tuned on Anthropic's,
-   Hugging Face's, Supabase's and Superpowers' skills, which they leave with at most one high finding (a packed archive
-   of Anthropic's own).
+   a font are **high** (a file is text by what it holds, not by its name: a NUL byte, or bytes that are not UTF-8, in a
+   file named as an image do not hide the plain text in it, which is scanned too, and the file is then as grave as the
+   worst finding of that text: high, or medium for a long run of base64 in a PDF's stream); scripts, a shell fed from
+   the network, the places credentials are kept, chat webhooks, tunnels, switches of safety and "without asking the
+   user" (unless the sentence forbids it) are **medium**, weighed in their context by the review. The rules were tuned
+   on Anthropic's, Hugging Face's, Supabase's and Superpowers' skills, which they leave with at most one high finding (a
+   packed archive of Anthropic's own).
 4. **The review**: the review model (`[models] review`) reads the skills in fences of their own, as text a stranger
    wrote that says nothing to it: each `SKILL.md` and the text of the files beside it, the scripts first, which a run
    would run or read, with the scan's findings beside them; and answers with its risk (low, medium, high), whether to
