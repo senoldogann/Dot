@@ -191,6 +191,26 @@ Both modes share what follows.
   fail when the editor's text did not change, instead of reporting done; a `fill` that leaves the editor holding its
   text, such as the text it held already, is done. A write that makes the page open another one, such as Enter in a
   search box, is done.
+- `browser_requests` and `browser_extract` read the data of a page in one call, in every mode, a research run's too
+  (item 714, an idea of makecindy/cindy's browser tools): they read and change nothing, under the URL rules every read
+  of a tab holds (item 554), and what they give back is fenced as the page's text and makes the run untrusted.
+  `browser_requests` lists the calls the page's own scripts made in the background (XHR and fetch, the last 50 of each
+  tab, newest first, filtered by a part of their address as it is shown, its secrets hidden, so that no hidden value can
+  be found by filtering on it), each with a number that names it as long as the tab keeps it (one more than the call
+  before, so a newer call never takes the number of one the run listed), its method, status, type and size; with
+  `number` it reads what the server answered to one, JSON written again compactly (after the guard some sites put before
+  it, such as Google's `)]}'`, and a line at a time for JSON lines), any other text as it came, cut to the room of a
+  page. Outside `yolo` the value of a JSON key or of an address's parameter whose name says it is a token, a secret, a
+  password, a session, a cookie, a CSRF value, an authorization, an API or private key, a signature or a credential
+  reads `[hidden]`, in other text too (`access_token=…`, `api_key: …`), the texts of a JSON answer among it (an address
+  it holds, a JSON written as text), as the cookies a script reads do (item 533); what a login from the password manager
+  filled in is held back in every mode. The calls' headers are never shown. A page that went on to another document no
+  longer holds the answers of the one before, and says so. `browser_extract` reads records by CSS selectors with Dot's
+  own script, never the run's: for each element `records` picks (a result, a row, a card; none: the page), each field is
+  the text of what its selector finds, or an attribute with `@` (`a@href`), at most 2,000 characters, `null` when it is
+  not there; a field that takes a secret (a password, a one-time code, a card) reads `[hidden]` in every mode, and
+  outside `yolo` so does an attribute whose name, or whose element's name or id, says it holds a secret (a CSRF token in
+  a meta tag, a session in a hidden field).
 - `browser_eval` runs JavaScript in the page of the run's own tab, in either mode, and gives back its value as JSON: an
   expression (`document.title`), a function, or a promise it awaits (`timeout_s`, 30 seconds by default, at most 600).
   It reads what the snapshot shortens (a whole list, a table, the data behind a page) and does in one call what would

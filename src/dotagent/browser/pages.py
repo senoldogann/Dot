@@ -6,6 +6,7 @@ structured fields and shown to the model as a note.
 
 import asyncio
 import time
+from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import partial
@@ -14,6 +15,7 @@ from pathlib import Path
 from playwright.async_api import CDPSession, Dialog, Download, FileChooser, Page, Request, Response
 from playwright.async_api import Error as PlaywrightError
 
+from dotagent.browser.network import KEPT_CALLS, Fetched, note_call
 from dotagent.browser.safety import dialog_is_financial, safe_download_name
 from dotagent.browser.snapshot import SnapshotLine
 from dotagent.browser.types import HeldValue
@@ -65,6 +67,8 @@ class Tab:
     # When a call of the thread last ended with this tab current (``time.monotonic``): a tab in the background unused
     # for ``[browser] background_tab_idle_s`` is closed (item 696).
     last_used: float = field(default_factory=time.monotonic)
+    # The calls its page's scripts made in the background, newest last (item 714): what browser_requests lists.
+    calls: deque[Fetched] = field(default_factory=lambda: deque(maxlen=KEPT_CALLS))
 
 
 @dataclass(slots=True)
@@ -187,6 +191,7 @@ def _on_request_end(tab: Tab, request: Request) -> None:
 def _on_response(tab: Tab, response: Response) -> None:
     if _is_main_navigation(tab, response.request):
         tab.status = response.status
+    note_call(tab.calls, response)
 
 
 def _text(payload: object, key: str) -> str | None:
