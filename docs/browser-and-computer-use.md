@@ -477,8 +477,11 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
   the pointer; `click`, `hover`, `scroll` and `drag` are real pointer events; `type`, `paste` and `key` are keyboard
   events. A `type` text longer than `paste_threshold_chars` (40) without a line break or a tab goes in through the
   clipboard, which is put back afterwards (also when the clipboard refuses the text or the paste fails, item 555),
-  unless the field is secure, is for a credential or a payment, or cannot be read, or the text looks like a key. After
-  steps that changed something, the window is read once the application has
+  unless the field is secure, is for a credential or a payment, or cannot be read, or the text looks like a key. A step
+  that brings another application to the front (a link that opens the browser, a dialog of another program) stops the
+  batch there, the steps after it skipped, saying which application came forward, so that the keys of the next steps do
+  not go to it; an `activate` step, and the batch's own application coming forward, do not (item 749). After steps that
+  changed something, the window is read once the application has
   announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
   without announcing anything in between shows in the next view.
 - In a terminal application (Terminal, iTerm2, Ghostty and the like) text and keys are shell input. Dot keeps the
