@@ -6,12 +6,20 @@ shows the score of saved runs and compares them.
 """
 
 import asyncio
+import json
 import sys
 import time
 from collections.abc import Sequence
 from pathlib import Path
 
-from dotagent.cli_commands import Command, EvalCheckCommand, EvalListCommand, EvalReportCommand, EvalRunCommand
+from dotagent.cli_commands import (
+    Command,
+    EvalCheckCommand,
+    EvalListCommand,
+    EvalReportCommand,
+    EvalRunCommand,
+    EvalToolsCommand,
+)
 from dotagent.config import AppConfig, load_default_config, load_user_config
 from dotagent.core.errors import ConfigError, InvalidValueError
 from dotagent.core.paths import evals_dir
@@ -38,6 +46,9 @@ from dotagent.evals.scoring import (
     render_scorecard,
     score_report,
 )
+from dotagent.evals.tool_cases import CASES as TOOL_CASES
+from dotagent.evals.toolcalls import CaseResult, ToolCase, pass_rate
+from dotagent.evals.toolcalls_play import keys_for, play_cases
 from dotagent.evals.types import EvalTask
 from dotagent.harness.components import NO_HARNESS
 from dotagent.llm.router import parse_model_ref
@@ -220,6 +231,61 @@ async def cmd_eval_report(command: EvalReportCommand) -> int:
     return 0
 
 
+# How much of a failed call's arguments the report of the eval of tool use shows.
+_ARGUMENTS_SHOWN: int = 160
+
+
+def render_tool_results(model: str, results: Sequence[CaseResult]) -> list[str]:
+    """The eval of tool use for one model (item 736): each case's passes of its attempts, the call it made last and why
+    it failed, then the share passed and the input tokens spent."""
+    lines: list[str] = [f"Tool use of {model}:"]
+    by_case: dict[str, list[CaseResult]] = {}
+    for result in results:
+        by_case.setdefault(result.case_id, []).append(result)
+    for case_id, attempts in by_case.items():
+        passes: int = sum(1 for attempt in attempts if attempt.passed)
+        last: CaseResult = attempts[-1]
+        shown: str = json.dumps(last.arguments, ensure_ascii=False)[:_ARGUMENTS_SHOWN]
+        said: str = "" if last.passed else f"  ({last.why}; {shown})"
+        lines.append(f"  {passes}/{len(attempts)}  {case_id}: {last.tool or '-'}{said}")
+    tokens: int = sum(result.input_tokens for result in results)
+    lines.append(f"Passed {pass_rate(results):.0%} of {len(results)} attempts; {tokens:,} input tokens.")
+    return lines
+
+
+async def cmd_eval_tools(command: EvalToolsCommand) -> int:
+    """Ask the model the cases of the eval of tool use (item 736), with its keys from the environment and the home's
+    ``.env`` file alone."""
+    user: AppConfig = load_user_config()
+    model: str = command.model or user.models.main
+    known: dict[str, ToolCase] = {case.id: case for case in TOOL_CASES}
+    unknown: list[str] = [case_id for case_id in command.cases if case_id not in known]
+    if unknown:
+        raise InvalidValueError("no such case", {"cases": ", ".join(unknown), "known": ", ".join(sorted(known))})
+    cases: list[ToolCase] = [known[case_id] for case_id in command.cases] if command.cases else list(TOOL_CASES)
+    keys: dict[str, str] = keys_for(user, model)
+    needed: tuple[str, ...] = required_secret_names(user, (model,))
+    missing: list[str] = [name for name in needed if name not in keys]
+    if missing:
+        # Said once, before any case: each would fail on it. The Keychain is not looked in (item 736).
+        raise ConfigError(
+            "the key of the model is in neither the environment nor the home's .env file",
+            {"model": model, "missing": ", ".join(missing), "fix": "dotx auth set NAME, or export NAME=..."},
+        )
+    login_env: dict[str, str] = await read_login_env(user.shell.login_env_timeout_s, ())
+    results: list[CaseResult] = await play_cases(
+        eval_config(user),
+        login_env,
+        keys,
+        model,
+        cases,
+        command.repeat,
+        lambda result: _write([f"  {'pass' if result.passed else 'FAIL'}  {result.case_id}"]),
+    )
+    _write(render_tool_results(model, results))
+    return 0 if all(result.passed for result in results) else 1
+
+
 async def dispatch(command: Command) -> int:
     """Carry out one of this module's commands."""
     match command:
@@ -231,5 +297,7 @@ async def dispatch(command: Command) -> int:
             return await cmd_eval_run(command)
         case EvalReportCommand():
             return await cmd_eval_report(command)
+        case EvalToolsCommand():
+            return await cmd_eval_tools(command)
         case _:
             raise InvalidValueError("not a command of this module", {"name": command.name})
