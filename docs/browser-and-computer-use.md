@@ -498,7 +498,9 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
   which is in the language of the Mac (item 555). It comes with the lines of text on it, read on this Mac by macOS's
   Vision from the picture the model is shown (what is painted black is not read), each with the x, y of its centre
   that `desktop_act` takes (item 701, `read_screen_text`; 50 ms a screen once warm): a window that shows nothing to
-  accessibility can be read and clicked by a model that sees no image.
+  accessibility can be read and clicked by a model that sees no image. A zoom into a region (`x`, `y`, `width`,
+  `height`) that leaves the screen is cut to the part that is on it, and the result says what was cut and to what; a
+  region with nothing (or less than 16 units on a side) on the screen fails (item 744).
 - Dot's own pointer, a glowing violet arrow, glides to where each step of `desktop_act` went and ripples where it
   clicked, so that you see what Dot does and where (item 706, `show_pointer`, on by default). It only shows: the
   step is done as before, through the HID event tap, which moves the Mac's own pointer as it did. A helper process

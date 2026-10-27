@@ -398,7 +398,10 @@ def render_screenshot_caption(view: ScreenshotView, nonce: str) -> str:
             f"{view.redacted} windows are blacked out "
             "(a password manager's, or Dot's own while its vault shows a secret)"
         )
-    shown: list[str] = [" · ".join(parts), fence_screen("frontmost application", view.frontmost or "(none)", nonce)]
+    shown: list[str] = [" · ".join(parts)]
+    if view.clipped:
+        shown.append(view.clipped)
+    shown.append(fence_screen("frontmost application", view.frontmost or "(none)", nonce))
     if view.text_lines:
         shown.append(
             f"{len(view.text_lines)} lines of text read on the screenshot, each at the x, y of its centre for "
