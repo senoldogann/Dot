@@ -63,8 +63,8 @@ TABLE_JOIN: str = " · "
 _EMPTY_CELL: str = "–"
 _BOXES: dict[str, str] = {" ": "☐", "x": "☑", "X": "☑"}
 # Where a code span waits while the marks around it are read: a private-use pair that no text of an answer holds.
-_HOLD_OPEN: str = ""
-_HOLD_CLOSE: str = ""
+_HOLD_OPEN: str = "\ue000"
+_HOLD_CLOSE: str = "\ue001"
 _HELD: re.Pattern[str] = re.compile(f"{_HOLD_OPEN}(\\d+){_HOLD_CLOSE}")
 # What a cut leaves of the answer is followed by this line: with the link to the chat, or, when Dot has no address a
 # phone can open (item 611), where to look.
