@@ -5299,9 +5299,9 @@ class Store:
 
     @_writing
     async def record_schedule_hand_run(self, schedule_id: str, started_at: float, thread_id: str) -> None:
-        """A run of the schedule ``schedule_id`` the owner started by hand at ``started_at`` in the chat ``thread_id``
-        (item 455): its last run and its chat, and nothing of when it fires next nor of whether it is switched on,
-        which :meth:`record_schedule_fire` would change."""
+        """A run of the schedule ``schedule_id`` started out of its time at ``started_at`` in the chat ``thread_id``, by
+        the owner's hand (item 455) or by a move of the market (item 772): its last run and its chat, and nothing of
+        when it fires next nor of whether it is switched on, which :meth:`record_schedule_fire` would change."""
         await self._db.execute(
             "UPDATE schedules SET last_run_at = ?, thread_id = ?, last_status = 'running' WHERE id = ?",
             (started_at, thread_id, schedule_id),

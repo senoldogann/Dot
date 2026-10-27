@@ -1093,7 +1093,10 @@ review_timeout_s = 120.0
 # be worth, max_day the most a day's orders may add up to, max_day_loss how much the account may lose in a day before no
 # buy is placed until the next, max_position the most one product held may be worth. No run can change them. products
 # may hold "*": then every product priced in quote that trades at least min_volume of it a day is allowed (on Coinbase
-# EUR has a handful of such products, USDC about fifty).
+# EUR has a handful of such products, USDC about fifty). wake_schedule names a schedule (its id, as sch_...) that a move
+# of the market starts at once, not at its time: the daemon looks at the allowed products every minute, with no model,
+# and a product that moved wake_move_pct percent in fifteen minutes, and three times what it usually moves in fifteen,
+# starts it, at most wake_per_day times a day and wake_gap_min minutes apart.
 mode = "off"
 quote = "EUR"
 products = ["BTC-EUR", "ETH-EUR", "SOL-EUR"]
@@ -1105,3 +1108,7 @@ max_position = 200.0
 paper_start = 1000.0
 paper_fee_rate = 0.006
 timeout_s = 15.0
+wake_schedule = ""
+wake_move_pct = 3.0
+wake_per_day = 6
+wake_gap_min = 30.0

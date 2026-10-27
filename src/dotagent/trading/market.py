@@ -10,6 +10,7 @@ from urllib.parse import quote as escape
 
 import httpx
 
+from dotagent.config import is_product_id
 from dotagent.core.errors import ToolExecutionError
 from dotagent.trading.types import Candle, MarketRow, ProductDay, ProductRules, Quote
 
@@ -172,7 +173,8 @@ class CoinbaseMarket:
                 continue
             price: float | None = _finite(item, "price")
             product: object = item.get("product_id")
-            if price is None or price <= 0 or not isinstance(product, str):
+            # An id that reads as none is left out: what a run is shown of the list is ids and numbers (item 772).
+            if price is None or price <= 0 or not isinstance(product, str) or not is_product_id(product):
                 continue
             rows.append(
                 MarketRow(

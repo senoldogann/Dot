@@ -303,6 +303,10 @@ its time and by hand, newest first, one at work among them, each with how it wen
 its answer (`GET /api/schedules/<id>/firings?limit=`, up to 50); a later firing's digest counts a run by hand among its
 earlier runs.
 
+The schedule `[trading] wake_schedule` names is also started when the market moves (item 772, [Trading](trading.md)),
+as **Run now** starts one, in a chat titled `<name> · <time> · market` (or the schedule's own), its first message saying
+what moved; a schedule switched off is not started so, and the end of such a run is told as its firings' ends are.
+
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A run of a schedule that the daemon's end cut off and you resumed (Resume on its page) counts as the schedule's run
   at work when the schedule comes due beside it (item 553): a repeating schedule is skipped, as for any run still

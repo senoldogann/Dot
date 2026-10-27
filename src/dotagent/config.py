@@ -938,6 +938,12 @@ _PRODUCT: re.Pattern[str] = re.compile(r"[A-Z0-9]{2,10}-[A-Z]{3,5}")
 _CURRENCY: re.Pattern[str] = re.compile(r"[A-Z]{3,5}")
 
 
+def is_product_id(text: str) -> bool:
+    """Whether ``text`` reads as a Coinbase product id, as BTC-EUR: what a product of Coinbase's list must be before it
+    is shown to a run (item 772), as a name in [trading] products must."""
+    return _PRODUCT.fullmatch(text) is not None
+
+
 class TradingConfig(FrozenModel):
     """Trading on Coinbase (``[trading]``, docs/trading.md). The limits are in ``quote``, the currency every product of
     ``products`` is priced in, and no run can raise them: a run cannot change this file, and an order past one of them
@@ -960,6 +966,12 @@ class TradingConfig(FrozenModel):
     paper_start: float = Field(gt=0, allow_inf_nan=False)
     paper_fee_rate: float = Field(ge=0, lt=0.1, allow_inf_nan=False)
     timeout_s: float = Field(gt=0, le=120, allow_inf_nan=False)
+    # A move of the market that starts a run (item 772): the id of the schedule it starts ("": none), the least move
+    # over fifteen minutes, in percent, that does, how many such runs a day may have and how many minutes apart.
+    wake_schedule: str = Field(default="", max_length=64)
+    wake_move_pct: float = Field(default=3.0, gt=0, le=100, allow_inf_nan=False)
+    wake_per_day: int = Field(default=6, ge=0, le=96)
+    wake_gap_min: float = Field(default=30.0, ge=5, le=1440, allow_inf_nan=False)
 
     @field_validator("quote")
     @classmethod

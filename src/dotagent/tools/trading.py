@@ -30,6 +30,7 @@ from dotagent.tools.base import (
 )
 from dotagent.tools.context import ToolContext
 from dotagent.trading.indicators import Indicators, indicator_text, indicators
+from dotagent.trading.limits import market_allows
 from dotagent.trading.market import MarketError, granularities, when
 from dotagent.trading.service import Trading, TradingRefused, holdings_text
 from dotagent.trading.types import Candle, MarketRow, OrderRequest, Portfolio, ProductDay, Quote
@@ -118,9 +119,7 @@ def _market_tool() -> RegisteredTool:
             if not products:
                 # Only "*": the overview is the busiest products of the quote; trading_scan ranks the rest.
                 rows = await trading.market.whole_market(config.quote)
-                products = [row.product for row in rows if row.quote_volume_24h >= config.min_volume][
-                    :_OVERVIEW_AT_MOST
-                ]
+                products = [row.product for row in rows if market_allows(config, row)][:_OVERVIEW_AT_MOST]
             lines: list[str] = []
             for product in products:
                 quote, day = await asyncio.gather(trading.market.quote(product), _day_of(trading, product))
@@ -185,12 +184,7 @@ def _scan_tool() -> RegisteredTool:
     async def run(args: ScanArgs, ctx: ToolContext) -> ToolResult:
         config: TradingConfig = _config(ctx)
         rows: tuple[MarketRow, ...] = await _trading(ctx).market.whole_market(config.quote)
-        allowed: list[MarketRow] = [
-            row
-            for row in rows
-            if row.product in config.products
-            or (ANY_PRODUCT in config.products and row.quote_volume_24h >= config.min_volume)
-        ]
+        allowed: list[MarketRow] = [row for row in rows if market_allows(config, row)]
         keys = {
             "movers": lambda row: -abs(row.change_24h_pct or 0.0),
             "volume": lambda row: -row.quote_volume_24h,
