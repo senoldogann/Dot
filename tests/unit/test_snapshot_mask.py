@@ -8,7 +8,7 @@ from typing import get_args
 import pytest
 from playwright.async_api import Error as PlaywrightError
 
-from dotagent.browser.driver import capture_lines, secret_refs
+from dotagent.browser.driver import capture_page, secret_refs
 from dotagent.browser.safety import hides_secrets, secret_selector
 from dotagent.browser.snapshot import (
     HIDDEN_VALUE,
@@ -161,9 +161,9 @@ async def test_a_field_that_cannot_be_asked_or_went_is_hidden_and_a_ref_of_anoth
 
 async def test_an_ordinary_field_keeps_its_value_a_marked_one_does_not_and_yolo_asks_nothing() -> None:
     plain: _Page = _Page(field=_Locator(present=True, marking="name"))
-    assert render_lines(await capture_lines(plain, 1000, True)) == '- textbox "Name" [ref=e5]: Ada'  # type: ignore[arg-type]
+    assert render_lines((await capture_page(plain, 1000, True)).lines) == '- textbox "Name" [ref=e5]: Ada'  # type: ignore[arg-type]
     marked: _Page = _Page(field=_Locator(present=True, marking="password current-password"))
-    assert HIDDEN_VALUE in render_lines(await capture_lines(marked, 1000, True))  # type: ignore[arg-type]
+    assert HIDDEN_VALUE in render_lines((await capture_page(marked, 1000, True)).lines)  # type: ignore[arg-type]
     yolo: _Page = _Page(field=_Locator(present=True, marking=None))
-    assert "Ada" in render_lines(await capture_lines(yolo, 1000, False))  # type: ignore[arg-type]
+    assert "Ada" in render_lines((await capture_page(yolo, 1000, False)).lines)  # type: ignore[arg-type]
     assert yolo.asked == []

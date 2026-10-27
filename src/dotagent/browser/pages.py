@@ -50,6 +50,8 @@ class Tab:
     lines: tuple[SnapshotLine, ...] = ()
     rendered: str = ""
     rendered_url: str = ""
+    # Whether the last view was of a part of the page (item 743): the next one is not compared with it.
+    rendered_partial: bool = False
     # Chrome's id of the page, which a tab the page opens names as its opener, and the ids of the tabs Chrome made for
     # the page that its thread has not taken in yet (item 342; see :func:`watch_births`).
     target_id: str = ""

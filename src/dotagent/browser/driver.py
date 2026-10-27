@@ -5,7 +5,7 @@ import json
 import re
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, NamedTuple
 from urllib.parse import urlsplit
 
 from playwright.async_api import CDPSession, Cookie, ElementHandle, Frame, JSHandle, Locator, Page
@@ -367,25 +367,98 @@ async def _once_more_after_navigation[T](page: Page, what: str, call: Callable[[
         raise _failure(what, page, {}, second) from second
 
 
-async def capture_lines(
+# The part of a page a snapshot falls back to when the whole is too heavy for it (item 743): the biggest element around
+# the middle of the window that holds at most this many elements, found by sampling the window on a grid.
+_PARTIAL_BUDGET: int = 3000
+_PARTIAL_ROOT_SCRIPT: str = """(budget) => {
+  const count = (node) => node.getElementsByTagName('*').length;
+  const chunks = new Map();
+  for (let column = 0; column < 6; column++) {
+    for (let row = 0; row < 4; row++) {
+      let node = document.elementFromPoint(innerWidth * (2 * column + 1) / 12, innerHeight * (2 * row + 1) / 8);
+      while (node && node.parentElement && count(node.parentElement) <= budget) node = node.parentElement;
+      if (node) chunks.set(node, (chunks.get(node) || 0) + 1);
+    }
+  }
+  let best = null;
+  for (const [node, seen] of chunks) {
+    const better = best === null || seen > chunks.get(best)
+      || (seen === chunks.get(best) && count(node) > count(best));
+    if (better) best = node;
+  }
+  if (best === null || best === document.documentElement || best === document.body) return null;
+  const path = [];
+  for (let node = best; node && node !== document.documentElement; node = node.parentElement) {
+    const siblings = node.parentElement ? Array.from(node.parentElement.children) : [];
+    path.unshift(node.tagName.toLowerCase() + ':nth-child(' + (siblings.indexOf(node) + 1) + ')');
+  }
+  return {selector: 'html > ' + path.join(' > '), elements: count(best) + 1, tag: best.tagName.toLowerCase()};
+}"""
+
+
+class PageLines(NamedTuple):
+    """What :func:`capture_page` read: the lines of the snapshot and, when the page was too heavy for a snapshot of the
+    whole and only a part of it was read, a sentence that says which (empty for a whole one)."""
+
+    lines: tuple[SnapshotLine, ...]
+    partial: str = ""
+
+
+async def _partial_snapshot(page: Page, timeout_ms: int) -> tuple[str, str] | None:
+    """The AI snapshot of the part of the page around the middle of the window (:data:`_PARTIAL_ROOT_SCRIPT`) and the
+    sentence that says it is a part; ``None`` when no part smaller than the page can be named or it cannot be read
+    either. Taking it replaces the ref table as a whole snapshot does, so its refs are the ones that work."""
+    try:
+        # The page that was too slow for the whole may be too busy for this too: it gets the same time, no more.
+        async with asyncio.timeout(timeout_ms / 1000):
+            root: object = await page.evaluate(_PARTIAL_ROOT_SCRIPT, _PARTIAL_BUDGET)
+        if not isinstance(root, dict) or not isinstance(root.get("selector"), str):
+            return None
+        raw: str = await page.locator(root["selector"]).aria_snapshot(mode="ai", boxes=True, timeout=timeout_ms)
+    except (PlaywrightError, TimeoutError) as error:
+        _log.warning(
+            "browser_partial_snapshot_failed",
+            url=page.url,
+            error=truncate_middle(str(error) or "timeout", _ERROR_CHARS),
+        )
+        return None
+    note: str = (
+        f"Partial view: the page was too heavy to read whole in {timeout_ms / 1000:g} s, so this holds only a part of "
+        f"it, a <{root.get('tag')}> of {root.get('elements')} elements around the middle of the window. Its refs "
+        "work; for the rest use browser_find or browser_read_text, or scroll and look again."
+    )
+    return raw, note
+
+
+async def capture_page(
     page: Page, timeout_ms: int, hide_secrets: bool, vault_filled: bool = False, held: Collection[HeldValue] = ()
-) -> tuple[SnapshotLine, ...]:
+) -> PageLines:
     """One AI snapshot with boxes, the options of collapsed dropdowns folded onto their lines. Taking it replaces the
-    ref table of every frame, so refs always mean the latest. With ``hide_secrets`` (every mode but yolo, item 467)
+    ref table of every frame, so refs always mean the latest. A page too heavy to be read within ``timeout_ms`` gives
+    a snapshot of a part of it instead (item 743), and says so. With ``hide_secrets`` (every mode but yolo, item 467)
     the value of a field the page marks secret shows as ``[hidden]``; once a login was filled into the tab
     (``vault_filled``, item 621) so does the value of a field Dot filled it into, in every mode, and so does a field
     of a later document of the same origin that holds one of the values ``held`` (:func:`remark_held`)."""
-    raw: str = await _once_more_after_navigation(
-        page,
-        "taking the page snapshot failed",
-        lambda: page.aria_snapshot(mode="ai", boxes=True, timeout=timeout_ms),
-    )
+    partial: str = ""
+    try:
+        raw: str = await _once_more_after_navigation(
+            page,
+            "taking the page snapshot failed",
+            lambda: page.aria_snapshot(mode="ai", boxes=True, timeout=timeout_ms),
+        )
+    except BrowserError as failed:
+        part: tuple[str, str] | None = (
+            await _partial_snapshot(page, timeout_ms) if "Timeout" in str(failed.context.get("error", "")) else None
+        )
+        if part is None:
+            raise
+        raw, partial = part
     lines: tuple[SnapshotLine, ...] = parse_snapshot(raw)
     if vault_filled and held:
         await remark_held(page, held)
     if hide_secrets or vault_filled:
         lines = hide_values(lines, await secret_refs(page, filled_fields(lines), hide_secrets))
-    return fold_options(lines)
+    return PageLines(fold_options(lines), partial)
 
 
 async def _count(locator: Locator) -> int:
