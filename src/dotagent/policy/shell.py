@@ -306,6 +306,221 @@ _NETWORK_FETCHERS: frozenset[str] = frozenset({"curl", "wget", "http", "https", 
 _REMOTE_COPY: frozenset[str] = frozenset({"scp", "sftp", "rsync", "nc", "ncat", "socat", "telnet", "ftp", "ssh"})
 # A path of another machine as scp and rsync take one: ``host:path``, ``user@host:path``, ``host::module``, ``rsync://``.
 _REMOTE_PATH: re.Pattern[str] = re.compile(r"[^/]*:")
+# The command lines that publish a package to a registry anyone reads, or push an image (item 725): a public post,
+# asked in every preset. Each tool with the verbs that publish, found where the tool's verb stands (its first word, or
+# its first after the values of the options before it, :func:`_verbs_at`), and the shortest of its own abbreviations
+# of them it takes (``npm pub``, ``gem pu``): a word from there up to the whole verb is that verb.
+_PUBLISHES: dict[str, tuple[tuple[tuple[str, int], ...], ...]] = {
+    "npm": ((("publish", 3),),),
+    "pnpm": ((("publish", 7),),),
+    "yarn": ((("publish", 7),), (("npm", 3), ("publish", 7))),
+    "bun": ((("publish", 7),),),
+    "cargo": ((("publish", 7),),),
+    "twine": ((("upload", 6),),),
+    "uv": ((("publish", 7),),),
+    "poetry": ((("publish", 7),),),
+    "flit": ((("publish", 7),),),
+    "hatch": ((("publish", 7),),),
+    "gem": ((("push", 2),),),
+    "docker": (
+        (("push", 4),),
+        (("image", 5), ("push", 4)),
+        (("manifest", 8), ("push", 4)),
+        (("compose", 7), ("push", 4)),
+    ),
+    "podman": ((("push", 4),), (("image", 5), ("push", 4)), (("manifest", 8), ("push", 4))),
+    "buildah": ((("push", 4),),),
+}
+# The verbs of an image build, whose options may push the image it builds (``docker buildx build --push``).
+_BUILDS: tuple[tuple[str, ...], ...] = (
+    ("build",),
+    ("buildx", "build"),
+    ("image", "build"),
+    ("compose", "build"),
+    ("bud",),
+)
+# An output of a build that pushes (the value of ``-o`` or ``--output``).
+_PUSHING_OUTPUT: re.Pattern[str] = re.compile(r"type=registry|push=true", re.IGNORECASE)
+# The tools that send files out (item 725): an upload, asked once a run read outside content, as ``git push`` and
+# ``scp`` are. Each is one whatever it is told but the verbs that only read or fetch (a verb of its not known is one
+# that sends: a spelling the guard does not know asks), and a copy is one in either direction, as the guard does not
+# tell which side is remote. A link to a file anyone can open (``rclone link``, ``gsutil signurl``) is no read: it
+# sends. The cloud command lines send by their storage services (:data:`_STORAGE_SERVICES`).
+_UPLOAD_READS: dict[str, frozenset[str]] = {
+    "gsutil": frozenset({"ls", "du", "cat", "stat", "hash", "version", "help", "config", "ls-l"}),
+    "rclone": frozenset(
+        {
+            "ls",
+            "lsd",
+            "lsl",
+            "lsf",
+            "lsjson",
+            "cat",
+            "size",
+            "about",
+            "config",
+            "listremotes",
+            "version",
+            "help",
+            "check",
+            "cryptcheck",
+            "md5sum",
+            "sha1sum",
+            "hashsum",
+            "tree",
+            "ncdu",
+            "obscure",
+            "authorize",
+            "genautocomplete",
+            "completion",
+            "test",
+            "selfupdate",
+        }
+    ),
+    "hg": frozenset(
+        {
+            "status",
+            "st",
+            "log",
+            "diff",
+            "pull",
+            "update",
+            "up",
+            "clone",
+            "incoming",
+            "in",
+            "summary",
+            "sum",
+            "id",
+            "identify",
+            "heads",
+            "branches",
+            "branch",
+            "tags",
+            "paths",
+            "help",
+            "version",
+            "annotate",
+            "blame",
+            "cat",
+            "files",
+            "show",
+            "config",
+            "root",
+            "add",
+            "commit",
+            "ci",
+            "init",
+            "merge",
+            "revert",
+            "forget",
+            "remove",
+            "rm",
+            "rename",
+            "mv",
+            "copy",
+            "cp",
+            "bookmarks",
+            "bookmark",
+            "graft",
+            "rebase",
+            "shelve",
+            "unshelve",
+            "resolve",
+            "phase",
+            "tag",
+            "grep",
+            "locate",
+            "manifest",
+            "archive",
+            "export",
+            "import",
+            "verify",
+            "recover",
+        }
+    ),
+    "croc": frozenset({"--version", "help"}),
+    "wormhole": frozenset({"receive", "rx", "recv", "recieve", "help"}),
+}
+_UPLOAD_ANY: frozenset[str] = frozenset({"lftp", "smbclient", "tftp"})
+# The options of the upload tools that take a value, as their own lists say (the rest are read as either).
+_UPLOAD_VALUES: dict[str, frozenset[str]] = {
+    "aws": frozenset(
+        {
+            "--profile",
+            "--region",
+            "--endpoint-url",
+            "--output",
+            "--query",
+            "--color",
+            "--ca-bundle",
+            "--cli-read-timeout",
+            "--cli-connect-timeout",
+            "--cli-binary-format",
+        }
+    ),
+    "gcloud": frozenset(
+        {"--project", "--account", "--configuration", "--format", "--verbosity", "--impersonate-service-account"}
+    ),
+    "gsutil": frozenset({"-o", "-h", "-u"}),
+    "rclone": frozenset(
+        {
+            "--config",
+            "--transfers",
+            "--checkers",
+            "--log-file",
+            "--log-level",
+            "--bwlimit",
+            "--include",
+            "--exclude",
+            "--filter",
+            "--max-age",
+            "--min-age",
+            "--max-size",
+            "--min-size",
+            "--retries",
+            "--timeout",
+        }
+    ),
+}
+# The storage services of the cloud command lines: every command of theirs is an upload (item 725, the owner's choice
+# after the review of the sixth push). Their verbs come under groups (``gcloud storage objects update``, ``az storage
+# blob generate-sas``) and a list of those that only read let through each verb a group hid, round after round: a run
+# that read outside content asks before any of them, ``aws s3 ls`` too.
+_STORAGE_SERVICES: dict[str, frozenset[str]] = {
+    "aws": frozenset({"s3", "s3api", "s3control"}),
+    "gcloud": frozenset({"storage"}),
+    "az": frozenset({"storage"}),
+}
+# Subversion: what commits by itself, and the verbs that change a repository's URL directly when given one.
+_SVN_COMMITS: frozenset[str] = frozenset({"commit", "ci", "import"})
+_SVN_URL_CHANGES: frozenset[str] = frozenset(
+    {
+        "copy",
+        "cp",
+        "move",
+        "mv",
+        "rename",
+        "ren",
+        "delete",
+        "del",
+        "remove",
+        "rm",
+        "mkdir",
+        "propset",
+        "pset",
+        "ps",
+        "propdel",
+        "pdel",
+        "pd",
+        "propedit",
+        "pedit",
+        "pe",
+        "lock",
+        "unlock",
+    }
+)
+
 _TUNNELS: frozenset[str] = frozenset({"ngrok", "cloudflared", "localtunnel", "lt", "bore", "serveo"})
 # The mailers of the command line (item 429): sendmail and msmtp send what they are given; mail, mailx and mutt send
 # when a word follows them (a recipient), and only open the mailbox otherwise.
@@ -2594,6 +2809,110 @@ def _assess_interpreter(command: str, args: list[str], scope: ShellScope, given:
     return findings
 
 
+def _verbs_at(args: list[str], values: frozenset[str] = frozenset()) -> list[list[str]]:
+    """The words of ``args`` a tool's verb may start with: from its first word that is no option, and from each after
+    it while the one before is the value of an option (``npm --registry r publish``: from ``r``, then ``publish``). A
+    word after an option is taken either way, as which options take a value is not told without the tool's own list;
+    the value of an option of ``values``, which the tool's list says takes one, is none."""
+    words: list[str] = []
+    after_option: list[bool] = []
+    previous_option: bool = False
+    skip: bool = False
+    for arg in args:
+        if skip:
+            skip = False
+            continue
+        if arg.startswith("-") and arg != "-":
+            skip = arg in values
+            previous_option = "=" not in arg and not skip
+            continue
+        words.append(arg)
+        after_option.append(previous_option)
+        previous_option = False
+    starts: list[list[str]] = []
+    for index, word_after_option in enumerate(after_option):
+        starts.append(words[index:])
+        if not word_after_option:
+            break
+    return starts
+
+
+def _is_verb(word: str, verb: str, shortest: int) -> bool:
+    """Whether ``word`` is ``verb`` or one of the abbreviations of it the tool takes (at least ``shortest`` long)."""
+    lowered: str = word.lower()
+    return len(lowered) >= shortest and verb.startswith(lowered)
+
+
+def _publishes(command: str, args: list[str]) -> bool:
+    for words in _verbs_at(args):
+        for wanted in _PUBLISHES.get(command, ()):
+            if len(words) >= len(wanted) and all(
+                _is_verb(word, verb, shortest) for word, (verb, shortest) in zip(words, wanted, strict=False)
+            ):
+                return True
+    return command in ("docker", "podman", "buildah") and _build_pushes(args)
+
+
+def _build_pushes(args: list[str]) -> bool:
+    """Whether an image build pushes what it builds: ``--push`` (not ``--push=false``) or an output to a registry
+    among the options after its verb (:data:`_BUILDS`), not a word of another command (``docker run -e PUSH=true``,
+    the review of the second push)."""
+    for words in _verbs_at(args):
+        if not any(words[: len(verb)] == list(verb) for verb in _BUILDS):
+            continue
+        tail: list[str] = args[args.index(words[0]) + 1 :]
+        for index, arg in enumerate(tail):
+            if arg == "--push" or (arg.startswith("--push=") and arg.split("=", 1)[1].lower() != "false"):
+                return True
+            output: str | None = None
+            if arg in ("-o", "--output") and index + 1 < len(tail):
+                output = tail[index + 1]
+            elif arg.startswith("--output="):
+                output = arg.split("=", 1)[1]
+            elif arg.startswith("-o") and len(arg) > 2:
+                output = arg[2:]
+            if output is not None and _PUSHING_OUTPUT.search(output):
+                return True
+        return False
+    return False
+
+
+def _only_reads(starts: list[list[str]], reads: frozenset[str]) -> bool:
+    """Whether each word the verb may be (:func:`_verbs_at`) is one of ``reads``, or there is none (options alone,
+    ``--help``): when which it is cannot be told, a line that may send asks."""
+    return all(words and words[0].lower() in reads for words in starts)
+
+
+def _uploads(command: str, args: list[str]) -> bool:
+    if command in _UPLOAD_ANY:
+        return True
+    values: frozenset[str] = _UPLOAD_VALUES.get(command, frozenset())
+    if command in _UPLOAD_READS:
+        return not _only_reads(_verbs_at(args, values), _UPLOAD_READS[command])
+    if command in _STORAGE_SERVICES:
+        # The service among any of the command's words (the review of the eighth push: where its first word stands
+        # was told wrong past gcloud's release track and an option the guard does not know). A value named like one
+        # (``az group create -n storage``) asks too: never too few questions, a rare one too many.
+        return any(word.lower() in _STORAGE_SERVICES[command] for word in _positional(args))
+    if command == "svn":
+        for words in _verbs_at(args):
+            verb: str = words[0].lower() if words else ""
+            if verb in _SVN_COMMITS or (verb in _SVN_URL_CHANGES and any("://" in word for word in words[1:])):
+                return True
+    return False
+
+
+def _assess_sender(command: str, args: list[str]) -> Finding | None:
+    """A package published, an image pushed or a file sent out by a tool of :data:`_PUBLISHES`, the upload tools
+    (:data:`_UPLOAD_READS`, :data:`_UPLOAD_ANY`, :data:`_STORAGE_SERVICES`, Subversion) (item 725); None for another
+    command, or one of them that only reads (``docker pull``, ``rclone ls``, ``gsutil ls``)."""
+    if _publishes(command, args):
+        return _fetching("medium", ("public_post",), f"{command} publishes to a registry anyone can read")
+    if _uploads(command, args):
+        return _fetching("medium", ("upload",), f"{command} sends files to a remote place")
+    return None
+
+
 def _assess_installer(command: str, args: list[str]) -> Finding | None:
     sub: str = next((arg for arg in args if not arg.startswith("-")), "")
     global_flag: bool = any(arg in ("-g", "--global") for arg in args)
@@ -3426,6 +3745,9 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
         return [_finding("high", ("system_settings",), f"{command} changes system configuration")]
     if command in _PROCESS_KILLERS:
         return [_finding("medium", (), f"{command} terminates processes")]
+    sender: Finding | None = _assess_sender(command, args)
+    if sender is not None:
+        return [sender]
     installer: Finding | None = _assess_installer(command, args)
     if installer is not None:
         return [installer]

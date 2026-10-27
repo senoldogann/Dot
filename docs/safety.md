@@ -463,35 +463,36 @@ the chat's tab stayed. A run that has seen such content is marked untrusted, and
 on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
 or a note, installing software (`brew install`, `pip install`, `npm install -g`, `cargo install`, `uv tool install`) or
 running a script the line downloaded (item 523), or a blob it decoded and ran (`base64 -d x | sh`, or a decode to a
-file the line then runs; item 528), and a shell line that sends data out: an upload or a form, a push, a
-copy to another machine, a change on a code host, inline code that reaches the network or runs a command of it, and a
-read that may reach a protected location, item 531) ask even when the preset or an `allow` rule would let them through;
-only a `preapproved` rule skips the question. A
-project's own install (`npm install`, `uv sync`, `uv add`) goes ahead. The error of a call that reached outside marks
-it too when it may hold such words (item 551): what an MCP server answered a call with, which the model reads inside
-the fence as data, and the error of a search whose engines answered with an error page; a failure in transit does not.
-A reaction on a message of Dot's (item 586) never clears the mark: while the run works it reaches it as a note
-from Dot, not as your words, which vouches for nothing and is no instruction to the review model, and it approves no
-step (the note says so); after the run ended it starts a follow-up run that starts as untrusted as the run of the
-message, or the chat's last, ended, whose goal holds none of Dot's words and whose quote of the message is no
-instruction (see [Reactions](runs.md#reactions-on-dots-messages)). A 📌 makes a note marked as read from outside
-content when the run read some. A message you send to the run clears the mark; your answer to a question of a run you
-watch does not,
-whether the run waited for it or went on (item 508), as it
-answers what the run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts
-once that run has ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a
-resumed run as the run it resumes was when it was cut off, and the run that tells a chat that its command in the
-background ended as the chat's last run ended: that message is Dot's, not yours, and so is the note that tells a run at
-work of such an end, which clears nothing. The run a watcher starts for a mail, an event or a notification (item 571,
-see [Dot comes to you](proactive.md#watchers)) starts untrusted whatever it goes on from, since what a stranger wrote
-set it off: its goal is your own words and the item stands in its first message, in a fence. A message you send starts
-a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`): it is never among the notes a run
-starts with, is handed while it works or as a site's lessons (item 384), a `memory_search` that returns one marks the
-run that read it, so its next save asks again, and Settings › Memory and `dotx memory list` say of such a note that it
-was saved while reading outside content. A
-learned skill whose steps may come from outside content (its record says so, or is older than the mark) marks the
-run that reads it with the `skill` tool, and a run that starts with one picked in the composer starts marked (item
-585).
+file the line then runs; item 528), and a shell line that sends data out: an upload or a form, a push, a copy to another
+machine, a file sent by a tool known by name (`aws s3`, `gsutil`, `gcloud storage`, `az storage`, `rclone`, `hg push`,
+`svn commit`, `lftp`, `smbclient`, `croc`, `wormhole send`; item 725: any verb of theirs but those that only read, a
+copy in either direction, as which side is remote is not told), a change on a code host, inline code that reaches the
+network or runs a command of it, and a read that may reach a protected location, item 531) ask even when the preset or
+an `allow` rule would let them through; only a `preapproved` rule skips the question. A project's own install (`npm
+install`, `uv sync`, `uv add`) goes ahead. A package published or an image pushed (`npm publish`, `twine upload`, `cargo
+publish`, `gem push`, `docker push`; item 725) is a public post, asked in every preset whether or not the run read
+outside content. The error of a call that reached outside marks it too when it may hold such words (item 551): what an
+MCP server answered a call with, which the model reads inside the fence as data, and the error of a search whose engines
+answered with an error page; a failure in transit does not. A reaction on a message of Dot's (item 586) never clears the
+mark: while the run works it reaches it as a note from Dot, not as your words, which vouches for nothing and is no
+instruction to the review model, and it approves no step (the note says so); after the run ended it starts a follow-up
+run that starts as untrusted as the run of the message, or the chat's last, ended, whose goal holds none of Dot's words
+and whose quote of the message is no instruction (see [Reactions](runs.md#reactions-on-dots-messages)). A 📌 makes a note
+marked as read from outside content when the run read some. A message you send to the run clears the mark; your answer
+to a question of a run you watch does not, whether the run waited for it or went on (item 508), as it answers what the
+run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts once that run has
+ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a resumed run as the run
+it resumes was when it was cut off, and the run that tells a chat that its command in the background ended as the chat's
+last run ended: that message is Dot's, not yours, and so is the note that tells a run at work of such an end, which
+clears nothing. The run a watcher starts for a mail, an event or a notification (item 571, see [Dot comes to
+you](proactive.md#watchers)) starts untrusted whatever it goes on from, since what a stranger wrote set it off: its goal
+is your own words and the item stands in its first message, in a fence. A message you send starts a run unmarked. A note
+a run saved while it was marked keeps that origin (`tainted`): it is never among the notes a run starts with, is handed
+while it works or as a site's lessons (item 384), a `memory_search` that returns one marks the run that read it, so its
+next save asks again, and Settings › Memory and `dotx memory list` say of such a note that it was saved while reading
+outside content. A learned skill whose steps may come from outside content (its record says so, or is older than the
+mark) marks the run that reads it with the `skill` tool, and a run that starts with one picked in the composer starts
+marked (item 585).
 
 **What a server says of itself** (item 659). When a run's tools come in groups, the line of an MCP server's group in its
 instructions says what the server is for, so that the model can tell which group to turn on ([MCP
@@ -1174,9 +1175,12 @@ event and approval.
 > told without each tool's options, so from a folder that holds a protected location (the home folder) it asks whatever
 > folder it is given. It does not follow what a recursive command does inside the other folders it walks, nor the code
 > of a script it runs, nor `git add -A` in a folder that holds one, nor the other tools that upload or copy a folder
-> whole under names it does not know, nor a loop that reads what a search lists (`find ~ | while read f; do cat "$f";
-> done`), nor a path whose unknown part holds the protected folder's own name (`~/Documents/$(echo ../.ssh)/id_rsa`);
-> the sandbox keeps those out of Dot's own files and of the sealed stores (the data of your browsers, Mail and
-> Messages), not out of the rest of yours, and a shell can do more than any analysis can foresee. Treat Dot as a user of
-> your account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
-> `cautious` on a machine where a mistake would be expensive.
+> whole under names it does not know (it knows those of item 725 by name), nor a package published through an
+> interpreter or a runner it does not unwrap (`python -m twine upload`, `pipx run twine upload`), nor a name looked up
+> (`dig`, `nslookup`, `host`) that carries out what the line puts in it, nor what `openssl s_client` is given to send,
+> nor a loop that reads what a search lists (`find ~ | while read f; do cat "$f"; done`), nor a path whose unknown part
+> holds the protected folder's own name (`~/Documents/$(echo ../.ssh)/id_rsa`); the sandbox keeps those out of Dot's own
+> files and of the sealed stores (the data of your browsers, Mail and Messages), not out of the rest of yours, and a
+> shell can do more than any analysis can foresee. Treat Dot as a user of your account with the rights of your account:
+> keep backups, keep the workspace for scratch work, and use `balanced` or `cautious` on a machine where a mistake would
+> be expensive.
