@@ -101,6 +101,21 @@ def _upcoming(record: ScheduleRecord, zone: ZoneInfo, now: float) -> float | Non
     return None
 
 
+def ran_once(record: ScheduleRecord) -> bool:
+    """Whether ``record`` is a one-time schedule whose firing at its moment came and started its run, so that it has
+    no run left (item 723): switched off by that firing, not by anyone's hand. A firing before the moment it has now
+    (it was given a new time since), one whose start failed, and one that switched it off for its failures are not."""
+    return (
+        record.cron is None
+        and not record.enabled
+        and record.next_run_at is None
+        and record.run_at is not None
+        and record.last_run_at is not None
+        and record.last_run_at >= record.run_at
+        and not record.last_status.startswith(("failed to start", "switched off"))
+    )
+
+
 async def plan_schedule(
     store: Store, config: SchedulerConfig, fallback_zone: ZoneInfo, request: ScheduleRequest, now: float
 ) -> Timing:
@@ -179,6 +194,10 @@ def _edited_timing(
     moment: float = record.run_at if record.run_at in moments else local_moment(request.at, zone, now)
     if moment != record.run_at and moment <= now:
         raise ToolInputError("'at' is not in the future", {"at": request.at, "now": format_local(now, zone)})
+    # A moment left as it was that is due and still waits to fire (a paused agent, the emergency stop, a start that
+    # failed and is tried again) keeps waiting (item 723): the edit of its goal was refused as having no run left.
+    if moment == record.run_at and moment <= now and record.enabled and record.next_run_at is not None:
+        return _EditedTiming(cron=None, run_at=moment, upcoming=record.next_run_at)
     return _EditedTiming(cron=None, run_at=moment, upcoming=moment if moment > now else None)
 
 

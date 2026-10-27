@@ -1074,18 +1074,23 @@ function who(record, face) {
  * switched off, to be read before it runs), when it runs, and Edit, on the Schedules page. */
 function agentScheduleRow(view, onToggle) {
   const { record } = view;
+  // A one-time schedule that fired reads as one that ran, not as one switched off, and has nothing to switch (item 723).
+  const done = view.ran_once === true;
   const toggle = el("button", {
     class: "switch",
     type: "button",
     role: "switch",
     "aria-checked": String(record.enabled),
     "aria-label": `${record.enabled ? "Switch off" : "Switch on"} ${record.name}`,
-    title: record.enabled ? "Switch this schedule off" : "Switch this schedule on",
+    title: done ? "It ran once and has no run left: give it a new time on the Schedules page" : record.enabled ? "Switch this schedule off" : "Switch this schedule on",
+    disabled: done,
     onclick: () => onToggle(record),
   });
-  const state = !record.enabled
-    ? el("span", { class: "badge b-muted" }, "switched off")
-    : el("span", null, view.next_local === null ? "Will not run again" : `Next ${view.next_local}`);
+  const state = done
+    ? el("span", { class: "badge b-muted", title: `It ran once; it ended: ${record.last_status}` }, "ran once")
+    : !record.enabled
+      ? el("span", { class: "badge b-muted" }, "switched off")
+      : el("span", null, view.next_local === null ? "Will not run again" : `Next ${view.next_local}`);
   return el(
     "div",
     { class: "list-row", dataset: { schedule: record.id } },

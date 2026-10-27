@@ -54,6 +54,7 @@ from dotagent.scheduler.plans import (
     disable_schedule,
     edit_schedule,
     enable_schedule,
+    ran_once,
     remove_schedule,
     schedule_order,
     schedule_timing,
@@ -155,6 +156,7 @@ def _schedule_view(
             id=agent.id, name=agent.name, look=agent.look, approvals=agent.approvals, paused_at=agent.paused_at
         ),
         brief=record.id == brief_id,
+        ran_once=ran_once(record),
     )
 
 
@@ -479,9 +481,9 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 skills=kept.skills,
             ),
         )
-        edited: ScheduleRecord = await edit_schedule(
-            store, config, zone, schedule_id, plan, request.enabled, time.time()
-        )
+        # Left out, on or off stays as it is now, not as a form saw it when it opened (item 723).
+        enabled: bool = (await store.get_schedule(schedule_id)).enabled if request.enabled is None else request.enabled
+        edited: ScheduleRecord = await edit_schedule(store, config, zone, schedule_id, plan, enabled, time.time())
         return await view_of(edited)
 
     @router.post("/schedules/{schedule_id}/enable")

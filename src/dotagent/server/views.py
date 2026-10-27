@@ -622,7 +622,7 @@ class ScheduleUpdateRequest(FrozenModel):
     ``same_chat`` and ``speed`` left out take the configured ones, as a client from before item 257 sends none of them
     (the standard speed for ``speed``, item 291). ``agent_id`` left out keeps the schedule's agent (item 462), so a
     client that does not know of it never turns an agent's schedule into Dot's, whose runs have every tool; ``null``
-    makes it Dot's."""
+    makes it Dot's. ``enabled`` left out keeps it switched on or off as it is (item 723)."""
 
     name: str = Field(min_length=1, max_length=_NAME_CHARS)
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
@@ -640,7 +640,9 @@ class ScheduleUpdateRequest(FrozenModel):
     notify: NotifyLevel | None = None
     speed: Speed | None = None
     agent_id: str | None = None
-    enabled: bool
+    # Left out (item 723), the schedule stays switched on or off as it is now: a form opened before the owner switched
+    # it in the list put its old state back when it was saved.
+    enabled: bool | None = None
 
 
 class BrowserModeRequest(FrozenModel):
@@ -1302,7 +1304,8 @@ class ScheduleRepeatView(FrozenModel):
 class ScheduleView(FrozenModel):
     """A schedule as the UI shows it; the times are in the schedule's own ``zone``. ``run_at_input`` is the one-time
     moment as a ``datetime-local`` field takes it (``2026-10-06T09:30``). ``agent`` is the agent its runs run as,
-    ``None`` for Dot. ``brief`` says that it is the morning brief (item 570), whose card sets it."""
+    ``None`` for Dot. ``brief`` says that it is the morning brief (item 570), whose card sets it. ``ran_once`` says that
+    it is a one-time schedule that ran at its moment and has no run left (item 723), not one switched off by hand."""
 
     record: ScheduleRecord
     when: str
@@ -1312,6 +1315,7 @@ class ScheduleView(FrozenModel):
     zone: str
     agent: ScheduleAgent | None
     brief: bool
+    ran_once: bool = False
 
 
 class ContextChoice(FrozenModel):

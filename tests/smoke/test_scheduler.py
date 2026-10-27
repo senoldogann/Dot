@@ -26,7 +26,7 @@ from dotagent.agent.verify import new_facts
 from dotagent.cli_commands import StatsCommand
 from dotagent.cli_stats import cmd_stats
 from dotagent.config import ModelsConfig, load_config
-from dotagent.core.errors import ConfigError, StoreError, ToolExecutionError, ToolInputError
+from dotagent.core.errors import ConfigError, RunConflict, StoreError, ToolExecutionError, ToolInputError
 from dotagent.core.paths import db_path, failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.events import SYSTEM_RUN_ID, EventBus, Subscription
@@ -38,7 +38,13 @@ from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
 from dotagent.scheduler import runner as scheduler_runner
-from dotagent.scheduler.failures import SCHEDULE_FAILURES_KEY, FiringFailures, parse_failures, record_firing_failure
+from dotagent.scheduler.failures import (
+    SCHEDULE_FAILURES_KEY,
+    FiringFailures,
+    firing_failure,
+    parse_failures,
+    record_firing_failure,
+)
 from dotagent.scheduler.plans import (
     UNSET_OPTIONS,
     ScheduleRequest,
@@ -1232,3 +1238,24 @@ async def test_the_nightly_step_starts_at_the_time_the_page_set_over_the_setting
         assert steps == [after]
     finally:
         await runtime.store.kv_set(STEP_TIME_KEY, "")
+
+
+class _ChatBusy(_Starts):
+    """Refuses every firing as a busy chat refuses it: a run works in it already (item 723)."""
+
+    async def start_firing(self, *args: object, **kwargs: object) -> RunRecord:
+        raise RunConflict("a run is already active on this thread", {"thread_id": "thr_busy"})
+
+
+async def test_a_recurring_firing_whose_chat_is_busy_is_skipped_not_failed(runtime: Runtime) -> None:
+    """Item 723: the owner's LinkedIn schedule read "failed to start: a run is already active on this thread", grey,
+    when its chat was busy with the owner's own message. A recurring schedule's firing is skipped then, saying why, and
+    counts as no failure; it goes on to its next time."""
+    record: ScheduleRecord = await _schedule(runtime, _cron("Busy chat", "*/5 * * * *"))
+    due: float = _planned(record)
+    scheduler: Scheduler = Scheduler(runtime, _ChatBusy(runtime))
+    await scheduler.tick(due + 1)
+    after: ScheduleRecord = await runtime.store.get_schedule(record.id)
+    assert after.last_status == "skipped: a run is already active on this thread"
+    assert after.enabled and after.next_run_at is not None and after.next_run_at > due
+    assert await firing_failure(runtime.store, record.id) is None
