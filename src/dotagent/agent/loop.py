@@ -31,6 +31,7 @@ from dotagent.agent.compact import (
     shrink_old_tool_results,
     split_for_summary,
 )
+from dotagent.agent.context_parts import CONTEXT_PARTS_EVENT, parts_of
 from dotagent.agent.continuity import (
     ContinuityCheck,
     RunLedger,
@@ -2191,6 +2192,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else None
     )
     steps: int = 0
+    # What the run's first request carries, part by part, recorded once (item 735).
+    parts_told: bool = False
     step_origin: CallOrigin = CallOrigin(run_id=run.id, purpose="step")
     ratio: float = 1.0
     nudges: int = 0
@@ -2365,6 +2368,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             # The window the run planned with as it started (item 520): a context size chosen since does not change it.
             window=scaffold.window if routed is None else routed.scaffold.window,
         )
+        if not parts_told:
+            parts_told = True
+            await runtime.bus.emit(run.id, CONTEXT_PARTS_EVENT, parts_of(request).model_dump(mode="json"), True)
         steps += 1
         asked_at: float = time.monotonic()
         # The secrets Dot holds, masked in what the step streams and in the message it stores (item 551).

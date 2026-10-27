@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal
 
+from dotagent.agent.context_parts import ContextParts, tokens_of
 from dotagent.agent.learning_health import (
     LEARNING_HEALTH_KEY,
     LEARNING_WORKS,
@@ -53,6 +54,7 @@ from dotagent.store.stats import (
     collect_statistics,
     collect_stuck,
     gui_share,
+    read_context_parts,
     read_kv,
 )
 
@@ -348,11 +350,53 @@ async def cmd_stats(command: StatsCommand) -> int:
         kept: str | None = await asyncio.to_thread(read_kv, db_path(), STEP_TIME_KEY)
         harness_on: bool = schedule_from(kept, config.harness).step_time != STEP_OFF
         lines.extend(render_learning_health(parse_health(health), time.time(), quiet_s, harness_on))
+        context: list[str] = await asyncio.to_thread(read_context_parts, db_path(), since, _CONTEXT_RUNS)
+        lines.extend(render_context(context))
         stuck: StuckWork = await asyncio.to_thread(collect_stuck, db_path())
         failing: str | None = await asyncio.to_thread(read_kv, db_path(), SCHEDULE_FAILURES_KEY)
         lines.extend(render_stuck(stuck, parse_failures(failing)))
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
+
+
+# The runs whose first step ``dotx stats`` reads for what it carries (item 735), and how many of its largest parts each
+# line names.
+_CONTEXT_RUNS: int = 200
+_PARTS_NAMED: int = 5
+
+
+def _median(values: list[int]) -> int:
+    ordered: list[int] = sorted(values)
+    return ordered[len(ordered) // 2] if ordered else 0
+
+
+def _largest(parts: list[dict[str, int]], count: int) -> str:
+    """The ``count`` largest parts by their median over ``parts``, in tokens; a part missing from a run counts 0."""
+    names: set[str] = {name for each in parts for name in each}
+    medians: dict[str, int] = {name: _median([each.get(name, 0) for each in parts]) for name in names}
+    top: list[tuple[str, int]] = sorted(medians.items(), key=lambda item: -item[1])[:count]
+    return ", ".join(f"{name} {tokens_of(chars):,}" for name, chars in top if chars > 0)
+
+
+def render_context(raw: list[str]) -> list[str]:
+    """What the first step of the newest runs carried to their model (item 735), as medians in Dot's estimate of
+    tokens: in all, the system prompt and its largest sections, the tools' schemas and their largest groups, and the
+    conversation before the first step."""
+    if not raw:
+        return ["", "What a run's first step carries: nothing recorded yet."]
+    parts: list[ContextParts] = [ContextParts.model_validate_json(each) for each in raw]
+    system: int = _median([sum(each.system.values()) for each in parts])
+    tools: int = _median([sum(each.tools.values()) for each in parts])
+    history: int = _median([sum(each.history.values()) for each in parts])
+    return [
+        "",
+        f"What a run's first step carries (median of the newest {len(parts)} runs, estimated tokens):",
+        f"  in all {_median([each.tokens for each in parts]):,}",
+        f"  system prompt {tokens_of(system):,}: {_largest([each.system for each in parts], _PARTS_NAMED)}",
+        f"  tools {tokens_of(tools):,} ({_median([each.tools_offered for each in parts])} offered): "
+        f"{_largest([each.tools for each in parts], _PARTS_NAMED)}",
+        f"  the conversation {tokens_of(history):,}",
+    ]
 
 
 def _when(at: float) -> str:
