@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from dotagent.cli_commands import COMMAND_ADAPTER, Command
 from dotagent.core.errors import DotError
+from dotagent.core.heap import ensure_space_efficient_heap
 from dotagent.core.logs import configure_logging, get_logger
 from dotagent.core.paths import ensure_layout, log_dir
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort
@@ -674,6 +675,9 @@ async def dispatch(command: Command) -> int:
 def main() -> None:
     parser: argparse.ArgumentParser = build_parser()
     command: Command = parse_command(parser, sys.argv[1:])
+    if command.name == "daemon":
+        # Before anything is opened: the daemon starts itself again with malloc's space-efficient mode (item 730).
+        ensure_space_efficient_heap()
     ensure_layout()
     configure_logging("info", False, log_dir() / "dotx.log")
     try:
