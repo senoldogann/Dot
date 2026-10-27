@@ -6,7 +6,7 @@ ordinary words."""
 import json
 import string
 from collections.abc import Iterable
-from functools import cache
+from functools import lru_cache
 from urllib.parse import quote, quote_plus, unquote
 
 from pydantic import JsonValue
@@ -32,7 +32,12 @@ def _form_encoded(value: str) -> str:
     )
 
 
-@cache
+# The values whose forms are kept, the most recently masked: every cookie value of every site a script ran in passes
+# through here, and session cookies change, so a cache without a bound grew for as long as the daemon ran (item 730).
+_FORMS_KEPT: int = 2048
+
+
+@lru_cache(maxsize=_FORMS_KEPT)
 def _forms(value: str) -> frozenset[str]:
     """``value`` as a page or a script may write it back: as it is; in an address, as a form, a script's
     ``encodeURIComponent`` and ``encodeURI``, and Python write it (``%21`` or ``!``, ``+`` or ``%20`` for a space);

@@ -8,6 +8,14 @@ dotx open       # open the web UI of the running daemon in your default browser,
 dotx url        # print its address with the sign-in token
 ```
 
+`dotx daemon` starts itself again at once, the same process with the same arguments, with `MallocSpaceEfficient=1` in
+its environment (item 730): macOS's malloc then gives the memory the daemon freed back to the system instead of keeping
+it for later, which Activity Monitor counted as the daemon's memory (a run's step builds and drops megabytes: the
+conversation sent to the model, its JSON, the tool output). The processes it starts inherit it. The libraries only
+some tools need are loaded by their first use, not by the daemon's start (item 729): the Word, Excel and PowerPoint
+readers with numpy, macOS's Vision (the text of a screenshot) and the push notifications' sender with aiohttp, about
+40 MB. Measured on an M4 with the owner's database: 184 MB after start before, 132 MB after.
+
 The web UI is laid out like a chat app: the chats in a sidebar on the left, one page on the right, and the settings on a
 page of their own.
 
