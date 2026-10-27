@@ -986,6 +986,22 @@ runs_per_hour = 5
 # and not told (the watcher's row says how many).
 judged_per_look = 25
 
+[initiative]
+# Dot's own initiative (item 715, docs/proactive.md): switched on in Schedules, Dot keeps a list of things to do for you
+# and does them while the Mac is idle, in chats of their own, with your approval mode. The Mac is idle when none of its
+# runs works and nobody touched the keyboard, the mouse or the trackpad for idle_minutes.
+idle_minutes = 10.0
+# How long after one of its own runs ends the next may start.
+gap_minutes = 15.0
+# How often, when the list has nothing to do, a research run looks for work that helps you: in what it remembers of
+# you, your chats, the runs that failed and the campaigns at work. It writes nothing but its list, its notes and Dot's
+# memory, as any research run may.
+look_every_hours = 6.0
+# How many runs try one thing before it is let go and you are told.
+attempts = 3
+# The most of its own runs that start in a day; 0 sets no limit.
+runs_per_day = 0
+
 [skills]
 # Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML
 # frontmatter (name, description) and optional scripts/, references/ and assets/. The agent sees "name: description" for

@@ -442,6 +442,12 @@ async def _campaigns(store: Store, zone: ZoneInfo) -> Quoted:
     return Quoted(lines=tuple(_section("Campaigns at work", shown, len(active))), run_ids=tuple(dict.fromkeys(noted)))
 
 
+async def record_parts(store: Store, since: float, zone: ZoneInfo) -> list[Quoted]:
+    """The parts of Dot's record that are not the brief's own, for a run that looks for work on Dot's own initiative
+    (item 715): what waits for the owner, the runs that failed since ``since`` and the campaigns at work."""
+    return [await _waiting(store), await _failed(store, since), await _campaigns(store, zone)]
+
+
 async def _today(store: Store, record: ScheduleRecord, now: float, zone: ZoneInfo) -> Quoted:
     """The schedules, but the brief, that fire later today, in the order they fire."""
     day: str = datetime.fromtimestamp(now, tz=zone).date().isoformat()

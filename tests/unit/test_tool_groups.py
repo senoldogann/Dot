@@ -66,6 +66,7 @@ AUTO: AgentConfig = DEFAULTS.model_copy(update={"tool_surface": "auto"})
         ("create_agent", "team"),
         ("show_page", "pages"),
         ("vault_contacts", "vault"),
+        ("todo_add", "todos"),
         ("browser_fill_login", "browser"),
         ("memory_update", "memory_admin"),
         ("memory_forget", "memory_admin"),
@@ -84,6 +85,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
     assert groups_of(TASK_TOOLS) == (
         "browser",
         "memory_admin",
+        "todos",
         "drafts",
         "accounts",
         "schedule",
@@ -97,6 +99,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
     # mail and calendars (item 424).
     assert groups_of([spec.name for spec in specs_for_mode(REGISTRY, "research")]) == (
         "browser",
+        "todos",
         "accounts",
         "schedule",
         "pages",
@@ -154,6 +157,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "pages",
         "team",
         "terminal",
+        "todos",
         "vault",
     }
     assert (hidden["apple_script"], hidden["memory_forget"]) == ("desktop", "memory_admin")
@@ -211,6 +215,7 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "browser_requests, browser_extract, browser_screenshot, browser_wait_text, browser_back, browser_switch_tab, "
         "browser_close_tab and 3 more)",
         "- memory_admin: correcting or forgetting saved notes (memory_update, memory_forget)",
+        "- todos: your own list of work to do for the owner later, on your own, while the Mac is idle (todo_add)",
         "- drafts: an email or a message you write for the owner, who sends it from the conversation (draft_message)",
         "- accounts: the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only "
         "(mail_search, mail_read, calendar_events)",

@@ -54,8 +54,9 @@ _SUMMARY_KEY: str = ":summary"
 _BROKEN_FAST: str = "broken"
 # The window of the runs whose summaries are measured: three quarters of it hold the fixed part of the prompt with a
 # little room, so that forty pages make the run summarize again and again. 24 000 held it with a few tokens to spare
-# until every run was told that there is always a way (item 446).
-_SMALL_WINDOW: int = 26_000
+# until every run was told that there is always a way (item 446), 26 000 until the browser read a page's data in one
+# call and Dot kept a list of its own (items 714 and 715).
+_SMALL_WINDOW: int = 28_000
 # Every section the continuity check asks for, and no identifier the run's history does not hold.
 _SUMMARY: str = (
     "GOAL: find why the backup failed.\nDONE: read the log page by page.\nSTATE: no failure found so far.\n"
@@ -334,12 +335,13 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     # leaves the fixed part of the prompt (the core tools of items 41 and 34, the page tool of item 193, the skill tool
     # with the skills that come with Dot of item 196 and the draft tool of item 314 included) room for three pages after
     # every compaction; what a compaction keeps grows a little each time, and a window that left room for one page ended
-    # up compacting at every step once the instructions grew by a few words (item 404).
+    # up compacting at every step once the instructions grew by a few words (item 404). It was 32 000 until three tools
+    # joined the fixed part (items 714 and 715).
     turns: list[ScriptedTurn] = _reading(40)
-    small: Played = await _play(_config({}, 6), login_env, 32_000, turns)
+    small: Played = await _play(_config({}, 6), login_env, 33_600, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(32_000, None, 24_000, 24_000, 3000, True),)
+    assert small.scaffolds == (_scaffold(33_600, None, 25_200, 25_200, 3150, True),)
     assert roomy.scaffolds == (_scaffold(None, None, 96_000, 81_600, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
@@ -350,7 +352,7 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for page in [*small_pages, *roomy_pages]:
         assert "chars omitted" not in page
         assert page.endswith("to continue]")
-    assert max(len(page) for page in small_pages) <= 3000 < min(len(page) for page in roomy_pages)
+    assert max(len(page) for page in small_pages) <= 3150 < min(len(page) for page in roomy_pages)
 
     # The small budget is kept by compacting with summaries of the fast model; the large one is never reached.
     assert len(small.compactions) > 1
@@ -362,8 +364,8 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for compaction in small.compactions:
         before, after = compaction["tokens_before"], compaction["tokens_after"]
         assert isinstance(before, int) and isinstance(after, int), compaction
-        assert after < before and after <= 24_000, compaction
-    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 24_000
+        assert after < before and after <= 25_200, compaction
+    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 25_200
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
     # history again at the very next step.
     gaps: list[int] = [

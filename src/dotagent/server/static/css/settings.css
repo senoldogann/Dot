@@ -4543,3 +4543,29 @@
     flex: 1 0 100%;
   }
 }
+
+/* ---------- Dot's own initiative (item 715) under the watchers: a switch in its head, the list of what Dot does on its
+   own while the Mac is idle (a row a thing, with where it stands and the button that takes it off or puts it back), and
+   the box that puts a thing of yours on it. ---------- */
+
+.initiative-list {
+  padding: var(--space-2) var(--space-4) 0;
+}
+
+.initiative-list > .watcher-list > .list-row {
+  padding-inline: 0;
+}
+
+.initiative-add {
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.initiative-add .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.initiative-idle {
+  margin: var(--space-2) var(--space-4) 0;
+}

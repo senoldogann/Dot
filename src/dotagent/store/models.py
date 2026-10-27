@@ -32,6 +32,8 @@ DraftChannel = Literal["mail", "message"]
 # ``waiting``: for the owner to send or discard it; ``sending``: handed to the application; ``failed``: the application
 # refused it, and the owner may send it again or discard it; ``sent`` and ``discarded`` are final.
 DraftStatus = Literal["waiting", "sending", "sent", "discarded", "failed"]
+# Where a thing on Dot's own list stands (item 715): to do, being done by a run of its own, done, or let go.
+TodoStatus = Literal["open", "doing", "done", "dropped"]
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
 # How the end of a schedule's run is told (item 461): every end, only a first failure or an end that needs the owner,
 # or nothing.
@@ -352,6 +354,26 @@ class ApprovalRecord(FrozenModel):
     used_at: float | None
     scope_thread_id: str | None
     scope_campaign_id: str | None
+
+
+class TodoRecord(FrozenModel):
+    """A thing Dot means to do for the owner on its own (item 715): what (``title``) and why it helps them (``why``),
+    who put it on the list (``source``: a run's tool, the owner, the search for work) and the run that did
+    (``source_run_id``), whether that run had read content third parties can author (``tainted``, which the run that
+    does it starts with), how many runs tried it, the newest of them and what came of it (``note``)."""
+
+    id: str
+    title: str
+    why: str
+    source: str
+    source_run_id: str | None
+    tainted: bool
+    status: TodoStatus
+    attempts: int
+    run_id: str | None
+    note: str
+    created_at: float
+    updated_at: float
 
 
 class DraftRecord(FrozenModel):

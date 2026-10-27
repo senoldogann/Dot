@@ -30,6 +30,7 @@ from dotagent.plugins import scout_service
 from dotagent.plugins.scout import ScoutStopped
 from dotagent.plugins.scout_types import ScoutState
 from dotagent.proactive.brief import BriefFiring, is_brief, prepare, tell_brief
+from dotagent.proactive.initiative import Initiative
 from dotagent.runtime import Runtime
 from dotagent.scheduler import (
     SCHEDULE_MISSED_EVENT,
@@ -138,6 +139,8 @@ class Scheduler:
         # The plugin scout's night (item 711), timed like the reflection.
         self._scouted_from: float = time.time()
         self._scouting: asyncio.Task[None] | None = None
+        # Dot's own initiative (item 715): its runs while the Mac is idle, started from the tick.
+        self._initiative: Initiative = Initiative(runtime, manager)
 
     async def start(self) -> asyncio.Task[None]:
         """Begin ticking in the background; what an earlier process left unfinished (a schedule starting or running a
@@ -185,6 +188,7 @@ class Scheduler:
         scouting: asyncio.Task[None] | None = self._scouting
         if scouting is not None:
             scouting.cancel()
+        await self._initiative.stop()
         loop: asyncio.Task[None] | None = self._loop
         if loop is None:
             return
@@ -218,8 +222,8 @@ class Scheduler:
         parts are done each on its own: one that fails is logged where it failed and keeps the others from nothing. The
         failures of the parts that fire schedules and start sessions are raised together at the end, as an
         ``ExceptionGroup``, and a tick that raises counts towards the end of the loop (:meth:`_tick_forever`); a
-        failure of the others (the reflection, the harness's step, the record of how learning fares) is logged at each
-        tick with the part's name and never raises (item 688)."""
+        failure of the others (the reflection, the harness's step, the record of how learning fares, Dot's own
+        initiative of item 715) is logged at each tick with the part's name and never raises (item 688)."""
         failures: list[Exception] = []
         for part in (self._fire_due, self._start_due_sessions):
             try:
@@ -227,7 +231,13 @@ class Scheduler:
             except Exception as exc:
                 log.exception("scheduler_part_failed", part=part.__name__)
                 failures.append(exc)
-        for part in (self._reflect_if_due, self._step_if_due, self._scout_if_due, self._check_learning):
+        for part in (
+            self._reflect_if_due,
+            self._step_if_due,
+            self._scout_if_due,
+            self._check_learning,
+            self._initiative.tick,
+        ):
             try:
                 await part(now)
             except Exception as exc:

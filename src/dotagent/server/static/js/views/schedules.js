@@ -9,6 +9,7 @@
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
 import { mountBrief } from "../briefcard.js";
+import { mountInitiative } from "../initiativecard.js";
 import { mountWatchers } from "../watcherspanel.js";
 import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
@@ -715,6 +716,8 @@ export function mount(root, ctx) {
   const brief = mountBrief(ctx, () => reload());
   // The watchers (item 571), under the brief: what Dot tells you of when it happens.
   const watchers = mountWatchers();
+  // Dot's own initiative (item 715), under the watchers: what Dot does for you on its own while the Mac is idle.
+  const initiative = mountInitiative();
 
   function paint() {
     if (views === null) {
@@ -793,6 +796,7 @@ export function mount(root, ctx) {
       views = fresh;
       paint();
       attempt(brief.reload);
+      attempt(initiative.reload);
     } catch (error) {
       if (disposed || mine !== ticket) {
         return;
@@ -887,6 +891,7 @@ export function mount(root, ctx) {
     ),
     brief.element,
     watchers.element,
+    initiative.element,
     zoneList(),
   );
   const stopLifecycle = onLifecycle((event) => {
@@ -901,6 +906,7 @@ export function mount(root, ctx) {
     stopCut();
     brief.dispose();
     watchers.dispose();
+    initiative.dispose();
     stopLifecycle();
     stopBack();
   };
