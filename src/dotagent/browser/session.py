@@ -43,6 +43,7 @@ from pydantic import JsonValue
 
 from dotagent.browser import ledger
 from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, read_debug_endpoint, redact_endpoint
+from dotagent.browser.console import console_lines
 from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
     PageLines,
@@ -174,6 +175,8 @@ _TEACH_START_PAGE: str = "https://www.google.com/"
 _TAB_MARK_BYTES: int = 6
 # Dot's own Chrome at this zoom draws a page at the size it was given, which the page need not be asked for (item 358).
 _UNZOOMED: int = 100
+# The height of a tab given a width alone (``browser_viewport``, item 746): a phone's, 390 by 844 being an iPhone's.
+_PHONE_HEIGHT: int = 844
 # A scroll with no distance moves by this share of the page area the model sees.
 _SCROLL_SHARE: float = 0.8
 # How long input from the screen waits for a step of the run that is under way when the owner took it over (item 470),
@@ -1644,6 +1647,8 @@ class BrowserSession:
         measures where it fills its window (item 354), is drawn larger or smaller (item 358: 1280 by 860 at 125 % is
         1024 by 688) or is in the open Chrome."""
         config: BrowserConfig = self._config
+        if tab.viewport is not None:
+            return tab.viewport
         if config.mode == "own" and not config.fit_window and config.zoom == _UNZOOMED:
             return Viewport(width=config.viewport_width, height=config.viewport_height)
         return await measure_viewport(tab.page)
@@ -2196,6 +2201,77 @@ class BrowserSession:
             # Under the URL rules, as every read of a tab is (item 554).
             lines: list[str] = await self._read_held(tab, read)
             return FindResult(url=self.held_back(thread_id, tab.page.url), hits=tuple(lines))
+
+    async def console_messages(self, thread_id: str, level: str | None, limit: int, hide_secrets: bool) -> FindResult:
+        """What the page of the thread's current tab wrote to its console since it was loaded, and the errors its
+        scripts did not catch (item 746), newest first, ``level`` only when given, with what :meth:`held_back` holds
+        back taken out."""
+        async with self._locked(thread_id) as thread:
+            tab: Tab = await self._current_tab(thread)
+
+            def shown_as(url: str) -> str:
+                return self.held_back(thread_id, url)
+
+            async def read() -> list[str]:
+                return console_lines(list(tab.console), level, limit, shown_as, hide_secrets)
+
+            # Under the URL rules, as every read of a tab is (item 554).
+            lines: list[str] = await self._read_held(tab, read)
+            return FindResult(
+                url=self.held_back(thread_id, tab.page.url),
+                hits=tuple(self.held_back(thread_id, line) for line in lines),
+            )
+
+    async def set_viewport(self, thread_id: str, width: int | None, height: int | None) -> Viewport:
+        """Give the thread's current tab the page area ``width`` by ``height`` CSS pixels (item 746), or, with no
+        ``width``, the size every tab of Dot's Chrome has (the one of Settings › Browser, or its window's); it returns
+        the size the page then measures. Dot's own Chrome only: the open Chrome of the user is never given an emulation
+        of Playwright's, and its window is theirs."""
+        if self._config.mode == "attach":
+            raise BrowserError(
+                "the browser is the open Chrome of the owner, whose window is theirs: Dot does not resize it or put an "
+                "emulation on it. Look at the page at a phone's size with Dot's own Chrome (Settings › Browser)",
+                {"mode": self._config.mode},
+            )
+        async with self._locked(thread_id) as thread:
+            tab: Tab = await self._current_tab(thread)
+            if width is None and tab.viewport is None:
+                return await self._viewport(tab)
+            size: Viewport = Viewport(width=width or 0, height=height or _PHONE_HEIGHT)
+            try:
+                # The size is laid over the tab's own with a DevTools session of the tab's. Where every tab follows its
+                # window (item 354), ending the session's size gives the tab that back rather than a fixed copy of the
+                # size it had. Where every tab has the size of Settings › Browser, the session gives it that size:
+                # ending its override ends Playwright's too, which Playwright, seeing no change of its own, does not
+                # give again.
+                if width is None and tab.sizing is not None and self._config.fit_window:
+                    await tab.sizing.send("Emulation.clearDeviceMetricsOverride")
+                    await tab.sizing.detach()
+                    tab.sizing = None
+                elif width is not None or tab.sizing is not None:
+                    if tab.sizing is None:
+                        tab.sizing = await tab.page.context.new_cdp_session(tab.page)
+                    given: Viewport = (
+                        size
+                        if width is not None
+                        else Viewport(width=self._config.viewport_width, height=self._config.viewport_height)
+                    )
+                    await tab.sizing.send(
+                        "Emulation.setDeviceMetricsOverride",
+                        {"width": given.width, "height": given.height, "deviceScaleFactor": 0, "mobile": False},
+                    )
+            except PlaywrightError as error:
+                raise BrowserError(
+                    "setting the size of the tab failed",
+                    {
+                        "width": width,
+                        "height": size.height,
+                        "error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
+                    },
+                ) from error
+            tab.viewport = None if width is None else size
+            await self._settle(tab)
+            return await self._read_held(tab, lambda: measure_viewport(tab.page))
 
     async def call_answer(self, thread_id: str, number: int, hide_secrets: bool) -> TextView:
         """What the server answered to the call ``number`` of :meth:`background_calls` (item 714), JSON written

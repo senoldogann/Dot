@@ -428,8 +428,8 @@ its request holds in characters, the system prompt by the heading of each sectio
 each). `dotx stats` ends with the medians of the newest 200 runs of its window: in all, the system prompt and its five
 largest sections, the tools and their five largest groups, and the conversation before the first step. A fresh
 scheduled run of the owner's sent 50,000 to 61,000 tokens before any work on 2026-10-27, a fresh home's about 20,000;
-`tests/smoke/test_context_budget.py` holds a fresh home's task run under a budget (20,500 in all, the system prompt
-6,900, the tools 13,700), and a change that needs more raises it there, saying why.
+`tests/smoke/test_context_budget.py` holds a fresh home's task run under a budget (21,300 in all, the system prompt
+7,000, the tools 14,400), and a change that needs more raises it there, saying why.
 
 **`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its
 own: file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, a goal that

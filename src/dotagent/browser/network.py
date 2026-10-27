@@ -101,6 +101,11 @@ def _hidden_json(value: JsonValue) -> JsonValue:
     return value
 
 
+def hidden_text(text: str) -> str:
+    """``text`` with the value of every secret name in it (:data:`_TEXT_SECRET`) replaced by :data:`HIDDEN`."""
+    return _TEXT_SECRET.sub(rf"\1\2\1\3{HIDDEN}", text)
+
+
 def _size(call: Fetched) -> str:
     if call.size is None:
         return ""
@@ -170,4 +175,4 @@ def read_answer(text: str, hide_secrets: bool) -> str:
     each: list[str | None] = [_json(line, hide_secrets) for line in lines]
     if lines and all(line is not None for line in each):
         return "\n".join(line for line in each if line is not None)
-    return _TEXT_SECRET.sub(rf"\1\2\1\3{HIDDEN}", text) if hide_secrets else text
+    return hidden_text(text) if hide_secrets else text

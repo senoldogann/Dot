@@ -29,9 +29,12 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # The budget of a fresh home's task run, every tool offered and the full prompt, in Dot's estimate of tokens (3.2
 # characters each). Measured 2026-10-27: 20,221 in all, the system prompt 6,692, the schemas of 54 tools 13,502 (the
 # core tools 20,406 characters, the browser's 11,440). Raise it with a reason; lower it when a change saves some.
-BUDGET_TOKENS: int = 20_500
-SYSTEM_BUDGET_TOKENS: int = 6_900
-TOOLS_BUDGET_TOKENS: int = 13_700
+# Raised by 800 for three browser tools and their lines (21,072 measured): browser_create_login, so that no password of
+# a new account is made up by a model and written into its history (item 740), and browser_console and
+# browser_viewport, to see why a page does not work and how it lays out on a phone (item 746).
+BUDGET_TOKENS: int = 21_300
+SYSTEM_BUDGET_TOKENS: int = 7_000
+TOOLS_BUDGET_TOKENS: int = 14_400
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:
