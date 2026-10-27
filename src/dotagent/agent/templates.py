@@ -74,6 +74,8 @@ _BROWSER: tuple[str, ...] = (
     "browser_eval",
     "browser_scroll",
     "browser_read_text",
+    "browser_requests",
+    "browser_extract",
     "browser_screenshot",
     "browser_wait_text",
     "browser_back",

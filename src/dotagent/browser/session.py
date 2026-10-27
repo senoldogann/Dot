@@ -67,8 +67,10 @@ from dotagent.browser.driver import (
     wait_dom_quiet,
     wait_for_text_or_dialog,
 )
+from dotagent.browser.extract import extract_records, render_records
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
 from dotagent.browser.look import PageLook, color_scheme
+from dotagent.browser.network import Fetched, answer_text, call_lines, hidden_address
 from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers, taken_in, watch_births
 from dotagent.browser.profile_lock import held_for_start, profile_holder_pid
 from dotagent.browser.profiles import (
@@ -2150,6 +2152,54 @@ class BrowserSession:
             capture: _Capture = await self._capture(tab, hide_secrets)
             tab.lines = capture.lines
             return FindResult(url=tab.page.url, hits=link_lines(capture.lines, tab.page.url, needle, limit))
+
+    async def background_calls(self, thread_id: str, needle: str, limit: int, hide_secrets: bool) -> FindResult:
+        """The calls the page of the thread's current tab made in the background (XHR and fetch, item 714) whose address
+        contains ``needle``, newest first, with what :meth:`held_back` holds back taken out."""
+        async with self._locked(thread_id) as thread:
+            tab: Tab = await self._current_tab(thread)
+
+            def shown_as(url: str) -> str:
+                return self.held_back(thread_id, hidden_address(url) if hide_secrets else url)
+
+            async def read() -> list[str]:
+                return call_lines(list(tab.calls), needle, limit, shown_as)
+
+            # Under the URL rules, as every read of a tab is (item 554).
+            lines: list[str] = await self._read_held(tab, read)
+            return FindResult(url=self.held_back(thread_id, tab.page.url), hits=tuple(lines))
+
+    async def call_answer(self, thread_id: str, number: int, hide_secrets: bool) -> TextView:
+        """What the server answered to the call ``number`` of :meth:`background_calls` (item 714), JSON written
+        compactly with its secret keys hidden when ``hide_secrets``, and what :meth:`held_back` holds back taken out."""
+        async with self._locked(thread_id) as thread:
+            tab: Tab = await self._current_tab(thread)
+            call: Fetched | None = next((kept for kept in tab.calls if kept.number == number), None)
+            if call is None:
+                raise BrowserError(
+                    "no call kept in this tab has that number (the tab keeps its newest 50): list them again with "
+                    "browser_requests",
+                    {"number": number, "calls": len(tab.calls)},
+                )
+            answer: str = await self._read_held(tab, lambda: answer_text(call, hide_secrets))
+            text: str = self.held_back(thread_id, answer)
+            address: str = hidden_address(call.url) if hide_secrets else call.url
+            return TextView(url=self.held_back(thread_id, address), text=text, offset=0, total_chars=len(text))
+
+    async def extract(
+        self, thread_id: str, records: str, fields: dict[str, str], limit: int, hide_secrets: bool
+    ) -> TextView:
+        """The records the page of the thread's current tab holds by ``fields`` (item 714,
+        :func:`~dotagent.browser.extract.extract_records`), written one JSON line each, with what :meth:`held_back`
+        holds back taken out."""
+        async with self._locked(thread_id) as thread:
+            tab: Tab = await self._current_tab(thread)
+            found: list[JsonValue] = await self._read_held(
+                tab, lambda: extract_records(tab.page, records, fields, limit, hide_secrets)
+            )
+            url: str = self.held_back(thread_id, tab.page.url)
+            text: str = self.held_back(thread_id, render_records(url, found))
+            return TextView(url=url, text=text, offset=0, total_chars=len(text))
 
     @property
     def quiet_reads(self) -> bool:

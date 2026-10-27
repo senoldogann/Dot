@@ -50,6 +50,7 @@ from dotagent.browser.safety import (
     unexplained_clicks,
     url_flags,
 )
+from dotagent.browser.snapshot import fence_untrusted
 from dotagent.browser.types import (
     ActOutcome,
     FindResult,
@@ -120,6 +121,9 @@ _AMOUNT_PAGE_CHARS: int = 20_000
 _CHECKED_PAGE_CHARS: int = 6000
 _EXPECT_CHARS: int = 300
 _DEFAULT_LINKS_LIMIT: int = 40
+# How many background calls browser_requests lists, and how many records browser_extract reads, unless asked (item 714).
+_DEFAULT_REQUESTS_LIMIT: int = 20
+_DEFAULT_EXTRACT_LIMIT: int = 50
 _DEFAULT_WAIT_S: float = 10.0
 _QUICK_TIMEOUT_S: float = 45.0
 _SLOW_TIMEOUT_S: float = 120.0
@@ -706,6 +710,93 @@ def _read_text_tool() -> RegisteredTool:
     )
 
 
+class RequestsArgs(ToolArgs):
+    text: str | None = Field(default=None, description="Keep calls whose address has this, e.g. '/api'.")
+    number: int | None = Field(default=None, ge=0, description="Read this call's answer instead of listing.")
+    limit: int | None = Field(default=None, ge=1, le=50, description="Most calls listed (default 20).")
+
+
+def _requests_tool() -> RegisteredTool:
+    def classify(args: RequestsArgs, ctx: ToolContext) -> ActionInfo:
+        what: str = "List the page's background calls" if args.number is None else f"Read call #{args.number}"
+        return _observe_action("browser_requests", what, ctx)
+
+    async def run(args: RequestsArgs, ctx: ToolContext) -> ToolResult:
+        hide: bool = hides_secrets(ctx.approvals)
+        if args.number is not None:
+            answer: TextView = await ctx.browser.call_answer(ctx.thread_id, args.number, hide)
+            room: int = _body_budget(ctx)
+            cut: TextView = answer.model_copy(update={"text": answer.text[:room]})
+            return mark_untrusted(ok(render_text_view(cut, _nonce())))
+        found: FindResult = await ctx.browser.background_calls(
+            ctx.thread_id, args.text or "", args.limit or _DEFAULT_REQUESTS_LIMIT, hide
+        )
+        if not found.hits:
+            return ok(
+                "The page made no background call that matches yet. Its data may be in the page itself "
+                "(browser_snapshot, browser_extract), or come once you scroll or search."
+            )
+        heading: str = f"{len(found.hits)} background calls, newest first (#number method status type size address)"
+        listed: str = fence_untrusted(found.url, "\n".join(found.hits), _nonce())
+        return mark_untrusted(ok(f"{heading}\n{listed}"))
+
+    return make_tool(
+        name="browser_requests",
+        description=(
+            "The page's background calls (XHR, fetch), newest first; read one by number to get its JSON: often the "
+            "data of a list or a search in one call. Read only; secrets are hidden."
+        ),
+        args_model=RequestsArgs,
+        modes=ALL_MODES,
+        parallel_safe=False,
+        timeout_s=_QUICK_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
+class ExtractArgs(ToolArgs):
+    records: str | None = Field(
+        default=None, description="CSS selector of each record, e.g. 'li.result'; none: the page."
+    )
+    fields: dict[str, str] = Field(
+        min_length=1,
+        max_length=20,
+        description="Name -> CSS selector in the record, 'a@href' for an attribute, '' for the record itself.",
+    )
+    limit: int | None = Field(default=None, ge=1, le=200, description="Most records (default 50).")
+
+
+def _extract_tool() -> RegisteredTool:
+    def classify(args: ExtractArgs, ctx: ToolContext) -> ActionInfo:
+        return _observe_action("browser_extract", f"Read records of the page: {', '.join(args.fields)}", ctx)
+
+    async def run(args: ExtractArgs, ctx: ToolContext) -> ToolResult:
+        found: TextView = await ctx.browser.extract(
+            ctx.thread_id,
+            args.records or "",
+            dict(args.fields),
+            args.limit or _DEFAULT_EXTRACT_LIMIT,
+            hides_secrets(ctx.approvals),
+        )
+        cut: TextView = found.model_copy(update={"text": found.text[: _body_budget(ctx)]})
+        return mark_untrusted(ok(render_text_view(cut, _nonce())))
+
+    return make_tool(
+        name="browser_extract",
+        description=(
+            "Read the page's records (results, rows, cards) at once as JSON by CSS selectors. Read only; a password, "
+            "code or card field is never read."
+        ),
+        args_model=ExtractArgs,
+        modes=ALL_MODES,
+        parallel_safe=False,
+        timeout_s=_QUICK_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
 def _screenshot_tool() -> RegisteredTool:
     def classify(args: NoArgs, ctx: ToolContext) -> ActionInfo:
         return _observe_action("browser_screenshot", "Take a screenshot of the page", ctx)
@@ -1215,6 +1306,8 @@ def _browser_tools() -> tuple[RegisteredTool, ...]:
         _eval_tool(),
         _scroll_tool(),
         _read_text_tool(),
+        _requests_tool(),
+        _extract_tool(),
         _screenshot_tool(),
         _wait_text_tool(),
         _back_tool(),
