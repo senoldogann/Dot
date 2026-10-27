@@ -191,3 +191,114 @@ def test_a_list_or_an_object_under_a_field_named_for_a_secret_is_masked_whole() 
         "secret": "",
         "api_key": 12,
     }
+
+
+# The passwords command lines take as words of their own (item 726, the outside review of 2026-10-27), and the short
+# names of a password; and the twins of each that hold none.
+_COMMAND_LINES: list[tuple[str, str]] = [
+    ("curl -u admin:hunter2xyz https://example.com", "curl -u admin:*** https://example.com"),
+    ("curl -s --user 'admin:hunter2xyz' https://example.com", "curl -s --user 'admin:***' https://example.com"),
+    ("curl --proxy-user proxy:b9xyzzz https://example.com", "curl --proxy-user proxy:*** https://example.com"),
+    ("wget --user=admin:hunter2xyz https://example.com", "wget --user=admin:*** https://example.com"),
+    ("docker login -u me -p S3cretPass9 registry.example", "docker login -u me -p *** registry.example"),
+    ("podman login registry.example -p 'S3cret Pass9'", "podman login registry.example -p ***"),
+    ("mysql -u root -pSuperSecret123 shop", "mysql -u root -p*** shop"),
+    ("mysqldump -pSuperSecret123 shop > dump.sql", "mysqldump -p*** shop > dump.sql"),
+    ("sshpass -p 'S3cret pass' ssh host", "sshpass -p *** ssh host"),
+    ("gpg --batch --passphrase Hunter2xyz -c notes.txt", "gpg --batch --passphrase *** -c notes.txt"),
+    ("htpasswd -b .htpasswd alice Hunter2xyz", "htpasswd -b .htpasswd alice ***"),
+    ("htpasswd -c -b .htpasswd alice Hunter2xyz", "htpasswd -c -b .htpasswd alice ***"),
+    ("aws configure set aws_secret_access_key Abc123def456", "aws configure set aws_secret_access_key ***"),
+    ("DB_PASS=Hunter2xyz ./run", "DB_PASS=*** ./run"),
+    ("PASS=Hunter2xyz", "PASS=***"),
+    ("login pw=Hunter2xyz", "login pw=***"),
+    ("pwd=Hunter2xyz", "pwd=***"),
+    ("sessionid=abcdef123456", "sessionid=***"),
+    ("session_id: abcDEF123456789", "session_id: ***"),
+    # The spellings the independent review of the first push found: clusters of options, a value joined to its option,
+    # an option before the password's, htpasswd with no file or with a cost, aws with its options before configure.
+    ("curl -uadmin:Hunter2xyz https://example.com", "curl -uadmin:*** https://example.com"),
+    ("curl -su admin:Hunter2xyz https://example.com", "curl -su admin:*** https://example.com"),
+    ("curl -sSu admin:Hunter2xyz https://example.com", "curl -sSu admin:*** https://example.com"),
+    ("docker login -u me -pS3cretPass9 registry.example", "docker login -u me -p*** registry.example"),
+    ("sshpass -v -p S3cretPass9 ssh host", "sshpass -v -p *** ssh host"),
+    ("htpasswd -nb alice Hunter2xyz", "htpasswd -nb alice ***"),
+    ("htpasswd -nbB alice Hunter2xyz", "htpasswd -nbB alice ***"),
+    ("htpasswd -b -C 12 .htpasswd alice Hunter2xyz", "htpasswd -b -C 12 .htpasswd alice ***"),
+    (
+        "aws --profile p configure set aws_secret_access_key Abc123def456",
+        "aws --profile p configure set aws_secret_access_key ***",
+    ),
+    (
+        "aws configure --profile p set aws_secret_access_key Abc123def456",
+        "aws configure --profile p set aws_secret_access_key ***",
+    ),
+    ("MYSQL_PWD=/SuperSecret123 mysql", "MYSQL_PWD=*** mysql"),
+    ("sshpass -pS3cretPass9 ssh host", "sshpass -p*** ssh host"),
+    # A short name with a prefix names a password after ": " too, as YAML writes it (the review of the fifth push).
+    ("DB_PASS: Tr0ub4dor&3", "DB_PASS: ***"),
+    ("SMTP_PASS: hunter2Secret!", "SMTP_PASS: ***"),
+    ("sshpass -f ~/.pass -p S3cretPass9 ssh host", "sshpass -f ~/.pass -p *** ssh host"),
+]
+_COMMAND_LINES_KEPT: list[str] = [
+    "curl -u admin https://example.com",
+    "git push -u origin main",
+    "sort -u a:b",
+    "mysql -u root -p shop",
+    "docker login -u me --password-stdin registry.example",
+    "sshpass -f ~/.pass ssh host",
+    "PWD=/Users/someone/project",
+    "cd $PWD && pwd",
+    "bypass=on compass=north",
+    "the pass rate: 98 percent",
+    "passes: 3",
+    "session_id: 42",
+    "aws configure set region eu-west-1",
+    "curl -X PUT -o out.txt https://example.com:8443/",
+    "curl -u admin https://example.com:8443/",
+    "htpasswd -v .htpasswd alice",
+    "OLDPWD=/Users/someone",
+    # The command sshpass runs has options of its own (the pre-push review of the second push).
+    "sshpass -f ~/.pass ssh -p 2222 host",
+    # A short name in a sentence (the pre-push review of the third push).
+    "All tests pass: tests/unit/test_shell_senders.py",
+    "--- PASS: TestParseConfigFile (0.00s)",
+]
+
+
+@pytest.mark.parametrize(("text", "masked"), _COMMAND_LINES)
+def test_a_password_a_command_line_takes_as_a_word_is_masked(text: str, masked: str) -> None:
+    assert redact_secrets(text) == masked
+
+
+@pytest.mark.parametrize("text", _COMMAND_LINES_KEPT)
+def test_a_command_line_that_gives_no_password_is_left_alone(text: str) -> None:
+    assert redact_secrets(text) == text
+
+
+def test_a_long_line_of_the_tools_whose_options_hold_a_password_is_masked_in_a_moment() -> None:
+    """The pre-push review of the first push: a pattern that looked for a tool's name, then for ``login`` and the
+    option anywhere after it, took time that grew with the cube of a long line of the names alone, which a page or a
+    tool's answer can hold. Each command is read once now."""
+    for text in (
+        "docker login " * 4000,
+        "mysql " * 8000,
+        "curl " * 8000 + "-u" * 4000,
+        "sshpass " * 8000,
+        "aws configure set " * 4000,
+        "htpasswd -b " * 4000,
+        "curl -" + "a" * 50_000 + "u x",
+    ):
+        started: float = time.monotonic()
+        redact_secrets(text)
+        assert time.monotonic() - started < _MOMENT_S, text[:40]
+
+
+def test_the_working_folder_of_an_object_is_kept_as_in_a_line() -> None:
+    """The pre-push review of the second push: ``PWD=/Users/x`` stayed in a line, but ``{"PWD": "/Users/x"}`` was masked
+    whole; a password given to it is masked in both."""
+    assert redact_json({"PWD": "/Users/someone", "OLDPWD": "~/project"}) == {
+        "PWD": "/Users/someone",
+        "OLDPWD": "~/project",
+    }
+    assert redact_json({"pwd": "Hunter2xyz", "MYSQL_PWD": "/SuperSecret123"}) == {"pwd": "***", "MYSQL_PWD": "***"}

@@ -33,18 +33,28 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?basic)(\s+)[A-Za-z0-9+/=]{4,}"),
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{16,}"),
     re.compile(r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?)((?:[a-z][a-z0-9\-]*\s+)?)[A-Za-z0-9._~+/=\-]{16,}"),
+    # The passwords the command lines take as words of their own (item 726), where the form alone says it: the
+    # ``--user`` and ``--proxy-user`` of any tool (``user:password``). Those whose option means a password only after
+    # the tool's name (``curl -u``, ``docker login -p``, ``sshpass -p``, a MySQL client's ``-p``, ``htpasswd -b``,
+    # ``aws configure set``) are masked a command at a time (:func:`_mask_command_passwords`), which reads each once: a
+    # pattern that looked for the name, then for the option anywhere after it, tried every start against the rest of a
+    # long line.
+    re.compile(r"(?i)((?<![\w-])--(?:proxy-)?user(?:\s+|=)['\"]?[^\s:'\"]+)(:)[^\s'\"]+"),
     # The cookies of a Cookie or Set-Cookie header, with the attributes among them.
     re.compile(
         r"(?i)\b((?:set-)?cookie)([\"']?\s*:\s*[\"']?)[^\s=;\"']+=[^\s;\"']*(?:;\s*[^\s=;\"']+(?:=[^\s;\"']*)?)*"
     ),
 )
+# The short names of a password (item 726), which prose uses too (``All tests pass: …``): one names a password given
+# with ``=`` or in quotes alone (:func:`_mask_field`).
+_SHORT_NAMES: str = r"(?:pass|pwd?)"
 # A key that names a secret (review Y3): one of these words after any prefix (``DB_PASSWORD``, ``apiKey``,
 # ``x-auth-token``, ``client_secret``), then at most two words that say what of the secret the value is
 # (``SECRET_KEY``, ``token_value``, ``private_key_id``, ``secret_key_base``); ``max_tokens``, ``token_count`` and
 # ``token_type`` name none.
 _SECRET_NAME: str = (
     r"[\w.\-]{0,40}?(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|account[_-]?key|private[_-]?key"
-    r"|credentials?|authorization|bearer|cookie)"
+    rf"|credentials?|authorization|bearer|cookie|passphrase|session[_\-.]?id|(?<![a-z]){_SHORT_NAMES})"
     r"(?:[_\-.]?(?:key|value|id|hash|base|string|str|data|hex|b64|header|plain|raw|enc)){0,2}"
 )
 # The value given to such a key: quoted (spaces and all), or a run of characters, after an authentication scheme that
@@ -67,11 +77,131 @@ _SECRET_FIELD: re.Pattern[str] = re.compile(rf"(?i)-*{_SECRET_NAME}")
 # ``$Tr0ngPass1`` is a password), a hint in angle brackets (``<your key>``: words, no digit, so that ``<abc12345>`` is a
 # value), a template (``{{ token }}``, ``${{ secrets.TOKEN }}``), a run of ``x`` or a word for none. An unquoted value
 # stops at a space or a brace, so the start of a hint or a template is enough.
+# The commands of a line, between the marks that end one (item 726): a password option of a tool counts in its own.
+_COMMAND_BREAK: re.Pattern[str] = re.compile(r"([|;&\n])")
+_QUOTED_OR_WORD: str = r"(?:'[^'\n]*'|\"[^\"\n]*\"|[^\s'\"]+)"
+# Each: the tool's name, the word that must follow it (or None), and its password option after them.
+_COMMAND_PASSWORDS: tuple[tuple[re.Pattern[str], re.Pattern[str] | None, re.Pattern[str]], ...] = (
+    (
+        # ``-u user:password``, in a cluster of short options (``-su``) or joined to its value (``-uadmin:pw``).
+        re.compile(r"(?i)\bcurl\b"),
+        None,
+        re.compile(r"(\s-[A-Za-z]{0,8}[uU](?:\s+|=)?['\"]?[^\s:'\"-][^\s:'\"]*)(:)[^\s'\"]+"),
+    ),
+    (
+        re.compile(r"(?i)\b(?:docker|podman|nerdctl|buildah|helm)\b"),
+        re.compile(r"(?i)\blogin\b"),
+        re.compile(rf"(\s-p)(=|\s*){_QUOTED_OR_WORD}"),
+    ),
+    (
+        # ``aws configure set <name> <value>`` of a secret, the options of aws anywhere before.
+        re.compile(r"(?i)\baws\b"),
+        re.compile(r"(?i)\bconfigure\b"),
+        re.compile(r"(?i)(\bset\s+(?:-\S+\s+\S+\s+)?\S{0,60}?(?:secret|token|password)\S{0,60})(\s+)\S+"),
+    ),
+    (
+        re.compile(r"(?i)\b(?:mysql|mysqldump|mysqladmin|mysqlimport|mysqlshow|mysqlcheck|mariadb(?:-dump|-admin)?)\b"),
+        None,
+        re.compile(r"(\s-p)()(?:'[^'\n]*'|\"[^\"\n]*\"|[^\s'\"-][^\s'\"]*)"),
+    ),
+)
+_HTPASSWD: re.Pattern[str] = re.compile(r"(?i)\bhtpasswd\b")
+_WORD_TOKEN: re.Pattern[str] = re.compile(_QUOTED_OR_WORD)
+# The options of ``htpasswd`` that take a value (a cost, rounds), which is no file, user nor password.
+_HTPASSWD_VALUES: str = "Cr"
+_COMMAND_WORDS: tuple[str, ...] = ("curl", "login", "sshpass", "configure", "mysql", "mariadb", "htpasswd")
+
+
+def _mask_command_passwords(text: str) -> str:
+    """``text`` with the password each command of it gives an option that means one only after the tool's name
+    (:data:`_COMMAND_PASSWORDS`, ``htpasswd -b``) masked, the tool and the option kept. Each command is read once."""
+    lowered: str = text.lower()
+    if not any(word in lowered for word in _COMMAND_WORDS):
+        return text
+    parts: list[str] = _COMMAND_BREAK.split(text)
+    for index in range(0, len(parts), 2):
+        part: str = parts[index]
+        for tool, needed, option in _COMMAND_PASSWORDS:
+            found: re.Match[str] | None = tool.search(part)
+            if found is None:
+                continue
+            start: int = found.end()
+            if needed is not None:
+                after: re.Match[str] | None = needed.search(part, start)
+                if after is None:
+                    continue
+                start = after.end()
+            part = part[:start] + option.sub(_mask_match, part[start:])
+        parts[index] = _mask_sshpass(_mask_htpasswd(part))
+    return "".join(parts)
+
+
+_SSHPASS: re.Pattern[str] = re.compile(r"(?i)\bsshpass\b")
+# The options of ``sshpass`` that take a value that is no password (a file, a descriptor, a prompt).
+_SSHPASS_VALUES: frozenset[str] = frozenset({"-f", "-d", "-P"})
+
+
+def _mask_sshpass(part: str) -> str:
+    """``part`` with the password ``sshpass -p`` is given masked (``-p pw`` or ``-ppw``), read among sshpass's own
+    options alone: they end at the command it runs, whose ``-p`` (``ssh -p 2222``) is that command's."""
+    named: re.Match[str] | None = _SSHPASS.search(part)
+    if named is None:
+        return part
+    tokens: list[re.Match[str]] = []
+    for token in _WORD_TOKEN.finditer(part, named.end()):
+        tokens.append(token)
+        if len(tokens) > 12:
+            break
+    index: int = 0
+    while index < len(tokens):
+        word: str = tokens[index].group()
+        if word == "-p" and index + 1 < len(tokens):
+            secret: re.Match[str] = tokens[index + 1]
+            return f"{part[: secret.start()]}***{part[secret.end() :]}"
+        if word.startswith("-p") and len(word) > 2:
+            return f"{part[: tokens[index].start() + 2]}***{part[tokens[index].end() :]}"
+        if not word.startswith("-"):
+            return part
+        index += 2 if word in _SSHPASS_VALUES else 1
+    return part
+
+
+def _mask_htpasswd(part: str) -> str:
+    """``part`` with the password ``htpasswd -b`` is given masked: its third word after the options (file, user,
+    password), its second with ``-n`` (no file), the value of ``-C`` and ``-r`` left out of the count."""
+    named: re.Match[str] | None = _HTPASSWD.search(part)
+    if named is None:
+        return part
+    letters: str = ""
+    positional: list[re.Match[str]] = []
+    skip: bool = False
+    for token in _WORD_TOKEN.finditer(part, named.end()):
+        word: str = token.group()
+        if skip:
+            skip = False
+        elif word.startswith("-") and len(word) > 1 and not positional:
+            letters += word[1:]
+            skip = word[-1] in _HTPASSWD_VALUES
+        else:
+            positional.append(token)
+    at: int = 1 if "n" in letters else 2
+    if "b" not in letters or len(positional) <= at:
+        return part
+    secret: re.Match[str] = positional[at]
+    return f"{part[: secret.start()]}***{part[secret.end() :]}"
+
+
 _PLACEHOLDER: re.Pattern[str] = re.compile(
     r"[*.…]*|<[A-Za-z _\-]*>?|\$\{[A-Z0-9_]*\}?|\$[A-Z_][A-Z0-9_]*|\$?\{\{.*|%[A-Z0-9_]+%"
     r"|(?i:none|null|nil|true|false|undefined|redacted|hidden|x+)"
 )
 _PASSWORD_NAME: re.Pattern[str] = re.compile(r"(?i)passw(?:or)?d")
+# The name of the working folder (``PWD=/Users/x``, ``pwd=~/project``) is a password's short name too: a path given to
+# it is the folder (item 726).
+_FOLDER_NAME: re.Pattern[str] = re.compile(r"(?i)^-*(?:old)?pwd$")
+# A name that is a short name alone: one with a prefix (``DB_PASS``, ``SMTP_PASS``) names a password after ``: `` too,
+# as YAML writes it (the review of the fifth push).
+_SHORT_NAME: re.Pattern[str] = re.compile(rf"(?i)^-*{_SHORT_NAMES}$")
 # A value after ``key: `` stands where prose stands too (``Authorization: required for every request``): it is a secret
 # when it is long, or has a digit, a capital beside small letters or a sign in it.
 _LONG_VALUE_CHARS: int = 12
@@ -163,6 +293,7 @@ def redact_secrets(text: str) -> str:
     masked: str = text
     for pattern in _SECRET_PATTERNS:
         masked = pattern.sub(_mask_match, masked)
+    masked = _mask_command_passwords(masked)
     for fields in _SECRET_FIELDS:
         masked = fields.sub(_mask_field, masked)
     return masked
@@ -192,6 +323,8 @@ def secret_value(name: str, value: str, prose: bool) -> bool:
     long or has a digit, a capital beside small letters or a sign in it."""
     if "***" in value or _PLACEHOLDER.fullmatch(value) is not None:
         return False
+    if _FOLDER_NAME.search(name) is not None and value.startswith(("/", "~")):
+        return False
     if _PASSWORD_NAME.search(name) is not None:
         return True
     if prose:
@@ -219,6 +352,10 @@ def _mask_field(match: re.Match[str]) -> str:
     scheme: str | None = match.group("scheme")
     bare: str = match.group("bare")
     prose: bool = scheme is None and ":" in between and between[-1:].isspace()
+    if prose and _SHORT_NAME.search(name) is not None:
+        # ``pass: …`` is a sentence's (``All tests pass: …``, Go's ``--- PASS: TestX``): a short name is a password's
+        # given with ``=`` or in quotes alone (the pre-push review of the third push).
+        return match.group(0)
     if not secret_value(name, bare, prose):
         return match.group(0)
     return f"{name}{between}{scheme or ''}***"
@@ -283,10 +420,18 @@ def redact_json(value: JsonValue, known: Sequence[str] = ()) -> JsonValue:
         return [redact_json(item, known) for item in value]
     if isinstance(value, dict):
         return {
-            key: _mask_whole(item) if _SECRET_FIELD.fullmatch(key) else redact_json(item, known)
+            key: _mask_whole(item) if _secret_field(key, item) else redact_json(item, known)
             for key, item in value.items()
         }
     return value
+
+
+def _secret_field(key: str, item: JsonValue) -> bool:
+    """Whether the field ``key`` holds a secret whatever it looks like: its name names one, but for the working
+    folder's (``PWD``) given a path, as in a line (:func:`secret_value`)."""
+    if _SECRET_FIELD.fullmatch(key) is None:
+        return False
+    return not (isinstance(item, str) and _FOLDER_NAME.search(key) is not None and item.startswith(("/", "~")))
 
 
 def _mask_whole(value: JsonValue) -> JsonValue:

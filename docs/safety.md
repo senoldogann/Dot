@@ -466,25 +466,26 @@ running a script the line downloaded (item 523), or a blob it decoded and ran (`
 file the line then runs; item 528), and a shell line that sends data out: an upload or a form, a push, a copy to another
 machine, a file sent by a tool known by name (`aws s3`, `gsutil`, `gcloud storage`, `az storage`, `rclone`, `hg push`,
 `svn commit`, `lftp`, `smbclient`, `croc`, `wormhole send`; item 725: any verb of theirs but those that only read, a
-copy in either direction, as which side is remote is not told), a change on a code host, inline code that reaches the
-network or runs a command of it, and a read that may reach a protected location, item 531) ask even when the preset or
-an `allow` rule would let them through; only a `preapproved` rule skips the question. A project's own install (`npm
-install`, `uv sync`, `uv add`) goes ahead. A package published or an image pushed (`npm publish`, `twine upload`, `cargo
-publish`, `gem push`, `docker push`; item 725) is a public post, asked in every preset whether or not the run read
-outside content. The error of a call that reached outside marks it too when it may hold such words (item 551): what an
-MCP server answered a call with, which the model reads inside the fence as data, and the error of a search whose engines
-answered with an error page; a failure in transit does not. A reaction on a message of Dot's (item 586) never clears the
-mark: while the run works it reaches it as a note from Dot, not as your words, which vouches for nothing and is no
-instruction to the review model, and it approves no step (the note says so); after the run ended it starts a follow-up
-run that starts as untrusted as the run of the message, or the chat's last, ended, whose goal holds none of Dot's words
-and whose quote of the message is no instruction (see [Reactions](runs.md#reactions-on-dots-messages)). A 📌 makes a note
-marked as read from outside content when the run read some. A message you send to the run clears the mark; your answer
-to a question of a run you watch does not, whether the run waited for it or went on (item 508), as it answers what the
-run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts once that run has
-ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a resumed run as the run
-it resumes was when it was cut off, and the run that tells a chat that its command in the background ended as the chat's
-last run ended: that message is Dot's, not yours, and so is the note that tells a run at work of such an end, which
-clears nothing. The run a watcher starts for a mail, an event or a notification (item 571, see [Dot comes to
+link anyone can open to a file of theirs (`rclone link`, `gsutil signurl`, `aws s3 presign`) included, a copy in either
+direction, as which side is remote is not told), a change on a code host, inline code that reaches the network or runs a
+command of it, and a read that may reach a protected location, item 531) ask even when the preset or an `allow` rule
+would let them through; only a `preapproved` rule skips the question. A project's own install (`npm install`, `uv sync`,
+`uv add`) goes ahead. A package published or an image pushed (`npm publish`, `twine upload`, `cargo publish`, `gem
+push`, `docker push`; item 725) is a public post, asked in every preset whether or not the run read outside content. The
+error of a call that reached outside marks it too when it may hold such words (item 551): what an MCP server answered a
+call with, which the model reads inside the fence as data, and the error of a search whose engines answered with an
+error page; a failure in transit does not. A reaction on a message of Dot's (item 586) never clears the mark: while the
+run works it reaches it as a note from Dot, not as your words, which vouches for nothing and is no instruction to the
+review model, and it approves no step (the note says so); after the run ended it starts a follow-up run that starts as
+untrusted as the run of the message, or the chat's last, ended, whose goal holds none of Dot's words and whose quote of
+the message is no instruction (see [Reactions](runs.md#reactions-on-dots-messages)). A 📌 makes a note marked as read
+from outside content when the run read some. A message you send to the run clears the mark; your answer to a question of
+a run you watch does not, whether the run waited for it or went on (item 508), as it answers what the run asked rather
+than sending it on its way: the run it reaches stays marked, and the run it starts once that run has ended starts as
+untrusted as that run ended. A delegated run starts as untrusted as its parent, a resumed run as the run it resumes was
+when it was cut off, and the run that tells a chat that its command in the background ended as the chat's last run
+ended: that message is Dot's, not yours, and so is the note that tells a run at work of such an end, which clears
+nothing. The run a watcher starts for a mail, an event or a notification (item 571, see [Dot comes to
 you](proactive.md#watchers)) starts untrusted whatever it goes on from, since what a stranger wrote set it off: its goal
 is your own words and the item stands in its first message, in a fence. A message you send starts a run unmarked. A note
 a run saved while it was marked keeps that origin (`tainted`): it is never among the notes a run starts with, is handed
@@ -550,21 +551,24 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   you write yourself, with `dotx memory add` or on the Memory page, is yours and not refused (on the Memory page the
   daemon masks in it a password that it filled).
 - What a run records of a step holds none of the secrets Dot holds (item 551), nor a key of a known form (a token, a
-  private key, a password in an address or a header): the call's arguments (item 525) and the summary, the target and
-  the text of its result, its `policy` event, its approval with the card and the push to your phone that ask about it,
-  and the reason kept with its result. So do a run's answer, what it needs from you and the context of the error that
-  ended it, a terminal's command in the log lines of its opening and closing, and the context of any error the API
-  answers with or logs (the key in a connector's address, an argument that is one, a field named `password`), which
-  the handler masks for every route; a value that only looks like a placeholder (`$Tr0ngPass1`, `<abc12345>`,
-  `%secretkey%`) is masked, and only an environment variable's name (`$TOKEN`, `${TOKEN}`, `%TOKEN%`), a hint in
-  angle brackets without a digit, a template (`{{ token }}`) or a run of `*`, `x` and dots is left (item 690).
-  So do what the model says and thinks, as it streams and as it is stored, and the
-  answer to a side question (`/btw`). The policy and the review model weigh the step as it is, and a card shows `***`
-  where your own key stood in a command. What streams is masked as it comes, a secret split between two pieces of the
-  stream included: what may still become part of a secret waits for the next piece (the word being written, the start
-  of a key Dot holds, words such as `Bearer` or `password =` until their value has come, the header of a private
-  key), and plain words are shown as they come. A secret in quotes, with spaces in it and introduced by more than a
-  few words, can show its start while it streams; the stored message masks it whole.
+  private key, a password in an address or a header, or one a command line takes as a word of its own: `curl -u
+  user:password`, `docker login -p`, `mysql -p…`, `sshpass -p`, `htpasswd -b`, `aws configure set` of a secret, a value
+  given to `passphrase` or `sessionid`, or to a name with them at its end (`DB_PASS`), or with `=` or in quotes to
+  `pass`, `pw` or `pwd` alone, short names prose uses too (`All tests pass: …`); item 726): the call's arguments (item
+  525) and the summary, the target and the text of its result, its `policy` event, its approval with the card and the
+  push to your phone that ask about it, and the reason kept with its result. So do a run's answer, what it needs from
+  you and the context of the error that ended it, a terminal's command in the log lines of its opening and closing, and
+  the context of any error the API answers with or logs (the key in a connector's address, an argument that is one, a
+  field named `password`), which the handler masks for every route; a value that only looks like a placeholder
+  (`$Tr0ngPass1`, `<abc12345>`, `%secretkey%`) is masked, and only an environment variable's name (`$TOKEN`, `${TOKEN}`,
+  `%TOKEN%`), a hint in angle brackets without a digit, a template (`{{ token }}`) or a run of `*`, `x` and dots is left
+  (item 690). So do what the model says and thinks, as it streams and as it is stored, and the answer to a side question
+  (`/btw`). The policy and the review model weigh the step as it is, and a card shows `***` where your own key stood in
+  a command. What streams is masked as it comes, a secret split between two pieces of the stream included: what may
+  still become part of a secret waits for the next piece (the word being written, the start of a key Dot holds, words
+  such as `Bearer` or `password =` until their value has come, the header of a private key), and plain words are shown
+  as they come. A secret in quotes, with spaces in it and introduced by more than a few words, can show its start while
+  it streams; the stored message masks it whole.
 - The browser and desktop tools check every field that would take a password, one-time-code or card text, whatever
   element the step names (a desktop `menu` step that pastes is not). Outside `yolo` they refuse it, and the step is
   yours (item 429), with the browser yours to take over and fill. In `yolo` the run types it (item 443): a code it can
