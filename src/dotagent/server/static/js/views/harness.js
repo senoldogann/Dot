@@ -9,6 +9,7 @@ import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, foldCard, loadingPanel, setCard, setRow, setSection } from "../panels.js";
 import { readFailed } from "../state.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
+import { poolNightWords } from "../harnessnight.js";
 import { codeText } from "./memory.js";
 
 const STATE_TONE = { adopted: "b-ok", probed: "b-warn", candidate: "b-info", retired: "b-muted" };
@@ -214,13 +215,11 @@ function stepRow(step) {
           "div",
           { class: "harness-meta" },
           ...joined([
-            // A night that only tried the pool (its record names what has headroom) takes no task, whatever it came to:
-            // tried, failed or nothing left to learn (item 719).
-            step.from_run === null && (step.state === "calibrating" || facts.headroom !== undefined)
-              ? "tried test tasks, learned from no task"
-              : step.from_run === null
-                ? "no task to learn from"
-                : el("a", { href: `#/runs/${step.from_run}` }, "the task it learned from"),
+            // A night that only worked on the pool (its record names what has headroom) takes no task, whatever it came
+            // to: tried, failed or nothing left to learn, and the words say which (items 719, 762).
+            step.from_run === null
+              ? (poolNightWords(step.state, facts) ?? "no task to learn from")
+              : el("a", { href: `#/runs/${step.from_run}` }, "the task it learned from"),
             `${plural(candidates, "version", "versions")} proposed`,
           ]),
         ),
