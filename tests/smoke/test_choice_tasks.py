@@ -205,21 +205,20 @@ async def test_a_run_that_turns_on_the_decoys_group_fails_though_it_goes_on_to_t
     assert _failed(outcome) == ["the tool group mcp__zq-kit stayed off"]
 
 
-async def test_a_call_of_a_tool_whose_group_is_off_turns_the_group_on_and_the_run_that_calls_again_passes(
+async def test_a_call_of_a_tool_whose_group_is_off_runs_and_turns_the_group_on(
     config: AppConfig, login_env: dict[str, str]
 ) -> None:
     straight: EvalTask = _with(
         "rates-server-by-its-words",
         [
             _turn("mcp__ab-tools__lookup", key="2026-03-02 EUR/TRY"),
-            _turn("mcp__ab-tools__lookup", key="2026-03-02 EUR/TRY"),
             _finish("250 euros are 9,653.13 Turkish lira."),
         ],
     )
     outcome: TaskOutcome = await replay_reference(straight, config, login_env)
     assert outcome.passed, outcome
-    # The first call did not run, and a call of the decoy's tool turns the decoy's group on, which the task refuses.
-    assert outcome.metrics.tool_errors == 1
+    # The call ran at once (item 742); a call of the decoy's tool turns the decoy's group on, which the task refuses.
+    assert outcome.metrics.tool_errors == 0
     wrong: EvalTask = _with(
         "rates-server-by-its-words",
         [

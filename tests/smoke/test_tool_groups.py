@@ -1,5 +1,5 @@
 """Tool groups in the real loop: a run whose tools are grouped starts with the core tools; a call of a tool whose group
-is off does not run but turns the group on, and the next step offers the group's tools; use_tools turns a group on;
+is off runs and turns the group on, and the next step offers the group's tools; use_tools turns a group on;
 the next run of the thread starts with the groups the thread used. A run that offers every tool has no groups and no
 use_tools.
 
@@ -174,14 +174,18 @@ async def test_a_call_of_a_tool_whose_group_is_off_turns_the_group_on_and_the_ne
     # The run starts with the core tools only, use_tools among them.
     assert USE_TOOLS_TOOL in offered[0]
     assert {group_of(name) for name in offered[0]} == {"core"}
-    # The call of a tool whose group was off did not run; its result says so, and the next step offers the group with
-    # the same definitions as a run that offers every tool.
+    # The call of a tool whose group was off ran, as any call does; its result says the group was off and is on now, and
+    # the next step offers the group with the same definitions as a run that offers every tool.
     assert played.results[0]["tool"] == "schedule_list"
-    assert (played.results[0]["ok"], played.results[0]["risk"]) == (False, "safe")
-    assert played.results[0]["summary"] == "Turn on the tool group schedule"
-    assert played.steps[1].messages[-1].content == (
-        "schedule_list did not run: it is in the tool group schedule, which was off. The group is on now: call "
-        "schedule_list again."
+    assert (played.results[0]["ok"], played.results[0]["risk"]) == (True, "safe")
+    assert played.results[0]["summary"] != "Turn on the tool group schedule"
+    assert (
+        played.steps[1]
+        .messages[-1]
+        .content.startswith(
+            "schedule_list is in the tool group schedule, which was off; the group is on now, and its tools are in the "
+            "tool list from the next step.\n\n"
+        )
     )
     assert [name for name in offered[1] if name not in offered[0]] == list(_SCHEDULE_TOOLS)
     definitions: dict[str, ToolSpec] = {spec.name: spec for spec in played.steps[1].tools}
