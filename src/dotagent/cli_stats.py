@@ -29,6 +29,7 @@ from dotagent.cli_commands import Command, StatsCommand
 from dotagent.config import load_user_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path
+from dotagent.harness.schedule import STEP_OFF, STEP_TIME_KEY, schedule_from
 from dotagent.scheduler.failures import SCHEDULE_FAILURES_KEY, FiringFailure, FiringFailures, parse_failures
 from dotagent.store.endings import ENDING_LABELS
 from dotagent.store.stats import (
@@ -343,9 +344,10 @@ async def cmd_stats(command: StatsCommand) -> int:
         health: str | None = await asyncio.to_thread(read_kv, db_path(), LEARNING_HEALTH_KEY)
         config = await asyncio.to_thread(load_user_config)
         quiet_s: float | None = quiet_limit(config.agent.reflection_time)
-        lines.extend(
-            render_learning_health(parse_health(health), time.time(), quiet_s, config.harness.step_time != "off")
-        )
+        # The page's choice wins over the settings file's (item 721).
+        kept: str | None = await asyncio.to_thread(read_kv, db_path(), STEP_TIME_KEY)
+        harness_on: bool = schedule_from(kept, config.harness).step_time != STEP_OFF
+        lines.extend(render_learning_health(parse_health(health), time.time(), quiet_s, harness_on))
         stuck: StuckWork = await asyncio.to_thread(collect_stuck, db_path())
         failing: str | None = await asyncio.to_thread(read_kv, db_path(), SCHEDULE_FAILURES_KEY)
         lines.extend(render_stuck(stuck, parse_failures(failing)))
@@ -371,7 +373,8 @@ def render_learning_health(
 ) -> list[str]:
     """How learning fares (:mod:`dotagent.agent.learning_health`): when each work last went well, its failures in a
     row since with the last error, and, when learning has stopped, why and whether the owner was told. The harness's
-    step (the nightly self-improvement) is "off" while ``[harness] step_time`` keeps it from running (``harness_on``),
+    step (the nightly self-improvement) is "off" while its schedule keeps it from running (``harness_on``: the page's
+    time, else ``[harness] step_time``, item 721),
     and says when it last went well if it ever did (item 613: it said it went well days after it was switched off)."""
     if health is None:
         return ["  learning health: nothing recorded yet"]
@@ -380,7 +383,7 @@ def render_learning_health(
         state = work_health(health, work)
         if work == "harness" and not harness_on:
             ran: str = "" if state.last_success is None else f"; it last went well {_when(state.last_success)}"
-            lines.append(f"  {WORK_NAMES[work].lower()}: off ([harness] step_time){ran}")
+            lines.append(f"  {WORK_NAMES[work].lower()}: off (Settings › Self-improvement){ran}")
             continue
         went: str = "never went well" if state.last_success is None else f"last went well {_when(state.last_success)}"
         failing: str = (

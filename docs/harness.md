@@ -176,7 +176,9 @@ line and the page. What it does refuse is a version whose text the gate refuses 
 You write a version yourself with `dotx harness set` (a component from a file or standard input, the other kept from the
 adopted version, `--adopt` to take it at once) or `POST /api/harness`, and manage them with `dotx harness list`, `show`,
 `diff`, `adopt` and `retire`, or `GET /api/harness`, `GET /api/harness/{id}`, `POST /api/harness/{id}/adopt` and
-`POST /api/harness/{id}/retire`. The daemon reads the adopted version as each run starts: no restart.
+`POST /api/harness/{id}/retire`. The daemon reads the adopted version as each run starts: no restart. `PUT
+/api/harness/schedule` with `{"step_time": "04:00"}` (or `"off"`) sets when the nightly step runs, as the page's switch
+does (item 721); anything but a time of day or `off` is refused (422).
 
 ## The scoring set is the owner's
 
@@ -288,10 +290,10 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    and its confidence. Experiences go to a library the proposer reads first next time; a step whose evidence shows no
    reusable contrast writes none.
 
-The step runs once a night at `[harness] step_time`, under its own health record, and by hand with `dotx harness step`.
-Its provenance (version ← probe ← run, experience → version, the decisions of each step) is a graph the loop keeps, so
-that what Dot changed about itself, when, and on what evidence, can always be read (the command line and the API read
-it; drawing it on the page is left for later).
+The step runs once a night at the time set on its page (or `[harness] step_time`), under its own health record, and by
+hand with `dotx harness step`. Its provenance (version ← probe ← run, experience → version, the decisions of each step)
+is a graph the loop keeps, so that what Dot changed about itself, when, and on what evidence, can always be read (the
+command line and the API read it; drawing it on the page is left for later).
 
 ## The roles
 
@@ -315,16 +317,17 @@ candidate, whose notes keep the scope and the moments; `keep` writes nothing.
 
 ## The step, as built
 
-`[harness] step_time` (a time of day; `off` by default) has the daemon run one step a night, and `dotx harness step
-`[harness] step_time` (a time of day; `off` by default) has the daemon run one step a night, and `dotx harness step
-[--run ID] [--scripted]` runs one by hand. The step reads one run of yours that ended since the last step that took one
-(a week back at most, item 719): a task or research run of its own, as the reflection reads them, that Dot's own agent
-worked (a run on one of Zen's free models goes whole to OpenCode's own agent, which takes no habits, tool guidance,
-notes or skills, so a step does not learn from it and a version never changes what it does; the reflection still reads
-it, for its journal, what Dot knows about you and its lessons). Of the newest thirty, it takes the one that went worst
-(item 720): one that failed, then one that was stopped or held, then the one with the most tool calls that failed, then
-the newest, since a run that went well teaches little. It asks the proposer for a candidate in each scope of
-`step_candidates`, then plays the tasks it scores on (the guards and the tasks with headroom, above: item 719)
+The switch and the time of *Nightly learning* on the page (item 721), or `[harness] step_time` (a time of day; `off` by
+default) until the page sets one, have the daemon run one step a night: what the page sets is kept in Dot's store
+(`harness:step_time`) and wins over the settings file, for the scheduler, the page and how learning fares. `dotx harness
+step [--run ID] [--scripted]` runs one by hand. The step reads one run of yours that ended since the last step that took
+one (a week back at most, item 719): a task or research run of its own, as the reflection reads them, that Dot's own
+agent worked (a run on one of Zen's free models goes whole to OpenCode's own agent, which takes no habits, tool
+guidance, notes or skills, so a step does not learn from it and a version never changes what it does; the reflection
+still reads it, for its journal, what Dot knows about you and its lessons). Of the newest thirty, it takes the one that
+went worst (item 720): one that failed, then one that was stopped or held, then the one with the most tool calls that
+failed, then the newest, since a run that went well teaches little. It asks the proposer for a candidate in each scope
+of `step_candidates`, then plays the tasks it scores on (the guards and the tasks with headroom, above: item 719)
 `step_repeats` times under the adopted texts and under each candidate. Each probe is a process of its own (`dotx harness
 probe`), because an attempt switches
 the process's Dot home to its throw-away one, which the daemon and your runs must never see; the step reads the report
@@ -428,8 +431,10 @@ is about and the moments of the run it answers, the trial's contrast, the decisi
 notes*, **Use** on each version not in use (it asks first for one from outside content) and **Set aside** on a new or
 tried one; the version in use is set aside from *What Dot follows now*, and setting a version aside asks first. *Nightly
 learning*, under *Versions*, opens with when the step runs (every night at its time, with the next one, or that it is
-off and which setting turns it on); it and *Lessons learned* list the newest steps and experiences, a step with the run
-it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and the final check
+off), what a night costs (up to `step_tokens` tokens of the main model, which it names, and `step_minutes` minutes),
+and a switch and a time of day (item 721): switching it on asks first and says that cost again, a time is kept as it
+is chosen, and off needs no question; it and *Lessons learned* list the newest steps and experiences, a step with the
+run it learned from and what it decided. *How it learns*, a fold, says the test tasks (the scoring set) and the final check
 (the final set), who chooses, and the limits; the test tasks are the guards and the tasks the version in use still
 fails, or, while too few are known, how many of the pool Dot has tried to find them (item 719). A night that only tried
 tasks reads *trying tasks*. On a phone the page is a row of the settings list under *How Dot works*,

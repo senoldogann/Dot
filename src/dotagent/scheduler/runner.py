@@ -24,6 +24,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.probe import probe_apart
+from dotagent.harness.schedule import schedule_of
 from dotagent.harness.step import run_step
 from dotagent.llm.types import Speed
 from dotagent.plugins import scout_service
@@ -298,7 +299,8 @@ class Scheduler:
             return
         if self.stepping():
             return
-        step_time: str = self._runtime.config.harness.step_time
+        # The page's choice wins over the settings file's (item 721).
+        step_time: str = (await schedule_of(self._runtime.store, self._runtime.config.harness)).step_time
         if step_time == REFLECTION_OFF:
             return
         last: list[HarnessStep] = await self._runtime.store.list_harness_steps(1)

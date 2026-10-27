@@ -22,6 +22,7 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.harness.schedule import STEP_TIME_KEY
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -197,7 +198,7 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
         await row.get_by_role("button", name="Use", exact=True).click()
         await expect(in_use.get_by_text(HABIT)).to_be_visible()
         await expect(page.get_by_text("every night at", exact=False)).to_have_count(0)
-        await expect(page.get_by_text("Set a time of day in the settings file", exact=False)).to_be_visible()
+        await expect(page.get_by_text("Switch it on, and Dot learns once a night", exact=False)).to_be_visible()
         # The form is made from the version in use each time it opens: its habits are the one's, its summary is empty,
         # and nobody changed it, so Escape shuts it at once and the focus is back on the button.
         dialog = await open_form(page, opener, "Write your own version")
@@ -502,3 +503,44 @@ async def test_the_versions_come_fifty_at_a_time_and_the_ones_in_use_and_older_s
             await expect(rows).to_have_count(total)
         finally:
             await page.close()
+
+
+async def test_the_nightly_learning_is_switched_on_and_timed_on_the_page(
+    browser: Browser, client: httpx.AsyncClient, runtime: Runtime, tmp_path: Path
+) -> None:
+    """Item 721: the page said to set a time of day in the settings file, and nothing on it could. Its switch says what
+    a night costs before it is on, keeps the time in the store, which wins over the settings file, and takes it off."""
+    assert (await client.put("/api/harness/schedule", json={"step_time": "25:00"})).status_code == 422
+    page: Page = await _open(browser, client, 390)
+    try:
+        nightly: Locator = _section(page, "Nightly learning")
+        await expect(nightly).to_contain_text("The nightly learning is off")
+        await expect(nightly).to_contain_text(f"with its main model, {SCRIPTED_MODEL}: up to 8 million tokens")
+        switch: Locator = nightly.get_by_role("switch", name="Nightly learning on")
+        await expect(switch).to_have_attribute("aria-checked", "false")
+        await switch.click()
+        dialog: Locator = page.get_by_role("dialog")
+        await expect(dialog).to_contain_text("Switch the nightly learning on?")
+        await expect(dialog).to_contain_text("million tokens")
+        await dialog.get_by_role("button", name="Switch on").click()
+        await expect(nightly).to_contain_text("Every night at 04:00")
+        await expect(switch).to_have_attribute("aria-checked", "true")
+        view: dict[str, object] = (await client.get("/api/harness")).json()
+        assert (view["step_time"], view["step_time_set_on"]) == ("04:00", "page")
+        assert (await client.get("/api/memories/learning")).json()["harness_on"] is True
+        assert await page.evaluate(FITS)
+        await page.screenshot(path=tmp_path / "harness-nightly-on-390.png", full_page=True)
+        # Another time is kept as it is chosen.
+        time_field: Locator = nightly.get_by_label("At what time")
+        await time_field.fill("05:30")
+        await time_field.dispatch_event("change")
+        await expect(nightly).to_contain_text("Every night at 05:30")
+        assert (await client.get("/api/harness")).json()["step_time"] == "05:30"
+        # Off again, without asking.
+        await nightly.get_by_role("switch", name="Nightly learning on").click()
+        await expect(nightly).to_contain_text("The nightly learning is off")
+        assert (await client.get("/api/harness")).json()["step_time"] == "off"
+    finally:
+        await page.close()
+        # The other tests of this home read the settings file's time: what the page kept is passed over.
+        await runtime.store.kv_set(STEP_TIME_KEY, "")

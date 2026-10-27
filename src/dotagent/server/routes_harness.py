@@ -11,6 +11,7 @@ from fastapi import APIRouter, Query
 from dotagent.harness.components import NO_HARNESS, HarnessText
 from dotagent.harness.graph import HarnessGraph, Lineage, graph_of, lineage_of
 from dotagent.harness.headroom import ScoringPlan, pool_of
+from dotagent.harness.schedule import StepSchedule, StepTimeRequest, schedule_of, set_schedule
 from dotagent.harness.service import (
     OWNER,
     adopt,
@@ -63,6 +64,7 @@ def harness_router(ctx: ServerContext) -> APIRouter:
         # daemon's runs, its page and its phone share (item 588, pre-push review round 4).
         refused: dict[str, str] = await asyncio.to_thread(_refused_of, shown, held)
         scoring: ScoringPlan = await scoring_of(store, limits, current)
+        schedule: StepSchedule = await schedule_of(store, limits)
         return HarnessView(
             adopted=current,
             versions=tuple(page),
@@ -73,7 +75,11 @@ def harness_router(ctx: ServerContext) -> APIRouter:
             habits_chars=limits.habits_chars,
             tool_guidance_chars=limits.tool_guidance_chars,
             component_lines=limits.component_lines,
-            step_time=limits.step_time,
+            step_time=schedule.step_time,
+            step_time_set_on=schedule.source,
+            step_minutes=limits.step_minutes,
+            step_tokens=limits.step_tokens,
+            main_model=ctx.runtime.config.models.main,
             scoring_tasks=tuple(limits.scoring_tasks),
             final_tasks=tuple(limits.final_tasks),
             pool_size=len(pool_of(limits)),
@@ -143,6 +149,13 @@ def harness_router(ctx: ServerContext) -> APIRouter:
         """Adopt a version; one whose text the gate for learned texts refuses now is not adopted (item 587)."""
         # A gate: the values filled into a page are not among the secrets it refuses by (item 621).
         return await adopt(store, version_id, time.time(), await asyncio.to_thread(known_secrets, filled=False))
+
+    @router.put("/harness/schedule")
+    async def put_schedule(request: StepTimeRequest) -> HarnessView:
+        """When the nightly step runs (item 721): a time of day ("04:10") or "off", kept in the store, which wins over
+        ``[harness] step_time``; the view as it is now."""
+        await set_schedule(store, ctx.runtime.config.harness, request.step_time)
+        return await view(HarnessQuery())
 
     @router.post("/harness/{version_id}/retire")
     async def retire_version(version_id: str) -> HarnessVersion:

@@ -884,18 +884,19 @@ class LearningHealthView(FrozenModel):
 
 
 class HarnessView(FrozenModel):
-    """``GET /api/harness`` (item 389, docs/harness.md): the adopted version, ``None`` while a run's prompt is Dot's
-    own text alone, a page of the versions, the newest first (``limit`` and ``offset``, item 589; ``versions_total`` of
-    them in all, ``version_counts`` of each state), which of these (the adopted one included) come from content others
-    can author and why (``from_outside``, by version id: the notes of a version and of the ones it was composed of,
-    item 588) and which hold a text the gate for learned texts refuses now (``refused``, by version id, in words: such a
+    """``GET /api/harness`` (item 389, docs/harness.md): the adopted version, ``None`` while a run's prompt is Dot's own
+    text alone, a page of the versions, the newest first (``limit`` and ``offset``, item 589; ``versions_total`` of them
+    in all, ``version_counts`` of each state), which of these (the adopted one included) come from content others can
+    author and why (``from_outside``, by version id: the notes of a version and of the ones it was composed of, item
+    588) and which hold a text the gate for learned texts refuses now (``refused``, by version id, in words: such a
     version is not adopted and a prompt leaves the component out, item 587), the bounds a component keeps to, and how
-    the nightly step is set (item 393): when it runs ("off" never), the scoring set (the guards, item 719), how many
-    tasks the pool holds, which of them the version in use still fails (``headroom``) and how many it has not tried
-    (``untried``), how many tasks with headroom a candidate needs to be judged, the final set, the repeats, the margin
-    of passes a candidate needs to count as better, who adopts a version the probe showed better and how many days the
-    loop's records are kept (item 589); and how many steps and experiences there are in all (item 527), as their lists
-    stop at the newest."""
+    the nightly step is set (item 393): when it runs ("off" never; ``step_time_set_on`` says whether the page set it or
+    the settings file, item 721), its budget of minutes and tokens of the main model it names, the scoring set (the
+    guards, item 719), how many tasks the pool holds, which of them the version in use still fails (``headroom``) and
+    how many it has not tried (``untried``), how many tasks with headroom a candidate needs to be judged, the final set,
+    the repeats, the margin of passes a candidate needs to count as better, who adopts a version the probe showed better
+    and how many days the loop's records are kept (item 589); and how many steps and experiences there are in all (item
+    527), as their lists stop at the newest."""
 
     adopted: HarnessVersion | None
     versions: tuple[HarnessVersion, ...]
@@ -907,6 +908,10 @@ class HarnessView(FrozenModel):
     tool_guidance_chars: int
     component_lines: int
     step_time: str
+    step_time_set_on: Literal["page", "settings"]
+    step_minutes: float
+    step_tokens: int
+    main_model: str
     scoring_tasks: tuple[str, ...]
     final_tasks: tuple[str, ...]
     pool_size: int
