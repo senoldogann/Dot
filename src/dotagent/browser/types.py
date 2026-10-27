@@ -73,6 +73,20 @@ class Step(BaseModel):
     x: float | None = Field(default=None, description="Viewport x in CSS pixels, for click_at.")
     y: float | None = Field(default=None, description="Viewport y in CSS pixels, for click_at.")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _plain_meaning(cls, data: object) -> object:
+        """A step written as the model meant it, where that is plain (item 755): a click at x and y with no ref is a
+        click_at, as in the owner's runs, where it cost the batch; ``upload`` is no step, and says which tool is."""
+        if not isinstance(data, dict):
+            return data
+        action: object = data.get("action")
+        if action == "click" and data.get("ref") is None and data.get("x") is not None and data.get("y") is not None:
+            return {**data, "action": "click_at"}
+        if action == "upload":
+            raise ValueError("upload is not a step: call browser_upload with the ref of the upload control and paths")
+        return data
+
     @model_validator(mode="after")
     def _check_fields(self) -> Self:
         action: str = self.action
