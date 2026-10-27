@@ -43,8 +43,8 @@ is the answer (a small model that is offered both writes the call out as text).
 - Old tool results and screenshots are trimmed, and the oldest part of the conversation is summarised by the fast
   model (`[models] fast`, the side work the run's slower model need not do), so a run stays inside its context budget:
   the model's own context size (Settings › Models, item 250), else `context_tokens`: by default `"most"`, three
-  quarters of the model's window (item 396), or a number for every model, cut to three quarters of the window when
-  that is less. A wider budget means fewer summaries in a long run and more input tokens a step (up to twice as many at
+  quarters of the model's window (item 396) and at most `context_most_tokens`, 200 000 (item 732), or a number for
+  every model, cut to three quarters of the window when that is less. A wider budget means fewer summaries in a long run and more input tokens a step (up to twice as many at
   the end of a long run); 96 000 was the default from 2026-10-11 and 48 000 before, and an owner on a metered key who
   weighs tokens over summaries sets a number, or a smaller size for a model. The
   summary may use a tenth of the budget and never more than 1 500 words, so a long run's summary does not grow with

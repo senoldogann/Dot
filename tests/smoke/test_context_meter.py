@@ -218,8 +218,8 @@ async def test_the_context_meter_shows_how_much_of_the_budget_the_last_step_fill
                         "The last step used 81,000. Past 96,000, Dot sums up the older part of the chat to make room.",
                         "The model can take in 1,000,000 at once.",
                         "Each step makes the model read the whole chat again, so a shorter chat is answered sooner "
-                        "and costs less. The limit is three quarters of the most the model can take in. Settings › "
-                        "Models lets you set a size for a model.",
+                        "and costs less. The limit, 96,000, is set below the most the model can take in: a longer chat "
+                        "makes every step slower to answer. Settings › Models lets you set a larger size for a model.",
                     ]
                 )
                 # The setting of the settings file stands under Details, shut until it is opened (item 625).

@@ -26,6 +26,7 @@ from dotagent.agent.playbooks import (
 from dotagent.agent.scaffold import (
     context_budget,
     context_ceiling,
+    most_bound,
     most_window,
     run_window,
     summarise_point,
@@ -176,6 +177,7 @@ def _context_choice(config: AgentConfig, info: ModelInfo, chosen: int | None) ->
         chosen=chosen,
         default=context_budget(config, info.context_length, None),
         configured=config.context_tokens if isinstance(config.context_tokens, int) else None,
+        most=most_bound(config),
         floor=CONTEXT_FLOOR,
         ceiling=context_ceiling(most_window(info)),
         sizes=list(window_choices(config, info, chosen)),

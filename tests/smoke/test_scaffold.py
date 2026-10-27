@@ -323,8 +323,9 @@ async def test_a_size_chosen_for_the_model_sets_the_budget_the_tool_output_and_t
     assert large.scaffolds == (_scaffold(1_000_000, 192_000, 192_000, 163_200, 12_000, False),)
     assert small.scaffolds == (_scaffold(1_000_000, 64_000, 64_000, 54_400, 8_000, False),)
     assert cut.scaffolds == (_scaffold(204_800, 192_000, 153_600, 153_600, 12_000, True),)
-    # A size chosen for another model leaves this one's at Dot's default, the most of its window (item 396).
-    assert other.scaffolds == (_scaffold(1_000_000, None, 750_000, 637_500, 12_000, False),)
+    # A size chosen for another model leaves this one's at Dot's default, the most of its window up to 200,000
+    # (items 396 and 732).
+    assert other.scaffolds == (_scaffold(1_000_000, None, 200_000, 170_000, 12_000, False),)
     assert {large.record.status, small.record.status, cut.record.status, other.record.status} == {"done"}
 
 

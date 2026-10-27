@@ -1,7 +1,8 @@
 """The scaffold of a run: how much help its model gets, from facts and not from one global setting.
 
 The budget is the context size chosen for the model in Settings › Models (item 250), else ``[agent] context_tokens``:
-``"most"``, three quarters of the model's window (item 396), or one number for every model. It follows the model's
+``"most"``, three quarters of the model's window (item 396) up to ``[agent] context_most_tokens`` (item 732), or one
+number for every model. It follows the model's
 window: a run never plans to fill more than three quarters of what one request can hold, so a model with a small window
 is compacted before it overflows, and its tool output is clipped in the same proportion.
 The tier follows how reliably the model worked in its newest runs: a model whose tool calls are often refused before
@@ -65,14 +66,26 @@ def _reference_size(config: AgentConfig) -> int:
 def configured_size(config: AgentConfig, window: int | None, chosen: int | None) -> int:
     """The context size a model whose request holds ``window`` tokens is configured with: the one chosen for the model
     (item 250), else the number ``[agent] context_tokens`` sets. While that is ``"most"`` (item 396), three quarters of
-    the window, never less than 96,000: so a window too small for that cuts the budget as it cuts a number, and a model
-    whose provider does not say its window has 96,000."""
+    the window, never less than 96,000, and at most ``[agent] context_most_tokens`` when that is set (item 732): so a
+    window too small for that cuts the budget as it cuts a number, and a model whose provider does not say its window
+    has 96,000."""
     if chosen is not None:
         return chosen
     if isinstance(config.context_tokens, int):
         return config.context_tokens
     ceiling: int | None = context_ceiling(window)
-    return _REFERENCE_TOKENS if ceiling is None else max(ceiling, _REFERENCE_TOKENS)
+    most: int = _REFERENCE_TOKENS if ceiling is None else max(ceiling, _REFERENCE_TOKENS)
+    bound: int | None = most_bound(config)
+    return most if bound is None else min(most, bound)
+
+
+def most_bound(config: AgentConfig) -> int | None:
+    """The most ``"most"`` gives a model without a size of its own (item 732): ``[agent] context_most_tokens``, never
+    under 96,000, the budget the tool output is sized for; ``None`` when ``context_tokens`` is a number or the bound is
+    0."""
+    if isinstance(config.context_tokens, int) or config.context_most_tokens == 0:
+        return None
+    return max(config.context_most_tokens, _REFERENCE_TOKENS)
 
 
 def context_ceiling(window: int | None) -> int | None:
