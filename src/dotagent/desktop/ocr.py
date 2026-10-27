@@ -11,7 +11,6 @@ import io
 from dataclasses import dataclass
 
 import Quartz
-import Vision
 from Foundation import NSData
 from PIL import Image
 
@@ -50,6 +49,9 @@ def read_lines(picture: Image.Image, languages: tuple[str, ...] = ()) -> tuple[T
     """The lines of text in ``picture``, top to bottom and then left to right, read at Vision's accurate level without
     its language correction (names, codes and addresses stay as they are written). ``languages`` are the ones Vision
     tries first; empty, it chooses."""
+    # Vision is loaded by the first screenshot read, not by the daemon's start (item 729).
+    import Vision
+
     request = Vision.VNRecognizeTextRequest.alloc().init()
     request.setRecognitionLevel_(Vision.VNRequestTextRecognitionLevelAccurate)
     request.setUsesLanguageCorrection_(False)

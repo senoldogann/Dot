@@ -7,6 +7,7 @@ import stat
 from pathlib import Path
 
 import pytest
+import pywebpush
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from pywebpush import WebPushException
@@ -332,7 +333,8 @@ async def test_each_subscription_is_pushed_on_its_own_and_the_caller_gets_the_to
             raise WebPushException("Push failed", response=_Answer(answers[endpoint]))
         taken.append((endpoint, json.loads(data)))
 
-    monkeypatch.setattr(push, "webpush", webpush)
+    # The daemon loads pywebpush when it first sends (item 729), so the fake takes the library's own place.
+    monkeypatch.setattr(pywebpush, "webpush", webpush)
     keys: PushKeys = read_or_create_keys(tmp_path / "vapid-key.pem")
     store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
     try:
@@ -376,7 +378,8 @@ async def test_a_busy_push_service_is_asked_once_more(tmp_path: Path, monkeypatc
             raise WebPushException("Push failed", response=_Answer(answers.pop(0)))
         taken.append(subscription_info["endpoint"])
 
-    monkeypatch.setattr(push, "webpush", webpush)
+    # The daemon loads pywebpush when it first sends (item 729), so the fake takes the library's own place.
+    monkeypatch.setattr(pywebpush, "webpush", webpush)
     keys: PushKeys = read_or_create_keys(tmp_path / "vapid-key.pem")
     p256dh, auth = _usable_keys()
     subscription: PushSubscription = PushSubscription(
