@@ -261,23 +261,58 @@
   animation-delay: calc(var(--motion-dots) / 4);
 }
 
-/* What the agents answered: one quiet head in the middle, "Messages from Scout and Editor" with their faces, and a
-   bubble for each, its face and name over its words. */
+/* What the agents answered (item 733): folded to one line, as a group of steps is, "Messages from Scout and Editor"
+   with their faces and how many; opened, each message as wide as Dot's own answers, its face and name over its words,
+   set apart by a rule at its left rather than a bubble. */
 .agent-said {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
+  min-width: 0;
+  margin-top: var(--space-2);
 }
 
 .agent-said-head {
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.agent-said-head::-webkit-details-marker {
+  display: none;
+}
+
+.agent-said-head:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+.agent-said-names {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
   gap: var(--space-1);
+  min-width: 0;
+}
+
+.agent-said-count {
   color: var(--muted);
-  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-said-count::before {
+  content: "· ";
+}
+
+.agent-said-count:empty {
+  display: none;
+}
+
+.agent-said-head > .chev {
+  flex: none;
 }
 
 .agent-said-who,
@@ -294,12 +329,17 @@
   height: 16px;
 }
 
+.agent-said-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-1);
+}
+
 .agent-message {
-  align-self: flex-start;
-  max-width: 85%;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  min-width: 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--border-strong);
 }
 
 .agent-message-name {

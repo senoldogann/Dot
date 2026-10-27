@@ -734,14 +734,17 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
   /**
    * What an agent answered, as its message in the conversation that handed it the part (item 668): under one head,
-   * "Message from Scout", that the next agent's answer joins ("Messages from Scout and Editor"), each a bubble with
-   * the agent's face and name over its words, cut to AGENT_SAID_CHARS with a way to the rest on its run's page.
+   * "Message from Scout", that the next agent's answer joins ("Messages from Scout and Editor"), each with the agent's
+   * face and name over its words, cut to AGENT_SAID_CHARS with a way to the rest on its run's page. The block is
+   * folded (item 733, the owner's word): its head, one line with the faces and how many messages, opens it for the
+   * reader who wants to read them, and Dot's own answer keeps the conversation.
    */
   function agentSaid(scope, child, result, ts) {
     const last = scope.container.lastElementChild;
     let block = last !== null && SAID_BLOCKS.has(last) ? last : null;
     if (block === null) {
-      block = el("section", { class: "agent-said" }, el("div", { class: "agent-said-head" }));
+      const head = el("summary", { class: "agent-said-head" }, el("span", { class: "agent-said-names" }), el("span", { class: "agent-said-count" }), el("span", { class: "chev" }, icon("chevron")));
+      block = el("details", { class: "agent-said" }, head, el("div", { class: "agent-said-body" }));
       SAID_BLOCKS.set(block, []);
       place(scope, block, ts);
     }
@@ -749,18 +752,20 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     if (!names.some((each) => each.name === child.agentName)) {
       names.push({ name: child.agentName, id: child.actorId });
     }
-    const head = block.querySelector(".agent-said-head");
     const said = names.flatMap((each, index) => [
       index === 0 ? null : index === names.length - 1 ? " and " : ", ",
       el("span", { class: "agent-said-who" }, actorFace(each.id, "idle", null), each.name),
     ]);
-    head.replaceChildren(el("span", null, names.length === 1 ? "Message from" : "Messages from"), " ", ...said.filter((part) => part !== null));
+    const body = block.querySelector(".agent-said-body");
+    const count = body.childElementCount + 1;
+    block.querySelector(".agent-said-names").replaceChildren(el("span", null, count === 1 ? "Message from" : "Messages from"), " ", ...said.filter((part) => part !== null));
+    setText(block.querySelector(".agent-said-count"), count === 1 ? "" : String(count));
     const text = result.trim();
     const cut = text.length > AGENT_SAID_CHARS;
-    block.append(
+    body.append(
       el(
         "div",
-        { class: "bubble agent-message" },
+        { class: "agent-message" },
         el("div", { class: "agent-message-name" }, actorFace(child.actorId, "idle", null), child.agentName),
         prose(cut ? `${text.slice(0, AGENT_SAID_CHARS).trimEnd()}…` : text),
         cut ? el("a", { class: "agent-message-more", href: `#/runs/${child.runId}` }, "Read it all") : null,

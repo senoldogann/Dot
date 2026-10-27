@@ -1,7 +1,8 @@
 """An agent's words in the conversation that handed it a part (item 668): while the part is on its way the conversation
 shows "Sending to Scout…", which the agent's row takes over once its run starts, and the agent's answer stands as its
 message under "Message from Scout", with its face and name, wide and on a phone's width, and in sight when the chat
-shows only what Dot is doing (item 663). The agent's run carries its name in its queued event. Measured in Chrome on
+shows only what Dot is doing (item 663); folded to that head until the reader opens it, then as wide as Dot's own
+answer (item 733). The agent's run carries its name in its queued event. Measured in Chrome on
 real runs of a scripted model. A helper an agent's own run delegated to carries the agent's id (item 553) but is no
 message to it: it is named "Helper 1", and its report is no message of the agent's."""
 
@@ -128,9 +129,21 @@ async def test_the_agents_answer_is_its_message_in_the_conversation(own_home: Pa
                     await expect(page.locator(".child-row .child-name")).to_have_text("Scout")
                     await expect(page.locator(".child-row .child-goal")).to_have_text("Check the date")
                     said = page.locator(".agent-said")
-                    await expect(said.locator(".agent-said-head")).to_have_text("Message from Scout")
+                    await expect(said.locator(".agent-said-names")).to_have_text("Message from Scout")
+                    # Folded until the reader opens it (item 733): Dot's own answer keeps the conversation.
                     message = said.locator(".agent-message")
+                    await expect(said).not_to_have_attribute("open", "")
+                    await expect(message).to_be_hidden()
+                    await page.screenshot(path=str(tmp_path / f"said-{width}-folded.png"))
+                    await said.locator(".agent-said-head").click()
+                    await expect(message).to_be_visible()
                     await expect(message.locator(".agent-message-name")).to_have_text("Scout")
+                    # Opened, the message is as wide as Dot's own answer, on a phone too.
+                    answer_box = await page.locator(".answer").last.bounding_box()
+                    message_box = await message.bounding_box()
+                    assert answer_box is not None and message_box is not None
+                    assert message_box["width"] >= answer_box["width"] - 2, (message_box, answer_box)
+                    assert abs(message_box["x"] - answer_box["x"]) <= 2, (message_box, answer_box)
                     await expect(message.locator(".prose")).to_have_text(
                         "Three sources agree: the launch moved to May."
                     )
