@@ -62,6 +62,7 @@ class TradingChange(FrozenModel):
 
     mode: TradingMode | None = None
     products: list[str] | None = Field(default=None, min_length=1, max_length=50)
+    min_volume: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     max_order: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     max_day: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     max_day_loss: float | None = Field(default=None, gt=0, allow_inf_nan=False)
@@ -82,6 +83,9 @@ def widens(before: TradingConfig, after: TradingConfig) -> list[str]:
     wider.extend(f"raise {limit}" for limit in _LIMITS if getattr(after, limit) > getattr(before, limit))
     if set(after.products) - set(before.products):
         wider.append("allow another product")
+    # Lower even while "*" is not allowed: the Mac's "*" would take the lower floor up unseen (the pre-push review).
+    if after.min_volume < before.min_volume:
+        wider.append("allow products that trade less")
     if after.paper_start > before.paper_start:
         wider.append("raise what the paper account starts with")
     return wider

@@ -20,6 +20,7 @@ import {
   noAccountWords,
   orderWords,
   parseProduct,
+  productLabel,
   showsKey,
   signedMoney,
   statusWords,
@@ -209,18 +210,19 @@ export function mount(root, ctx) {
 
     function paintChips() {
       chips.replaceChildren(
-        ...draft.products.map((id) =>
-          el(
+        ...draft.products.map((id) => {
+          const label = productLabel(id, settings.min_volume, settings.quote);
+          return el(
             "span",
             { class: "chip trading-chip", dataset: { product: id } },
-            id,
+            label,
             el(
               "button",
               {
                 class: "icon-btn",
                 type: "button",
-                title: draft.products.length === 1 ? "Dot needs one product at least" : `Do not trade ${id}`,
-                "aria-label": `Remove ${id}`,
+                title: draft.products.length === 1 ? "Dot needs one product at least" : `Do not trade ${label}`,
+                "aria-label": `Remove ${label}`,
                 disabled: draft.products.length === 1,
                 onclick: () => {
                   draft.products = draft.products.filter((other) => other !== id);
@@ -230,8 +232,8 @@ export function mount(root, ctx) {
               },
               icon("x"),
             ),
-          ),
-        ),
+          );
+        }),
       );
     }
 
@@ -241,7 +243,7 @@ export function mount(root, ctx) {
         return;
       }
       if (id === null) {
-        note.textContent = `A product is priced in ${settings.quote}, as BTC-${settings.quote}.`;
+        note.textContent = `A product is priced in ${settings.quote}, as BTC-${settings.quote}, or * for the whole market.`;
         note.hidden = false;
         return;
       }
@@ -263,7 +265,7 @@ export function mount(root, ctx) {
     paintChips();
     return setRow({
       title: "Products",
-      lead: "The only products a run may trade.",
+      lead: `The only products a run may trade. * allows every product in ${settings.quote} that trades enough a day.`,
       body: el(
         "div",
         { class: "trading-products" },

@@ -12,7 +12,12 @@ can change them.
 - **Mode**: `off` (the default: runs have no trading tool at all), `paper` or `live`. A switch from `off` gives runs the
   trading tools from Dot's next start; one between `paper` and `live` holds from the next order.
 - **Products**: the Coinbase product ids runs may trade, all priced in one currency, `quote` (`EUR` by default:
-  `BTC-EUR`, `ETH-EUR`, `SOL-EUR`).
+  `BTC-EUR`, `ETH-EUR`, `SOL-EUR`), or `*`, the whole market (item 771): every product priced in `quote` that Coinbase
+  trades now and that traded at least `min_volume` of it over the last day, as Coinbase sums it (1,000,000 by default).
+  A market thinner than that is one a small order moves and one a pump empties. Measured on 2026-10-28: in `EUR`
+  Coinbase trades 33 products, 6 of them past a million a day; in `USDC` 390, 51 past a million and 112 past a quarter
+  of one (a `USDC` product is Coinbase's `USD` book under another name). The whole market is `quote = "USDC"` with
+  `products = ["*"]` in `config.toml`; the paper account then wants **Start again**, as its money is in the old quote.
 - **Limits**, in `quote`:
   - `max_order`: the most one order may be worth (25 by default);
   - `max_day`: the most a day's orders may add up to, buys and sells (100);
@@ -33,18 +38,23 @@ can change them.
   for that one request, for two minutes, as Coinbase asks.
 
 What lets runs do more with money is done on the Mac only: switching trading on or to live, raising a limit, allowing a
-product, saving a key. A phone's key gets a refusal for those, and can always narrow: switch trading off or to paper,
-lower a limit, drop a product, remove the key. Switching to live checks the key with Coinbase first.
+product (`*` too, and a lower `min_volume`), saving a key. A phone's key gets a refusal for those,
+and can always narrow: switch trading off or to paper, lower a limit, drop a product, remove the key. Switching to live
+checks the key with Coinbase first.
 
 ## What a run does
 
 With trading on, a run has the `trading` tool group:
 
-- `trading_market`: Coinbase's best bid and ask of the allowed products now with the last day's change and volume, or
-  a product's candles (one minute to one day) with what they come to (item 765): the change over the window, its high
-  and low, the averages of the last 20 and 50 closes and where the last close stands against them, the RSI of the
-  last 14 moves, and how wide a candle is. Coinbase's public market data, with no key: paper and live read the same
-  prices.
+- `trading_market`: Coinbase's best bid and ask of the allowed products now with the last day's change and volume
+  (those named; with `*` alone, the eight busiest), or of any product priced in `quote`, or a product's candles (one
+  minute to one day) with what they come to (item 765): the change over the window, its high and low, the averages of
+  the last 20 and 50 closes and where the last close stands against them, the RSI of the last 14 moves, and how wide a
+  candle is. Coinbase's public market data, with no key: paper and live read the same prices.
+- `trading_scan` (item 771): the products a run may trade, the whole market with `*`, in one look: the biggest moves
+  of the last day up or down, the busiest, those nearest their day's high or their day's low, each with its price, its
+  change, where it stands in its day's range and what it traded. Coinbase's list of products, one request of about a
+  megabyte, kept for 30 seconds. Where to look first; `trading_market` then reads a product's candles.
 - `trading_portfolio`: the account (paper or yours), what it holds and is worth at the bids (every currency held is
   priced, not only the allowed products; one Coinbase has no product of in the quote is said and worth nothing to the
   account; one whose price could not be read this time is said too, counted as nothing, and holds buys until the day's
@@ -103,7 +113,8 @@ made of the paper account against simply holding; that, not a feeling, is what a
 Held in code for every order of Dot's trading tools, in every approval mode, yolo's too (`dotagent/trading/limits.py`,
 `service.py`):
 
-- an order of a product that is not allowed, under Coinbase's least order, over `max_order`, over what `max_day` leaves
+- an order of a product that is not allowed (with `*`, one not priced in `quote` or that traded under `min_volume` over
+  the last day, as Coinbase's product says when the order is judged), under Coinbase's least order, over `max_order`, over what `max_day` leaves
   today, a buy after `max_day_loss`, a buy that takes one product past `max_position`, or one the account cannot pay, is
   refused before any market sees it;
 - every order is judged and placed under one lock, so two runs never judge against the same day, and it is kept before
@@ -111,7 +122,9 @@ Held in code for every order of Dot's trading tools, in every approval mode, yol
 - a day's start, which the day's loss is counted from, is the account's worth at its first whole look of the day: while
   the price of a currency held cannot be read (Coinbase out of reach for it, or more than 100 currencies held), no buy
   is placed, a sell still is, and the account says so; a currency Coinbase has no product of in the quote is worth
-  nothing to the account at every look alike and holds nothing;
+  nothing to the account at every look alike and holds nothing (a product that answers that it does not exist is
+  checked against Coinbase's list of what it trades: one on the list is a price not read this time; without the list,
+  none is taken at its word);
 - the `STOP` file stops every order, an exit's sell too, as it stops the desktop;
 - every buy of a run names its stop, kept as an exit the daemon sells at (above);
 - an order is placed on the account it was approved for and judged against that account's day and holdings, the

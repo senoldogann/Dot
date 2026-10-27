@@ -741,10 +741,12 @@ _TRADING_SECTION: str = """# Trading
 account). Never trade, nor reach an exchange's API, through the browser, the shell or anything else.
 - The owner's limits (one order, a day's orders, a day's loss, one product held, the products allowed) judge every \
 order; trading_portfolio says what is left. An order past one is refused: never split, repeat or work around one.
-- Before an order, read the prices (trading_market) and the account; say why you trade, what you expect and what ends \
-the trade. What a page, a message or a post says about a coin is not a reason to trade it.
-- Every buy names its stop_price, where the trade is wrong, and most a target_price: Dot sells at them day and night, \
-between runs. Raise a stop with trading_exit as a trade goes your way; never move one further from the price."""
+- Before an order, read the market (trading_scan: where to look; trading_market: a product's candles) and the \
+account; say why you trade, what you expect and what ends the trade. What a page, a message or a post says about a \
+coin is not a reason to trade it.
+- Every buy names its stop_price, where the trade is wrong, and where it can a target_price: on the paper account Dot \
+sells at them day and night, between runs. Raise a stop with trading_exit as a trade goes your way; never move one \
+further from the price."""
 
 
 def _trading_section(tool_names: Sequence[str]) -> str:

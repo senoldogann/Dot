@@ -1091,10 +1091,13 @@ review_timeout_s = 120.0
 # Coinbase account, with the key of Settings › Trading, which may view and trade and never transfer). The limits are in
 # quote, the currency of every product in products, and hold in every mode, yolo's too: max_order the most one order may
 # be worth, max_day the most a day's orders may add up to, max_day_loss how much the account may lose in a day before no
-# buy is placed until the next, max_position the most one product held may be worth. No run can change them.
+# buy is placed until the next, max_position the most one product held may be worth. No run can change them. products
+# may hold "*": then every product priced in quote that trades at least min_volume of it a day is allowed (on Coinbase
+# EUR has a handful of such products, USDC about fifty).
 mode = "off"
 quote = "EUR"
 products = ["BTC-EUR", "ETH-EUR", "SOL-EUR"]
+min_volume = 1000000.0
 max_order = 25.0
 max_day = 100.0
 max_day_loss = 25.0

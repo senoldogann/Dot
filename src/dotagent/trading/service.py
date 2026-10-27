@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 from zoneinfo import ZoneInfo
 
-from dotagent.config import TradingConfig
+from dotagent.config import ANY_PRODUCT, TradingConfig
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.logs import get_logger
 from dotagent.store.db import Store
@@ -261,6 +261,17 @@ class Trading:
                 unpriceable.append(currency)
             else:
                 unread.append(currency)
+        if unpriceable:
+            # A 404 is checked against Coinbase's list of what it trades: a product it trades that answered 404 is a
+            # price not read this time, and a day that started without it would read its worth as the day's gain (the
+            # pre-push review of item 765). Without the list, no 404 is taken at its word.
+            try:
+                trades: set[str] = {row.product for row in await self.market.whole_market(config.quote)}
+            except MarketError as error:
+                _log.info("trading_product_list_unread", error=error.message)
+                trades = {f"{currency}-{config.quote}" for currency in unpriceable}
+            unread.extend(currency for currency in unpriceable if f"{currency}-{config.quote}" in trades)
+            unpriceable = [currency for currency in unpriceable if f"{currency}-{config.quote}" not in trades]
         return _Priced(found, tuple(unpriceable), tuple(unread))
 
     async def portfolio(self) -> Portfolio:
@@ -342,10 +353,11 @@ class Trading:
             except TradingRefused as refused:
                 raise _refusal(request, refused.message) from refused
             mode: Literal["paper", "live"] = "paper" if broker is self.paper else "live"
-            if request.closing is None and request.product not in config.products:
-                raise TradingRefused(
-                    f"{request.product} is not among the products the owner allows ({', '.join(config.products)})", {}
-                )
+            if request.closing is None and ANY_PRODUCT not in config.products:
+                # Refused before any read when it is not named, as no read could make it allowed.
+                named: str | None = limits.not_allowed(config, request.product, None)
+                if named is not None:
+                    raise TradingRefused(named, {})
             quote, rules = await asyncio.gather(self.market.quote(request.product), self.market.rules(request.product))
             exit_problem: str | None = _exit_problem(request, quote)
             if exit_problem is not None:

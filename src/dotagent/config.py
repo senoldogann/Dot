@@ -932,6 +932,8 @@ class PluginsConfig(FrozenModel):
 # Whether runs trade, and with what money (docs/trading.md): no trading tools at all, an account of Dot's own that
 # trades at the market's real prices with money that is not there, or the owner's Coinbase account.
 TradingMode = Literal["off", "paper", "live"]
+# Among [trading] products (item 771): every product of the quote with [trading] min_volume a day.
+ANY_PRODUCT: str = "*"
 _PRODUCT: re.Pattern[str] = re.compile(r"[A-Z0-9]{2,10}-[A-Z]{3,5}")
 _CURRENCY: re.Pattern[str] = re.compile(r"[A-Z]{3,5}")
 
@@ -948,6 +950,9 @@ class TradingConfig(FrozenModel):
     mode: TradingMode
     quote: str
     products: list[str] = Field(min_length=1, max_length=50)
+    # With "*" among the products (item 771): every product priced in quote that trades at least this much of the
+    # quote a day, as Coinbase sums it; a market thinner than that is one a small order moves, and one a pump empties.
+    min_volume: float = Field(default=1_000_000.0, ge=0, allow_inf_nan=False)
     max_order: float = Field(gt=0, allow_inf_nan=False)
     max_day: float = Field(gt=0, allow_inf_nan=False)
     max_day_loss: float = Field(gt=0, allow_inf_nan=False)
@@ -968,11 +973,12 @@ class TradingConfig(FrozenModel):
         wrong: list[str] = [
             product
             for product in self.products
-            if _PRODUCT.fullmatch(product) is None or not product.endswith(f"-{self.quote}")
+            if product != ANY_PRODUCT
+            and (_PRODUCT.fullmatch(product) is None or not product.endswith(f"-{self.quote}"))
         ]
         if wrong:
             raise ValueError(
-                f"[trading] products are Coinbase product ids priced in {self.quote}, as BTC-{self.quote}: "
+                f'[trading] products are Coinbase product ids priced in {self.quote}, as BTC-{self.quote}, or "*": '
                 + ", ".join(wrong)
             )
         if self.max_order > self.max_day:

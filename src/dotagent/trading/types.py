@@ -39,6 +39,22 @@ class ProductRules(FrozenModel):
     quote_min_size: float
     base_min_size: float
     trading: bool
+    # What the product traded in the last day, in its quote, as Coinbase sums it (item 771); None when not given.
+    quote_volume_24h: float | None = None
+
+
+class MarketRow(FrozenModel):
+    """One product of the whole market as Coinbase's product list gives it (item 771): its price, best bid and ask,
+    the last day's change in percent, high and low, and what it traded in its quote."""
+
+    product: str
+    price: float
+    bid: float | None
+    ask: float | None
+    change_24h_pct: float | None
+    high_24h: float | None
+    low_24h: float | None
+    quote_volume_24h: float
 
 
 class ProductDay(FrozenModel):

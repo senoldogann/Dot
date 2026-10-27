@@ -14,6 +14,7 @@ import {
   orderWords,
   parseAmount,
   parseProduct,
+  productLabel,
   showsKey,
   signedMoney,
   statusWords,
@@ -75,9 +76,16 @@ test("a limit is a positive number, a comma is a decimal point, and nothing else
 test("a product is in capitals and priced in the quote", () => {
   assert.equal(parseProduct(" btc-eur ", "EUR"), "BTC-EUR");
   assert.equal(parseProduct("SOL-EUR", "EUR"), "SOL-EUR");
+  // "*": every product of the quote that trades enough a day (item 771).
+  assert.equal(parseProduct(" * ", "EUR"), "*");
   for (const text of ["BTC-USD", "BTC", "BTC-EUR-X", "", "BTC EUR", "-EUR"]) {
     assert.equal(parseProduct(text, "EUR"), null, text);
   }
+});
+
+test("a product's chip says its id, and * the whole market down to the daemon's floor", () => {
+  assert.equal(productLabel("BTC-EUR", 1_000_000, "EUR"), "BTC-EUR");
+  assert.equal(productLabel("*", 1_000_000, "USDC"), "Every product trading 1,000,000 USDC a day");
 });
 
 test("only what differs from the settings is sent, as numbers, and the products as the list they became", () => {

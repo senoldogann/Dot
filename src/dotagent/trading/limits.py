@@ -2,11 +2,31 @@
 mode, yolo's too. Pure: the caller reads the portfolio, the quote and the rules first, under the lock that keeps two
 orders from being judged against the same day."""
 
-from dotagent.config import TradingConfig
+from dotagent.config import ANY_PRODUCT, TradingConfig
 from dotagent.trading.types import Portfolio, ProductRules, Side
 
 # What is left of a limit is said with this many decimals.
 _SHOWN: int = 2
+
+
+def not_allowed(config: TradingConfig, product: str, rules: ProductRules | None) -> str | None:
+    """Why ``product`` is not one the owner allows, or ``None`` when it is: named among the products, or, with ``"*"``
+    there (item 771), priced in the quote and trading at least ``min_volume`` of it a day (``rules`` says how much;
+    without them a product not named is not allowed)."""
+    if product in config.products:
+        return None
+    if ANY_PRODUCT not in config.products:
+        return f"{product} is not among the products the owner allows ({', '.join(config.products)})"
+    if not product.endswith(f"-{config.quote}"):
+        return f"{product} is not priced in {config.quote}, the currency of the owner's limits"
+    volume: float | None = None if rules is None else rules.quote_volume_24h
+    if volume is None or volume < config.min_volume:
+        traded: str = "an unknown amount" if volume is None else _money(volume, config.quote)
+        return (
+            f"{product} traded {traded} in the last day, under the {_money(config.min_volume, config.quote)} the owner "
+            "allows a product at"
+        )
+    return None
 
 
 def _money(value: float, quote: str) -> str:
@@ -41,8 +61,9 @@ def refusal(
         if held <= 0 or not notional > 0:
             return f"the account holds no {product.split('-')[0]} to sell"
         return None
-    if product not in config.products:
-        return f"{product} is not among the products the owner allows ({', '.join(config.products)})"
+    disallowed: str | None = not_allowed(config, product, rules)
+    if disallowed is not None:
+        return disallowed
     if not rules.trading:
         return f"Coinbase does not take orders of {product} now"
     if not notional > 0:
