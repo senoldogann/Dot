@@ -710,6 +710,28 @@ async def test_a_step_whose_candidate_never_started_fails_and_says_why(login_env
         assert str(facts["contrasts"]).count("In all unclear") == 1
 
 
+_PROSE: ScriptedTurn = ScriptedTurn(text="I would add a habit about reading files first.", calls=())
+
+
+async def test_a_proposer_that_fails_in_one_scope_leaves_the_other_scope_played(login_env: dict[str, str]) -> None:
+    """2026-10-24: the review model answered the proposer in words, twice, and the night was lost (item 718). The other
+    scope is still proposed and played; the step is failed with the error and adopts nothing."""
+    turns: list[ScriptedTurn] = [_FINISH, _PROSE, _PROSE, _guidance(), _effects(1)]
+    async with _session(login_env, turns, {"adopt": "auto", "step_repeats": 2}) as (runtime, manager):
+        run: RunRecord = await _run(manager)
+        step: HarnessStep = await run_step(runtime, 1.0, run.id, _scored(frozenset(TASKS)), True)
+        assert step.state == "failed", step
+        assert step.error is not None and step.error.startswith("the proposer failed in the invariant scope")
+        facts: dict[str, object] = json.loads(step.outcome)
+        assert len(facts["candidates"]) == 1 and "probed" in facts
+        assert await adopted(runtime.store) is None
+    # Failing in every scope, the step says the proposer failed.
+    async with _session(login_env, [_FINISH, _PROSE, _PROSE, _PROSE, _PROSE], {}) as (runtime, manager):
+        run = await _run(manager)
+        step = await run_step(runtime, 1.0, run.id, _scored(frozenset()), True)
+        assert step.state == "failed" and json.loads(step.outcome)["reason"] == "the proposer failed"
+
+
 async def test_a_step_recorded_as_failed_adopts_nothing(login_env: dict[str, str]) -> None:
     """A composer that fails after the probes leaves the step failed with the error and the best candidate probed; with
     `adopt = "auto"` it must not have put that candidate in use."""

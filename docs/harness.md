@@ -327,6 +327,8 @@ its own when it did better (above) with `step_repeats` of at least 2 and was con
 survivor's notes, the step's record and its decision hold the confirmation), and never from a run that had read content
 third parties can author; `"owner"`, the default, leaves it to you. A role that fails after the probes (the composer,
 the experience writer) leaves the step `failed` with the error, the survivor probed all the same and adopted by nobody,
+and so does a proposer whose answer is no proposal in one scope, asked twice: the other scopes are still proposed and
+played (item 718),
 whatever `adopt` says (the decision says it was left to you), and how learning fares counts the failure; a scripted
 check is recorded and marked `scripted`, and does not move the window the next step learns from. `--scripted` plays the
 references through the scripted model and has the roles answer from a script (the proposer proposes one habit and keeps

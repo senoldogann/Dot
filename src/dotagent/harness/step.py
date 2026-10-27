@@ -26,7 +26,7 @@ from dotagent.agent.review import (
     ProposalScope,
 )
 from dotagent.config import HarnessConfig
-from dotagent.core.errors import DotError, InvalidValueError
+from dotagent.core.errors import DotError, InvalidValueError, ProviderProtocolError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -214,18 +214,24 @@ async def _carry_out(runtime: Runtime, step: HarnessStep, plan: StepPlan, prober
         return _Outcome(
             state="skipped", facts={"reason": "no run of the owner's ended since the last step"}, error=None
         )
-    # Propose.
+    # Propose. A proposer whose answer is no proposal in one scope (the review module asked it twice already) leaves the
+    # other scopes to be proposed and played (item 718): on 2026-10-24 one such answer lost the night. The step is
+    # recorded failed all the same, with the error, and adopts nothing.
+    errors: list[str] = []
     candidates: list[HarnessVersion] = []
     for scope in plan.scopes:
-        candidate: HarnessVersion | None = await propose_from_run(runtime, from_run, scope)
+        try:
+            candidate: HarnessVersion | None = await propose_from_run(runtime, from_run, scope)
+        except ProviderProtocolError as exc:
+            log.warning("harness_proposal_failed", step=step.id, scope=scope, error=exc.message)
+            errors.append(f"the proposer failed in the {scope} scope: {exc.message}")
+            continue
         if candidate is not None:
             candidates.append(candidate)
     if not candidates:
-        return _Outcome(
-            state="keep", facts={"from_run": from_run, "reason": "the proposer kept the harness"}, error=None
-        )
+        reason: str = "the proposer failed" if errors else "the proposer kept the harness"
+        return _Outcome(state="keep", facts={"from_run": from_run, "reason": reason}, error="; ".join(errors) or None)
     case: LessonCase = await case_of(runtime, from_run)
-    errors: list[str] = []
 
     async def write_experience(probed: HarnessVersion | None) -> None:
         try:
