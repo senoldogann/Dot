@@ -1,6 +1,7 @@
 """Playwright calls that touch one page. Each function does one thing and turns driver errors into ``BrowserError``."""
 
 import asyncio
+import contextlib
 import json
 import re
 from collections.abc import Awaitable, Callable, Collection, Sequence
@@ -354,17 +355,27 @@ def _document_replaced(error: PlaywrightError) -> bool:
     return "Execution context was destroyed" in message or "navigat" in message.lower()
 
 
-async def _once_more_after_navigation[T](page: Page, what: str, call: Callable[[], Awaitable[T]]) -> T:
-    """Run ``call``; when the document was replaced under it, run it a second time on the new document."""
-    try:
-        return await call()
-    except PlaywrightError as first:
-        if not _document_replaced(first):
-            raise _failure(what, page, {}, first) from first
-    try:
-        return await call()
-    except PlaywrightError as second:
-        raise _failure(what, page, {}, second) from second
+# How many documents a read goes through when each is replaced under it (item 752): a sign-in hops through several
+# pages by itself (entra.microsoft.com, login.microsoftonline.com, its error page, back), and a read that met the second
+# hop failed the whole call. How long it waits for each new document to be parsed before it reads again.
+_NAVIGATION_TRIES: int = 5
+_NEW_DOCUMENT_WAIT_MS: int = 5000
+
+
+async def _again_after_navigation[T](page: Page, what: str, call: Callable[[], Awaitable[T]]) -> T:
+    """Run ``call``; while the document is replaced under it (a page that sends itself on, a sign-in's chain of
+    redirects), wait for the new document to be parsed and run it again there, :data:`_NAVIGATION_TRIES` times at
+    most. Any other failure, or the last, fails at once."""
+    for attempt in range(1, _NAVIGATION_TRIES + 1):
+        try:
+            return await call()
+        except PlaywrightError as error:
+            if attempt == _NAVIGATION_TRIES or not _document_replaced(error) or page.is_closed():
+                raise _failure(what, page, {"attempts": str(attempt)}, error) from error
+            _log.info("browser_document_replaced", what=what, attempt=attempt, url=truncate_middle(page.url, 200))
+        with contextlib.suppress(PlaywrightError):
+            await page.wait_for_load_state("domcontentloaded", timeout=_NEW_DOCUMENT_WAIT_MS)
+    raise AssertionError("unreachable")
 
 
 # The part of a page a snapshot falls back to when the whole is too heavy for it (item 743): the biggest element around
@@ -441,7 +452,7 @@ async def capture_page(
     of a later document of the same origin that holds one of the values ``held`` (:func:`remark_held`)."""
     partial: str = ""
     try:
-        raw: str = await _once_more_after_navigation(
+        raw: str = await _again_after_navigation(
             page,
             "taking the page snapshot failed",
             lambda: page.aria_snapshot(mode="ai", boxes=True, timeout=timeout_ms),
@@ -593,7 +604,7 @@ async def _remark_frame(frame: Frame, expected: str, wanted: frozenset[str]) -> 
 
 
 async def page_title(page: Page) -> str:
-    return await _once_more_after_navigation(page, "reading the page title failed", page.title)
+    return await _again_after_navigation(page, "reading the page title failed", page.title)
 
 
 async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:
@@ -607,7 +618,7 @@ async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -
 
 async def wait_dom_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:
     """Wait for DOMContentLoaded and then for a DOM quiet window (never ``networkidle``, which analytics defeat)."""
-    await _once_more_after_navigation(
+    await _again_after_navigation(
         page,
         "waiting for the page to settle failed",
         lambda: _wait_quiet(page, quiet_ms, max_ms, timeout_ms),
@@ -1344,10 +1355,9 @@ async def cookie_secrets(page: Page, url: str) -> tuple[str, ...]:
 async def measure_viewport(page: Page) -> Viewport:
     """The page area of ``page`` that is on screen. A browser Dot did not size itself (the open Chrome of the user)
     has the size of its window, which only the page can tell."""
-    try:
-        reported: object = await page.evaluate(_VIEWPORT_SCRIPT)
-    except PlaywrightError as error:
-        raise _failure("measuring the viewport failed", page, {}, error) from error
+    reported: object = await _again_after_navigation(
+        page, "measuring the viewport failed", lambda: page.evaluate(_VIEWPORT_SCRIPT)
+    )
     if (
         not isinstance(reported, list)
         or len(reported) != 2

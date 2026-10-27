@@ -1668,11 +1668,27 @@ class BrowserSession:
 
         async def read() -> tuple[Viewport, PageLines]:
             # The window's size is read alongside the snapshot, not before it (item 342): in the Chrome of the user it
-            # is one more round trip to the page on every capture, and the two reads do not depend on each other.
-            return await asyncio.gather(
-                self._viewport(tab),
-                capture_page(tab.page, _ms(config.action_timeout_s), hide_secrets, tab.vault_held, tab.filled_values),
+            # is one more round trip to the page on every capture, and the two reads do not depend on each other. When
+            # one fails the other is cancelled (item 752): a snapshot left running after the call failed replaced the
+            # tab's refs under the next call.
+            sizing: asyncio.Task[Viewport] = asyncio.ensure_future(self._viewport(tab))
+            snapping: asyncio.Task[PageLines] = asyncio.ensure_future(
+                capture_page(tab.page, _ms(config.action_timeout_s), hide_secrets, tab.vault_held, tab.filled_values)
             )
+            try:
+                # The first to fail ends the wait, whichever it is; the other is cancelled below.
+                await asyncio.wait((sizing, snapping), return_when=asyncio.FIRST_EXCEPTION)
+                for task in (sizing, snapping):
+                    failed: BaseException | None = task.exception() if task.done() else None
+                    if failed is not None:
+                        raise failed
+                return sizing.result(), snapping.result()
+            finally:
+                for task in (sizing, snapping):
+                    if not task.done():
+                        task.cancel()
+                    elif not task.cancelled():
+                        task.exception()  # read, so that the one not raised here is not reported as never read
 
         viewport, (lines, part_note) = await self._read_held(tab, read)
         kept: tuple[SnapshotLine, ...] = viewport_filter(
