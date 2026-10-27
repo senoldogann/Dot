@@ -587,10 +587,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   }
 
   /** A delegated run asks the reader something (item 123): its row opens, and so do the rows it sits in and their
-   * groups (item 245), so the card is in sight. */
+   * groups (item 245), so the card is in sight, its steps in the page with it (item 767). */
   function reveal(scope) {
     for (let at = scope; at.panel !== null; at = at.parent) {
       at.asking += 1;
+      at.panel.showSteps();
       at.panel.node.open = true;
       if (at.panel.flock.group !== null) {
         at.panel.flock.group.node.open = true;
@@ -673,9 +674,25 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       open,
       el("span", { class: "chev" }, icon("chevron")),
     );
-    const node = el("details", { class: "child" }, summary, inner);
+    const node = el("details", { class: "child" }, summary);
+    // The run's steps are drawn into `inner` from the start, and `inner` joins the row the first time it opens (item
+    // 767): until then they are kept out of the page, which spends nothing on them, so a chat whose helpers took
+    // hundreds of steps opens light. Once in, they stay. A click on the summary (a key on it is one) comes before the
+    // browser opens the row, so they are in the frame that shows it open; `reveal` puts them in before it opens the
+    // row, and a row opened any other way takes them in at its toggle.
+    const showSteps = () => {
+      if (inner.parentNode === null) {
+        node.append(inner);
+      }
+    };
     summary.addEventListener("click", () => {
       scope.touched = true;
+      showSteps();
+    });
+    node.addEventListener("toggle", () => {
+      if (node.open) {
+        showSteps();
+      }
     });
     // What the row's card tells of the delegated run, kept up to date by its events (see helperCard).
     const helper = {
@@ -690,8 +707,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       calls: 0,
     };
     card.attach(summary, helper, () => actorFace(data.agent_id ?? runId, faceState(helper.status), null));
-    // `line`: the facts its last line shows (see paintChild).
-    const panel = { node, face, status, meta, progress, line: "starting", time, steps: 0, helper, flock: null };
+    // `line`: the facts its last line shows (see paintChild); `showSteps()` puts the run's steps in the row.
+    const panel = { node, face, status, meta, progress, line: "starting", time, steps: 0, helper, flock: null, showSteps };
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
     // The agent the run is of, by its name (item 668): its answer stands in the parent's conversation as its message.
     scope.agentName = agentName;
@@ -1077,9 +1094,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
           settleLive(scope, stray);
         }
       }
-      // This step's message, ended when another step's words took its place, is drawn again where it stands.
+      // This step's message, ended when another step's words took its place, is drawn again where it stands: in the
+      // scope still, whose steps may be out of the page (a closed helper's row, item 767).
       const settled =
-        bubble === null ? scope.replies.find((reply) => reply.step === data.step && reply.body !== undefined && reply.node.isConnected) : undefined;
+        bubble === null
+          ? scope.replies.find((reply) => reply.step === data.step && reply.body !== undefined && scope.container.contains(reply.node))
+          : undefined;
       if (settled !== undefined) {
         scope.replies = scope.replies.filter((reply) => reply !== settled);
       }

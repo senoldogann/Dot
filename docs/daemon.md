@@ -408,7 +408,11 @@ chevron that opens its steps. Rows that follow each other gather in one group: i
 are and how they stand ("3 helpers", "1 working · 2 done"), the time from the first one's start to the last one's end
 and a chevron that folds the rows away; an approval a helper asks for opens the group. The row is closed from the start;
 an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes
-again. Resting the pointer on a row, or moving the focus to it, shows its card (item 226): the whole goal, the model
+again. Its steps are put in the page the first time it opens, by you or by an approval, and stay (item 767): until then
+the row is its line alone, which its events keep up to date, so a chat whose helpers took hundreds of steps opens light
+(one of the owner's held 75,340 elements before, every step of every closed row among them), and the browser's find
+does not reach into a row that never opened.
+Resting the pointer on a row, or moving the focus to it, shows its card (item 226): the whole goal, the model
 with its reasoning level, how the run stands and for how long, counting on while it works, and what it does now or did
 last; the pointer leaving, a click or Escape puts it away, and on a touch screen a tap opens the row as before. Its own
 page names the parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and has a pill where the
