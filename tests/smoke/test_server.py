@@ -46,7 +46,7 @@ from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.guard import daemon_proof
 from dotagent.server.kept_pages import keep_pages
 from dotagent.server.links import ui_url
-from dotagent.server.stream import OPENING
+from dotagent.server.stream import OPENING, follow_run
 from dotagent.server.views import PermissionsView
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_STOPPED
 from dotagent.store.models import NO_PICKS, ApprovalRecord, EventRecord, RunRecord, ThreadRecord, ThreadSummary
@@ -937,6 +937,33 @@ async def test_the_stream_of_a_finished_run_replays_it_with_the_runs_it_delegate
     detail: httpx.Response = await client.get(f"/api/runs/{parent.id}")
     assert [run["id"] for run in detail.json()["children"]] == [child.id]
     assert detail.json()["active"] is False
+
+
+async def test_the_stored_events_of_a_stream_go_out_in_one_piece(runtime: Runtime, manager: RunManager) -> None:
+    # WebKit took the first frames of a burst of writes and then nothing until the next keepalive, 15 s on: a chat at
+    # work opened without its steps on about every other try (test_phone_layout.py). What is stored goes in one write,
+    # up to the run's end.
+    run: RunRecord = await _stored_run(runtime, None)
+    await _tell(
+        runtime,
+        [
+            (run.id, "run_queued", _queued(None)),
+            (run.id, "run_started", {}),
+            (run.id, "assistant", {"text": "a step"}),
+            (run.id, "run_finished", {"status": "done"}),
+            (run.id, "assistant", {"text": "after the end"}),
+        ],
+    )
+    context: ServerContext = _context(runtime, manager, PORT, asyncio.Event())
+    async with aclosing(follow_run(context, run.id, 0)) as stream:
+        pieces: list[bytes] = [piece async for piece in stream]
+    assert len(pieces) == 1, pieces
+    assert [item.kind for item in parse_sse(pieces[0].decode())] == [
+        "run_queued",
+        "run_started",
+        "assistant",
+        "run_finished",
+    ]
 
 
 async def test_the_stream_of_a_run_that_nothing_is_running_ends_after_what_it_stored(
