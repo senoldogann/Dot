@@ -136,9 +136,10 @@ def no_browser_chrome() -> frozenset[int]:
 
 def _pick_app(state: ThreadDesktop, name: str | None, running: Sequence[AppInfo], preferred: frozenset[int]) -> AppInfo:
     """The application a call is about: the one named, else the one the thread works in, else the one in front. A name
-    that fits several applications means the ``preferred`` one, the Chrome Dot's browser works in."""
+    that fits several applications means the one this thread works in, else the ``preferred`` one, the Chrome Dot's
+    browser works in, else the one in front (item 750)."""
     if name is not None:
-        return apps.require_app(name, running, preferred)
+        return apps.require_app(name, running, preferred, state.pid)
     if state.pid is not None:
         for app in running:
             if app.pid == state.pid:
@@ -223,14 +224,19 @@ def _app_view_job(config: DesktopConfig, app: AppInfo) -> AppView:
     return views.app_view(app, screen.windows_everywhere(), scale)
 
 
-def _open_job(config: DesktopConfig, query: str, preferred: frozenset[int], bundle: str | None) -> tuple[AppInfo, bool]:
+def _open_job(
+    config: DesktopConfig, query: str, preferred: frozenset[int], bundle: str | None, current: int | None
+) -> tuple[AppInfo, bool]:
     """Open an application (worker thread): the application and whether this call started it. An application that
     runs without a window is asked to reopen one, as a click on its Dock icon would. ``bundle``, the path a check of
     ``query`` came to, is what starts when none runs (item 418)."""
-    running: AppInfo | None = apps.find_app(query, apps.list_apps(), preferred)
+    listed: tuple[AppInfo, ...] = apps.list_apps()
+    running: AppInfo | None = apps.find_app(query, listed, preferred, current)
     if running is None:
-        return apps.open_app(query, config.launch_timeout_s, preferred, bundle), True
-    if not views.has_window(running.pid, screen.windows_everywhere()):
+        return apps.open_app(query, config.launch_timeout_s, preferred, bundle, current), True
+    # Launch Services reopens a window for a bundle id, whichever copy of it it picks: not while another copy runs.
+    twins: bool = any(app.pid != running.pid and app.bundle_id == running.bundle_id for app in listed)
+    if not twins and not views.has_window(running.pid, screen.windows_everywhere()):
         apps.launch(running.bundle_id or running.bundle_path or running.name)
     apps.activate(running, config.activate_timeout_s)
     return running, False
@@ -273,7 +279,7 @@ def _preview_job(
     typed: Mapping[str, str] = lines
     for step in steps:
         if step.action == "activate":
-            named: AppInfo | None = apps.find_app(step.text or "", running, preferred)
+            named: AppInfo | None = apps.find_app(step.text or "", running, preferred, current.pid)
             if named is not None:
                 current = named
                 known = memory.known_nodes(memory.memory_of(state, current.pid))
@@ -726,8 +732,11 @@ class DesktopSession:
         async with self._turn():
             await self._prepare(self._prepare_acting)
             await self._note_front_before(thread_id)
+            working_in: int | None = self._thread(thread_id).pid
             try:
-                opened, fresh = await self._call(lambda: _open_job(self._config, query, self._browser_chrome(), bundle))
+                opened, fresh = await self._call(
+                    lambda: _open_job(self._config, query, self._browser_chrome(), bundle, working_in)
+                )
             finally:
                 await self._note_front_left(thread_id)
             _refuse_secrets(opened)
