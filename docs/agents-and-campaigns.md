@@ -251,7 +251,7 @@ are reached, from the targets and how they are verified, the progress in the led
 evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with
 the checker's reason and the session goes on (one the checker finds out of reach asks you how to go on); accepted, the
 campaign is achieved and you are told (the notifications under the web UI and the phone's pushes), as you are when the
-emergency stop or `campaign_max_sessions` stops it.
+emergency stop, `campaign_max_sessions` or `campaign_failed_sessions` (item 724) stops it.
 - **Only you stop it.** Campaigns, in the sidebar, lists them, and a row has buttons for what you can do to its campaign
   without opening it: Stop while it is active, Mark achieved until it is achieved, and Delete once it is not active and
   none of its sessions works; each asks first. A campaign's page shows its targets, the questions and the steps kept for
@@ -260,6 +260,10 @@ emergency stop or `campaign_max_sessions` stops it.
   stops the campaign of the session it ends, and while the stop is engaged no session starts. `dotx campaign` changes
   the campaign without the daemon, so a session working then goes on until it ends (Stop on its run page ends it).
   `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on gives it one more.
+  `campaign_failed_sessions` (3; 0: never) stops one whose last sessions failed that many times in a row, with a note
+  in its ledger that says so and you told (item 724): one was tried again every `campaign_gap_minutes` for ever, its
+  page saying when its next session was. A claim of a session still working after your Stop leaves the campaign
+  stopped: `campaign_achieved` achieves only an active campaign (item 724), while your own Mark achieved still does.
 - **Deleting one** (`DELETE /api/campaigns/{id}`) deletes its ledger and the threads of its sessions after the first,
   with all they hold, as deleting those chats would. The conversation it started in stays a chat, with the first
   session as a run of that chat, and the questions its runs left for you expire, as no session reads the answers any

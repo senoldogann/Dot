@@ -1253,3 +1253,60 @@ async def test_a_session_that_could_not_start_in_any_way_is_tried_again_after_th
         finally:
             await manager.shutdown()
     assert planned.next_session_at is not None and abs(planned.next_session_at - (before + 3600)) < 5
+
+
+async def test_a_campaign_whose_sessions_keep_failing_stops_saying_so(login_env: dict[str, str]) -> None:
+    """Item 724: a campaign whose sessions failed was followed after the gap for ever, the page saying its next session.
+    After ``campaign_failed_sessions`` failed sessions in a row it stops, with a note that says why; a session that
+    went well between them starts the count again."""
+    config: AppConfig = _config(60)
+    three: AppConfig = config.model_copy(
+        update={"agent": config.agent.model_copy(update={"campaign_failed_sessions": 3})}
+    )
+    model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, []))
+    async with _session(three, login_env, model, Notices()) as (runtime, _):
+        manager: RunManager = RunManager(runtime)
+        store = runtime.store
+        thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
+        campaign: CampaignRecord = await store.create_campaign(
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+        )
+        try:
+            for status in ("failed", "failed", "done", "failed", "failed"):
+                session: RunRecord = await store.create_run(
+                    thread.id, GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, "medium", "standard", None, "ask",
+                    False, campaign.id, None, None,
+                )  # fmt: skip
+                await manager._record_end(session, status, "x", "", None, RunInbox())
+                assert (await store.get_campaign(campaign.id)).status == "active"
+            last: RunRecord = await store.create_run(
+                thread.id, GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, "medium", "standard", None, "ask", False,
+                campaign.id, None, None,
+            )  # fmt: skip
+            await manager._record_end(last, "failed", "x", "", None, RunInbox())
+        finally:
+            await manager.shutdown()
+        stopped: CampaignRecord = await store.get_campaign(campaign.id)
+        assert stopped.status == "stopped"
+        notes: list[str] = [entry.text for entry in await store.campaign_entries(campaign.id, 50)]
+        assert any(note.startswith("Stopped: its last 3 sessions failed") for note in notes), notes
+
+
+async def test_a_claim_that_comes_after_the_owner_stopped_the_campaign_leaves_it_stopped(
+    login_env: dict[str, str],
+) -> None:
+    """Item 724: a session still working after the owner's Stop could claim the outcome, and the stopped campaign read
+    achieved, the owner told so. A claim achieves only a campaign that is active; the owner's own mark still does."""
+    model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, []))
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, _):
+        store = runtime.store
+        thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
+        campaign: CampaignRecord = await store.create_campaign(
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+        )
+        await store.set_campaign_status(campaign.id, "stopped", None)
+        assert not await store.achieve_campaign(campaign.id, "Fifty leads.", only_active=True)
+        assert (await store.get_campaign(campaign.id)).status == "stopped"
+        await store.set_campaign_status(campaign.id, "active", None)
+        assert await store.achieve_campaign(campaign.id, "Fifty leads.", only_active=True)
+        assert (await store.get_campaign(campaign.id)).status == "achieved"
