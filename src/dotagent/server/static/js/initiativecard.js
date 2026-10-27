@@ -74,10 +74,14 @@ export function mountInitiative() {
 
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Work on its own while the Mac is idle", disabled: true });
   const count = el("span", { class: "hint" });
+  // The mode its runs start in, as the daemon says it (item 756): in YOLO they ask nothing.
+  const mode = el("span", null, "asking nothing (YOLO)");
   const lead = el(
     "p",
     { class: "hint watcher-lead" },
-    "While the Mac is idle, Dot does on its own what is on this list, each in a chat of its own, in your approval mode; with nothing on it, it looks for work that helps you now and then. A thing a run found in a mail or a page is done as untrusted: what would reach others asks you first, or in YOLO is refused.",
+    "While the Mac is idle, Dot does on its own what is on this list, each in a chat of its own, ",
+    mode,
+    "; with nothing on it, it looks for work that helps you now and then. A thing a run found in a mail or a page is done as untrusted: what would reach others asks you first, or in YOLO is refused unless your words call for it.",
   );
   const idleNote = el("div", { class: "note warn initiative-idle", hidden: true, role: "status" }, icon("alert"), el("span", null, "macOS does not say how long the Mac has been idle, so Dot starts nothing on its own. The daemon's log has why."));
   const holder = el("div", { class: "initiative-list" }, el("div", { class: "hint" }, "Reading the list…"));
@@ -98,6 +102,7 @@ export function mountInitiative() {
     view = fresh;
     toggle.setAttribute("aria-checked", String(view.enabled));
     idleNote.hidden = !view.enabled || view.idle_readable !== false;
+    mode.textContent = view.approvals === "yolo" ? "asking nothing (YOLO)" : `in the ${view.approvals} approval mode`;
     toggle.title = view.enabled ? "Dot works on its own while the Mac is idle: switch it off" : "Switch on: Dot works on its own while the Mac is idle";
     toggle.disabled = busy;
     add.disabled = busy;

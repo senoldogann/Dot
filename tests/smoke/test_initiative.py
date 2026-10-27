@@ -59,7 +59,9 @@ def _config(runs_per_day: int = 0) -> AppConfig:
     initiative = config.initiative.model_copy(
         update={"idle_minutes": 10.0, "gap_minutes": 0.0, "attempts": 2, "runs_per_day": runs_per_day}
     )
-    return config.model_copy(update={"initiative": initiative})
+    # The owner's own mode asks, as by default: Dot's own runs start in [initiative] approvals all the same.
+    policy = config.policy.model_copy(update={"approvals": "ask"})
+    return config.model_copy(update={"initiative": initiative, "policy": policy})
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -130,6 +132,8 @@ async def test_it_does_the_oldest_thing_in_a_chat_of_its_own_and_tells_the_owner
             told: list[EventRecord] = await _told(subscription)
         ended: RunRecord = await runtime.store.get_run(run.id)
         assert (ended.source, ended.status, ended.mode) == (INITIATIVE_SOURCE, "done", "task")
+        # It starts in [initiative] approvals, yolo, whatever the owner's own mode is (item 756).
+        assert runtime.config.policy.approvals != "yolo" and ended.approvals == "yolo"
         assert (await runtime.store.get_thread(run.thread_id)).title == "Sort the receipts by month"
         done: TodoRecord = await runtime.store.get_todo(first.id)
         assert (done.status, done.attempts, done.run_id) == ("done", 1, run.id)
@@ -189,6 +193,8 @@ async def test_with_nothing_on_the_list_it_looks_for_work_with_a_research_run(lo
         await _settled(initiative)
         looked: RunRecord = await runtime.store.get_run(run.id)
         assert (looked.mode, looked.status, looked.source) == ("research", "done", INITIATIVE_SOURCE)
+        # The run that looks for work starts in yolo too: the owner's screenshot was of one asking (item 756).
+        assert looked.approvals == "yolo"
         [found] = await runtime.store.list_todos(("open",), 10)
         assert (found.title, found.source, found.source_run_id, found.tainted) == (
             "Summarise the open pull requests",
@@ -224,7 +230,13 @@ async def test_the_owner_switches_it_and_keeps_the_list_through_the_api(
             headers={"Authorization": f"Bearer {_TOKEN}"},
         ) as client:
             first: httpx.Response = await client.get("/api/initiative")
-            assert first.json() == {"enabled": False, "looked_at": None, "todos": [], "idle_readable": True}
+            assert first.json() == {
+                "enabled": False,
+                "looked_at": None,
+                "todos": [],
+                "idle_readable": True,
+                "approvals": "yolo",
+            }
             # macOS that cannot say how long the Mac has been idle is said, as Dot starts nothing then.
             monkeypatch.setattr("dotagent.server.routes_proactive.idle_seconds", lambda: None)
             assert (await client.get("/api/initiative")).json()["idle_readable"] is False
@@ -294,6 +306,8 @@ async def test_the_card_on_schedules_switches_it_and_keeps_the_list(login_env: d
                     await expect(switch).to_be_enabled(timeout=15000)
                     if await switch.get_attribute("aria-checked") == "false":
                         await expect(card.locator(".panel-head .hint")).to_have_text("Off")
+                        # It says the mode its runs start in (item 756).
+                        await expect(card.locator(".watcher-lead")).to_contain_text("asking nothing (YOLO)")
                         await switch.click()
                     await expect(switch).to_have_attribute("aria-checked", "true")
                     found: Locator = card.locator("[data-status=open]", has_text="Summarise the open pull requests")

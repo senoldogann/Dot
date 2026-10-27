@@ -893,8 +893,8 @@ class RunManager:
         """Queue a run Dot starts on its own initiative (item 715), in the chat ``thread_id``: ``goal`` is Dot's words,
         which the chat shows and no reviewer takes as the owner's instruction (:meth:`_instructions_for` gives none),
         and ``opening`` its first message to the model. Nobody watches it (:data:`INITIATIVE_SOURCE`); it takes the
-        configured model and approvals; it starts tainted when what it was given came from a run that had read content
-        third parties can author (``tainted``)."""
+        configured model and ``[initiative] approvals`` (``yolo`` by default, item 756); it starts tainted when what it
+        was given came from a run that had read content third parties can author (``tainted``)."""
         run, _ = await self._launch(
             goal,
             mode,
@@ -904,7 +904,7 @@ class RunManager:
             None,
             None,
             "standard",
-            None,
+            self._runtime.config.initiative.approvals,
             None,
             RunOpening(text=opening, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS, tainted=tainted),
             None,
