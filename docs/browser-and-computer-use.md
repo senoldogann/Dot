@@ -170,30 +170,32 @@ Both modes share what follows.
   call is still found. A very long list is cut with the number of options left out and the current choice.
 - `browser_act` runs up to `max_batch_steps` steps in one call (10 by default; a longer batch is cut to the first ones
   and the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`,
-  `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a
-  step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets the page take one turn of
-  its event loop, by which Chrome has told of a dialog, a file chooser, a navigation or a tab the step set off, and
-  waits for such a tab until it is the run's, at most a second (item 342): a tab whose page answers later stops the
-  batch with a line that it is opening. Then Dot waits until the page has settled (no DOM change for `settle_quiet_ms`,
-  60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared. A read of the page (its
-  settling, its size, its snapshot) whose document is replaced under it, as a sign-in that hops through several pages
-  replaces it, is made again on the new document once it is parsed, five times at most (item 752). The result is the
-  part of the page that changed, with the refs of the last snapshot still valid; a page that did not change comes back
-  as one line that says so. A click, a double click, a click at a point and Enter are watched for what they did (item
-  739): when the page's documents (any frame), its fields (a box ticked, a field typed in or focused by the click, a
-  dropdown it opened), its requests, its address, its tabs and its dialogs all stayed as they were for half a second,
-  the step's line says it is done but the page did not change, with the fields the page marks invalid (a form a required
-  field held back), so that a run does not take a click that did nothing (a button behind something in front of it, one
-  that waits for another event: `browser_eval` with its ref reaches it) for one that worked; a step that changed the
-  page names what the page says new in an alert or a live region and the fields it newly marks invalid. A change that
-  comes later than half a second is seen by the next look. A tab that closes under a batch (a sign-in callback that did
-  its job, a tab the user closed) stops the batch without a failed step: the result says the page closed it and shows
-  the tab that is now current. A popup that opens and closes itself before the model could see it is a note on the page
-  that opened it. The page a batch leaves is a stranger's to write, so the run that reads it is marked untrusted, as
-  `browser_upload` and `browser_fill_login` mark it by the page they leave (item 561; see [Safety](safety.md#safety)). A
-  batch carries one payment step at most (a click on a control that asks to pay, by its words or by the typed judge's
-  reading): two payments in one call would pass for the larger of their amounts under the caps of `[policy.spend]`, so
-  the call is refused and the steps are sent one call at a time, in every mode.
+  `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. A step
+  written as plainly meant is read so (item 755): a `click` at `x` and `y` with no ref is a `click_at`, a step that only
+  looks (`snapshot`, `screenshot`, `look`) is left out, as the result shows the page, and an `upload` step fails naming
+  `browser_upload`. After a step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets
+  the page take one turn of its event loop, by which Chrome has told of a dialog, a file chooser, a navigation or a tab
+  the step set off, and waits for such a tab until it is the run's, at most a second (item 342): a tab whose page
+  answers later stops the batch with a line that it is opening. Then Dot waits until the page has settled (no DOM change
+  for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared. A read
+  of the page (its settling, its size, its snapshot) whose document is replaced under it, as a sign-in that hops through
+  several pages replaces it, is made again on the new document once it is parsed, five times at most (item 752). The
+  result is the part of the page that changed, with the refs of the last snapshot still valid; a page that did not
+  change comes back as one line that says so. A click, a double click, a click at a point and Enter are watched for what
+  they did (item 739): when the page's documents (any frame), its fields (a box ticked, a field typed in or focused by
+  the click, a dropdown it opened), its requests, its address, its tabs and its dialogs all stayed as they were for half
+  a second, the step's line says it is done but the page did not change, with the fields the page marks invalid (a form
+  a required field held back), so that a run does not take a click that did nothing (a button behind something in front
+  of it, one that waits for another event: `browser_eval` with its ref reaches it) for one that worked; a step that
+  changed the page names what the page says new in an alert or a live region and the fields it newly marks invalid. A
+  change that comes later than half a second is seen by the next look. A tab that closes under a batch (a sign-in
+  callback that did its job, a tab the user closed) stops the batch without a failed step: the result says the page
+  closed it and shows the tab that is now current. A popup that opens and closes itself before the model could see it is
+  a note on the page that opened it. The page a batch leaves is a stranger's to write, so the run that reads it is
+  marked untrusted, as `browser_upload` and `browser_fill_login` mark it by the page they leave (item 561; see
+  [Safety](safety.md#safety)). A batch carries one payment step at most (a click on a control that asks to pay, by its
+  words or by the typed judge's reading): two payments in one call would pass for the larger of their amounts under the
+  caps of `[policy.spend]`, so the call is refused and the steps are sent one call at a time, in every mode.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a

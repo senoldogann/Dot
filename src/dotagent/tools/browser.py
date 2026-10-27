@@ -355,7 +355,24 @@ def _links_tool() -> RegisteredTool:
     )
 
 
+# Steps a model writes into a batch that only look, which the result of the batch does already (item 755): they are left
+# out rather than failing the whole batch, as they did in the owner's runs.
+_LOOKING_STEPS: frozenset[str] = frozenset({"snapshot", "screenshot", "look"})
+
+
 class ActArgs(ToolArgs):
+    @model_validator(mode="before")
+    @classmethod
+    def _without_looks(cls, data: object) -> object:
+        if not isinstance(data, dict) or not isinstance(data.get("steps"), list):
+            return data
+        steps: list[object] = [
+            step
+            for step in data["steps"]
+            if not (isinstance(step, dict) and step.get("action") in _LOOKING_STEPS and len(step) == 1)
+        ]
+        return {**data, "steps": steps or data["steps"]}
+
     steps: list[Step] = Field(
         min_length=1,
         description=(
