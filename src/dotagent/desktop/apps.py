@@ -130,28 +130,56 @@ def _names_of(app: AppInfo) -> tuple[str, ...]:
     return tuple(fold_search(name) for name in (app.name, stem, app.bundle_id or "") if name)
 
 
-def find_app(query: str, apps: Sequence[AppInfo], preferred: frozenset[int]) -> AppInfo | None:
-    """The one application ``query`` names (pid, bundle id, name or file name), or ``None``. Several candidates raise,
-    unless exactly one of them is ``preferred``: the Chromes Dot's browser works in (item 343), one of which "Google
-    Chrome" means while the owner's Chrome and Dot's own both run."""
+def _candidates_text(candidates: Sequence[AppInfo], preferred: frozenset[int]) -> str:
+    return ", ".join(
+        f"{app.name} (pid {app.pid}{', a Chrome Dot works in' if app.pid in preferred else ''})" for app in candidates
+    )
+
+
+def _tie_break(
+    query: str,
+    candidates: Sequence[AppInfo],
+    preferred: frozenset[int],
+    current: int | None,
+) -> AppInfo:
+    """The one of several applications a name fits that the caller means, in order: the one the thread already works
+    in, the one of Dot's browser (when only one of them is) (item 750). Raises, listing the pids, when neither tells
+    them apart: what is in front or has a window changes between the review of a batch and its run, so that the two
+    could resolve to different copies, while these do not."""
+    if len(candidates) == 1:
+        return candidates[0]
+    for pick in (
+        [app for app in candidates if app.pid == current],
+        [app for app in candidates if app.pid in preferred],
+    ):
+        if len(pick) == 1:
+            return pick[0]
+    raise DesktopError(
+        f"{query!r} names several applications; use the pid of the one you mean",
+        {"candidates": _candidates_text(candidates, preferred)},
+    )
+
+
+def find_app(
+    query: str,
+    apps: Sequence[AppInfo],
+    preferred: frozenset[int],
+    current: int | None = None,
+) -> AppInfo | None:
+    """The one application ``query`` names (pid, bundle id, name or file name), or ``None``. A name that fits several
+    copies (the owner's Chrome and Dot's own are two apps of one name and one bundle id) means, in order, the one the
+    thread works in (``current``), then the ``preferred`` one (the Chromes Dot's browser works in, item 343); else it
+    raises, listing the pids (item 750)."""
     wanted: str = query.strip()
     if wanted.isdigit():
         return next((app for app in apps if app.pid == int(wanted)), None)
     if "/" in wanted:
         # A path names the bundle that sits at it, which is what `desktop_open_app` opens (item 418); several copies of
-        # one application may sit at the same bundle, and then Dot's own stands as it does for a name.
+        # one application may sit at the same bundle, and then they are told apart as they are for a name.
         at_path: str = os.path.realpath(wanted)
         there: list[AppInfo] = [app for app in apps if app.bundle_path and os.path.realpath(app.bundle_path) == at_path]
-        chosen_there: list[AppInfo] = [app for app in there if app.pid in preferred]
-        if len(there) == 1:
-            return there[0]
-        if len(chosen_there) == 1:
-            return chosen_there[0]
         if there:
-            raise DesktopError(
-                f"{query!r} names several applications; use the pid or the bundle id",
-                {"candidates": ", ".join(f"{app.name} (pid {app.pid})" for app in there)},
-            )
+            return _tie_break(query, there, preferred, current)
     folded: str = fold_search(wanted)
     tiers: tuple[Callable[[str], bool], ...] = (
         lambda name: name == folded,
@@ -165,19 +193,13 @@ def find_app(query: str, apps: Sequence[AppInfo], preferred: frozenset[int]) -> 
             return matches[0]
         if len(regular) == 1:
             return regular[0]
-        chosen: list[AppInfo] = [app for app in regular or matches if app.pid in preferred]
-        if len(chosen) == 1:
-            return chosen[0]
         if matches:
-            raise DesktopError(
-                f"{query!r} names several applications; use the pid or the bundle id",
-                {"candidates": ", ".join(f"{app.name} (pid {app.pid})" for app in matches)},
-            )
+            return _tie_break(query, regular or matches, preferred, current)
     return None
 
 
-def require_app(query: str, apps: Sequence[AppInfo], preferred: frozenset[int]) -> AppInfo:
-    app: AppInfo | None = find_app(query, apps, preferred)
+def require_app(query: str, apps: Sequence[AppInfo], preferred: frozenset[int], current: int | None = None) -> AppInfo:
+    app: AppInfo | None = find_app(query, apps, preferred, current)
     if app is None:
         running: str = ", ".join(sorted({a.name for a in apps if a.kind == "regular"}))
         raise DesktopError(
@@ -262,16 +284,19 @@ def open_document(path: Path) -> None:
         )
 
 
-def open_app(query: str, timeout_s: float, preferred: frozenset[int], bundle: str | None) -> AppInfo:
+def open_app(
+    query: str, timeout_s: float, preferred: frozenset[int], bundle: str | None, current: int | None = None
+) -> AppInfo:
     """The running application ``query`` names, started first when it is not running yet: ``bundle``, the path a check
-    of ``query`` came to, is what starts, so an application put in its place meanwhile is not (item 418)."""
-    running: AppInfo | None = find_app(query, list_apps(), preferred)
+    of ``query`` came to, is what starts, so an application put in its place meanwhile is not (item 418). ``current``
+    is the application the thread works in, which a name that fits several copies means (item 750)."""
+    running: AppInfo | None = find_app(query, list_apps(), preferred, current)
     if running is not None:
         return running
     launch(bundle or query)
     deadline: float = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        started: AppInfo | None = find_app(query, list_apps(), preferred)
+        started: AppInfo | None = find_app(query, list_apps(), preferred, current)
         if started is not None:
             return started
         time.sleep(_POLL_S)
@@ -296,14 +321,38 @@ def _raise_through_accessibility(app: AppInfo) -> None:
         AS.AXUIElementPerformAction(window, "AXRaise")
 
 
+def _activate_running(pid: int) -> bool:
+    """Ask the running application with this pid to come forward, unhiding it first; ``False`` when no such process
+    runs. By pid: a bundle id may belong to two running copies (the owner's Chrome and Dot's own), and Launch Services
+    brings forward whichever it likes."""
+    running = AppKit.NSRunningApplication.runningApplicationWithProcessIdentifier_(pid)
+    if running is None:
+        return False
+    running.unhide()
+    running.activateWithOptions_(AppKit.NSApplicationActivateAllWindows | AppKit.NSApplicationActivateIgnoringOtherApps)
+    return True
+
+
+def _has_twin(app: AppInfo) -> bool:
+    """Whether another running copy shares ``app``'s bundle id (the owner's Chrome and Dot's own)."""
+    if not app.bundle_id:
+        return False
+    copies = AppKit.NSRunningApplication.runningApplicationsWithBundleIdentifier_(app.bundle_id) or ()
+    return len(copies) > 1
+
+
 def activate(app: AppInfo, timeout_s: float) -> None:
-    """Bring ``app`` to the front: first through accessibility, then through Launch Services, verifying each time."""
+    """Bring ``app`` to the front: first through accessibility, then through Launch Services, verifying each time. An
+    application of which another copy runs is asked by its pid instead (item 750), as Launch Services brings forward
+    whichever copy of a bundle id it likes; one copy alone keeps Launch Services, which brings an application forward
+    from a background process where the process's own activation may be refused."""
     if frontmost_pid() == app.pid:
         return
     _raise_through_accessibility(app)
     if _wait_for_front(app.pid, timeout_s / 2):
         return
-    launch(app.bundle_id or app.bundle_path or app.name)
+    if not (_has_twin(app) and _activate_running(app.pid)):
+        launch(app.bundle_id or app.bundle_path or app.name)
     if _wait_for_front(app.pid, timeout_s):
         return
     raise DesktopError(

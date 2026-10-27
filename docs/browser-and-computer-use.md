@@ -457,10 +457,14 @@ one that leads elsewhere by then is refused, as a path a file tool names is (ite
 waited for its approval opens nothing. Outside yolo a run's command opens nothing (`open` is refused in the sandbox), so
 this tool is how a run's command starts an application; an AppleScript can still start one itself (see
 [Safety](safety.md#safety)).
-A name that fits several running copies of one application, "Google Chrome" while your Chrome and Dot's own both run,
-means the Chrome Dot's browser works in (item 343); a pid names any one of them. Chrome's remote debugging is the
-owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks is refused in every mode but
-`yolo` (item 433).
+A name that fits several running copies of one application, "Google Chrome" while your Chrome and Dot's own both run
+(two apps of one name and one bundle id), means, in order: the one the conversation already works in, the Chrome Dot's
+browser works in when only one of them is (item 343, item 750); when neither tells them apart, the error lists each copy
+with its pid and a pid names any one of them (what is in front is not taken: it may change between a batch's review and
+its run). An application of which another copy runs is brought to the front by its pid, never by its bundle id, which
+Launch Services may resolve to the other copy; an `activate` step brings forward the copy its review judged. Chrome's
+remote debugging is the owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks is refused in
+every mode but `yolo` (item 433).
 - Work inside a web page goes through the browser tools, which act in the run's own tab whatever other Chromes run;
   the desktop tools are for what lies outside the page: a native dialog, a file picker, an extension's window. A script
   sent to Chrome with AppleScript reaches whichever Chrome window macOS picks; `browser_eval` runs in the run's tab.

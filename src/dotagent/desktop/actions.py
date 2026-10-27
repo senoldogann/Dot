@@ -499,7 +499,9 @@ def inspect_step(env: StepEnv, step: Step, lines: Mapping[str, str]) -> Inspecti
                 Target(ref=None, state=None, owner=env.app, point=None, window=_app_window_title(env, env.app)),
             )
         case "activate":
-            named: AppInfo | None = apps.find_app(_required(step.text, "application"), env.running, env.preferred)
+            named: AppInfo | None = apps.find_app(
+                _required(step.text, "application"), env.running, env.preferred, env.app.pid
+            )
             owner: AppInfo = named or env.app
             return _inspection(
                 env, lines, Target(ref=None, state=None, owner=owner, point=None, window=_app_window_title(env, owner))
@@ -752,8 +754,17 @@ def _menu(env: StepEnv, step: Step) -> Effect:
     return _effect(f"chose {chosen} in {env.app.name}", None, True)
 
 
-def _activate(env: StepEnv, step: Step) -> Effect:
-    app: AppInfo = apps.require_app(_required(step.text, "application"), apps.list_apps(), env.preferred)
+def _activate(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    """Bring forward the application the step names, resolved as its inspection resolved it (the thread's own copy
+    first, item 750), and only when that is the copy the review judged: two running copies of one application must not
+    resolve to one there and to the other here."""
+    app: AppInfo = apps.require_app(_required(step.text, "application"), apps.list_apps(), env.preferred, env.app.pid)
+    if app.pid != inspection.pid:
+        raise DesktopError(
+            f"{step.text!r} now names {app.name} (pid {app.pid}), not the copy the step was judged for (pid "
+            f"{inspection.pid}); nothing was done. Name the pid of the one you mean",
+            {"named": app.pid, "reviewed": inspection.pid},
+        )
     apps.activate(app, env.config.activate_timeout_s)
     return Effect(detail=f"{app.name} is in front", pointer=None, opens_ui=True, switched_to=app)
 
@@ -819,6 +830,6 @@ def execute_step(env: StepEnv, step: Step, reviewed: Inspection) -> Effect:
         case "menu":
             return _menu(env, step)
         case "activate":
-            return _activate(env, step)
+            return _activate(env, step, inspection)
         case "wait":
             raise DesktopError("wait is performed by the session, not on the worker thread", {})
