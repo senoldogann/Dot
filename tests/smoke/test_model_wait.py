@@ -15,7 +15,16 @@ import pytest_asyncio
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
-from dotagent.core.errors import ProviderError, ProviderHttpError, ProviderRateLimitError, ProviderTransportError
+from dotagent.core.errors import (
+    ProviderAuthError,
+    ProviderCreditError,
+    ProviderError,
+    ProviderHttpError,
+    ProviderQuotaError,
+    ProviderRateLimitError,
+    ProviderTransportError,
+    ProviderWindowError,
+)
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home, seed_workspace
 from dotagent.evals.scripted import ScriptedProvider
@@ -53,6 +62,15 @@ REFUSED_WITH_CONTEXT: ProviderHttpError = ProviderHttpError(
 )
 # A status the connector retries, but one that says the model cannot answer for a while, not that it is out of reach.
 RATE_LIMITED: ProviderRateLimitError = ProviderRateLimitError("the rate limit is reached", 429, 5.0, {})
+# A spent subscription window, as OpenCode Go words it (item 713), and a key the provider refuses, which no wait mends.
+SPENT: ProviderWindowError = ProviderWindowError("provider answered HTTP 429: Go usage limit exceeded", 429, None, {})
+# A monthly plan spent, which no wait within hours mends, and a quota whose provider named when it comes back.
+MONTH_SPENT: ProviderQuotaError = ProviderQuotaError("You used all included Pro usage", 429, None, {})
+NAMED: ProviderQuotaError = ProviderQuotaError("quota exceeded, try again in 0.1 s", 429, 0.1, {})
+# Credits whose provider still named a time, and a quota that comes back only after the wait would be over.
+CREDITS_NAMED: ProviderCreditError = ProviderCreditError("credit balance is too low", 402, 0.1, {}, None)
+NEXT_MONTH: ProviderQuotaError = ProviderQuotaError("monthly limit reached", 429, 30 * 86_400.0, {})
+KEY_REFUSED: ProviderAuthError = ProviderAuthError("provider answered HTTP 401: invalid key", 401, {})
 
 
 class Unreachable:
@@ -108,9 +126,10 @@ async def login_env() -> dict[str, str]:
     return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
 
 
-def _config(wait_s: float) -> AppConfig:
+def _config(wait_s: float, quota_wait_s: float) -> AppConfig:
     config: AppConfig = eval_config(load_default_config())
-    return config.model_copy(update={"agent": config.agent.model_copy(update={"model_wait_s": wait_s})})
+    waits: dict[str, float] = {"model_wait_s": wait_s, "quota_wait_s": quota_wait_s}
+    return config.model_copy(update={"agent": config.agent.model_copy(update=waits)})
 
 
 async def _until(subscription: Subscription, run_id: str, kind: str) -> EventRecord:
@@ -131,11 +150,13 @@ def _left(subscription: Subscription, run_id: str) -> list[EventRecord]:
     return events
 
 
-async def _play(login_env: dict[str, str], wait_s: float, model: Unreachable, stop_when_waiting: bool) -> Played:
+async def _play(
+    login_env: dict[str, str], wait_s: float, model: Unreachable, stop_when_waiting: bool, quota_wait_s: float = 0.0
+) -> Played:
     """``GOAL`` as an unattended run of ``model`` in a throw-away home; with ``stop_when_waiting`` the run is stopped
     as soon as it says it waits for its model."""
     with scratch_home() as home, eval_environment(home, {}):
-        runtime: Runtime = await open_runtime(_config(wait_s), login_env)
+        runtime: Runtime = await open_runtime(_config(wait_s, quota_wait_s), login_env)
         try:
             await runtime.router.register(_PROVIDER, model)
             await asyncio.to_thread(seed_workspace, runtime.workspace, [TODO])
@@ -227,3 +248,96 @@ async def test_a_run_an_error_fails_shows_its_message_and_keeps_its_context_with
         "message": REFUSED_WITH_CONTEXT.message,
         "context": {"payload": "the request of the run", "response_body": "the answer of the provider", "status": 400},
     }
+
+
+@pytest.fixture
+def quick_quota(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A spent quota asked again within a fraction of a second rather than minutes."""
+    monkeypatch.setattr("dotagent.agent.loop._QUOTA_RETRY_S", 0.2)
+    monkeypatch.setattr("dotagent.agent.loop._QUOTA_RETRY_LEAST_S", 0.1)
+
+
+@pytest.mark.usefixtures("quick_quota")
+async def test_a_run_waits_for_a_spent_quota_and_goes_on_once_it_is_back(login_env: dict[str, str]) -> None:
+    """Item 710: a subscription whose window is spent, with no standby model to move to, made the run fail; it waits
+    for the quota now, asks the same step again and goes on once the model answers."""
+    model: Unreachable = Unreachable(ScriptedProvider(_PROVIDER, TURNS), 2, SPENT)
+    played: Played = await _play(login_env, 600.0, model, False, quota_wait_s=600.0)
+    assert played.record.status == "done", played.record.result
+    waiting: list[EventRecord] = played.kind("model_waiting")
+    assert [event.data["spent"] for event in waiting] == ["usage window spent", "usage window spent"]
+    assert all(event.data["retry_in_s"] <= 0.2 for event in waiting)
+    assert len(played.kind("model_back")) == 1
+
+
+@pytest.mark.usefixtures("quick_quota")
+async def test_a_quota_that_stays_spent_fails_the_run_with_the_providers_words_once_the_wait_is_over(
+    login_env: dict[str, str],
+) -> None:
+    model: Unreachable = Unreachable(ScriptedProvider(_PROVIDER, TURNS), 1000, SPENT)
+    played: Played = await _play(login_env, 600.0, model, False, quota_wait_s=1.0)
+    assert played.record.status == "failed"
+    assert SPENT.message in played.record.result
+    assert len(played.kind("model_waiting")) >= 2
+    assert 1.0 <= played.seconds < 5.0
+
+
+@pytest.mark.usefixtures("quick_quota")
+async def test_a_refused_key_never_waits_for_the_quota(login_env: dict[str, str]) -> None:
+    model: Unreachable = Unreachable(ScriptedProvider(_PROVIDER, TURNS), 1000, KEY_REFUSED)
+    played: Played = await _play(login_env, 600.0, model, False, quota_wait_s=600.0)
+    assert played.record.status == "failed"
+    assert played.kind("model_waiting") == []
+    assert played.seconds < 5.0
+
+
+class Failing(Unreachable):
+    """The scripted model behind a connection that fails its first calls with ``errors``, one each, in order."""
+
+    def __init__(self, script: ScriptedProvider, errors: Sequence[ProviderError]) -> None:
+        super().__init__(script, len(errors), errors[0])
+        self._errors: tuple[ProviderError, ...] = tuple(errors)
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        if self.calls < len(self._errors):
+            self.calls += 1
+            raise self._errors[self.calls - 1]
+        self.calls += 1
+        return await self._script.complete(request, sink)
+
+
+@pytest.mark.usefixtures("quick_quota")
+async def test_a_connection_that_breaks_while_the_quota_is_waited_for_does_not_end_the_wait(
+    login_env: dict[str, str],
+) -> None:
+    """The code review of item 713: a broken connection during the wait for a spent quota (a Mac that wakes) was timed
+    from the start of the whole wait against model_wait_s, and ended the run at once."""
+    model: Failing = Failing(ScriptedProvider(_PROVIDER, TURNS), [SPENT, SPENT, SPENT, BROKEN])
+    played: Played = await _play(login_env, 0.3, model, False, quota_wait_s=600.0)
+    assert played.record.status == "done", played.record.result
+    assert [event.data["spent"] for event in played.kind("model_waiting")] == [
+        "usage window spent",
+        "usage window spent",
+        "usage window spent",
+        None,
+    ]
+    assert played.seconds > 0.3
+
+
+@pytest.mark.usefixtures("quick_quota")
+@pytest.mark.parametrize(
+    "error",
+    [MONTH_SPENT, KEY_REFUSED, CREDITS_NAMED, NEXT_MONTH, NAMED],
+    ids=["month-spent", "key-refused", "credits-named", "next-month", "quota-named-soon"],
+)
+async def test_a_quota_that_does_not_come_back_soon_ends_the_run_at_once(
+    login_env: dict[str, str], error: ProviderError
+) -> None:
+    """The code reviews of item 713: only what comes back by itself is waited for, a rate limit and a subscription's
+    usage window, not a monthly plan, credits or a spend limit, whatever their provider calls them or the time it
+    names (a gateway may name one on every answer)."""
+    played: Played = await _play(
+        login_env, 600.0, Unreachable(ScriptedProvider(_PROVIDER, TURNS), 1000, error), False, quota_wait_s=600.0
+    )
+    assert played.record.status == "failed"
+    assert played.kind("model_waiting") == []

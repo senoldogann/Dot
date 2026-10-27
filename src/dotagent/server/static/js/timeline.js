@@ -1593,9 +1593,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     },
 
     // The run's model could not be reached (`error`: the connection broke or timed out, or its server failed with a
-    // status that retrying gets past): the run asks step `step` again in `retry_in_s` seconds, and keeps asking until
-    // `until` ([agent] model_wait_s). One note stands for the whole wait, each attempt rewrites it; `model_back` says that
-    // the model answered again after `waited_s` seconds (item 158).
+    // status that retrying gets past), or its quota or rate is spent (`spent` says which, item 713): the run
+    // asks step `step` again in `retry_in_s` seconds, and keeps asking until `until` ([agent] model_wait_s, or
+    // quota_wait_s for a spent quota). One note stands for the whole wait, each attempt rewrites it; `model_back` says
+    // that the model answered again after `waited_s` seconds (item 158).
     model_waiting(scope, record) {
       const data = record.data;
       if (scope.unreachable === null) {
@@ -1606,8 +1607,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const wait = scope.unreachable;
       wait.tries += 1;
       const tried = wait.tries === 1 ? "" : `tried ${wait.tries} times; `;
+      const why = data.spent === undefined || data.spent === null ? "cannot be reached" : `cannot answer (${data.spent})`;
       wait.text.replaceChildren(
-        ...[`${data.model} cannot be reached; ${tried}Dot asks again in ${duration(data.retry_in_s)} and keeps asking until ${clock(data.until)}.`, detailsFold(String(data.error))].filter((part) => part !== null),
+        ...[`${data.model} ${why}; ${tried}Dot asks again in ${duration(data.retry_in_s)} and keeps asking until ${clock(data.until)}.`, detailsFold(String(data.error))].filter((part) => part !== null),
       );
     },
     model_back(scope, record) {

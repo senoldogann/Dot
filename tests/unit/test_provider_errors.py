@@ -12,12 +12,15 @@ from dotagent.core.errors import (
     ProviderQuotaError,
     ProviderRateLimitError,
     ProviderRunnerError,
+    ProviderWindowError,
 )
 from dotagent.llm.http import is_retryable_provider_error
 from dotagent.llm.provider_errors import (
     WireError,
+    classify_anthropic,
     classify_generic,
     classify_ollama,
+    classify_opencode,
     classify_openrouter,
     parse_wire_error,
 )
@@ -116,3 +119,21 @@ def test_openrouters_402_for_credits_is_out_of_credits_and_names_the_answer_they
     # A 402 that speaks of no credits stays a model the plan does not include.
     unplanned = classify_openrouter(402, EXCLUDED.model_copy(update={"message": "model not included"}), None, {})
     assert not isinstance(unplanned, ProviderCreditError) and unavailable_reason(unplanned) == "not in the plan"
+
+
+def test_spent_credits_are_told_apart_from_a_spent_usage_window() -> None:
+    """Item 713: a run waits for a quota or a rate that comes back by itself, a subscription's window, and never for
+    credits, which the owner buys: Anthropic's spent balance and OpenCode's CreditsError are out of credits, OpenCode
+    Go's usage limit a quota."""
+    no_balance: WireError = WireError(
+        kind="invalid_request_error",
+        code="",
+        message="Your credit balance is too low to access the API.",
+        limit_name="",
+    )
+    credits: WireError = WireError(kind="CreditsError", code="", message="No credits left", limit_name="")
+    window: WireError = WireError(kind="GoUsageLimitError", code="", message="Go usage limit exceeded", limit_name="5h")
+    assert unavailable_reason(classify_anthropic(400, no_balance, None, {})) == "out of credits"
+    assert unavailable_reason(classify_opencode(429, credits, None, {})) == "out of credits"
+    assert isinstance(classify_opencode(429, window, None, {}), ProviderWindowError)
+    assert unavailable_reason(classify_opencode(429, window, None, {})) == "quota exhausted"

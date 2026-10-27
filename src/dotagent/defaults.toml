@@ -287,6 +287,11 @@ model_call_timeout_s = 420.0
 # failed with a status that retrying can get past), asking the same step again after 10 s, then 20, 40 and every 60 s
 # (at least four times however short the wait), before it ends failed. 0 does not wait.
 model_wait_s = 900.0
+# How long a run waits when its model is rate limited or its subscription's usage window is spent (OpenCode Go's
+# limit) and no standby model can take the run over (item 713): it asks the same step again when the provider said,
+# else every 10 minutes (at least a minute apart, at most half an hour), and ends failed once this time is over. Any
+# other quota, spent credits and a month's plan end the run at once. 0 does not wait: the run ends at once, as before.
+quota_wait_s = 21600.0
 max_concurrent_runs = 3
 # How much help a model gets. "fixed": every model is standard. "measured": a model is weak when its newest 30 finished
 # runs made at least profile_min_calls tool calls and at least weak_refusal_share of them were refused before they ran
