@@ -11,6 +11,7 @@ from dotagent.agent.review import EXPERIENCE_TOOL, PROPOSE_TOOL
 from dotagent.cli_commands import HarnessFinalCommand
 from dotagent.cli_harness import cmd_harness_final
 from dotagent.config import load_default_config
+from dotagent.evals.results import TaskOutcome
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.harness.components import NO_HARNESS, GivenText, HarnessText, component_problem
 from dotagent.harness.contrast import (
@@ -28,12 +29,14 @@ from dotagent.harness.probe import (
     ProbeReport,
     Scorecard,
     ask_from_file,
+    card_of,
     nothing_played,
     over_budget,
     report_json,
 )
 from dotagent.harness.step import SCRIPTED_HABIT, _why_not_adopted, adopts_on_its_own, plan_of, scripted_role_turns
 from dotagent.store.db import Store
+from dotagent.store.models import RunStatus
 
 GUIDANCE: str = "- The port is in config.toml, under server."
 HELD: str = "pw-7731-kxq9-zz"
@@ -69,6 +72,22 @@ def _report(label: str, cards: list[Scorecard], tasks: tuple[str, ...] = ("a", "
         cut_short=None,
     )
 
+
+# A run's counts with nothing in them, which a test fills.
+_METRICS: dict[str, int] = dict.fromkeys(
+    (
+        "steps",
+        "input_tokens",
+        "output_tokens",
+        "tool_calls",
+        "tool_errors",
+        "invalid_arguments",
+        "stalls",
+        "compactions",
+        "unanswered_questions",
+    ),
+    0,
+)
 
 # The base fails task a both times and passes task b both times: a candidate that passes a twice has two passes more.
 BASE_REPORT: ProbeReport = _report(
@@ -115,6 +134,66 @@ def test_a_probe_cut_short_says_which_budget_it_stopped_at() -> None:
         found.why
         == "2 of 2 tasks were not played 2 times under both texts (the candidate's probe stopped at its tokens budget)"
     )
+
+
+def _never_started(task: str, attempt: int) -> Scorecard:
+    return Scorecard(
+        task_id=task,
+        attempt=attempt,
+        passed=False,
+        status="failed",
+        cut="none",
+        steps=0,
+        input_tokens=0,
+        output_tokens=0,
+        tool_errors=0,
+        seconds=0.7,
+        started=False,
+        failure="the provider refused the key",
+    )
+
+
+def test_attempts_that_never_started_are_no_evidence_against_the_candidate() -> None:
+    # 2026-10-21: every attempt of a candidate ended failed in under a second with no step, and it was called worse on
+    # eight tasks (item 717). Such attempts are left out: the candidate is unclear, and says why, never worse.
+    candidate: ProbeReport = _report("c1", [_never_started(task, attempt) for task in ("a", "b") for attempt in (1, 2)])
+    found: Contrast = contrast(BASE_REPORT, candidate)
+    assert found.verdict == "unclear"
+    assert found.worse == 0
+    assert found.not_started == 4
+    assert "4 of the candidate's attempts did not start" in found.why
+    # The owner reads why in the run's words; a model reads the count alone.
+    assert "the provider refused the key" in contrast_detail(found)
+    assert "the provider refused the key" not in contrast_text(found)
+    # One attempt that did not start, beside one that did, leaves its task short of its repeats.
+    one: ProbeReport = _report(
+        "c2", [_card("a", 1, True), _never_started("a", 2), _card("b", 1, True), _card("b", 2, True)]
+    )
+    assert [task.verdict for task in contrast(BASE_REPORT, one).tasks] == ["unclear", "same"]
+
+
+def test_a_card_says_a_run_that_failed_with_no_step_and_no_token_never_started() -> None:
+    def outcome(steps: int, tokens: int, status: RunStatus) -> TaskOutcome:
+        return TaskOutcome.model_validate(
+            {
+                "task_id": "a",
+                "category": "files",
+                "attempt": 1,
+                "passed": False,
+                "status": status,
+                "cut": "none",
+                "answer": "  the model is not available  ",
+                "checks": [],
+                "metrics": {**_METRICS, "steps": steps, "input_tokens": tokens},
+                "seconds": 0.5,
+            }
+        )
+
+    lost: Scorecard = card_of(outcome(0, 0, "failed"))
+    assert (lost.started, lost.failure) == (False, "the model is not available")
+    assert card_of(outcome(1, 0, "failed")).started
+    assert card_of(outcome(0, 10, "failed")).started
+    assert card_of(outcome(0, 0, "done")).started
 
 
 def test_one_lucky_attempt_in_two_is_no_better_candidate() -> None:

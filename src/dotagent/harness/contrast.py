@@ -56,13 +56,19 @@ class Contrast(FrozenModel):
     tokens_delta: int
     gain: int = 0
     why: str = ""
+    # The attempts, of the base and of the candidate, whose runs never started (item 717), and the first one's reason in
+    # its run's words: for the owner's detail and the step's error, never for a model.
+    not_started: int = 0
+    failure: str = ""
 
 
 def scores_of(report: ProbeReport) -> dict[str, TaskScore]:
-    """Each task's score in ``report``, from the cards it holds."""
+    """Each task's score in ``report``, from the cards of the attempts that started (item 717): one that never did is
+    no evidence for or against the text, and a task short of its attempts is unclear."""
     by_task: dict[str, list[Scorecard]] = {}
     for card in report.cards:
-        by_task.setdefault(card.task_id, []).append(card)
+        if card.started:
+            by_task.setdefault(card.task_id, []).append(card)
     return {
         task_id: TaskScore(
             task_id=task_id,
@@ -88,14 +94,23 @@ def _task_verdict(base: TaskScore | None, candidate: TaskScore | None, repeats: 
     return "same"
 
 
+def _not_started(report: ProbeReport) -> list[Scorecard]:
+    return [card for card in report.cards if not card.started]
+
+
 def _cut_short(base: ProbeReport, candidate: ProbeReport, unplayed: int, tasks: int) -> str:
     """Why a verdict cannot be told: ``unplayed`` of ``tasks`` were not played as many times as asked under both texts,
-    and the probe that stopped short, with the budget it stopped at."""
+    the probe that stopped short, with the budget it stopped at, and the attempts whose runs never started."""
     stopped: list[str] = [
         f"the {name}'s probe stopped at its {report.cut_short} budget"
         for name, report in (("base", base), ("candidate", candidate))
         if report.cut_short is not None
     ]
+    stopped.extend(
+        f"{len(lost)} of the {name}'s attempts did not start"
+        for name, report in (("base", base), ("candidate", candidate))
+        if (lost := _not_started(report))
+    )
     said: str = f"{unplayed} of {tasks} tasks were not played {base.repeats} times under both texts"
     return f"{said} ({'; '.join(stopped)})" if stopped else said
 
@@ -148,6 +163,7 @@ def contrast(base: ProbeReport, candidate: ProbeReport, margin: int = DEFAULT_MA
             if task.base is not None and task.candidate is not None
         )
     )
+    lost: list[Scorecard] = [*_not_started(base), *_not_started(candidate)]
     return Contrast(
         label=candidate.label,
         tasks=tuple(tasks),
@@ -157,6 +173,8 @@ def contrast(base: ProbeReport, candidate: ProbeReport, margin: int = DEFAULT_MA
         tokens_delta=tokens_delta,
         gain=gain,
         why=why,
+        not_started=len(lost),
+        failure=lost[0].failure if lost else "",
     )
 
 
@@ -194,7 +212,8 @@ def contrast_detail(found: Contrast) -> str:
             f"{task.task_id}: {task.verdict} ({task.candidate.passes}/{task.candidate.attempts} passed against "
             f"{task.base.passes}/{task.base.attempts}; {task.candidate.steps:.1f} steps against {task.base.steps:.1f})"
         )
-    return f"{contrast_text(found)} " + "; ".join(parts) + "."
+    said: str = f"{contrast_text(found)} " + "; ".join(parts) + "."
+    return f"{said} The first that did not start said: {found.failure}" if found.not_started else said
 
 
 def choose(contrasts: Sequence[Contrast]) -> Contrast | None:

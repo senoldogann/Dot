@@ -667,6 +667,49 @@ async def test_a_step_that_leaves_the_choice_to_the_owner_plays_no_confirmation(
         assert labels == {BASE, survivor.id}
 
 
+def _not_starting(inner: Prober) -> Prober:
+    """``inner``, but every attempt of a candidate ends as a run that never started (item 717)."""
+
+    async def play(ask: ProbeAsk) -> ProbeReport:
+        report: ProbeReport = await inner(ask)
+        if ask.label in (BASE, CONFIRM_BASE):
+            return report
+        lost: tuple[Scorecard, ...] = tuple(
+            card.model_copy(
+                update={
+                    "passed": False,
+                    "status": "failed",
+                    "steps": 0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "started": False,
+                    "failure": "the model is not available",
+                }
+            )
+            for card in report.cards
+        )
+        return report.model_copy(update={"cards": lost, "tokens": 0})
+
+    return play
+
+
+async def test_a_step_whose_candidate_never_started_fails_and_says_why(login_env: dict[str, str]) -> None:
+    """2026-10-21: a candidate's attempts ended in under a second with no step, and the step kept the base as if the
+    candidate had lost (item 717). The step fails, says why, and sets the candidate aside as not judged."""
+    turns: list[ScriptedTurn] = [_FINISH, _habit(), _KEEP, _effects(1)]
+    async with _session(login_env, turns, {}) as (runtime, manager):
+        run: RunRecord = await _run(manager)
+        step: HarnessStep = await run_step(runtime, 1.0, run.id, _not_starting(_scored(frozenset())), True)
+        assert step.state == "failed", step
+        assert step.error is not None and "did not start: the model is not available" in step.error
+        facts: dict[str, object] = json.loads(step.outcome)
+        (candidate_id,) = facts["candidates"]
+        candidate: HarnessVersion = await runtime.store.get_harness_version(str(candidate_id))
+        assert candidate.state == "retired"
+        assert "not judged" in candidate.notes and "the model is not available" in candidate.notes
+        assert str(facts["contrasts"]).count("In all unclear") == 1
+
+
 async def test_a_step_recorded_as_failed_adopts_nothing(login_env: dict[str, str]) -> None:
     """A composer that fails after the probes leaves the step failed with the error and the best candidate probed; with
     `adopt = "auto"` it must not have put that candidate in use."""
