@@ -27,6 +27,7 @@ from test_browser_attach import ScratchChrome, start_chrome, stop_chrome
 from dotagent.agent.gate import RunGate
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
+from dotagent.browser.render import render_script_run
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import PageView, ScriptRun
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
@@ -496,3 +497,26 @@ async def test_refs_a_script_cannot_be_given_are_told_and_the_page_stays_usable(
     assert json.loads(framed.text) == "Inside"
     again: ScriptRun = await browser.run_script("bad-refs", "document.title", 10.0, False)
     assert json.loads(again.text) == "Stubborn page"
+
+
+async def test_what_a_scripts_page_sent_is_said_reads_are_not(browser: BrowserSession, site: str) -> None:
+    """Item 741: scripts of the owner's runs sent mail through a site's own API (a POST from the page), which the
+    run's record named nowhere. What the page sends while a script runs, other than reads, is said with its value."""
+    await browser.open_url("sent", f"{site}/", True)
+    ran: ScriptRun = await browser.run_script(
+        "sent",
+        """async () => {
+          await fetch('/api/send?token=abc', { method: 'POST', body: 'to=ada' }).catch(() => null);
+          await fetch('/api/send', { method: 'POST', body: 'to=grace' }).catch(() => null);
+          await fetch('/next').catch(() => null);
+          return 'done';
+        }""",
+        10.0,
+        False,
+    )
+    host: str = site.split("//", 1)[1].split(":", 1)[0]
+    assert ran.end == "value" and ran.sent == (f"POST {host}/api/send (×2)",)
+    rendered: str = render_script_run(ran, 10.0, "n0nce", 20_000)
+    assert f"[the page sent, while it ran: POST {host}/api/send (×2)]" in rendered
+    quiet: ScriptRun = await browser.run_script("sent", "document.title", 10.0, False)
+    assert quiet.sent == ()
