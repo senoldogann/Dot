@@ -566,7 +566,7 @@ async def test_a_team_card_makes_its_agents_in_one_click_with_their_schedules_sw
                 use: Locator = card.get_by_role("button", name=f"Use the team {team.name}")
                 await use.click()
                 await expect(_toast(page, "ok", f"{team.name}: ")).to_be_visible()
-                await expect(_toast(page, "ok", "Their schedules are switched off")).to_be_visible()
+                await expect(_toast(page, "ok", "schedules were added, switched off")).to_be_visible()
                 summaries: list[JsonObject] = (await http.get("/api/agents")).raise_for_status().json()
                 assert [each["record"]["name"] for each in summaries[1:]] == names
                 views: list[JsonObject] = (await http.get("/api/schedules")).raise_for_status().json()
@@ -587,5 +587,59 @@ async def test_a_team_card_makes_its_agents_in_one_click_with_their_schedules_sw
                 assert await _overflow(phone) <= 0
                 await phone.screenshot(path=tmp_path / "teams-390-dark.png", full_page=True)
                 await phone.close()
+            finally:
+                await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_team_used_again_gives_the_agents_the_owner_had_their_schedules_once(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    """Item 722: Use team added the schedules of the agents it made alone. The owner's growth team, made before, got
+    none with the switch on, and the switch was off again when the cards were drawn anew. Used again with it on, the
+    agents the owner has get theirs, switched off; once more, none twice; and an agent page that lacks its template's
+    schedule offers it."""
+    team: AgentTeam = next(each for each in TEAMS if each.id == "growth")
+    names: list[str] = _names(team)
+    with scratch_home() as home, eval_environment(home, {}):
+        async with (
+            _daemon(login_env) as (runtime, address),
+            httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http,
+            async_playwright() as playwright,
+        ):
+            # The team, made before without its schedules.
+            (await http.post(f"/api/agent-teams/{team.id}/use")).raise_for_status()
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await _open(browser, address, "/agents", 390, "light")
+                card: Locator = page.locator(f".team-card[data-team='{team.id}']")
+                for _ in range(2):
+                    also: Locator = card.get_by_role("switch", name="Also add their schedules")
+                    await also.click()
+                    await expect(also).to_have_attribute("aria-checked", "true")
+                    await card.get_by_role("button", name=f"Use the team {team.name}").click()
+                    await expect(page.locator(".toast").last).to_contain_text(
+                        f"You have every agent of the {team.name}"
+                    )
+                views: list[JsonObject] = (await http.get("/api/schedules")).raise_for_status().json()
+                records: list[JsonObject] = [view["record"] for view in views]
+                assert sorted(str(record["name"]) for record in records) == sorted(names), records
+                assert {record["enabled"] for record in records} == {False}
+                # The second Use added none twice, and said that they had them.
+                await expect(page.locator(".toast").last).to_contain_text("had their schedules already")
+                # An agent whose schedule was deleted is offered it on its page.
+                first: JsonObject = next(record for record in records if record["name"] == names[0])
+                (await http.delete(f"/api/schedules/{first['id']}")).raise_for_status()
+                agent_id: object = first["options"]["agent_id"]
+                await page.goto(f"{address}/#/agents/{agent_id}")
+                offer: Locator = page.locator("[data-suggested-schedule]")
+                await expect(offer).to_contain_text("Suggested by its template")
+                await offer.get_by_role("button", name="Add it").click()
+                await expect(offer).to_have_count(0)
+                row: Locator = page.locator("[data-section='schedules'] .list-row")
+                await expect(row).to_have_count(1)
+                await expect(row.get_by_role("switch")).to_have_attribute("aria-checked", "false")
+                assert await _overflow(page) <= 0
+                await page.screenshot(path=tmp_path / "agent-suggested-390.png", full_page=True)
             finally:
                 await browser.close()

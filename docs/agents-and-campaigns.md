@@ -64,22 +64,25 @@ with `shell` for the folders the receipts sit in; Bug Reproduction and Reviewer 
 the terminal's tools, and the Reviewer names no web at all. Ten templates suggest a schedule (item 464): Sales Outbound
 and Account Health on weekdays at 9:00 and 8:30, Chief of Staff on weekdays at 7:30, Paid Media every day at 8:00,
 Talent Scout on Mondays at 10:00, Product Performance and Competitor Watch on Mondays at 9:00 and 8:00, and Expense
-Manager, Release QA and Reviewer on Fridays at 16:00, 15:00 and 17:00. Their card offers a switch, **Add its schedule
-too, switched off** (its full name for a screen reader says until you read its goal): on, **Use template** makes the
-agent and a schedule of it with the template's time (in your time zone) and its goal, the whole goal of one run, which
-the agent's instructions then guide; the schedule is added switched off, so nothing runs before you have read what it
-will do, and a schedule that could not be added leaves the agent made and says why. An agent's page lists the schedules
-its runs run as under **Schedules**, each with its goal in full, when it runs and its switch, and **Edit** on the
-Schedules page. An agent's page has **Export** in its bar: a file `<name>.dot-agent.json` with the agent's name, role,
-instructions, model, reasoning level, approvals, tools and look (`"format": "dot-agent"`, `"version": 1`), never its id,
-memory, lessons, skills or chats. An agent whose name, role or instructions hold a secret is not exported, and the page
-says to take it out first: a value Dot holds (any value of the home's `.env`, and a key the daemon has read from the
-Keychain), or a key, a token or a password by its form, as the masking of secrets finds them. **Import** on the Agents
-page makes the same agent from such a file, in this home or another, and opens it; a file that names a tool this home
-lacks is refused with the tool's name. The API: `GET /api/agent-templates` (each with `cron` and `task`, empty for one
-that suggests no schedule), `POST /api/agent-templates/{id}/use`, `GET /api/agents/{id}/export` and `POST
-/api/agents/import` (422 for Dot, for a secret, and for a file that is not an agent's or names tools not here); a
-template's schedule is `POST /api/schedules` with `"enabled": false`.
+Manager, Release QA and Reviewer on Fridays at 16:00, 15:00 and 17:00. Their card offers a switch, **Also add its
+schedule; you switch it on on the Schedules page after reading its goal**: on, **Use template** makes the agent and a
+schedule of it with the template's time (in your time zone) and its goal, the whole goal of one run, which the agent's
+instructions then guide; the schedule is added switched off, so nothing runs before you have read what it will do, and a
+schedule that could not be added leaves the agent made and says why. The switch is for that one Use, not a setting: the
+card is drawn with it off again. An agent's page lists the schedules its runs run as under **Schedules**, each with its
+goal in full, when it runs and its switch, and **Edit** on the Schedules page; an agent with the name of a template that
+suggests a schedule, and without that schedule (made before, kept by Use team, or its schedule deleted), is offered it
+there, **Suggested by its template** with **Add it**, which adds it switched off (item 722). An agent's page has
+**Export** in its bar: a file `<name>.dot-agent.json` with the agent's name, role, instructions, model, reasoning level,
+approvals, tools and look (`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An
+agent whose name, role or instructions hold a secret is not exported, and the page says to take it out first: a value
+Dot holds (any value of the home's `.env`, and a key the daemon has read from the Keychain), or a key, a token or a
+password by its form, as the masking of secrets finds them. **Import** on the Agents page makes the same agent from such
+a file, in this home or another, and opens it; a file that names a tool this home lacks is refused with the tool's name.
+The API: `GET /api/agent-templates` (each with `cron` and `task`, empty for one that suggests no schedule), `POST
+/api/agent-templates/{id}/use`, `GET /api/agents/{id}/export` and `POST /api/agents/import` (422 for Dot, for a secret,
+and for a file that is not an agent's or names tools not here); a template's schedule is `POST /api/schedules` with
+`"enabled": false`.
 
 **Teams** (item 504) shows four teams, each a few templates whose agents work side by side: the Content team (Research
 Desk, Copy Editor), the Engineering team (Bug Reproduction, Reviewer, Release QA), the Growth team (Competitor Watch,
@@ -92,7 +95,10 @@ says so; a team one of whose agents this home cannot make (a tool it lacks) make
 makes the team itself, a record under **Your teams** (item 610, below); used again, it finds that record, whatever you
 have named it since, and brings back an agent it lacks (one you took out of the team, or deleted) at its end, and the
 toast says which; the card of a ready team you have says **In your teams**. A team whose agents suggest schedules offers
-**Add their schedules too, switched off**, for the agents it makes. Every template names `message_agent` beside
+**Also add their schedules**, switched off, for every agent of the team: the ones it makes and the ones of yours it
+keeps (item 722: those were left without, and the switch read as if it had not taken), but for one that has that
+schedule already (its agent and its goal), so that a second Use adds none twice; the toast says how many were added and
+which agents had theirs. Every template names `message_agent` beside
 `delegate`, and a member's run is told its team (item 512): the prompt's Team section says "You are in the Growth team",
 lists its teammates first, each agent with the team it is in, and says that a part an agent's role fits goes to that
 agent with `message_agent`, not to `delegate`, which is for a part no agent's role covers. An agent is in a team when
