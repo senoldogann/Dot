@@ -11,7 +11,7 @@ from urllib.parse import quote as escape
 import httpx
 
 from dotagent.core.errors import ToolExecutionError
-from dotagent.trading.types import Candle, ProductRules, Quote
+from dotagent.trading.types import Candle, ProductDay, ProductRules, Quote
 
 MARKET_URL: str = "https://api.coinbase.com/api/v3/brokerage/market"
 _GRANULARITY_S: Mapping[str, int] = {
@@ -28,6 +28,13 @@ _MOST_CANDLES: int = 300
 class MarketError(ToolExecutionError):
     """Coinbase's market data could not be read, or said something that is not a price."""
 
+    @property
+    def no_such_product(self) -> bool:
+        """Whether Coinbase answered that the product does not exist: no price is to be had, now or later. Measured on
+        2026-10-28: ``/products/FOO-EUR/ticker`` answers 404 with ``{"error": "NOT_FOUND", "error_details": "ProductID
+        \"FOO-EUR\" could not be found."}``; a product that exists answers 200 whatever its quote."""
+        return self.context.get("status") == 404 or "NOT_FOUND" in str(self.context.get("body", ""))
+
 
 def _positive(payload: Mapping[str, object], key: str, what: str) -> float:
     raw: object = payload.get(key)
@@ -38,6 +45,16 @@ def _positive(payload: Mapping[str, object], key: str, what: str) -> float:
     if not math.isfinite(value) or value <= 0:
         raise MarketError(f"Coinbase gave no usable {what}", {"field": key, "value": str(raw)[:40]})
     return value
+
+
+def _finite(payload: Mapping[str, object], key: str) -> float | None:
+    """The number at ``key`` when it is a finite one, else ``None``: a sum Coinbase may leave out."""
+    raw: object = payload.get(key)
+    try:
+        value: float = float(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
 
 
 def _volume(row: Mapping[str, object]) -> float:
@@ -97,6 +114,15 @@ class CoinbaseMarket:
             _positive(last_trade, "price", f"last price of {product}") if isinstance(last_trade, dict) else bid
         )
         return Quote(product=product, bid=bid, ask=ask, last=last, ts=time.time())
+
+    async def day(self, product: str) -> ProductDay:
+        """How ``product`` moved over the last day, as Coinbase sums it (item 765); a number it leaves out is None."""
+        payload: dict[str, object] = await self._get(f"/products/{escape(product, safe='-')}")
+        return ProductDay(
+            product=product,
+            change_24h_pct=_finite(payload, "price_percentage_change_24h"),
+            quote_volume_24h=_finite(payload, "approximate_quote_24h_volume"),
+        )
 
     async def rules(self, product: str) -> ProductRules:
         """What Coinbase takes of an order of ``product``, and whether it trades now."""

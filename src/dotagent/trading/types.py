@@ -41,6 +41,14 @@ class ProductRules(FrozenModel):
     trading: bool
 
 
+class ProductDay(FrozenModel):
+    """A product's last day as Coinbase sums it (item 765): the price change in percent, and the volume in the quote."""
+
+    product: str
+    change_24h_pct: float | None
+    quote_volume_24h: float | None
+
+
 class Holding(FrozenModel):
     """A currency an account holds, and what it is worth in the quote currency at the bid (the quote itself: 1)."""
 
@@ -58,6 +66,13 @@ class Portfolio(FrozenModel):
     equity: float
     day_start_equity: float
     day_traded: float
+    # Currencies held that Coinbase has no product of in the quote (item 765): worth nothing to the account, at every
+    # look alike; and those whose price could not be read this time, a hole in the worth.
+    unpriceable: tuple[str, ...] = ()
+    unpriced: tuple[str, ...] = ()
+    # Whether the day's start is a whole worth of the account, kept at the day's first whole look; until it is, no buy
+    # is placed, as today's loss could not be counted.
+    day_start_known: bool = True
 
     @property
     def day_change(self) -> float:
@@ -72,6 +87,8 @@ class OrderRequest(FrozenModel):
     side: Side
     quote_amount: float | None
     base_amount: float | None
+    # Why the run trades, in its words (item 765): kept with the order, shown with it.
+    reason: str = ""
 
 
 class Fill(FrozenModel):

@@ -19,7 +19,8 @@ export const MODE_LINES = {
 
 const MONEY = new Intl.NumberFormat("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const AMOUNT = new Intl.NumberFormat("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 8 });
-const PRODUCT = /^[A-Z0-9]{2,12}-[A-Z0-9]{2,12}$/;
+// As the daemon reads a product id (config.py, _PRODUCT): the page refuses what the daemon would.
+const PRODUCT = /^[A-Z0-9]{2,10}-[A-Z]{3,5}$/;
 const MINUS = "−";
 
 /** "1,234.50 EUR": an amount of the quote currency to the cent. */
