@@ -23,9 +23,10 @@ from dotagent.vault.items import (
     ImportReport,
     LoginDraft,
     LoginFill,
+    Removal,
     VaultItems,
 )
-from dotagent.vault.secretstore import VaultStoreError
+from dotagent.vault.secretstore import PartlyRemoved, VaultStoreError
 
 NUMBER: str = "4242 4242 4242 4242"
 PASSWORD: str = "S3cret-Passw0rd!"
@@ -317,6 +318,83 @@ async def test_the_lock_of_an_item_lasts_as_long_as_the_item(store: Store) -> No
     assert set(vault._locks) == {second.id}
     await vault.remove(second.id)
     assert vault._locks == {}
+
+
+async def test_removing_several_goes_a_batch_at_a_time_and_passes_over_what_the_vault_does_not_hold(
+    store: Store,
+) -> None:
+    """The Delete of the ticked rows of Settings › Vault (item 768): the Keychain items of a batch are removed in one
+    call, then the batch's records; an id given twice, or one the vault does not hold, is passed over; a contact has
+    nothing in the Keychain; no lock is kept for an item that is gone."""
+    vault, keychain = _vault(store)
+    await vault.import_logins(CHROME)
+    home: VaultRecord = await vault.create(ContactDraft(kind="contact", label="Home", fields={"city": "Izmir"}))
+    logins: list[VaultRecord] = await vault.of_kind("login")
+    chosen: list[str] = [login.id for login in logins[:90]] + [home.id, logins[0].id, "vlt_never_was"]
+    keychain.calls.clear()
+    assert await vault.remove_many(chosen) == Removal(removed=91, stopped=None)
+    # 91 items, 40 to a batch.
+    assert keychain.calls == ["remove_many"] * 3
+    left: set[str] = {login.id for login in logins[90:]}
+    assert {record.id for record in await vault.items()} == left and set(keychain.kept) == left
+    assert vault._locks == {}
+    assert await vault.remove_many(["vlt_never_was"]) == Removal(removed=0, stopped=None)
+
+
+async def test_a_keychain_that_refuses_part_way_leaves_its_batch_whole_and_says_how_many_went(store: Store) -> None:
+    """A Keychain that refuses a batch leaves that batch's items whole, their records and their secrets, to be removed
+    again; the batches before it are gone, and the answer says how many and why it stopped."""
+    keychain: _RemovesBatches = _RemovesBatches(batches=1)
+    vault, _ = _vault(store, keychain)
+    await vault.import_logins(CHROME)
+    removal: Removal = await vault.remove_many([login.id for login in await vault.of_kind("login")])
+    assert removal == Removal(removed=40, stopped="the Keychain did not remove the items")
+    left: list[VaultRecord] = await vault.of_kind("login")
+    assert len(left) == 55 and set(keychain.kept) == {login.id for login in left}
+
+
+async def test_a_keychain_that_refuses_within_a_batch_takes_the_records_of_what_it_removed_before_it(
+    store: Store,
+) -> None:
+    """``security -i`` runs a batch's lines one by one: those before a refusal are gone from the Keychain, and their
+    records go too, so that no record is left without its secrets (the review of item 768); the rest stay whole."""
+    keychain: _RefusesWithin = _RefusesWithin(keep=10)
+    vault, _ = _vault(store, keychain)
+    await vault.import_logins(CHROME)
+    logins: list[VaultRecord] = await vault.of_kind("login")
+    removal: Removal = await vault.remove_many([login.id for login in logins])
+    assert removal == Removal(removed=10, stopped="the Keychain did not remove the item")
+    left: list[VaultRecord] = await vault.of_kind("login")
+    assert len(left) == 85 and set(keychain.kept) == {login.id for login in left}
+
+
+class _RefusesWithin(MemorySecretStore):
+    """A Keychain that removes the first ``keep`` accounts of the first batch it is given and refuses the next, as a
+    keychain locked part way does."""
+
+    def __init__(self, keep: int) -> None:
+        super().__init__()
+        self._keep: int = keep
+
+    async def remove_many(self, accounts):  # type: ignore[no-untyped-def]
+        gone: list[str] = list(accounts[: self._keep])
+        for account in gone:
+            self.kept.pop(account, None)
+        raise PartlyRemoved("the Keychain did not remove the item", {"returncode": 51}, gone)
+
+
+class _RemovesBatches(MemorySecretStore):
+    """A Keychain that removes ``batches`` batches and then refuses."""
+
+    def __init__(self, batches: int) -> None:
+        super().__init__()
+        self._batches: int = batches
+
+    async def remove_many(self, accounts):  # type: ignore[no-untyped-def]
+        if self._batches == 0:
+            raise VaultStoreError("the Keychain did not remove the items", {"returncode": 51})
+        self._batches -= 1
+        await super().remove_many(accounts)
 
 
 async def test_a_keychain_that_refuses_leaves_no_record_and_a_database_that_refuses_leaves_no_keychain_item(

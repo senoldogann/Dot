@@ -2,10 +2,11 @@
 // their counts (All, Logins, Cards, Contacts), a search, and a New item menu (Login, Card, Contact, Import from CSV…); each
 // item is a row with its mark, its label, its site or the last four digits of its card, and Edit and Delete. The forms are
 // dialogs (vaultforms.js). Nothing here holds a secret: the daemon's list has none, and a secret is asked of it only when the
-// owner presses an eye in a form.
+// owner presses an eye in a form. The list scrolls in its card and draws its rows as it is scrolled; Select ticks rows to
+// delete together (item 768), as the sidebar's Select ticks chats.
 
 import { api } from "../api.js";
-import { debounce, el, foldSearch, plural } from "../dom.js";
+import { debounce, el, foldSearch, plural, setText } from "../dom.js";
 import { dotName } from "../face.js";
 import { icon } from "../icons.js";
 import { openMenu } from "../menu.js";
@@ -15,6 +16,8 @@ import { itemMatches, reportWords, rowWords } from "../vaultitems.js";
 import { openCardDialog, openContactDialog, openLoginDialog } from "../vaultforms.js";
 
 const PAGE_SIZE = 60;
+// How far under the list's end the next rows are drawn, so that a scroll does not wait on them.
+const DRAW_AHEAD = "0px 0px 600px 0px";
 const SEARCH_DELAY_MS = 150;
 const TABS = [
   { id: "all", label: "All", hint: "Every item" },
@@ -55,6 +58,18 @@ function itemRow(item, actions) {
   );
 }
 
+/** An item as a row to tick while items are chosen to delete: the whole row is the tick's label. */
+function pickRow(item, checked) {
+  const { title, sub } = rowWords(item);
+  return el(
+    "label",
+    { class: "vault-row vault-pick", dataset: { vaultItem: item.id, kind: item.kind } },
+    el("input", { class: "vault-check", type: "checkbox", checked, "aria-label": sub === "" ? title : `${title}, ${sub}`, dataset: { pick: item.id } }),
+    el("span", { class: `vault-mark vault-mark-${item.kind}`, "aria-hidden": "true" }, icon(KIND_MARK[item.kind])),
+    el("div", { class: "vault-main" }, el("div", { class: "vault-title" }, title), el("div", { class: "vault-sub" }, sub)),
+  );
+}
+
 export function mount(root, ctx) {
   let disposed = false;
   let ticket = 0;
@@ -62,6 +77,14 @@ export function mount(root, ctx) {
   let counts = { login: 0, card: 0, contact: 0 };
   let kind = "all";
   let shown = PAGE_SIZE;
+  // What the tab and the search let through, as last painted: the rows drawn are its first `shown`.
+  let current = [];
+  let selecting = false;
+  let deleting = false;
+  // The ticked items, and the row ticked last, from which a shift-click ticks a run of rows.
+  const selected = new Set();
+  let anchor = null;
+  let shiftHeld = false;
 
   const search = el("input", {
     class: "input",
@@ -73,13 +96,24 @@ export function mount(root, ctx) {
     "aria-label": "Search the vault",
   });
   const holder = el("div", null, inlineLoading());
-  const more = el("button", { class: "note-more", type: "button", hidden: true }, "Show more");
+  const list = el("div", { class: "vault-rows" });
+  const end = el("div", { class: "vault-end", "aria-hidden": "true" });
+  const selectButton = el("button", { class: "btn", type: "button", hidden: true }, "Select");
+  const count = el("span", { class: "vault-select-count", role: "status" });
+  const allButton = el("button", { class: "btn sm", type: "button" }, "Select all");
+  const deleteButton = el("button", { class: "btn danger solid sm", type: "button" }, icon("trash"), "Delete");
+  const cancelButton = el(
+    "button",
+    { class: "icon-btn", type: "button", title: "Stop choosing", "aria-label": "Stop choosing" },
+    icon("x"),
+  );
+  const bar = el("div", { class: "vault-select-bar", hidden: true }, count, el("div", { class: "vault-select-tools" }, allButton, deleteButton, cancelButton));
   const report = el("div", { class: "note vault-report", role: "status", hidden: true });
   const newItem = el("button", { class: "btn primary", type: "button", "aria-haspopup": "menu", "aria-expanded": "false" }, icon("plus"), "New item");
   const tabs = segmented(TABS, kind, (id) => {
     kind = id;
     shown = PAGE_SIZE;
-    paint();
+    paint(false);
   });
   tabs.element.setAttribute("aria-label", "Show");
   tabs.element.classList.add("vault-tabs");
@@ -99,22 +133,154 @@ export function mount(root, ctx) {
     });
   }
 
-  function paint() {
+  /** Draw the next rows of the list under those drawn. */
+  function drawMore() {
+    if (shown >= current.length) {
+      return;
+    }
+    const next = current.slice(shown, shown + PAGE_SIZE);
+    shown += next.length;
+    end.before(...next.map(rowOf));
+  }
+
+  function rowOf(item) {
+    return selecting ? pickRow(item, selected.has(item.id)) : itemRow(item, rowActions);
+  }
+
+  // The end of the list in sight, or near it, draws the next rows; it is watched again after, as it may still be in sight.
+  const ahead = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting) && shown < current.length) {
+        drawMore();
+        ahead.unobserve(end);
+        ahead.observe(end);
+      }
+    },
+    { root: list, rootMargin: DRAW_AHEAD },
+  );
+  ahead.observe(end);
+
+  function paintBar() {
+    bar.hidden = !selecting;
+    const all = current.length > 0 && current.every((item) => selected.has(item.id));
+    setText(count, selected.size === 0 ? "Choose items to delete" : `${plural(selected.size, "item", "items")} selected`);
+    setText(allButton, all ? "Clear" : "Select all");
+    allButton.disabled = current.length === 0 || deleting;
+    deleteButton.disabled = selected.size === 0 || deleting;
+  }
+
+  /** Paint the list: in its place (`keep`), as after a save, or from its top, as after another tab or search. */
+  function paint(keep = true) {
     paintCounts();
-    const found = wanted();
+    current = wanted();
+    const passing = new Set(current.map((item) => item.id));
+    // Only what is listed stays ticked: Delete removes what the owner sees ticked.
+    for (const id of selected) {
+      if (!passing.has(id)) {
+        selected.delete(id);
+      }
+    }
+    if (items.length === 0) {
+      selecting = false;
+    }
+    selectButton.hidden = items.length === 0 || selecting;
+    paintBar();
     if (items.length === 0) {
       holder.replaceChildren(emptyPanel("lock", "Nothing saved yet", "Add a login, a card or contact details with New item."));
-      more.hidden = true;
       return;
     }
-    if (found.length === 0) {
+    if (current.length === 0) {
       const message = search.value.trim() === "" ? `No ${KIND_NAME[kind] ?? "item"}s saved yet.` : "Try other words, or another tab.";
       holder.replaceChildren(emptyPanel("search", "Nothing matches", message));
-      more.hidden = true;
       return;
     }
-    holder.replaceChildren(el("div", { class: "vault-rows" }, found.slice(0, shown).map((item) => itemRow(item, rowActions))));
-    more.hidden = found.length <= shown;
+    const top = keep ? list.scrollTop : 0;
+    list.replaceChildren(...current.slice(0, shown).map(rowOf), end);
+    if (holder.firstChild !== list) {
+      holder.replaceChildren(list);
+    }
+    list.scrollTop = top;
+  }
+
+  /** Tick or untick the row of `id`; with shift, every row from the one ticked last to it. */
+  function pick(id, on, shift) {
+    const ids = current.map((item) => item.id);
+    const from = shift && anchor !== null ? ids.indexOf(anchor) : -1;
+    const to = ids.indexOf(id);
+    const run = from === -1 || to === -1 ? [id] : ids.slice(Math.min(from, to), Math.max(from, to) + 1);
+    for (const one of run) {
+      if (on) {
+        selected.add(one);
+      } else {
+        selected.delete(one);
+      }
+    }
+    anchor = id;
+    syncTicks();
+  }
+
+  /** The ticks of the rows drawn, and the bar, as `selected` has them. */
+  function syncTicks() {
+    for (const box of list.querySelectorAll("input.vault-check")) {
+      box.checked = selected.has(box.dataset.pick);
+    }
+    paintBar();
+  }
+
+  function startChoosing() {
+    selecting = true;
+    selected.clear();
+    anchor = null;
+    paint();
+    (list.querySelector("input.vault-check") ?? cancelButton).focus({ preventScroll: true });
+  }
+
+  function stopChoosing() {
+    selecting = false;
+    selected.clear();
+    anchor = null;
+    paint();
+    selectButton.focus({ preventScroll: true });
+  }
+
+  async function deleteSelected() {
+    const chosen = items.filter((item) => selected.has(item.id));
+    if (chosen.length === 0) {
+      return;
+    }
+    const one = chosen.length === 1;
+    const logins = chosen.filter((item) => item.kind === "login").length;
+    const kept = chosen.some((item) => item.kind !== "contact") ? " and from the Keychain" : "";
+    const signIn = logins === 0 ? "" : ` ${dotName()} can no longer sign in with ${logins === chosen.length ? (one ? "it" : "them") : "the logins among them"}.`;
+    const confirmed = await confirmDialog({
+      title: `Delete ${plural(chosen.length, "item", "items")}?`,
+      message: `${one ? "It is" : "They are"} removed from the vault${kept}.${signIn} This cannot be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
+      focusCancel: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    deleting = true;
+    paintBar();
+    try {
+      const done = await api.post("/vault/items/remove", { ids: chosen.map((item) => item.id) });
+      if (done.stopped === null) {
+        toast("ok", `Deleted ${plural(done.removed, "item", "items")}.`);
+        selecting = false;
+        selected.clear();
+      } else {
+        toast("error", `Deleted ${plural(done.removed, "item", "items")}; the others are still here: ${done.stopped}.`);
+      }
+    } finally {
+      deleting = false;
+      paintBar();
+    }
+    await reload();
+    if (!selecting) {
+      selectButton.focus({ preventScroll: true });
+    }
   }
 
   async function reload() {
@@ -224,14 +390,36 @@ export function mount(root, ctx) {
   const reloadSoon = debounce(() => {
     if (!disposed) {
       shown = PAGE_SIZE;
-      paint();
+      paint(false);
     }
   }, SEARCH_DELAY_MS);
   search.addEventListener("input", reloadSoon);
-  more.addEventListener("click", () => {
-    shown += PAGE_SIZE;
-    paint();
+  // A click on a row's words reaches its tick as a second click: whether shift was held is taken from the first.
+  list.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const box = target?.closest("input.vault-check") ?? null;
+    if (box === null) {
+      shiftHeld = event.shiftKey && target?.closest(".vault-pick") !== null;
+      return;
+    }
+    const shift = event.shiftKey || shiftHeld;
+    shiftHeld = false;
+    pick(box.dataset.pick, box.checked, shift);
   });
+  selectButton.addEventListener("click", startChoosing);
+  cancelButton.addEventListener("click", stopChoosing);
+  allButton.addEventListener("click", () => {
+    const all = current.every((item) => selected.has(item.id));
+    for (const item of current) {
+      if (all) {
+        selected.delete(item.id);
+      } else {
+        selected.add(item.id);
+      }
+    }
+    syncTicks();
+  });
+  deleteButton.addEventListener("click", () => attempt(deleteSelected));
   report.addEventListener("click", (event) => {
     if (event.target instanceof Element && event.target.closest("button") !== null) {
       report.hidden = true;
@@ -241,7 +429,7 @@ export function mount(root, ctx) {
   ctx.head.setLead(
     `Logins, cards and contact details you keep for ${dotName()}. It can sign in with a login and type your contact details where a form asks. Passwords and cards are kept in your Mac's Keychain.`,
   );
-  ctx.head.setActions(newItem);
+  ctx.head.setActions(selectButton, newItem);
   root.append(
     el(
       "div",
@@ -250,7 +438,7 @@ export function mount(root, ctx) {
       setSection({
         title: "Saved items",
         actions: el("div", { class: "note-tools vault-tools" }, tabs.element, el("label", { class: "note-search" }, icon("search"), search)),
-        body: setCard(holder, el("div", { class: "note-foot" }, more)),
+        body: setCard(bar, holder),
       }),
       el(
         "p",
@@ -263,5 +451,6 @@ export function mount(root, ctx) {
   attempt(reload);
   return () => {
     disposed = true;
+    ahead.disconnect();
   };
 }

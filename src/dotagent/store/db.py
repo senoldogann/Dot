@@ -3905,6 +3905,14 @@ class Store:
             raise NotFoundError("no such item in the vault", {"item_id": item_id})
         return _vault_item(row)
 
+    async def get_vault_items(self, item_ids: Sequence[str]) -> list[VaultRecord]:
+        """The records of those of ``item_ids`` the vault holds (a batch of a removal, item 768), in no set order."""
+        if not item_ids:
+            return []
+        marks: str = ", ".join("?" for _ in item_ids)
+        rows = await self._all(f"SELECT * FROM vault_items WHERE id IN ({marks})", tuple(item_ids))
+        return [_vault_item(row) for row in rows]
+
     async def vault_counts(self) -> dict[str, int]:
         """How many items of each kind the vault holds, a kind without any counted as 0."""
         rows = await self._all("SELECT kind, COUNT(*) AS items FROM vault_items GROUP BY kind", ())
@@ -3965,6 +3973,15 @@ class Store:
         cursor = await self._db.execute("DELETE FROM vault_items WHERE id = ?", (item_id,))
         await self._db.commit()
         return cursor.rowcount > 0
+
+    @_writing
+    async def delete_vault_items(self, item_ids: Sequence[str]) -> int:
+        """Forget the records of several items; how many there were."""
+        cursor = await self._db.executemany(
+            "DELETE FROM vault_items WHERE id = ?", [(item_id,) for item_id in item_ids]
+        )
+        await self._db.commit()
+        return cursor.rowcount
 
     # ----- queued messages ---------------------------------------------------------------------
 

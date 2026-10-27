@@ -33,6 +33,21 @@ def _parts(**given: str) -> dict[str, SecretStr]:
     return {name: SecretStr(value) for name, value in given.items()}
 
 
+async def test_several_are_removed_in_one_prompt_and_one_the_keychain_lacks_does_not_stop_the_rest(
+    keychain_file: str,
+) -> None:
+    """The Delete of the ticked rows of Settings › Vault (item 768): a removal of several items, one of which the
+    keychain does not hold, leaves none of the others behind and the items not named as they were."""
+    keychain: LoginKeychain = LoginKeychain(keychain_file)
+    await keychain.put_many({f"vlt_many_{n}": _parts(password=f"pw-{n}") for n in range(4)})
+    await keychain.remove_many(["vlt_many_0", "vlt_many_1"])
+    assert _items(keychain_file) == ["vlt_many_2", "vlt_many_3"]
+    await keychain.remove_many(["vlt_many_2", "vlt_not_there"])
+    assert _items(keychain_file) == ["vlt_many_3"]
+    await keychain.remove_many([])
+    assert _items(keychain_file) == ["vlt_many_3"]
+
+
 async def test_what_is_kept_comes_back_whole_and_a_removed_item_is_none(keychain_file: str) -> None:
     keychain: LoginKeychain = LoginKeychain(keychain_file)
     await keychain.put("vlt_login_1", _parts(password=AWKWARD, notes="a note"))

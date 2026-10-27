@@ -799,7 +799,15 @@ labels, sites, usernames, nicknames, last four digits and the details of contact
 item**, a menu of **Login**, **Card**, **Contact** and **Import from CSV…**. An empty vault says "Nothing saved yet. Add
 a login, a card or contact details with New item." Each item is a row with its mark, its label (a login's site, a card's
 nickname or brand, a contact's label), the line under it (a login's username, a card's brand and last four digits, a
-contact's details) and **Edit** and **Delete** (which asks first).
+contact's details) and **Edit** and **Delete** (which asks first). The list scrolls in its card and draws more rows as
+it is scrolled (item 768).
+
+- **Select** (beside New item, item 768) turns each row into a tick: a click on the row ticks it, a shift-click ticks
+  every row from the one ticked last, and a bar over the list says how many are ticked, with **Select all** (every item
+  the tab and the search show, also those not drawn yet) or **Clear**, **Delete** and a cross to stop choosing. A ticked
+  row that a search or another tab hides is unticked, so that Delete removes only what you see ticked. Delete asks first
+  ("Delete 12 items?") and removes the items and their Keychain items, 40 at a time; a Keychain that refuses part way
+  leaves the rest as they were and says how many went.
 
 - **New login** (a dialog, item 615): Website (the site's address alone: one with a user name or a password in it is
   refused), Username or email (optional), Password (dots until the eye is pressed), Notes (optional); **Save login**
@@ -827,13 +835,16 @@ contact's details) and **Edit** and **Delete** (which asks first).
   and that the CSV file holds your passwords in plain text and is to be deleted. One-time-code seeds are left out;
   the vault keeps none.
 
-The routes (all under `/api/vault`; the 1Password routes above share the prefix): `GET /vault/items` (the items by
-label with `counts`) and `GET /vault/items/{id}` answer no secret; `GET /vault/counts` (the tabs' numbers); `POST
+The routes (all under `/api/vault`; the 1Password routes above share the prefix): `GET /vault/items` (the items by label
+with `counts`) and `GET /vault/items/{id}` answer no secret; `GET /vault/counts` (the tabs' numbers); `POST
 /vault/items` and `PUT /vault/items/{id}` take a `kind` (`login`, `card` or `contact`) and the values, a part left out
 of a `PUT` being kept; `DELETE /vault/items/{id}` removes the Keychain item and the record; `POST
 /vault/items/{id}/reveal` (`{"part": "password"}`) answers that one part, once, to a request that names this Mac's own
-address (403 from a phone); `POST /vault/items/import` (`{"csv": "…"}`) and `POST /vault/card-photo` (`{"image":
-"<base64>"}`) read what they are given in memory. An error names what failed and never a value.
+address (403 from a phone); `POST /vault/items/remove` (`{"ids": ["…"]}`, item 768) removes several items, their
+Keychain items and their records, passing over an id the vault does not hold, and answers how many went and, when the
+Keychain refused part way, why it stopped (`{"removed": 40, "stopped": "…"}`); `POST /vault/items/import` (`{"csv":
+"…"}`) and `POST /vault/card-photo` (`{"image": "<base64>"}`) read what they are given in memory. An error names what
+failed and never a value.
 
 **Dot's first conversation** (item 420). On a first open, while Dot has not introduced itself (`[assistant] introduced`)
 and there is no chat yet, New chat shows Dot's first conversation in the place of the greeting, over the composer, with
@@ -1178,7 +1189,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /plugin-gallery/{id}/revert` | put back the version an update from a proposal replaced; the updated one goes to the Trash (409 when no earlier version is kept) |
 | `DELETE /installed-plugins/{name}` | take a plugin out of Dot (item 497): its MCP servers stop, its skills leave the runs that start after (Dot reads its plugins again, item 542), and its folder in Dot's plugins goes to the Trash (409 for one of `[plugins] dirs`; of a plugin whose folder went without Dot, only the servers are stopped) |
 | `GET /accounts`, `POST /accounts/{provider}/start`, `DELETE /accounts/{provider}/{address}` | the accounts of Google and Microsoft signed in through their own sign-ins and whether the client you registered with each is saved (item 422); start a sign-in, only from this Mac's own address with the installation's token (the provider's page to open; 422 when the client is not saved); sign an account out |
-| `GET /vault/items`, `GET /vault/counts`, `GET\|PUT\|DELETE /vault/items/{id}`, `POST /vault/items`, `POST /vault/items/{id}/reveal`, `POST /vault/items/import`, `POST /vault/card-photo` | Dot's own vault of logins, cards and contacts (item 621, Settings › Vault, [above](#settings--vault)): the list and one item with no secret in either; make, change and delete an item (its secrets in the Keychain, its record in the database; a delete takes both); the eye, one secret part, once, only from this Mac's own address and with the installation's token, never a phone's key (403 otherwise, item 678); an import of a CSV export and the reading of a card's photo, both in memory (422 with why for a file that is no list of logins, a card whose number or expiry is not good, a site that is no web address) |
+| `GET /vault/items`, `GET /vault/counts`, `GET\|PUT\|DELETE /vault/items/{id}`, `POST /vault/items`, `POST /vault/items/{id}/reveal`, `POST /vault/items/remove`, `POST /vault/items/import`, `POST /vault/card-photo` | Dot's own vault of logins, cards and contacts (item 621, Settings › Vault, [above](#settings--vault)): the list and one item with no secret in either; make, change and delete an item (its secrets in the Keychain, its record in the database; a delete takes both), or several at once (item 768); the eye, one secret part, once, only from this Mac's own address and with the installation's token, never a phone's key (403 otherwise, item 678); an import of a CSV export and the reading of a card's photo, both in memory (422 with why for a file that is no list of logins, a card whose number or expiry is not good, a site that is no web address) |
 | `GET /vault`, `POST /vault/connect`, `POST /vault/token` (`{"token": "ops_…"}`), `DELETE /vault` | the owner's 1Password (item 493): whether `op` is installed and Dot holds a service account's token, and the vaults it reads with how many logins each; Connect, which makes the vault "Shared with Dot" and a service account that only reads it through the owner's `op` and the 1Password app, which asks first; a token of the owner's, kept once it reads a vault (422 for one that is no `ops_` token); both only from this Mac's own address with the installation's token; Disconnect, which forgets the token. No token and no value is ever answered |
 | `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state`, an account's of Google or Microsoft first, else an MCP server's, and answers a page of Dot's own look that names the account or service and says how it came out (item 437; 400 for a state nobody waits for, for an account's that failed, and for one that waited more than 10 minutes; what the address carries is shown only for a state that waits) |
 | `GET /assistant`, `PUT /assistant` (`{"name": "Miro", "owner": "Ada", "introduced": true}`, each optional) | the name the owner calls Dot by, the owner's name (the first name of their account on this Mac until they give one) and whether Dot has had its first conversation (item 420); a change, live and in the config file (422 for a blank name, a control character or a name too long) |
