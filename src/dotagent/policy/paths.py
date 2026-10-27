@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
-from dotagent.core.errors import PolicyDenied
+from dotagent.core.errors import NulCharacterError, PolicyDenied
 
 # ``dot`` is what Dot loads and runs, and its emergency stop (``Runtime.dot_paths``): a run reads it as it reads the
 # home folder; Dot's own file tools change it once the user agrees (item 398), a command line and OpenCode's agent
@@ -103,7 +103,10 @@ def kernel_path(path: Path) -> Path:
 
 def expand_path(raw: str, cwd: Path) -> Path:
     """Resolve ``raw`` (``~`` and ``$VAR`` aware) against ``cwd`` without requiring it to exist, to the path the kernel
-    names (:func:`kernel_path`)."""
+    names (:func:`kernel_path`). A path with a NUL character names no file: the call is refused for what it gave (item
+    727), never a crash of the run."""
+    if "\0" in raw:
+        raise NulCharacterError("a path cannot hold a NUL character", {"path": raw.replace("\0", "\\0")[:200]})
     expanded: str = os.path.expandvars(os.path.expanduser(raw))
     candidate: Path = Path(expanded)
     if not candidate.is_absolute():

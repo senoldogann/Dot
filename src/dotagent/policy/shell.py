@@ -19,6 +19,7 @@ from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from dotagent.core.errors import NulCharacterError
 from dotagent.core.types import FrozenModel
 from dotagent.policy.paths import (
     CHANGES_DOT,
@@ -4079,7 +4080,10 @@ def _scope(cwd: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: t
 def assess_shell(
     command: str, cwd: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
 ) -> ShellAssessment:
-    """Classify ``command`` (a full shell line) as it would run in ``cwd``."""
+    """Classify ``command`` (a full shell line) as it would run in ``cwd``. A line with a NUL character is refused for
+    what it gave (item 727): no shell runs it, and no word of it is judged."""
+    if "\0" in command:
+        raise NulCharacterError("a command line cannot hold a NUL character", {})
     return _merge(_assess_all(command, _scope(cwd, workspace, protected, dot_paths)))
 
 

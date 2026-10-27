@@ -63,6 +63,7 @@ from dotagent.core.errors import (
     OpenCodeError,
     PolicyDenied,
     RunCancelled,
+    ToolInputError,
 )
 from dotagent.core.jsonutil import parse_json_object
 from dotagent.core.logs import get_logger
@@ -709,13 +710,18 @@ class _Follow:
             await self.server.reply(event.request_id, self.directory, "reject", NO_SUBAGENT_NOTE)
             return
         workdir: JsonValue = call.arguments.get("workdir")
-        action: ActionInfo = permission_action(
-            event,
-            self.directory,
-            runtime.protected,
-            runtime.dot_paths,
-            workdir if isinstance(workdir, str) and workdir else None,
-        )
+        try:
+            action: ActionInfo = permission_action(
+                event,
+                self.directory,
+                runtime.protected,
+                runtime.dot_paths,
+                workdir if isinstance(workdir, str) and workdir else None,
+            )
+        except ToolInputError as refused:
+            # A step that cannot be told (a path or a line with a NUL character, item 727) is refused, the run goes on.
+            await self.server.reply(event.request_id, self.directory, "reject", refused.message)
+            return
         call.asked(action)
         # An edit that would step on another run at work is refused, as a call of Dot's own tools is (item 301).
         held: str | None = runtime.peers.conflict(self.agent.run.id, action.tool, action)
