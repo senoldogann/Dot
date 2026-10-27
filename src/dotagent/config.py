@@ -781,13 +781,15 @@ class WatchersConfig(FrozenModel):
 class InitiativeConfig(FrozenModel):
     """Dot's own initiative (item 715, docs/proactive.md): the owner switches it on in Schedules; these say when the Mac
     counts as idle, how far apart Dot's own runs start, how often it looks for work, how many runs try one thing, and
-    how many of its own runs start in a day (0: no limit)."""
+    how many of its own runs start in a day (0: no limit), and the approval mode its runs start in (``yolo`` by default,
+    item 756, the owner's word of 2026-10-27: a run of its own that asked waited on nobody, as nobody watches it)."""
 
     idle_minutes: float = Field(ge=0, le=1440, allow_inf_nan=False)
     gap_minutes: float = Field(ge=0, le=1440, allow_inf_nan=False)
     look_every_hours: float = Field(gt=0, le=168, allow_inf_nan=False)
     attempts: int = Field(ge=1, le=10)
     runs_per_day: int = Field(ge=0, le=1000)
+    approvals: ApprovalMode
 
 
 type McpTransport = Literal["stdio", "http", "sse"]

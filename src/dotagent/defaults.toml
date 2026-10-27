@@ -1021,8 +1021,8 @@ judged_per_look = 25
 
 [initiative]
 # Dot's own initiative (item 715, docs/proactive.md): switched on in Schedules, Dot keeps a list of things to do for you
-# and does them while the Mac is idle, in chats of their own, with your approval mode. The Mac is idle when none of its
-# runs works and nobody touched the keyboard, the mouse or the trackpad for idle_minutes.
+# and does them while the Mac is idle, in chats of their own, in the approval mode below. The Mac is idle when none of
+# its runs works and nobody touched the keyboard, the mouse or the trackpad for idle_minutes.
 idle_minutes = 10.0
 # How long after one of its own runs ends the next may start.
 gap_minutes = 15.0
@@ -1034,6 +1034,11 @@ look_every_hours = 6.0
 attempts = 3
 # The most of its own runs that start in a day; 0 sets no limit.
 runs_per_day = 0
+# The approval mode its runs start in, whatever [policy] approvals says: "yolo" asks nothing (the owner's choice, item
+# 756: a run of its own that asked waited on nobody, since nobody watches it). In yolo the review model still refuses a
+# message, a post, a payment or an upload that no word of yours calls for, in a run that read content others can write
+# (item 525). "ask", "auto" or "supervised" make its runs ask as yours do.
+approvals = "yolo"
 
 [skills]
 # Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML

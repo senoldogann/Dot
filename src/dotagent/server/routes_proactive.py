@@ -69,6 +69,10 @@ class TryResult(FrozenModel):
 def proactive_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
 
+    def moded(view: InitiativeView) -> InitiativeView:
+        """``view`` with the approval mode Dot's own runs start in (item 756), for the card to say."""
+        return view.model_copy(update={"approvals": ctx.runtime.config.initiative.approvals})
+
     @router.get("/initiative")
     async def get_initiative() -> InitiativeView:
         """Dot's own initiative (item 715): whether it works on its own list while the Mac is idle, when it last looked
@@ -76,27 +80,27 @@ def proactive_router(ctx: ServerContext) -> APIRouter:
         whether macOS says how long the Mac has been idle (``idle_readable``), which it needs to start anything."""
         view: InitiativeView = await initiative_view(ctx.runtime.store)
         readable: bool = await asyncio.to_thread(idle_seconds) is not None
-        return view.model_copy(update={"idle_readable": readable})
+        return moded(view).model_copy(update={"idle_readable": readable})
 
     @router.put("/initiative")
     async def put_initiative(request: InitiativeRequest) -> InitiativeView:
         """Switch Dot's own initiative on or off; a run of it under way goes on until its end or a stop."""
-        return await set_initiative(ctx.runtime.store, request.enabled)
+        return moded(await set_initiative(ctx.runtime.store, request.enabled))
 
     @router.post("/initiative/todos", status_code=201)
     async def post_todo(request: TodoRequest) -> InitiativeView:
         """Put a thing of the owner's on Dot's list; 422 when it is on it, or was done or let go in the last 30 days."""
-        return await owners_todo(ctx.runtime.store, request)
+        return moded(await owners_todo(ctx.runtime.store, request))
 
     @router.post("/initiative/todos/{todo_id}/drop")
     async def drop_todo(todo_id: str) -> InitiativeView:
         """Take a thing to do off the list (404 for none); a thing being done is left to its run."""
-        return await let_go(ctx.runtime.store, todo_id)
+        return moded(await let_go(ctx.runtime.store, todo_id))
 
     @router.post("/initiative/todos/{todo_id}/again")
     async def again_todo(todo_id: str) -> InitiativeView:
         """Put a thing that was let go back on the list, its tries counted from none."""
-        return await take_up_again(ctx.runtime.store, todo_id)
+        return moded(await take_up_again(ctx.runtime.store, todo_id))
 
     @router.get("/brief")
     async def get_brief() -> BriefView:

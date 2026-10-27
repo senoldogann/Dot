@@ -8,6 +8,7 @@ from pydantic import Field, ValidationError
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
+from dotagent.policy.types import ApprovalMode
 from dotagent.store.db import Store
 from dotagent.store.models import TodoRecord
 
@@ -106,6 +107,8 @@ class InitiativeView(FrozenModel):
     todos: tuple[TodoView, ...]
     # Whether macOS says how long the Mac has been idle; without it Dot starts nothing on its own, which the card says.
     idle_readable: bool = True
+    # The approval mode Dot's own runs start in (``[initiative] approvals``, item 756), which the card says.
+    approvals: ApprovalMode = "yolo"
 
 
 class InitiativeRequest(FrozenModel):
