@@ -422,7 +422,8 @@ async def cmd_harness_steps(command: HarnessStepsCommand) -> int:
         steps: list[HarnessStep] = await store.list_harness_steps(command.limit)
     if not steps:
         sys.stdout.write(
-            "No step yet: 'dotx harness step' runs one, [harness] step_time has the daemon run one a night.\n"
+            "No step yet: 'dotx harness step' runs one; switched on in Settings › Self-improvement (or [harness]"
+            " step_time), the daemon runs one a night.\n"
         )
         return 0
     for step in steps:

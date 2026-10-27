@@ -8,7 +8,7 @@ import { clip, dateTime, el, joined, nextNight, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, foldCard, loadingPanel, setCard, setRow, setSection } from "../panels.js";
 import { readFailed } from "../state.js";
-import { attempt, confirmDialog, formDialog, settingFold, toast } from "../ui.js";
+import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 import { codeText } from "./memory.js";
 
 const STATE_TONE = { adopted: "b-ok", probed: "b-warn", candidate: "b-info", retired: "b-muted" };
@@ -375,8 +375,33 @@ function testTasks(view) {
   return `none yet. Dot tries a few tasks of its pool a night, ${each}, to find ${view.headroom_least} the version in use fails sometimes (${found}; ${tried}): nothing is proposed until then, since no version could be better on tasks that pass already`;
 }
 
+/** The time the nightly learning is offered at when it is switched on, a quiet hour of most nights. */
+const DEFAULT_NIGHT = "04:00";
+
+/**
+ * The switch of the nightly learning and its time (item 721): `onSchedule(stepTime, switchingOn)` keeps a time of day
+ * or "off". The page's choice wins over the settings file's.
+ */
+function scheduleControl(view, onSchedule) {
+  const on = view.step_time !== "off";
+  const time = el("input", { class: "input night-time", type: "time", "aria-label": "At what time", value: on ? view.step_time : DEFAULT_NIGHT, hidden: !on });
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": String(on), "aria-label": "Nightly learning on", title: on ? "Switch the nightly learning off" : "Switch the nightly learning on" });
+  toggle.addEventListener("click", () => attempt(() => onSchedule(on ? "off" : time.value || DEFAULT_NIGHT, !on)));
+  time.addEventListener("change", () => {
+    if (time.value !== "") {
+      attempt(() => onSchedule(time.value, false));
+    }
+  });
+  return el("span", { class: "night-controls" }, time, toggle);
+}
+
+/** What a night costs, in the words the page says it before the learning is switched on (item 721). */
+function nightCost(view) {
+  return `Each night Dot tries new versions on test tasks with its main model, ${view.main_model}: up to ${Math.round(view.step_tokens / 1e6)} million tokens and ${plural(Math.round(view.step_minutes), "minute", "minutes")}.`;
+}
+
 /** The nightly learning: when it runs and what it does, and under that the nights it ran, the newest first. */
-function nightlyBody(view, steps) {
+function nightlyBody(view, steps, onSchedule) {
   const on = view.step_time !== "off";
   const when = setRow({
     title: on ? `Every night at ${view.step_time}` : "The nightly learning is off",
@@ -384,23 +409,20 @@ function nightlyBody(view, steps) {
       ? el(
           "span",
           null,
-          "Dot reads what its tasks did and proposes versions by itself; you never have to write one. The time can be changed in the settings file.",
-          settingFold("[harness] step_time", "The key is"),
+          `Dot reads the task that went worst since the night before and tries versions by itself; you never have to write one. ${nightCost(view)}`,
         )
-      : el(
-          "span",
-          null,
-          "Set a time of day in the settings file, and Dot learns once a night.",
-          settingFold("[harness] step_time", "The key is"),
-        ),
-    control: on
-      ? el("span", { class: "night-next", title: "By this window's clock; Dot reads the time in the time zone of its schedules" }, icon("clock"), nextNight(view.step_time))
-      : null,
+      : el("span", null, `Switch it on, and Dot learns once a night. ${nightCost(view)}`),
+    control: el(
+      "span",
+      { class: "night-when" },
+      on ? el("span", { class: "night-next", title: "By this window's clock; Dot reads the time in the time zone of its schedules" }, icon("clock"), nextNight(view.step_time)) : null,
+      scheduleControl(view, onSchedule),
+    ),
   });
   if (steps.length === 0) {
     return setCard(
       when,
-      emptyPanel("bolt", "Nothing learned yet", el("span", null, "Once a time of day is set in the settings file, Dot learns once a night.", el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, "The key is ", el("code", { class: "mono" }, "[harness] step_time"), ". In Terminal, ", el("code", { class: "mono" }, "dotx harness step"), " runs it once now.")))),
+      emptyPanel("bolt", "Nothing learned yet", el("span", null, on ? "The first night comes at its time." : "Switch the nightly learning on above, and Dot learns once a night.", el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, "In Terminal, ", el("code", { class: "mono" }, "dotx harness step"), " runs it once now.")))),
     );
   }
   return setCard(when, el("div", { class: "night-head" }, el("span", { class: "follow-label" }, "Recent nights"), nightLegend()), ...steps.map(stepRow));
@@ -593,7 +615,7 @@ export function mount(root, ctx) {
           actions: opener,
           body: versionsBody(handlers),
         }),
-        setSection({ title: "Nightly learning", body: nightlyBody(view, steps) }),
+        setSection({ title: "Nightly learning", body: nightlyBody(view, steps, (stepTime, switchingOn) => schedule(stepTime, switchingOn)) }),
         setSection({
           title: "Lessons learned",
           body:
@@ -628,6 +650,30 @@ export function mount(root, ctx) {
       returnFocus: opener,
       onSubmit: saved(true),
     });
+  }
+
+  /** Keep when the nightly learning runs; switching it on says first what a night costs. */
+  async function schedule(stepTime, switchingOn) {
+    if (switchingOn) {
+      const confirmed = await confirmDialog({
+        title: "Switch the nightly learning on?",
+        message: `${nightCost(view)} It runs at ${stepTime}, and you choose the version Dot follows.`,
+        confirmLabel: "Switch on",
+        danger: false,
+        focusCancel: false,
+      });
+      if (!confirmed) {
+        paint();
+        return;
+      }
+    }
+    const fresh = await api.put("/harness/schedule", { step_time: stepTime });
+    if (disposed) {
+      return;
+    }
+    view = { ...fresh, versions: view.versions, from_outside: view.from_outside, refused: view.refused };
+    paint();
+    toast("ok", stepTime === "off" ? "The nightly learning is off." : `Dot learns every night at ${stepTime}.`);
   }
 
   async function reload() {

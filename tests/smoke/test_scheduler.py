@@ -30,12 +30,14 @@ from dotagent.core.errors import ConfigError, StoreError, ToolExecutionError, To
 from dotagent.core.paths import db_path, failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.events import SYSTEM_RUN_ID, EventBus, Subscription
+from dotagent.harness.schedule import STEP_TIME_KEY, set_schedule
 from dotagent.llm.types import Effort, Speed
 from dotagent.plugins import scout_service
 from dotagent.plugins.scout_types import ScoutState
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
+from dotagent.scheduler import runner as scheduler_runner
 from dotagent.scheduler.failures import SCHEDULE_FAILURES_KEY, FiringFailures, parse_failures, record_firing_failure
 from dotagent.scheduler.plans import (
     UNSET_OPTIONS,
@@ -52,6 +54,7 @@ from dotagent.store.models import (
     CampaignRecord,
     ChatChoices,
     EventRecord,
+    HarnessStep,
     RunMode,
     RunRecord,
     ScheduleOptions,
@@ -1195,3 +1198,37 @@ async def test_a_look_now_under_way_at_the_scouts_time_is_that_nights_look(
     assert scheduler._scouting is None
     await scheduler._scout_if_due(after + 600)
     assert scheduler._scouting is None and nights == []
+
+
+async def test_the_nightly_step_starts_at_the_time_the_page_set_over_the_settings_file(
+    runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 721: the time kept from the Self-improvement page wins over [harness] step_time ("off" by default); "off"
+    kept from the page holds it, whatever the file says."""
+    steps: list[float] = []
+
+    async def step(given: Runtime, now: float, from_run: str | None, prober: object, scripted: bool) -> HarnessStep:
+        steps.append(now)
+        return await given.store.create_harness_step(now, None, None)
+
+    monkeypatch.setattr(scheduler_runner, "run_step", step)
+    scheduler: Scheduler = Scheduler(runtime, _Starts(runtime))
+    zone = runtime.schedule_zone
+    day: datetime = datetime(2026, 10, 27, tzinfo=zone)
+    scheduler._stepped_from = day.replace(hour=1).timestamp()
+    after: float = day.replace(hour=4, minute=1).timestamp()
+    try:
+        assert runtime.config.harness.step_time == "off"
+        await scheduler._step_if_due(after)
+        assert steps == []
+        await set_schedule(runtime.store, runtime.config.harness, "04:00")
+        await scheduler._step_if_due(after)
+        assert scheduler._stepping is not None
+        await asyncio.wait({scheduler._stepping})
+        assert steps == [after]
+        await set_schedule(runtime.store, runtime.config.harness, "off")
+        scheduler._stepped_from = 0.0
+        await scheduler._step_if_due(after + 86_400)
+        assert steps == [after]
+    finally:
+        await runtime.store.kv_set(STEP_TIME_KEY, "")

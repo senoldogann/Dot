@@ -11,7 +11,7 @@ import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from 
 import { icon } from "../icons.js";
 import { orderControl, proposedSection, trashSection } from "../memorylife.js";
 import { emptyPanel, field, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
-import { attempt, confirmDialog, formDialog, settingFold, toast } from "../ui.js";
+import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
 
 const PAGE_SIZE = 30;
 // The most notes the route reads at once (MemoriesQuery in server/views.py).
@@ -781,8 +781,8 @@ export function mount(root, ctx) {
             learningRow("The nightly reflection", view.health.reflection),
             learningRow("Lessons from tasks", view.health.lessons),
             learningRow("Skills from tasks", view.health.playbooks),
-            // A step that [harness] step_time keeps from running is off, not failing, and says so though it once ran
-            // (item 613: the page said it last went well days after it was switched off).
+            // A step its schedule keeps from running is off, not failing, and says so though it once ran (item 613: the
+            // page said it last went well days after it was switched off); it is switched on on its page (item 721).
             !view.harness_on
               ? setRow({
                   title: "The nightly self-improvement",
@@ -790,7 +790,7 @@ export function mount(root, ctx) {
                     "span",
                     null,
                     view.health.harness.last_success === null ? "off. " : `off; it last went well ${ago(view.health.harness.last_success)}. `,
-                    settingFold("[harness] step_time"),
+                    "Switch it on in Settings › Self-improvement.",
                   ),
                 })
               : learningRow("The nightly self-improvement", view.health.harness),

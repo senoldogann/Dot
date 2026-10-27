@@ -4157,6 +4157,20 @@
   white-space: nowrap;
 }
 
+/* The time and the switch of the nightly learning (item 721), beside when the next night is; under the line on a
+   phone. */
+.night-when,
+.night-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.night-time {
+  width: auto;
+}
+
 .night-head {
   display: flex;
   flex-wrap: wrap;

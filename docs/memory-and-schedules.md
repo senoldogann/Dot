@@ -50,8 +50,8 @@ the agent's `memory_forget`) is not deleted: it waits in the trash for `[memory]
 How learning fares, the last card, says for the reflection, the lessons and the skills when each last went well and,
 for one that failed, how many times in a row and why. A work with neither a success nor a failure recorded (one that
 had nothing to learn from leaves no mark) says "nothing recorded yet", not that it has not gone well. The nightly
-self-improvement (the harness's step) says "off" while `[harness] step_time` is `off`, and when it last went well if it
-ever ran (item 613). Learning that
+self-improvement (the harness's step) says "off" while it is switched off (on Settings › Self-improvement, or with
+`[harness] step_time` before the page set it, item 721), and when it last went well if it ever ran (item 613). Learning that
 has stopped (a work that failed three times in a row, or no reflection that went well for two days while the
 reflection is on) is told once, as "Dot's learning has stopped", and again only after it worked again; the clock is
 not read while a reflection is under way, so the one that catches up after a Mac slept through its time tells nothing

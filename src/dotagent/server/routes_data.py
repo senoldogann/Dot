@@ -13,6 +13,7 @@ from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import InvalidValueError, NotFoundError, RunConflict
 from dotagent.events import SYSTEM_RUN_ID
+from dotagent.harness.schedule import STEP_OFF, StepSchedule, schedule_of
 from dotagent.memory.lifecycle import (
     Decided,
     ForgetProposal,
@@ -352,9 +353,8 @@ def memories_router(ctx: ServerContext) -> APIRouter:
         health: LearningHealth | None = await read_learning_health(ctx.runtime.store)
         quiet_s: float | None = quiet_limit(ctx.runtime.config.agent.reflection_time)
         stalled: str | None = None if health is None else stall_reason(health, time.time(), quiet_s)
-        return LearningHealthView(
-            health=health, stalled=stalled, harness_on=ctx.runtime.config.harness.step_time != "off"
-        )
+        schedule: StepSchedule = await schedule_of(ctx.runtime.store, ctx.runtime.config.harness)
+        return LearningHealthView(health=health, stalled=stalled, harness_on=schedule.step_time != STEP_OFF)
 
     @router.get("/memories/search")
     async def search_memories(query: Annotated[SearchQuery, Query()]) -> list[MemoryHit]:
