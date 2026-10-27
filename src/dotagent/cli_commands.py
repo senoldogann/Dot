@@ -353,6 +353,15 @@ class EvalRunCommand(FrozenModel):
     no_mcp_purposes: bool
 
 
+class EvalToolsCommand(FrozenModel):
+    """`dotx eval tools` (item 736): the cases of the eval of tool use asked of ``model``, ``repeat`` times each."""
+
+    name: Literal["eval-tools"]
+    model: str | None
+    cases: tuple[str, ...]
+    repeat: int = Field(ge=1)
+
+
 class EvalReportCommand(FrozenModel):
     name: Literal["eval-report"]
     files: tuple[str, ...]
@@ -553,6 +562,7 @@ type Command = Annotated[
     | EvalListCommand
     | EvalCheckCommand
     | EvalRunCommand
+    | EvalToolsCommand
     | EvalReportCommand
     | StatsCommand
     | DaemonCommand

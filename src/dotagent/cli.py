@@ -116,6 +116,7 @@ _FAMILIES: dict[str, str] = {
     "eval-check": "dotagent.cli_eval",
     "eval-run": "dotagent.cli_eval",
     "eval-report": "dotagent.cli_eval",
+    "eval-tools": "dotagent.cli_eval",
     "stats": "dotagent.cli_stats",
     "daemon": "dotagent.cli_daemon",
     "open": "dotagent.cli_daemon",
@@ -558,6 +559,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="leave the line of each MCP server's tool group as it was before it said what the server is for "
         "([agent] mcp_purposes = false for this run), to measure what those words change",
     )
+    eval_tools = eval_commands.add_parser(
+        "tools",
+        help="ask a model the moments of tool use Dot's runs got wrong, one call each, and print which it gets right "
+        "(this spends the tokens of that model)",
+    )
+    eval_tools.add_argument(
+        "--model", default=None, help="provider:model; the main model of the configuration if omitted"
+    )
+    eval_tools.add_argument(
+        "--case", dest="cases", action="append", default=[], help="ask only this case; give it again for more"
+    )
+    eval_tools.add_argument("--repeat", type=int, default=1, help="ask every case this many times")
     eval_report = eval_commands.add_parser(
         "report", help="show the score of saved eval runs and compare them (all saved runs if no file is given)"
     )

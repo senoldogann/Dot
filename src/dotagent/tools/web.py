@@ -91,7 +91,7 @@ _INDEX_TITLE_CHARS: int = 200
 # A plain request turned away: the page is read in the browser instead when the run may read quietly (items 59, 98).
 _UNREADABLE_STATUS: frozenset[int] = REFUSED_STATUS
 # What the result says when the browser was refused too (item 98): the next rung, in one line.
-_NEXT_RUNG: str = (
+NEXT_RUNG: str = (
     "The site refuses this machine. Next: another source for the same facts; web_search with the address as the "
     "query, for the hosted search's snippet of the page; for a login wall, browser_open and ask the owner to Take over."
 )
@@ -255,7 +255,7 @@ def render_http_failure(
     if browser_problem:
         lines.append(browser_problem)
     if document.status in _UNREADABLE_STATUS:
-        lines.append(f"Some sites turn plain requests away. {_NEXT_RUNG}")
+        lines.append(f"Some sites turn plain requests away. {NEXT_RUNG}")
     if document.status in _NOT_THERE_STATUS:
         lines.append(
             "The page is not there. Do not try other addresses on a hunch: find the page with web_search (site:host "
@@ -332,7 +332,7 @@ def browser_document(rendered: RenderedDocument) -> FetchedDocument:
 
 def render_browser_failure(shown_url: str, why: str, status: int, excerpt: str, nonce: str) -> str:
     """The result when Dot's browser got an error status too: both answers, then what the page said."""
-    lines: list[str] = [f"web_fetch got HTTP {status} from {shown_url} in Dot's browser too ({why}).", _NEXT_RUNG]
+    lines: list[str] = [f"web_fetch got HTTP {status} from {shown_url} in Dot's browser too ({why}).", NEXT_RUNG]
     if excerpt:
         lines.append(fence_untrusted(shown_url, excerpt, nonce))
     return "\n".join(lines)
