@@ -11,6 +11,7 @@ have, and what it gives back is fenced as the page's and marked untrusted, a thr
 
 import asyncio
 import json
+import re
 import threading
 import time
 from collections.abc import AsyncIterator, Iterator
@@ -54,6 +55,15 @@ _PAGES: dict[str, str] = {
     "/login": '<!doctype html><title>Sign in</title><input type="password" aria-label="Password" value="hunter2">',
     "/slow": "<!doctype html><title>Slow page</title><h1>Late</h1>",
     "/sign-in": '<!doctype html><title>Sign in</title><input id="name" aria-label="Name"><p id="marker">first load</p>',
+    # A button that a click does not move, as some of Slack's do: it answers its own event alone (item 738).
+    "/stubborn": """<!doctype html><title>Stubborn page</title>
+<button id="send" aria-label="Send">Send</button><button aria-label="Other">Other</button>
+<p id="sent">not sent</p><iframe srcdoc="<button aria-label='Inside'>Inside</button>"></iframe>
+<script>
+document.getElementById("send").addEventListener("stubborn-press", () => {
+  document.getElementById("sent").textContent = "sent";
+});
+</script>""",
 }
 # How long /slow takes to answer: far longer than a script's value takes to come back.
 _SLOW_S: float = 1.5
@@ -310,6 +320,18 @@ async def test_the_tool_is_a_click_of_medium_risk_and_what_it_gives_back_is_untr
     failed: ToolResult = await thrown.run(ctx)
     assert (failed.is_error, failed.untrusted) == (True, True)
     assert failed.text.startswith("The script threw an error") and "Error: boom" in failed.text
+    # Given refs (item 738), the same click of medium risk, which names them, and its value as the page's.
+    view: PageView = await ctx.browser.open_url(ctx.thread_id, f"{site}/stubborn", True)
+    send: str = _ref(view, "Send")
+    on_ref: PreparedCall = await runtime.registry.tools["browser_eval"].prepare(
+        {"script": "(el) => el.textContent", "refs": [send]}, ctx
+    )
+    assert (on_ref.action.risk, on_ref.action.summary) == (
+        "medium",
+        f"Run a script in the page on {send}: (el) => el.textContent",
+    )
+    pressed: ToolResult = await on_ref.run(ctx)
+    assert (pressed.is_error, pressed.untrusted) == (False, True) and '"Send"' in pressed.text
 
 
 async def test_the_tool_keeps_a_script_off_a_page_with_a_secret_field_and_hides_the_cookies_outside_yolo(
@@ -427,3 +449,50 @@ async def test_a_page_a_script_ran_in_is_opened_again_for_the_owner_who_takes_th
     assert await browser.clean_for_owner("plain") is False
     assert await plain.page.input_value("#name") == "kept"
     assert await browser.clean_for_owner("never-used") is False
+
+
+def _ref(view: PageView, name: str) -> str:
+    """The ref the snapshot gives the button ``name``."""
+    found: re.Match[str] | None = re.search(rf'button "{name}"[^\n]*\[ref=([^\]]+)\]', view.body)
+    assert found is not None, view.body
+    return found.group(1)
+
+
+async def test_a_script_given_refs_gets_their_elements_and_moves_a_button_a_click_does_not(
+    browser: BrowserSession, site: str
+) -> None:
+    """Item 738: the owner moved Slack's buttons that did not answer a click with a script on the very element; the
+    script gets the elements of the refs, in their order, and reaches the one that listens for its own event."""
+    view: PageView = await browser.open_url("refs", f"{site}/stubborn", False)
+    send, other = _ref(view, "Send"), _ref(view, "Other")
+    names: ScriptRun = await browser.run_script(
+        "refs", "(first, second) => [first.getAttribute('aria-label'), second.textContent];", 10.0, False, (send, other)
+    )
+    assert (names.end, json.loads(names.text)) == ("value", ["Send", "Other"])
+    pressed: ScriptRun = await browser.run_script(
+        "refs", "(button) => button.dispatchEvent(new Event('stubborn-press'))", 10.0, False, (send,)
+    )
+    assert pressed.end == "value"
+    sent: ScriptRun = await browser.run_script("refs", "document.getElementById('sent').textContent", 10.0, False)
+    assert json.loads(sent.text) == "sent"
+
+
+async def test_refs_a_script_cannot_be_given_are_told_and_the_page_stays_usable(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("bad-refs", f"{site}/stubborn", False)
+    send: str = _ref(view, "Send")
+    # Not a function: the call fails with the page's own words.
+    plain: ScriptRun = await browser.run_script("bad-refs", "document.title", 10.0, False, (send,))
+    assert plain.end == "error" and "function" in plain.text and not plain.text.startswith("Frame.evaluate")
+    with pytest.raises(BrowserError, match="not in the latest snapshot"):
+        await browser.run_script("bad-refs", "(el) => el.id", 10.0, False, ("e9999",))
+    with pytest.raises(BrowserError, match="snapshot"):
+        await browser.run_script("bad-refs", "(el) => el.id", 10.0, False, ("button; alert(1)",))
+    inside: str = _ref(await browser.snapshot("bad-refs", False), "Inside")
+    with pytest.raises(BrowserError, match="different frames"):
+        await browser.run_script("bad-refs", "(a, b) => 1", 10.0, False, (send, inside))
+    framed: ScriptRun = await browser.run_script("bad-refs", "(el) => el.textContent", 10.0, False, (inside,))
+    assert json.loads(framed.text) == "Inside"
+    again: ScriptRun = await browser.run_script("bad-refs", "document.title", 10.0, False)
+    assert json.loads(again.text) == "Stubborn page"

@@ -2999,9 +2999,12 @@ class BrowserSession:
         mask_error(error, self._vault_values.get(thread_id, ()))
         mask_error(error, self._cookie_values.get(thread_id, ()), HIDDEN_VALUE)
 
-    async def run_script(self, thread_id: str, script: str, timeout_s: float, hide_secrets: bool) -> ScriptRun:
+    async def run_script(
+        self, thread_id: str, script: str, timeout_s: float, hide_secrets: bool, refs: Sequence[str] = ()
+    ) -> ScriptRun:
         """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
-        263). What the script led to is waited for as after a step (a tab it opened, a dialog), and the page is settled
+        263), with the elements of ``refs`` as its arguments when they are given (item 738). What the script led to
+        is waited for as after a step (a tab it opened, a dialog), and the page is settled
         after every script as after a step (item 270), so that a navigation it started is let load, also one that
         commits after its value came back; the address rules then hold as after a step: a tab that ended on an address
         they forbid is reset to a blank page and the call fails. After a script still running when the wait ended, only
@@ -3038,7 +3041,7 @@ class BrowserSession:
             try:
                 before: _Watch = self._watch(thread, tab)
                 started: float = time.monotonic()
-                end, text = await run_script(tab.page, script, timeout_s)
+                end, text = await run_script(tab.page, script, timeout_s, refs)
                 if hide_secrets:
                     self._cookie_values.setdefault(thread_id, set()).update(await cookie_secrets(tab.page, address))
                 seconds: float = time.monotonic() - started

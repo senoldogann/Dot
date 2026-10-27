@@ -3,7 +3,7 @@
 import asyncio
 import json
 import re
-from collections.abc import Awaitable, Callable, Collection
+from collections.abc import Awaitable, Callable, Collection, Sequence
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -1053,8 +1053,9 @@ async def visible_text(page: Page, ref: str | None, timeout_ms: int) -> str:
         raise _failure("reading the page text failed", page, {"ref": ref}, error) from error
 
 
-# How Playwright begins the error of a script, and the start of a line of its call stack.
-_EVALUATE_PREFIX: str = "Page.evaluate: "
+# How Playwright begins the error of a script (in the page, or in a frame of it given refs), and the start of a
+# line of its call stack.
+_EVALUATE_PREFIXES: tuple[str, ...] = ("Page.evaluate: ", "Frame.evaluate: ")
 _STACK_LINE: str = "    at "
 # What Playwright says when the page navigated while a script ran (only this: a script's own error may say "navigator").
 _CONTEXT_DESTROYED: str = "Execution context was destroyed"
@@ -1063,18 +1064,66 @@ _CONTEXT_DESTROYED: str = "Execution context was destroyed"
 def _script_error(raw: str) -> str:
     """The message a script threw, without Playwright's prefix and the lines of the call stack (Playwright's own frames
     and the anonymous ones of the script)."""
-    lines: list[str] = raw.removeprefix(_EVALUATE_PREFIX).splitlines()
+    for prefix in _EVALUATE_PREFIXES:
+        raw = raw.removeprefix(prefix)
+    lines: list[str] = raw.splitlines()
     return "\n".join(line for line in lines if not line.startswith(_STACK_LINE)).strip()
 
 
-async def run_script(page: Page, script: str, timeout_s: float) -> tuple[ScriptEnd, str]:
+async def _elements_of(page: Page, refs: Sequence[str]) -> tuple[Frame, list[ElementHandle]]:
+    """The elements the refs ``refs`` of the latest snapshot stand for (:func:`live_locator`), and the frame they share:
+    a script runs in one document, so the elements of two frames cannot be given to one script."""
+    handles: list[ElementHandle] = []
+    frames: list[Frame] = []
+    for ref in refs:
+        locator: Locator = await live_locator(page, ref, "script")
+        try:
+            # Both ask the page, which a script still running from before may hold: as long as a count waits.
+            async with asyncio.timeout(_COUNT_TIMEOUT_S):
+                handle: ElementHandle | None = await locator.element_handle(timeout=_COUNT_TIMEOUT_S * 1000)
+                frame: Frame | None = None if handle is None else await handle.owner_frame()
+        except TimeoutError as error:
+            raise BrowserError(
+                "the page did not answer in time (a script may be holding it); wait, then take a new snapshot",
+                {"action": "script", "ref": ref, "url": page.url, "waited_s": _COUNT_TIMEOUT_S},
+            ) from error
+        except PlaywrightError as error:
+            raise _failure("finding the element for the script failed", page, {"ref": ref}, error) from error
+        if handle is None or frame is None:
+            raise BrowserError(
+                "the ref is not in the page any more (it re-rendered); take a new snapshot",
+                {"action": "script", "ref": ref, "url": page.url},
+            )
+        handles.append(handle)
+        frames.append(frame)
+    if any(frame != frames[0] for frame in frames):
+        raise BrowserError(
+            "the refs are in different frames of the page: give one script the elements of one frame",
+            {"action": "script", "refs": ", ".join(refs), "url": page.url},
+        )
+    return frames[0], handles
+
+
+async def run_script(page: Page, script: str, timeout_s: float, refs: Sequence[str] = ()) -> tuple[ScriptEnd, str]:
     """Run ``script`` in the page's own JavaScript world (item 263) and wait at most ``timeout_s`` for its value:
-    Playwright calls a function and evaluates anything else, and waits for a promise either gives. Returns how it ended
-    and the JSON of its value (``null`` for ``undefined``; a value JSON cannot hold, a DOM node, comes as Playwright
-    writes it) or the message it threw. A script still running when the wait ends goes on in the page."""
+    Playwright calls a function and evaluates anything else, and waits for a promise either gives. With ``refs`` (item
+    738), refs of the latest snapshot, the script is a function called with their elements, in that order, in the frame
+    they are in: the element a click of a step did not move (a button that listens for other events) is reached
+    as it is, not found again by a selector. Returns how it ended and the JSON of its value (``null`` for ``undefined``;
+    a value JSON cannot hold, a DOM node, comes as Playwright writes it) or the message it threw. A script still
+    running when the wait ends goes on in the page. The elements are found before the wait starts: a wait that ends
+    while they are found would say a script runs that never began."""
+    elements: tuple[Frame, list[ElementHandle]] | None = await _elements_of(page, refs) if refs else None
     try:
         async with asyncio.timeout(timeout_s):
-            value: object = await page.evaluate(script)
+            if elements is not None:
+                frame, handles = elements
+                # A trailing ";" ends the expression the function must be; the line breaks keep a closing comment
+                # out of the call.
+                called: str = f"(elements) => (\n{script.rstrip().rstrip(';')}\n)(...elements)"
+                value: object = await frame.evaluate(called, handles)
+            else:
+                value = await page.evaluate(script)
     except TimeoutError:
         return "timeout", ""
     except PlaywrightError as error:
