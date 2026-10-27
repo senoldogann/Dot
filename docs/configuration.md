@@ -47,6 +47,10 @@ it). Two environment variables of the process move things: `DOT_HOME` (the home 
 | `backups/`                                       | the copies of the database, unless `[store] backup_dir` names a folder |
 | `backups-partial/`                               | the uncompressed file of a copy under way                            |
 
+`config.toml` and `.env` may be links to files you keep elsewhere (a dotfiles repository): what Dot changes in them
+(Settings, `dotx auth`, the keys of Customize › Connectors) is written where the link leads, and the link stays (item
+728). Dot's other files are written in place of whatever stands at their name.
+
 **The MCP server that comes with Dot** (item 583). `[builtin_mcp] web_research` (`true`) says whether the server
 `web-research` is started with Dot's other MCP servers. It starts when its package, `dotagent-web-research`, can be
 imported (every install has it) and no `[[mcp]]` table, plugin or added server has the name `web-research`, which
