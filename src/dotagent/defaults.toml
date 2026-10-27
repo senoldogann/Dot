@@ -694,8 +694,10 @@ background_tab_idle_s = 300.0
 # under "Dot's computer", no task is being taught in it and its window is not the one in front. A Chrome left open keeps
 # memory, and macOS takes it for your Google Chrome, whose Dock icon then brings it forward instead of opening yours.
 # The next call that needs it starts it again on the same profile, signed in as before (item 453 keeps the session
-# cookies across its restarts; Incognito keeps nothing); the chats' tabs go with it. 0, the default, keeps it open until the daemon stops.
-idle_close_s = 0.0
+# cookies across its restarts; Incognito keeps nothing); the chats' tabs go with it. 1800, the default since item 731, is
+# tab_idle_s: Chrome closes once the chats' own tabs would have closed (it kept about 600 MB in 14 processes while
+# unused, measured 2026-10-27); 0 keeps it open until the daemon stops.
+idle_close_s = 1800.0
 screenshot_quality = 60
 # The most steps one browser_act runs (item 700: 10 since 2026-10-26, 5 before).
 max_batch_steps = 10

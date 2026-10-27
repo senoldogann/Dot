@@ -274,14 +274,16 @@ Both modes share what follows.
   itself, which sites move off the screen or put under an icon (a click on such a field waited eight seconds and
   failed), or the one file field inside it, as in a label that wraps a hidden field. Otherwise the element is clicked
   and the file chooser it opens takes them; a field beside it is not taken, as it may be another control's.
-- With `idle_close_s` set (seconds; 0, the default, keeps it open until the daemon stops; item 454), Dot's own Chrome
-  (`own`) closes, the Playwright driver with it, once nothing used it for that long: no chat's step is under way in it,
-  no run at work holds tabs in it, no page is being read in it for the web tools or watched under "Dot's computer", no
-  task is being taught in it, and its window is not the one in front. The next call that needs it starts it again on the
-  same profile, signed in as before (a profile keeps its session cookies, item 453; Incognito keeps nothing); the chats'
-  tabs go with it. Dot's Chrome is the Google Chrome application, so while it runs macOS takes it for yours: a click on
-  Chrome in the Dock brings Dot's forward instead of opening yours. Once Dot's has closed, the Dock opens yours again;
-  while a run works in its browser, the mode `attach` lets Dot work in your own Chrome instead.
+- With `idle_close_s` (seconds; 1800 by default since item 731, the time after which the chats' own tabs close; 0 keeps
+  it open until the daemon stops; item 454), Dot's own Chrome (`own`) closes, the Playwright driver with it, once
+  nothing used it for that long: no chat's step is under way in it, no run at work holds tabs in it, no page is being
+  read in it for the web tools or watched under "Dot's computer", no task is being taught in it, and its window is not
+  the one in front. The next call that needs it starts it again on the same profile, signed in as before (a profile
+  keeps its session cookies, item 453; Incognito keeps nothing); the chats' tabs go with it, and so does a page you
+  opened in it yourself and left behind its window. Dot's Chrome is the Google
+  Chrome application, so while it runs macOS takes it for yours: a click on Chrome in the Dock brings Dot's forward
+  instead of opening yours. Once Dot's has closed, the Dock opens yours again; while a run works in its browser, the
+  mode `attach` lets Dot work in your own Chrome instead.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`, and the
   addresses a call of the web-research server's tools holds (`web_scrape`, `web_extract`, `web_map` and
   `web_crawl_start`, item 583: checked as `web_fetch`'s is, and a long one is flagged as it is, see
