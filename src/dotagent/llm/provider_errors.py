@@ -64,6 +64,15 @@ _OPENROUTER_EXCLUDED: re.Pattern[str] = re.compile(
     r"^\s*(.+?)(?: \(account settings\))?: \d+ endpoints? excluded", re.MULTILINE
 )
 _OPENROUTER_PRIVACY: str = "https://openrouter.ai/settings/privacy"
+# Where the owner sets how OpenRouter chooses a model's provider (item 737), and how OpenRouter says, with HTTP 404,
+# that a request's routing left none ("No endpoints found that can handle the requested parameters", "No allowed
+# providers are available for the selected model").
+_OPENROUTER_ROUTING: str = "config.toml ([providers.openrouter] routing)"
+# A 404 that a model lacks what the request asks ("No endpoints found that support image input") is the request's,
+# not the routing's, and is read as before.
+_OPENROUTER_NO_ENDPOINT: re.Pattern[str] = re.compile(
+    r"no allowed providers|no endpoints found that can handle the requested parameters", re.IGNORECASE
+)
 # How OpenRouter words a 402 for credits that do not pay for the longest answer a request allows: "This request requires
 # more credits, or fewer max_tokens. You requested up to 131072 tokens, but can only afford 29597."
 _OPENROUTER_CREDITS: str = "credits"
@@ -237,21 +246,43 @@ def classify_anthropic(
 
 
 def classify_openrouter(
-    status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
+    status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject, routed: bool = False
 ) -> ProviderHttpError:
     """OpenRouter: a 402 that speaks of credits is :class:`ProviderCreditError`, with the longest answer the credits pay
     for when the message names it; a 404 that says the account's privacy settings leave no provider of the model is a
-    refused access, worded with what excluded them and where to change that (item 361)."""
+    refused access, worded with what excluded them and where to change that (item 361). ``routed``: the request carried
+    the model's ``[providers.openrouter] routing``, which may be what left no provider (item 737), so a 404 of that
+    kind, or one that says no allowed provider, or no endpoint that can handle the requested parameters, is left,
+    is a refused access that names the routing too."""
     if status == 402 and wire is not None and _OPENROUTER_CREDITS in wire.message.lower():
         found: re.Match[str] | None = _OPENROUTER_AFFORDABLE.search(wire.message)
         affordable: int | None = None if found is None else int(found.group(1))
         return ProviderCreditError(error_message(status, wire), status, retry_after_s, detail, affordable)
-    if status == 404 and wire is not None and _OPENROUTER_POLICY in wire.message:
+    policy: bool = status == 404 and wire is not None and _OPENROUTER_POLICY in wire.message
+    if policy and wire is not None:
         reasons: str = redact_secrets("; ".join(_OPENROUTER_EXCLUDED.findall(wire.message)))[:_MESSAGE_CHARS]
         excluded: str = f" ({reasons})" if reasons else ""
+        if routed:
+            return ProviderAccessError(
+                f"OpenRouter's privacy settings for this account, or the routing set for the model in "
+                f"{_OPENROUTER_ROUTING}, leave no provider of the model{excluded}: choose another model in Settings › "
+                f"Models, loosen its routing (only, ignore, allow_fallbacks, quantizations, max_price), or change the "
+                f"privacy settings at {_OPENROUTER_PRIVACY}",
+                status,
+                detail,
+            )
         return ProviderAccessError(
             f"OpenRouter's privacy settings for this account leave no provider of the model{excluded}: choose another "
             f"model in Settings › Models, or change them at {_OPENROUTER_PRIVACY}",
+            status,
+            detail,
+        )
+    if routed and status == 404 and wire is not None and _OPENROUTER_NO_ENDPOINT.search(wire.message):
+        said: str = redact_secrets(wire.message)[:_MESSAGE_CHARS]
+        return ProviderAccessError(
+            f"The routing set for the model in {_OPENROUTER_ROUTING}, with what the request asks of it, leaves no "
+            f"provider of it on OpenRouter ({said}): loosen the routing (only, ignore, allow_fallbacks, quantizations, "
+            f"max_price), or choose another model in Settings › Models",
             status,
             detail,
         )

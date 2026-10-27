@@ -201,12 +201,34 @@ class AnthropicConfig(FrozenModel):
     max_concurrent: int = Field(ge=1)
 
 
+class OpenRouterMaxPrice(FrozenModel):
+    """The most a request may cost at the provider OpenRouter routes it to, in dollars per million tokens."""
+
+    prompt: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    completion: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+
+class OpenRouterRouting(FrozenModel):
+    """How OpenRouter chooses the provider of one model (its ``provider`` object): each field left out is OpenRouter's
+    own default. See https://openrouter.ai/docs/guides/routing/provider-selection."""
+
+    sort: Literal["price", "throughput", "latency"] | None = None
+    order: list[str] | None = None
+    only: list[str] | None = None
+    ignore: list[str] | None = None
+    allow_fallbacks: bool | None = None
+    quantizations: list[str] | None = None
+    max_price: OpenRouterMaxPrice | None = None
+
+
 class OpenRouterConfig(FrozenModel):
     """OpenRouter (item 349): the models of many labs on one key. Its list of its models, which says what each model
-    can do, is kept for ``models_ttl_s`` without asking again."""
+    can do, is kept for ``models_ttl_s`` without asking again. ``routing`` is how OpenRouter chooses the provider of a
+    model, by its id; a variant (``model:nitro``) takes its model's (item 737)."""
 
     base_url: ServiceAddress
     api_key_env: str
+    routing: dict[str, OpenRouterRouting]
     models_ttl_s: float = Field(gt=0, allow_inf_nan=False)
     connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     read_timeout_s: float = Field(gt=0, allow_inf_nan=False)

@@ -154,15 +154,27 @@ answer keeps its words, Ollama's too.
   models_ttl_s` (an hour): whether it reads images and calls tools (the model picker offers only those that do), its
   context and output limits, whether it takes a temperature, and its reasoning levels, the ones OpenRouter lists for it.
   A variant OpenRouter does not list (`:nitro`, `:floor` or `:online` after the id) can do what its model can.
-  A model whose reasoning is a switch offers On and Off, and one that always reasons and names no levels offers none.
-  The level goes as OpenRouter's `reasoning` object; a step's reasoning details go back to the same model on its next
-  step, unchanged, as OpenRouter asks beside tool calls, so a model that thinks keeps its thread across a run's tool
-  calls. A model whose id ends in `:free`, or whose prices are both zero, says Free; OpenRouter limits the free ones to
-  a few requests a minute and a day. Dot sends no `HTTP-Referer` or `X-OpenRouter-Title`, so its requests do not count
-  Dot in OpenRouter's rankings. The prompt caching OpenRouter does by itself (OpenAI, DeepSeek, Gemini and others)
-  applies; the cache marks Claude would need through OpenRouter are not sent. A model that the account's privacy
-  settings leave no provider of, as a model whose providers keep what they are sent is under Zero Data Retention, is
-  answered 404; Dot reads that as a refused access: the error names what excluded the providers and where to change it
+  `[providers.openrouter] routing` sets, by a model's id, how OpenRouter chooses the provider that serves it (item 737):
+  the request carries it as OpenRouter's `provider` object
+  (https://openrouter.ai/docs/guides/routing/provider-selection), with `sort` (`"price"`, `"throughput"` or
+  `"latency"`), `order`, `only` and `ignore` (provider slugs), `allow_fallbacks`, `quantizations` and `max_price`
+  (`prompt` and `completion`, in dollars per million tokens), each left out at OpenRouter's own default; for example
+  `routing = { "deepseek/deepseek-v4.1-flash-1017" = { sort = "throughput", max_price = { prompt = 0.3, completion = 1.2
+  } } }`. A variant takes its model's routing unless its own id has one. `:nitro` and `:floor` choose by throughput and
+  by price for that one call and make the faster or cheaper tiers of service eligible too; a routing applies to every
+  call of the model and can also name the providers, their order, the quantizations and the most a call may cost. A key
+  or a value Dot does not know is a configuration error. A routing that leaves no provider (an `only` none of whose
+  providers serves the model, `allow_fallbacks = false`, a `max_price` below every provider's) is answered 404, which
+  Dot reads as a refused access whose error names the routing beside the privacy settings. A model whose reasoning is a
+  switch offers On and Off, and one that always reasons and names no levels offers none. The level goes as OpenRouter's
+  `reasoning` object; a step's reasoning details go back to the same model on its next step, unchanged, as OpenRouter
+  asks beside tool calls, so a model that thinks keeps its thread across a run's tool calls. A model whose id ends in
+  `:free`, or whose prices are both zero, says Free; OpenRouter limits the free ones to a few requests a minute and a
+  day. Dot sends no `HTTP-Referer` or `X-OpenRouter-Title`, so its requests do not count Dot in OpenRouter's rankings.
+  The prompt caching OpenRouter does by itself (OpenAI, DeepSeek, Gemini and others) applies; the cache marks Claude
+  would need through OpenRouter are not sent. A model that the account's privacy settings leave no provider of, as a
+  model whose providers keep what they are sent is under Zero Data Retention, is answered 404; Dot reads that as a
+  refused access: the error names what excluded the providers and where to change it
   (https://openrouter.ai/settings/privacy), or to choose another model. As after a 403, a run whose own model it is
   moves to its standby model, and the model is paused (item 361).
 - **OpenCode Go**: Dot knows the route of the models in its catalog, and of a new Claude, Qwen, MiniMax, Grok, GPT or
