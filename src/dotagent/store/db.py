@@ -2958,6 +2958,18 @@ class Store:
         rows = await self._all("SELECT * FROM runs WHERE finished_at >= ? ORDER BY created_at", (since,))
         return [_run(row) for row in rows]
 
+    async def tool_errors_of(self, run_ids: Sequence[str]) -> dict[str, int]:
+        """How many of the tool calls of each of ``run_ids`` failed (a ``tool_result`` that is not ``ok``), a run with
+        none left out."""
+        if not run_ids:
+            return {}
+        rows = await self._all(
+            "SELECT run_id, COUNT(*) AS errors FROM events WHERE kind = 'tool_result'"
+            f" AND run_id IN ({','.join('?' * len(run_ids))}) AND json_extract(data, '$.ok') = 0 GROUP BY run_id",
+            tuple(run_ids),
+        )
+        return {row["run_id"]: row["errors"] for row in rows}
+
     async def runs_with_failed_lessons(
         self, since: float, failed_kind: str, drawn_kinds: Sequence[str]
     ) -> list[RunRecord]:

@@ -316,12 +316,15 @@ candidate, whose notes keep the scope and the moments; `keep` writes nothing.
 ## The step, as built
 
 `[harness] step_time` (a time of day; `off` by default) has the daemon run one step a night, and `dotx harness step
-[--run ID] [--scripted]` runs one by hand. The step reads the newest run of yours that ended since the last step that
-took one, a week back at most (item 719; a task or research run of its own, as the reflection reads them, that Dot's own
-agent worked: a run on one of Zen's free models goes whole to OpenCode's own agent, which takes no habits, tool
-guidance, notes or skills, so a step does not learn from it and a version never changes what it does; the reflection
-still reads it, for its journal, what Dot knows about you and its lessons), asks the proposer for a candidate in each
-scope of `step_candidates`, then plays the tasks it scores on (the guards and the tasks with headroom, above: item 719)
+`[harness] step_time` (a time of day; `off` by default) has the daemon run one step a night, and `dotx harness step
+[--run ID] [--scripted]` runs one by hand. The step reads one run of yours that ended since the last step that took one
+(a week back at most, item 719): a task or research run of its own, as the reflection reads them, that Dot's own agent
+worked (a run on one of Zen's free models goes whole to OpenCode's own agent, which takes no habits, tool guidance,
+notes or skills, so a step does not learn from it and a version never changes what it does; the reflection still reads
+it, for its journal, what Dot knows about you and its lessons). Of the newest thirty, it takes the one that went worst
+(item 720): one that failed, then one that was stopped or held, then the one with the most tool calls that failed, then
+the newest, since a run that went well teaches little. It asks the proposer for a candidate in each scope of
+`step_candidates`, then plays the tasks it scores on (the guards and the tasks with headroom, above: item 719)
 `step_repeats` times under the adopted texts and under each candidate. Each probe is a process of its own (`dotx harness
 probe`), because an attempt switches
 the process's Dot home to its throw-away one, which the daemon and your runs must never see; the step reads the report
