@@ -9,6 +9,7 @@ shows only what changed.
 import asyncio
 import contextlib
 import subprocess
+import threading
 import time
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
@@ -380,7 +381,23 @@ class DesktopSession:
         self._fronts: dict[str, _Front] = {}
 
     async def _call[T](self, work: Callable[[], T]) -> T:
-        return await asyncio.get_running_loop().run_in_executor(self._pool, work)
+        """``work`` on the desktop's worker thread. A call whose coroutine is cancelled (the run stopped, its tool timed
+        out) cannot stop the thread: it sets the call's stop, which the steps' failsafe checks read between keys, so
+        the step ends at the next check instead of typing on (item 747)."""
+        stop: threading.Event = threading.Event()
+
+        def run() -> T:
+            actions.set_call_stop(stop)
+            try:
+                return work()
+            finally:
+                actions.set_call_stop(None)
+
+        try:
+            return await asyncio.get_running_loop().run_in_executor(self._pool, run)
+        except asyncio.CancelledError:
+            stop.set()
+            raise
 
     def _refuse_while_asking(self) -> None:
         since: float | None = self._asking_since

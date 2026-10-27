@@ -3,6 +3,9 @@ at it between their events, so that what is left is not typed into whatever has 
 step whose pointer was moved by someone else since the previous one stops the batch, as docs/safety.md says. No event
 reaches the Mac: the posting is a stand-in."""
 
+import asyncio
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -14,6 +17,7 @@ from dotagent.core.errors import DesktopError, FailSafeTriggered
 from dotagent.desktop import actions, screen
 from dotagent.desktop import input as hid
 from dotagent.desktop.actions import StepEnv, execute_step
+from dotagent.desktop.session import DesktopSession
 from dotagent.desktop.types import Point, Step
 
 
@@ -72,3 +76,32 @@ def test_the_stop_never_comes_between_a_press_and_its_release(monkeypatch: pytes
     with pytest.raises(FailSafeTriggered):
         hid.post([hid.TimedEvent(kind, 0.0) for kind in kinds], check)
     assert posted == kinds[:15] and checked_at == [0, 15]
+
+
+async def test_a_step_whose_run_stopped_stops_typing_though_its_thread_cannot_be_cancelled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 747: a stopped run, or a tool that ran out of time, cancels the call's coroutine but not the desktop's
+    worker thread, which went on typing a long text key by key into whatever had the keyboard. The call's stop ends it
+    at the next check."""
+    monkeypatch.setattr(actions.screen, "pointer_location", lambda: Point(x=600.0, y=400.0))
+    env: StepEnv = cast(StepEnv, SimpleNamespace(config=load_default_config().desktop, failsafe_file=tmp_path / "STOP"))
+    typed: list[int] = []
+    ended: threading.Event = threading.Event()
+
+    def typing() -> None:
+        try:
+            for key in range(10_000):
+                actions.check_failsafe(env)
+                typed.append(key)
+                time.sleep(0.005)
+        finally:
+            ended.set()
+
+    session: DesktopSession = DesktopSession(load_default_config().desktop, tmp_path / "STOP", frozenset)
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(session._call(typing), 0.2)
+    assert await asyncio.to_thread(ended.wait, 2.0), "the thread went on after the call was cancelled"
+    assert len(typed) < 200
+    # The next call of the thread is not stopped by the one before.
+    assert await session._call(lambda: actions.check_failsafe(env)) is None
