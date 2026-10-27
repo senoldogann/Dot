@@ -4,6 +4,7 @@ import asyncio
 import json
 import re
 from collections.abc import Awaitable, Callable, Collection, Sequence
+from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -538,6 +539,97 @@ async def wait_dom_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int
         "waiting for the page to settle failed",
         lambda: _wait_quiet(page, quiet_ms, max_ms, timeout_ms),
     )
+
+
+# What a step that should change the page did to it (item 739): how many changes the page's documents have had since
+# Dot first asked (a MutationObserver of each frame's document), the alerts and live regions it shows, and the fields
+# it marks invalid with what it says of each. Read in every frame, as a control may be in one.
+_PULSE_SCRIPT: str = """() => {
+  const w = window;
+  if (!w.__dotPulse) {
+    w.__dotPulse = { changes: 0 };
+    try {
+      new MutationObserver((list) => { w.__dotPulse.changes += list.length; })
+        .observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+      // What changes a page with no mutation: a box ticked, a field typed in, a <details> opened.
+      for (const kind of ["input", "change", "toggle"]) {
+        document.addEventListener(kind, () => { w.__dotPulse.changes += 1; }, true);
+      }
+    } catch (error) { w.__dotPulse.changes = -1; }
+  }
+  const shown = (el) => { const box = el.getBoundingClientRect(); return box.width > 0 && box.height > 0; };
+  const words = (el) => (el.innerText || el.textContent || "").trim().replace(/\\s+/g, " ").slice(0, 160);
+  const alerts = [...document.querySelectorAll("[role=alert], [aria-live=assertive], [aria-live=polite]")]
+    .filter(shown).map(words).filter(Boolean).slice(0, 8);
+  const invalid = [...document.querySelectorAll(
+    "[aria-invalid=true], input:invalid, select:invalid, textarea:invalid"
+  )].filter(shown).slice(0, 8).map((el) => {
+    const label = (el.labels && el.labels[0] ? words(el.labels[0]) : "") || el.getAttribute("aria-label")
+      || el.getAttribute("name") || el.getAttribute("placeholder") || el.tagName.toLowerCase();
+    return `${label.slice(0, 60)}: ${(el.validationMessage || "invalid").slice(0, 120)}`;
+  });
+  return { changes: w.__dotPulse.changes, alerts, invalid };
+}"""
+_PULSE_FRAMES: int = 10
+_PULSE_TIMEOUT_S: float = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class Pulse:
+    """The page as :data:`_PULSE_SCRIPT` reads it: the changes its documents had (``None`` when one could not be
+    read, which then counts as a change), and what it shows of alerts and invalid fields."""
+
+    changes: int | None
+    alerts: tuple[str, ...]
+    invalid: tuple[str, ...]
+
+
+async def page_pulse(page: Page) -> Pulse:
+    """What :data:`_PULSE_SCRIPT` reads of ``page``'s first :data:`_PULSE_FRAMES` frames, summed (item 739)."""
+    frames: list[Frame] = [frame for frame in page.frames if not frame.is_detached()][:_PULSE_FRAMES]
+
+    async def one(frame: Frame) -> object:
+        try:
+            async with asyncio.timeout(_PULSE_TIMEOUT_S):
+                return await frame.evaluate(_PULSE_SCRIPT)
+        except (TimeoutError, PlaywrightError):
+            return None
+
+    answers: list[object] = list(await asyncio.gather(*(one(frame) for frame in frames)))
+    changes: int | None = 0
+    alerts: list[str] = []
+    invalid: list[str] = []
+    for answer in answers:
+        if not isinstance(answer, dict) or not isinstance(answer.get("changes"), int) or answer["changes"] < 0:
+            changes = None
+            continue
+        if changes is not None:
+            changes += answer["changes"]
+        alerts.extend(str(one) for one in answer.get("alerts") or [] if isinstance(one, str))
+        invalid.extend(str(one) for one in answer.get("invalid") or [] if isinstance(one, str))
+    return Pulse(changes=changes, alerts=tuple(dict.fromkeys(alerts)), invalid=tuple(dict.fromkeys(invalid)))
+
+
+# Whether the element a click named now has the focus as a field that takes input (a text field, a box, a dropdown,
+# an edited element), itself, inside it or as the field of its label: a change no element of the page shows.
+_HOLDS_FIELD_FOCUS_SCRIPT: str = """(el) => {
+  const focused = el.ownerDocument.activeElement;
+  if (!focused || !(focused === el || el.contains(focused) || el.control === focused)) return false;
+  return focused.isContentEditable || focused.matches(
+    "input:not([type=button]):not([type=submit]):not([type=reset]):not([type=image]), textarea, select"
+  );
+}"""
+
+
+async def holds_field_focus(page: Page, ref: str) -> bool:
+    """Whether the element ``ref`` names took the focus as a field (:data:`_HOLDS_FIELD_FOCUS_SCRIPT`, item 739): a
+    click that focused a text field or opened a dropdown changed the page. ``False`` when that cannot be read."""
+    try:
+        target: Locator = await live_locator(page, ref, "click")
+        async with asyncio.timeout(_PULSE_TIMEOUT_S):
+            return await target.evaluate(_HOLDS_FIELD_FOCUS_SCRIPT) is True
+    except (TimeoutError, PlaywrightError, BrowserError):
+        return False
 
 
 async def let_page_turn(page: Page, timeout_ms: int) -> None:

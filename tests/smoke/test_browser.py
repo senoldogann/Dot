@@ -102,9 +102,10 @@ _PAGES: dict[str, str] = {
 <script>setTimeout(() => { document.getElementById('root').innerHTML =
 '<h1>Loaded late</h1><button>Late button</button><a href="/">one</a><a href="/">two</a>' }, 350)</script>""",
     # A hidden copy of the awaited text comes first, the way a template or a closed menu would.
+    # The text comes 1.2 s after the click: the click's own watch of its effect (item 739) takes the first half second.
     "/later": """<!doctype html><title>Later</title><p hidden>Order placed</p>
 <button onclick="setTimeout(() => {
-  document.getElementById('s').textContent = 'Order placed' }, 800)">Place order</button>
+  document.getElementById('s').textContent = 'Order placed' }, 1200)">Place order</button>
 <p id="s">Working</p>""",
     # File fields as sites show them (item 704): one moved off the screen under an icon, one hidden in its label, one
     # next to a button that does not open it, and two behind one button that opens the chooser of the second. Each says
@@ -122,20 +123,22 @@ _PAGES: dict[str, str] = {
 <div><input type="file" hidden><input type="file" id="second" hidden onchange="got('photo')(event)">
 <button type="button" onclick="document.getElementById('second').click()">Add photo</button></div>
 <p>Photo: <span id="photo">none</span></p>""",
-    # A dialog opens 400 ms after the first click, one that says the order is placed after the second (item 698).
+    # A dialog opens 0.9 s after the first click (past the watch of its effect, item 739), one that says the order is
+    # placed after the second (item 698).
     "/asks": """<!doctype html><title>Asks</title>
 <button onclick="setTimeout(() => { const d = document.createElement('div'); d.setAttribute('role', 'dialog');
   d.setAttribute('aria-label', 'Confirm'); d.innerHTML = '<p>Are you sure?</p><button>Yes</button>';
-  document.body.append(d) }, 400)">Pay</button>
+  document.body.append(d) }, 900)">Pay</button>
 <button onclick="setTimeout(() => { const d = document.createElement('div'); d.setAttribute('role', 'dialog');
-  d.innerHTML = '<p>Order placed</p>'; document.body.append(d) }, 400)">Order</button>""",
-    # The page leaves half a second after the click, for one whose end comes only after _SLOW_REST_S.
+  d.innerHTML = '<p>Order placed</p>'; document.body.append(d) }, 900)">Order</button>""",
+    # The page leaves 0.9 s after the click (past the watch of a click's effect, item 739), for one whose end comes
+    # only after _SLOW_REST_S.
     "/leaving": """<!doctype html><title>Leaving</title>
-<button onclick="setTimeout(() => { location.href = '/half-page' }, 500)">Leave</button>""",
-    # The page leaves half a second after the click for another host, whose answer comes after _LATE_HEADERS_S.
+<button onclick="setTimeout(() => { location.href = '/half-page' }, 900)">Leave</button>""",
+    # The page leaves 0.9 s after the click for another host, whose answer comes after _LATE_HEADERS_S.
     "/to-blocked": """<!doctype html><title>Leaving</title>
 <button onclick="setTimeout(() => {
-  location.href = `http://localhost:${location.port}/late-headers` }, 500)">Leave</button>""",
+  location.href = `http://localhost:${location.port}/late-headers` }, 900)">Leave</button>""",
     "/late-headers": "<!doctype html><title>Blocked</title><h1>Blocked page</h1>",
     # An editor that takes text only through beforeinput, as Draft.js and Lexical do, and drops what comes before it is
     # ready, ?ready= milliseconds after it takes the focus (30 by default); it shows a change ?apply= milliseconds after
