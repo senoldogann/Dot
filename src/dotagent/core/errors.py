@@ -122,6 +122,11 @@ class ToolInputError(DotError):
     """The model supplied arguments that do not satisfy the tool schema."""
 
 
+class NulCharacterError(ToolInputError, ValueError):
+    """A path or a line with a NUL character, which names no file and no command (item 727): refused for what the step
+    gave, and a ``ValueError`` as well, as ``os`` raises for one, so that what caught that still catches it."""
+
+
 class ToolExecutionError(DotError):
     """A tool failed while running; the message is shown to the model."""
 

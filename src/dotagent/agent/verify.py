@@ -226,6 +226,8 @@ def _goes_on(reading: str, readings: Sequence[str]) -> bool:
 def _found(reading: str, readings: Sequence[str], touched: set[Path], workspace: Path) -> bool:
     """Whether ``reading`` is there: a successful call of the run named it, or it exists, as a file or as a folder that
     no longer reading goes on from (a folder ``Projects`` says nothing of ``Projects Final/plan.md``)."""
+    if "\0" in reading:
+        return False
     path: Path = expand_path(reading, workspace)
     if path in touched:
         return True
@@ -238,7 +240,9 @@ def missing_paths(paths: Sequence[NamedPath], named: Collection[str], workspace:
     """The names of ``paths`` of which no reading is there (:func:`_found`): a file the run removed or moved, which a
     successful call of the run named, is not missing. A relative ``named`` value is resolved against ``workspace``.
     Reads the file system."""
-    touched: set[Path] = {expand_path(value, workspace) for value in named if not value.startswith(_ADDRESS_STARTS)}
+    touched: set[Path] = {
+        expand_path(value, workspace) for value in named if not value.startswith(_ADDRESS_STARTS) and "\0" not in value
+    }
     return tuple(
         path.name
         for path in paths

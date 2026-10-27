@@ -142,6 +142,9 @@ def browser_host(host: str) -> str | None:
     its full-width letters read as IDNA does, lower case, and an IPv4 address in any spelling (``2852039166``,
     ``0x7f.1``, ``127.1``) as its four numbers. None for a host IDNA cannot read, as one whose escapes are no UTF-8."""
     decoded: str = unquote(host)
+    if "\0" in decoded:
+        # A NUL names no host (item 727): the address is refused, not a crash of the step.
+        return None
     try:
         name: str = decoded.lower() if decoded.isascii() else decoded.encode("idna").decode("ascii").lower()
     except UnicodeError:
@@ -149,7 +152,7 @@ def browser_host(host: str) -> str | None:
     try:
         # A browser reads an IPv4 address with one dot at its end as the address.
         return str(ipaddress.IPv4Address(socket.inet_aton(name.removesuffix("."))))
-    except OSError:
+    except (OSError, ValueError):
         return name
 
 
