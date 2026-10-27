@@ -25,6 +25,8 @@ can change them.
     it lowers what is at stake (25);
   - `max_position`: the most one product held may be worth after a buy (200).
   The day is yours: midnight in `[scheduler] timezone`.
+- **Wakes** (`config.toml` only): `wake_schedule`, the id of a schedule (as `sch_...`) a move of the market starts at
+  once, `wake_move_pct`, `wake_per_day` and `wake_gap_min` (below, "Woken by the market").
 - **Paper**: `paper_start` (1000) is what the paper account starts with, `paper_fee_rate` (0.006) the share of each fill
   it pays, as Coinbase's taker fee does; it buys at the ask and sells at the bid. **Start again** gives it `paper_start`
   back; its orders stay in the record, outside it.
@@ -98,6 +100,31 @@ is told to you once, and Dot keeps trying. An exit sells what it holds when its 
 took from it in the meantime leaves it less to sell, or nothing, never what is not its own. The watch runs while the
 daemon does: a Mac asleep or off sells nothing until it wakes.
 
+## Woken by the market
+
+A schedule fires at its time; the market does not wait for it (item 772). With `wake_schedule` naming a schedule, Dot's
+daemon looks at the products a run may trade about once a minute, with no model and no run (Coinbase's list of
+products: one request, about 70 kB compressed). A product whose price moved over the last fifteen minutes by at least
+`wake_move_pct` percent (3 by default) and by three times what it usually moves in fifteen minutes (the median of its
+moves over the last two hours) starts that schedule at once, as **Run now** would, in a chat titled `<name> · <time> ·
+market` or in the schedule's own, its first message saying what moved: `(Started at 14:02 by a move of the market, not
+at its time: SOL-USDC +4.20 % in 15 minutes (it usually moves 0.60 %), now 187 USDC. Look at what moved first.)`. A
+coin that swings by five percent an hour wakes nothing at three; one that hardly moves wakes nothing under
+`wake_move_pct`.
+
+What holds it back:
+
+- at most `wake_per_day` runs a day (6) and `wake_gap_min` minutes between two (30): the model's time is what a wake
+  costs;
+- a product that moved wakes nothing again for two hours, whether its move woke a run or found none to wake (the day's
+  count reached, the gap not passed, a run of the schedule at work, the emergency stop engaged, the schedule switched
+  off): a move is not taken up later, when it is old;
+- a product's usual move is known after about three quarters of an hour of looks, which Dot keeps in memory: for that
+  long after the daemon starts or the Mac wakes, nothing moves enough;
+- trading off, or no schedule named: the market is not looked at.
+
+A run woken so is one of the schedule's like any other, held by the same limits.
+
 ## Trying it: the paper shift
 
 The way to see what Dot's trading comes to before any money is on it: a schedule on the paper account (the owner's runs
@@ -105,8 +132,10 @@ have one every hour, "Kağıt trading vardiyası") whose goal says the order of 
 limits, read the prices, the last day and the hourly and daily candles of the allowed products, check the news of the
 day when something moved, check the exit conditions of the positions opened before, then at most one order with its
 reason and its exit (a stop and a target), or none and why — and ends in a four-line summary for the next shift. Its
-runs go on in one chat with the last three summaries in view. After a couple of weeks, Settings › Trading shows what it
-made of the paper account against simply holding; that, not a feeling, is what a switch to live rests on.
+runs go on in one chat with the last three summaries in view; with `products = ["*"]` in `USDC` and the shift as
+`wake_schedule`, it covers the whole market and is woken between its hours when a product moves. After a couple of
+weeks, Settings › Trading shows what it made of the paper account against simply holding; that, not a feeling, is what
+a switch to live rests on.
 
 ## What holds, and what only asks
 
@@ -114,9 +143,9 @@ Held in code for every order of Dot's trading tools, in every approval mode, yol
 `service.py`):
 
 - an order of a product that is not allowed (with `*`, one not priced in `quote` or that traded under `min_volume` over
-  the last day, as Coinbase's product says when the order is judged), under Coinbase's least order, over `max_order`, over what `max_day` leaves
-  today, a buy after `max_day_loss`, a buy that takes one product past `max_position`, or one the account cannot pay, is
-  refused before any market sees it;
+  the last day, as Coinbase's product says when the order is judged), under Coinbase's least order, over `max_order`,
+  over what `max_day` leaves today, a buy after `max_day_loss`, a buy that takes one product past `max_position`, or one
+  the account cannot pay, is refused before any market sees it;
 - every order is judged and placed under one lock, so two runs never judge against the same day, and it is kept before
   it reaches the market, so it counts at once; an order sent with no answer of what it did stays counted (`unknown`);
 - a day's start, which the day's loss is counted from, is the account's worth at its first whole look of the day: while

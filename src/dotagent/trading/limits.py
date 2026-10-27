@@ -3,7 +3,7 @@ mode, yolo's too. Pure: the caller reads the portfolio, the quote and the rules 
 orders from being judged against the same day."""
 
 from dotagent.config import ANY_PRODUCT, TradingConfig
-from dotagent.trading.types import Portfolio, ProductRules, Side
+from dotagent.trading.types import MarketRow, Portfolio, ProductRules, Side
 
 # What is left of a limit is said with this many decimals.
 _SHOWN: int = 2
@@ -27,6 +27,14 @@ def not_allowed(config: TradingConfig, product: str, rules: ProductRules | None)
             "allows a product at"
         )
     return None
+
+
+def market_allows(config: TradingConfig, row: MarketRow) -> bool:
+    """Whether the owner allows the product of ``row``, one of Coinbase's list in the quote: named among the products,
+    or, with ``"*"`` there (item 771), trading at least ``min_volume`` a day, as :func:`not_allowed` judges an order."""
+    return row.product in config.products or (
+        ANY_PRODUCT in config.products and row.quote_volume_24h >= config.min_volume
+    )
 
 
 def _money(value: float, quote: str) -> str:

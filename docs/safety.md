@@ -249,9 +249,11 @@ model's or a rule's to answer, and Dot places it on your yes; a `yolo` run that 
 model check it (item 525). A `paper` order moves no money. An exit's sell (item 770), on the paper account only, is the
 one order no limit holds: Dot's daemon places it with no run once the bid reaches the stop or the target the buy named,
 and it sells what that buy bought; trading off or switched to live, the `STOP` file and Coinbase not taking orders of
-the product hold it, the exit open. On your Coinbase account Dot keeps no exit and sells nothing by itself. The Coinbase
-key, which may view and trade and never transfer, is kept in your login Keychain; switching to live, raising a limit,
-allowing a product and saving a key are done on the Mac only, and a phone can always switch trading off.
+the product hold it, the exit open. On your Coinbase account Dot keeps no exit and sells nothing by itself. A move of
+the market starts the schedule `[trading] wake_schedule` names (item 772), as **Run now** does, with that schedule's own
+approvals. The Coinbase key, which may view and trade and never transfer, is kept in your login Keychain; switching to
+live, raising a limit, allowing a product and saving a key are done on the Mac only, and a phone can always switch
+trading off.
 
 **Decision order**, strictest first:
 
@@ -505,7 +507,9 @@ tells a chat that its command in the background ended as the chat's last run end
 and so is the note that tells a run at work of such an end, which clears nothing. The run a watcher starts for a mail,
 an event or a notification (item 571, see [Dot comes to you](proactive.md#watchers)) starts untrusted whatever it goes
 on from, since what a stranger wrote set it off: its goal is your own words and the item stands in its first message, in
-a fence. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`):
+a fence. The run a move of the market starts (item 772) starts unmarked, as its schedule's firing does: what its first
+message adds is product ids Dot checked against the form of an id and numbers it read from Coinbase's list, no one's
+words. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`):
 it is never among the notes a run starts with, is handed while it works or as a site's lessons (item 384), a
 `memory_search` that returns one marks the run that read it, so its next save asks again, and Settings › Memory and
 `dotx memory list` say of such a note that it was saved while reading outside content. A learned skill whose steps may
