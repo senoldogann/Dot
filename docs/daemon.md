@@ -923,21 +923,21 @@ light on the way in; a screenshot tour (`tests/smoke/test_tour.py`) photographs 
 390 for reading by eye.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
-Notifications adds
-desktop notifications (off until you switch them on; the browser asks for its permission on that click): Dot says
-when it asks for an approval, a question or your help, and when it leaves you a question that a run could not wait for
-(a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or stopped, with the
-first line of its answer; the sub-runs of a run stay quiet, and a schedule's run is told as its notification level
-says, item 461, see [Memory and schedules](memory-and-schedules.md)); when a campaign ends by itself (achieved, or
-stopped by the emergency stop or by `campaign_max_sessions`); when a schedule misses a firing that nobody saw (overdue,
-or its run could not start; told once while the reason stays the same, and not at its level "never"); when a
-repeating schedule is switched off because its runs failed so many times in a row (item 458, once); and when Dot has
-something to tell you on its own: the first line of the morning brief (item 570) and what a watcher tells (item 571; see
-[Dot comes to you](proactive.md)). It says nothing while you are looking at that run: its page open, the tab visible and
-the window active. On another page, in a background tab or in an inactive window you are told; "Tell me even when
-I am looking" under the same setting turns the rule off. Clicking a notification opens what it tells of. The tab's
-icon is the same face in the state of the whole of Dot (amber ring while something waits for you, working while a run
-is active, still otherwise), and a notification carries the face in the state it tells of.
+Notifications adds desktop notifications (off until you switch them on; the browser asks for its permission on that
+click): Dot says when it asks for an approval, a question or your help, and when it leaves you a question that a run
+could not wait for (a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or
+stopped, with the first line of its answer; the sub-runs of a run stay quiet, and a schedule's run is told as its
+notification level says, item 461, see [Memory and schedules](memory-and-schedules.md)); when a campaign ends by itself
+(achieved, or stopped by the emergency stop, by `campaign_max_sessions` or by `campaign_failed_sessions`, item 724);
+when a schedule misses a firing that nobody saw (overdue, or its run could not start; told once while the reason stays
+the same, and not at its level "never"); when a repeating schedule is switched off because its runs failed so many times
+in a row (item 458, once); and when Dot has something to tell you on its own: the first line of the morning brief (item
+570) and what a watcher tells (item 571; see [Dot comes to you](proactive.md)). It says nothing while you are looking at
+that run: its page open, the tab visible and the window active. On another page, in a background tab or in an inactive
+window you are told; "Tell me even when I am looking" under the same setting turns the rule off. Clicking a notification
+opens what it tells of. The tab's icon is the same face in the state of the whole of Dot (amber ring while something
+waits for you, working while a run is active, still otherwise), and a notification carries the face in the state it
+tells of.
 
 Ctrl-C stops the daemon: the runs that are going on are cancelled, and the browser and the other services are closed.
 

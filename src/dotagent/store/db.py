@@ -5466,11 +5466,22 @@ class Store:
             campaign_id, "status = ?, next_session_at = ?, evidence = ''", (status, next_session_at)
         )
 
-    async def achieve_campaign(self, campaign_id: str, evidence: str) -> None:
-        """The campaign's outcome is verified: no session follows."""
-        await self._update_campaign(
-            campaign_id, "status = 'achieved', evidence = ?, next_session_at = NULL", (evidence,)
+    async def achieve_campaign(self, campaign_id: str, evidence: str, only_active: bool = False) -> bool:
+        """The campaign's outcome is verified: no session follows. With ``only_active`` a campaign that is no longer
+        active (the owner stopped it while its session made the claim) is left as it is (item 724): whether it was
+        achieved."""
+        if not only_active:
+            await self._update_campaign(
+                campaign_id, "status = 'achieved', evidence = ?, next_session_at = NULL", (evidence,)
+            )
+            return True
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE campaigns SET status = 'achieved', evidence = ?, next_session_at = NULL, updated_at = ?"
+            " WHERE id = ? AND status = 'active'",
+            (evidence, time.time(), campaign_id),
         )
+        await self._db.commit()
+        return cursor.rowcount > 0
 
     async def due_campaigns(self, now: float) -> list[CampaignRecord]:
         """The active campaigns whose next session is due at ``now`` and none of whose sessions is still working (in

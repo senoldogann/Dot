@@ -55,10 +55,10 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   the concurrency limits (`max_concurrent_runs`) and, when you set them, `run_max_minutes` and `run_max_tokens`. Without
   `stall_escalation` and without those limits, a run that varies its steps without getting anywhere ends only when you
   stop it.
-- A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run
-  costs. What bounds it is Stop, `campaign_max_sessions` and the limits of each session; its page shows the tokens of
-  its sessions. The tests play the sessions and the goal check with the scripted model: no campaign has run with a real
-  model here.
+- A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run costs.
+  What bounds it is Stop, `campaign_max_sessions`, `campaign_failed_sessions` (three failed sessions in a row stop it,
+  item 724) and the limits of each session; its page shows the tokens of its sessions. The tests play the sessions and
+  the goal check with the scripted model: no campaign has run with a real model here.
 - Resuming: in goal mode, the goal check of a resumed run judges from what the resumed run did, not from the steps of
   the run it resumes. After a crash the conversation shows every call of the step that was cut off as interrupted, also
   the ones that finished (a stop, the corner of the screen and an error outside a tool, a store that cannot write, keep

@@ -55,6 +55,12 @@ _CHECKED_ENTRIES: int = 60
 _SUMMARY_CHARS: int = 300
 
 
+# What a claim on a campaign that is no longer active says (item 724): the owner's stop stands, and is not undone.
+_NOT_ACTIVE: str = (
+    "The campaign is no longer active: the owner stopped it. The claim is not recorded; finish saying what you found."
+)
+
+
 def _action(tool: str, summary: str, flags: tuple[Flag, ...]) -> ActionInfo:
     flat: str = " ".join(summary.split())
     return ActionInfo(
@@ -292,6 +298,8 @@ def _achieved_tool() -> RegisteredTool:
         campaign: CampaignRecord = await campaign_of(ctx)
         if campaign.status == "achieved":
             return ok(f"The campaign is achieved already: {campaign.evidence}")
+        if campaign.status != "active":
+            return fail(_NOT_ACTIVE)
         if not campaign.targets:
             return fail("The campaign has no targets yet: record them with campaign_targets, verify them, then claim.")
         config: AppConfig = ctx.runtime.config
@@ -337,7 +345,9 @@ def _achieved_tool() -> RegisteredTool:
         if verdict.decision in ("continue", "scheduled"):
             return fail(f"Not accepted: {reason} The campaign goes on: work on what is missing.")
         accepted: str = f"The goal checker accepted the outcome: {reason}"
-        await ctx.runtime.store.achieve_campaign(campaign.id, args.evidence)
+        # The owner may have stopped the campaign while the check ran: their stop stands (item 724).
+        if not await ctx.runtime.store.achieve_campaign(campaign.id, args.evidence, only_active=True):
+            return fail(_NOT_ACTIVE)
         await ctx.runtime.store.add_campaign_entry(campaign.id, ctx.run_id, "note", accepted, {})
         log.info("campaign_achieved", campaign_id=campaign.id, run_id=ctx.run_id)
         ended: CampaignEnded = CampaignEnded(

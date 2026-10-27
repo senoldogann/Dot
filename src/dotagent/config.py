@@ -267,6 +267,8 @@ class AgentConfig(FrozenModel):
     campaign_wait_hours: float = Field(ge=0, allow_inf_nan=False)
     campaign_patience_sessions: int = Field(ge=1)
     campaign_max_sessions: int = Field(ge=0)
+    # A campaign whose sessions failed this many times in a row stops, saying so (item 724); 0: never.
+    campaign_failed_sessions: int = Field(ge=0)
     # Read by nothing since item 579, which has a campaign follow [browser] mode; kept so that an older config.toml
     # that sets it still loads.
     campaign_browser: BrowserMode

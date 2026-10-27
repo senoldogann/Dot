@@ -360,6 +360,16 @@ def _unmarked(raw: str | None, run_ids: Sequence[str]) -> str:
     return json.dumps({run_id: at for run_id, at in _emergency_marks(raw).items() if run_id not in run_ids})
 
 
+def _failed_in_row(sessions: list[RunRecord]) -> int:
+    """How many of a campaign's newest ``sessions`` (oldest first) failed in a row (item 724)."""
+    count: int = 0
+    for session in reversed(sessions):
+        if session.status != "failed":
+            break
+        count += 1
+    return count
+
+
 class RunManager:
     """Owns the live runs of one process. At most ``max_concurrent_runs`` execute at the same time.
 
@@ -3332,7 +3342,21 @@ class RunManager:
                 log.info("campaign_stopped_by_an_emergency_stop", campaign_id=campaign.id, run_id=run.id)
                 await self._tell_campaign_stopped(run, campaign, halted)
                 return
-            sessions: int = len(await runtime.store.campaign_sessions(campaign.id))
+            runs: list[RunRecord] = await runtime.store.campaign_sessions(campaign.id)
+            sessions: int = len(runs)
+            # Sessions that keep failing stop the campaign, saying so (item 724): it was tried again every gap for ever.
+            failing: int = runtime.config.agent.campaign_failed_sessions
+            in_row: int = _failed_in_row(runs)
+            if 0 < failing <= in_row:
+                why: str = (
+                    f"Stopped: its last {in_row} sessions failed ([agent] campaign_failed_sessions is {failing}). "
+                    "Read the newest one, then Go on when what made them fail is fixed."
+                )
+                await runtime.store.set_campaign_status(campaign.id, "stopped", None)
+                await runtime.store.add_campaign_entry(campaign.id, run.id, "note", why, {})
+                log.info("campaign_stopped_failing", campaign_id=campaign.id, sessions_failed=in_row)
+                await self._tell_campaign_stopped(run, campaign, why)
+                return
             limit: int = runtime.config.agent.campaign_max_sessions
             if 0 < limit <= sessions:
                 spent: str = f"Stopped after {sessions} sessions: [agent] campaign_max_sessions is {limit}."
