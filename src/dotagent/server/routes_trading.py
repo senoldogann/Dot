@@ -107,6 +107,8 @@ class TradingChange(FrozenModel):
     max_day_loss: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     max_position: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     paper_start: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    # The schedule a move of the market starts, or "" for none (item 813): one the store holds.
+    wake_schedule: str | None = Field(default=None, max_length=64)
 
 
 class TradingKeyRequest(FrozenModel):
@@ -232,6 +234,15 @@ def trading_router(ctx: ServerContext) -> APIRouter:
             except ValidationError as error:
                 said: str = "; ".join(str(problem["msg"]).removeprefix("Value error, ") for problem in error.errors())
                 raise InvalidValueError(said[:300], {}) from error
+            if after.wake_schedule and after.wake_schedule != before.wake_schedule:
+                # A schedule that is gone would wake nothing (the page says so): one is named only while it is there.
+                try:
+                    await ctx.runtime.store.get_schedule(after.wake_schedule)
+                except NotFoundError as error:
+                    raise InvalidValueError(
+                        "no schedule has that id: choose one of the schedules, or none",
+                        {"wake_schedule": after.wake_schedule},
+                    ) from error
             wider: list[str] = widens(before, after)
             if wider:
                 refuse_from_a_phone(request.scope, ", ".join(wider))

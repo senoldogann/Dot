@@ -187,7 +187,9 @@ test("the watch says what it looks at, the schedule a move starts, and what is w
   assert.equal(lines[3].text, "Next shift at at 900.");
   const gone = watchLines({ settings, watch: { ...watch, schedule_name: null }, positions: [] }, when);
   assert.equal(gone[2].tone, "bad");
-  assert.match(gone[2].text, /names no schedule \(sch_1\)/);
+  assert.match(gone[2].text, /is gone \(sch_1\): no run is woken\. Choose another under Wake on a move, or none\./);
+  const none = watchLines({ settings, watch: { ...watch, wake_schedule: "" }, positions: [] }, when);
+  assert.match(none.find((line) => line.id === "wake")?.text ?? "", /choose one under Wake on a move/);
   const off = watchLines({ settings, watch: { ...watch, schedule_on: false }, positions: [] }, when);
   assert.equal(off.find((line) => line.id === "wake")?.tone, "warn");
   assert.equal(off.length, 3);

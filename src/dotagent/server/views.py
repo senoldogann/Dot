@@ -124,6 +124,7 @@ class SnapshotsView(FrozenModel):
     animations: bool
     flash: bool
     open_dot: bool
+    double_tap: bool
     shortcut: str
     listening: bool
     problem: str | None
@@ -131,11 +132,11 @@ class SnapshotsView(FrozenModel):
 
 
 class SnapshotSettingRequest(FrozenModel):
-    """One setting of Snapshots to change (item 405): ``enabled``, ``app_text``, ``animations``, ``flash`` and
-    ``open_dot`` (item 414) take a bool, ``sound`` one of its choices; a value that does not fit its key is refused
-    before anything is written, since the config file would refuse it at the daemon's next start."""
+    """One setting of Snapshots to change (item 405): ``enabled``, ``app_text``, ``animations``, ``flash``, ``open_dot``
+    (item 414) and ``double_tap`` (item 814) take a bool, ``sound`` one of its choices; a value that does not fit its
+    key is refused before anything is written, since the config file would refuse it at the daemon's next start."""
 
-    key: Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
+    key: Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot", "double_tap"]
     value: bool | SnapshotSound
 
     @model_validator(mode="after")

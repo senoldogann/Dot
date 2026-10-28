@@ -810,6 +810,24 @@ a.pill:hover {
   cursor: not-allowed;
 }
 
+/* The button of a form whose request runs (item 812): the spinner over its words, which keep their room, so that
+   neither the button nor the ones beside it move while it waits. The spinner takes the button's own colour. */
+.btn.busy {
+  position: relative;
+}
+
+.btn.busy > .btn-label {
+  opacity: 0;
+}
+
+.btn.busy > .spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-color: color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+}
+
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -898,6 +916,34 @@ a.pill:hover {
 .select {
   height: 36px;
   padding: 0 12px;
+}
+
+/* A file field (item 812): its button and the file's name stand in the middle of the box, as a text field's words do,
+   where WebKit set them at its top: 4 pixels inside its border, and a button as tall as the line it stands on, which
+   grows with the text size. */
+.input[type="file"] {
+  height: auto;
+  padding: 4px;
+  line-height: var(--leading-xl);
+}
+
+.input[type="file"]::file-selector-button {
+  box-sizing: border-box;
+  height: var(--leading-xl);
+  vertical-align: middle;
+  margin: 0 12px 0 0;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: calc(var(--radius-control) - 4px);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
+.input[type="file"]:hover::file-selector-button {
+  background: var(--surface-3);
 }
 
 .input:hover,

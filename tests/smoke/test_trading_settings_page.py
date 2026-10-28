@@ -253,3 +253,50 @@ async def _wide(page: Page, runtime: Runtime, served: str) -> None:
     await page.get_by_role("button", name="Start again").click()
     await page.get_by_role("dialog").get_by_role("button", name="Start again").click()
     await expect(page.locator('[data-figure="equity"]')).to_have_text("1,000.00 EUR")
+
+
+async def test_the_watch_chooses_the_schedule_a_move_wakes_and_says_when_it_is_gone(
+    runtime: Runtime, served: str
+) -> None:
+    """Item 813: Wake on a move lists the schedules and None, a schedule that is gone shows as such until another is
+    chosen, and a choice is kept as the watch says it."""
+    async with httpx.AsyncClient(base_url=f"{served}/api", headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+        made: httpx.Response = await client.post(
+            "/schedules", json={"name": "Paper shift", "goal": "Trade.", "cron": "15 * * * *"}
+        )
+    assert made.status_code == 201, made.text
+    shift: str = made.json()["record"]["id"]
+    runtime.trading.settings.value = runtime.trading.config().model_copy(
+        update={"mode": "paper", "products": ["BTC-EUR"], "wake_schedule": "sch_gone"}
+    )
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(
+            channel=load_default_config().browser.channel, headless=True
+        )
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", int(served.rpartition(":")[2]), TOKEN))
+            await page.goto(f"{served}/#/settings/trading")
+            wake: Locator = page.locator("[data-watch='wake']")
+            await expect(wake).to_contain_text("is gone (sch_gone)")
+            picker: Locator = page.get_by_role("combobox", name="Wake on a move")
+            await expect(picker.locator("option:checked")).to_have_text("A schedule that is gone")
+            await picker.select_option(shift)
+            await expect(wake).to_contain_text("A move of the market starts Paper shift")
+            assert runtime.trading.config().wake_schedule == shift
+            await picker.select_option("")
+            await expect(wake).to_contain_text("choose one under Wake on a move")
+            assert runtime.trading.config().wake_schedule == ""
+            # A schedule deleted while the page shows it is refused, and the picker shows what is kept beside why.
+            async with httpx.AsyncClient(
+                base_url=f"{served}/api", headers={"Authorization": f"Bearer {TOKEN}"}
+            ) as client:
+                assert (await client.delete(f"/schedules/{shift}")).status_code in (200, 204)
+            await picker.select_option(shift)
+            await expect(page.locator(".trading-problem:not([hidden])")).to_contain_text("No schedule has that id")
+            await expect(picker).to_have_value("")
+            assert runtime.trading.config().wake_schedule == ""
+            await page.close()
+        finally:
+            await browser.close()
+            runtime.trading.settings.value = runtime.trading.config().model_copy(update={"mode": "off"})

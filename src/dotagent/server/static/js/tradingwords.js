@@ -250,9 +250,13 @@ export function watchLines(view, when) {
       : `${settings.products.join(", ")}.`,
   });
   if (watch.wake_schedule === "") {
-    lines.push({ id: "wake", tone: "muted", text: "No schedule is started by a move of the market: name one in [trading] wake_schedule." });
+    lines.push({ id: "wake", tone: "muted", text: "No schedule is started by a move of the market: choose one under Wake on a move." });
   } else if (watch.schedule_name === null) {
-    lines.push({ id: "wake", tone: "bad", text: `[trading] wake_schedule names no schedule (${watch.wake_schedule}): no run is woken.` });
+    lines.push({
+      id: "wake",
+      tone: "bad",
+      text: `The schedule a move of the market starts is gone (${watch.wake_schedule}): no run is woken. Choose another under Wake on a move, or none.`,
+    });
   } else if (!watch.schedule_on) {
     lines.push({ id: "wake", tone: "warn", text: `${watch.schedule_name} is switched off: no run is woken, and it does not fire at its time.` });
   } else {
