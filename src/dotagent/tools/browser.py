@@ -1306,7 +1306,9 @@ def _logins_tool() -> RegisteredTool:
         for login in logins:
             hosts: str = ", ".join(login.hosts)
             shown: str = f" ({hosts})" if hosts and hosts not in login.title else ""
-            lines.append(f"- {login.id}: {login.title}{shown}, in {login.source_name}")
+            kept: str = ", its password in the Mac's Keychain" if login.onepassword is None else ""
+            lines.append(f"- {login.id}: {login.title}{shown}, in {login.source_name}{kept}")
+        # A vault login's record shows no password, which a run read as "the vault has none" (item 786): it is said.
         return ok("The logins Dot may fill, by id:\n" + "\n".join(lines) + note)
 
     return make_tool(

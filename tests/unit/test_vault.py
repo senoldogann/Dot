@@ -41,6 +41,12 @@ from dotagent.vault.masking import MASK, in_address, mask_error, masked
         ("https://example.com", ("com",), False),
         ("about:blank", ("https://github.com",), False),
         ("https://github.com", (), False),
+        # A website saved in Unicode is the page Chrome is on in its ASCII form (item 786).
+        ("https://xn--bcher-kva.de/login", ("https://bücher.de",), True),
+        ("https://xn--bcher-kva.de/login", ("https://bucher.de",), False),
+        # IDNA 2003 maps ß to ss: straße.de is never read as strasse.de, another site, and matches no page instead.
+        ("https://strasse.de/login", ("https://straße.de",), False),
+        ("https://xn--strae-oqa.de/login", ("https://straße.de",), False),
     ],
 )
 def test_a_login_is_filled_on_its_own_sites_alone(url: str, websites: tuple[str, ...], fills: bool) -> None:

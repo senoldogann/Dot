@@ -710,7 +710,10 @@ _LOGINS_LINE: str = (
     "them by id, title and website, and browser_fill_login fills one into the current page, given the refs of its "
     "username, password and (1Password only) one-time code fields. Dot types the values; you never see them, and no "
     "answer of yours needs them. Use it whenever a page asks you to sign in to a site a login is for, instead of "
-    "asking the user for a password; it fills a login only on its own site."
+    "asking the user for a password; it fills a login only on its own site. A login of the vault keeps its password in "
+    "the Mac's Keychain, so its record (in Dot's database or a list) shows none: that is how every one is kept, not a "
+    "login without a password. Never tell the user the vault has no passwords from what a record shows, and never "
+    "look for a password in the Keychain or Dot's database: fill it, and browser_fill_login says if one is missing."
 )
 _CONTACTS_LINE: str = (
     "- vault_contacts lists the user's saved contact details (name, address, phone, email, and the billing address of "
