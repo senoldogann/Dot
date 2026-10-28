@@ -231,6 +231,8 @@ async def test_a_quiet_session_is_pinged_and_connected_again_unless_its_server_a
     connected again, and the call goes on the new one; a server that answers the ping with not knowing it is there,
     and its session is used as it is. The call is of wipe, which declares no hints and is never called twice."""
     monkeypatch.setattr(connection_module, "_QUIET_CHECK_S", 0.0)
+    # A session of the protocol that has a ping (the SDK's server here speaks the modern one, which has none).
+    monkeypatch.setattr(connection_module, "MODERN_PROTOCOL_VERSIONS", ())
     pinged: list[Client] = []
     ping: Callable[..., Awaitable[EmptyResult]] = Client.send_ping
 
@@ -256,6 +258,30 @@ async def test_a_quiet_session_is_pinged_and_connected_again_unless_its_server_a
             assert "mcp_server_restart" not in events and "mcp_server_quiet_session_gone" not in events, events
         # The session the call went on was not pinged again: a new one is fresh, and one that answered is too.
         assert len(pinged) == 1
+    finally:
+        await hub.close()
+
+
+async def test_a_quiet_session_of_the_modern_protocol_is_not_pinged(
+    http_port: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review of every module: the modern protocol has no ping (the SDK warns it is removed, and a server may refuse
+    it, which read as a session gone and connected again each quiet minute); a call that fails reconnects instead."""
+    monkeypatch.setattr(connection_module, "_QUIET_CHECK_S", 0.0)
+    pinged: list[Client] = []
+
+    async def counted(self: Client, *, meta: RequestParamsMeta | None = None) -> EmptyResult:
+        pinged.append(self)
+        raise MCPError(INTERNAL_ERROR, "a ping should not be sent")
+
+    monkeypatch.setattr(Client, "send_ping", counted)
+    hub: McpHub = await open_hub([_http("docs", http_port, f"Bearer ${{{TOKEN_VARIABLE}}}")], _login_env())
+    try:
+        wipe: McpTool = next(tool for tool in hub.tools if tool.server == "docs" and tool.remote_name == "wipe")
+        with capture_logs() as logs:
+            result: CallToolResult = await hub.call(wipe, {"target": "the cache"})
+        assert not result.is_error, result
+        assert pinged == [] and "mcp_server_restart" not in [entry["event"] for entry in logs]
     finally:
         await hub.close()
 
