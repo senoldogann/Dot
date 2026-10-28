@@ -42,7 +42,8 @@ async def test_several_are_removed_in_one_prompt_and_one_the_keychain_lacks_does
     await keychain.put_many({f"vlt_many_{n}": _parts(password=f"pw-{n}") for n in range(4)})
     await keychain.remove_many(["vlt_many_0", "vlt_many_1"])
     assert _items(keychain_file) == ["vlt_many_2", "vlt_many_3"]
-    await keychain.remove_many(["vlt_many_2", "vlt_not_there"])
+    # The account the keychain lacks comes first: its line fails, and the one after it is removed all the same.
+    await keychain.remove_many(["vlt_not_there", "vlt_many_2"])
     assert _items(keychain_file) == ["vlt_many_3"]
     await keychain.remove_many([])
     assert _items(keychain_file) == ["vlt_many_3"]

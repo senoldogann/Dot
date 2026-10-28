@@ -58,7 +58,8 @@ function itemRow(item, actions) {
   );
 }
 
-/** An item as a row to tick while items are chosen to delete: the whole row is the tick's label. */
+/** An item as a row to tick while items are chosen to delete: the whole row is the tick's label, so what is in it is
+ * phrasing content (spans). */
 function pickRow(item, checked) {
   const { title, sub } = rowWords(item);
   return el(
@@ -66,7 +67,7 @@ function pickRow(item, checked) {
     { class: "vault-row vault-pick", dataset: { vaultItem: item.id, kind: item.kind } },
     el("input", { class: "vault-check", type: "checkbox", checked, "aria-label": sub === "" ? title : `${title}, ${sub}`, dataset: { pick: item.id } }),
     el("span", { class: `vault-mark vault-mark-${item.kind}`, "aria-hidden": "true" }, icon(KIND_MARK[item.kind])),
-    el("div", { class: "vault-main" }, el("div", { class: "vault-title" }, title), el("div", { class: "vault-sub" }, sub)),
+    el("span", { class: "vault-main" }, el("span", { class: "vault-title" }, title), el("span", { class: "vault-sub" }, sub)),
   );
 }
 

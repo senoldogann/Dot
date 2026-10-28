@@ -272,7 +272,9 @@ class LoginKeychain:
         except VaultStoreError:
             # A line that fails fails the prompt, and an account with no item fails its line: each account is asked
             # again alone, in order, where one with no item counts as removed and a Keychain that refuses ends it,
-            # naming the ones gone before it, so that their records go too.
+            # naming the ones gone before it, so that their records go too. A refusal of one item alone (a keychain
+            # locked part way refuses every later line too) leaves those after it as the prompt left them: one whose
+            # item the prompt removed keeps its record, which a removal again takes, its item counting as removed.
             gone: list[str] = []
             for account in accounts:
                 try:
