@@ -252,7 +252,7 @@ def test_a_list_of_names_is_written_and_replaced_with_the_comment_after_it_kept(
 
 
 def test_a_setting_of_snapshots_is_written_under_its_own_table(tmp_path: Path) -> None:
-    """Settings › SnapShots writes ``[snapshots]`` (item 405): a choice as a string, a switch as a bool."""
+    """Settings › Snapshots writes ``[snapshots]`` (item 405): a choice as a string, a switch as a bool."""
     path: Path = tmp_path / "config.toml"
     path.write_text('[models]\nmain = "ollama:x"\n', encoding="utf-8")
     set_setting(path, "snapshots", "sound", "pop")

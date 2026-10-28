@@ -284,7 +284,7 @@ async def run_daemon(config: AppConfig) -> int:
             warming: asyncio.Task[None] = asyncio.create_task(warm_help_vectors(runtime), name="help-vectors")
             warming.add_done_callback(_log_warm_end)
             cleanup.push_async_callback(_cancelled, warming)
-            # The Command key is watched for SnapShots while they are on (item 405); the watch ends with the daemon.
+            # The Command key is watched for Snapshots while they are on (item 405); the watch ends with the daemon.
             # Dot's own pages are looked for at its addresses: this Mac's and the names it is reached by (item 414).
             addresses: list[str] = [
                 base_url(host, port),

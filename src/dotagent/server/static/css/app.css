@@ -8910,7 +8910,7 @@ button.attach-chip:hover {
   flex: none;
 }
 
-/* A capture of SnapShots comes into the box with a small spring (item 405); reduced motion shows it in place. */
+/* A capture of Snapshots comes into the box with a small spring (item 405); reduced motion shows it in place. */
 .attach-chip.arrived {
   animation: chip-arrive var(--motion-slow) var(--ease-emphasis) both;
 }
@@ -8932,7 +8932,7 @@ button.attach-chip:hover {
   }
 }
 
-/* A picture of SnapShots on its way into its chip (item 414): drawn over the page, the script moves it. */
+/* A picture of Snapshots on its way into its chip (item 414): drawn over the page, the script moves it. */
 .attach-flight {
   position: fixed;
   z-index: 100;

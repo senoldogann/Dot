@@ -17,7 +17,7 @@ export const TABS = [
   { id: "harness", label: "Self-improvement", icon: "sparkle" },
   { id: "phone", label: "Phone", icon: "smartphone" },
   { id: "channels", label: "Channels", icon: "message" },
-  { id: "snapshots", label: "SnapShots", icon: "image" },
+  { id: "snapshots", label: "Snapshots", icon: "image" },
   { id: "system", label: "System", icon: "monitor" },
 ];
 

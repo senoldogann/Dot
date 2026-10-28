@@ -1,4 +1,4 @@
-"""A capture of SnapShots kept as attachments (item 405): what :mod:`dotagent.desktop.snapshots` takes of the window
+"""A capture of Snapshots kept as attachments (item 405): what :mod:`dotagent.desktop.snapshots` takes of the window
 in front, stored in the workspace as the files of a message are, so that the composer lists them and a run reads them.
 Apart from the capture so that the desktop module needs nothing of the agent's."""
 
