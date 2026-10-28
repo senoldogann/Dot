@@ -517,13 +517,15 @@ async def _run(args: SecurityArgs, ctx: ToolContext) -> ToolResult:
         return mark_untrusted(ok(_render_forms(target, page, forms)))
     attempts: tuple[_Attempt, ...] = _attempts(forms, args.max_attempts, target.host)
     findings: list[_Finding] = []
+    seen: set[tuple[str, str]] = set()
     skipped: int = sum(1 for form in forms if not _same_host(form.action, target.host))
     for attempt in attempts:
         answer: FetchedDocument | str = await _submit(ctx, attempt.form, attempt.data, limit)
         if isinstance(answer, str):
             continue
         finding: _Finding | None = _judge(attempt, answer, _answer_text(answer))
-        if finding is not None:
+        if finding is not None and (finding.kind, finding.where) not in seen:
+            seen.add((finding.kind, finding.where))
             findings.append(finding)
         await asyncio.sleep(_SPACING_S)
     return mark_untrusted(
