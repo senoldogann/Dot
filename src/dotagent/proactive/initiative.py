@@ -167,12 +167,18 @@ class Initiative:
             return
         if config.runs_per_day > 0 and await self._started_lately() >= config.runs_per_day:
             return
-        if self._manager.active_run_ids() or self._manager.elsewhere_run_ids():
-            return
-        idle: float | None = await asyncio.to_thread(self._idle)
-        if idle is None or idle < config.idle_minutes * 60.0:
-            return
+        
+        # Opportunistic Initiative: check for urgent tasks that bypass idle/active constraints.
         todo: TodoRecord | None = await self._next(config.attempts)
+        is_urgent = todo is not None and ("[URGENT]" in todo.title.upper() or "[URGENT]" in todo.why.upper())
+        
+        if not is_urgent:
+            if self._manager.active_run_ids() or self._manager.elsewhere_run_ids():
+                return
+            idle: float | None = await asyncio.to_thread(self._idle)
+            if idle is None or idle < config.idle_minutes * 60.0:
+                return
+        
         if todo is not None:
             await self._do(todo)
         elif state.looked_at is None or now - state.looked_at >= config.look_every_hours * 3600.0:

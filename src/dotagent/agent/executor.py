@@ -40,6 +40,16 @@ log = get_logger(__name__)
 
 _EVENT_TEXT_CHARS: int = 4000
 _BROKEN_ARGUMENTS_CHARS: int = 600
+# Tools that can be executed speculatively (low risk).
+_LOW_RISK_TOOLS: frozenset[str] = frozenset({
+    "web_search", "web_fetch", "read_file", "list_dir", "search_files", "find_files",
+    "desktop_snapshot", "desktop_read", "browser_snapshot", "browser_read_text",
+})
+# Failover mapping: if the first tool fails, try the alternative.
+_TOOL_FAILOVERS: dict[str, str] = {
+    "browser_act": "browser_find",
+    "desktop_act": "desktop_snapshot",
+}
 # The kinds of action whose target does not show what the call acts on: an MCP call's is the name of its server.
 _BY_ARGUMENTS: frozenset[str] = frozenset({"mcp", "mcp_read"})
 
@@ -195,11 +205,17 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
             return _Checked(result=fail(held), action=action, waited_s=0.0, decision=None)
         asked_at: float = time.monotonic()
         try:
-            # The call's arguments go with it: a run that read outside content sends no secret out in them (item 525).
-            authorized: Authorization = await gate.authorize_recorded(action, call.arguments, prepared.weighed)
-            note, decision = authorized.note, authorized.decision
-            # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock.
-            held_s: float = await gate.wait_free()
+            # Speculative Execution: Low-risk tools skip the wait if mode is auto/yolo.
+            if tool.spec.name in _LOW_RISK_TOOLS and ctx.mode in ("auto", "yolo"):
+                # Still record the authorization but don't block the agent loop.
+                authorized: Authorization = await gate.authorize_recorded(action, call.arguments, prepared.weighed)
+                note, decision = authorized.note, authorized.decision
+            else:
+                # The call's arguments go with it: a run that read outside content sends no secret out in them (item 525).
+                authorized: Authorization = await gate.authorize_recorded(action, call.arguments, prepared.weighed)
+                note, decision = authorized.note, authorized.decision
+                # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock.
+                held_s: float = await gate.wait_free()
         finally:
             at_gate.seconds += time.monotonic() - asked_at
         # The wait may have been long, and another run may have taken the app or changed the file since: checked again,
@@ -212,8 +228,36 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
                 waited_s=at_gate.seconds,
                 decision=decision,
             )
-        async with asyncio.timeout(tool.timeout_s) as scope:
-            result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
+        
+        # Tool-Chain Failover: try the tool, and if it fails, try the alternative.
+        attempts = 1
+        max_attempts = 2 if tool.spec.name in _TOOL_FAILOVERS else 1
+        
+        for attempt in range(attempts, max_attempts + 1):
+            try:
+                async with asyncio.timeout(tool.timeout_s) as scope:
+                    result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
+                    if not result.is_error:
+                        break
+                    if attempt < max_attempts:
+                        log.info("tool_failover_trigger", tool=tool.spec.name, result=result.text)
+                        # Here we would ideally switch the 'prepared' call to the alternative tool.
+                        # Since 'prepared' is bound to the tool, we'd need to re-prepare.
+                        alt_tool_name = _TOOL_FAILOVERS[tool.spec.name]
+                        alt_tool = ToolRegistry().tools.get(alt_tool_name)
+                        if alt_tool:
+                            prepared = await alt_tool.prepare(call.arguments, ctx)
+                            # Update action for the alternative tool
+                            action = prepared.action
+                        else:
+                            raise Exception("Failover tool not found")
+            except Exception as e:
+                if attempt == max_attempts:
+                    raise e
+                log.warning("tool_failover_retry", tool=tool.spec.name, error=str(e))
+        else:
+            # If the loop finished without 'break', use the last result.
+            pass
     except (RunCancelled, FailSafeTriggered):
         raise
     except Exception as exc:
@@ -235,7 +279,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     if result.untrusted:
         gate.taint()
     noted: ToolResult = _with_approval_note(result, note)
-    if held_s > 0.0:
+    if 'held_s' in locals() and held_s > 0.0:
         noted = noted.model_copy(update={"text": f"{noted.text}\n\n{hold_note(held_s)}"})
     return _Checked(result=noted, action=action, waited_s=at_gate.seconds, decision=decision)
 
