@@ -282,6 +282,20 @@ async def test_a_crawl_that_does_not_fit_one_result_is_written_to_files_the_extr
     assert "# Product 1" in files[0].read_text(encoding="utf-8")
 
 
+class _ByPage(ScriptedProvider):
+    """The fast model, answering each product's page with that product's turn, whichever page comes first: the
+    sources are read at once (item 773)."""
+
+    def __init__(self, turns: dict[int, ScriptedTurn]) -> None:
+        super().__init__("ollama", [])
+        self._turns: dict[int, ScriptedTurn] = turns
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        named: re.Match[str] | None = re.search(r"Product (\d+) costs", str(request.messages[-1].content))
+        assert named is not None, request.messages[-1].content
+        return await ScriptedProvider("ollama", [self._turns[int(named.group(1))]]).complete(request, sink)
+
+
 async def test_the_extraction_returns_typed_fields_with_quotes_checked_against_the_sources(
     runtime: Runtime, site: str
 ) -> None:
@@ -301,14 +315,13 @@ async def test_the_extraction_returns_typed_fields_with_quotes_checked_against_t
 
     await runtime.router.register(
         "ollama",
-        ScriptedProvider(
-            "ollama",
-            [
-                answer("11,50 EUR", "costs 11,50 EUR", "100 g"),
-                answer("12,50 EUR", "costs 12,50 EUR", "200 g"),
+        _ByPage(
+            {
+                1: answer("11,50 EUR", "costs 11,50 EUR", "100 g"),
+                2: answer("12,50 EUR", "costs 12,50 EUR", "200 g"),
                 # A quote the page does not hold: the value stays, marked unverified.
-                answer("13,50 EUR", "costs 99,99 EUR", "300 g"),
-            ],
+                3: answer("13,50 EUR", "costs 99,99 EUR", "300 g"),
+            }
         ),
     )
     result, _ = await _call(
@@ -399,29 +412,33 @@ async def test_a_fast_model_paused_after_a_rate_limit_is_not_asked_again_and_the
     limited: _RateLimited = _RateLimited()
     await router.register("ollama", limited)
     offline: Runtime = dataclasses.replace(runtime, router=router, web=_NoFetch())  # type: ignore[arg-type]
+    sources: int = web_tools._EXTRACT_AT_ONCE + 2
     arguments: JsonObject = {
-        "sources": [name, name],
+        "sources": [name] * sources,
         "fields": [{"name": "price", "description": "The price with its currency."}],
     }
     try:
         first, _ = await _call(offline, "web_extract", arguments, 200_000)
+        asked: int = limited.calls
         again, _ = await _call(offline, "web_extract", arguments, 200_000)
     finally:
         await router.aclose()
-    # The first source met the rate limit, which paused the fast model; nothing after it was sent (item 240).
-    assert limited.calls == 1
+    # The sources read at once (item 773) may have been sent as the rate limit came, which paused the fast model; none
+    # after it was (item 240), and none of the next call.
+    assert 1 <= asked <= web_tools._EXTRACT_AT_ONCE and limited.calls == asked
     assert first.is_error and again.is_error
     paused: str = rf"- {re.escape(name)}: {re.escape(SCRIPTED_MODEL)} \(rate limited until [^)]+\) cannot answer now; "
-    assert re.search(rf"- {re.escape(name)}: the fast model is rate limited\n{paused}", first.text), first.text
-    assert len(re.findall(paused, again.text)) == 2, again.text
+    assert first.text.count("the fast model is rate limited\n") == asked, first.text
+    assert len(re.findall(paused, first.text)) == sources - asked, first.text
+    assert len(re.findall(paused, again.text)) == sources, again.text
 
 
 async def test_a_call_that_runs_out_of_time_returns_what_it_extracted_and_lists_the_rest(
     runtime: Runtime, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Item 554: the executor cancels a call at its timeout and everything extracted so far went with it; the call
-    ends at its own time instead, with the extractions it has, the source it was in the middle of and the ones it did
-    not reach listed as not extracted."""
+    ends at its own time instead, with the extractions it has, the sources it was in the middle of and the one it did
+    not reach listed as not extracted. Four sources are read at once (item 773): a slow one holds no other back."""
     asked: list[str] = []
 
     async def source_text(source: str, ctx: ToolContext, allowed: tuple[str, ...]) -> str:
@@ -444,20 +461,58 @@ async def test_a_call_that_runs_out_of_time_returns_what_it_extracted_and_lists_
     monkeypatch.setattr(web_tools, "_EXTRACT_MARGIN_S", 15.0)
     monkeypatch.setattr(web_tools, "_EXTRACT_MIN_SOURCE_S", 1.0)
     started: float = time.monotonic()
+    sources: list[str] = ["a.example/one", *(f"a.example/{n}-slow" for n in range(4)), "a.example/last"]
     result, _ = await _call(
         runtime,
         "web_extract",
-        {
-            "sources": ["a.example/one", "a.example/slow", "a.example/three", "a.example/four"],
-            "fields": [{"name": "price", "description": "The price with its currency."}],
-        },
+        {"sources": sources, "fields": [{"name": "price", "description": "The price with its currency."}]},
         200_000,
     )
     assert time.monotonic() - started < 10.0
     assert not result.is_error, result.text
-    assert result.text.startswith("Extracted 1 of 4 sources;"), result.text
-    assert "a.example/one" in result.text and asked == ["a.example/one", "a.example/slow"]
-    assert result.text.count("not extracted: the call's time ran out") == 3, result.text
+    assert result.text.startswith("Extracted 1 of 6 sources;"), result.text
+    # The first four begin together; the fifth takes the place of the one that was done; the last finds no time left.
+    assert "a.example/one" in result.text and sorted(asked) == sorted(sources[:5])
+    assert result.text.count("not extracted: the call's time ran out") == 5, result.text
+
+
+async def test_the_sources_are_read_four_at_a_time_and_told_in_their_order(
+    runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 773: six job lists of the owner's, extracted one after the other, took 200 s."""
+    at_once: list[int] = [0, 0]
+
+    async def source_text(source: str, ctx: ToolContext, allowed: tuple[str, ...]) -> str:
+        return f"The text of {source}."
+
+    async def extraction(
+        router: object, model: str, timeout_s: float, thread: str, run: str, source: str, text: str, fields: object
+    ) -> Extraction:
+        at_once[0] += 1
+        at_once[1] = max(at_once)
+        # The later sources answer first.
+        await asyncio.sleep(0.5 - 0.05 * int(source.rpartition("/")[2]))
+        at_once[0] -= 1
+        return Extraction(source=source, fields={"price": ExtractedField(value=source, quote=source, verified=False)})
+
+    monkeypatch.setattr(web_tools, "_source_text", source_text)
+    monkeypatch.setattr(web_tools, "extract", extraction)
+    sources: list[str] = [f"a.example/{n}" for n in range(8)]
+    started: float = time.monotonic()
+    result, _ = await _call(
+        runtime,
+        "web_extract",
+        {"sources": sources, "fields": [{"name": "price", "description": "The price with its currency."}]},
+        200_000,
+    )
+    seconds: float = time.monotonic() - started
+    assert not result.is_error, result.text
+    assert result.text.startswith("Extracted 8 of 8 sources;"), result.text
+    assert at_once[1] == web_tools._EXTRACT_AT_ONCE
+    # Two rounds of four (about 1 s), not eight sources one after the other (about 3 s).
+    assert seconds < 2.5
+    shown: list[int] = [result.text.index(f'"source": "{source}"') for source in sources]
+    assert shown == sorted(shown), result.text
 
 
 async def test_a_protected_file_is_refused_to_the_extraction_as_it_is_to_read_file(runtime: Runtime) -> None:
