@@ -62,6 +62,7 @@ from dotagent.browser.driver import (
     let_page_turn,
     measure_viewport,
     navigate,
+    no_dialog_open,
     page_pulse,
     page_title,
     run_script,
@@ -232,6 +233,14 @@ _SCRIPTED_NOTE: str = (
 UNANSWERED_HOLD_S: float = 300.0
 # What ended a wait for a text that a dialog interrupted (item 698).
 _DIALOG_OPENED: str = "a dialog opened in front of the page"
+# A wait for a text ends early once the page stands still (item 774): no change of its documents for _TEXT_STILL_S, no
+# navigation, no request started or under way and no WebSocket open, once the wait has gone on for _TEXT_STILL_AFTER_S.
+# Over 30 days of the owner's runs 64 waits saw their text, half of them within 0.4 s and 60 within 5 s, while 42 that
+# did not lasted their whole time, 20 s at the median: a guess of a thank-you text after a form that had not gone. The
+# page is looked at every _TEXT_SLICE_S.
+_TEXT_STILL_S: float = 3.0
+_TEXT_STILL_AFTER_S: float = 5.0
+_TEXT_SLICE_S: float = 0.5
 # Why a chat's tabs were made new before a login was filled (item 697).
 _FRESH_FOR_LOGIN_NOTE: str = (
     "a script of this run ran in this chat's tabs and could copy what is typed there: before the login, Dot closed "
@@ -3018,7 +3027,7 @@ class BrowserSession:
             # Not waited on a page that went to a URL the rules forbid (item 554): the answer would tell what it shows.
             await self._enforce_landing(tab)
             started: float = time.monotonic()
-            end: TextWaitEnd = await wait_for_text_or_dialog(tab.page, text, _ms(timeout_s))
+            end: TextWaitEnd | Literal["still"] = await self._text_or_still(tab, text, timeout_s)
             appeared: bool = end == "text"
             waited_s: float = time.monotonic() - started
             if appeared:
@@ -3029,7 +3038,39 @@ class BrowserSession:
             view: PageView = await self._changes_view(thread, tab, hide_secrets)
             await self._enforce_landing(tab)
             ended_by: str | None = _DIALOG_OPENED if end == "dialog" else None
-            return TextWait(appeared=appeared, waited_s=waited_s, view=view, ended_by=ended_by)
+            still_s: float | None = _TEXT_STILL_S if end == "still" else None
+            return TextWait(appeared=appeared, waited_s=waited_s, view=view, ended_by=ended_by, still_s=still_s)
+
+    async def _text_or_still(self, tab: Tab, text: str, timeout_s: float) -> TextWaitEnd | Literal["still"]:
+        """What ended a wait of at most ``timeout_s`` for ``text`` (:func:`wait_for_text_or_dialog`), or ``"still"``:
+        the page stood still once the wait had gone on for a while (item 774, :data:`_TEXT_STILL_S`). The page is
+        looked at between short waits, each ending by its own time, so that none is left waiting in the page; a
+        page whose changes cannot be read is never taken for still."""
+        started: float = time.monotonic()
+        ends: float = started + timeout_s
+        watch_dialogs: bool = await no_dialog_open(tab.page)
+        changes: int | None = (await page_pulse(tab.page)).changes
+        requests: int = tab.requests
+        moved: float = started
+        while True:
+            left: float = ends - time.monotonic()
+            if left <= 0:
+                return "timeout"
+            # Playwright waits without end for a time of 0 ms: a slice is at least one.
+            end: TextWaitEnd = await wait_for_text_or_dialog(
+                tab.page, text, max(1, _ms(min(_TEXT_SLICE_S, left))), watch_dialogs
+            )
+            if end != "timeout":
+                return end
+            now: float = time.monotonic()
+            seen: int | None = (await page_pulse(tab.page)).changes
+            # A request begun since the last look is the page at work too: one that polls its server every few seconds
+            # with short requests is rarely seen with one under way.
+            busy: bool = tab.requests != requests or tab.fetches > 0 or tab.sockets > 0 or not tab.nav_idle.is_set()
+            if seen is None or seen != changes or busy:
+                changes, requests, moved = seen, tab.requests, now
+            elif now - moved >= _TEXT_STILL_S and now - started >= _TEXT_STILL_AFTER_S:
+                return "still"
 
     def _refuse_fill(self, url: str, fills_on: Callable[[str], bool], kinds: Sequence[VaultFieldKind]) -> None:
         """Raise when a fill of ``kinds`` into the page at ``url`` is refused whatever the tabs: the page is not one of

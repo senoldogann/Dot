@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 
-from playwright.async_api import CDPSession, Dialog, Download, FileChooser, Page, Request, Response
+from playwright.async_api import CDPSession, Dialog, Download, FileChooser, Page, Request, Response, WebSocket
 from playwright.async_api import Error as PlaywrightError
 
 from dotagent.browser.console import KEPT_MESSAGES, ConsoleEntry, note_message, note_page_error
@@ -44,6 +44,10 @@ class Tab:
     notes: list[str] = field(default_factory=list)
     events: int = 0  # dialogs, downloads and file choosers; a change during a step means the page surprised us
     nav_inflight: int = 0  # main-frame navigation requests that have started and not finished
+    # The page's own requests under way (fetch, XHR, an EventSource's stream) and its WebSockets open: a page waiting on
+    # its server (item 774).
+    fetches: int = 0
+    sockets: int = 0
     nav_idle: asyncio.Event = field(default_factory=_set_event)
     status: int | None = None
     accept_confirms: bool = False
@@ -187,18 +191,34 @@ def _is_main_navigation(tab: Tab, request: Request) -> bool:
     return request.is_navigation_request() and request.frame == tab.page.main_frame
 
 
+_FETCHES: frozenset[str] = frozenset({"fetch", "xhr", "eventsource"})
+
+
 def _on_request(tab: Tab, request: Request) -> None:
     tab.requests += 1
+    if request.resource_type in _FETCHES:
+        tab.fetches += 1
     if _is_main_navigation(tab, request):
         tab.nav_inflight += 1
         tab.nav_idle.clear()
 
 
 def _on_request_end(tab: Tab, request: Request) -> None:
+    if request.resource_type in _FETCHES:
+        tab.fetches = max(0, tab.fetches - 1)
     if _is_main_navigation(tab, request):
         tab.nav_inflight = max(0, tab.nav_inflight - 1)
         if tab.nav_inflight == 0:
             tab.nav_idle.set()
+
+
+def _on_websocket(tab: Tab, socket: WebSocket) -> None:
+    tab.sockets += 1
+    socket.on("close", partial(_on_websocket_close, tab))
+
+
+def _on_websocket_close(tab: Tab, socket: WebSocket) -> None:
+    tab.sockets = max(0, tab.sockets - 1)
 
 
 def _on_response(tab: Tab, response: Response) -> None:
@@ -276,5 +296,6 @@ def attach_handlers(tab: Tab, downloads: Path) -> None:
     page.on("requestfinished", partial(_on_request_end, tab))
     page.on("requestfailed", partial(_on_request_end, tab))
     page.on("response", partial(_on_response, tab))
+    page.on("websocket", partial(_on_websocket, tab))
     page.on("console", partial(note_message, tab.console))
     page.on("pageerror", partial(note_page_error, tab.console))
