@@ -40,6 +40,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 SERVER: ServerConfig = load_default_config().server
 _SLOW_REST_S: float = 8.0
 _LATE_HEADERS_S: float = 3.0
+# How long the server takes to answer a page's own request (item 774): past the time a wait may end early.
+_ANSWER_LATE_S: float = 7.0
 
 # How late the pages of /opens-late answer: within the wait for a new tab (one second), and after it.
 _LATE_TAB_S: float = 0.4
@@ -107,6 +109,19 @@ _PAGES: dict[str, str] = {
 <button onclick="setTimeout(() => {
   document.getElementById('s').textContent = 'Order placed' }, 1200)">Place order</button>
 <p id="s">Working</p>""",
+    # A page that keeps changing, and one whose answer waits on its server (item 774): neither stands still.
+    "/ticking": """<!doctype html><title>Ticking</title><p id="t">0</p>
+<script>let n = 0; setInterval(() => { document.getElementById('t').textContent = String(++n) }, 300)</script>""",
+    # A page that asks its server every 1.5 s with a short request, as a payment's approval does, and shows the answer
+    # at the fourth: its DOM stands still meanwhile, and a request is rarely under way when it is looked at.
+    "/polling": """<!doctype html><title>Polling</title><p id="s">Waiting for approval</p>
+<script>let polls = 0; const tick = () => fetch('/poll').then(() => { polls += 1;
+  if (polls === 4) { document.getElementById('s').textContent = 'Approved' } else { setTimeout(tick, 1500) } });
+setTimeout(tick, 1500)</script>""",
+    "/pending": """<!doctype html><title>Pending</title>
+<button onclick="fetch('/answer-late').then((r) => r.text()).then(() => {
+  document.getElementById('s').textContent = 'Sent' })">Send</button>
+<p id="s">Sending</p>""",
     # File fields as sites show them (item 704): one moved off the screen under an icon, one hidden in its label, one
     # next to a button that does not open it, and two behind one button that opens the chooser of the second. Each says
     # what it got.
@@ -277,6 +292,13 @@ class _Handler(BaseHTTPRequestHandler):
             time.sleep(_LATE_TAB_S)
         if path == "/later-tab":
             time.sleep(_LATER_TAB_S)
+        if path == "/poll":
+            self._plain(b"not yet")
+            return
+        if path == "/answer-late":
+            time.sleep(_ANSWER_LATE_S)
+            self._plain(b"ok")
+            return
         if path == "/half-page":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -298,6 +320,13 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             body = b"not found"
             self.send_response(404)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _plain(self, body: bytes) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -626,6 +655,48 @@ async def test_a_wait_for_text_that_does_not_come_fails_and_still_shows_the_page
     assert result.is_error
     assert result.untrusted  # the gate counts no failed result as a read, and this one shows the page
     assert result.text.startswith(f"The text did not appear within {wait.waited_s:.1f} s; the page now · Tab 1 of 1 · ")
+
+
+async def test_a_wait_for_text_on_a_page_that_stands_still_ends_once_it_has_for_three_seconds(
+    browser: BrowserSession, site: str
+) -> None:
+    """Item 774: a text the page shows no sign of bringing is not waited for to the end of the wait's time."""
+    view: PageView = await browser.open_url("wait-still", f"{site}/later", True)
+    await act(browser, "wait-still", [Step(action="click", ref=ref_of(view.body, 'button "Place order"'))], False)
+    wait: TextWait = await browser.wait_text("wait-still", "Payment failed", 20.0, True)
+    assert not wait.appeared and wait.still_s == 3.0 and wait.ended_by is None
+    assert 4.9 < wait.waited_s < 7.5, wait.waited_s
+    assert "Order placed" in (await browser.read_text("wait-still", None, 0, 2000)).text
+    result: ToolResult = wait_text_result(wait, "n0nce", 20_000)
+    assert result.is_error and result.untrusted
+    assert result.text.startswith(
+        f"The text has not appeared; the wait ended after {wait.waited_s:.1f} s because the page has not changed for "
+        "3 s and waits on nothing: as it stands the text is not coming; the page now · Tab 1 of 1 · "
+    ), result.text
+
+
+async def test_a_page_that_keeps_changing_or_waits_on_its_server_is_waited_for(
+    browser: BrowserSession, site: str
+) -> None:
+    """Item 774: a page that changes, one of whose requests is under way, or one that polls its server, does not stand
+    still. Their tabs are closed after, so that a page that keeps ticking slows no later test of the module."""
+    try:
+        await browser.open_url("wait-ticking", f"{site}/ticking", True)
+        ticking: TextWait = await browser.wait_text("wait-ticking", "Done", 6.5, True)
+        assert not ticking.appeared and ticking.still_s is None
+        assert ticking.waited_s >= 6.4, ticking.waited_s
+        view: PageView = await browser.open_url("wait-pending", f"{site}/pending", True)
+        await act(browser, "wait-pending", [Step(action="click", ref=ref_of(view.body, 'button "Send"'))], False)
+        sent: TextWait = await browser.wait_text("wait-pending", "Sent", 15.0, True)
+        assert sent.appeared, sent
+        assert _ANSWER_LATE_S - 1.0 < sent.waited_s < _ANSWER_LATE_S + 2.0, sent.waited_s
+        # A page that polls its server is at work although no request may be under way when it is looked at.
+        await browser.open_url("wait-polling", f"{site}/polling", True)
+        approved: TextWait = await browser.wait_text("wait-polling", "Approved", 15.0, True)
+        assert approved.appeared, approved
+    finally:
+        for thread in ("wait-ticking", "wait-pending", "wait-polling"):
+            await browser.release_thread(thread)
 
 
 def _file(path: Path) -> Path:

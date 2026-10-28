@@ -1413,16 +1413,30 @@ _MODALS: str = f":is([role='dialog'], [role='alertdialog'], dialog[open], [aria-
 TextWaitEnd = Literal["text", "dialog", "timeout"]
 
 
-async def wait_for_text_or_dialog(page: Page, text: str, timeout_ms: int) -> TextWaitEnd:
+async def no_dialog_open(page: Page) -> bool:
+    """Whether no dialog stands in front of ``page`` (:data:`_MODALS`): one that opens then ends a wait for a text."""
+    try:
+        return await _count(page.locator(_MODALS).filter(visible=True)) == 0
+    except TimeoutError as error:
+        raise BrowserError("the page did not say in time what it shows", {"url": page.url}) from error
+    except PlaywrightError as error:
+        raise _failure("looking for a dialog failed", page, {}, error) from error
+
+
+async def wait_for_text_or_dialog(
+    page: Page, text: str, timeout_ms: int, watch_dialogs: bool | None = None
+) -> TextWaitEnd:
     """What ended a wait of at most ``timeout_ms`` for ``text`` to become visible, in any of its matches (an earlier
     hidden one, such as a template or a closed menu, does not hold the wait): the text, a dialog that opened in front
     of the page while none was open when the wait began (item 698; the text would not come until it is answered), or
     the time. A dialog that brings the text with it is the text. One wait in the page, for either, so nothing is left
-    waiting behind it."""
+    waiting behind it. ``watch_dialogs`` says whether no dialog was open when a wait made of several began (item 774);
+    ``None`` looks now."""
     wanted: Locator = page.get_by_text(text).filter(visible=True)
     dialogs: Locator = page.locator(_MODALS).filter(visible=True)
     try:
-        watch_dialogs: bool = await _count(dialogs) == 0
+        if watch_dialogs is None:
+            watch_dialogs = await _count(dialogs) == 0
         target: Locator = wanted.or_(dialogs) if watch_dialogs else wanted
         await target.first.wait_for(state="visible", timeout=timeout_ms)
         if not watch_dialogs or await _count(wanted) > 0:
