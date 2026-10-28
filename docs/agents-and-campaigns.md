@@ -40,9 +40,10 @@ its Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is 
 The page is in three parts (items 509 and 610): **Your teams** and **Your agents**, each with its count, and under
 them **Add ready-made agents**, which shows the teams or the single agents, one of the two at a time (**Teams** first;
 the one chosen last while the app is open). Your agents are a grid of compact cards, as many across as the page has
-room for, two to four, and one on a phone: the face, the name over the role, each on one line, and under them the title
-of the agent's newest chat (the chat's own, as you may have renamed it) with how long ago it began, or that it has
-none. Dot's card names Dot's newest chat of its own (item 633): one that is not an agent's, a campaign's or a team's,
+room for, two to four, and one on a phone: the face, the name over the role, each on one line ("Made by Dot" and
+"Paused" go under a name too long to share its line, item 782), and under them the title of the agent's newest chat
+(the chat's own, as you may have renamed it) with how long ago it began, or that it has none. Your teams are wider
+cards, two across at most, each as wide as two of the agents' columns, so that the two grids end at the same edge. Dot's card names Dot's newest chat of its own (item 633): one that is not an agent's, a campaign's or a team's,
 which their own cards name. How long ago keeps up with the clock while the page stays open, and the list is read again
 when a run starts or ends. The card is the way to the agent's page, and says "Paused" and "Made by Dot" as the page
 does; Dot's opens the chats.
