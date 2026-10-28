@@ -16,8 +16,8 @@ the phone: a 👎 on a run at work reaches it, a ✋ holds it until you write, a
 [Reactions](runs.md#reactions-on-dots-messages)).
 
 The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on the chat you
-were in last (New chat the first time; item 286), with the sidebar's sections, the chats and the run pages at a phone
-width. Back from the background, it follows the daemon again at once, and says it is reconnecting only when that takes
+were in last (New chat the first time, and when that chat is gone; items 286 and 810), with the sidebar's sections, the
+chats and the run pages at a phone width. Back from the background, it follows the daemon again at once, and says it is reconnecting only when that takes
 more than two seconds. Its colours follow the light or dark appearance
 through CSS `light-dark()`, so it needs iOS 17.5 or later (Safari 17.5; Chrome 123 and Firefox 120 on a computer). It
 needs to reach the Mac, and a push needs a secure address, so the way there is your own network:

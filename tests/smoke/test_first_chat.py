@@ -327,3 +327,64 @@ async def test_the_look_starts_in_the_mode_its_promises_were_said_in_whatever_th
             assert run.goal.startswith("Look through my Gmail inbox"), run.goal
         finally:
             await chromium.close()
+
+
+# ----- the chat that is gone (item 810) ---------------------------------------------------------------------------
+
+
+@pytest.mark.browser
+async def test_a_chat_dot_opens_at_that_is_gone_opens_new_chat_and_another_missing_task_says_not_found(
+    tmp_path: Path,
+) -> None:
+    async with (
+        _daemon(tmp_path, "", 'name = "Dot"\nowner = "Ada"\nintroduced = true\n') as (_runtime, _manager, _f, address),
+        async_playwright() as playwright,
+    ):
+        chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await _home(chromium, address, False, playwright.devices)
+            await expect(page.get_by_role("textbox", name="Goal")).to_be_visible()
+            # The chat that was open last, which Dot opens at, is gone (a store started afresh).
+            await page.evaluate("localStorage.setItem('dot.lastChat', '/runs/run_mvgone00_000000')")
+            # Opened at no page, as Dot.app and a bookmark open it: a load of its own, with the token kept before.
+            await page.goto(f"{address}/")
+            await expect(page.get_by_role("textbox", name="Goal")).to_be_visible()
+            await expect(page.locator(".toast")).to_contain_text("The chat that was open last is gone")
+            assert page.url.endswith("#/runs"), page.url
+            assert await page.evaluate("localStorage.getItem('dot.lastChat')") in (None, "/runs")
+            # A task that is not the one Dot opens at still says so.
+            await page.goto(f"{address}/#/runs/run_mvgone11_111111")
+            await expect(page.get_by_text("Task not found")).to_be_visible()
+            await expect(page.get_by_text("No task has the ID run_mvgone11_111111.")).to_be_visible()
+        finally:
+            await chromium.close()
+
+
+@pytest.mark.browser
+async def test_a_chat_dot_opened_at_and_deleted_since_says_not_found(tmp_path: Path) -> None:
+    """The review: the mark of the chat a page opened at stayed once that chat loaded, and a later "not found" of it
+    opened New chat as if it had been gone at the opening."""
+    async with (
+        _daemon(tmp_path, "", 'name = "Dot"\nowner = "Ada"\nintroduced = true\n') as (runtime, manager, _f, address),
+        async_playwright() as playwright,
+    ):
+        run: RunRecord = await manager.start(
+            "Say hello.", "task", None, None, "ui", None, None, "standard", None, None, None, ()
+        )
+        await asyncio.wait_for(manager.wait(run.id), _RUN_TIMEOUT_S)
+        chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await _home(chromium, address, False, playwright.devices)
+            await expect(page.get_by_role("textbox", name="Goal")).to_be_visible()
+            await page.evaluate(f"localStorage.setItem('dot.lastChat', '/runs/{run.id}')")
+            await page.goto(f"{address}/")
+            await page.wait_for_url(f"**/#/runs/{run.id}")
+            await expect(page.get_by_text("Done.").first).to_be_visible()
+            await runtime.store.delete_threads([run.thread_id])
+            await page.goto(f"{address}/#/runs")
+            await expect(page.get_by_role("textbox", name="Goal")).to_be_visible()
+            await page.goto(f"{address}/#/runs/{run.id}")
+            await expect(page.get_by_text(f"No task has the ID {run.id}.")).to_be_visible()
+            await expect(page.locator(".toast")).to_have_count(0)
+        finally:
+            await chromium.close()

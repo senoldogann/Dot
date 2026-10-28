@@ -3,6 +3,41 @@
 
 const setHere = new Map();
 
+/** The chat screen the owner was on last, which Dot opens at (`#/runs/<id>`, or `#/runs` for New chat). */
+export const LAST_CHAT_KEY = "dot.lastChat";
+
+// The chat screen this page opened at from `LAST_CHAT_KEY` (item 810), for as long as the page lives.
+let openedAt = null;
+
+/** The page opened at `path`, the chat screen `LAST_CHAT_KEY` held. */
+export function openedAtLastChat(path) {
+  openedAt = path;
+}
+
+/** Whether the page opened at `path` from `LAST_CHAT_KEY`; it is asked once, and forgotten after. */
+export function tookOpening(path) {
+  const took = openedAt === path;
+  if (took) {
+    openedAt = null;
+  }
+  return took;
+}
+
+/**
+ * The opening of the chat page at `path` (item 810), taken as the page mounts: `gone()` says whether a read of it that
+ * found nothing is the opening's, which is so for the page's reads until one has found the chat (`found()`). A chat
+ * deleted after it was read once, then read again (a Reload), is the owner's to see as not found.
+ */
+export function openingOf(path) {
+  let opening = tookOpening(path);
+  return {
+    gone: () => opening,
+    found: () => {
+      opening = false;
+    },
+  };
+}
+
 /** The saved value of a preference, or null when none was saved. */
 export function readPref(key) {
   try {

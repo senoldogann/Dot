@@ -19,7 +19,7 @@ import { requestCompose } from "./shortcuts.js";
 import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
 import { applyStoredDensity, applyStoredWork, PHONE } from "./layout.js";
-import { readPref, writePref } from "./prefs.js";
+import { LAST_CHAT_KEY, openedAtLastChat, readPref, writePref } from "./prefs.js";
 import { applyStoredScheme, applyStoredTheme, followBarColour } from "./theme.js";
 import { attempt, detailsFold, toast, toastError } from "./ui.js";
 import { openingCurtain, PAGE_READY_EVENT } from "./waiting.js";
@@ -28,7 +28,6 @@ import * as runs from "./views/runs.js";
 
 const DEFAULT_ROUTE = "/runs";
 // The chat screen the owner was on last, a run's page or New chat: Dot opens there (item 286).
-const LAST_CHAT_KEY = "dot.lastChat";
 // Where a home-screen app added before item 286 starts (its manifest's start_url then): it opens the last chat instead.
 const OLD_START = "#/activity";
 // The pages of the earlier sidebar live on as tabs of the settings or of Customize; their old addresses lead there.
@@ -634,7 +633,12 @@ function beginSession() {
   onAway(markAway);
   // Opened at no page, or as a home-screen app added before item 286: the last chat screen, in the address too.
   if (location.hash === "" || location.hash === "#" || (standalone() && location.hash === OLD_START)) {
-    history.replaceState(null, "", `${location.pathname}${location.search}#${startPath()}`);
+    const start = startPath();
+    if (start !== DEFAULT_ROUTE) {
+      // A chat that is gone by now opens New chat in its place (item 810, the run's page).
+      openedAtLastChat(start);
+    }
+    history.replaceState(null, "", `${location.pathname}${location.search}#${start}`);
   }
   show();
   warmUpPages();

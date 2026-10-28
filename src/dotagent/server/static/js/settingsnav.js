@@ -6,12 +6,11 @@
 import { api, query } from "./api.js";
 import { el, modelName, setText } from "./dom.js";
 import { icon } from "./icons.js";
-import { readPref } from "./prefs.js";
+import { LAST_CHAT_KEY, readPref } from "./prefs.js";
 import { GROUPS, TABS, tabAt } from "./settingstabs.js";
 import { getSnapshot, onChange } from "./state.js";
 
 // The chat the owner was on last, which main.js keeps; Back to chats leads there.
-const LAST_CHAT_KEY = "dot.lastChat";
 // What the phone needs asked of Tailscale is read again no sooner than this: a tab's visit should not ask it each time.
 const PHONE_FRESH_MS = 60_000;
 
