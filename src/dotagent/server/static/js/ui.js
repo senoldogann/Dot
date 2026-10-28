@@ -227,11 +227,21 @@ export function formDialog({
   const fields = el("div", { class: "modal-fields" }, ...(Array.isArray(body) ? body : [body]));
   const problem = el("div", { class: "note bad form-dialog-error", role: "alert", hidden: true }, icon("alert"), el("span"));
   const cancel = el("button", { class: "btn", type: "button", onclick: () => void flow.dismiss() }, "Cancel");
-  const primary = el("button", { class: danger ? "btn danger solid" : "btn primary", type: "button", onclick: () => void flow.submit(onSubmit, "primary") }, submitLabel);
+  // The words of a submit button stand in a box of their own, which keeps its room while the spinner of a request runs
+  // over it (item 812).
+  const primary = el(
+    "button",
+    { class: danger ? "btn danger solid" : "btn primary", type: "button", onclick: () => void flow.submit(onSubmit, "primary") },
+    el("span", { class: "btn-label" }, submitLabel),
+  );
   const other =
     alternative === null
       ? null
-      : el("button", { class: "btn", type: "button", onclick: () => void flow.submit(alternative.onSubmit, "alternative") }, alternative.label);
+      : el(
+          "button",
+          { class: "btn", type: "button", onclick: () => void flow.submit(alternative.onSubmit, "alternative") },
+          el("span", { class: "btn-label" }, alternative.label),
+        );
   const { dialog, cross } = dialogFrame({
     className: `modal form-dialog form-dialog-${size}`,
     title,
@@ -305,8 +315,15 @@ export function formDialog({
       }
       paintPrimary();
       spinner.remove();
+      for (const button of [primary, other]) {
+        button?.classList.remove("busy");
+      }
       if (at) {
-        (which === "alternative" && other !== null ? other : primary).prepend(spinner);
+        // Over the button's words, not before them: a button that grew moved the ones beside it, and WebKit left their
+        // traces behind (item 812).
+        const asked = which === "alternative" && other !== null ? other : primary;
+        asked.classList.add("busy");
+        asked.append(spinner);
       } else if (dialog.isConnected && !dialog.contains(document.activeElement)) {
         primary.focus({ preventScroll: true });
       }

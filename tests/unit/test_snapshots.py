@@ -302,3 +302,36 @@ async def test_a_capture_takes_dots_pointer_off_the_screen_while_it_captures_and
         await failing.take()
     assert seen == [["hide"], ["hide", "reveal", "hide"]]
     assert pointer.told == ["hide", "reveal", "hide", "reveal"]
+
+
+def test_a_double_tap_captures_only_while_it_is_switched_on_and_both_keys_always_do(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Item 814: the owner presses one Command key twice for its shortcuts, and that took a capture; both keys pressed
+    together are the shortcut, and the double tap captures only once Settings › Snapshots switches it on."""
+    monkeypatch.setattr(snapshots.Quartz, "CGEventGetFlags", lambda event: event)
+    changed: int = snapshots.Quartz.kCGEventFlagsChanged
+    left: int = snapshots.Quartz.kCGEventFlagMaskCommand | snapshots._LEFT_COMMAND
+    both: int = left | snapshots._RIGHT_COMMAND
+    switched: list[bool] = [False]
+    fired: list[str] = []
+    watcher: snapshots.SnapshotWatcher = snapshots.SnapshotWatcher(
+        0.4, lambda: fired.append("capture"), lambda: switched[0]
+    )
+    for flags in (left, 0, left, 0):
+        watcher._event(None, changed, flags, None)
+    assert fired == []
+    switched[0] = True
+    for flags in (left, 0, left, 0):
+        watcher._event(None, changed, flags, None)
+    assert fired == ["capture"]
+    switched[0] = False
+    fired.clear()
+    for flags in (left, both, left, 0):
+        watcher._event(None, changed, flags, None)
+    assert fired == ["capture"]
+    # The review: a lone press just before both keys is a tap that does not count, and it kept them from capturing.
+    fired.clear()
+    for flags in (left, 0, left, both, left, 0):
+        watcher._event(None, changed, flags, None)
+    assert fired == ["capture"]
