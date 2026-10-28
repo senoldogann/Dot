@@ -5,6 +5,7 @@ structured fields and shown to the model as a note.
 """
 
 import asyncio
+import contextlib
 import time
 from collections import deque
 from collections.abc import Mapping
@@ -118,13 +119,26 @@ def add_note(tab: Tab, text: str) -> None:
 
 
 def unique_download_path(directory: Path, name: str) -> Path:
-    """``directory/name``, or with a numeric suffix when a file of that name exists already."""
+    """``directory/name``, or with a numeric suffix when a file of that name exists already, made empty here so that
+    it is taken: two downloads of one name at once each get a file of their own, where both were handed the free name
+    and the second overwrote the first."""
     candidate: Path = directory / name
     counter: int = 1
-    while candidate.exists():
-        candidate = directory / f"{Path(name).stem}-{counter}{Path(name).suffix}"
-        counter += 1
-    return candidate
+    while True:
+        try:
+            candidate.touch(exist_ok=False)
+        except FileExistsError:
+            candidate = directory / f"{Path(name).stem}-{counter}{Path(name).suffix}"
+            counter += 1
+        else:
+            return candidate
+
+
+def _drop_empty(target: Path) -> None:
+    """Remove the file :func:`unique_download_path` took for a download that failed, when nothing was written to it."""
+    with contextlib.suppress(OSError):
+        if target.stat().st_size == 0:
+            target.unlink()
 
 
 async def _on_dialog(tab: Tab, dialog: Dialog) -> None:
@@ -169,9 +183,11 @@ async def _on_download(tab: Tab, directory: Path, download: Download) -> None:
     except PlaywrightError as error:
         _log.warning("browser_download_failed", file=target.name, error=truncate_middle(str(error), _NOTE_LOG_CHARS))
         add_note(tab, f"download of {target.name} failed: {truncate_middle(str(error), _NOTE_LOG_CHARS)}")
+        await asyncio.to_thread(_drop_empty, target)
         return
     if failure is not None:
         add_note(tab, f"download of {target.name} failed: {failure}")
+        await asyncio.to_thread(_drop_empty, target)
         return
     size: int = await asyncio.to_thread(lambda: target.stat().st_size)
     add_note(tab, f"download saved to {target} ({size} bytes); it was not opened")
@@ -233,6 +249,27 @@ def _on_response(tab: Tab, response: Response) -> None:
 def _text(payload: object, key: str) -> str | None:
     value: object = payload.get(key) if isinstance(payload, Mapping) else None
     return value if isinstance(value, str) and value else None
+
+
+def target_id_of(answer: object) -> str | None:
+    """The tab id in Chrome's answer to ``Target.createTarget``."""
+    return _text(answer, "targetId")
+
+
+async def page_target_id(page: Page) -> str | None:
+    """The id Chrome gives the tab of ``page``, ``None`` when the page cannot tell it (closed since)."""
+    try:
+        session: CDPSession = await page.context.new_cdp_session(page)
+    except PlaywrightError:
+        return None
+    try:
+        own: dict[str, object] = await session.send("Target.getTargetInfo")
+    except PlaywrightError:
+        return None
+    finally:
+        with contextlib.suppress(PlaywrightError):
+            await session.detach()
+    return _text(own.get("targetInfo"), "targetId")
 
 
 def _on_target_created(tab: Tab, event: object) -> None:
