@@ -134,8 +134,8 @@ day when something moved, check the exit conditions of the positions opened befo
 reason and its exit (a stop and a target), or none and why — and ends in a four-line summary for the next shift. Its
 runs go on in one chat with the last three summaries in view; with `products = ["*"]` in `USDC` and the shift as
 `wake_schedule`, it covers the whole market and is woken between its hours when a product moves. After a couple of
-weeks, Settings › Trading shows what it made of the paper account against simply holding; that, not a feeling, is what
-a switch to live rests on.
+weeks, Settings › Trading shows what it made of the paper account since its start; set beside what simply holding
+would have made, that, not a feeling, is what a switch to live rests on.
 
 ## What holds, and what only asks
 

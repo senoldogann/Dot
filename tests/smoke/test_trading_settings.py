@@ -11,6 +11,7 @@ import pytest
 from test_phone_limits import TOKEN, _phone_key, _served, own_home  # noqa: F401 - the fixture is used by name
 from vault_stand_ins import MemorySecretStore
 
+from dotagent.core.errors import StoreError
 from dotagent.runtime import Runtime
 from dotagent.trading.market import CoinbaseMarket
 from dotagent.trading.types import OrderRequest
@@ -168,6 +169,20 @@ async def test_the_desk_shows_each_open_position_and_what_watches_the_market(own
         typed.trading.settings.value = typed.trading.config().model_copy(update={"wake_schedule": "sch_gone"})
         gone = (await client.get("/trading", headers=mac)).json()["watch"]
         assert (gone["wake_schedule"], gone["schedule_name"], gone["schedule_on"]) == ("sch_gone", None, False)
+        # What watches the market cannot be read (the store fails): the page is drawn all the same, and says why.
+        failing = typed.store.get_schedule
+
+        async def broken(schedule_id: str) -> object:
+            raise StoreError("the database is locked", {})
+
+        typed.store.get_schedule = broken  # type: ignore[method-assign]
+        typed.trading.settings.value = typed.trading.config().model_copy(update={"wake_schedule": shift})
+        try:
+            unread: httpx.Response = await client.get("/trading", headers=mac)
+        finally:
+            typed.store.get_schedule = failing  # type: ignore[method-assign]
+        assert unread.status_code == 200 and unread.json()["watch"] is None
+        assert "could not be read: the database is locked" in unread.json()["problem"]
         # Off, nothing is watched.
         typed.trading.settings.value = typed.trading.config().model_copy(update={"mode": "off"})
         off: dict[str, object] = (await client.get("/trading", headers=mac)).json()
