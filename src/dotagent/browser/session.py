@@ -152,6 +152,11 @@ from dotagent.vault.masking import in_address, mask_error, masked
 from dotagent.web.addresses import is_private_text, non_public_address
 
 _log = get_logger("dotagent.browser.session")
+# What a page that had not settled after an action that went through is said to be (the review of every module).
+_UNSETTLED: str = (
+    "the page was still loading when Dot stopped waiting: what was done went through, so do not repeat it; read the "
+    "page again to see where it stands"
+)
 
 _REAP_INTERVAL_S: float = 60.0
 # The screencast of a tab (``screencast``): JPEG quality, the longest edge, and how often a silent cast says so.
@@ -1651,6 +1656,19 @@ class BrowserSession:
         await self._let_commit(tab)
         await wait_dom_quiet(tab.page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
 
+    async def _settle_acted(self, tab: Tab) -> str | None:
+        """Settle the page after a step, a script or an upload that already went through (the review of every module,
+        2026-10-28): a page that does not settle in time is said, not raised, since what was done is done, and a run
+        told only that the call failed did it again (a submit, a post, a like). A forbidden address still raises."""
+        try:
+            await self._settle(tab)
+        except ForbiddenUrlError:
+            raise
+        except BrowserError as error:
+            _log.info("browser_unsettled_after_action", error=error.message, url=truncate_middle(tab.page.url, 200))
+            return _UNSETTLED
+        return None
+
     async def _viewport(self, tab: Tab) -> Viewport:
         """The page area the model sees, in CSS pixels: the configured size in Dot's own Chrome at 100 %, what the page
         measures where it fills its window (item 354), is drawn larger or smaller (item 358: 1280 by 860 at 125 % is
@@ -2987,13 +3005,15 @@ class BrowserSession:
             finally:
                 tab.accept_confirms = False
             current: Tab = await self._current_tab(thread)
-            await self._settle(current)
+            unsettled: str | None = await self._settle_acted(current)
             await self._enforce_landing(current)
             view: PageView = (
                 await self._changes_view(thread, current, hide_secrets)
                 if current is tab
                 else await self._settled_view(thread, current, hide_secrets)
             )
+            if unsettled is not None:
+                view = view.model_copy(update={"notes": (*view.notes, unsettled)})
             return ActOutcome(steps=tuple(reports), stopped=stopped, view=view)
 
     async def scroll(
@@ -3271,6 +3291,7 @@ class BrowserSession:
                 seconds: float = time.monotonic() - started
                 current: Tab
                 opening: bool
+                unsettled: str | None = None
                 if end == "timeout":
                     # The script holds the page still: it takes no turn, and the tabs it opened are what can land.
                     opening = await self._let_births_land(tab)
@@ -3279,8 +3300,10 @@ class BrowserSession:
                 else:
                     opening = await self._let_events_land(tab)
                     current = await self._current_tab(thread)
-                    await self._settle(current)
-                surprise: str | None = describe_surprise(before, self._watch(thread, tab))
+                    unsettled = await self._settle_acted(current)
+                # Both are said when both happened: the run must know that what it did went through (the review).
+                looked: str | None = describe_surprise(before, self._watch(thread, tab))
+                surprise: str | None = "; ".join(said for said in (looked, unsettled) if said) or None
                 await self._enforce_landing(current)
             except DotError as error:
                 # What the script led the tab to may be an address that carries a cookie: the refusal names it.
@@ -3356,8 +3379,9 @@ class BrowserSession:
                 await upload_files(tab.page, ref, list(paths), _ms(self._config.action_timeout_s))
             finally:
                 tab.expect_chooser = False
-            await self._settle(tab)
-            return await self._changes_view(thread, tab, hide_secrets)
+            unsettled: str | None = await self._settle_acted(tab)
+            view: PageView = await self._changes_view(thread, tab, hide_secrets)
+            return view if unsettled is None else view.model_copy(update={"notes": (*view.notes, unsettled)})
 
     # ------------------------------------------------------------------ reads without browser access
 
