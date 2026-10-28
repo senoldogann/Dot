@@ -1,7 +1,8 @@
-"""Snapshots (item 405): both Command keys pressed together (item 414), or the Command key tapped twice, in whatever
-application the owner is in, captures the window in front and hands it to the composer of the open chat as a file,
-with the window's text when the application shows it to accessibility and the setting asks for it; a short sound says
-it was taken, a soft flash over the window and a card that flies to Dot's window show it
+"""Snapshots (item 405): both Command keys pressed together (item 414), or, with ``[snapshots] double_tap``, the Command
+key tapped twice (item 814: off by default, so that a Command key pressed twice for its shortcuts takes nothing), in
+whatever application the owner is in, captures the window in front and hands it to the composer of the open chat as a
+file, with the window's text when the application shows it to accessibility and the setting asks for it; a short sound
+says it was taken, a soft flash over the window and a card that flies to Dot's window show it
 (:mod:`dotagent.desktop.flight`), and Dot's window or tab comes to the front with the capture in its box
 (:mod:`dotagent.desktop.show_dot`). The keys are watched by a listen-only event tap on a thread of its own: it reads
 only whether a Command key went down or up and whether any other key was pressed meanwhile (⌘C ⌘V is not a capture),
@@ -90,8 +91,11 @@ class TapDetector:
     key released between them, and no other key pressed from the first press on (⌘C ⌘V is two shortcuts). Pure: it is
     told the key's changes and the clock."""
 
-    def __init__(self, within_s: float) -> None:
+    def __init__(self, within_s: float, counts: Callable[[], bool] = lambda: True) -> None:
         self._within_s: float = within_s
+        # Whether a double tap captures (item 814): one that does not is no gesture, and both keys pressed right after
+        # it are still a capture of their own.
+        self._counts: Callable[[], bool] = counts
         self._first: float | None = None
         self._held: bool = False
         self._keyed: bool = False
@@ -100,13 +104,15 @@ class TapDetector:
         self._captured: bool = False
 
     def command(self, down: bool, now: float) -> bool:
-        """The Command key went ``down`` (or up) at ``now``; whether that completes a double tap."""
+        """The Command key went ``down`` (or up) at ``now``; whether that completes a double tap that captures."""
         if down:
             if self._held:
                 return False
             self._held = True
             if self._first is not None and not self._keyed and now - self._first <= self._within_s:
                 self._first = None
+                if not self._counts():
+                    return False
                 self._captured = True
                 return True
             self._first = now
@@ -214,12 +220,15 @@ def play_sound(sound: SnapshotSound) -> None:
 
 class SnapshotWatcher(threading.Thread):
     """The thread that watches the Command key: a listen-only event tap of the session, fed to a
-    :class:`TapDetector`; a double tap calls ``on_double`` on this thread. ``problem`` says why the tap could not be
-    made (macOS has not granted Accessibility or Input Monitoring to the app that runs Dot), once ``ready`` is set."""
+    :class:`TapDetector`; both Command keys pressed together, and a double tap while ``double_tap()`` says it counts
+    (item 814), call ``on_double`` on this thread. ``problem`` says why the tap could not be made (macOS has not
+    granted Accessibility or Input Monitoring to the app that runs Dot), once ``ready`` is set."""
 
-    def __init__(self, within_s: float, on_double: Callable[[], None]) -> None:
+    def __init__(
+        self, within_s: float, on_double: Callable[[], None], double_tap: Callable[[], bool] = lambda: True
+    ) -> None:
         super().__init__(name="snapshots", daemon=True)
-        self._detector: TapDetector = TapDetector(within_s)
+        self._detector: TapDetector = TapDetector(within_s, double_tap)
         self._on_double: Callable[[], None] = on_double
         self._run_loop: object | None = None
         self._tap: object | None = None
@@ -235,6 +244,8 @@ class SnapshotWatcher(threading.Thread):
             return event
         if kind == Quartz.kCGEventFlagsChanged:
             flags: int = int(Quartz.CGEventGetFlags(event))
+            # The detector follows the tap whether it counts or not (item 814), so the switch takes at once; a tap that
+            # does not count captures nothing and keeps nothing back from both keys pressed after it.
             tapped: bool = self._detector.command(bool(flags & Quartz.kCGEventFlagMaskCommand), time.monotonic())
             paired: bool = self._detector.sides(bool(flags & _LEFT_COMMAND), bool(flags & _RIGHT_COMMAND))
             if tapped or paired:
@@ -325,6 +336,8 @@ class SnapshotService:
         self.animations: bool = config.animations
         self.flash: bool = config.flash
         self.open_dot: bool = config.open_dot
+        # Whether a double tap of one Command key captures as both keys together do (item 814).
+        self.double_tap: bool = config.double_tap
         # The User-Agent of the page that last claimed captures: Dot's tab is looked for in its browser first.
         self.agent: str | None = None
         self._within_s: float = config.double_tap_ms / 1000
@@ -375,7 +388,7 @@ class SnapshotService:
                 await overlay.warm()
 
     def _listen(self) -> None:
-        watcher: SnapshotWatcher = SnapshotWatcher(self._within_s, self._tapped)
+        watcher: SnapshotWatcher = SnapshotWatcher(self._within_s, self._tapped, lambda: self.double_tap)
         # The service's to stop from now, also when it is slow to stand up.
         self._watcher = watcher
         self._slow = False
@@ -431,6 +444,8 @@ class SnapshotService:
             self.flash = value
         elif key == "open_dot" and isinstance(value, bool):
             self.open_dot = value
+        elif key == "double_tap" and isinstance(value, bool):
+            self.double_tap = value
         elif key == "sound" and isinstance(value, str) and value in SOUND_NAMES:
             self.sound = value
         else:
