@@ -241,6 +241,9 @@ work:
 
 - **Connect 1Password** makes the vault "Shared with Dot" and a service account that only reads it, with your own
   `op` signed in through the 1Password app (Settings › Developer › Integrate with 1Password CLI), which asks you first.
+  Without the app (`op` alone, as Homebrew installs it, signs in to no account) Connect cannot work, and the page and
+  Connect say so (item 791): 1Password is not needed then, since Dot's own vault (Settings › Vault) keeps your logins in
+  the Mac's Keychain and fills them; a service account key still connects.
 - **Use a service account key instead** takes one you made at 1password.com, asked for in a dialog (item 615).
 
 Either way Dot keeps the token in its `.env` (`DOT_ONEPASSWORD_TOKEN`), and the page says how many logins the vaults
