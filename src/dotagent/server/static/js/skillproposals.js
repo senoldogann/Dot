@@ -34,6 +34,11 @@ function fieldBlock(field) {
   );
 }
 
+/**
+ * A proposal to change or merge learned skills, as `/api/skills/proposals` gives it.
+ * @typedef {{ id: string, kind: string, names: string[], tainted: boolean, reason: string, words: string | null }} SkillProposal
+ */
+
 /** Everything the yes writes, each field against what the first skill says now, with the steps counted above them. */
 function fieldsDiff(view) {
   return [
@@ -46,7 +51,7 @@ function fieldsDiff(view) {
  * One proposal as a card: what it does, why, every field it would write, what happens to each skill, and Yes and No. A
  * proposal that cannot be applied now (a skill changed since) says why and has No alone. `onAccepted(list)` gets the learned
  * skills after a yes, `onDismissed(view)` the proposals after a no.
- * @param {{ proposal: object, stale: string | null, current: object[], fields: object[] }} view
+ * @param {{ proposal: SkillProposal, stale: string | null, current: object[], fields: object[] }} view
  * @param {{ onAccepted: (list: object[]) => void, onDismissed: (view: { items: object[] }) => void }} handlers
  */
 export function proposalCard(view, { onAccepted, onDismissed }) {
