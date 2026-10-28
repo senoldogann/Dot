@@ -55,6 +55,7 @@ from dotagent.channels.seen import COMMAND_KEY, Look, Seen, SeenCommand, Watch, 
 from dotagent.channels.sends import runs_sending_at
 from dotagent.channels.staging import Staged, Staging
 from dotagent.channels.types import ChannelId, Receive, is_stop
+from dotagent.channels.words import ENGLISH, SpokenLanguage, Words
 from dotagent.core.errors import ChannelError, DesktopError, DesktopPermissionError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
@@ -71,14 +72,8 @@ MARKER: str = "◆ "
 # The longest message Dot sends, the marker with it: a longer answer is cut, with the link to the chat in Dot.
 OUT_CHARS: int = 2000
 POLL_S: float = 3.0
-BY_A_RUN: str = (
-    "Dot did not run that: a run of Dot sent a message at that moment, and Dot cannot tell its message from yours. "
-    "Send it again."
-)
-SCHEDULED: str = (
-    "Dot did not run that: it is a scheduled message, and Dot cannot tell when it was written. Send it now, not "
-    "scheduled."
-)
+BY_A_RUN: str = ENGLISH.by_a_run
+SCHEDULED: str = ENGLISH.scheduled
 # The most rows read in one poll; the rest follow at the next.
 BATCH: int = 50
 # The handles that may be paired: a number and an address, and one more.
@@ -473,8 +468,12 @@ class IMessageChannel:
         poll_s: float = POLL_S,
         clock: Callable[[], float] = time.time,
         staging: Staging | None = None,
+        language: SpokenLanguage | None = None,
     ) -> None:
         self._store: Store = store
+        # The language of the lines the channel writes itself (item 805), told by the owner's messages; with none they
+        # are in English.
+        self._language: SpokenLanguage | None = language
         self._script: Script = script
         self._db: Path = db
         self._timeout_s: float = timeout_s
@@ -490,7 +489,7 @@ class IMessageChannel:
         self._poll_s: float = poll_s
         self._clock: Callable[[], float] = clock
         self._state: ImessageState = ImessageState()
-        self._intake: Intake = Intake()
+        self._intake: Intake = Intake(self._words)
         self._pending: _Pending | None = None
         self._code_sent_at: float = -CODE_APART_S
         # What the channel sees of the database (item 595), and the one look or poll at a time that adds to it.
@@ -685,6 +684,9 @@ class IMessageChannel:
             return False
         return any(at - _OWN_LINK_BEFORE_S <= row.sent_at <= at + OWN_LINK_S for at in self._pictures_sent)
 
+    def _words(self) -> Words:
+        return ENGLISH if self._language is None else self._language.words()
+
     async def _handle(self, row: Row, receive: Receive) -> None:
         if row.balloon is not None and row.balloon != URL_BALLOON:
             # Rich content (a sticker, an app, a payment) is never a command, whatever words it carries.
@@ -715,6 +717,9 @@ class IMessageChannel:
         # no file the owner sent, and a message with a link would else be told to the run, and to the owner, as one
         # that came with a file.
         attached: bool = row.attachment and row.balloon != URL_BALLOON
+        if self._language is not None and row.text:
+            # The owner's words tell the language Dot answers in (item 805), also when they are not run.
+            await self._language.hear(row.text)
         verdict: Verdict = self._intake.judge(row.text, row.sent_at, attached, self._clock())
         # What would be run is first checked against what Dot's own runs may have written (item 572), but for the one
         # message that only stops a run: Dot stops when told to, whoever may have told it. That is a whole message of
@@ -774,14 +779,14 @@ class IMessageChannel:
         address cannot be shown, so nothing waives the window for it."""
         if row.scheduled:
             log.warning("imessage_message_scheduled", rowid=row.rowid)
-            return SCHEDULED
+            return self._words().scheduled
         runs: set[str] = set()
         for sent_at in (row.sent_at, row.link_at):
             if sent_at is not None:
                 runs.update(await runs_sending_at(self._store, sent_at, self._clock()))
         if runs:
             log.warning("imessage_message_next_to_a_send", rowid=row.rowid, run_ids=sorted(runs))
-            return BY_A_RUN
+            return self._words().by_a_run
         return None
 
     def _fail(self, message: str, needs: Needs | None) -> None:
@@ -883,8 +888,7 @@ class IMessageChannel:
         code: OneTimeCode = new_code(now)
         await self._send_to(
             handle,
-            f"Dot's pairing code is {shown_code(code)}. Type it in Settings › Channels on your Mac. If you did not ask "
-            "for it, ignore this message.",
+            self._words().fill(self._words().pairing_code, code=shown_code(code)),
         )
         self._pending = _Pending(handle, code)
         self._code_sent_at = now

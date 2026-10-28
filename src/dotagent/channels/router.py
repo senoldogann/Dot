@@ -36,11 +36,12 @@ from pydantic import JsonValue
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.agent.mode_words import resolved_mode
-from dotagent.channels.intake import UNREAD_ANSWER, UNREAD_NOTE
+from dotagent.channels.intake import UNREAD_NOTE
 from dotagent.channels.pictures import Found, Pictures
 from dotagent.channels.progress import APART_S, FIRST_AFTER_S, Progress, first_sentence, step_words
 from dotagent.channels.text import as_plain_text, cut_with_link, one_line
 from dotagent.channels.types import TITLES, Channel, ChannelId, is_stop
+from dotagent.channels.words import ENGLISH, SpokenLanguage, Words
 from dotagent.core.errors import DotError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
@@ -85,8 +86,6 @@ ASKS_APART_S: float = 20.0
 _FOLDED_TITLE: str = "Dot"
 # How far up from a helper's run the run of the channel's chat is looked for.
 _ROOT_DEPTH: int = 8
-_ASKING_LEAD: dict[str, str] = {"question": "Dot has a question", "handoff": "Dot needs your help"}
-_FINISHED_LEAD: dict[str, str] = {"failed": "The run failed.", "cancelled": "The run was stopped."}
 _ASK_CHARS: int = 240
 _FIRST_LINE_CHARS: int = 300
 # The blank line between the text of an answer and the line that says what it names that was left out (item 617).
@@ -95,12 +94,9 @@ _NOTE_APART: int = 2
 _OPEN: frozenset[str] = frozenset({"pending", "left"})
 # What a message that comes while the owner's emergency stop is engaged is answered (item 611): nothing was started, and
 # how to go on. The banner of an engaged stop, on every page, has the button that releases it.
-STOPPED: str = (
-    "Dot is stopped: the emergency stop is engaged, so nothing was started. Release it in Dot (the banner at the top "
-    "of any page has the button), then send the message again."
-)
+STOPPED: str = ENGLISH.stopped
 # What a message that comes while a run works is answered: it waits, and the owner is told how to stop the run.
-QUEUED: str = "Queued: the run at work in this chat goes first. Send /stop to stop it."
+QUEUED: str = ENGLISH.queued
 DEFAULT_CHOICES: ChatChoices = ChatChoices(
     mode="auto", model=None, effort=None, speed="standard", approvals=None, goal_mode=None
 )
@@ -158,8 +154,11 @@ class ChannelRouter:
         clock: Callable[[], float] = time.monotonic,
         progress_first_s: float = FIRST_AFTER_S,
         progress_apart_s: float = APART_S,
+        language: SpokenLanguage | None = None,
     ) -> None:
         self._store: Store = runtime.store
+        # The language of the lines the router writes itself (item 805); with none they are in English.
+        self._language: SpokenLanguage | None = language
         self._manager: RunManager = manager
         self._channels: Mapping[ChannelId, Channel] = channels
         self._base: str | None = base
@@ -195,6 +194,9 @@ class ChannelRouter:
             if stored is not None:
                 self._chats[stored] = channel_id
 
+    def _words(self) -> Words:
+        return ENGLISH if self._language is None else self._language.words()
+
     def link(self, run_id: str) -> str | None:
         """The page of ``run_id`` in Dot, as the owner opens it from the channel: the run's chat; ``None`` when Dot has
         no address a phone can open (item 611)."""
@@ -217,15 +219,17 @@ class ChannelRouter:
         """Post the owner's ``text`` into the chat of ``channel_id``: a run starts on it, or it is queued behind the run
         at work; while the emergency stop is engaged neither happens, and the owner is told so (item 611). What fails
         is told to the owner on the channel."""
+        # The language is heard by the channel, from the owner's own words (item 805).
+        words: Words = self._words()
         try:
             await self._post(channel_id, text)
         except DotError as error:
             log.warning("channel_message_not_posted", channel=channel_id, error=error.message, context=error.context)
-            await self._say(channel_id, f"Dot could not start on that: {error.message}.", None)
+            await self._say(channel_id, words.fill(words.could_not_start, error=error.message), None)
         except Exception:
             # Whatever else went wrong: the traceback is in the log, and the owner, who sees no answer, is told so.
             log.exception("channel_message_failed", channel=channel_id)
-            await self._say(channel_id, "Dot failed on that message. The log has what went wrong.", None)
+            await self._say(channel_id, words.failed_message, None)
 
     async def _post(self, channel_id: ChannelId, text: str) -> None:
         stop: bool = is_stop(text)
@@ -236,7 +240,7 @@ class ChannelRouter:
             # the one at work ends, stop or no stop), and the owner, who sees no run, is told why and how to go on.
             # ``/stop`` is run in any case, and so is pairing, which is not the router's.
             log.info("channel_message_refused_emergency_stop", channel=channel_id, chars=len(text))
-            await self._say(channel_id, STOPPED, None)
+            await self._say(channel_id, self._words().stopped, None)
             return
         thread: ThreadRecord = await self._thread(channel_id)
         newest: list[RunRecord] = await self._store.list_runs(1, thread.id)
@@ -292,21 +296,21 @@ class ChannelRouter:
             channel_id,
         )
         log.info("channel_message_queued", channel=channel_id, thread_id=thread.id, chars=len(text))
-        await self._say(channel_id, QUEUED, None)
+        await self._say(channel_id, self._words().queued, None)
 
     async def _stop(self, channel_id: ChannelId, working: RunRecord | None) -> None:
         """``/stop``, or a message of the plain stop words (item 611): the run at work in the chat is stopped, as the
         Stop of the pages stops it."""
         if working is None:
-            await self._say(channel_id, "No run is at work in this chat.", None)
+            await self._say(channel_id, self._words().no_run, None)
             return
         try:
             await self._manager.stop(working.id)
         except RunConflict:
-            await self._say(channel_id, "No run is at work in this chat.", None)
+            await self._say(channel_id, self._words().no_run, None)
             return
         log.info("channel_run_stopped", channel=channel_id, run_id=working.id)
-        await self._say(channel_id, "Stopping the run.", working.id)
+        await self._say(channel_id, self._words().stopping, working.id)
 
     async def _thread(self, channel_id: ChannelId) -> ThreadRecord:
         """The chat of ``channel_id``, made with the first message, and again when the owner deleted it."""
@@ -366,7 +370,7 @@ class ChannelRouter:
             if run.parent_run_id is None:
                 await self._say_answer(
                     channel_id,
-                    self._answer(event, run.goal.endswith(UNREAD_NOTE)),
+                    self._answer(event, run.goal.endswith(UNREAD_NOTE), self._words()),
                     run.id,
                     event.data.get("status") == "done",
                 )
@@ -388,22 +392,29 @@ class ChannelRouter:
         return run
 
     @staticmethod
-    def _answer(event: EventRecord, unread: bool = False) -> str:
+    def _answer(event: EventRecord, unread: bool = False, words: Words = ENGLISH) -> str:
         """What the end of a run tells: its answer, or how it ended. The answer of a run whose message came with a
         picture or a file that was not read (``unread``, item 611) starts with a line that says so. The words of how a
         run ended are said once: a stopped run's result is the sentence that leads them."""
         status: object = event.data.get("status")
         result: object = event.data.get("result")
-        words: str = result.strip() if isinstance(result, str) else ""
+        result_words: str = result.strip() if isinstance(result, str) else ""
         if status == "done":
-            answer: str = words or "Done."
-            return f"{UNREAD_ANSWER}\n\n{answer}" if unread else answer
-        lead: str = _FINISHED_LEAD.get(str(status), "The run ended.")
-        first: str = one_line(words, _FIRST_LINE_CHARS) if words else ""
+            answer: str = result_words or words.done
+            return f"{words.unread_answer}\n\n{answer}" if unread else answer
+        leads: dict[str, tuple[str, str]] = {
+            "failed": (words.run_failed, ENGLISH.run_failed),
+            "cancelled": (words.run_stopped, ENGLISH.run_stopped),
+        }
+        lead, english = leads.get(str(status), (words.run_ended, ENGLISH.run_ended))
+        first: str = one_line(result_words, _FIRST_LINE_CHARS) if result_words else ""
+        # The result of a stopped run is the run's own English sentence (item 805): in another language it is the
+        # lead, said once in the owner's words.
+        first = first.removeprefix(english).strip() if first.startswith(english) else first
         return first if first.startswith(lead) else f"{lead} {first}".strip()
 
     @staticmethod
-    def _asking(event: EventRecord, link: str | None, more: int = 0) -> str:
+    def _asking(event: EventRecord, link: str | None, more: int = 0, words: Words = ENGLISH) -> str:
         """The one line of a run that waits for the owner: what it asks, and where to answer; with ``more`` other waits
         held with it (item 611), how many. ``link`` is ``None`` when Dot has no address a phone can open: the line says
         where in words."""
@@ -412,10 +423,16 @@ class ChannelRouter:
         question: object = args.get("question") if severity == "question" and isinstance(args, dict) else None
         summary: object = event.data.get("summary")
         what: str = question if isinstance(question, str) else str(summary or "")
-        lead: str = _ASKING_LEAD.get(str(severity), "Dot waits for your approval")
-        also: str = f" (and {more} more)" if more else ""
-        where: str = f"Answer {'them' if more else 'it'} in Dot"
-        pointer: str = f"{where} on your Mac, not here." if link is None else f"{where}, not here: {link}"
+        lead: str = {"question": words.has_question, "handoff": words.needs_help}.get(
+            str(severity), words.waits_approval
+        )
+        also: str = words.fill(words.and_more, count=more) if more else ""
+        where: str = words.answer_them if more else words.answer_it
+        pointer: str = (
+            words.fill(words.on_your_mac, where=where)
+            if link is None
+            else words.fill(words.not_here, where=where, link=link)
+        )
         return f"{lead}: {one_line(what, _ASK_CHARS)}{also}\n{pointer}"
 
     async def _told_on_its_own(self, owner: OwnerTold) -> None:
@@ -465,7 +482,9 @@ class ChannelRouter:
             return
         newest: _HeldAsk = waiting[-1]
         await self._say(
-            channel_id, self._asking(newest.event, self.link(newest.run_id), len(waiting) - 1), newest.run_id
+            channel_id,
+            self._asking(newest.event, self.link(newest.run_id), len(waiting) - 1, self._words()),
+            newest.run_id,
         )
         self._asked_at[channel_id] = self._clock()
         log.info("channel_wait_told", channel=channel_id, waits=len(waiting))
@@ -529,11 +548,13 @@ class ChannelRouter:
             else:
                 tool: object = event.data.get("tool")
                 args: JsonValue = redact_json(event.data.get("args"), known)
-                words: str | None = (
-                    step_words(tool, args if isinstance(args, dict) else {}) if isinstance(tool, str) else None
+                told: str | None = (
+                    step_words(tool, args if isinstance(args, dict) else {}, followed.progress.words)
+                    if isinstance(tool, str)
+                    else None
                 )
-                if words is not None:
-                    followed.progress.step(words)
+                if told is not None:
+                    followed.progress.step(told)
         await self._tell_progress()
 
     async def _followed(self, event: EventRecord) -> _Followed | None:
@@ -547,7 +568,10 @@ class ChannelRouter:
         followed: _Followed | None = None
         if run.parent_run_id is None and channel_id is not None and run.source == channel_id:
             started: float = self._clock()
-            followed = _Followed(channel_id, Progress(started, self._progress_first_s, self._progress_apart_s))
+            followed = _Followed(
+                channel_id,
+                Progress(started, self._progress_first_s, self._progress_apart_s, words=self._words()),
+            )
         if len(self._following) >= _FOLLOWED_MAX:
             self._following = {run_id: kept for run_id, kept in self._following.items() if kept is not None}
         self._following[event.run_id] = followed
@@ -589,7 +613,8 @@ class ChannelRouter:
         pointer: str = "" if self._base is None else f"\n{self._base}{held.newest.url}"
         if held.count == 1:
             return f"{held.newest.title}: {held.newest.text}{pointer}"
-        return f"{held.title or _FOLDED_TITLE}: and {held.count} more{pointer}"
+        words: Words = self._words()
+        return f"{words.fill(words.told_more, title=held.title or _FOLDED_TITLE, count=held.count)}{pointer}"
 
     def _reachable(self, channel_id: ChannelId) -> bool:
         """Whether the owner can be told on ``channel_id``: it is switched on and knows who to answer."""
@@ -603,7 +628,7 @@ class ChannelRouter:
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         words: str = as_plain_text(redact_known(text, known))
         link: str | None = self._base if run_id is None else self.link(run_id)
-        await self._deliver(channel_id, cut_with_link(words, channel.limit, link), known)
+        await self._deliver(channel_id, cut_with_link(words, channel.limit, link, self._words()), known)
 
     async def _say_answer(self, channel_id: ChannelId, text: str, run_id: str, pictures: bool) -> None:
         """Send the answer of the run ``run_id`` (item 617): as :meth:`_say` sends a text, then, as messages of their
@@ -623,10 +648,11 @@ class ChannelRouter:
                 log.exception("channel_pictures_not_looked_for", channel=channel_id, run_id=run_id)
         # What is said of the files is masked as the answer is: the names in it are the answer's own, but a finder may
         # name a file by what it read on the disk, and none of that goes to a phone unmasked.
-        note: str = redact_known(found.note(), known)
+        said: Words = self._words()
+        note: str = redact_known(found.note(said), known)
         words: str = as_plain_text(found.text)
         room: int = channel.limit - ((len(note) + _NOTE_APART) if note else 0)
-        body: str = cut_with_link(words, room, self.link(run_id)) if words else ""
+        body: str = cut_with_link(words, room, self.link(run_id), said) if words else ""
         message: str = "\n\n".join(part for part in (body, note) if part)
         if message:
             await self._deliver(channel_id, message, known)
@@ -647,7 +673,7 @@ class ChannelRouter:
                 log.exception("channel_picture_failed", channel=channel_id, run_id=run_id, picture=picture.name)
                 unsent.append(picture.name)
         if unsent:
-            told: str = redact_known(f"Dot could not send {', '.join(unsent)}. The log has why.", known)
+            told: str = redact_known(said.fill(said.not_sent, names=", ".join(unsent)), known)
             await self._deliver(channel_id, told, known)
 
     async def _deliver(self, channel_id: ChannelId, message: str, known: tuple[str, ...]) -> None:

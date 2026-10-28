@@ -110,6 +110,15 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   delegated, nor of a run you typed in the chat's page. Settings › Channels › iMessage has the switch (**Progress
   messages**, on by default), live; off, only the answer comes. A channel that is off or has nobody paired is told
   nothing, and what a run did meanwhile is not told later.
+- **Dot's own lines are in your language** (item 805): every line Dot writes there itself, not the model (that a
+  message was queued, the lines of progress, how a run ended, where to answer a wait, what was left out of an answer,
+  why a message was not run, the pairing code), is in English or in Turkish. `[channels] language = "auto"` (the
+  default) speaks the language of your last message on the channel, told by its letters (ğ, ı, İ, ş are Turkish's
+  own) and its commonest words; a message that tells neither (a link, a number, *ok*) keeps the language before it,
+  and the language is kept across restarts, so what Dot tells you on its own speaks it too. `"en"` or `"tr"` holds
+  one. A run that works says its progress in the language of the message that started it (*Çalışıyorum (2 dk 5 sn):*,
+  *notes.txt dosyasını okudum*, *bir sayfa okudum: example.com*). An answer is in whatever language the model wrote
+  it, and what a run is told by Dot (that an attachment was not read) stays in English, for the model.
 - When a run waits for you (an approval, or a question it asked), one line says what it asks and where to answer, and at
   most one line is sent every twenty seconds: *Dot waits for your approval: Run `rm -r build`. Answer it in Dot, not
   here: https://…/#/runs/…*. A wait that comes inside that window is held, never dropped (item 611): a run that left a

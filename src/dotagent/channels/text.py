@@ -10,6 +10,7 @@ import re
 from collections.abc import Sequence
 from typing import Literal
 
+from dotagent.channels.words import ENGLISH, Words
 from dotagent.core.text import plain_line, text_window
 
 type LineKind = Literal["prose", "fence", "code"]
@@ -89,10 +90,6 @@ _BOXES: dict[str, str] = {" ": "☐", "x": "☑", "X": "☑"}
 _HOLD_OPEN: str = "\ue000"
 _HOLD_CLOSE: str = "\ue001"
 _HELD: re.Pattern[str] = re.compile(f"{_HOLD_OPEN}(\\d+){_HOLD_CLOSE}")
-# What a cut leaves of the answer is followed by this line: with the link to the chat, or, when Dot has no address a
-# phone can open (item 611), where to look.
-_REST: str = "\n\n… The rest of the answer is in Dot: "
-_REST_ON_THE_MAC: str = "\n\n… The rest of the answer is in Dot on your Mac."
 _TAB_SPACES: int = 4
 _PASSES: int = 3
 
@@ -415,13 +412,14 @@ def as_plain_text(markdown: str) -> str:
     return _BLANK_RUNS.sub("\n\n", text).strip()
 
 
-def cut_with_link(text: str, limit: int, link: str | None) -> str:
+def cut_with_link(text: str, limit: int, link: str | None, words: Words = ENGLISH) -> str:
     """``text`` as it is when it fits ``limit`` characters; else its start, cut at a line or word break when one is
-    close, then a line that says where the rest is: ``link``, the chat in Dot, or, with no link (``None``: Dot has no
-    address a phone can open), that it is in Dot on the Mac. The result is within ``limit``."""
+    close, then a line that says where the rest is, in the owner's language (``words``, item 805): ``link``, the chat
+    in Dot, or, with no link (``None``: Dot has no address a phone can open), that it is in Dot on the Mac. The result
+    is within ``limit``."""
     if len(text) <= limit:
         return text
-    tail: str = _REST_ON_THE_MAC if link is None else f"{_REST}{link}"
+    tail: str = words.rest_on_mac if link is None else f"{words.rest_in_dot}{link}"
     head, _ = text_window(text, 0, max(0, limit - len(tail)))
     return f"{head.rstrip()}{tail}"
 

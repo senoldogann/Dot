@@ -811,6 +811,10 @@ imessage = false
 # thought when the model thinks. Never a tool's output, and masked of the secrets Dot holds like an answer. "steps" (the
 # default) or "off": only the answer.
 progress = "steps"
+# language: the language of the lines Dot writes on a channel itself (item 805): that a message was queued, the lines of
+# progress, how a run ended, what was left out. "auto" (the default) speaks the language of your last message there,
+# English or Turkish; "en" or "tr" holds one. An answer is in the language the model wrote it in.
+language = "auto"
 
 [reactions]
 # Reactions on Dot's messages (item 586, docs/runs.md): a button under each message of Dot's opens a palette: 👍 good,

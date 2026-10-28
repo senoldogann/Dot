@@ -539,10 +539,12 @@ class ChannelsConfig(FrozenModel):
     """Which of the owner's messaging apps reach Dot (item 572): whether Dot reads the owner's conversation with
     themselves in Messages and answers in it, and tells them there what it says on its own (item 582) (``imessage``),
     and whether a run started from there tells what it does while it works (``progress``, item 618). Settings ›
-    Channels switches both, live."""
+    Channels switches both, live. ``language`` is the language of the lines Dot writes there itself (item 805):
+    ``auto`` speaks the language of the owner's last message."""
 
     imessage: bool
     progress: ProgressMode
+    language: Literal["auto", "en", "tr"] = "auto"
 
 
 # What a reaction does once the run it is about has ended (item 586): ``follow_up`` starts a run in the same chat, as
