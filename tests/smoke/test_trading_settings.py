@@ -204,3 +204,34 @@ async def test_the_desk_shows_each_open_position_and_what_watches_the_market(own
         typed.trading.settings.value = typed.trading.config().model_copy(update={"mode": "off"})
         off: dict[str, object] = (await client.get("/trading", headers=mac)).json()
         assert (off["watch"], off["positions"]) == (None, [])
+
+
+async def test_the_page_chooses_the_schedule_a_move_of_the_market_starts_and_never_one_that_is_gone(
+    own_home: Path,  # noqa: F811
+) -> None:
+    """Item 813: the schedule was named in the config file alone, and once it was gone (a fresh start of Dot's store)
+    the page could only say so."""
+    async with _served(own_home) as (client, _, runtime):
+        typed: Runtime = runtime
+        typed.trading.key_store = MemorySecretStore()
+        typed.trading.market = CoinbaseMarket(5.0, httpx.MockTransport(_market))
+        typed.trading.settings.value = typed.trading.config().model_copy(update={"mode": "paper"})
+        mac: dict[str, str] = {"Authorization": f"Bearer {TOKEN}"}
+        made: httpx.Response = await client.post(
+            "/schedules", json={"name": "Paper shift", "goal": "Trade.", "cron": "15 * * * *"}, headers=mac
+        )
+        assert made.status_code == 201, made.text
+        shift: str = made.json()["record"]["id"]
+        chosen: httpx.Response = await client.patch("/trading", json={"wake_schedule": shift}, headers=mac)
+        assert chosen.status_code == 200, chosen.text
+        assert chosen.json()["watch"]["schedule_name"] == "Paper shift"
+        assert typed.trading.config().wake_schedule == shift
+        kept: dict[str, object] = tomllib.loads((own_home / "config.toml").read_text(encoding="utf-8"))["trading"]
+        assert kept["wake_schedule"] == shift
+        refused: httpx.Response = await client.patch("/trading", json={"wake_schedule": "sch_gone"}, headers=mac)
+        assert refused.status_code == 422 and "no schedule has that id" in refused.json()["message"], refused.text
+        assert typed.trading.config().wake_schedule == shift
+        cleared: httpx.Response = await client.patch("/trading", json={"wake_schedule": ""}, headers=mac)
+        assert cleared.status_code == 200, cleared.text
+        assert typed.trading.config().wake_schedule == ""
+        assert cleared.json()["watch"]["wake_schedule"] == ""

@@ -87,6 +87,7 @@ type TradingSetting = Literal[
     "max_position",
     "paper_start",
     "paper_fee_rate",
+    "wake_schedule",
 ]
 type SettingKey = (
     AgentSetting

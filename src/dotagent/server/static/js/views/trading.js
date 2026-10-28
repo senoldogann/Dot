@@ -58,6 +58,9 @@ export function mount(root, ctx) {
   let view = null;
   // The fields of the limits as the person typed them, and the products as a list: the draft a save compares with the settings.
   let draft = null;
+  // The schedules a move of the market may start (item 813), as `/api/schedules` lists them; null when they could not
+  // be read, and the picker then offers only what is chosen now and none.
+  let schedules = null;
   const holder = el("div", { class: "stack" }, loadingPanel());
   // The key's form is made once, so that what is typed in it stays through the repaints a mode change brings.
   const keyForm = buildKeyForm();
@@ -566,11 +569,65 @@ export function mount(root, ctx) {
     return setSection({
       title: "Watching",
       lead: "What Dot looks at between runs, day and night, with no model.",
-      body: el(
-        "div",
-        { class: "set-card trading-watch" },
-        lines.map((line) => el("div", { class: `trading-watch-line ${line.tone}`, dataset: { watch: line.id } }, el("span", { class: "trading-dot", "aria-hidden": "true" }), el("span", null, line.text))),
-      ),
+      body: [
+        el(
+          "div",
+          { class: "set-card trading-watch" },
+          lines.map((line) => el("div", { class: `trading-watch-line ${line.tone}`, dataset: { watch: line.id } }, el("span", { class: "trading-dot", "aria-hidden": "true" }), el("span", null, line.text))),
+        ),
+        setCard(wakeRow()),
+      ],
+    });
+  }
+
+  /** The schedule a move of the market starts (item 813), chosen among the schedules or none; one that is gone shows as
+   * such until another is chosen. */
+  function wakeRow() {
+    const spot = problemLine();
+    const chosen = view.watch?.wake_schedule ?? view.settings.wake_schedule ?? "";
+    const listed = schedules ?? [];
+    const options = [el("option", { value: "" }, "None")];
+    for (const schedule of listed) {
+      const { id, name, enabled } = schedule.record;
+      options.push(el("option", { value: id }, enabled ? name : `${name} (switched off)`));
+    }
+    if (chosen !== "" && !listed.some((schedule) => schedule.record.id === chosen)) {
+      options.push(el("option", { value: chosen }, schedules === null ? chosen : "A schedule that is gone"));
+    }
+    const picker = el("select", { class: "select", "aria-label": "Wake on a move" }, options);
+    picker.value = chosen;
+    picker.addEventListener("change", () => {
+      attempt(async () => {
+        if (!(await change(spot, () => api.patch("/trading", { wake_schedule: picker.value })))) {
+          // Refused (a schedule deleted meanwhile): the picker shows what is kept, beside the reason.
+          picker.value = chosen;
+        }
+      });
+    });
+    // A schedule made since the page was read is offered once the picker is opened again.
+    picker.addEventListener("focus", () => {
+      api
+        .get("/schedules")
+        .then((listed) => {
+          if (disposed || document.activeElement !== picker) {
+            return;
+          }
+          const known = new Set((schedules ?? []).map((schedule) => schedule.record.id));
+          schedules = listed;
+          for (const schedule of listed) {
+            if (!known.has(schedule.record.id)) {
+              const { id, name, enabled } = schedule.record;
+              picker.append(el("option", { value: id }, enabled ? name : `${name} (switched off)`));
+            }
+          }
+        })
+        .catch((error) => console.warn("the schedules could not be read again", error));
+    });
+    return setRow({
+      title: "Wake on a move",
+      lead: "The schedule a move of the market starts between its own times, as many times a day as wake_per_day allows.",
+      control: picker,
+      body: spot.node,
     });
   }
 
@@ -684,7 +741,15 @@ export function mount(root, ctx) {
 
   async function load() {
     try {
-      apply(await api.get("/trading"));
+      const [trading, listed] = await Promise.all([
+        api.get("/trading"),
+        api.get("/schedules").catch((error) => {
+          console.warn("the schedules could not be read", error);
+          return null;
+        }),
+      ]);
+      schedules = listed;
+      apply(trading);
     } catch (error) {
       if (!disposed) {
         holder.replaceChildren(errorPanel(error, () => attempt(load)));

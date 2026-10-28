@@ -780,7 +780,8 @@ and does, with the settings under it. With trading on (Paper or Live) the page s
   stops and targets (every 15 seconds), the products a run may trade now (with `*`, how many trade past
   `[trading] min_volume` at this moment), the schedule a move of the market starts with how many runs it started today
   of `wake_per_day` and when the last one did, and when that schedule fires next; a `wake_schedule` that names no
-  schedule is said in red, one switched off in amber.
+  schedule (it was deleted, or Dot started with an empty store) is said in red, one switched off in amber. **Wake on a
+  move**, under the lines, chooses that schedule among the schedules, or none (item 813).
 - **Holdings**: each currency held, its amount, the bid now, what it is worth and its share of the account; a currency
   that could not be priced is named under them.
 - **Orders**: the latest fifty, newest first, as a table: when, the side (a green Buy or a red Sell) and the product,
