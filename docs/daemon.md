@@ -761,33 +761,49 @@ the box by both Command keys pressed together: see below.
 
 ### Settings › Trading
 
-**Trading** (`#/settings/trading`, in the group This Mac, item 764) is where you decide whether Dot may trade crypto on Coinbase,
-with what limits, and see what it did. The page shows, top to bottom:
+**Trading** (`#/settings/trading`, in the group This Mac, items 764 and 777) is a trading desk: what Dot's trading holds
+and does, with the settings under it. With trading on (Paper or Live) the page shows, top to bottom:
 
-- **Mode**: Off (Dot has no trading tools), Paper (an account of Dot's own, at Coinbase's real prices, with money that is
-  not there) or Live (your Coinbase account, real money), each with a line saying what it means. Switching to Live asks
-  first and says that a run in yolo mode places orders without asking, within the limits. When trading is on but runs
-  do not have the trading tools yet, the page says they get them after Dot restarts and offers **Restart Dot**.
-- **Limits**: the most for one order, the most traded and the most lost in a day, the most held of one product, all in
-  the quote currency, and what the paper account starts with (in Paper). The products a run may trade are a list of ids
-  such as `BTC-EUR`, each with a remove button, and a field that allows another; `*` allows the whole market, every
-  product in the quote that trades `[trading] min_volume` a day, and its chip says so in words (item 771). **Save
-  limits** sends only what changed; a reason the daemon gives (a limit past another, an id not priced in the quote, a
-  phone asked to widen) shows under the button. Like the config file's `[trading]` table, these hold from the next
-  order.
-- **Coinbase key** (when trading is on, or a key is kept): whether a key is kept and the end of its name, **Remove
-  key**, and a form for its name and its private key, which is sent to the Keychain and never shown again. Make the
-  key in the Coinbase Developer Platform with the ECDSA signature algorithm and the permissions View and Trade, never
-  Transfer; a key that may transfer money is refused.
-- **Account** (Paper and Live): what the account is worth, today's change in green or red with its sign, what was
-  traded today against the day's limit and the holdings; a reason the account could not be read stands above them. In
-  Paper, **Start again** (after a question) resets the account to its starting money.
-- **Orders**: the latest fifty, newest first, each with its side, product, worth, status, time, size, price, fee and
-  the note the run left.
+- **Account**: what the account is worth, large; today's change and, in Paper, the change since the account's start,
+  each in green or red with its sign and its share; what is in positions and its share of the account; and two meters
+  of the day's limits, the loss so far against the most lost in a day and what was traded against the most traded,
+  green, then amber past 60 %, red at the limit. A reason the account could not be read stands above them. In Paper,
+  **Start again** (after a question) resets the account to its starting money.
+- **Open positions** (Paper): each buy's exit as a row of a table: the asset, the size, the buy's price, the bid now,
+  what it is worth, its gain or loss in money and in share, and a scale from its stop to its target with the entry
+  (a line) and the price (a dot, green or red) on it, and how far each end is from the price. Live keeps no exit yet
+  ([Trading](trading.md#exits-the-stop-and-the-target-watched-day-and-night)).
+- **Watching**: what Dot looks at between runs, with no model, a line each with a dot of its tone: the open positions'
+  stops and targets (every 15 seconds), the products a run may trade now (with `*`, how many trade past
+  `[trading] min_volume` at this moment), the schedule a move of the market starts with how many runs it started today
+  of `wake_per_day` and when the last one did, and when that schedule fires next; a `wake_schedule` that names no
+  schedule is said in red, one switched off in amber.
+- **Holdings**: each currency held, its amount, the bid now, what it is worth and its share of the account; a currency
+  that could not be priced is named under them.
+- **Orders**: the latest fifty, newest first, as a table: when, the side (a green Buy or a red Sell) and the product,
+  the size, the price, the worth, the fee and the status, with the reason the run gave on the line under each.
+- **Settings**, under a line:
+  - **Mode**: Off (Dot has no trading tools), Paper (an account of Dot's own, at Coinbase's real prices, with money
+    that is not there) or Live (your Coinbase account, real money), each with a line saying what it means. Switching
+    to Live asks first and says that a run in yolo mode places orders without asking, within the limits. When trading
+    is on but runs do not have the trading tools yet, the page says they get them after Dot restarts and offers
+    **Restart Dot**.
+  - **Limits**: the most for one order, the most traded and the most lost in a day, the most held of one product, all
+    in the quote currency, and what the paper account starts with (in Paper). The products a run may trade are a list
+    of ids such as `BTC-EUR`, each with a remove button, and a field that allows another; `*` allows the whole market,
+    every product in the quote that trades `[trading] min_volume` a day, and its chip says so in words (item 771).
+    **Save limits** sends only what changed; a reason the daemon gives (a limit past another, an id not priced in the
+    quote, a phone asked to widen) shows under the button. Like the config file's `[trading]` table, these hold from
+    the next order.
+  - **Coinbase key** (when trading is on, or a key is kept): whether a key is kept and the end of its name, **Remove
+    key**, and a form for its name and its private key, which is sent to the Keychain and never shown again. Make the
+    key in the Coinbase Developer Platform with the ECDSA signature algorithm and the permissions View and Trade, never
+    Transfer; a key that may transfer money is refused.
 
-A phone's key narrows trading (off, paper, a lower limit, a product dropped, the key removed, the paper account started
-again) and is refused anything that widens it, with the reason shown. The endpoints are `GET|PATCH /api/trading`,
-`PUT|DELETE /api/trading/key` and `POST /api/trading/paper/reset`.
+With trading off the page shows the settings alone. On a phone each table's row is a card of labelled lines. A phone's
+key narrows trading (off, paper, a lower limit, a product dropped, the key removed, the paper account started again) and
+is refused anything that widens it, with the reason shown. The endpoints are `GET|PATCH /api/trading` (whose answer
+carries `positions` and `watch`), `PUT|DELETE /api/trading/key` and `POST /api/trading/paper/reset`.
 
 ### Settings › Vault
 
