@@ -98,6 +98,11 @@ test("an import says how many went in, what was left out and why, and that the f
     "Imported 1 login from Chrome or Edge's file.",
     "Delete the CSV file now: it holds your passwords in plain text. Empty the Trash too.",
   ]);
+  // A file exported again updates the passwords it changed (item 791).
+  assert.deepEqual(reportWords({ ...clean, imported: 0, updated: 2, updated_logins: ["a.example · ada", "b.example"] }).slice(0, 2), [
+    "Imported 0 logins from Chrome or Edge's file.",
+    "Updated the password of 2 logins already in the vault: a.example · ada, b.example. The password each had before is kept in its notes, in case the file's was the older one.",
+  ]);
 });
 
 test("an import the Keychain ended says why and what to do, and logins that lost their notes are counted", () => {

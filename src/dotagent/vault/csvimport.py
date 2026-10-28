@@ -41,6 +41,9 @@ NOT_A_LOGIN: str = "not a login (a card, a note or an identity)"
 TOO_LONG: str = "a password or username too long"
 NOT_ONE_LINE: str = "a password or username with a line break"
 ALREADY_SAVED: str = "already in the vault, or twice in the file"
+UNCOMPARED: str = "already in the vault, its password not compared (the Keychain did not answer or refused)"
+NO_ROOM: str = "already in the vault with another password, not changed: its notes have no room to keep the old one"
+CHANGED_MEANWHILE: str = "already in the vault, removed or changed there while the file was read"
 OTHER_PASSWORD: str = "a second, different password for a login already in the file (the first is kept)"
 # What one cell of an export may hold: a long note is cut to the vault's own limit below, not the whole file refused
 # for it (the csv module's own limit is 128 KiB).

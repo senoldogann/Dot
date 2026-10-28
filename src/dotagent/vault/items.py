@@ -15,7 +15,7 @@ import re
 import time
 import unicodedata
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr
@@ -29,9 +29,18 @@ from dotagent.store.db import Store
 from dotagent.store.models import VaultKind, VaultRecord
 from dotagent.vault import cards
 from dotagent.vault.cards import Brand, Expiry
-from dotagent.vault.csvimport import ALREADY_SAVED, FORMAT_NAMES, ParsedExport, parse_export
+from dotagent.vault.csvimport import (
+    ALREADY_SAVED,
+    CHANGED_MEANWHILE,
+    FORMAT_NAMES,
+    NO_ROOM,
+    UNCOMPARED,
+    ParsedExport,
+    ParsedLogin,
+    parse_export,
+)
 from dotagent.vault.hosts import site_label, website_problem
-from dotagent.vault.secretstore import PartlyRemoved, SecretStore, VaultStoreError
+from dotagent.vault.secretstore import PartlyRemoved, SecretStore, VaultStoreError, fits
 
 log = get_logger(__name__)
 
@@ -68,6 +77,8 @@ SECRET_PARTS: dict[VaultKind, tuple[str, ...]] = {
 MOST_LABEL_CHARS: int = 40
 MOST_PASSWORD_CHARS: int = 512
 MOST_NOTES_CHARS: int = 1000
+# How many logins whose password an import changed its report names.
+_NAMED_UPDATES: int = 50
 # An import keeps its logins in the Keychain this many at a time, and a removal of several removes them so, so that a
 # refusal part way costs one batch.
 _IMPORT_BATCH: int = 40
@@ -138,6 +149,10 @@ class ImportReport(FrozenModel):
     skipped: list[Skipped]
     notes_left_out: int
     stopped: str | None
+    # Logins already in the vault whose password the file has changed, and which took it (item 791), each named (site ·
+    # username, the first 50): the one replaced is in its notes.
+    updated: int = 0
+    updated_logins: list[str] = Field(default_factory=list)
 
 
 class Removal(FrozenModel):
@@ -533,24 +548,66 @@ class VaultItems:
                 log.warning("vault_items_left_in_keychain", items=len(remaining) - index, error=left.message)
                 return
 
+    async def _renew(self, item_id: str, key: tuple[str, str], seen_at: float, login: ParsedLogin, now: float) -> str:
+        """Give the saved login ``item_id`` the password of ``login`` from a file (item 791), under its lock and read
+        again there: ``"updated"``, ``"same"`` when it holds that password already, ``"gone"`` when it was removed or
+        changed in any way since the import began (``seen_at``, when it was last changed then: an edit of the owner's
+        is never undone by a file), ``"no_room"`` when its notes cannot keep the password replaced. Its own notes stay,
+        not the file's. A Keychain that does not read or write raises."""
+        async with self._lock(item_id):
+            try:
+                before: VaultRecord = await self._store.get_vault_item(item_id)
+            except NotFoundError:
+                self._locks.pop(item_id, None)
+                return "gone"
+            if (
+                before.kind != "login"
+                or (site_label(before.website or ""), (before.username or "").lower()) != key
+                or before.updated_at != seen_at
+            ):
+                return "gone"
+            kept: dict[str, SecretStr] = await self._kept(before)
+            old: SecretStr | None = kept.get("password")
+            if old is not None and old.get_secret_value() == login.password.get_secret_value():
+                return "same"
+            parts: dict[str, SecretStr] = {**kept, "password": login.password}
+            notes: str = (kept.get("notes") or SecretStr("")).get_secret_value()
+            if old is not None:
+                # A browser's file has no dates: its password may be older than the one kept (the review of item 791).
+                # The one it replaces is kept in the notes, which the eye shows, so that a step back can be undone.
+                stamp: str = datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M")
+                notes = f"{notes}\nPassword before the import of {stamp}: {old.get_secret_value()}".strip()
+            if notes:
+                parts["notes"] = SecretStr(notes)
+            if len(notes) > MOST_NOTES_CHARS or not fits(parts):
+                return "no_room"
+            await self._write(before.model_copy(update={"updated_at": now}), parts, created=False, before=kept)
+        return "updated"
+
     async def import_logins(self, text: str) -> ImportReport:
         """Keep the logins of a CSV export. The text is read in memory and dropped; what is left out is counted by its
         reason, and a Keychain that ends the import part way is told with how many went in."""
         parsed: ParsedExport = parse_export(text)
-        taken: set[tuple[str, str]] = {
-            (site_label(record.website or ""), (record.username or "").lower())
-            for record in await self._store.list_vault_items()
-            if record.kind == "login"
-        }
+        # The first saved login of a site and username: one row of the file is one login, counted once in the report (a
+        # second the owner saved by hand for the same pair is left as it is).
+        saved: dict[tuple[str, str], VaultRecord] = {}
+        for listed in await self._store.list_vault_items():
+            if listed.kind == "login":
+                saved.setdefault((site_label(listed.website or ""), (listed.username or "").lower()), listed)
         skipped: dict[str, int] = dict(parsed.skipped)
-        wanted = []
+        wanted: list[ParsedLogin] = []
+        # A login already saved is looked at once the new ones are kept (item 791): one whose password the file has
+        # changed takes the new one, so that a file exported again from the browser brings the vault up to date.
+        # Each with when it was last changed as the import began: one changed since is the owner's, and left alone.
+        matched: list[tuple[str, tuple[str, str], ParsedLogin, float]] = []
+        refused: bool = False
         for login in parsed.logins:
             key: tuple[str, str] = (site_label(login.website), login.username.lower())
-            if key in taken:
-                skipped[ALREADY_SAVED] = skipped.get(ALREADY_SAVED, 0) + 1
-                continue
-            taken.add(key)
-            wanted.append(login)
+            found: VaultRecord | None = saved.get(key)
+            if found is None:
+                wanted.append(login)
+            else:
+                matched.append((found.id, key, login, found.updated_at))
         now: float = self._clock()
         used: set[str] = {record.id for record in await self._store.list_vault_items()}
         imported: int = 0
@@ -582,6 +639,7 @@ class VaultItems:
             try:
                 await self._secrets.put_many(entries)
             except (VaultStoreError, InvalidValueError) as error:
+                refused = isinstance(error, VaultStoreError)
                 # The Keychain's prompt runs its lines one by one: those before the one that failed are kept, and have
                 # no record, so that nothing would list or remove them. They are taken back. An item too big for a
                 # word of the prompt (``parse_export`` leaves out the notes that make it so) ends the import the same
@@ -595,7 +653,32 @@ class VaultItems:
                 await self._take_back(entries)
                 raise
             imported += len(records)
-        log.info("vault_import", rows=parsed.rows, imported=imported, stopped=stopped is not None)
+        updated: int = 0
+        renewed: list[str] = []
+        # Each saved login is renewed on its own, under its lock and read again there, as an edit is (the review of
+        # item 791): one removed or changed meanwhile is left alone. The first Keychain that refuses or does not
+        # answer ends it, and a Keychain that ended the new logins is not asked at all: the rest are counted, not lost.
+        answering: bool = not refused
+        for item_id, key, login, seen_at in matched:
+            if not answering:
+                skipped[UNCOMPARED] = skipped.get(UNCOMPARED, 0) + 1
+                continue
+            try:
+                outcome: str = await self._renew(item_id, key, seen_at, login, now)
+            except VaultStoreError as error:
+                log.warning("vault_import_not_compared", error=error.message)
+                answering = False
+                skipped[UNCOMPARED] = skipped.get(UNCOMPARED, 0) + 1
+                continue
+            if outcome == "updated":
+                updated += 1
+                renewed.append(f"{key[0]} · {login.username}" if login.username else key[0])
+            else:
+                reason: str = (
+                    ALREADY_SAVED if outcome == "same" else NO_ROOM if outcome == "no_room" else CHANGED_MEANWHILE
+                )
+                skipped[reason] = skipped.get(reason, 0) + 1
+        log.info("vault_import", rows=parsed.rows, imported=imported, updated=updated, stopped=stopped is not None)
         return ImportReport(
             format=FORMAT_NAMES[parsed.format],
             rows=parsed.rows,
@@ -603,4 +686,6 @@ class VaultItems:
             skipped=[Skipped(reason=reason, count=count) for reason, count in skipped.items()],
             notes_left_out=parsed.notes_left_out,
             stopped=stopped,
+            updated=updated,
+            updated_logins=renewed[:_NAMED_UPDATES],
         )
