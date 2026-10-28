@@ -1,18 +1,19 @@
 """Routes of Dot's own vault (item 621), Settings › Vault: the list of the logins, cards and contacts the owner saved,
-one item, and saving, changing and removing them; the eye, which shows one secret part to this Mac's own page; an
-import of the logins of a CSV export; and a card's photo, read on this Mac.
+one item, and saving, changing and removing them (one or several at once); the eye, which shows one secret part to this
+Mac's own page; an import of the logins of a CSV export; and a card's photo, read on this Mac.
 
 What a ``GET`` answers holds no secret: the database's records, which never do. ``POST`` and ``PUT`` take the values
-(the models of the requests hold them as ``SecretStr``, so that no repr, log line or error shows one), ``DELETE``
-removes the Keychain item as well as the record. The eye is ``POST …/reveal``, answered to a request that names this
-Mac's own address alone (as 1Password's connect is, :func:`dotagent.server.routes_accounts.on_this_mac`) and never
-kept. What the API says of a failure names what failed and never a value; the text of an import and the picture of a
-card are read in memory and dropped."""
+(the models of the requests hold them as ``SecretStr``, so that no repr, log line or error shows one), ``DELETE`` and
+``POST …/remove`` remove the Keychain items as well as the records. The eye is ``POST …/reveal``, answered to a
+request that names this Mac's own address alone (as 1Password's connect is,
+:func:`dotagent.server.routes_accounts.on_this_mac`) and never kept. What the API says of a failure names what failed
+and never a value; the text of an import and the picture of a card are read in memory and dropped."""
 
 import base64
 import binascii
 import time
 from datetime import date
+from typing import Annotated
 
 from fastapi import APIRouter, Request
 from pydantic import Field, SecretStr
@@ -22,13 +23,15 @@ from dotagent.core.types import FrozenModel
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_accounts import on_this_mac
 from dotagent.store.models import VaultRecord
-from dotagent.vault.items import ITEM_DRAFT, ImportReport
+from dotagent.vault.items import ITEM_DRAFT, ImportReport, Removal
 from dotagent.vault.ocr import MOST_BYTES, CardPhoto, read_card_photo
 from dotagent.vault.shown import note_shown
 
 # The most characters of a CSV export one import takes, and of a card's photo in base64.
 _MOST_CSV_CHARS: int = 8_000_000
 _MOST_PHOTO_CHARS: int = MOST_BYTES * 4 // 3 + 16
+# The most items one removal takes: as many as an import's rows.
+_MOST_REMOVED: int = 20_000
 
 
 class VaultList(FrozenModel):
@@ -40,6 +43,12 @@ class VaultList(FrozenModel):
 
 class Removed(FrozenModel):
     id: str
+
+
+class RemoveRequest(FrozenModel):
+    """The ids of the items to remove: the ticked rows of the page."""
+
+    ids: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(min_length=1, max_length=_MOST_REMOVED)
 
 
 class RevealRequest(FrozenModel):
@@ -98,6 +107,12 @@ def vault_items_router(ctx: ServerContext) -> APIRouter:
     async def import_logins(body: ImportRequest) -> ImportReport:
         """Save the logins of a CSV export of a password manager. The text is read in memory and dropped."""
         return await ctx.runtime.vault_items.import_logins(body.csv.get_secret_value())
+
+    @router.post("/items/remove")
+    async def remove_many(body: RemoveRequest) -> Removal:
+        """Remove several items, their Keychain items and their records; an id the vault does not hold is passed
+        over."""
+        return await ctx.runtime.vault_items.remove_many(body.ids)
 
     @router.get("/items/{item_id}")
     async def item(item_id: str) -> VaultRecord:

@@ -3,7 +3,7 @@ owner's. ``MemorySecretStore`` keeps the parts in a dictionary, through the same
 that is too long is refused here as it is there); ``RefusingSecretStore`` is a Keychain that refuses, locked or with a
 prompt nobody answers."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from pydantic import SecretStr
 
@@ -38,6 +38,11 @@ class MemorySecretStore:
         self.calls.append("remove")
         return self.kept.pop(account, None) is not None
 
+    async def remove_many(self, accounts: Sequence[str]) -> None:
+        self.calls.append("remove_many")
+        for account in accounts:
+            self.kept.pop(account, None)
+
 
 class RefusingSecretStore(MemorySecretStore):
     """A Keychain that refuses to keep, give or remove anything after ``allow`` more writes."""
@@ -60,3 +65,6 @@ class RefusingSecretStore(MemorySecretStore):
 
     async def remove(self, account: str) -> bool:
         raise VaultStoreError("the Keychain did not remove the item", {"returncode": 51})
+
+    async def remove_many(self, accounts: Sequence[str]) -> None:
+        raise VaultStoreError("the Keychain did not remove the items", {"returncode": 51})

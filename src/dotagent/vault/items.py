@@ -10,10 +10,11 @@ daemon that fills it into a page (:meth:`VaultItems.login_for_fill`), and the va
 secrets Dot holds (:func:`dotagent.secrets.hold_filled`)."""
 
 import asyncio
+import contextlib
 import re
 import time
 import unicodedata
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date
 from typing import Annotated, Literal
 
@@ -30,7 +31,7 @@ from dotagent.vault import cards
 from dotagent.vault.cards import Brand, Expiry
 from dotagent.vault.csvimport import ALREADY_SAVED, FORMAT_NAMES, ParsedExport, parse_export
 from dotagent.vault.hosts import site_label, website_problem
-from dotagent.vault.secretstore import SecretStore, VaultStoreError
+from dotagent.vault.secretstore import PartlyRemoved, SecretStore, VaultStoreError
 
 log = get_logger(__name__)
 
@@ -67,7 +68,8 @@ SECRET_PARTS: dict[VaultKind, tuple[str, ...]] = {
 MOST_LABEL_CHARS: int = 40
 MOST_PASSWORD_CHARS: int = 512
 MOST_NOTES_CHARS: int = 1000
-# An import keeps its logins in the Keychain this many at a time, so that a refusal part way costs one batch.
+# An import keeps its logins in the Keychain this many at a time, and a removal of several removes them so, so that a
+# refusal part way costs one batch.
 _IMPORT_BATCH: int = 40
 _EMAIL: re.Pattern[str] = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 _PHONE: re.Pattern[str] = re.compile(r"[0-9+\-().\s#*xX]{3,40}")
@@ -135,6 +137,14 @@ class ImportReport(FrozenModel):
     imported: int
     skipped: list[Skipped]
     notes_left_out: int
+    stopped: str | None
+
+
+class Removal(FrozenModel):
+    """What a removal of several items did: how many went, and ``stopped``, the reason the Keychain ended it part way
+    (``None`` when it went through)."""
+
+    removed: int
     stopped: str | None
 
 
@@ -273,6 +283,39 @@ class VaultItems:
             await self._store.delete_vault_item(item_id)
         self._locks.pop(item_id, None)
         log.info("vault_item_removed", kind=record.kind)
+
+    async def remove_many(self, item_ids: Sequence[str]) -> Removal:
+        """Remove several items (the ticked rows of Settings › Vault), a batch at a time: the batch's Keychain items
+        first, its records after, as :meth:`remove` does. A Keychain that refuses part way ends the removal: the
+        records of the items whose Keychain items went before it go too (and those that have none, a contact's), the
+        others are left as they were, to be removed again, and the answer says how many went and why it stopped. An
+        id the vault does not hold is passed over."""
+        held: set[str] = {record.id for record in await self._store.list_vault_items()}
+        wanted: list[str] = [item_id for item_id in dict.fromkeys(item_ids) if item_id in held]
+        removed: int = 0
+        stopped: str | None = None
+        for start in range(0, len(wanted), _IMPORT_BATCH):
+            batch: list[str] = sorted(wanted[start : start + _IMPORT_BATCH])
+            async with contextlib.AsyncExitStack() as locks:
+                for item_id in batch:
+                    await locks.enter_async_context(self._lock(item_id))
+                # What was removed while the locks were waited for is passed over too.
+                records: list[VaultRecord] = await self._store.get_vault_items(batch)
+                done: list[str] = [record.id for record in records]
+                try:
+                    await self._secrets.remove_many([record.id for record in records if SECRET_PARTS[record.kind]])
+                except VaultStoreError as error:
+                    stopped = error.message
+                    gone: frozenset[str] = frozenset(error.removed if isinstance(error, PartlyRemoved) else ())
+                    done = [record.id for record in records if record.id in gone or not SECRET_PARTS[record.kind]]
+                if done:
+                    removed += await self._store.delete_vault_items(done)
+            for item_id in done:
+                self._locks.pop(item_id, None)
+            if stopped is not None:
+                break
+        log.info("vault_items_removed", items=removed, stopped=stopped is not None)
+        return Removal(removed=removed, stopped=stopped)
 
     async def _kept(self, record: VaultRecord) -> dict[str, SecretStr]:
         """What the Keychain keeps for an item, nothing for a kind that keeps none or an item it lost."""

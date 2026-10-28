@@ -4346,8 +4346,69 @@
   color: var(--text-2);
 }
 
+/* The list scrolls in its card (item 768): its rows are drawn as it nears its end, with no Show more to press. */
+.vault-rows {
+  max-height: min(70vh, 800px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: inherit;
+}
+
 .vault-rows > .vault-row + .vault-row {
   border-top: 1px solid var(--border);
+}
+
+.vault-end {
+  height: 1px;
+}
+
+/* While items are chosen to delete, a bar over the list: how many are ticked, Select all, Delete and the way out. */
+.vault-select-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.vault-select-bar[hidden] {
+  display: none;
+}
+
+.vault-select-count {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.vault-select-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.vault-pick {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.vault-pick:has(.vault-check:checked) {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.vault-pick:has(.vault-check:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+
+.vault-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .vault-row {
@@ -4539,6 +4600,10 @@
   .vault-row {
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
+  }
+
+  .vault-select-bar {
+    padding-left: var(--space-4);
   }
 
   /* The four tabs with their counts fit a phone's width. */
