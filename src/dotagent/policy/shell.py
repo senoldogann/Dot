@@ -1568,6 +1568,149 @@ def _program(word: str) -> str:
     return Path(word).name.casefold()
 
 
+# Item 788: a system tool's line is a read only when what it asks for is one of the reads below; any other verb or
+# option, one Apple adds tomorrow included, is a change and asks. The lists name reads, never changes, so a change
+# spelled in a way not listed asks rather than passing as a query.
+_DISKUTIL_READS: frozenset[str] = frozenset(
+    {
+        "", "list", "info", "information", "activity", "listfilesystems", "verifyvolume", "verifydisk",
+        "apfs list", "apfs listcryptousers", "apfs listsnapshots", "apfs listvolumegroups", "apfs listusers",
+        "cs list", "cs info", "corestorage list", "corestorage info", "ar list", "appleraid list", "image info",
+    }
+)  # fmt: skip
+# The verbs of diskutil that name a family whose own verb follows (``diskutil apfs list``).
+_DISKUTIL_FAMILIES: frozenset[str] = frozenset({"apfs", "cs", "corestorage", "ar", "appleraid", "image"})
+_DEFAULTS_READS: frozenset[str] = frozenset({"", "read", "read-type", "domains", "find", "help"})
+# The options each system tool reads with; a line of one of these tools is a read when it gives at least one option and
+# every option it gives is one of these (``networksetup -getinfo Wi-Fi``), and a change when any other is there
+# (``networksetup -setwebproxy Wi-Fi status.example.com 80``, ``systemsetup -setremotelogin on -getremotelogin``).
+_SYSTEM_READ_OPTIONS: dict[str, tuple[str, ...]] = {
+    "networksetup": ("-get", "-list", "-print", "-version", "-help"),
+    "systemsetup": ("-get", "-list", "-print", "-version", "-help"),
+    "pmset": ("-g",),
+    "scutil": ("--get", "--dns", "--proxy", "--nwi", "-r"),
+    "spctl": (
+        "--status",
+        "--assess",
+        "-a",
+        "--type",
+        "-t",
+        "--verbose",
+        "-v",
+        "-vv",
+        "-vvv",
+        "-av",
+        "-avv",
+        "-avvv",
+        "--raw",
+        "--context",
+        "--ignore-cache",
+    ),
+}
+_TMUTIL_READS: frozenset[str] = frozenset(
+    {
+        "", "listbackups", "latestbackup", "destinationinfo", "status", "machinedirectory", "isexcluded", "compare",
+        "calculatedrift", "uniquesize", "version", "help", "listlocalsnapshots", "listlocalsnapshotdates",
+        "verifychecksums",
+    }
+)  # fmt: skip
+
+
+# What a shell makes more words of before the tool sees them (``{-set…,x}``, a glob a file of the run's makes an
+# option): a line that holds one is read as nothing it can be told to be (the security review of item 788).
+_EXPANDS: re.Pattern[str] = re.compile(r"[{}*?\[\]]")
+
+
+def _words(args: list[str]) -> list[str]:
+    """The words of a line that are not options, in lower case (macOS's tools take their verbs in any case)."""
+    return [arg.lower() for arg in args if not arg.startswith("-")]
+
+
+def _assess_diskutil(args: list[str]) -> Finding:
+    """diskutil reads with the verbs of :data:`_DISKUTIL_READS` (a family's verb read with its own, ``apfs list``); any
+    other verb erases, partitions, deletes, overwrites, mounts or changes a disk, and asks (item 788: ``apfs
+    deleteContainer`` and ``randomDisk`` passed as queries)."""
+    words: list[str] = _words(args)
+    verb: str = words[0] if words else ""
+    if any(_EXPANDS.search(arg) for arg in args):
+        verb = "a word the shell expands"
+    if verb in _DISKUTIL_FAMILIES:
+        verb = f"{verb} {words[1]}" if len(words) > 1 else verb
+    if verb in _DISKUTIL_READS or verb in _DISKUTIL_FAMILIES:
+        return _finding("safe", (), "diskutil query")
+    return _finding("high", ("destructive", "system_settings"), f"diskutil {verb} changes disks")
+
+
+def _assess_defaults(args: list[str]) -> Finding:
+    """defaults reads with the verbs of :data:`_DEFAULTS_READS`; its verb comes after ``-currentHost`` or ``-host
+    <name>``, which name whose preferences (item 788: ``defaults -currentHost write …`` passed as a read)."""
+    rest: list[str] = list(args)
+    while rest and rest[0] in ("-currentHost", "-host"):
+        rest = rest[2:] if rest[0] == "-host" else rest[1:]
+    verb: str = rest[0].lower() if rest else ""
+    if any(_EXPANDS.search(arg) for arg in args):
+        verb = "a word the shell expands"  # ``-host {localhost,write,…} read`` is a write (the review of item 788)
+    if verb in _DEFAULTS_READS:
+        return _finding("safe", (), "defaults read")
+    return _finding("medium", ("system_settings",), f"defaults {verb} changes preferences")
+
+
+# The read options that name a family, which a read option of it begins (``-getinfo``, ``-listallnetworkservices``,
+# ``-printcommands``); every other read option is matched whole (the review of item 788: ``-av`` as a beginning took
+# ``-avX`` too).
+_READ_FAMILIES: tuple[str, ...] = ("-get", "-list", "-print")
+
+
+def _reads_with(option: str, reads: tuple[str, ...]) -> bool:
+    """Whether ``option`` is one of ``reads``: the same word, or a word that begins one of the families of
+    :data:`_READ_FAMILIES` that ``reads`` names."""
+    return option in reads or any(family in reads and option.startswith(family) for family in _READ_FAMILIES)
+
+
+def _system_read(command: str, args: list[str]) -> bool:
+    """Whether a line of a system tool only reads, by the exact shapes of its reads (the security review of item 788):
+    ``csrutil status`` or ``csrutil authenticated-root status``; ``pmset -g`` and at most one word for what it shows;
+    for the tools of :data:`_SYSTEM_READ_OPTIONS`, a first word that is one of its read options and no other option
+    that is not, so that a verb a tool takes as a plain word (``pmset sleepnow``, ``spctl developer-mode``) is never
+    beside a read; and no word a shell would make more of. The other tools never only read."""
+    if any(_EXPANDS.search(arg) for arg in args):
+        return False
+    if command == "csrutil":
+        return [arg.lower() for arg in args] in (["status"], ["authenticated-root", "status"])
+    if command == "pmset":
+        return 1 <= len(args) <= 2 and args[0] == "-g" and not any(arg.startswith("-") for arg in args[1:])
+    reads: tuple[str, ...] | None = _SYSTEM_READ_OPTIONS.get(command)
+    if reads is None or not args or not _reads_with(args[0], reads):
+        return False
+    if command == "spctl":
+        # spctl takes its verbs as plain words too (``developer-mode``, ``kext-consent``): a plain word is a read only
+        # as what ``--assess`` looks at, after it.
+        assessing: bool = False
+        for arg in args:
+            if arg in ("--assess", "-a", "-av", "-avv", "-avvv"):
+                assessing = True
+            elif not arg.startswith("-") and not assessing:
+                return False
+    return all(_reads_with(arg, reads) for arg in args if arg.startswith("-"))
+
+
+def _assess_tmutil(args: list[str]) -> Finding:
+    """tmutil reads with the verbs of :data:`_TMUTIL_READS`; any other starts, stops, changes or deletes the owner's
+    backups, and asks (item 788: ``tmutil disable`` and ``tmutil delete`` passed as a plain command)."""
+    words: list[str] = _words(args)
+    verb: str = words[0] if words else ""
+    if any(_EXPANDS.search(arg) for arg in args):
+        verb = "a word the shell expands"
+    if verb in _TMUTIL_READS:
+        return _finding("safe", (), "tmutil query")
+    flags: tuple[Flag, ...] = (
+        ("destructive", "system_settings")
+        if verb.startswith(("delete", "thin", "disable", "remove"))
+        else ("system_settings",)
+    )
+    return _finding("high", flags, f"tmutil {verb} changes backups")
+
+
 def _positional(args: list[str]) -> list[str]:
     """Arguments that are not options; everything after ``--`` counts as positional."""
     positional: list[str] = []
@@ -3723,27 +3866,22 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
     if command in _DISK_DESTROYERS or command.startswith("mkfs"):
         return [_finding("high", ("destructive", "system_settings"), f"{command} creates or erases filesystems")]
     if command == "diskutil":
-        destructive_verbs: tuple[str, ...] = ("erase", "partition", "secureerase", "reformat", "deletevolume", "zero")
-        if any(verb in " ".join(args).lower() for verb in destructive_verbs):
-            return [_finding("high", ("destructive", "system_settings"), "diskutil erases or repartitions disks")]
-        return [_finding("safe", (), "diskutil query")]
+        return [_assess_diskutil(args)]
     if command == "dd":
         return [_finding("medium", (), "dd copies raw data"), *_assess_dd(args, scope)]
     if command == "defaults":
-        verb: str = args[0] if args else ""
-        if verb in ("write", "delete", "import", "rename"):
-            return [_finding("medium", ("system_settings",), f"defaults {verb} changes preferences")]
-        return [_finding("safe", (), "defaults read")]
+        return [_assess_defaults(args)]
     if command == "launchctl":
         verb = args[0] if args else ""
         if verb in ("list", "print", "blame", "print-cache", "print-disabled", "version", "error"):
             return [_finding("safe", (), "launchctl query")]
         return [_finding("high", ("system_settings",), f"launchctl {verb} changes launch services")]
     if command in _SYSTEM_TOOLS:
-        read_only: bool = any(arg.startswith(("-get", "-list", "--status", "status", "-g", "-read")) for arg in args)
-        if command in ("pmset", "scutil", "networksetup", "systemsetup", "spctl", "csrutil") and read_only:
+        if _system_read(command, args):
             return [_finding("safe", (), f"{command} query")]
         return [_finding("high", ("system_settings",), f"{command} changes system configuration")]
+    if command == "tmutil":
+        return [_assess_tmutil(args)]
     if command in _PROCESS_KILLERS:
         return [_finding("medium", (), f"{command} terminates processes")]
     sender: Finding | None = _assess_sender(command, args)
