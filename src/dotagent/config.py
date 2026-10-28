@@ -516,10 +516,11 @@ class AssistantConfig(FrozenModel):
 
 
 class SnapshotsConfig(FrozenModel):
-    """Snapshots (item 405): whether both Command keys together, or a double tap of one, capture the window in front
-    into the open chat's composer, whether the window's text comes with it, the sound that says it was taken, whether
-    the capture animates into the box (its card flies to Dot's window, item 414), whether the window flashes as it is
-    captured, whether Dot's window comes to the front with it, and how close the two taps must be."""
+    """Snapshots (item 405): whether both Command keys together capture the window in front into the open chat's
+    composer, and whether a double tap of one does too (``double_tap``, off: item 814), whether the window's text comes
+    with it, the sound that says it was taken, whether the capture animates into the box (its card flies to Dot's
+    window, item 414), whether the window flashes as it is captured, whether Dot's window comes to the front with it,
+    and how close the two taps must be."""
 
     enabled: bool
     app_text: bool
@@ -527,6 +528,7 @@ class SnapshotsConfig(FrozenModel):
     animations: bool
     flash: bool
     open_dot: bool
+    double_tap: bool = False
     double_tap_ms: int = Field(gt=0)
 
 

@@ -29,6 +29,7 @@ def snapshots_router(ctx: ServerContext) -> APIRouter:
             animations=service.animations,
             flash=service.flash,
             open_dot=service.open_dot,
+            double_tap=service.double_tap,
             shortcut=SHORTCUT_WORDS,
             listening=service.listening,
             problem=service.problem,
