@@ -14,9 +14,12 @@ from pydantic import Field
 from dotagent.memory.render import render_note
 from dotagent.memory.service import (
     CORE_TAG,
+    REST_TAG,
+    SEPARATE_TAG,
     MemoryHit,
     SavedMemory,
     forget_memory,
+    normalize_tags,
     recall_for,
     rewrite_memory_note,
     save_memory,
@@ -108,6 +111,21 @@ def render_hits(query: str, hits: list[MemoryHit]) -> str:
     return "\n".join(lines)
 
 
+# The tags the nightly reflection keeps for itself (the review of every module): a run that gave ``rest`` hid its note
+# from every search, and one whose words matched an awake note's put that note to rest; ``keep-separate`` is the
+# owner's word against a merge.
+_RESERVED_TAGS: frozenset[str] = frozenset({REST_TAG, SEPARATE_TAG})
+
+
+def _own_tags(tags: list[str], kept: tuple[str, ...] = ()) -> list[str]:
+    """``tags`` as a run gives them, cleaned as the store keeps them (so that ``#rest`` is ``rest``), without the
+    reflection's own; the reflection's tags the note had (``kept``) stay, as the owner's ``keep-separate`` must."""
+    # The note's reserved tags first: the store keeps six tags at most, and the run's are what gives way.
+    return [tag for tag in kept if tag in _RESERVED_TAGS] + [
+        tag for tag in normalize_tags(tags) if tag not in _RESERVED_TAGS
+    ]
+
+
 class SaveArgs(ToolArgs):
     content: str = Field(
         min_length=3,
@@ -151,7 +169,7 @@ def _save_tool() -> RegisteredTool:
         # content third parties can author saves a tainted note: yolo removes the approval, not the origin.
         expires_at: float | None = expiry_of(args.valid_days, time.time())
         saved: SavedMemory = await save_memory(
-            ctx.runtime.memory, args.content, args.tags, ctx.run_id, None, expires_at, ctx.tainted()
+            ctx.runtime.memory, args.content, _own_tags(args.tags), ctx.run_id, None, expires_at, ctx.tainted()
         )
         return ok(render_saved(saved))
 
@@ -262,7 +280,12 @@ def _update_tool() -> RegisteredTool:
         if refused is not None:
             return refused
         updated: MemoryRecord = await rewrite_memory_note(
-            ctx.runtime.memory, args.memory_id, args.content, args.tags, ctx.run_id, ctx.tainted()
+            ctx.runtime.memory,
+            args.memory_id,
+            args.content,
+            _own_tags(args.tags, (await ctx.runtime.memory.store.get_memory(args.memory_id)).tags),
+            ctx.run_id,
+            ctx.tainted(),
         )
         return ok(f"Updated: {render_note(updated)}")
 

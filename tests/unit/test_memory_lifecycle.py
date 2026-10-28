@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from dotagent.agent.reflection import merge_duplicates
 from dotagent.config import AppConfig, load_config
 from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.memory.lifecycle import (
@@ -39,13 +40,14 @@ from dotagent.memory.service import (
     SEPARATE_TAG,
     MemoryIndex,
     forget_memory,
+    normalize_tags,
     recall,
     resting,
     save_memory,
 )
 from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord, TrashedMemory
-from dotagent.tools.memory import build_memory_tools
+from dotagent.tools.memory import _own_tags, build_memory_tools
 
 DAY_S: float = 86400.0
 TWIN: str = "pdftotext keeps the columns of a table only with the -layout flag."
@@ -405,6 +407,8 @@ async def test_a_merge_taken_back_wakes_its_sources_apart_and_trashes_the_merged
         assert [note.id for note in undone.woken] == [first.id] and undone.merged.id == merged.id
         woken: MemoryRecord = await store.get_memory(first.id)
         assert woken.tags == ("lesson", "pdf", SEPARATE_TAG) and (woken.merged_into, woken.rested_at) == (None, None)
+        # Written anew as it wakes (the review of every module): with its old date it rested again the next night.
+        assert woken.updated_at == now + 60
         assert {found.record.id for found in await trash_of(index)} == {merged.id, second.id}
         with pytest.raises(NotFoundError):
             await store.get_memory(merged.id)
@@ -536,3 +540,49 @@ async def test_a_note_in_the_trash_is_in_no_table_a_search_reads(
     finally:
         connection.close()
     assert counts == {"memories": 0, "memories_fts": 0, "memory_vectors": 0, "memory_trash": 1}
+
+
+async def test_a_trashed_notes_vector_of_a_model_since_changed_is_not_restored_beside_the_new_ones(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review of every module: the trash kept each note's vector when the embedding model changed, and a note
+    restored then brought a vector of another size beside the new ones, which failed every search."""
+    async with _index(tmp_path, monkeypatch) as index:
+        store: Store = index.store
+        note: MemoryRecord = await _note(store, TWIN, ("lesson",), vector=(1.0, 0.0))
+        await forget_memory(index, note.id)
+        await store.clear_memory_vectors()
+        await _note(store, OTHER, ("lesson",), vector=(0.0, 1.0, 0.0))
+        await restore_note(index, note.id, time.time())
+        assert [found_id for found_id, _ in await store.all_memory_vectors()] != [] and note.id not in {
+            found_id for found_id, _ in await store.all_memory_vectors()
+        }
+        assert (await store.memories_without_vectors(10))[0].id == note.id
+
+
+async def test_a_lesson_with_six_tags_folded_into_its_twin_rests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review of every module: the rest tag came after a note's own and the cap of six tags cut it off, so a note
+    folded into its twin stayed awake while the reflection counted it put aside."""
+    async with _index(tmp_path, monkeypatch) as index:
+        store: Store = index.store
+        tags: tuple[str, ...] = ("lesson", "pdf", "columns", "tables", "text", "layout")
+        one: MemoryRecord = await _note(store, TWIN, tags, vector=(1.0, 0.0))
+        two: MemoryRecord = await _note(store, f"{TWIN} ", tags, vector=(1.0, 0.0))
+        vectors = {one.id: (1.0, 0.0), two.id: (1.0, 0.0)}
+        assert await merge_duplicates(store, [one, two], vectors, set()) == 1
+        after: list[MemoryRecord] = [await store.get_memory(one.id), await store.get_memory(two.id)]
+        assert [REST_TAG in note.tags for note in after].count(True) == 1, [note.tags for note in after]
+
+
+def test_a_run_cannot_give_its_note_the_reflections_own_tags() -> None:
+    """The review of every module: ``rest`` from a run hid its note from every search."""
+    assert _own_tags(["lesson", "rest", "Keep-Separate", "pdf"]) == ["lesson", "pdf"]
+    # Every spelling the store cleans into one of them (the review of item 796).
+    assert _own_tags(["#rest", "rest.", "Rest!", " rest\n", "keep separate", "keep/separate", "pdf"]) == ["pdf"]
+    # A note's own keep-separate (the owner's undone merge) stays through a run's update that passes its tags.
+    assert _own_tags(["lesson"], ("lesson", "keep-separate")) == ["keep-separate", "lesson"]
+    # Six of the run's own and the store's cap of six: the run's sixth gives way, not keep-separate.
+    six: list[str] = ["a1", "a2", "a3", "a4", "a5", "a6"]
+    assert normalize_tags(_own_tags(six, ("lesson", "keep-separate")))[0] == "keep-separate"

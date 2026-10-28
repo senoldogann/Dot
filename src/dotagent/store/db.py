@@ -4869,8 +4869,10 @@ class Store:
                 awake: tuple[str, ...] = tuple(tag for tag in _memory(found).tags if tag != rest_tag)
                 tag_text: str = ",".join(dict.fromkeys((*awake, separate_tag)))
                 await self._db.execute(
-                    "UPDATE memories SET tags = ?, merged_into = NULL, rested_at = NULL WHERE id = ?",
-                    (tag_text, source.id),
+                    # Written anew, as a woken note is (the review of every module): with its old date a note
+                    # unused for 60 days rested again the next night.
+                    "UPDATE memories SET tags = ?, merged_into = NULL, rested_at = NULL, updated_at = ? WHERE id = ?",
+                    (tag_text, when, source.id),
                 )
                 await self._db.execute(
                     "UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), source.id)
@@ -4959,7 +4961,11 @@ class Store:
                 "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
                 (record.id, fold_search(record.content), fold_search(tag_text)),
             )
-            if row["vec"] is not None:
+            # Its vector only where it is of the size the others are (the review of every module): one of a model
+            # since changed beside the new ones failed every search; without it the note is embedded again.
+            others: aiosqlite.Row | None = await self._one("SELECT dim FROM memory_vectors LIMIT 1", ())
+            # (None of the others' size to go by: the trash's vectors are dropped with theirs when the model changes.)
+            if row["vec"] is not None and (others is None or int(others["dim"]) == int(row["dim"])):
                 await self._db.execute(
                     "INSERT INTO memory_vectors(id, dim, vec) VALUES(?, ?, ?)",
                     (record.id, int(row["dim"]), bytes(row["vec"])),
@@ -5138,7 +5144,9 @@ class Store:
 
     @_writing
     async def clear_memory_vectors(self) -> None:
+        """Drop every note's vector, the trash's too, as the embedding model changed: each is embedded again."""
         await self._db.execute("DELETE FROM memory_vectors")
+        await self._db.execute("UPDATE memory_trash SET dim = NULL, vec = NULL")
         await self._db.commit()
 
     async def memories_without_vectors(self, limit: int) -> list[MemoryRecord]:

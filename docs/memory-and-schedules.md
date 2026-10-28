@@ -44,7 +44,8 @@ notes" and has **Undo this merge**: the notes it took in wake apart and the merg
 **Forget all N**, which asks first and forgets the notes the card lists, all in sight in a box that scrolls. Nothing
 is forgotten before you press one of them. A note you forget (there, in the list, with `dotx memory forget`, or by
 the agent's `memory_forget`) is not deleted: it waits in the trash for `[memory] trash_days` (30), listed as
-**Forgotten notes** under the notes with when each is deleted for good, **Restore** (it comes back awake) and
+**Forgotten notes** under the notes with when each is deleted for good, **Restore** (it comes back awake, with its
+vector when it is of the embedding model in use, else embedded again: item 796) and
 **Delete for good**; the nightly reflection deletes the notes that stayed longer, and no others.
 
 How learning fares, the last card, says for the reflection, the lessons and the skills when each last went well and,
@@ -125,7 +126,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   correction.
 - Three tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
   days, which searches skip (the list and the page still show it; take the tag off to wake it), and
-  `keep-separate` on the notes whose merge you took back, which no night merges again (take it off to let them).
+  `keep-separate` on the notes whose merge you took back, which no night merges again (take it off to let them). A
+  run that saves or rewrites a note cannot give it `rest` or `keep-separate`, however spelled, and keeps the ones
+  the note has (item 796).
 - The night merges notes that say the same in other words (item 584). Besides the fold of two lessons that say the
   same the same way round, which asks no model, the reflection shows the review model the notes of Dot's that are
   awake and not pinned, not yours and not a journal, whose embeddings are at least `merge_similarity` (0.80) close
