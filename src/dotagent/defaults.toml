@@ -220,9 +220,10 @@ goal_patience = 4
 # call of the run and of the runs it delegated to. Checked between steps: at the first step past one, the run is told to
 # finish with what it reached and what is missing, may only finish or close its plan, and ends after that reply (as
 # failed when it did not finish). 0 is no limit. Each run has its own: a resumed run starts again from 0. Delegated and
-# scheduled runs have the same limits; eval runs have their task's own.
-run_max_minutes = 0
-run_max_tokens = 0
+# scheduled runs have the same limits; eval runs have their task's own. The defaults bound a runaway run while leaving
+# room for a long one: two hours and ten million tokens; set either to 0 for no bound.
+run_max_minutes = 120
+run_max_tokens = 10_000_000
 # Campaigns ("Keep going until done"): a campaign works on its goal in sessions until the goal checker accepts its
 # evidence or the owner stops it. A session that planned no next one is followed after campaign_gap_minutes; one that
 # ended needing you, with questions it left for you and none answered yet, is followed after campaign_wait_hours, or as

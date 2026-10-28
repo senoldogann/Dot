@@ -295,7 +295,7 @@ class SecretField(FrozenModel):
 
 
 # What a step does at a field that takes a secret: it returns to let the text in, and raises to refuse.
-type SecretFieldCheck = Callable[[SecretField], Awaitable[None]]
+type SecretFieldCheck = Callable[[SecretField, str | None], Awaitable[None]]
 
 
 class Viewport(FrozenModel):

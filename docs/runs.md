@@ -165,7 +165,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   is off by default until evals show that it helps. The timeline shows each send-back.
 - A run has no step limit. It ends when the model calls `finish`, when the progress watchdog stops it (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries and
-  the wait for a model out of reach, at a limit of minutes or tokens you set, or when you stop it. In goal mode the goal
+  the wait for a model out of reach, at the default ceiling of 120 minutes or 10,000,000 tokens (or the limit you set),
+  or when you stop it. In goal mode the goal
   check can also end it (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A goal that names an outcome instead of a task (grow, earn, reach, as many as possible, find a way) is held to the
   outcome in task and research runs: the model is told to record measurable targets in its plan before it acts, to

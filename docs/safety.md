@@ -225,8 +225,10 @@ alone, with who sent it, its subject (cut to 200 characters) and how old the mes
 the model. Its sender and its subject are words whoever sent the message wrote, so the run counts from then on as one
 that read content third parties can author (item 684). It is a high-risk action of
 the Mac: the aggressive preset allows it, balanced and cautious ask, a research run has no such tool. Typing the code
-into a field is the run's in `yolo` (item 443) and yours in every other mode (item 429), where Dot hands the field to
-you.
+into a field is the run's in `yolo` (item 443) and, when you gave the code in the conversation, in every mode (item
+797); a code the run found itself outside `yolo` is handed to you (item 429). The same holds for a password or a card
+number you gave in the browser: it is yours to hand over, so the run types it; one a page or a tool's output carries is
+never typed outside `yolo`.
 
 **Pre-approved spending.** `[policy.spend]` lists sites with caps, for example `"namecheap.com" = { per_purchase = 20,
 per_day = 50 }`. Dot reads the amount of a payment step from the labels of its controls ("Pay €19.90") and from the

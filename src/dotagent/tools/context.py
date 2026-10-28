@@ -32,6 +32,11 @@ def _untainted() -> bool:
     return False
 
 
+def _no_user_text() -> str:
+    """A context outside a run of the loop, with no user message whose words a tool may trust."""
+    return ""
+
+
 @dataclass(frozen=True)
 class DelegateOutcome:
     """A delegated run that has ended, and whether it read content that third parties can author."""
@@ -93,6 +98,9 @@ class ToolContext:
     # Whether the run has read content third parties can author as it stands (the gate's ``tainted``), read when a tool
     # that writes something lasting asks: the memory tools mark the notes they save with it.
     tainted: Callable[[], bool] = _untainted
+    # What the user wrote in this run, the goal and every instruction since, read when a tool must tell a secret the
+    # user gave from one a page or a tool's output carries (item 797).
+    user_text: Callable[[], str] = _no_user_text
     # The names of the tools the run was given, which bound the agents it makes (item 307); ``None`` outside a run of
     # the loop, which makes no agent.
     run_tools: frozenset[str] | None = None
