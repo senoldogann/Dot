@@ -38,7 +38,11 @@ _AUTOLINK: re.Pattern[str] = re.compile(r"<(https?://[^>\s]+)>")
 _LINE_BREAK: re.Pattern[str] = re.compile(r"<br\s*/?>", re.IGNORECASE)
 # Bold and strike marks that come in pairs on one line, and the emphasis of one star or one underscore around words:
 # a lone star or underscore stays (``snake_case``, a * b, src/*.py).
-_PAIRED: re.Pattern[str] = re.compile(r"(\*\*|__|~~)(?=\S)(.+?)(?<=\S)\1")
+# A pair of double underscores is bold only outside a word and not before a file's extension (the review of every
+# module): ``__init__.py`` keeps its underscores; ``__words__`` alone reads as bold, as Markdown has it.
+_PAIRED: re.Pattern[str] = re.compile(
+    r"(\*\*|~~)(?=\S)(.+?)(?<=\S)\1|(?<![\w_])(__)(?=[^\s_])((?:(?!__).)+?)(?<=[^\s_])__(?![\w_]|\.\w)"
+)
 _STARS: re.Pattern[str] = re.compile(r"(?<![\w*/\\])\*(?=[^\s*])([^*\n]+?)(?<=[^\s*])\*(?![\w*])")
 _UNDERSCORES: re.Pattern[str] = re.compile(r"(?<![\w_\\])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w_])")
 _BLANK_RUNS: re.Pattern[str] = re.compile(r"\n{3,}")
@@ -159,12 +163,17 @@ def _inline(line: str) -> str:
     text = _LINK.sub(_link_words, text)
     text = _AUTOLINK.sub(r"\1", text)
     for _ in range(_PASSES):
-        marked: str = _UNDERSCORES.sub(r"\1", _STARS.sub(r"\1", _PAIRED.sub(r"\2", text)))
+        marked: str = _UNDERSCORES.sub(r"\1", _STARS.sub(r"\1", _PAIRED.sub(_paired_words, text)))
         if marked == text:
             break
         text = marked
     text = _SPACE_RUNS.sub(" ", text)
     return _HELD.sub(lambda found: held[int(found.group(1))], text)
+
+
+def _paired_words(found: re.Match[str]) -> str:
+    """The words between a pair of bold or strike marks, without the marks."""
+    return found.group(2) if found.group(1) is not None else found.group(4)
 
 
 class _Lists:

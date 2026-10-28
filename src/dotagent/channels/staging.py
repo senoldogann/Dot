@@ -22,6 +22,7 @@ import os
 import re
 import secrets
 import stat
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -117,6 +118,7 @@ class Staging:
         self._pictures: Pictures = pictures
         self._kept_s: float = kept_s
         self._waiting: list[_Waiting] = []
+        self._waiting_lock: threading.Lock = threading.Lock()
 
     @property
     def root(self) -> Path:
@@ -150,7 +152,8 @@ class Staging:
 
     def sent(self, staged: Staged, now: float) -> None:
         """The copy was handed to Messages at ``now``: it stays :attr:`kept_s` and is removed by a sweep then."""
-        self._waiting.append(_Waiting(staged.folder, now + self._kept_s))
+        with self._waiting_lock:
+            self._waiting.append(_Waiting(staged.folder, now + self._kept_s))
 
     def drop(self, staged: Staged) -> None:
         """Remove the copy at once (nothing was sent)."""
@@ -161,14 +164,14 @@ class Staging:
         return any(waiting.remove_at <= now for waiting in self._waiting)
 
     def sweep(self, now: float) -> None:
-        """Remove the copies that were sent and are due at ``now``."""
-        left: list[_Waiting] = []
-        for waiting in self._waiting:
-            if waiting.remove_at <= now:
-                self._remove(waiting.folder)
-            else:
-                left.append(waiting)
-        self._waiting = left
+        """Remove the copies that were sent and are due at ``now``. The sweep runs in a thread while a picture is sent
+        on the loop (the review of every module): the list is taken and given back under a lock, so that a copy sent
+        meanwhile is not dropped from it and left for good."""
+        with self._waiting_lock:
+            due: list[_Waiting] = [waiting for waiting in self._waiting if waiting.remove_at <= now]
+            self._waiting = [waiting for waiting in self._waiting if waiting.remove_at > now]
+        for waiting in due:
+            self._remove(waiting.folder)
 
     def sweep_old(self, now: float) -> None:
         """Remove the folders of Dot's that are older than the time a copy stays, as the daemon starts: the copies a

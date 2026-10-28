@@ -193,12 +193,14 @@ async def test_switching_on_again_starts_from_now(
     own: int = db.chat(PHONE)
     db.message(own, "sent while the channel was off", at=NOW)
     await channel.start_from_now()
+    # Written in the second after the switch, before the next look (the review of every module): it is read.
+    db.message(own, "sent right after the switch", at=NOW)
     heard: Heard = Heard()
     await channel.poll(heard)
-    assert heard.texts == []
+    assert heard.texts == ["sent right after the switch"]
     db.message(own, "sent after", at=NOW)
     await channel.poll(heard)
-    assert heard.texts == ["sent after"]
+    assert heard.texts == ["sent right after the switch", "sent after"]
 
 
 async def test_what_was_written_while_no_number_was_paired_is_never_run(
@@ -212,12 +214,14 @@ async def test_what_was_written_while_no_number_was_paired_is_never_run(
     await channel.send_code(PHONE)
     clock.now += 5
     await channel.confirm(runner.sent[-1][1].split("code is ")[1][:7])
+    # Written in the seconds after the pairing, before the next look (the review of every module): it is read.
+    db.message(own, "written right after the pairing", at=NOW)
     heard: Heard = Heard()
     await channel.poll(heard)
-    assert heard.texts == []
+    assert heard.texts == ["written right after the pairing"]
     db.message(own, "written once it is paired again", at=NOW)
     await channel.poll(heard)
-    assert heard.texts == ["written once it is paired again"]
+    assert heard.texts == ["written right after the pairing", "written once it is paired again"]
 
 
 async def test_an_answer_goes_to_the_chat_the_owner_wrote_in_after_the_marker(

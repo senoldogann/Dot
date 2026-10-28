@@ -31,9 +31,10 @@ send of Dot's), and never reads it as a message.
 
 A handle is paired by sending a code to it that the owner types back in Settings › Channels: the code reaches the
 owner's iPhone only when the handle is theirs. The newest row read is kept as the cursor, so that a restart repeats
-nothing; the first poll sets it and answers nothing. A database whose newest row is below the cursor (it was rebuilt or
-restored, and numbers its rows again) would never be read again: the cursor comes down to its newest row, with a line in
-the log and in the tab (item 611)."""
+nothing; pairing the first handle and switching the channel on set it to the newest row then (item 793), and the
+first poll does only when the database could not be read then. A database whose newest row is below the cursor (it
+was rebuilt or restored, and numbers its rows again) would never be read again: the cursor comes down to its newest
+row, with a line in the log and in the tab (item 611)."""
 
 import asyncio
 import errno
@@ -532,8 +533,10 @@ class IMessageChannel:
         self._state = ImessageState.model_validate_json(kept)
 
     async def start_from_now(self) -> None:
-        """The first poll after this sets the cursor to the newest row and reads nothing before it."""
-        await self._keep(cursor=None)
+        """Read from now on: the cursor is the newest row as it is now, so that a message written before the next look
+        is read (the review of every module: a cursor left unset was set at that look, past it); when the database
+        cannot be read now, the first poll sets it."""
+        await self._keep(cursor=await self._newest_or_none())
 
     # ----- reading ---------------------------------------------------------------------------
 
@@ -900,10 +903,18 @@ class IMessageChannel:
             tries: int = 0 if outcome.left is None else outcome.left.tries_left
             raise ChannelError(f"that is not the code; {tries} tries are left", {"tries_left": tries})
         self._pending = None
-        # The first number paired starts the reading from now: what was written in its conversation before is not run.
-        fresh: dict[str, object] = {} if self._state.handles else {"cursor": None}
+        # The first number paired starts the reading from now (:meth:`start_from_now`): what was written in its
+        # conversation before is not run, and what is written after the pairing is.
+        fresh: dict[str, object] = {} if self._state.handles else {"cursor": await self._newest_or_none()}
         await self._keep(handles=(*self._state.handles, pending.handle), reply_to=pending.handle, **fresh)
         log.info("imessage_paired")
+
+    async def _newest_or_none(self) -> int | None:
+        """The newest row of the Messages database, ``None`` when it cannot be read now (the next look sets it)."""
+        try:
+            return await asyncio.to_thread(newest_rowid, self._db)
+        except (OSError, sqlite3.Error, DesktopError):
+            return None
 
     async def remove(self, handle_text: str) -> None:
         """Forget a paired handle; the chat with it is no longer read."""
