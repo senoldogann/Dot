@@ -579,6 +579,14 @@ async def test_iframe_content_gets_refs_that_work(browser: BrowserSession, site:
     assert "clicked inside frame" in (await browser.snapshot("frame", True)).body
 
 
+async def test_a_wait_for_text_sees_it_come_inside_an_iframe(browser: BrowserSession, site: str) -> None:
+    """The review of every module: the wait looked at the main document alone and waited out its time."""
+    view: PageView = await browser.open_url("frame-wait", f"{site}/", True)
+    await act(browser, "frame-wait", [Step(action="click", ref=ref_of(view.body, 'button "Frame button"'))], False)
+    wait: TextWait = await browser.wait_text("frame-wait", "clicked inside frame", 10.0, True)
+    assert wait.appeared and wait.waited_s < 3.0, wait.waited_s
+
+
 async def test_password_fields_are_never_typed_into(browser: BrowserSession, site: str) -> None:
     view: PageView = await browser.open_url("secret", f"{site}/", True)
     ref: str = ref_of(view.body, 'textbox "Account password"')

@@ -1519,6 +1519,24 @@ async def wait_for_text_or_dialog(
     return "dialog"
 
 
+async def text_in_frames(page: Page, text: str) -> bool:
+    """Whether ``text`` is visible in one of the first :data:`_PULSE_FRAMES` frames of ``page`` below the main one
+    (the review of every module): the snapshot reads an iframe, a sign-in form or a payment box, and a wait for its
+    words looked only at the main document, so it waited out its whole time. A frame that does not answer within
+    :data:`_PULSE_TIMEOUT_S` counts as not showing it."""
+    main: Frame = page.main_frame
+    frames: list[Frame] = [frame for frame in page.frames if frame is not main and not frame.is_detached()]
+
+    async def shows(frame: Frame) -> bool:
+        try:
+            async with asyncio.timeout(_PULSE_TIMEOUT_S):
+                return await frame.get_by_text(text).filter(visible=True).count() > 0
+        except (TimeoutError, PlaywrightError):
+            return False
+
+    return any(await asyncio.gather(*(shows(frame) for frame in frames[:_PULSE_FRAMES])))
+
+
 # The file field that a control named by label or by ``aria-controls`` hands its files to, which a custom "choose file"
 # button, a label drawn as a button or a dropzone that wraps nothing are made of (item 745): the field of the label the
 # element is in (its ``for``, or the field inside it) or the one an id in its ``aria-controls`` names.

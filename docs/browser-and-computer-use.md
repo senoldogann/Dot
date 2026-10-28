@@ -178,7 +178,8 @@ Both modes share what follows.
   the page take one turn of its event loop, by which Chrome has told of a dialog, a file chooser, a navigation or a tab
   the step set off, and waits for such a tab until it is the run's, at most a second (item 342): a tab whose page
   answers later stops the batch with a line that it is opening. Then Dot waits until the page has settled (no DOM change
-  for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared. A read
+  for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared (two
+  downloads of one name at once are saved as `name` and `name-1`, item 799). A read
   of the page (its settling, its size, its snapshot) whose document is replaced under it, as a sign-in that hops through
   several pages replaces it, is made again on the new document once it is parsed, five times at most (item 752). The
   result is the part of the page that changed, with the refs of the last snapshot still valid; a page that did not
@@ -195,7 +196,8 @@ Both modes share what follows.
   a button may act slower than half a second, and a second click would do it twice). A page that has not settled when
   the steps, a script or an upload went through is said, rather than failing the call, which a run took for a step that
   did not happen (item 792): after steps or an upload in the page's notes ("do not repeat it"), after a script in what
-  it says happened ("then: …"), with any surprise of the tab. A step that
+  it says happened ("then: …"), with any surprise of the tab. When the page cannot be read after steps or an upload
+  that went through, the error names the steps that did and says not to repeat them (item 799). A step that
   changed the page names what the page says new in an alert or a live region and the fields it newly marks invalid. A
   change that comes later than half a second is seen by the next look. A tab that closes under a batch (a sign-in
   callback that did its job, a tab the user closed) stops the batch without a failed step: the result says the page
@@ -292,7 +294,8 @@ Both modes share what follows.
   frames), no page loading, no request started or under way and no WebSocket open, saying so (item 774): over 30 days of
   the owner's runs 60 of the 64 texts that came did so within 5 s, while the 42 that did not kept their runs 20 s at the
   median, mostly a guessed thank-you text after a form that had not gone. A page that keeps changing, waits on its
-  server or asks it every few seconds is waited for to the end of the wait's time.
+  server or asks it every few seconds is waited for to the end of the wait's time. The text is looked for in the page's
+  first ten iframes too, as the snapshot shows them (item 799): a sign-in or a payment box in a frame.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",
   and the line above the page says how many are open. A click that another element takes fails with the name of that
   element and what to do about it (close or answer the box, or press Escape). A page whose script holds it, so that it
@@ -403,7 +406,9 @@ Both modes share what follows.
   `browser_hop_unanswered`.
 - `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
-  the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and
+  the Mac), and it still paints the page under Dot's computer. Such a tab is told by the id Chrome gives it, also when
+  Chrome reports it before its address commits. A new tab that Chrome does not hand over within `action_timeout_s`,
+  that cannot be set up or whose run stops meanwhile is closed, not left open with no chat to close it (item 799). macOS brings a newly started Chrome to the front, and
   Chrome takes the front itself when a page opens a tab of its own (a link to a new tab, `window.open`): the app that
   had the focus is brought back right after, as long as the program that runs Dot has Accessibility. Switching tabs
   does not raise the window. With `true` the window comes to the front at the start, with each new tab and on each tab
