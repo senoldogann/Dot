@@ -241,6 +241,9 @@ work:
 
 - **Connect 1Password** makes the vault "Shared with Dot" and a service account that only reads it, with your own
   `op` signed in through the 1Password app (Settings › Developer › Integrate with 1Password CLI), which asks you first.
+  Without the app (`op` alone, as Homebrew installs it, signs in to no account) Connect cannot work, and the page and
+  Connect say so (item 791): 1Password is not needed then, since Dot's own vault (Settings › Vault) keeps your logins in
+  the Mac's Keychain and fills them; a service account key still connects.
 - **Use a service account key instead** takes one you made at 1password.com, asked for in a dialog (item 615).
 
 Either way Dot keeps the token in its `.env` (`DOT_ONEPASSWORD_TOKEN`), and the page says how many logins the vaults
@@ -310,8 +313,10 @@ The ways a service connects:
   Mac's, or your phone's through `[server] reach`), to a page that names the service and its mark and says Dot is
   finishing the sign-in, because the service's code is traded for its tokens after that page; then the tile turns
   **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself with the service as a client
-  without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and renews them before they run
-  out, after a restart too; a run never signs in, so a server whose sign-in is gone is left out with words that bring
+  without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600), with where the service's
+  authorization server renews them (item 795: without it a token was renewed at `/token` of the server's own address,
+  which a service whose token endpoint is elsewhere answered 404, and Dot asked to sign in again at every start; a
+  sign-in made before keeps asking once more), and renews them before they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left out with words that bring
   you back here (**Sign in again**). **Remove** takes a server added here out, with its tools and its sign-in, and takes
   one added from another agent of this Mac back from Dot, stopped at once (item 497; the agent keeps it). A server of a
   plugin goes with its plugin: **Remove plugin** stops the plugin's servers now, its skills leave the runs that start
@@ -561,8 +566,9 @@ sign in as MCP's authorization asks (OAuth): `oauth = true` has
 Dot send the token it keeps for it, which **Sign in again** on [Customize › Connectors](#customize--connectors) gets, and the servers added
 there sign in by themselves. The tool list is read when Dot starts and when a server is added, removed or has its tools
 chosen on Connectors, for the runs that start after; a server that dies is started again by the next call. A
-server reached at a URL whose session was quiet for a minute is pinged before it is used, and connected again when the
-ping finds it gone (its connection closed, its server ended the session or failed; a server that answers that it
+server reached at a URL whose session of the older protocol (one with a ping; the modern protocol holds no session to go
+stale and has none, so its call that fails reconnects, item 795) was quiet for a minute is pinged before it is used,
+and connected again when the ping finds it gone (its connection closed, its server ended the session or failed; a server that answers that it
 does not know ping is there), so that the calls that come go to a new session rather than fail on the old one (item
 513). A call or a listing its server refuses as a request of no session it knows (`INVALID_REQUEST`, whatever the
 server's words: "Session not found", "Session has been terminated") is a connection that broke, and the next call

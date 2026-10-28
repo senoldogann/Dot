@@ -194,18 +194,53 @@ _VAULT_MARK: str = "dot-vault"
 # The secrets each part of a login may go into (item 493): a password into a password field alone, so that it shows in
 # no text; a one-time code into a field marked for one or a plain one; a username into anything but a password field.
 _PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-password", "new-password"})
-# Whether the form a field is in sends what is typed in the page's address (item 493): its method is GET, as the method
-# of a form that names none is, and of one that names a word no browser knows (``form.method`` is what a browser makes
-# of the attribute), or a submit button of the form names GET. It is asked of the control (:data:`_CONTROL_OF`) and of
-# no other element: a div has no form. A page whose script sends the form some other way is not seen here: the guard
-# of Dot's Chrome refuses a fetch or a frame of the page whose address carries a password or a one-time code (item
-# 621).
-_SENDS_BY_GET_SCRIPT: str = """(field) => {
+# The form a field is in, made to send by POST before a password or a code goes into the field (item 775; item 493
+# refused the field instead, and a sign-in page whose script sends its form, which names no method, got no login):
+# - a form whose method is GET (``form.method`` is what a browser makes of the attribute: GET for none, and for a word
+#   no browser knows) gets ``method="post"``, and a control of it that names ``formmethod`` GET loses it; a dialog form
+#   sends nothing and is left alone;
+# - a browser reads the method once the ``submit`` event has run its listeners, so the window's first and last
+#   listeners put the form back to POST, undoing a script of the page that set GET again; a form in a shadow root,
+#   whose ``submit`` never reaches the window, gets them on its root;
+# - ``form.submit()`` fires no event: the form gets an own ``submit`` that sets POST first, unless a control named
+#   ``submit`` hides the method (the page cannot call it either).
+# A control named ``method``, ``elements`` or ``setAttribute`` hides the form's own of that name, so they are read from
+# the prototypes. It is asked of the control (:data:`_CONTROL_OF`) and of no other element: a div has no form. It
+# returns whether the form would have sent by GET. A page whose script sends the form itself is not changed: the guard
+# of Dot's Chrome refuses a fetch or a frame of the page whose address carries a password or a one-time code (item 621).
+_POSTS_SCRIPT: str = """(field) => {
   const form = field.form;
   if (!form) return false;
-  return form.method === 'get'
-    || [...form.elements].some((control) => ['submit', 'image'].includes(control.type)
-      && control.hasAttribute('formmethod') && control.formMethod === 'get');
+  const own = (name) => Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, name).get;
+  const methodOf = own('method');
+  const elementsOf = own('elements');
+  const { hasAttribute, setAttribute, removeAttribute } = Element.prototype;
+  const byGet = (target) => methodOf.call(target) === 'get'
+    || [...elementsOf.call(target)].some((control) => hasAttribute.call(control, 'formmethod')
+      && control.formMethod === 'get');
+  const post = (target) => {
+    if (methodOf.call(target) === 'get') setAttribute.call(target, 'method', 'post');
+    for (const control of elementsOf.call(target))
+      if (hasAttribute.call(control, 'formmethod') && control.formMethod === 'get')
+        removeAttribute.call(control, 'formmethod');
+  };
+  const was = byGet(form);
+  post(form);
+  if (!hasAttribute.call(form, 'data-dot-posts')) {
+    setAttribute.call(form, 'data-dot-posts', '');
+    const atSubmit = (event) => { if (event.target === form) post(form); };
+    const root = Node.prototype.getRootNode.call(form);
+    for (const at of root instanceof ShadowRoot ? [window, root] : [window]) {
+      at.addEventListener('submit', atSubmit, true);
+      at.addEventListener('submit', atSubmit, false);
+    }
+    const native = HTMLFormElement.prototype.submit;
+    if (form.submit === native) {
+      const submit = function () { post(form); native.call(form); };
+      Object.defineProperty(form, 'submit', { configurable: true, value: submit });
+    }
+  }
+  return was;
 }"""
 # The mark of a field a login was filled into (items 493 and 621), which every screenshot covers, in every mode: the
 # field shows the username, and a password once the page shows it.
@@ -878,12 +913,14 @@ def _key_of(step: Step) -> str:
     return step.key
 
 
-async def _check_secret_field(page: Page, marking: object, ref: str | None, check: SecretFieldCheck) -> None:
+async def _check_secret_field(
+    page: Page, marking: object, ref: str | None, check: SecretFieldCheck, text: str | None = None
+) -> None:
     """Hand a field that takes a secret, by its ``marking`` (:data:`_FIELD_MARKING_SCRIPT`), to ``check`` before any
-    text goes into it."""
+    text goes into it, with the text the step would write (``None`` when it writes none)."""
     kind: SecretKind | None = secret_kind(marking)
     if kind is not None:
-        await check(SecretField(ref=ref, kind=kind, url=page.url))
+        await check(SecretField(ref=ref, kind=kind, url=page.url), text)
 
 
 async def _focused_marking(page: Page) -> object:
@@ -956,7 +993,7 @@ async def _into_editor(
             raise BrowserError(
                 "the editor was replaced when it took the focus; take a new snapshot", {"ref": ref, "url": page.url}
             )
-        await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+        await _check_secret_field(page, await _focused_marking(page), ref, secret_field, expected)
         await write()
         try:
             took: object = await element.evaluate(_EDITOR_TOOK_SCRIPT, [_EDITOR_MAX_MS, expected])
@@ -1037,7 +1074,6 @@ async def fill_login_field(
                 raise BrowserError(_NOT_A_FORM_FIELD.format(ref=ref, kind=kind), {"ref": ref, "url": page.url})
             frame: Frame | None = await element.owner_frame()
             marking: object = await element.evaluate(_FIELD_MARKING_SCRIPT)
-            by_get: object = await element.evaluate(_SENDS_BY_GET_SCRIPT)
         except PlaywrightError as error:
             raise BrowserError(
                 "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
@@ -1060,14 +1096,19 @@ async def fill_login_field(
                 "that it shows in no text",
                 {"ref": ref, "url": page.url, "part": kind, "field": field},
             )
-        if kind != "username" and by_get is True:
-            # An address is written into the page's views, its history and logs, and shortened where it is long.
-            raise BrowserError(
-                f"the form of the field {ref} sends what is typed in the page's address (its method is GET, or it "
-                f"names none, which is GET): Dot fills a login's {kind} only into a form that keeps it out of the "
-                "address",
-                {"ref": ref, "url": page.url, "part": kind},
-            )
+        if kind != "username":
+            # An address is written into the page's views, its history and logs, and shortened where it is long: the
+            # form sends by POST before the value goes in, or nothing goes in.
+            try:
+                by_get: object = await element.evaluate(_POSTS_SCRIPT)
+            except PlaywrightError as error:
+                raise BrowserError(
+                    f"the form of the field {ref} could not be made to send by POST: Dot fills a login's {kind} only "
+                    "into a form that keeps it out of the address",
+                    {"ref": ref, "url": page.url, "part": kind},
+                ) from error
+            if by_get is True:
+                _log.info("vault_form_posts", url=truncate_middle(frame.url, _ERROR_CHARS), part=kind)
         typing(frame.url)
         try:
             await element.evaluate(_PREPARE_SCRIPT)
@@ -1087,6 +1128,21 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
     """Perform one step against the latest snapshot. A field that takes a secret goes to ``secret_field`` first, which
     raises to refuse the step: the field ``fill`` writes into, the one ``drag`` drops onto, and the one that has the
     keyboard focus when ``type``, ``insert``, or ``press`` with a key that puts text in, is about to send its text."""
+    if step.action == "drag_at":
+        if step.x is None or step.y is None or step.to_x is None or step.to_y is None:
+            raise BrowserError("drag_at needs x, y, to_x and to_y", {"url": page.url})
+        try:
+            await page.mouse.move(step.x, step.y)
+            await page.mouse.down()
+            await page.mouse.move(step.to_x, step.to_y, steps=_DRAG_MOVES)
+            await page.mouse.up()
+        except PlaywrightError as error:
+            with contextlib.suppress(PlaywrightError):
+                await page.mouse.up()  # a drag that fails after the press leaves the button down
+            raise _failure(
+                "drag_at failed", page, {"from": f"{step.x},{step.y}", "to": f"{step.to_x},{step.to_y}"}, error
+            ) from error
+        return
     if step.action == "click_at":
         if step.x is None or step.y is None:
             raise BrowserError("click_at needs x and y", {"url": page.url})
@@ -1117,7 +1173,9 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             case "hover":
                 await locator.hover(timeout=timeout_ms)
             case "fill":
-                await _check_secret_field(page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field)
+                await _check_secret_field(
+                    page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field, _text_of(step)
+                )
                 if not await _into_editor(
                     page,
                     locator,
@@ -1130,10 +1188,16 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     await locator.fill(_text_of(step), timeout=timeout_ms)
             case "type":
                 if not await _into_editor(
-                    page, locator, ref, timeout_ms, secret_field, None, lambda: page.keyboard.type(_text_of(step))
+                    page,
+                    locator,
+                    ref,
+                    timeout_ms,
+                    secret_field,
+                    _text_of(step),
+                    lambda: page.keyboard.type(_text_of(step)),
                 ):
                     await locator.focus(timeout=timeout_ms)
-                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field, _text_of(step))
                     await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
             case "insert":
                 if not await _into_editor(
@@ -1142,11 +1206,11 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     ref,
                     timeout_ms,
                     secret_field,
-                    None,
+                    _text_of(step),
                     lambda: page.keyboard.insert_text(_text_of(step)),
                 ):
                     await locator.focus(timeout=timeout_ms)
-                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field, _text_of(step))
                     if not await locator.evaluate(_TAKES_TEXT_SCRIPT, timeout=timeout_ms):
                         raise BrowserError(
                             "insert needs a text field or an editor that takes the focus; this element takes no text",
@@ -1164,7 +1228,9 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     await page.mouse.up()  # a drag that fails or is cancelled after the press leaves the button down
                     raise
             case "select":
-                await _check_secret_field(page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field)
+                await _check_secret_field(
+                    page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field, _text_of(step)
+                )
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
             case "press":
                 if key_enters_text(_key_of(step)):
@@ -1315,9 +1381,12 @@ async def run_script(page: Page, script: str, timeout_s: float, refs: Sequence[s
         async with asyncio.timeout(timeout_s):
             if elements is not None:
                 frame, handles = elements
-                # A trailing ";" ends the expression the function must be; the line breaks keep a closing comment
-                # out of the call.
-                called: str = f"(elements) => (\n{script.rstrip().rstrip(';')}\n)(...elements)"
+                # The function is assigned, then called: a statement its own ";" ends and a comment after it ends
+                # nowhere else, alone or together (the review of every module: ";" then "// …" was a SyntaxError).
+                called: str = (
+                    f"(elements) => {{ let __dotScript;\n__dotScript =\n{script}\n;\n"
+                    "return __dotScript(...elements); }"
+                )
                 value: object = await frame.evaluate(called, handles)
             else:
                 value = await page.evaluate(script)
@@ -1413,16 +1482,30 @@ _MODALS: str = f":is([role='dialog'], [role='alertdialog'], dialog[open], [aria-
 TextWaitEnd = Literal["text", "dialog", "timeout"]
 
 
-async def wait_for_text_or_dialog(page: Page, text: str, timeout_ms: int) -> TextWaitEnd:
+async def no_dialog_open(page: Page) -> bool:
+    """Whether no dialog stands in front of ``page`` (:data:`_MODALS`): one that opens then ends a wait for a text."""
+    try:
+        return await _count(page.locator(_MODALS).filter(visible=True)) == 0
+    except TimeoutError as error:
+        raise BrowserError("the page did not say in time what it shows", {"url": page.url}) from error
+    except PlaywrightError as error:
+        raise _failure("looking for a dialog failed", page, {}, error) from error
+
+
+async def wait_for_text_or_dialog(
+    page: Page, text: str, timeout_ms: int, watch_dialogs: bool | None = None
+) -> TextWaitEnd:
     """What ended a wait of at most ``timeout_ms`` for ``text`` to become visible, in any of its matches (an earlier
     hidden one, such as a template or a closed menu, does not hold the wait): the text, a dialog that opened in front
     of the page while none was open when the wait began (item 698; the text would not come until it is answered), or
     the time. A dialog that brings the text with it is the text. One wait in the page, for either, so nothing is left
-    waiting behind it."""
+    waiting behind it. ``watch_dialogs`` says whether no dialog was open when a wait made of several began (item 774);
+    ``None`` looks now."""
     wanted: Locator = page.get_by_text(text).filter(visible=True)
     dialogs: Locator = page.locator(_MODALS).filter(visible=True)
     try:
-        watch_dialogs: bool = await _count(dialogs) == 0
+        if watch_dialogs is None:
+            watch_dialogs = await _count(dialogs) == 0
         target: Locator = wanted.or_(dialogs) if watch_dialogs else wanted
         await target.first.wait_for(state="visible", timeout=timeout_ms)
         if not watch_dialogs or await _count(wanted) > 0:
@@ -1434,6 +1517,24 @@ async def wait_for_text_or_dialog(page: Page, text: str, timeout_ms: int) -> Tex
     except PlaywrightError as error:
         raise _failure("waiting for the text failed", page, {"text": text}, error) from error
     return "dialog"
+
+
+async def text_in_frames(page: Page, text: str) -> bool:
+    """Whether ``text`` is visible in one of the first :data:`_PULSE_FRAMES` frames of ``page`` below the main one
+    (the review of every module): the snapshot reads an iframe, a sign-in form or a payment box, and a wait for its
+    words looked only at the main document, so it waited out its whole time. A frame that does not answer within
+    :data:`_PULSE_TIMEOUT_S` counts as not showing it."""
+    main: Frame = page.main_frame
+    frames: list[Frame] = [frame for frame in page.frames if frame is not main and not frame.is_detached()]
+
+    async def shows(frame: Frame) -> bool:
+        try:
+            async with asyncio.timeout(_PULSE_TIMEOUT_S):
+                return await frame.get_by_text(text).filter(visible=True).count() > 0
+        except (TimeoutError, PlaywrightError):
+            return False
+
+    return any(await asyncio.gather(*(shows(frame) for frame in frames[:_PULSE_FRAMES])))
 
 
 # The file field that a control named by label or by ``aria-controls`` hands its files to, which a custom "choose file"

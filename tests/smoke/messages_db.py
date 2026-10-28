@@ -33,6 +33,12 @@ CREATE TABLE message (
     date_delivered INTEGER DEFAULT 0, date_read INTEGER DEFAULT 0, error INTEGER DEFAULT 0{more}
 );
 CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
+CREATE TABLE attachment (
+    ROWID INTEGER PRIMARY KEY AUTOINCREMENT, guid TEXT, filename TEXT, uti TEXT, mime_type TEXT,
+    transfer_state INTEGER DEFAULT 5, is_outgoing INTEGER DEFAULT 0, transfer_name TEXT, total_bytes INTEGER DEFAULT 0,
+    is_sticker INTEGER DEFAULT 0
+);
+CREATE TABLE message_attachment_join (message_id INTEGER, attachment_id INTEGER);
 """
 
 
@@ -137,6 +143,20 @@ class MessagesDb:
             self._db.execute("UPDATE message SET balloon_bundle_id = ? WHERE ROWID = ?", (balloon, rowid))
         self._db.execute("INSERT INTO chat_message_join(chat_id, message_id) VALUES(?, ?)", (chat, rowid))
         return rowid
+
+    def attach(
+        self, rowid: int, path: str, name: str, mime: str = "", uti: str = "", size: int = 0, sticker: bool = False
+    ) -> None:
+        """A file the message ``rowid`` brought (item 806), as Messages names it in its attachment table: ``path`` as
+        it writes it (``~/Library/Messages/Attachments/…``), the name it was sent by, its type and its length."""
+        cursor: sqlite3.Cursor = self._db.execute(
+            "INSERT INTO attachment(guid, filename, uti, mime_type, transfer_name, total_bytes, is_sticker) "
+            "VALUES(?, ?, ?, ?, ?, ?, ?)",
+            (f"att-{rowid}-{name}", path, uti, mime, name, size, int(sticker)),
+        )
+        self._db.execute(
+            "INSERT INTO message_attachment_join(message_id, attachment_id) VALUES(?, ?)", (rowid, cursor.lastrowid)
+        )
 
     def receipt(self, rowid: int, **columns: int) -> None:
         """What Messages writes to a message after it is there: it was delivered (``is_delivered=1``,

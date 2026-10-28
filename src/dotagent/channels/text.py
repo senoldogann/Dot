@@ -5,10 +5,12 @@ heading on a line of its own, a table a row to a line, and none of the marks of 
 narrow screen a list of long items reads as one block, so its items stand apart, and a heading ends with a colon, as a
 title typed in a message does (item 627)."""
 
+import html
 import re
 from collections.abc import Sequence
 from typing import Literal
 
+from dotagent.channels.words import ENGLISH, Words
 from dotagent.core.text import plain_line, text_window
 
 type LineKind = Literal["prose", "fence", "code"]
@@ -38,9 +40,27 @@ _AUTOLINK: re.Pattern[str] = re.compile(r"<(https?://[^>\s]+)>")
 _LINE_BREAK: re.Pattern[str] = re.compile(r"<br\s*/?>", re.IGNORECASE)
 # Bold and strike marks that come in pairs on one line, and the emphasis of one star or one underscore around words:
 # a lone star or underscore stays (``snake_case``, a * b, src/*.py).
-_PAIRED: re.Pattern[str] = re.compile(r"(\*\*|__|~~)(?=\S)(.+?)(?<=\S)\1")
+# A pair of double underscores is bold only outside a word and not before a file's extension (the review of every
+# module): ``__init__.py`` keeps its underscores; ``__words__`` alone reads as bold, as Markdown has it.
+_PAIRED: re.Pattern[str] = re.compile(
+    r"(\*\*|~~)(?=\S)(.+?)(?<=\S)\1|(?<![\w_])(__)(?=[^\s_])((?:(?!__).)+?)(?<=[^\s_])__(?![\w_]|\.\w)"
+)
 _STARS: re.Pattern[str] = re.compile(r"(?<![\w*/\\])\*(?=[^\s*])([^*\n]+?)(?<=[^\s*])\*(?![\w*])")
 _UNDERSCORES: re.Pattern[str] = re.compile(r"(?<![\w_\\])_(?=[^\s_])([^_\n]+?)(?<=[^\s_])_(?![\w_])")
+# The tags of HTML a model writes into Markdown (item 804): dropped, their words kept. Only these names, so that
+# ``a <b c`` or a comparison (``x < y``) is left as it is.
+_HTML_TAG: re.Pattern[str] = re.compile(
+    r"</?(?:a|abbr|b|big|center|cite|code|dd|del|details|div|dl|dt|em|font|h[1-6]|i|ins|kbd|mark|p|pre|s|samp|small"
+    r"|span|strike|strong|sub|summary|sup|tt|u|var)(?:\s[^<>]*)?/?>",
+    re.IGNORECASE,
+)
+# An entity of HTML with its closing semicolon (``&amp;``, ``&#39;``, ``&#x2014;``): read as the character it names.
+_ENTITY: re.Pattern[str] = re.compile(r"&(?:[a-zA-Z]{2,8}|#\d{1,6}|#[xX][0-9a-fA-F]{1,6});")
+# A footnote's mark (``[^1]``) reads ``[1]``; the line of its note (``[^1]: words``) starts ``[1] words``.
+_FOOTNOTE_NOTE: re.Pattern[str] = re.compile(r"^(?P<lead>[ \t]*)\[\^(?P<id>[^\]\s]+)\]:[ \t]*")
+_FOOTNOTE: re.Pattern[str] = re.compile(r"\[\^(?P<id>[^\]\s]+)\]")
+# A mark written with a backslash before it is the mark itself, never the start of emphasis or a list.
+_ESCAPED: re.Pattern[str] = re.compile(r"\\(?P<mark>[\\`*_{}\[\]()#+\-.!|>~<])")
 _BLANK_RUNS: re.Pattern[str] = re.compile(r"\n{3,}")
 _TRAILING_SPACES: re.Pattern[str] = re.compile(r"[ \t]+$", re.MULTILINE)
 # Spaces between two words: a run of them is one space (item 627); an indent, before the first word, stays.
@@ -56,20 +76,20 @@ _CLOSERS: str = ")]}\"'”’»"
 _GOES_ON: int = -1
 # The indent and the mark of a list item's line in plain text, which are not its words.
 _ITEM_MARK: re.Pattern[str] = re.compile(r"^[ \t]*(?:[•◦☐☑]|\d{1,3}[.)])?[ \t]*")
-# The marks a list item wears in plain text (a bullet, a nested one, a task's box), and how a table's cells are joined.
+# The marks a list item wears in plain text (a bullet, a nested one, a task's box), and how the cells of a table with no
+# header are joined.
 BULLET: str = "•"
 NESTED_BULLET: str = "◦"
 TABLE_JOIN: str = " · "
 _EMPTY_CELL: str = "–"
+# How a row of a table of three columns or more reads on a phone (item 804): its first cell after a bullet, and each
+# other cell under it as ``Header: value`` with this indent.
+_CARD_INDENT: str = "  "
 _BOXES: dict[str, str] = {" ": "☐", "x": "☑", "X": "☑"}
 # Where a code span waits while the marks around it are read: a private-use pair that no text of an answer holds.
 _HOLD_OPEN: str = "\ue000"
 _HOLD_CLOSE: str = "\ue001"
 _HELD: re.Pattern[str] = re.compile(f"{_HOLD_OPEN}(\\d+){_HOLD_CLOSE}")
-# What a cut leaves of the answer is followed by this line: with the link to the chat, or, when Dot has no address a
-# phone can open (item 611), where to look.
-_REST: str = "\n\n… The rest of the answer is in Dot: "
-_REST_ON_THE_MAC: str = "\n\n… The rest of the answer is in Dot on your Mac."
 _TAB_SPACES: int = 4
 _PASSES: int = 3
 
@@ -115,33 +135,67 @@ def _is_table_rule(line: str, columns: int) -> bool:
     return len(cells) == columns and all(_TABLE_RULE_CELL.match(cell) is not None for cell in cells)
 
 
-def _table_rows(lines: Sequence[str], start: int) -> tuple[list[str], int] | None:
-    """The rows of the table that starts at ``lines[start]`` as plain lines, and the index after its last line; ``None``
-    when no table starts there. A table is a line with pipes, a rule line of as many cells, and the lines with pipes
-    that follow. A row is its cells joined by :data:`TABLE_JOIN`, an empty cell written as a dash; the rule line is
-    gone."""
+def _table_rows(lines: Sequence[str], start: int) -> tuple[list[list[str]], int] | None:
+    """The rows of the table that starts at ``lines[start]``, its header first, each as its cells, and the index after
+    its last line; ``None`` when no table starts there. A table is a line with pipes, a rule line of as many cells, and
+    the lines with pipes that follow; the rule line is no row."""
     header: str = lines[start]
     if "|" not in header or start + 1 >= len(lines):
         return None
     if not _is_table_rule(lines[start + 1], len(_cells(header))):
         return None
-    rows: list[str] = [TABLE_JOIN.join(cell or _EMPTY_CELL for cell in _cells(header))]
+    rows: list[list[str]] = [_cells(header)]
     index: int = start + 2
     while index < len(lines) and lines[index].strip() != "" and "|" in lines[index]:
-        rows.append(TABLE_JOIN.join(cell or _EMPTY_CELL for cell in _cells(lines[index])))
+        rows.append(_cells(lines[index]))
         index += 1
     return rows, index
+
+
+def table_lines(rows: Sequence[Sequence[str]]) -> list[str]:
+    """A table (its header first, each row its cells) as the plain lines a phone's narrow screen reads well (item 804),
+    where a row of cells joined on one line wraps into a run of words that no column holds together:
+
+    - one column: its header, then each cell after a bullet;
+    - two columns: each row ``• first: second``, the header left out (what it names is the rows' own words);
+    - three columns or more: each row a card, its first cell after a bullet and each other cell under it as
+      ``Header: value``, a blank line between the cards. An empty cell is left out of its card.
+
+    A table whose header cells are all empty joins each row's cells with :data:`TABLE_JOIN`. The words of a cell are
+    read as prose (:func:`_inline`); a row with fewer cells than the header has the rest empty."""
+    header: list[str] = [_inline(cell) for cell in rows[0]]
+    body: list[list[str]] = [[_inline(cell) for cell in row] for row in rows[1:]]
+    width: int = len(header)
+    body = [row[:width] + [""] * (width - len(row)) for row in body]
+    if not body:
+        return [TABLE_JOIN.join(cell or _EMPTY_CELL for cell in header)]
+    if not any(header):
+        return [TABLE_JOIN.join(cell or _EMPTY_CELL for cell in row) for row in body]
+    if width == 1:
+        return [_titled(header[0]), *(f"{BULLET} {row[0] or _EMPTY_CELL}" for row in body)]
+    if width == 2:
+        return [f"{BULLET} {row[0] or _EMPTY_CELL}: {row[1] or _EMPTY_CELL}" for row in body]
+    lines: list[str] = []
+    for row in body:
+        if lines:
+            lines.append("")
+        lines.append(f"{BULLET} {row[0] or _EMPTY_CELL}")
+        named: list[tuple[str, str]] = [(name, cell) for name, cell in zip(header[1:], row[1:], strict=True) if cell]
+        lines.extend(f"{_CARD_INDENT}{name or _EMPTY_CELL}: {cell}" for name, cell in named)
+    return lines
 
 
 def _hold_code(line: str, held: list[str]) -> str:
     """``line`` with each code span replaced by a mark that stands for it, the span (without its backticks) kept in
     ``held``."""
 
-    def hold(span: re.Match[str]) -> str:
-        held.append(span.group("code"))
-        return f"{_HOLD_OPEN}{len(held) - 1}{_HOLD_CLOSE}"
+    return _CODE_SPAN.sub(lambda span: _hold(span.group("code"), held), line)
 
-    return _CODE_SPAN.sub(hold, line)
+
+def _hold(text: str, held: list[str]) -> str:
+    """A mark that stands for ``text`` while the marks around it are read, ``text`` kept in ``held``."""
+    held.append(text)
+    return f"{_HOLD_OPEN}{len(held) - 1}{_HOLD_CLOSE}"
 
 
 def _link_words(found: re.Match[str]) -> str:
@@ -155,16 +209,26 @@ def _inline(line: str) -> str:
     around words are left out, and a code span keeps what is in it as it is."""
     held: list[str] = []
     text: str = _hold_code(line, held)
+    text = _ESCAPED.sub(lambda found: _hold(found.group("mark"), held), text)
     text = _LINE_BREAK.sub(" ", text)
+    text = _HTML_TAG.sub("", text)
+    text = _ENTITY.sub(lambda found: html.unescape(found.group(0)), text)
+    text = _FOOTNOTE_NOTE.sub(lambda found: f"{found.group('lead')}[{found.group('id')}] ", text)
+    text = _FOOTNOTE.sub(lambda found: f"[{found.group('id')}]", text)
     text = _LINK.sub(_link_words, text)
     text = _AUTOLINK.sub(r"\1", text)
     for _ in range(_PASSES):
-        marked: str = _UNDERSCORES.sub(r"\1", _STARS.sub(r"\1", _PAIRED.sub(r"\2", text)))
+        marked: str = _UNDERSCORES.sub(r"\1", _STARS.sub(r"\1", _PAIRED.sub(_paired_words, text)))
         if marked == text:
             break
         text = marked
     text = _SPACE_RUNS.sub(" ", text)
     return _HELD.sub(lambda found: held[int(found.group(1))], text)
+
+
+def _paired_words(found: re.Match[str]) -> str:
+    """The words between a pair of bold or strike marks, without the marks."""
+    return found.group(2) if found.group(1) is not None else found.group(4)
 
 
 class _Lists:
@@ -325,28 +389,37 @@ def as_plain_text(markdown: str) -> str:
             lists.close()
             if kinds[index] == "code":
                 out.add(lines[index])
+            elif not out.ends_blank() and not lines[index].startswith((" ", "\t")):
+                # A block of code stands apart from the words around it (item 804): a phone draws no box around it.
+                # One indented under a list item stays with the item.
+                out.add("")
             index += 1
             continue
-        table: tuple[list[str], int] | None = _table_rows(lines, index)
+        table: tuple[list[list[str]], int] | None = _table_rows(lines, index)
         if table is None:
             _prose_line(lines[index], out, lists)
             index += 1
             continue
         rows, index = table
         lists.close()
-        for row in rows:
-            out.add(_inline(row))
+        if not out.ends_blank():
+            out.add("")
+        for row in table_lines(rows):
+            out.add(row)
+        if index < len(lines) and lines[index].strip() != "":
+            out.add("")
     text: str = _TRAILING_SPACES.sub("", "\n".join(_aired(out)))
     return _BLANK_RUNS.sub("\n\n", text).strip()
 
 
-def cut_with_link(text: str, limit: int, link: str | None) -> str:
+def cut_with_link(text: str, limit: int, link: str | None, words: Words = ENGLISH) -> str:
     """``text`` as it is when it fits ``limit`` characters; else its start, cut at a line or word break when one is
-    close, then a line that says where the rest is: ``link``, the chat in Dot, or, with no link (``None``: Dot has no
-    address a phone can open), that it is in Dot on the Mac. The result is within ``limit``."""
+    close, then a line that says where the rest is, in the owner's language (``words``, item 805): ``link``, the chat
+    in Dot, or, with no link (``None``: Dot has no address a phone can open), that it is in Dot on the Mac. The result
+    is within ``limit``."""
     if len(text) <= limit:
         return text
-    tail: str = _REST_ON_THE_MAC if link is None else f"{_REST}{link}"
+    tail: str = words.rest_on_mac if link is None else f"{words.rest_in_dot}{link}"
     head, _ = text_window(text, 0, max(0, limit - len(tail)))
     return f"{head.rstrip()}{tail}"
 

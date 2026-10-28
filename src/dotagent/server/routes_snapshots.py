@@ -1,4 +1,4 @@
-"""Routes for SnapShots (item 405, :mod:`dotagent.desktop.snapshots`): the settings as they stand and the captures not
+"""Routes for Snapshots (item 405, :mod:`dotagent.desktop.snapshots`): the settings as they stand and the captures not
 yet claimed, a setting changed from the page (live, and kept in the config file), a capture taken by hand, and the
 claim a composer makes of the captures waiting for it."""
 

@@ -13,6 +13,7 @@ from dotagent.vault.csvimport import (
     NOT_A_LOGIN,
     NOT_A_WEB_ADDRESS,
     NOT_ONE_LINE,
+    OTHER_PASSWORD,
     TOO_LONG,
     ExportFormat,
     parse_export,
@@ -39,6 +40,12 @@ GitHub,https://github.com,ada,S3cret-one!,,false,false,,
 Example,https://example.com,bob,pa$$word,,false,false,,a note
 """
 
+# 1Password's newer export names a Url and an OTPAuth, as Safari's does, and a Title (item 786).
+ONEPASSWORD_URL: str = """Title,Url,Username,Password,OTPAuth,Favorite,Archived,Tags,Notes
+GitHub,https://github.com,ada,S3cret-one!,,false,false,,
+Example,https://example.com,bob,pa$$word,,false,false,,a note
+"""
+
 BITWARDEN: str = """folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp
 ,0,login,GitHub,,,0,https://github.com,ada,S3cret-one!,
 ,0,login,Example,a note,,0,https://example.com,bob,pa$$word,
@@ -54,6 +61,7 @@ BITWARDEN: str = """folder,favorite,type,name,notes,fields,reprompt,login_uri,lo
         (SAFARI, "safari", 2, 2, {}),
         (FIREFOX, "firefox", 2, 2, {}),
         (ONEPASSWORD, "1password", 2, 2, {}),
+        (ONEPASSWORD_URL, "1password", 2, 2, {}),
         (BITWARDEN, "bitwarden", 4, 2, {NOT_A_LOGIN: 2}),
     ],
 )
@@ -83,7 +91,7 @@ def test_a_row_that_cannot_be_a_login_is_counted_by_why() -> None:
         "spaces,not a site at all,ada,pw-3,\n"
         "ok,https://b.example,ada,pw-4,\n"
         "again,https://b.example,ada,pw-5,\n"
-        "twin,https://www.b.example/login,ADA,pw-6,\n"
+        "twin,https://www.b.example/login,ADA,pw-4,\n"
         ",,,,\n"
         f"long,https://c.example,ada,{'x' * 600},\n"
     )
@@ -93,7 +101,9 @@ def test_a_row_that_cannot_be_a_login_is_counted_by_why() -> None:
         NO_WEBSITE: 1,
         NO_PASSWORD: 1,
         NOT_A_WEB_ADDRESS: 2,
-        ALREADY_SAVED: 2,
+        ALREADY_SAVED: 1,
+        # Item 786: a second row of the login with another password is said, not counted as saved already.
+        OTHER_PASSWORD: 1,
         TOO_LONG: 1,
     }
 
@@ -191,3 +201,9 @@ def test_a_file_with_too_many_rows_is_refused_with_how_many_are_taken() -> None:
     body: str = "".join(f"s{n},https://s{n}.example,u,pw{n}\n" for n in range(20_001))
     with pytest.raises(InvalidValueError, match="more than 20000 rows"):
         parse_export("name,url,username,password\n" + body)
+
+
+def test_a_note_longer_than_the_csv_modules_own_limit_leaves_its_note_out_not_the_file() -> None:
+    """Item 786: a cell past the 128 KiB the csv module reads by default refused the whole file as no CSV."""
+    parsed = parse_export(f"name,url,username,password,note\nA,https://a.example,ada,pw-1,{'n' * 200_000}\n")
+    assert len(parsed.logins) == 1 and parsed.logins[0].notes is None and parsed.notes_left_out == 1

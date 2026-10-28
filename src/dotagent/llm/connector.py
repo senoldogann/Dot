@@ -25,6 +25,7 @@ from dotagent.llm.http import (
     wrap_transport_error,
 )
 from dotagent.llm.provider_errors import StatusClassifier
+from dotagent.llm.reach import cannot_connect, out_of_reach
 from dotagent.llm.types import DeltaSink, ModelReply, StreamDelta
 
 log = get_logger(__name__)
@@ -98,6 +99,24 @@ async def stream_model_reply[S](
     return codec.to_reply(state)
 
 
+def _worth_retrying(error: Exception) -> bool:
+    """A failure retrying can get past, unless its server cannot be connected to (item 769): the network is down, or a
+    local server is not running, and the caller says so at once instead of retrying in silence for a minute."""
+    return is_retryable_provider_error(error) and out_of_reach(error) is None
+
+
+async def _unless_out_of_reach[T](operation: Callable[[], Awaitable[T]]) -> T:
+    """``operation``, whose broken connection is told as one to a server that cannot be connected to when it cannot
+    be (:func:`~dotagent.llm.reach.cannot_connect`)."""
+    try:
+        return await operation()
+    except ProviderTransportError as error:
+        unreachable: ProviderTransportError | None = await cannot_connect(error)
+        if unreachable is None:
+            raise
+        raise unreachable from error
+
+
 async def retry_with_reset(
     attempt_once: Callable[[], Awaitable[ModelReply]], sink: DeltaSink, policy: RetryPolicy, label: str
 ) -> ModelReply:
@@ -108,9 +127,9 @@ async def retry_with_reset(
         if started:
             await sink(StreamDelta(kind="reset", text=""))
         started.append(True)
-        return await attempt_once()
+        return await _unless_out_of_reach(attempt_once)
 
-    return await retry_async(attempt, is_retryable_provider_error, retry_after_hint, policy, label)
+    return await retry_async(attempt, _worth_retrying, retry_after_hint, policy, label)
 
 
 async def _json_attempt(
@@ -147,8 +166,8 @@ async def post_json(
         return await client.post(url, json=payload, headers=headers)
 
     return await retry_async(
-        lambda: _json_attempt(send, context, classify, label),
-        is_retryable_provider_error,
+        lambda: _unless_out_of_reach(lambda: _json_attempt(send, context, classify, label)),
+        _worth_retrying,
         retry_after_hint,
         policy,
         label,
@@ -170,8 +189,8 @@ async def get_json(
         return await client.get(url, headers=headers)
 
     return await retry_async(
-        lambda: _json_attempt(send, context, classify, label),
-        is_retryable_provider_error,
+        lambda: _unless_out_of_reach(lambda: _json_attempt(send, context, classify, label)),
+        _worth_retrying,
         retry_after_hint,
         policy,
         label,

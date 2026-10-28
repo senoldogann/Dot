@@ -8,8 +8,8 @@ UI, where Settings › Memory (items 373 and 566) is the box that adds a note at
 per note, **Remember** or ⌘Enter; on a phone the tags have a line of their own and **Remember** stands at the right of
 the line under them, and a touch screen is not offered the key, item 576), then **Notes** with how many there are, a
 choice of All, Lessons, Preferences and From outside content (each reads the 2,000 newest notes, not only the ones
-shown; with a search, the search's 50 best hits; one line in every window, which scrolls sideways on a phone when it
-does not fit, item 576, and beside which the search stands, or under it when both do not fit, item 578) and their
+shown; with a search, the search's 50 best hits; one line on a computer, beside which the search stands, or under it
+when both do not fit, item 578, and two by two on a phone, item 778) and their
 search, the notes changed last first, 30 at a time with **Show more notes**, each a row with its tags
 (labels the height of their words, on a phone too: item 576), the mark of a note saved while a run read outside content,
 who saved it and when, how often it was used, and its edit and delete; then what Dot knows about you with your own
@@ -44,7 +44,8 @@ notes" and has **Undo this merge**: the notes it took in wake apart and the merg
 **Forget all N**, which asks first and forgets the notes the card lists, all in sight in a box that scrolls. Nothing
 is forgotten before you press one of them. A note you forget (there, in the list, with `dotx memory forget`, or by
 the agent's `memory_forget`) is not deleted: it waits in the trash for `[memory] trash_days` (30), listed as
-**Forgotten notes** under the notes with when each is deleted for good, **Restore** (it comes back awake) and
+**Forgotten notes** under the notes with when each is deleted for good, **Restore** (it comes back awake, with its
+vector when it is of the embedding model in use, else embedded again: item 796) and
 **Delete for good**; the nightly reflection deletes the notes that stayed longer, and no others.
 
 How learning fares, the last card, says for the reflection, the lessons and the skills when each last went well and,
@@ -125,7 +126,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   correction.
 - Three tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
   days, which searches skip (the list and the page still show it; take the tag off to wake it), and
-  `keep-separate` on the notes whose merge you took back, which no night merges again (take it off to let them).
+  `keep-separate` on the notes whose merge you took back, which no night merges again (take it off to let them). A
+  run that saves or rewrites a note cannot give it `rest` or `keep-separate`, however spelled, and keeps the ones
+  the note has (item 796).
 - The night merges notes that say the same in other words (item 584). Besides the fold of two lessons that say the
   same the same way round, which asks no model, the reflection shows the review model the notes of Dot's that are
   awake and not pinned, not yours and not a journal, whose embeddings are at least `merge_similarity` (0.80) close
@@ -303,6 +306,10 @@ its time and by hand, newest first, one at work among them, each with how it wen
 its answer (`GET /api/schedules/<id>/firings?limit=`, up to 50); a later firing's digest counts a run by hand among its
 earlier runs.
 
+The schedule `[trading] wake_schedule` names is also started when the market moves (item 772, [Trading](trading.md)),
+as **Run now** starts one, in a chat titled `<name> · <time> · market` (or the schedule's own), its first message saying
+what moved; a schedule switched off is not started so, and the end of such a run is told as its firings' ends are.
+
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A run of a schedule that the daemon's end cut off and you resumed (Resume on its page) counts as the schedule's run
   at work when the schedule comes due beside it (item 553): a repeating schedule is skipped, as for any run still
@@ -354,5 +361,6 @@ earlier runs.
   schedules off, as Dot's ("switched off: its agent was deleted"). While you have paused the agent (item 465), its
   schedules fire nothing by themselves: a repeating one is skipped to its next time ("skipped: <name> is paused") and a
   one-time one waits, still due ("waiting: <name> is paused"), and fires once you resume it; a pause counts no failed
-  run and tells nothing, and **Run now** still starts a run. An agent that cannot be read fires nothing.
+  run and tells nothing, and **Run now** still starts a run; a move of the market (`[trading] wake_schedule`) is no
+  hand and starts nothing as a paused agent (item 785). An agent that cannot be read fires nothing.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.

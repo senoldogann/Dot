@@ -138,7 +138,9 @@ function vaultGuide(vault) {
   if (!vault.connected) {
     return vault.cli === null
       ? el("span", null, "The 1Password command-line tool is not installed on this Mac. Install it, then check again.", el("details", { class: "error-details" }, el("summary", null, "Details"), el("p", { class: "small muted" }, "In Terminal: ", el("code", { class: "mono" }, "brew install 1password-cli"))))
-      : "Connect makes the vault Shared with Dot and a service account that only reads it, through the 1Password app, which asks you first: turn on its Settings › Developer › Integrate with 1Password CLI.";
+      : vault.app === false
+        ? "1Password's app is not on this Mac, and Connect goes through it. You do not need 1Password: Settings › Vault keeps your logins and Dot fills them. To use it all the same, install its app or paste a service account token."
+        : "Connect makes the vault Shared with Dot and a service account that only reads it, through the 1Password app, which asks you first: turn on its Settings › Developer › Integrate with 1Password CLI.";
   }
   if (vault.error !== null) {
     return vault.error;

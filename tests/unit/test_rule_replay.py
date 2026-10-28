@@ -338,3 +338,13 @@ def test_a_hand_off_tried_after_a_rule_that_fits_decides_its_steps() -> None:
     used: dict[str, RuleUsage] = _used([*allowing, _rule(2, "handoff", "shell", r"\bpush\b", "Pushes are mine")], steps)
     assert (used["rul_2"].decides, used["rul_1"].decides) == (1, 0)
     assert [(shadow.rule_id, shadow.steps) for shadow in used["rul_1"].shadowed_by] == [("rul_2", 1)]
+
+
+def test_an_order_with_real_money_is_asked_before_any_rule_and_a_rule_tried_says_so() -> None:
+    """The pre-push review of item 763: a rule that allows was counted as letting past live orders through, which the
+    guard of an order with real money asks before any rule; only a rule that hands the step off is stricter."""
+    steps: list[StepRow] = [_step(1, _PUSH, _decision("ask", "trade", "user"), True, False)]
+    allowed: RulePreview = _tried("allow", [], steps)
+    assert (allowed.before_rules, allowed.would_decide, allowed.looser) == (1, 0, 0)
+    handed: RulePreview = _tried("handoff", [], steps)
+    assert (handed.before_rules, handed.would_decide, handed.stricter) == (0, 1, 1)

@@ -555,7 +555,9 @@ async def merge_duplicates(
         tags: tuple[str, ...] = normalize_tags([*kept.tags, *folded.tags])
         if tags != kept.tags:
             await store.set_memory_tags(kept.id, tags)
-        await store.retire_memory(folded.id, normalize_tags([*folded.tags, REST_TAG]), kept.id)
+        # The rest tag after the note's own, uncut (the review of every module: six tags and more cut it off, and the
+        # note retired stayed awake).
+        await store.retire_memory(folded.id, tuple(dict.fromkeys((*normalize_tags(folded.tags), REST_TAG))), kept.id)
         log.info("lesson_merged", folded=folded.id, kept=kept.id, folded_source_run=folded.source_run)
         merged += 1
     return merged
@@ -632,7 +634,9 @@ async def _put_aside_outdated(
         verdict: OutdatedVerdict | None = by_pair.get(number)
         if verdict is None or not verdict.outdated:
             continue
-        await runtime.store.retire_memory(older.id, normalize_tags([*older.tags, REST_TAG]), newer.id)
+        await runtime.store.retire_memory(
+            older.id, tuple(dict.fromkeys((*normalize_tags(older.tags), REST_TAG))), newer.id
+        )
         log.info("note_outdated", memory_id=older.id, replaced_by=newer.id, reason=verdict.reason)
         put_aside += 1
     return put_aside

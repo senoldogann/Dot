@@ -44,7 +44,8 @@ function inlineNode(part) {
 }
 
 function inlineNodes(parts) {
-  return parts.map(inlineNode);
+  // A piece of a bold that code cut in pieces (markdown.js, item 778) is drawn bold, code and all.
+  return parts.map((part) => (part.strong ? el("strong", null, inlineNode(part)) : inlineNode(part)));
 }
 
 // A column that is aligned says so by a class, as the page's content security policy allows no style of its own.

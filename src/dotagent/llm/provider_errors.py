@@ -56,6 +56,11 @@ _OPENCODE_CREDITS: str = "CreditsError"
 _ANTHROPIC_QUOTA: frozenset[str] = frozenset({"billing_error"})
 # How ollama.com words a plan whose included usage is spent ("You used all included … usage"), with HTTP 429.
 _OLLAMA_PLAN_SPENT: str = "used all included"
+# How ollama.com words a usage limit reached, with HTTP 429 (item 789, measured 2026-10-26: "you (name) have reached
+# your monthly usage limit, upgrade for higher limits"): a month's is spent until the plan renews, a shorter one comes
+# back by itself.
+_OLLAMA_LIMIT_REACHED: str = "usage limit"
+_OLLAMA_WINDOWS: tuple[str, ...] = ("hourly", "daily", "weekly", "session", "hour", "week")
 # How OpenRouter answers a call to a model that the account's privacy settings leave no provider of, with HTTP 404 (item
 # 361): "0 endpoints out of 1 requested are available matching your guardrail restrictions and data policy. We removed
 # them for the following reasons …:" and a line for each, "ZDR violation (account settings): 1 endpoint excluded; …".
@@ -195,7 +200,13 @@ def classify_ollama(
     """Ollama: a 429 that says the plan's included usage is used up is terminal, not a burst to retry; an answer that
     says the model's runner broke off (a 400 or a 5xx whose words are the failed request to the runner) is retryable
     (item 256)."""
-    if status == 429 and wire is not None and _OLLAMA_PLAN_SPENT in wire.message.lower():
+    said: str = wire.message.lower() if wire is not None else ""
+    if status == 429 and _OLLAMA_PLAN_SPENT in said:
+        return ProviderQuotaError(error_message(status, wire), status, retry_after_s, detail)
+    if status == 429 and _OLLAMA_LIMIT_REACHED in said:
+        # A limit reached is no burst to retry six times (item 789): a month's is spent, a window's waited for.
+        if "monthly" not in said and any(window in said for window in _OLLAMA_WINDOWS):
+            return ProviderWindowError(error_message(status, wire), status, retry_after_s, detail)
         return ProviderQuotaError(error_message(status, wire), status, retry_after_s, detail)
     if (status == 400 or status >= 500) and wire is not None and runner_lost(wire.message):
         return ProviderRunnerError(error_message(status, wire), status, detail)

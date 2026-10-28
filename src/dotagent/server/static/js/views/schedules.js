@@ -292,14 +292,15 @@ function scheduleRow(view, handlers) {
   } else if (!record.enabled) {
     next = el("span", { class: "badge b-muted" }, "switched off");
   } else if (view.next_local !== null) {
-    next = el("span", null, `Next ${view.next_local}`);
+    // A time keeps one line: its date's hyphens let a phone break it as "2026-10-" over "28 05:15" (item 778).
+    next = el("span", { class: "nowrap" }, `Next ${view.next_local}`);
   } else {
     next = el("span", null, "Will not run again");
   }
   const last =
     view.last_local === null
       ? el("span", null, record.last_status === "" ? "Never ran" : "Not run yet")
-      : el("span", null, `Last ${view.last_local}`);
+      : el("span", { class: "nowrap" }, `Last ${view.last_local}`);
   return el(
     "div",
     { class: "list-row", dataset: { schedule: record.id } },

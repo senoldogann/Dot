@@ -175,7 +175,8 @@ at a thumbnail's size, its name its tooltip and its × at its corner, where anot
 size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
-the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen for it, at
+the bar is still one line. On a phone the bar's buttons are 36 px and answer a finger's 44 px around them (item
+787, as every icon button of the bars and the lists does), and the box's text is the size chosen for it, at
 least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item
 311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a pick or Escape
 or a click outside closes it. The model's menu (item 208) has a rail on its left, a star for the
@@ -408,7 +409,11 @@ chevron that opens its steps. Rows that follow each other gather in one group: i
 are and how they stand ("3 helpers", "1 working · 2 done"), the time from the first one's start to the last one's end
 and a chevron that folds the rows away; an approval a helper asks for opens the group. The row is closed from the start;
 an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes
-again. Resting the pointer on a row, or moving the focus to it, shows its card (item 226): the whole goal, the model
+again. Its steps are put in the page the first time it opens, by you or by an approval, and stay (item 767): until then
+the row is its line alone, which its events keep up to date, so a chat whose helpers took hundreds of steps opens light
+(one of the owner's held 75,340 elements before, every step of every closed row among them), and the browser's find
+does not reach into a row that never opened.
+Resting the pointer on a row, or moving the focus to it, shows its card (item 226): the whole goal, the model
 with its reasoning level, how the run stands and for how long, counting on while it works, and what it does now or did
 last; the pointer leaving, a click or Escape puts it away, and on a touch screen a tap opens the row as before. Its own
 page names the parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and has a pill where the
@@ -718,7 +723,8 @@ draws no line either way (items 346, 362 and 500, kept in this browser), and **S
 of this browser, below), **Models** (the **Default model** first, a menu of the models that can call tools: the runs
 that name no model, a new chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models]
 main`, as when it is changed from the composer's model menu; the **Roles** card holds the fast, review and vision
-models too, each with its provider in its box, and **Fallbacks** the models a run moves to; then **Every model, by
+models too, each with its provider in its box (on a phone the model's name has the whole box, item 787), and
+**Fallbacks** the models a run moves to; then **Every model, by
 service**, a search over one fold per service, with the reasoning levels of each model and a menu to choose one, and
 what the services hold in the page's head with the button **Check again**; a provider without a key, or whose key
 was refused (HTTP 401), says so and links to AI services, and one that refused access (HTTP 403) says that, with its
@@ -729,7 +735,7 @@ behind a filter; see [Models and providers](models.md#models-and-providers)), **
 search; see [Runs](runs.md)), **Browser** (which Chrome Dot browses with
 and what Chrome has to allow first; see [Browser
 use](browser-and-computer-use.md#browser-use)), **Vault** (the logins, cards and contact details you give Dot; below),
-**Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
+**Trading** (whether Dot may trade crypto on Coinbase; see [Settings › Trading](#settings--trading)), **Rules**, **Memory**, **Skills**, **Self-improvement** (the harness,
 what Dot improves around its model, in plain words: what Dot follows now, a form for a version of your own, the
 versions, fifty at a time, with Use and Set aside, the nightly learning, the lessons learned and how it learns; see [The
 harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a sign-in code for its home-screen app; see
@@ -752,8 +758,56 @@ every page. The page is the open tab alone, in a column of 920 px under its own 
 for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On
 a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
 phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
-the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
+the schedules' tab (`#/settings/schedules`) to the Schedules page. **Snapshots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
+
+### Settings › Trading
+
+**Trading** (`#/settings/trading`, in the group This Mac, items 764 and 777) is a trading desk: what Dot's trading holds
+and does, with the settings under it. With trading on (Paper or Live) the page shows, top to bottom:
+
+- **Account**: what the account is worth, large; today's change and, in Paper, the change since the account's start,
+  each in green or red with its sign and its share; what is in positions and its share of the account; and two meters
+  of the day's limits, the loss so far against the most lost in a day and what was traded against the most traded,
+  green, then amber past 60 %, red at the limit. A reason the account or what watches the market could not be read
+  stands above them, both when neither could. In Paper, **Start again** (after a question) resets the account to its
+  starting money.
+- **Open positions** (Paper): each buy's exit as a row of a table: the asset, the size, the buy's price, the bid now,
+  what it is worth, its gain or loss in money and in share, and a scale from its stop to its target with the entry
+  (a line) and the price (a dot, green or red) on it, and how far each end is from the price. Live keeps no exit yet
+  ([Trading](trading.md#exits-the-stop-and-the-target-watched-day-and-night)).
+- **Watching**: what Dot looks at between runs, with no model, a line each with a dot of its tone: the open positions'
+  stops and targets (every 15 seconds), the products a run may trade now (with `*`, how many trade past
+  `[trading] min_volume` at this moment), the schedule a move of the market starts with how many runs it started today
+  of `wake_per_day` and when the last one did, and when that schedule fires next; a `wake_schedule` that names no
+  schedule is said in red, one switched off in amber.
+- **Holdings**: each currency held, its amount, the bid now, what it is worth and its share of the account; a currency
+  that could not be priced is named under them.
+- **Orders**: the latest fifty, newest first, as a table: when, the side (a green Buy or a red Sell) and the product,
+  the size, the price, the worth, the fee and the status, with the reason the run gave under each, on as many lines
+  as it takes.
+- **Settings**, under a line:
+  - **Mode**: Off (Dot has no trading tools), Paper (an account of Dot's own, at Coinbase's real prices, with money
+    that is not there) or Live (your Coinbase account, real money), each with a line saying what it means. Switching
+    to Live asks first and says that a run in yolo mode places orders without asking, within the limits. When trading
+    is on but runs do not have the trading tools yet, the page says they get them after Dot restarts and offers
+    **Restart Dot**.
+  - **Limits**: the most for one order, the most traded and the most lost in a day, the most held of one product, all
+    in the quote currency, and what the paper account starts with (in Paper). The products a run may trade are a list
+    of ids such as `BTC-EUR`, each with a remove button, and a field that allows another; `*` allows the whole market,
+    every product in the quote that trades `[trading] min_volume` a day, and its chip says so in words (item 771).
+    **Save limits** sends only what changed; a reason the daemon gives (a limit past another, an id not priced in the
+    quote, a phone asked to widen) shows under the button. Like the config file's `[trading]` table, these hold from
+    the next order.
+  - **Coinbase key** (when trading is on, or a key is kept): whether a key is kept and the end of its name, **Remove
+    key**, and a form for its name and its private key, which is sent to the Keychain and never shown again. Make the
+    key in the Coinbase Developer Platform with the ECDSA signature algorithm and the permissions View and Trade, never
+    Transfer; a key that may transfer money is refused.
+
+With trading off the page shows the settings alone. On a phone each table's row is a card of labelled lines. A phone's
+key narrows trading (off, paper, a lower limit, a product dropped, the key removed, the paper account started again) and
+is refused anything that widens it, with the reason shown. The endpoints are `GET|PATCH /api/trading` (whose answer
+carries `positions` and `watch`), `PUT|DELETE /api/trading/key` and `POST /api/trading/paper/reset`.
 
 ### Settings › Vault
 
@@ -762,12 +816,20 @@ you give Dot. It signs in with a login and types your contact details into pages
 shown to you, and Dot fills it into no page. A login a run made for a new account (`browser_create_login`, item 740) is
 kept here too, with the note "Made by Dot for a new account on …". Passwords and cards are kept in your Mac's Keychain,
 not in Dot's database; what Dot sees and what it cannot see is in [Safety](safety.md#safety). The page has the tabs
-**All**, **Logins**, **Cards** and **Contacts**, each with its count, a search (**Search the vault**: it looks in the
-labels, sites, usernames, nicknames, last four digits and the details of contacts and billing addresses), and **New
-item**, a menu of **Login**, **Card**, **Contact** and **Import from CSV…**. An empty vault says "Nothing saved yet. Add
-a login, a card or contact details with New item." Each item is a row with its mark, its label (a login's site, a card's
-nickname or brand, a contact's label), the line under it (a login's username, a card's brand and last four digits, a
-contact's details) and **Edit** and **Delete** (which asks first).
+**All**, **Logins**, **Cards** and **Contacts**, each with its count (two by two on a phone, item 778), a search
+(**Search the vault**: it looks in the labels, sites, usernames, nicknames, last four digits and the details of contacts
+and billing addresses), and **New item**, a menu of **Login**, **Card**, **Contact** and **Import from CSV…**. An empty
+vault says "Nothing saved yet. Add a login, a card or contact details with New item." Each item is a row with its mark,
+its label (a login's site, a card's nickname or brand, a contact's label), the line under it (a login's username, a
+card's brand and last four digits, a contact's details) and **Edit** and **Delete** (which asks first). The list scrolls
+in its card and draws more rows as it is scrolled (item 768).
+
+- **Select** (beside New item, item 768) turns each row into a tick: a click on the row ticks it, a shift-click ticks
+  every row from the one ticked last, and a bar over the list says how many are ticked, with **Select all** (every item
+  the tab and the search show, also those not drawn yet) or **Clear**, **Delete** and a cross to stop choosing. A ticked
+  row that a search or another tab hides is unticked, so that Delete removes only what you see ticked. Delete asks first
+  ("Delete 12 items?") and removes the items and their Keychain items, 40 at a time; a Keychain that refuses part way
+  leaves the rest as they were and says how many went.
 
 - **New login** (a dialog, item 615): Website (the site's address alone: one with a user name or a password in it is
   refused), Username or email (optional), Password (dots until the eye is pressed), Notes (optional); **Save login**
@@ -791,17 +853,30 @@ contact's details) and **Edit** and **Delete** (which asks first).
   security code, the name on the card, the notes) is removed.
 - **Import from CSV…** reads the export of a password manager (Chrome, Edge, Safari, Firefox, 1Password, Bitwarden),
   known by its header row, in memory, and says how many logins went in, how many rows were left out and why (no site,
-  no password, not a web address, an address with a user name or a password in it, not a login, already in the vault)
+  no password, not a web address, an address with a user name or a password in it, not a login, already in the vault,
+  a second and different password for a login already in the file, whose first is kept: item 786); a login already
+  in the vault whose password the file has changed takes the new one, and the report says how many (item 791), so a
+  file exported again from the browser brings the vault up to date: each is read again and changed under its own lock,
+  as an edit is, after the new logins are kept, and one removed or changed in any way there meanwhile (an edit of yours)
+  is left alone; its own notes stay, not the file's. A browser's
+  file has no dates, so its password wins whatever its age: the one it replaces is kept in the login's notes
+  ("Password before the import of …"), which the eye shows, and the report names the logins it changed; one whose
+  notes have no room for it is left as it is and counted so; when the
+  Keychain does not answer to compare one, the saved logins from there on are left as they are and counted as not
+  compared
   and that the CSV file holds your passwords in plain text and is to be deleted. One-time-code seeds are left out;
   the vault keeps none.
 
-The routes (all under `/api/vault`; the 1Password routes above share the prefix): `GET /vault/items` (the items by
-label with `counts`) and `GET /vault/items/{id}` answer no secret; `GET /vault/counts` (the tabs' numbers); `POST
+The routes (all under `/api/vault`; the 1Password routes above share the prefix): `GET /vault/items` (the items by label
+with `counts`) and `GET /vault/items/{id}` answer no secret; `GET /vault/counts` (the tabs' numbers); `POST
 /vault/items` and `PUT /vault/items/{id}` take a `kind` (`login`, `card` or `contact`) and the values, a part left out
 of a `PUT` being kept; `DELETE /vault/items/{id}` removes the Keychain item and the record; `POST
 /vault/items/{id}/reveal` (`{"part": "password"}`) answers that one part, once, to a request that names this Mac's own
-address (403 from a phone); `POST /vault/items/import` (`{"csv": "…"}`) and `POST /vault/card-photo` (`{"image":
-"<base64>"}`) read what they are given in memory. An error names what failed and never a value.
+address (403 from a phone); `POST /vault/items/remove` (`{"ids": ["…"]}`, item 768) removes several items, their
+Keychain items and their records, passing over an id the vault does not hold, and answers how many went and, when the
+Keychain refused part way, why it stopped (`{"removed": 40, "stopped": "…"}`); `POST /vault/items/import` (`{"csv":
+"…"}`) and `POST /vault/card-photo` (`{"image": "<base64>"}`) read what they are given in memory. An error names what
+failed and never a value.
 
 **Dot's first conversation** (item 420). On a first open, while Dot has not introduced itself (`[assistant] introduced`)
 and there is no chat yet, New chat shows Dot's first conversation in the place of the greeting, over the composer, with
@@ -1066,7 +1141,7 @@ dotx service uninstall   # stop the daemon and remove the job
   /api/desktop/permissions/open`), and, when the daemon is the service's own process (launchd's job runs Dot.app's
   launcher, the daemon's parent), **Restart Dot** (`POST /api/system/restart`): the daemon stops with an exit launchd
   does not count as clean, so the job starts it again, with what was granted meanwhile; a daemon run by hand is refused
-  the restart, and so is one when launchd cannot be asked. The SnapShots page offers the Accessibility pane the same
+  the restart, and so is one when launchd cannot be asked. The Snapshots page offers the Accessibility pane the same
   way. Each section of Settings › System folds (item 411), as the reader leaves it in this browser (the health checks and
   **Details** start shut, item 625); the Permissions fold
   says what is missing beside its title. Measured through the service with all three granted: the model opened the
@@ -1146,8 +1221,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /plugin-gallery/{id}/revert` | put back the version an update from a proposal replaced; the updated one goes to the Trash (409 when no earlier version is kept) |
 | `DELETE /installed-plugins/{name}` | take a plugin out of Dot (item 497): its MCP servers stop, its skills leave the runs that start after (Dot reads its plugins again, item 542), and its folder in Dot's plugins goes to the Trash (409 for one of `[plugins] dirs`; of a plugin whose folder went without Dot, only the servers are stopped) |
 | `GET /accounts`, `POST /accounts/{provider}/start`, `DELETE /accounts/{provider}/{address}` | the accounts of Google and Microsoft signed in through their own sign-ins and whether the client you registered with each is saved (item 422); start a sign-in, only from this Mac's own address with the installation's token (the provider's page to open; 422 when the client is not saved); sign an account out |
-| `GET /vault/items`, `GET /vault/counts`, `GET\|PUT\|DELETE /vault/items/{id}`, `POST /vault/items`, `POST /vault/items/{id}/reveal`, `POST /vault/items/import`, `POST /vault/card-photo` | Dot's own vault of logins, cards and contacts (item 621, Settings › Vault, [above](#settings--vault)): the list and one item with no secret in either; make, change and delete an item (its secrets in the Keychain, its record in the database; a delete takes both); the eye, one secret part, once, only from this Mac's own address and with the installation's token, never a phone's key (403 otherwise, item 678); an import of a CSV export and the reading of a card's photo, both in memory (422 with why for a file that is no list of logins, a card whose number or expiry is not good, a site that is no web address) |
-| `GET /vault`, `POST /vault/connect`, `POST /vault/token` (`{"token": "ops_…"}`), `DELETE /vault` | the owner's 1Password (item 493): whether `op` is installed and Dot holds a service account's token, and the vaults it reads with how many logins each; Connect, which makes the vault "Shared with Dot" and a service account that only reads it through the owner's `op` and the 1Password app, which asks first; a token of the owner's, kept once it reads a vault (422 for one that is no `ops_` token); both only from this Mac's own address with the installation's token; Disconnect, which forgets the token. No token and no value is ever answered |
+| `GET /vault/items`, `GET /vault/counts`, `GET\|PUT\|DELETE /vault/items/{id}`, `POST /vault/items`, `POST /vault/items/{id}/reveal`, `POST /vault/items/remove`, `POST /vault/items/import`, `POST /vault/card-photo` | Dot's own vault of logins, cards and contacts (item 621, Settings › Vault, [above](#settings--vault)): the list and one item with no secret in either; make, change and delete an item (its secrets in the Keychain, its record in the database; a delete takes both), or several at once (item 768); the eye, one secret part, once, only from this Mac's own address and with the installation's token, never a phone's key (403 otherwise, item 678); an import of a CSV export and the reading of a card's photo, both in memory (422 with why for a file that is no list of logins, a card whose number or expiry is not good, a site that is no web address) |
+| `GET /vault`, `POST /vault/connect`, `POST /vault/token` (`{"token": "ops_…"}`), `DELETE /vault` | the owner's 1Password (item 493): whether `op` is installed, whether 1Password's app is (`app`, item 791), and whether Dot holds a service account's token, and the vaults it reads with how many logins each; Connect, which makes the vault "Shared with Dot" and a service account that only reads it through the owner's `op` and the 1Password app, which asks first; a token of the owner's, kept once it reads a vault (422 for one that is no `ops_` token); both only from this Mac's own address with the installation's token; Disconnect, which forgets the token. No token and no value is ever answered |
 | `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state`, an account's of Google or Microsoft first, else an MCP server's, and answers a page of Dot's own look that names the account or service and says how it came out (item 437; 400 for a state nobody waits for, for an account's that failed, and for one that waited more than 10 minutes; what the address carries is shown only for a state that waits) |
 | `GET /assistant`, `PUT /assistant` (`{"name": "Miro", "owner": "Ada", "introduced": true}`, each optional) | the name the owner calls Dot by, the owner's name (the first name of their account on this Mac until they give one) and whether Dot has had its first conversation (item 420); a change, live and in the config file (422 for a blank name, a control character or a name too long) |
 | `GET /phone`, `POST /phone/pairing` (the latter the token only)                 | the addresses a phone reaches Dot at (`[server] reach`), what Tailscale says of the Mac and whether the daemon keeps it awake (item 271); a new pairing code (item 267) |
@@ -1157,7 +1232,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /phone/phones`, `DELETE /phone/phones/{id}` (the token only, never a phone's key) | the phones that hold a key of their own, with their names and when they were paired and last used, never the key; a phone removed, its key refused from then on and its open streams ended (404 when it is not paired) (item 670) |
 | `GET /channels`, `POST /channels/imessage/switch` (`{"on": true}`; the switch, the code, the confirmation and the removal take the token only, never a phone's key: item 670) | the channels of Settings › Channels (item 572, [Channels](channels.md)): iMessage's switch, paired numbers and addresses, a code that waits, what macOS granted (`database`, `automation`), what keeps it from working (`problem`, `needs`) and what the channel sees of Messages' database (`seen`, item 595: when it looked, the cursor, the newest row, the sizes and times of `chat.db` and `chat.db-wal`, the last command and error, a `warning` when the log changed for two minutes and nothing Dot reads did, and `cursor_reset`, item 611, when the cursor had to come down to the newest row of a database rebuilt or restored: `{"from_row", "to_row", "at"}`), and the address its links open at (`links`: the name `[server] reach` gives, `null` when it names none and no link is sent); the switch, at once and in `[channels] imessage` (422 when the config file cannot be changed, and the switch stays as it was); `POST /channels/progress` (`{"on": true}`) turns on or off the messages of progress of a run started from a channel (item 618; `progress` in `GET /channels`), at once and in `[channels] progress` (`"steps"` or `"off"`; 422 when the config file cannot be changed) |
 | `POST /channels/imessage/code` (`{"handle": "+358401234567"}`), `POST /channels/imessage/confirm` (`{"code": "482 913"}`), `POST /channels/imessage/remove` (`{"handle": …}`), `POST /channels/imessage/check`, `POST /channels/imessage/poll` | send a pairing code to a number (with its country code) or an address through Messages; pair it when the code is typed back (422 for a wrong one, with the tries left, and for one out of date or used up); forget a paired one; show macOS's question whether Dot may control Messages, a minute for the answer; look at Messages' database now (Check now, item 595): a poll like the loop's, never reading a row twice with it, when the channel is on and a number paired, else a look that reads no message |
-| `GET /snapshots`, `POST /snapshots/settings` (`{"key": "sound", "value": "pop"}`), `POST /snapshots/take`, `POST /snapshots/claim` | SnapShots (item 405): the settings as they stand, whether the Command key is watched and the captures waiting; a setting changed, live and in the config file; a capture taken by hand; the captures a composer takes into its draft |
+| `GET /snapshots`, `POST /snapshots/settings` (`{"key": "sound", "value": "pop"}`), `POST /snapshots/take`, `POST /snapshots/claim` | Snapshots (item 405): the settings as they stand, whether the Command key is watched and the captures waiting; a setting changed, live and in the config file; a capture taken by hand; the captures a composer takes into its draft |
 | `GET /desktop/permissions`, `POST /desktop/permissions`, `POST /desktop/permissions/open` (`{"pane": "screen_recording"}`), `POST /system/restart` | the desktop permissions as macOS reports them, make macOS ask for the missing ones, show a pane, start the service's daemon again (item 409) |
 | `POST /voice/allow` (`{"pane": "microphone"}` or `{"pane": "speech"}`)         | for the composer's microphone in the desktop app (item 636): show System Settings at the pane where Dot.app is allowed the microphone, or speech recognition, from this Mac's own address with the installation's token only (422 from any other, a phone's key among them, and for any other pane). It reads the Dot.app that runs first and answers `{"opened", "app"}`: `ready`, it asks macOS for the microphone, and the pane is shown; `old`, it was built before it asked, so macOS gives it none whatever System Settings shows, and nothing is shown (`opened` false); `unknown`, none was found running, and the pane is shown all the same. A Dot.app or a `codesign` that cannot be read is an error (500), not an answer. It changes no setting: you switch Dot on |
 
@@ -1172,7 +1247,7 @@ log keeps its traceback once (item 558: the answer is made inside the guard, so 
 `Cache-Control: no-store` of every other answer, and is not raised again for uvicorn to log a second time). Invalid
 input is a 422 with the validation errors in the context.
 
-**SnapShots** (item 405, after another coding agent's). In any application, both Command keys pressed together (⌘ ⌘,
+**Snapshots** (item 405, after another coding agent's). In any application, both Command keys pressed together (⌘ ⌘,
 item 414, as another coding agent's shortcut is), or the Command key tapped twice, captures the window in front and puts
 it in the box of the open chat (or of the new chat) as a picture, without switching to Dot; a short sound says it was
 taken, a soft white flash goes over the window (`flash`), and a card with the picture lifts off it and flies to Dot's
@@ -1191,7 +1266,7 @@ not a capture), never which key. Only the pages of this Mac take captures: a pho
 reach`, does not take one away from the Mac's box. Dot's own window (the desktop app, or a browser showing Dot) and a
 password manager's are never captured; what lies over the window shows in the picture, as on the screen. A box on screen
 takes the capture as it comes; with none on screen (another page open) the daemon keeps it until a box is made. Settings
-› SnapShots switches it (`[snapshots] enabled`), the text (`app_text`), the sound (`sound`: click, pop, glass or off),
+› Snapshots switches it (`[snapshots] enabled`), the text (`app_text`), the sound (`sound`: click, pop, glass or off),
 the flight and the spring (`animations`), the flash (`flash`), Dot coming to the front (`open_dot`), and says whether
 the key is watched and, when it is not, why; while the permission is missing the daemon tries the watch again every few
 seconds, so granting it needs no restart. A capture past the ten files of a message is left out, and the box says so.

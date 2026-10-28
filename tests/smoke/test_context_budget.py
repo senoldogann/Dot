@@ -32,9 +32,17 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 800 for three browser tools and their lines (21,072 measured): browser_create_login, so that no password of
 # a new account is made up by a model and written into its history (item 740), and browser_console and
 # browser_viewport, to see why a page does not work and how it lays out on a phone (item 746).
-BUDGET_TOKENS: int = 21_300
-SYSTEM_BUDGET_TOKENS: int = 7_000
-TOOLS_BUDGET_TOKENS: int = 14_400
+# Raised by 200 for `recon` (item 776): one tool, 985 characters of schema, the audit of a site's public face and the
+# ports of an owned host (21,401 measured).
+# Raised by 600 for `security_scan` (item 781) and the selector and retry of the browser tools: a form's payloads on
+# an owned host, one tool of 1,063 tokens (21,984 measured).
+# Raised by 700 for the captcha skill and its prompt rule, and `drag_at` on browser_act (item 792): a human check is
+# solved in the page, so the rule and the drag's two coordinates are carried by every run (22,466 measured; system
+# 7,148, tools 15,292).
+BUDGET_TOKENS: int = 22_800
+SYSTEM_BUDGET_TOKENS: int = 7_200
+# Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
+TOOLS_BUDGET_TOKENS: int = 15_400
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

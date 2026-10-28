@@ -56,9 +56,10 @@ _TABS: dict[str, str] = {
     "harness": "Self-improvement",
     "browser": "Browser",
     "vault": "Vault",
+    "trading": "Trading",
     "phone": "Phone",
     "channels": "Channels",
-    "snapshots": "SnapShots",
+    "snapshots": "Snapshots",
     "system": "System",
 }
 _NOTES: tuple[str, ...] = (

@@ -637,7 +637,7 @@ async def test_the_sidebar_and_the_pages_beside_it_say_what_they_mean(browser: B
 
 
 async def test_the_settings_say_what_they_change_in_words(browser: Browser, served: Served) -> None:
-    """General, Appearance, Models, AI services, Browser, Memory, Self-improvement, Phone, Channels, SnapShots and
+    """General, Appearance, Models, AI services, Browser, Memory, Self-improvement, Phone, Channels, Snapshots and
     System, with the dialogs and the forms that open from them."""
     tabs: tuple[str, ...] = (
         "general",

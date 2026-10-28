@@ -24,7 +24,9 @@ and your instructions), ahead of Dot's rules, which still hold; its tools are th
 asking you and turning tool groups on, and the tools of an MCP server you pick for its message, or picked for an earlier
 message of its chat (item 415): your pick widens the agent's bounds for that chat; a server the model only called does
 not. A run it delegates a part to (`delegate`) is bound to the agent's tools too, without the servers picked for a
-message, and carries the agent's id (item 553). The run's page wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on
+message, and carries the agent's id (item 553). Ask the delegated run to end with a `Verification:` section: the
+command or check it ran and the answer. A report without one is marked as a claim, so the sender does not close a plan
+step on trust alone. The run's page wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on
 the home's Today strip wear the face too. A schedule can run as one of your agents (its **Agent** on Schedules, item
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting an agent leaves its chats, its lessons and its
 learned skills to Dot, and switches its schedules off ("switched off: its agent was deleted"), as Dot's with no agent
@@ -40,9 +42,10 @@ its Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is 
 The page is in three parts (items 509 and 610): **Your teams** and **Your agents**, each with its count, and under
 them **Add ready-made agents**, which shows the teams or the single agents, one of the two at a time (**Teams** first;
 the one chosen last while the app is open). Your agents are a grid of compact cards, as many across as the page has
-room for, two to four, and one on a phone: the face, the name over the role, each on one line, and under them the title
-of the agent's newest chat (the chat's own, as you may have renamed it) with how long ago it began, or that it has
-none. Dot's card names Dot's newest chat of its own (item 633): one that is not an agent's, a campaign's or a team's,
+room for, two to four, and one on a phone: the face, the name over the role, each on one line ("Made by Dot" and
+"Paused" go under a name too long to share its line, item 782), and under them the title of the agent's newest chat
+(the chat's own, as you may have renamed it) with how long ago it began, or that it has none. Your teams are wider
+cards, two across at most, each as wide as two of the agents' columns, so that the two grids end at the same edge. Dot's card names Dot's newest chat of its own (item 633): one that is not an agent's, a campaign's or a team's,
 which their own cards name. How long ago keeps up with the clock while the page stays open, and the list is read again
 when a run starts or ends. The card is the way to the agent's page, and says "Paused" and "Made by Dot" as the page
 does; Dot's opens the chats.
@@ -190,7 +193,7 @@ name over its words, cut at 1,200 characters with **Read it all** leading to its
 answer of a run that ended done is shown so; it stays in sight when the chat shows only what Dot is doing (item 663).
 The run that answers a message names the agent in its `run_queued` event (`agent_name`), which the page reads; a
 helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (a button on the Agents page, `#/team`) lists today's messages: who to whom, the
-message, the reply, the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
+message and the reply (their words, with no markdown marks: item 778), the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
 gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
 which older tool output is shortened, once, to 700 characters; a step's request to Anthropic also marks the end of the
 part of the run the next step sends unchanged, before the newest tool results, as Anthropic looks for a cached prefix

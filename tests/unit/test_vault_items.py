@@ -16,16 +16,17 @@ from dotagent import secrets
 from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.store.db import Store
 from dotagent.store.models import VaultRecord
-from dotagent.vault.csvimport import ParsedExport, ParsedLogin
+from dotagent.vault.csvimport import CHANGED_MEANWHILE, UNCOMPARED, ParsedExport, ParsedLogin
 from dotagent.vault.items import (
     CardDraft,
     ContactDraft,
     ImportReport,
     LoginDraft,
     LoginFill,
+    Removal,
     VaultItems,
 )
-from dotagent.vault.secretstore import VaultStoreError
+from dotagent.vault.secretstore import PartlyRemoved, VaultStoreError
 
 NUMBER: str = "4242 4242 4242 4242"
 PASSWORD: str = "S3cret-Passw0rd!"
@@ -319,6 +320,83 @@ async def test_the_lock_of_an_item_lasts_as_long_as_the_item(store: Store) -> No
     assert vault._locks == {}
 
 
+async def test_removing_several_goes_a_batch_at_a_time_and_passes_over_what_the_vault_does_not_hold(
+    store: Store,
+) -> None:
+    """The Delete of the ticked rows of Settings › Vault (item 768): the Keychain items of a batch are removed in one
+    call, then the batch's records; an id given twice, or one the vault does not hold, is passed over; a contact has
+    nothing in the Keychain; no lock is kept for an item that is gone."""
+    vault, keychain = _vault(store)
+    await vault.import_logins(CHROME)
+    home: VaultRecord = await vault.create(ContactDraft(kind="contact", label="Home", fields={"city": "Izmir"}))
+    logins: list[VaultRecord] = await vault.of_kind("login")
+    chosen: list[str] = [login.id for login in logins[:90]] + [home.id, logins[0].id, "vlt_never_was"]
+    keychain.calls.clear()
+    assert await vault.remove_many(chosen) == Removal(removed=91, stopped=None)
+    # 91 items, 40 to a batch.
+    assert keychain.calls == ["remove_many"] * 3
+    left: set[str] = {login.id for login in logins[90:]}
+    assert {record.id for record in await vault.items()} == left and set(keychain.kept) == left
+    assert vault._locks == {}
+    assert await vault.remove_many(["vlt_never_was"]) == Removal(removed=0, stopped=None)
+
+
+async def test_a_keychain_that_refuses_part_way_leaves_its_batch_whole_and_says_how_many_went(store: Store) -> None:
+    """A Keychain that refuses a batch leaves that batch's items whole, their records and their secrets, to be removed
+    again; the batches before it are gone, and the answer says how many and why it stopped."""
+    keychain: _RemovesBatches = _RemovesBatches(batches=1)
+    vault, _ = _vault(store, keychain)
+    await vault.import_logins(CHROME)
+    removal: Removal = await vault.remove_many([login.id for login in await vault.of_kind("login")])
+    assert removal == Removal(removed=40, stopped="the Keychain did not remove the items")
+    left: list[VaultRecord] = await vault.of_kind("login")
+    assert len(left) == 55 and set(keychain.kept) == {login.id for login in left}
+
+
+async def test_a_keychain_that_refuses_within_a_batch_takes_the_records_of_what_it_removed_before_it(
+    store: Store,
+) -> None:
+    """``security -i`` runs a batch's lines one by one: those before a refusal are gone from the Keychain, and their
+    records go too, so that no record is left without its secrets (the review of item 768); the rest stay whole."""
+    keychain: _RefusesWithin = _RefusesWithin(keep=10)
+    vault, _ = _vault(store, keychain)
+    await vault.import_logins(CHROME)
+    logins: list[VaultRecord] = await vault.of_kind("login")
+    removal: Removal = await vault.remove_many([login.id for login in logins])
+    assert removal == Removal(removed=10, stopped="the Keychain did not remove the item")
+    left: list[VaultRecord] = await vault.of_kind("login")
+    assert len(left) == 85 and set(keychain.kept) == {login.id for login in left}
+
+
+class _RefusesWithin(MemorySecretStore):
+    """A Keychain that removes the first ``keep`` accounts of the first batch it is given and refuses the next, as a
+    keychain locked part way does."""
+
+    def __init__(self, keep: int) -> None:
+        super().__init__()
+        self._keep: int = keep
+
+    async def remove_many(self, accounts):  # type: ignore[no-untyped-def]
+        gone: list[str] = list(accounts[: self._keep])
+        for account in gone:
+            self.kept.pop(account, None)
+        raise PartlyRemoved("the Keychain did not remove the item", {"returncode": 51}, gone)
+
+
+class _RemovesBatches(MemorySecretStore):
+    """A Keychain that removes ``batches`` batches and then refuses."""
+
+    def __init__(self, batches: int) -> None:
+        super().__init__()
+        self._batches: int = batches
+
+    async def remove_many(self, accounts):  # type: ignore[no-untyped-def]
+        if self._batches == 0:
+            raise VaultStoreError("the Keychain did not remove the items", {"returncode": 51})
+        self._batches -= 1
+        await super().remove_many(accounts)
+
+
 async def test_a_keychain_that_refuses_leaves_no_record_and_a_database_that_refuses_leaves_no_keychain_item(
     store: Store, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -434,16 +512,19 @@ async def test_an_import_keeps_the_logins_in_batches_and_counts_what_it_left_out
     await vault.create(_login(website="https://site3.example", username="user3"))
     report: ImportReport = await vault.import_logins(CHROME + ",,,,\nbad,,u,pw,\n")
     assert (report.format, report.rows, report.imported, report.stopped) == ("Chrome or Edge", 96, 94, None)
-    assert {(skip.reason, skip.count) for skip in report.skipped} == {
-        ("no website", 1),
-        ("already in the vault, or twice in the file", 1),
-    }
-    assert keychain.calls.count("put_many") == 3
+    # The login already saved had another password: it takes the file's (item 791).
+    assert report.updated == 1
+    assert {(skip.reason, skip.count) for skip in report.skipped} == {("no website", 1)}
+    # The new logins in batches; the changed one on its own, read again under its lock (the review of item 791).
+    assert keychain.calls.count("put_many") == 3 and keychain.calls[-2:] == ["get", "put"]
     logins = await vault.of_kind("login")
     assert len(logins) == 95 and len({login.id for login in logins}) == 95
     assert keychain.kept[next(login.id for login in logins if login.username == "user7")] == {"password": "pw-7"}
+    assert keychain.kept[next(login.id for login in logins if login.username == "user3")]["password"] == "pw-3"
+    # The same file again changes nothing: every login is saved with the password it has.
     again: ImportReport = await vault.import_logins(CHROME)
-    assert again.imported == 0 and again.skipped[0].count == 95
+    assert (again.imported, again.updated) == (0, 0)
+    assert [(skip.reason, skip.count) for skip in again.skipped] == [("already in the vault, or twice in the file", 95)]
 
 
 class _StopsPartWay(MemorySecretStore):
@@ -598,3 +679,106 @@ async def test_a_file_that_is_no_list_of_logins_changes_nothing(store: Store) ->
     with pytest.raises(InvalidValueError, match="not a list of logins"):
         await vault.import_logins("a,b\n1,2\n")
     assert keychain.calls == [] and await vault.items() == []
+
+
+class _UnreadableOnce(MemorySecretStore):
+    """A Keychain that cannot read one item back."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.unreadable: str = ""
+        self.reads: int = 0
+
+    async def get(self, account: str) -> dict[str, SecretStr] | None:
+        self.reads += 1
+        if account == self.unreadable:
+            raise VaultStoreError("the Keychain did not read the item", {"returncode": 1})
+        return await super().get(account)
+
+
+async def test_an_import_goes_on_past_a_saved_login_whose_password_cannot_be_read(store: Store) -> None:
+    """The review of item 791: a password that cannot be read to compare left the whole import undone, the file's new
+    logins with it; it is left as it is and counted as saved."""
+    keychain: _UnreadableOnce = _UnreadableOnce()
+    vault, _ = _vault(store, keychain)
+    saved: VaultRecord = await vault.create(_login(website="https://site3.example", username="user3"))
+    keychain.unreadable = saved.id
+    await vault.create(_login(website="https://site5.example", username="user5", password="pw-5"))
+    report: ImportReport = await vault.import_logins(CHROME)
+    assert (report.imported, report.updated, report.stopped) == (93, 0, None)
+    # The first unread password ends the comparing: site5's, after it, is not read (a locked Keychain is asked once).
+    assert [(skip.reason, skip.count) for skip in report.skipped] == [(UNCOMPARED, 2)]
+    assert keychain.reads == 1
+
+
+class _RemovedWhileRead(MemorySecretStore):
+    """A Keychain during whose first read the owner removes another saved login, as the vault's page would."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.vault: VaultItems | None = None
+        self.removing: str = ""
+
+    async def get(self, account: str) -> dict[str, SecretStr] | None:
+        if self.vault is not None and self.removing:
+            removing, self.removing = self.removing, ""
+            await self.vault.remove(removing)
+        return await super().get(account)
+
+
+async def test_a_saved_login_removed_while_an_import_reads_is_left_removed(store: Store) -> None:
+    """The review of item 791: the import wrote a changed password over a login removed meanwhile, which left a
+    Keychain item no record names; each login is read again under its lock, and one gone is left gone."""
+    keychain: _RemovedWhileRead = _RemovedWhileRead()
+    vault, _ = _vault(store, keychain)
+    keychain.vault = vault
+    first: VaultRecord = await vault.create(_login(website="https://site3.example", username="user3"))
+    second: VaultRecord = await vault.create(_login(website="https://site5.example", username="user5"))
+    keychain.removing = second.id
+    report: ImportReport = await vault.import_logins(CHROME)
+    assert (report.imported, report.updated, report.stopped) == (93, 1, None)
+    assert [(skip.reason, skip.count) for skip in report.skipped] == [(CHANGED_MEANWHILE, 1)]
+    assert second.id not in keychain.kept and keychain.kept[first.id]["password"] == "pw-3"
+
+
+async def test_a_password_an_import_replaces_is_kept_in_the_notes_and_the_login_named(store: Store) -> None:
+    """The review of item 791: a browser's file has no dates, so its password may be the older one; the password it
+    replaces is kept in the login's notes, and the report names the logins it changed."""
+    vault, keychain = _vault(store)
+    saved: VaultRecord = await vault.create(_login(website="https://site3.example", username="user3"))
+    report: ImportReport = await vault.import_logins(CHROME)
+    assert report.updated == 1 and report.updated_logins == ["site3.example · user3"]
+    kept: dict[str, str] = keychain.kept[saved.id]
+    assert kept["password"] == "pw-3"
+    assert kept["notes"].endswith(f": {PASSWORD}") and "Password before the import of" in kept["notes"]
+
+
+class _EditedWhileRead(MemorySecretStore):
+    """A Keychain during whose first read the owner changes another saved login's password, as the page would."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.vault: VaultItems | None = None
+        self.editing: str = ""
+
+    async def get(self, account: str) -> dict[str, SecretStr] | None:
+        if self.vault is not None and self.editing:
+            editing, self.editing = self.editing, ""
+            await self.vault.update(
+                editing, _login(website="https://site5.example", username="user5", password="the-owners-new-one")
+            )
+        return await super().get(account)
+
+
+async def test_a_saved_login_the_owner_edits_while_an_import_reads_keeps_their_edit(store: Store) -> None:
+    """The review of item 791: a password the owner changed while the import ran was written over by the file's."""
+    keychain: _EditedWhileRead = _EditedWhileRead()
+    vault, _ = _vault(store, keychain)
+    keychain.vault = vault
+    await vault.create(_login(website="https://site3.example", username="user3", notes="mine"))
+    edited: VaultRecord = await vault.create(_login(website="https://site5.example", username="user5"))
+    keychain.editing = edited.id
+    report: ImportReport = await vault.import_logins(CHROME)
+    assert report.updated == 1 and report.updated_logins == ["site3.example · user3"]
+    assert [(skip.reason, skip.count) for skip in report.skipped] == [(CHANGED_MEANWHILE, 1)]
+    assert keychain.kept[edited.id]["password"] == "the-owners-new-one"

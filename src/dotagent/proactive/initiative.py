@@ -34,7 +34,7 @@ from dotagent.proactive.text import one_line, quoted
 from dotagent.proactive.todos import InitiativeState, note_look, read_initiative
 from dotagent.runtime import Runtime
 from dotagent.store.db import Store
-from dotagent.store.endings import RESULT_EMERGENCY_STOPPED, RESULT_SHUTDOWN
+from dotagent.store.endings import PREFIX_EMERGENCY_STOP, RESULT_SHUTDOWN
 from dotagent.store.models import WORKING_STATUSES, RunMode, RunRecord, TodoRecord
 
 log = get_logger(__name__)
@@ -231,32 +231,52 @@ class Initiative:
         ``[initiative] attempts`` times, as one that fails is; what any end makes of it otherwise (:meth:`_settle`): to
         do again, its try uncounted, after a shutdown or the emergency stop, let go when the owner stopped it, done when
         it ended done (the code reviews of item 715)."""
-        self._recovered = True
         store: Store = self._runtime.store
         for todo in await store.list_todos(("doing",), _LISTED):
             if todo.run_id is not None and todo.run_id in self._manager.active_run_ids():
                 continue
-            ended: RunRecord | None = None
-            if todo.run_id is not None:
-                with contextlib.suppress(NotFoundError):
-                    ended = await store.get_run(todo.run_id)
-            if ended is None:
-                await store.set_todo(todo.id, "open", todo.attempts, todo.run_id, todo.note)
-            elif cut_off_by(ended) == "daemon_restarted":
-                await self._tried(todo, ended, "Dot stopped while it did this, without shutting down.")
-            else:
-                # Its run ended while the daemon was going down, before its end was written to the list: as any end.
-                await self._settle(todo.id, ended)
+            # Each thing on its own (item 790): one the store fails for is logged and looked at again at the next
+            # daemon's start, and the others are not left as being done for good.
+            try:
+                await self._recover_one(todo)
+            except DotError as error:
+                log.error("initiative_not_recovered", todo_id=todo.id, error=error.message, context=error.context)
+        # Set once the list was read: a store that failed to list it is asked again at the next tick.
+        self._recovered = True
+
+    async def _recover_one(self, todo: TodoRecord) -> None:
+        store: Store = self._runtime.store
+        ended: RunRecord | None = None
+        if todo.run_id is not None:
+            with contextlib.suppress(NotFoundError):
+                ended = await store.get_run(todo.run_id)
+        if ended is None:
+            await store.set_todo(todo.id, "open", todo.attempts, todo.run_id, todo.note)
+        elif cut_off_by(ended) == "daemon_restarted":
+            await self._tried(todo, ended, "Dot stopped while it did this, without shutting down.")
+        else:
+            # Its run ended while the daemon was going down, before its end was written to the list: as any end.
+            await self._settle(todo.id, ended)
 
     async def _do(self, todo: TodoRecord) -> None:
         store: Store = self._runtime.store
-        run: RunRecord = await self._start(
-            todo.title,
-            _DO_GOAL.format(title=todo.title),
-            _DO_OPENING.format(title=todo.title, why=todo.why or "(not said)"),
-            "task",
-            todo.tainted,
-        )
+        # Written as being done before its run starts (item 790), which narrows the window in which a daemon that dies
+        # leaves a run going and its thing open: what is left is the moment between the start and the line below. It
+        # names no run until then: an earlier run's id, kept here, would be read by the recovery (:meth:`_recover`) as
+        # how this try ended.
+        await store.set_todo(todo.id, "doing", todo.attempts, None, todo.note)
+        try:
+            run: RunRecord = await self._start(
+                todo.title,
+                _DO_GOAL.format(title=todo.title),
+                _DO_OPENING.format(title=todo.title, why=todo.why or "(not said)"),
+                "task",
+                todo.tainted,
+            )
+        except DotError:
+            # Its last run stays named (the review of item 790): an owner's resume of it is found by that id.
+            await store.set_todo(todo.id, "open", todo.attempts, todo.run_id, todo.note)
+            raise
         await store.set_todo(todo.id, "doing", todo.attempts, run.id, todo.note)
         log.info("initiative_started", todo_id=todo.id, run_id=run.id, tainted=todo.tainted)
         self._follow(run.id, todo.id)
@@ -329,7 +349,11 @@ class Initiative:
             await store.set_todo(todo.id, "done", todo.attempts + 1, ended.id, note)
             await tell_owner(self._runtime.bus, "Dot did on its own", one_line(todo.title, _TELL_CHARS), url)
             return
-        if ended.status == "cancelled" and ended.result in (RESULT_SHUTDOWN, RESULT_EMERGENCY_STOPPED):
+        # The emergency stop ends a run in two words: the stop of every run, and the STOP file a run saw as it worked
+        # ("Emergency stop: …"); either leaves the thing to do, as the docs say (item 790).
+        if ended.status == "cancelled" and (
+            ended.result == RESULT_SHUTDOWN or ended.result.startswith(PREFIX_EMERGENCY_STOP)
+        ):
             await store.set_todo(todo.id, "open", todo.attempts, ended.id, todo.note)
             return
         if ended.status == "cancelled":

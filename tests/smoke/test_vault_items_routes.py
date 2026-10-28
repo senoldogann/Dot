@@ -184,6 +184,24 @@ async def test_a_delete_removes_the_keychain_item_and_the_record_and_a_second_de
     assert again.status_code == 404 and "no such item" in again.text
 
 
+async def test_a_removal_of_several_takes_their_keychain_items_and_records_and_passes_over_an_unknown_id(
+    parts: tuple[httpx.AsyncClient, MemorySecretStore, Path],
+) -> None:
+    """The Delete of the ticked rows (item 768); a list with no id is refused."""
+    client, keychain, _ = parts
+    made: list[str] = []
+    for site in ("one.example", "two.example", "three.example"):
+        answer = await client.post("/api/vault/items", json={"kind": "login", "website": site, "password": PASSWORD})
+        made.append(answer.json()["id"])
+    gone = await client.post("/api/vault/items/remove", json={"ids": [*made[:2], "vlt_never_was"]})
+    assert gone.status_code == 200 and gone.json() == {"removed": 2, "stopped": None}
+    assert made[0] not in keychain.kept and made[1] not in keychain.kept and made[2] in keychain.kept
+    listed: list[str] = [item["id"] for item in (await client.get("/api/vault/items")).json()["items"]]
+    assert made[2] in listed and made[0] not in listed and made[1] not in listed
+    assert (await client.post("/api/vault/items/remove", json={"ids": []})).status_code == 422
+    await client.delete(f"/api/vault/items/{made[2]}")
+
+
 async def test_the_eye_answers_one_part_to_this_macs_own_address_alone_and_the_list_to_a_phone(
     parts: tuple[httpx.AsyncClient, MemorySecretStore, Path],
 ) -> None:

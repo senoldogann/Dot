@@ -440,6 +440,16 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     scope.boundary = ts;
   }
 
+  /** The one note that stands for a wait for the run's model (item 158), placed at `ts` when the wait begins. */
+  function waitNote(scope, ts) {
+    if (scope.unreachable === null) {
+      const text = el("span", null);
+      place(scope, el("div", { class: "note warn" }, icon("clock"), text), ts);
+      scope.unreachable = { text, tries: 0 };
+    }
+    return scope.unreachable;
+  }
+
   /**
    * Put the row of the delegated run of `scope` at the end of its parent's scope, as `place` does. Rows that follow one
    * another gather in one group (item 245): the second one makes it and takes the first one in.
@@ -587,10 +597,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   }
 
   /** A delegated run asks the reader something (item 123): its row opens, and so do the rows it sits in and their
-   * groups (item 245), so the card is in sight. */
+   * groups (item 245), so the card is in sight, its steps in the page with it (item 767). */
   function reveal(scope) {
     for (let at = scope; at.panel !== null; at = at.parent) {
       at.asking += 1;
+      at.panel.showSteps();
       at.panel.node.open = true;
       if (at.panel.flock.group !== null) {
         at.panel.flock.group.node.open = true;
@@ -673,9 +684,25 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       open,
       el("span", { class: "chev" }, icon("chevron")),
     );
-    const node = el("details", { class: "child" }, summary, inner);
+    const node = el("details", { class: "child" }, summary);
+    // The run's steps are drawn into `inner` from the start, and `inner` joins the row the first time it opens (item
+    // 767): until then they are kept out of the page, which spends nothing on them, so a chat whose helpers took
+    // hundreds of steps opens light. Once in, they stay. A click on the summary (a key on it is one) comes before the
+    // browser opens the row, so they are in the frame that shows it open; `reveal` puts them in before it opens the
+    // row, and a row opened any other way takes them in at its toggle.
+    const showSteps = () => {
+      if (inner.parentNode === null) {
+        node.append(inner);
+      }
+    };
     summary.addEventListener("click", () => {
       scope.touched = true;
+      showSteps();
+    });
+    node.addEventListener("toggle", () => {
+      if (node.open) {
+        showSteps();
+      }
     });
     // What the row's card tells of the delegated run, kept up to date by its events (see helperCard).
     const helper = {
@@ -690,8 +717,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       calls: 0,
     };
     card.attach(summary, helper, () => actorFace(data.agent_id ?? runId, faceState(helper.status), null));
-    // `line`: the facts its last line shows (see paintChild).
-    const panel = { node, face, status, meta, progress, line: "starting", time, steps: 0, helper, flock: null };
+    // `line`: the facts its last line shows (see paintChild); `showSteps()` puts the run's steps in the row.
+    const panel = { node, face, status, meta, progress, line: "starting", time, steps: 0, helper, flock: null, showSteps };
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
     // The agent the run is of, by its name (item 668): its answer stands in the parent's conversation as its message.
     scope.agentName = agentName;
@@ -1077,9 +1104,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
           settleLive(scope, stray);
         }
       }
-      // This step's message, ended when another step's words took its place, is drawn again where it stands.
+      // This step's message, ended when another step's words took its place, is drawn again where it stands: in the
+      // scope still, whose steps may be out of the page (a closed helper's row, item 767).
       const settled =
-        bubble === null ? scope.replies.find((reply) => reply.step === data.step && reply.body !== undefined && reply.node.isConnected) : undefined;
+        bubble === null
+          ? scope.replies.find((reply) => reply.step === data.step && reply.body !== undefined && scope.container.contains(reply.node))
+          : undefined;
       if (settled !== undefined) {
         scope.replies = scope.replies.filter((reply) => reply !== settled);
       }
@@ -1609,21 +1639,30 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // The run's model could not be reached (`error`: the connection broke or timed out, or its server failed with a
     // status that retrying gets past), or its quota or rate is spent (`spent` says which, item 713): the run
     // asks step `step` again in `retry_in_s` seconds, and keeps asking until `until` ([agent] model_wait_s, or
-    // quota_wait_s for a spent quota). One note stands for the whole wait, each attempt rewrites it; `model_back` says
-    // that the model answered again after `waited_s` seconds (item 158).
+    // quota_wait_s for a spent quota). Its server cannot be connected to at all (`offline`: its host, item 769): the run
+    // asks again as soon as it connects, and `retry_in_s` is null; `model_reconnected` says it connected again after
+    // `offline_s` seconds. One note stands for the whole wait, each attempt rewrites it, with the clock time of the next
+    // (a count of seconds is out of date by the time it is read); `model_back` says that the model answered again after
+    // `waited_s` seconds (item 158).
     model_waiting(scope, record) {
       const data = record.data;
-      if (scope.unreachable === null) {
-        const text = el("span", null);
-        place(scope, el("div", { class: "note warn" }, icon("clock"), text), record.ts);
-        scope.unreachable = { text, tries: 0 };
-      }
-      const wait = scope.unreachable;
+      const wait = waitNote(scope, record.ts);
       wait.tries += 1;
       const tried = wait.tries === 1 ? "" : `tried ${wait.tries} times; `;
-      const why = data.spent === undefined || data.spent === null ? "cannot be reached" : `cannot answer (${data.spent})`;
-      wait.text.replaceChildren(
-        ...[`${data.model} ${why}; ${tried}Dot asks again in ${duration(data.retry_in_s)} and keeps asking until ${clock(data.until)}.`, detailsFold(String(data.error))].filter((part) => part !== null),
+      const until = `until ${clock(data.until)}`;
+      let words;
+      if (typeof data.offline === "string") {
+        words = `No connection to ${data.offline}; Dot asks ${data.model} again as soon as it connects, ${until}.`;
+      } else {
+        const why = data.spent === undefined || data.spent === null ? "cannot be reached" : `cannot answer (${data.spent})`;
+        words = `${data.model} ${why}; ${tried}Dot asks again at ${clock(record.ts + data.retry_in_s)} and keeps asking ${until}.`;
+      }
+      wait.text.replaceChildren(...[words, detailsFold(String(data.error))].filter((part) => part !== null));
+    },
+    model_reconnected(scope, record) {
+      const data = record.data;
+      waitNote(scope, record.ts).text.replaceChildren(
+        `The connection to ${data.host} is back after ${duration(data.offline_s)}; Dot asks ${data.model} again.`,
       );
     },
     model_back(scope, record) {

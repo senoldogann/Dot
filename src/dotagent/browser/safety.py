@@ -495,8 +495,9 @@ def secret_field_flag(kind: SecretKind) -> Flag:
     return "financial" if kind.startswith("cc-") else "credential"
 
 
-async def refuse_secret_field(field: SecretField) -> None:
-    """The secret-field check of every mode but yolo: no text goes into a field that takes a secret."""
+async def refuse_secret_field(field: SecretField, text: str | None = None) -> None:
+    """The secret-field check of every mode but yolo: text the user did not give in this run goes into no field."""
+    del text
     raise BrowserError(
         f"refusing to type into {secret_field_label(field.kind)}: ask the user to enter it themselves",
         {"action": "type", "ref": field.ref, "url": field.url},

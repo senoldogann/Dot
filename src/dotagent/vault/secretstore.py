@@ -17,7 +17,7 @@ import binascii
 import json
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Protocol
 
 from pydantic import JsonValue, SecretStr
@@ -28,7 +28,7 @@ from dotagent.core.text import truncate_middle
 SERVICE: str = "dot-vault"
 _SECURITY: str = "/usr/bin/security"
 _TIMEOUT_S: float = 15.0
-# An import writes many items in one run of ``security``; it is given longer.
+# An import writes many items, and a removal of several removes many, in one run of ``security``; it is given longer.
 _BATCH_TIMEOUT_S: float = 90.0
 # ``security``'s exit status for an item that is not there.
 _NOT_FOUND: int = 44
@@ -55,6 +55,15 @@ class VaultStoreError(ToolExecutionError):
     value."""
 
 
+class PartlyRemoved(VaultStoreError):
+    """The Keychain refused a removal of several items part way (item 768): ``removed`` are the accounts it had
+    removed, or never held, before it refused."""
+
+    def __init__(self, message: str, context: Mapping[str, JsonValue], removed: Sequence[str]) -> None:
+        super().__init__(message, context)
+        self.removed: tuple[str, ...] = tuple(removed)
+
+
 class SecretStore(Protocol):
     """What the vault asks of a place that keeps secrets: the parts of an item, by its account (the item's id)."""
 
@@ -72,6 +81,12 @@ class SecretStore(Protocol):
 
     async def remove(self, account: str) -> bool:
         """Remove what is kept for ``account``; ``False`` when nothing was."""
+        ...
+
+    async def remove_many(self, accounts: Sequence[str]) -> None:
+        """Remove what is kept for each of ``accounts`` (the ticked rows of Settings › Vault), as :meth:`remove`
+        does: one that has nothing counts as removed. A refusal part way raises :class:`PartlyRemoved`, which names
+        the ones removed before it."""
         ...
 
 
@@ -244,3 +259,26 @@ class LoginKeychain:
                 f"the Keychain did not remove the item: {_HINT}", {"returncode": returncode, "said": said(err)}
             )
         return True
+
+    async def remove_many(self, accounts: Sequence[str]) -> None:
+        lines: list[str] = [
+            " ".join(("delete-generic-password", "-s", SERVICE, "-a", self._checked(account), *self._file))
+            for account in accounts
+        ]
+        if not lines:
+            return
+        try:
+            await self._prompt(lines, "the Keychain did not remove the items", _BATCH_TIMEOUT_S)
+        except VaultStoreError:
+            # A line that fails fails the prompt, and an account with no item fails its line: each account is asked
+            # again alone, in order, where one with no item counts as removed and a Keychain that refuses ends it,
+            # naming the ones gone before it, so that their records go too. A refusal of one item alone (a keychain
+            # locked part way refuses every later line too) leaves those after it as the prompt left them: one whose
+            # item the prompt removed keeps its record, which a removal again takes, its item counting as removed.
+            gone: list[str] = []
+            for account in accounts:
+                try:
+                    await self.remove(account)
+                except VaultStoreError as refused:
+                    raise PartlyRemoved(refused.message, refused.context, gone) from refused
+                gone.append(account)

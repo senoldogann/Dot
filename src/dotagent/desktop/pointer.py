@@ -4,7 +4,7 @@ where.
 It only shows: the step itself is done as before, through the HID event tap, which moves the Mac's own pointer.
 
 The daemon has no AppKit run loop for windows of its own, so a helper process draws it (``python -m
-dotagent.desktop.pointer``), as the flight of SnapShots is drawn (:mod:`dotagent.desktop.flight`), started at the first
+dotagent.desktop.pointer``), as the flight of Snapshots is drawn (:mod:`dotagent.desktop.flight`), started at the first
 step that needs it and fed one JSON line per command (:class:`PointerCommand`): ``move`` glides to a point and, with
 ``click``, ripples there; ``hide`` takes it off the screen at once and answers ``hidden <n>`` on its output, so that a
 screenshot the model is shown never holds it; ``reveal`` puts it back; ``rest`` fades it out. Points are the screen's,

@@ -81,7 +81,7 @@ export function mountInitiative() {
     { class: "hint watcher-lead" },
     "While the Mac is idle, Dot does on its own what is on this list, each in a chat of its own, ",
     mode,
-    "; with nothing on it, it looks for work that helps you now and then. A thing a run found in a mail or a page is done as untrusted: what would reach others asks you first, or in YOLO is refused unless your words call for it.",
+    "; with nothing on it, it looks for work that helps you now and then. What Dot found in a mail or a page while at it is handled as untrusted: what would reach others asks you first, or in YOLO is refused unless your words call for it.",
   );
   const idleNote = el("div", { class: "note warn initiative-idle", hidden: true, role: "status" }, icon("alert"), el("span", null, "macOS does not say how long the Mac has been idle, so Dot starts nothing on its own. The daemon's log has why."));
   const holder = el("div", { class: "initiative-list" }, el("div", { class: "hint" }, "Reading the list…"));

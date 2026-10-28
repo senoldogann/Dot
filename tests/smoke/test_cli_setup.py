@@ -10,7 +10,9 @@ chosen yet, and leaves the service alone (``--no-service``). It:
 
 A model the provider does not list is refused, and no model is written. The provider is a stand-in OpenAI service on
 this Mac that lists its models to that key alone; the key is not a real one. Ollama is a port of this Mac nothing
-listens on, or a stand-in that lists the embedding model.
+listens on, or a stand-in that lists the embedding model. Only Dot's own requests (its ``User-Agent``) are checked for
+the key: a tool of this Mac that looks at every new port (an editor's preview does, with ``GET /`` and no key) reaches
+the stand-in too (item 780).
 """
 
 import json
@@ -38,12 +40,12 @@ _TIME_LIMIT_S: float = 60.0
 
 class _OpenAI(BaseHTTPRequestHandler):
     """OpenAI's list of models, served to the key ``KEY`` alone, as OpenAI's own refuses any other (HTTP 401). The
-    ``Authorization`` of every request is kept in ``seen``."""
+    ``User-Agent`` and the ``Authorization`` of every request are kept in ``seen``."""
 
-    seen: ClassVar[list[str]] = []
+    seen: ClassVar[list[tuple[str, str]]] = []
 
     def do_GET(self) -> None:
-        self.seen.append(self.headers.get("Authorization", ""))
+        self.seen.append((self.headers.get("User-Agent", ""), self.headers.get("Authorization", "")))
         allowed: bool = self.path == "/v1/models" and self.headers.get("Authorization") == f"Bearer {KEY}"
         body: dict[str, object] = (
             {
@@ -165,10 +167,12 @@ def test_setup_stores_the_key_and_writes_a_model_its_provider_serves(tmp_path: P
         assert done.returncode == 0, (done.stdout, done.stderr)
         assert f"{KEY_NAME} is set and kept" in done.stdout
         assert "dotx open" in done.stdout
-        seen: list[str] = list(_OpenAI.seen)
+        seen: list[tuple[str, str]] = list(_OpenAI.seen)
     models: ModelsConfig = load_config(config_file).models
     assert (models.main, models.fast, models.review, models.vision) == (MODEL, MODEL, MODEL, MODEL)
-    assert seen and all(header == f"Bearer {KEY}" for header in seen), seen
+    # Each run of setup asked the provider once, with the key; a request of another tool of this Mac is not Dot's.
+    dots: list[str] = [header for agent, header in seen if agent.startswith("dot-agent/")]
+    assert dots == [f"Bearer {KEY}"] * 2, seen
     # No Ollama answers on this Mac: the notes are found by their words, which setup says (item 558).
     assert not load_config(config_file).memory.embed_enabled
     assert "no Ollama answers on this Mac" in done.stdout and "embed_enabled = false" in done.stdout
