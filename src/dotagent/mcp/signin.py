@@ -20,8 +20,14 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from mcp.client.auth.oauth2 import OAuthClientProvider
-from mcp.shared.auth import AuthorizationCodeResult, OAuthClientInformationFull, OAuthClientMetadata, OAuthToken
+from mcp.client.auth.oauth2 import OAuthClientProvider, OAuthContext
+from mcp.shared.auth import (
+    AuthorizationCodeResult,
+    OAuthClientInformationFull,
+    OAuthClientMetadata,
+    OAuthMetadata,
+    OAuthToken,
+)
 from pydantic import AnyUrl, ValidationError
 
 from dotagent.config import McpServerConfig
@@ -53,6 +59,11 @@ class StoredSignIn(FrozenModel):
     client: OAuthClientInformationFull | None
     tokens: OAuthToken | None
     expires_at: float | None
+    # Where the authorization server is and what it says of itself, found as the owner signed in (the review of every
+    # module): without them a token that ran out is renewed at ``/token`` of the MCP server's own origin, which a server
+    # whose token endpoint is elsewhere answers 404, and Dot asked to sign in again at every start.
+    metadata: OAuthMetadata | None = None
+    auth_server_url: str | None = None
 
 
 def sign_in_path(server: str) -> Path:
@@ -95,6 +106,8 @@ class FileTokenStorage:
     def __init__(self, path: Path, redirect_uri: str) -> None:
         self._path: Path = path
         self._redirect_uri: str = redirect_uri
+        # The provider's context, whose authorization server is kept with the tokens it gave (:meth:`set_tokens`).
+        self.context: OAuthContext | None = None
 
     def _read(self) -> StoredSignIn:
         stored: StoredSignIn | None = read_sign_in(self._path)
@@ -111,8 +124,12 @@ class FileTokenStorage:
 
     async def set_tokens(self, tokens: OAuthToken) -> None:
         expires_at: float | None = None if tokens.expires_in is None else time.time() + tokens.expires_in
+        found: dict[str, object] = {}
+        if self.context is not None and self.context.oauth_metadata is not None:
+            found = {"metadata": self.context.oauth_metadata, "auth_server_url": self.context.auth_server_url}
         await asyncio.to_thread(
-            self._change, lambda stored: stored.model_copy(update={"tokens": tokens, "expires_at": expires_at})
+            self._change,
+            lambda stored: stored.model_copy(update={"tokens": tokens, "expires_at": expires_at, **found}),
         )
 
     async def get_client_info(self) -> OAuthClientInformationFull | None:
@@ -150,6 +167,7 @@ def _provider(
     redirect: Callable[[str], Awaitable[None]],
     callback: Callable[[], Awaitable[AuthorizationCodeResult]],
     expires_at: float | None,
+    kept: StoredSignIn | None = None,
 ) -> OAuthClientProvider:
     if config.url is None:
         raise McpError("only an MCP server at a URL signs in", {"server": config.name})
@@ -163,6 +181,11 @@ def _provider(
     # The library reads the tokens back from the file but not when they run out, which it learns only from a token it
     # receives itself; told it here, it renews a token that ran out while the daemon was stopped instead of using it.
     provider.context.token_expiry_time = expires_at
+    # Where the token is renewed, as the sign-in found it: the token endpoint, not ``/token`` of the server's origin.
+    if kept is not None and kept.metadata is not None:
+        provider.context.oauth_metadata = kept.metadata
+        provider.context.auth_server_url = kept.auth_server_url
+    storage.context = provider.context
     return provider
 
 
@@ -181,7 +204,7 @@ def kept_sign_in(config: McpServerConfig) -> OAuthClientProvider:
         raise McpError(SIGN_IN_AGAIN, {"server": config.name})
 
     storage: FileTokenStorage = FileTokenStorage(sign_in_path(config.name), stored.redirect_uri)
-    return _provider(config, storage, stored.redirect_uri, refuse, no_code, stored.expires_at)
+    return _provider(config, storage, stored.redirect_uri, refuse, no_code, stored.expires_at, stored)
 
 
 class _Waiting(FrozenModel):
@@ -263,6 +286,7 @@ class SignIns:
             redirect,
             callback,
             None if stored is None else stored.expires_at,
+            stored,
         )
 
     def answer(self, state: str, code: str | None, issuer: str | None, error: str | None) -> str | None:

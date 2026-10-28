@@ -9,12 +9,13 @@ next to Dot's own logs, never to the terminal.
 import asyncio
 import os
 import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
 
 import httpx2
-from mcp import Client, MCPError, StdioServerParameters, stdio_client
+from mcp import Client, MCPDeprecationWarning, MCPError, StdioServerParameters, stdio_client
 from mcp.client.auth import OAuthFlowError
 from mcp.client.sse import sse_client
 from mcp.client.streamable_http import StreamableHTTPError, streamable_http_client
@@ -38,6 +39,16 @@ from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.mcp.naming import exposed_name
 from dotagent.mcp.types import McpTool, ToolHints
+
+# The protocol versions without a ping, from the mcp SDK's own types package (installed with it, not a dependency of
+# Dot's): where a later SDK moves it, every session is pinged as before rather than the daemon failing to start.
+MODERN_PROTOCOL_VERSIONS: tuple[str, ...]
+try:
+    from mcp_types.version import MODERN_PROTOCOL_VERSIONS as _MODERN
+except ImportError:  # pragma: no cover - the SDK this was written for has it
+    MODERN_PROTOCOL_VERSIONS = ()
+else:
+    MODERN_PROTOCOL_VERSIONS = tuple(_MODERN)
 
 log = get_logger(__name__)
 
@@ -302,7 +313,14 @@ class McpConnection:
         slot: _Slot = _Slot()
         owner: asyncio.Task[None] = asyncio.create_task(self._hold(slot), name=f"mcp-{self.name}")
         waiting: set[asyncio.Future[None]] = {owner, slot.ready}
-        await asyncio.wait(waiting, timeout=self._config.startup_timeout_s, return_when=asyncio.FIRST_COMPLETED)
+        try:
+            await asyncio.wait(waiting, timeout=self._config.startup_timeout_s, return_when=asyncio.FIRST_COMPLETED)
+        except BaseException:
+            # A call cancelled while its server starts (a stop, a tool's time) takes the server down with it: kept
+            # nowhere, it would run until the daemon ends (the review of every module).
+            owner.cancel()
+            await asyncio.wait({owner})
+            raise
         if slot.client is not None:
             log.info("mcp_server_started", server=self.name, protocol=slot.client.protocol_version)
             return _Live(client=slot.client, owner=owner, stop=slot.stop, broken=False, answered_at=time.monotonic())
@@ -368,9 +386,16 @@ class McpConnection:
         again, so that the calls that come wait for the new session rather than fail on the old one."""
         if self._config.command is not None or time.monotonic() - live.answered_at < _QUIET_CHECK_S:
             return True
+        # A session of the modern protocol holds nothing that goes stale, and has no ping (the library warns that it is
+        # removed, and a server may refuse it, which read as a session gone): a call that fails reconnects instead (the
+        # review of every module).
+        if live.client.protocol_version in MODERN_PROTOCOL_VERSIONS:
+            return True
         try:
             async with asyncio.timeout(_PING_TIMEOUT_S):
-                await live.client.send_ping()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", MCPDeprecationWarning)
+                    await live.client.send_ping()
         except TimeoutError:
             log.warning("mcp_server_quiet_session_gone", server=self.name, error="the ping was not answered in time")
             live.broken = True
