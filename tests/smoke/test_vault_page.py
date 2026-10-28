@@ -8,6 +8,7 @@ import asyncio
 import dataclasses
 import io
 import json
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -22,7 +23,7 @@ from form_dialogs import (
     shows_the_failure,
 )
 from PIL import Image, ImageDraw, ImageFont
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 from test_plain_words import JARGON, RUN_AS_A_THING, VISIBLE
 from vault_stand_ins import MemorySecretStore
 
@@ -794,6 +795,50 @@ async def test_an_import_of_a_made_csv_says_what_it_did_and_to_delete_the_file(
         await dialog.get_by_role("button", name="Import", exact=True).click()
         await shows_the_failure(dialog, "not a list of logins")
     finally:
+        await page.close()
+
+
+async def test_the_import_dialog_keeps_its_buttons_in_place_while_it_imports_and_its_file_field_is_a_field(
+    browser: Browser, address: str
+) -> None:
+    """Item 812: the spinner put before Import's word made the button grow and Cancel move, and WebKit left traces of
+    both, as if the buttons ran into each other; and the file field's button and name stood at the top of its box."""
+    page: Page = await _open(browser, address)
+    released: asyncio.Event = asyncio.Event()
+
+    async def slow(route: Route) -> None:
+        await released.wait()
+        await route.continue_()
+
+    try:
+        await page.route("**/api/vault/items/import", slow)
+        await page.get_by_role("button", name="New item").click()
+        dialog: Locator = await open_form(
+            page,
+            page.get_by_role("menu", name="New item").get_by_role("menuitem", name="Import from CSV…"),
+            "Import logins from a CSV file",
+        )
+        field: Locator = dialog.get_by_label("CSV file")
+        # The button stands on the field's line, as tall as it, with the same room above and below inside the border.
+        box = await field.bounding_box()
+        line: str = await field.evaluate("(input) => getComputedStyle(input).lineHeight")
+        # (A pixel or so of the font's own measure may come with the line.)
+        assert box is not None and abs(box["height"] - (float(line.removesuffix("px")) + 2 * 4 + 2)) <= 1.5, (box, line)
+        await field.set_input_files(files=[{"name": "passwords.csv", "mimeType": "text/csv", "buffer": CSV}])
+        import_button: Locator = dialog.get_by_role("button", name="Import", exact=True)
+        cancel: Locator = dialog.get_by_role("button", name="Cancel", exact=True)
+        before = (await import_button.bounding_box(), await cancel.bounding_box())
+        await import_button.click()
+        await expect(import_button.locator(".spinner")).to_be_visible()
+        await expect(import_button).to_have_class(re.compile(r"\bbusy\b"))
+        during = (await import_button.bounding_box(), await cancel.bounding_box())
+        assert during == before, (before, during)
+        # The button keeps its name for a screen reader while its words are hidden under the spinner.
+        await expect(import_button).to_have_accessible_name("Import")
+        released.set()
+        await expect(dialog).to_have_count(0)
+    finally:
+        released.set()
         await page.close()
 
 

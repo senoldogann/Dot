@@ -780,7 +780,8 @@ and does, with the settings under it. With trading on (Paper or Live) the page s
   stops and targets (every 15 seconds), the products a run may trade now (with `*`, how many trade past
   `[trading] min_volume` at this moment), the schedule a move of the market starts with how many runs it started today
   of `wake_per_day` and when the last one did, and when that schedule fires next; a `wake_schedule` that names no
-  schedule is said in red, one switched off in amber.
+  schedule (it was deleted, or Dot started with an empty store) is said in red, one switched off in amber. **Wake on a
+  move**, under the lines, chooses that schedule among the schedules, or none (item 813).
 - **Holdings**: each currency held, its amount, the bid now, what it is worth and its share of the account; a currency
   that could not be priced is named under them.
 - **Orders**: the latest fifty, newest first, as a table: when, the side (a green Buy or a red Sell) and the product,
@@ -1262,7 +1263,9 @@ log keeps its traceback once (item 558: the answer is made inside the guard, so 
 input is a 422 with the validation errors in the context.
 
 **Snapshots** (item 405, after another coding agent's). In any application, both Command keys pressed together (⌘ ⌘,
-item 414, as another coding agent's shortcut is), or the Command key tapped twice, captures the window in front and puts
+the keys on both sides of the space bar; item 414, as another coding agent's shortcut is), and, with **Double tap of ⌘
+too** on (`double_tap`, off by default: item 814, so that a Command key pressed twice for its shortcuts takes nothing),
+the Command key tapped twice, captures the window in front and puts
 it in the box of the open chat (or of the new chat) as a picture, without switching to Dot; a short sound says it was
 taken, a soft white flash goes over the window (`flash`), and a card with the picture lifts off it and flies to Dot's
 window as it comes to the front (`open_dot`): the desktop app, or the tab of a browser that shows Dot's pages, chosen
