@@ -6276,6 +6276,15 @@ a.schedule-line:hover .schedule-made {
   display: none;
 }
 
+/* A fold that draws its own chevron shows no native triangle beside it (item 782), in Chrome and in WebKit alike. */
+summary:has(> .chev) {
+  list-style: none;
+}
+
+summary:has(> .chev)::-webkit-details-marker {
+  display: none;
+}
+
 .child-face {
   position: relative;
   flex: none;
@@ -9176,9 +9185,10 @@ button.attach-chip:hover {
   gap: var(--space-3);
 }
 
-/* A team's card holds a name, what it is for and a row of faces, so its columns are wider: three across at most. */
+/* A team's card holds a name, what it is for and a row of faces, so its columns are wider: two across at most, each as
+   wide as two of the agents' columns and their gap, so that the two grids end at the same edge (item 782). */
 .team-grid {
-  grid-template-columns: repeat(auto-fill, minmax(max(260px, calc((100% - 2 * var(--space-3)) / 3)), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(max(260px, calc((100% - var(--space-3)) / 2)), 1fr));
 }
 
 /* An agent's compact card: the face at the left of the name over the role, each on one line, and under them the title of
@@ -9223,8 +9233,9 @@ button.attach-chip:hover {
 
 .agent-card-name {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1) var(--space-2);
   min-width: 0;
   font-weight: var(--weight-label);
 }
