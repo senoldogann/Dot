@@ -1,8 +1,9 @@
 """Settings › Trading in a real browser (docs/daemon.md): trading is switched from off to paper, a limit is changed and
 kept in the config file, a limit the settings refuse says why, Live asks first, a key the Keychain stand-in never
-receives is refused with its reason, and an order of the record is listed; wide and light, and on a phone and dark,
-where the page keeps inside the screen. The Keychain is a stand-in, and so is Coinbase's market (an empty list of
-products, for the watch's count once "*" is allowed): the paper account holds only euros, which need no price."""
+receives is refused with its reason, and an order of the record is listed, its long reason wrapped inside the table's
+card; wide and light, and on a phone and dark, where the page keeps inside the screen. The Keychain is a stand-in, and
+so is Coinbase's market (an empty list of products, for the watch's count once "*" is allowed): the paper account
+holds only euros, which need no price."""
 
 import asyncio
 import time
@@ -32,6 +33,17 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "trading-settings-page-token"
 _OVERFLOW: str = "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
+# The orders table keeps inside its card, and its reason inside its cell (item 779: a reason kept to one line pushed
+# the table past the card, which cut off its last columns).
+_FITS: str = """(card) => {
+  const reason = card.querySelector('.trading-reason td');
+  return card.querySelector('table').offsetWidth <= card.clientWidth && reason.scrollWidth <= reason.clientWidth + 1;
+}"""
+_REASON: str = (
+    "The price moved past the stop the run had set: the 15-minute RSI fell from 56 to 41, the daily SMA20 sits under"
+    " the bid, the book thinned on the sell side and the order would have filled far below its limit, so it was not"
+    " sent."
+)
 _SIZES: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
 
 
@@ -112,9 +124,15 @@ async def _fail_an_order(runtime: Runtime) -> None:
             ts=time.time(),
             run_id="",
             exchange_id="",
-            note="The price moved",
+            note=_REASON,
         )
     )
+
+
+async def _reason_fits(page: Page) -> None:
+    """The orders table, with an order's long reason under it, keeps inside its card."""
+    card: Locator = page.locator(".trading-table-card").filter(has=page.locator(".trading-orders"))
+    assert await card.evaluate(_FITS), "the orders table or its reason is wider than the card"
 
 
 async def _held(page: Page, served: str) -> dict[str, Any]:
@@ -152,6 +170,7 @@ async def test_the_page_switches_trading_keeps_a_limit_and_asks_before_live(
                     await page.reload()
                     await expect(_mode(page, "Paper")).to_have_attribute("aria-pressed", "true")
                     await expect(page.locator(".trading [data-order]")).to_contain_text("Sell ETH-EUR")
+                    await _reason_fits(page)
                     assert await page.evaluate(_OVERFLOW) <= 1
                 await page.screenshot(path=str(tmp_path / f"trading-{width}-{scheme}.png"), full_page=True)
                 await page.close()
@@ -189,6 +208,7 @@ async def _wide(page: Page, runtime: Runtime, served: str) -> None:
     await _fail_an_order(runtime)
     await page.reload()
     await expect(page.locator(".trading [data-order]")).to_contain_text("The price moved")
+    await _reason_fits(page)
     # A limit is changed and saved: only it is sent, and the config file keeps it.
     save: Locator = page.get_by_role("button", name="Save limits")
     await expect(save).to_be_disabled()
