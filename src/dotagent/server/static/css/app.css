@@ -279,6 +279,11 @@ textarea {
   color: var(--faint);
 }
 
+/* Words that keep one line: a date and time, whose hyphens are places to break (item 778). */
+.nowrap {
+  white-space: nowrap;
+}
+
 .mono {
   font-family: var(--mono);
   font-size: var(--text-sm);
@@ -937,6 +942,22 @@ a.pill:hover {
   padding: 0 28px 0 8px;
   font-size: var(--text-sm);
   background-position: right 8px center;
+}
+
+/* A model's name over what it can do (item 778), so that its reasoning and chat size menus stay inside the card. */
+.model-cell-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.model-cell .cluster {
+  margin-top: var(--space-1);
+}
+
+.model-cell .cluster:empty {
+  display: none;
 }
 
 /* The reasoning menus of one table line up, whatever their longest option is. */
@@ -1642,13 +1663,20 @@ a.pill:hover {
   font-weight: var(--weight-title);
 }
 
+/* An account's address beside its Sign out; where both do not fit (a phone), the button goes under the address rather
+   than breaking it mid-domain (item 778). */
 .account-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
   padding-left: 36px;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.account-row > .grow {
+  flex: 1 1 14rem;
 }
 
 /* The cards of Customize › Connectors (item 316): a card's lines stand clear of the line under its head and of its first
@@ -4055,10 +4083,11 @@ dialog.modal.versions-dialog {
   animation: none;
 }
 
-/* The value sits a breath from the icon and the chevron; a long model name gives way with an ellipsis. */
+/* The value sits a breath from the icon and the chevron; a long model name gives way with an ellipsis, only where the bar
+   is short: at 200 px it ended in one beside room it could have filled (item 778). */
 .composer-pill-value {
   min-width: 0;
-  max-width: 200px;
+  max-width: 20rem;
   padding-inline: var(--space-half);
   overflow: hidden;
   font-weight: var(--weight-label);

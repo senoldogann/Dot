@@ -1231,12 +1231,23 @@
   font-weight: var(--weight-label);
 }
 
+/* The model's name and its service on one line, the service going under the name where both do not fit (a phone); a
+   name longer than the row ends in an ellipsis instead of breaking mid-word (item 778). */
 .standby-name {
   display: flex;
+  flex-wrap: wrap;
   min-width: 0;
   align-items: baseline;
-  gap: 12px;
-  overflow-wrap: anywhere;
+  gap: 0 12px;
+}
+
+.standby-name > .mono,
+.standby-name > .muted {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .standby-name > .mono {
@@ -2563,6 +2574,31 @@
 
 .note-card {
   overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  /* On a phone the four choices stand two by two, the last of them whole; in one line it ran off the edge (item 778). */
+  .note-tools .segmented {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .note-tools .segmented button {
+    padding-inline: var(--space-2);
+  }
+
+  /* A note's text takes the card's width, its pin, edit and forget going under it: beside it, they squeezed the text
+     to half the card and broke its code mid-word (item 778). */
+  .note-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .note-actions {
+    align-self: flex-end;
+  }
 }
 
 .note-row {
@@ -4460,11 +4496,14 @@
   overflow-wrap: anywhere;
 }
 
+/* A username or an address on one line, ending in an ellipsis: broken mid-word on a phone it read as two (item 778). */
 .vault-sub {
+  overflow: hidden;
   color: var(--muted);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vault-actions {

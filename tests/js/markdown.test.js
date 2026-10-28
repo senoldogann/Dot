@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { openFence, parseBlocks, parseInline, readsAsMarkdown, sourceLines } from "../../src/dotagent/server/static/js/markdown.js";
+import { openFence, parseBlocks, parseInline, plainText, readsAsMarkdown, sourceLines } from "../../src/dotagent/server/static/js/markdown.js";
 
 test("inline text keeps code, emphasis and links apart", () => {
   const parts = parseInline("Run `make` for **all** of [the docs](https://example.com/docs).");
@@ -351,3 +351,52 @@ test("a heading with a long run of spaces is read in a moment, and its closing m
   assert.equal(words("# a ## b"), "a ## b");
   assert.equal(words("# a # #"), "a #");
 });
+
+test("a bold that code cuts in pieces is found across them, and one that never closes stands as written", () => {
+  // The design audit of item 778: "**LinkedIn `x@y.z` 'a gidiyor**" stood on the page with its marks.
+  assert.deepEqual(parseInline("**LinkedIn `x@y.z` 'a gidiyor**"), [
+    { type: "text", value: "LinkedIn ", strong: true },
+    { type: "code", value: "x@y.z", strong: true },
+    { type: "text", value: " 'a gidiyor", strong: true },
+  ]);
+  assert.deepEqual(parseInline("**a** b **c `d` e** f"), [
+    { type: "bold", value: "a" },
+    { type: "text", value: " b " },
+    { type: "text", value: "c ", strong: true },
+    { type: "code", value: "d", strong: true },
+    { type: "text", value: " e", strong: true },
+    { type: "text", value: " f" },
+  ]);
+  assert.deepEqual(parseInline("**open `code` never closed"), [
+    { type: "text", value: "**open " },
+    { type: "code", value: "code" },
+    { type: "text", value: " never closed" },
+  ]);
+  // No marks (the pre-push review of item 778): escaped stars, stars with a space inside, a bold that a link cuts and
+  // that never closes. Each stands as it was written.
+  assert.deepEqual(parseInline("a \\*\\* b `x` c \\*\\*"), [
+    { type: "text", value: "a ** b " },
+    { type: "code", value: "x" },
+    { type: "text", value: " c **" },
+  ]);
+  assert.deepEqual(parseInline("2 ** 3 is `8`, and 3 ** 2 is `9`"), [
+    { type: "text", value: "2 ** 3 is " },
+    { type: "code", value: "8" },
+    { type: "text", value: ", and 3 ** 2 is " },
+    { type: "code", value: "9" },
+  ]);
+  assert.equal(parseInline("**a `x` b [l](https://u.v) c")[0].value, "**a ");
+  assert.ok(parseInline("**see [l](https://u.v) `x`**").every((part) => part.strong));
+});
+
+test("a preview's words have their markdown taken off", () => {
+  assert.equal(
+    plainText("**Files (both verified):**\n- `~/a/b.pdf` — **1 page**\n## Head\n> quoted\n1. [the link](http://x) and *it*"),
+    "Files (both verified):\n~/a/b.pdf — 1 page\nHead\nquoted\nthe link and it",
+  );
+  assert.equal(plainText("```python\nprint(1)\n```"), "print(1)");
+  assert.equal(plainText("2 * 3 * 4 and a_b_c"), "2 * 3 * 4 and a_b_c");
+  // As the chat draws them (EMPHASIS): "__init__.py" is a bold "init" and ".py" there, so its words read so here.
+  assert.equal(plainText("snake_case_name and __init__.py"), "snake_case_name and init.py");
+});
+
