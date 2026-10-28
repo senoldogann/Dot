@@ -259,6 +259,18 @@
   display: none;
 }
 
+/* On a phone the select keeps its whole width for the model's name (item 787): the provider's name, which stood in the
+   box and left the name cut short, is the group the name is under when the list opens. */
+@media (max-width: 720px) {
+  .model-pick .select {
+    padding-right: 32px;
+  }
+
+  .model-pick-provider {
+    display: none;
+  }
+}
+
 /* Every model, by provider (item 563): a search over the providers' folds, each fold a row with its models' count at its
    right; a model the search leaves out, and a provider with none, are out of sight. */
 .models-search {

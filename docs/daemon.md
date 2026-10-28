@@ -175,7 +175,8 @@ at a thumbnail's size, its name its tooltip and its × at its corner, where anot
 size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
-the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen for it, at
+the bar is still one line. On a phone the bar's buttons are 36 px and answer a finger's 44 px around them (item
+787, as every icon button of the bars and the lists does), and the box's text is the size chosen for it, at
 least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item
 311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a pick or Escape
 or a click outside closes it. The model's menu (item 208) has a rail on its left, a star for the
@@ -722,7 +723,8 @@ draws no line either way (items 346, 362 and 500, kept in this browser), and **S
 of this browser, below), **Models** (the **Default model** first, a menu of the models that can call tools: the runs
 that name no model, a new chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models]
 main`, as when it is changed from the composer's model menu; the **Roles** card holds the fast, review and vision
-models too, each with its provider in its box, and **Fallbacks** the models a run moves to; then **Every model, by
+models too, each with its provider in its box (on a phone the model's name has the whole box, item 787), and
+**Fallbacks** the models a run moves to; then **Every model, by
 service**, a search over one fold per service, with the reasoning levels of each model and a menu to choose one, and
 what the services hold in the page's head with the button **Check again**; a provider without a key, or whose key
 was refused (HTTP 401), says so and links to AI services, and one that refused access (HTTP 403) says that, with its
