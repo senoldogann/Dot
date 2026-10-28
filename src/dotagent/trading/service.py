@@ -32,6 +32,8 @@ from dotagent.vault.secretstore import SecretStore
 
 _log = get_logger("dotagent.trading")
 _PAPER_SINCE_KEY: str = "trading_paper_since"
+# What the paper account started with at its last start (item 785): ``paper_start`` changed later is the next start's.
+_PAPER_START_KEY: str = "trading_paper_start"
 # What an order's note holds: the run's reason (300 characters at most, the tool's bound) and, once something went
 # wrong, what happened, which keeps its room (the pre-push review: a long reason cut it off).
 _REASON_CHARS: int = 300
@@ -146,9 +148,16 @@ class PaperBroker:
         raw: str | None = await self.store.kv_get(_PAPER_SINCE_KEY)
         return float(raw) if raw is not None else 0.0
 
+    async def started_with(self) -> float:
+        """What the account started with: kept at its start (item 785), so that ``paper_start`` changed in Settings is
+        what the next start gives, not money added to or taken from the account now; an account started before it was
+        kept started with ``paper_start``."""
+        raw: str | None = await self.store.kv_get(_PAPER_START_KEY)
+        return float(raw) if raw is not None else self.config().paper_start
+
     async def balances(self) -> dict[str, float]:
         config: TradingConfig = self.config()
-        held: dict[str, float] = {config.quote: config.paper_start}
+        held: dict[str, float] = {config.quote: await self.started_with()}
         for order in await self.store.trading_orders("paper", await self.since(), _ORDERS_READ):
             if order.status != "filled":
                 continue
@@ -308,7 +317,10 @@ class Trading:
         else:
             kept = await self.store.kv_update(key, lambda value: value if value is not None else repr(equity))
             known = True
-        traded: float = await self.store.trading_traded_since(mode, since)
+        # The paper account started again today counts what was traded from its start (item 785): the orders before
+        # are outside it, as its day's loss is.
+        counted_from: float = max(since, await self.paper.since()) if mode == "paper" else since
+        traded: float = await self.store.trading_traded_since(mode, counted_from)
         return Portfolio(
             mode=mode,
             quote=config.quote,
@@ -669,9 +681,11 @@ class Trading:
         Under the lock orders are placed under, so that no sell is judged across the start."""
         async with self._lock:
             now: float = self.clock()
+            start: float = self.config().paper_start
+            await self.store.kv_set(_PAPER_START_KEY, repr(start))
             await self.store.kv_set(_PAPER_SINCE_KEY, repr(now))
             day, _ = self.day_start()
-            await self.store.kv_set(f"trading_day:paper:{day}", repr(self.config().paper_start))
+            await self.store.kv_set(f"trading_day:paper:{day}", repr(start))
             for exit_ in await self.store.trading_exits("open", _EXITS_READ):
                 if exit_.mode == "paper":
                     await self.store.put_trading_exit(

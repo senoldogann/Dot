@@ -432,7 +432,8 @@ export function mount(root, ctx) {
       const cash = portfolio.holdings.find((holding) => holding.currency === quote)?.amount ?? 0;
       const invested = Math.max(0, portfolio.equity - cash);
       const lost = Math.max(0, -day);
-      const sinceStart = settings.mode === "paper" ? portfolio.equity - settings.paper_start : null;
+      // Counted from what the account started with at its start (item 785), not from `paper_start` changed since.
+      const sinceStart = settings.mode === "paper" ? portfolio.equity - (view.paper_started_with ?? settings.paper_start) : null;
       parts.push(
         el(
           "div",
@@ -451,7 +452,7 @@ export function mount(root, ctx) {
               "div",
               { class: "desk-stats" },
               deskStat("Today", signedMoney(day, quote), signedShare(day, portfolio.day_start_equity), changeTone(day), "day"),
-              sinceStart === null ? null : deskStat("Since the start", signedMoney(sinceStart, quote), signedShare(sinceStart, settings.paper_start), changeTone(sinceStart), "start"),
+              sinceStart === null ? null : deskStat("Since the start", signedMoney(sinceStart, quote), signedShare(sinceStart, view.paper_started_with ?? settings.paper_start), changeTone(sinceStart), "start"),
               deskStat("In positions", money(invested, quote), shareOf(invested, portfolio.equity), "plain", "invested"),
             ),
           ),

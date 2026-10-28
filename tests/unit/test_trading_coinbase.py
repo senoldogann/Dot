@@ -196,7 +196,8 @@ async def test_a_live_order_is_kept_with_coinbases_id_and_a_refused_one_does_not
         )
     statuses: list[str] = [one.status for one in await store.trading_orders("live", 0.0, 10)]
     assert statuses == ["failed", "filled"]
-    assert await store.trading_traded_since("live", 0.0) == pytest.approx(order.notional)
+    # The buy counts with its fee (item 785); the refused one counts nothing.
+    assert await store.trading_traded_since("live", 0.0) == pytest.approx(order.notional + order.fee)
 
 
 async def test_an_order_coinbase_took_stays_counted_when_the_key_fails_while_it_is_followed(

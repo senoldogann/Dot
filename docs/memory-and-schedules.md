@@ -358,5 +358,6 @@ what moved; a schedule switched off is not started so, and the end of such a run
   schedules off, as Dot's ("switched off: its agent was deleted"). While you have paused the agent (item 465), its
   schedules fire nothing by themselves: a repeating one is skipped to its next time ("skipped: <name> is paused") and a
   one-time one waits, still due ("waiting: <name> is paused"), and fires once you resume it; a pause counts no failed
-  run and tells nothing, and **Run now** still starts a run. An agent that cannot be read fires nothing.
+  run and tells nothing, and **Run now** still starts a run; a move of the market (`[trading] wake_schedule`) is no
+  hand and starts nothing as a paused agent (item 785). An agent that cannot be read fires nothing.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.

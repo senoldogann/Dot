@@ -6030,9 +6030,11 @@ class Store:
         return TradingExitRecord.model_validate(dict(row))
 
     async def trading_traded_since(self, mode: str, since: float) -> float:
-        """What the orders of ``mode`` after ``since`` were worth, but those that surely did nothing (``failed``)."""
+        """What the orders of ``mode`` after ``since`` were worth, but those that surely did nothing (``failed``): a
+        buy with its fee, which it spent too (item 785: a buy of 25 filled at 24.85 and a fee of 0.15 counts 25)."""
         row: aiosqlite.Row | None = await self._one(
-            "SELECT COALESCE(SUM(notional), 0) AS total FROM trading_orders WHERE mode = ? AND ts > ? "
+            "SELECT COALESCE(SUM(notional + CASE WHEN side = 'buy' THEN fee ELSE 0 END), 0) AS total "
+            "FROM trading_orders WHERE mode = ? AND ts > ? "
             "AND status != 'failed'",
             (mode, since),
         )

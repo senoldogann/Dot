@@ -91,6 +91,9 @@ class TradingView(FrozenModel):
     watch: TradingWatchView | None
     orders: list[TradingOrderRecord]
     problem: str
+    # What the paper account started with at its last start (item 785), which "since the start" is counted from; None
+    # out of paper.
+    paper_started_with: float | None = None
 
 
 class TradingChange(FrozenModel):
@@ -169,6 +172,7 @@ def trading_router(ctx: ServerContext) -> APIRouter:
             watch=watch,
             orders=orders,
             problem=problem,
+            paper_started_with=await trading.paper.started_with() if settings.mode == "paper" else None,
         )
 
     async def positions_of(portfolio: Portfolio) -> list[TradingPosition]:

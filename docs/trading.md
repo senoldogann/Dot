@@ -20,7 +20,7 @@ can change them.
   `products = ["*"]` in `config.toml`; the paper account then wants **Start again**, as its money is in the old quote.
 - **Limits**, in `quote`:
   - `max_order`: the most one order may be worth (25 by default);
-  - `max_day`: the most a day's orders may add up to, buys and sells (100);
+  - `max_day`: the most a day's orders may add up to, buys and sells, a buy with its fee (100; item 785);
   - `max_day_loss`: how much the account may lose in a day before no buy is placed until the next; a sell still is, as
     it lowers what is at stake (25);
   - `max_position`: the most one product held may be worth after a buy (200).
@@ -29,7 +29,9 @@ can change them.
   once, `wake_move_pct`, `wake_per_day` and `wake_gap_min` (below, "Woken by the market").
 - **Paper**: `paper_start` (1000) is what the paper account starts with, `paper_fee_rate` (0.006) the share of each fill
   it pays, as Coinbase's taker fee does; it buys at the ask and sells at the bid. **Start again** gives it `paper_start`
-  back; its orders stay in the record, outside it.
+  back; its orders stay in the record, outside it, and what they traded today no longer counts against `max_day`. A
+  `paper_start` changed later is what the next **Start again** gives: the account keeps what it started with, and
+  "since the start" is counted from that (item 785).
 - **Coinbase key** (for `live`): make an API key in Coinbase's Developer Platform with the **ECDSA** signature algorithm
   and the **View** and **Trade** permissions, never **Transfer**, and paste its name (`organizations/.../apiKeys/...`)
   and private key. Dot asks Coinbase what the key may do before it keeps it, and refuses one that may transfer money:
