@@ -419,6 +419,9 @@ export async function* sse(path, signal, onOpen) {
 /**
  * Wait `ms` before a stream is tried again, or less: once the browser is back on the network, or the page back in
  * view (a Mac that woke), it is tried at once. Ends at once when `signal` aborts.
+ * @param {number} ms
+ * @param {AbortSignal} signal
+ * @returns {Promise<void>}
  */
 function untilRetry(ms, signal) {
   return new Promise((resolve) => {
@@ -441,7 +444,11 @@ function untilRetry(ms, signal) {
   });
 }
 
-/** Settles once the page is in view, or at once when `signal` aborts. */
+/**
+ * Settles once the page is in view, or at once when `signal` aborts.
+ * @param {AbortSignal} signal
+ * @returns {Promise<void>}
+ */
 function untilInView(signal) {
   return new Promise((resolve) => {
     function check() {
