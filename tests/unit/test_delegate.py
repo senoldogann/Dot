@@ -10,6 +10,7 @@ from dotagent.tools.base import ToolResult
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import (
     DelegateArgs,
+    build_delegate_tools,
     closing_step,
     default_child_mode,
     delegated_evidence,
@@ -79,3 +80,22 @@ def test_a_delegated_run_takes_its_parents_mode_and_the_model_cannot_name_anothe
     assert "mode" not in DelegateArgs.model_json_schema()["properties"]
     with pytest.raises(ValidationError):
         DelegateArgs.model_validate({"goal": "Read the page", "mode": "research"})
+
+
+def test_a_report_without_a_verification_section_is_marked_as_a_claim() -> None:
+    outcome: DelegateOutcome = DelegateOutcome(run=_run("done"), tainted=False)
+    result: ToolResult = render_outcome(outcome, "abcd", None, None)
+    assert "No Verification section was reported" in result.text
+
+
+def test_a_report_with_a_verification_section_is_not_marked() -> None:
+    run = _run("done").model_copy(update={"result": "Found 12 items.\n\nVerification: `uv run pytest` — 2 passed."})
+    outcome: DelegateOutcome = DelegateOutcome(run=run, tainted=False)
+    result: ToolResult = render_outcome(outcome, "abcd", None, None)
+    assert "No Verification section was reported" not in result.text
+
+
+def test_the_delegate_tool_asks_the_child_for_a_verification_section() -> None:
+    goal: str = DelegateArgs.model_json_schema()["properties"]["goal"]["description"]
+    assert "Verification" in goal
+    assert "Verification" in build_delegate_tools()[0].spec.description

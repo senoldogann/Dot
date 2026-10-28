@@ -62,12 +62,14 @@ from dotagent.browser.driver import (
     let_page_turn,
     measure_viewport,
     navigate,
+    no_dialog_open,
     page_pulse,
     page_title,
     run_script,
     run_step,
     screenshot_jpeg,
     scroll_page,
+    text_in_frames,
     upload_files,
     visible_text,
     wait_dom_quiet,
@@ -77,7 +79,16 @@ from dotagent.browser.extract import extract_records, render_records
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
 from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.network import Fetched, answer_text, call_lines, hidden_address
-from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers, taken_in, watch_births
+from dotagent.browser.pages import (
+    Tab,
+    ThreadTabs,
+    add_note,
+    attach_handlers,
+    page_target_id,
+    taken_in,
+    target_id_of,
+    watch_births,
+)
 from dotagent.browser.profile_lock import held_for_start, profile_holder_pid
 from dotagent.browser.profiles import (
     HIDE_CRASH_BUBBLE,
@@ -151,6 +162,43 @@ from dotagent.vault.masking import in_address, mask_error, masked
 from dotagent.web.addresses import is_private_text, non_public_address
 
 _log = get_logger("dotagent.browser.session")
+# What a page that had not settled after an action that went through is said to be (the review of every module).
+_UNSETTLED: str = (
+    "the page was still loading when Dot stopped waiting: what was done went through, so do not repeat it; read the "
+    "page again to see where it stands"
+)
+
+# How many step reports an error after a batch names (:func:`_steps_said`).
+_SAID_STEPS: int = 10
+
+
+def _steps_said(reports: Sequence[StepReport]) -> str | None:
+    """The steps of a batch that went through, for an error said after them (``step 1 click e9 done``), ``None`` when
+    none did."""
+    done: list[str] = [f"step {report.index} {report.description}" for report in reports if report.outcome == "done"]
+    if not done:
+        return None
+    more: str = f" and {len(done) - _SAID_STEPS} more" if len(done) > _SAID_STEPS else ""
+    return "these steps went through: " + "; ".join(done[:_SAID_STEPS]) + more
+
+
+async def _read_after(read: Awaitable[PageView], done: str | None) -> PageView:
+    """The page read after an action that went through (``done`` says what), as it is when nothing did. A read that
+    fails is said with what was done (the review of every module): raised alone, it told the run only that the call
+    failed, and the run did the submit or the post again. A forbidden address is raised as it is."""
+    try:
+        return await read
+    except ForbiddenUrlError:
+        raise
+    except BrowserError as error:
+        if done is None:
+            raise
+        raise BrowserError(
+            f"{done}; but reading the page after them failed ({error.message}): do not repeat what went through, "
+            "read the page again with browser_snapshot",
+            error.context,
+        ) from error
+
 
 _REAP_INTERVAL_S: float = 60.0
 # The screencast of a tab (``screencast``): JPEG quality, the longest edge, and how often a silent cast says so.
@@ -232,6 +280,14 @@ _SCRIPTED_NOTE: str = (
 UNANSWERED_HOLD_S: float = 300.0
 # What ended a wait for a text that a dialog interrupted (item 698).
 _DIALOG_OPENED: str = "a dialog opened in front of the page"
+# A wait for a text ends early once the page stands still (item 774): no change of its documents for _TEXT_STILL_S, no
+# navigation, no request started or under way and no WebSocket open, once the wait has gone on for _TEXT_STILL_AFTER_S.
+# Over 30 days of the owner's runs 64 waits saw their text, half of them within 0.4 s and 60 within 5 s, while 42 that
+# did not lasted their whole time, 20 s at the median: a guess of a thank-you text after a form that had not gone. The
+# page is looked at every _TEXT_SLICE_S.
+_TEXT_STILL_S: float = 3.0
+_TEXT_STILL_AFTER_S: float = 5.0
+_TEXT_SLICE_S: float = 0.5
 # Why a chat's tabs were made new before a login was filled (item 697).
 _FRESH_FOR_LOGIN_NOTE: str = (
     "a script of this run ran in this chat's tabs and could copy what is typed there: before the login, Dot closed "
@@ -507,7 +563,7 @@ _SENT_CHARS: int = 200
 _EFFECT_WAIT_S: float = 0.5
 _EFFECT_POLL_S: float = 0.1
 # The steps that are meant to change the page: a click, or Enter, which sends a form.
-_MOVING_ACTIONS: frozenset[str] = frozenset({"click", "double_click", "click_at"})
+_MOVING_ACTIONS: frozenset[str] = frozenset({"click", "double_click", "click_at", "drag_at"})
 
 
 def _moves_the_page(step: Step) -> bool:
@@ -1562,7 +1618,13 @@ class BrowserSession:
                         "opening a tab failed", {"error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
                     ) from error
             tab: Tab = Tab(page=page)
-            await self._register(tab)
+            try:
+                await self._register(tab)
+            except BaseException:
+                # No thread holds the tab yet: closed here, it is not left open in Chrome (the review of every module).
+                with contextlib.suppress(Exception):
+                    await page.close()
+                raise
             thread.tabs.append(tab)
             thread.active = len(thread.tabs) - 1
         await self._enforce_cap(thread)
@@ -1641,6 +1703,19 @@ class BrowserSession:
         config: BrowserConfig = self._config
         await self._let_commit(tab)
         await wait_dom_quiet(tab.page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
+
+    async def _settle_acted(self, tab: Tab) -> str | None:
+        """Settle the page after a step, a script or an upload that already went through (the review of every module,
+        2026-10-28): a page that does not settle in time is said, not raised, since what was done is done, and a run
+        told only that the call failed did it again (a submit, a post, a like). A forbidden address still raises."""
+        try:
+            await self._settle(tab)
+        except ForbiddenUrlError:
+            raise
+        except BrowserError as error:
+            _log.info("browser_unsettled_after_action", error=error.message, url=truncate_middle(tab.page.url, 200))
+            return _UNSETTLED
+        return None
 
     async def _viewport(self, tab: Tab) -> Viewport:
         """The page area the model sees, in CSS pixels: the configured size in Dot's own Chrome at 100 %, what the page
@@ -2440,19 +2515,51 @@ class BrowserSession:
         # Each tab is told apart by an address of its own: tabs made at the same time (a crawl reads pages side by side)
         # would otherwise all be handed the first new page (measured 2026-10-12: five calls, one page). It goes back to
         # a plain blank page at once, the address the URL rules and the tab views know.
+        # A page Playwright reports before its address committed is told by the id Chrome gave the tab (the review of
+        # every module): matched by its address once, it was let pass and the call waited out its time.
         mark: str = f"about:blank#dot-{secrets.token_hex(_TAB_MARK_BYTES)}"
         target: dict[str, object] = {"url": mark, "background": True}
         if self._config.mode == "attach":
             target["newWindow"] = True
         cdp: CDPSession = await browser.new_browser_cdp_session()
+        arrived: asyncio.Queue[Page] = asyncio.Queue()
+        heard: Callable[[Page], None] = arrived.put_nowait
+        context.on("page", heard)
+        made: str | None = None
         try:
-            async with context.expect_page(lambda page: page.url == mark) as opened:
-                await cdp.send("Target.createTarget", target)
-            page: Page = await opened.value
+            answer: dict[str, object] = await cdp.send("Target.createTarget", target)
+            made = target_id_of(answer)
+            try:
+                async with asyncio.timeout(self._config.action_timeout_s):
+                    page: Page = await self._page_of_target(arrived, mark, made)
+            except TimeoutError as error:
+                raise BrowserError(
+                    "opening a tab failed",
+                    {"error": f"Chrome did not hand over the new tab within {self._config.action_timeout_s:g} s"},
+                ) from error
+            await page.goto("about:blank", wait_until="commit")
+        except BaseException:
+            # The tab Chrome made is not left behind with no thread to close it: not handed over in time, not made
+            # blank, or the run stopped while it waited.
+            if made is not None:
+                with contextlib.suppress(Exception):
+                    await cdp.send("Target.closeTarget", {"targetId": made})
+            raise
         finally:
+            context.remove_listener("page", heard)
             await cdp.detach()
-        await page.goto("about:blank", wait_until="commit")
         return page
+
+    @staticmethod
+    async def _page_of_target(arrived: asyncio.Queue[Page], mark: str, made: str | None) -> Page:
+        """The page of the tab Chrome made as ``made``, among the pages reported since it was asked for: by its
+        address ``mark`` once that committed, else by the id of its tab. Another call's new tab is passed over."""
+        while True:
+            page: Page = await arrived.get()
+            if page.url == mark:
+                return page
+            if made is not None and not page.is_closed() and await page_target_id(page) == made:
+                return page
 
     async def _new_tab(self, context: BrowserContext) -> Page:
         """A thread's new tab: in the background, unless the window may be raised (item 97), when it is the window's
@@ -2470,7 +2577,13 @@ class BrowserSession:
         """``page`` told the colour scheme Settings › Browser chose (item 354): Dot's own Chrome tells each of its pages
         from its start, the Chrome of the user only the tabs Dot opens in it, one by one."""
         if self._config.mode == "attach" and self._config.appearance != "system":
-            await page.emulate_media(color_scheme=color_scheme(self._config.appearance))
+            try:
+                await page.emulate_media(color_scheme=color_scheme(self._config.appearance))
+            except BaseException:
+                # No thread holds the tab yet: it is closed rather than left open in Chrome.
+                with contextlib.suppress(Exception):
+                    await page.close()
+                raise
         return page
 
     async def _close_scratch(self, page: Page) -> None:
@@ -2978,13 +3091,16 @@ class BrowserSession:
             finally:
                 tab.accept_confirms = False
             current: Tab = await self._current_tab(thread)
-            await self._settle(current)
+            unsettled: str | None = await self._settle_acted(current)
             await self._enforce_landing(current)
-            view: PageView = (
-                await self._changes_view(thread, current, hide_secrets)
+            view: PageView = await _read_after(
+                self._changes_view(thread, current, hide_secrets)
                 if current is tab
-                else await self._settled_view(thread, current, hide_secrets)
+                else self._settled_view(thread, current, hide_secrets),
+                _steps_said(reports),
             )
+            if unsettled is not None:
+                view = view.model_copy(update={"notes": (*view.notes, unsettled)})
             return ActOutcome(steps=tuple(reports), stopped=stopped, view=view)
 
     async def scroll(
@@ -3018,7 +3134,7 @@ class BrowserSession:
             # Not waited on a page that went to a URL the rules forbid (item 554): the answer would tell what it shows.
             await self._enforce_landing(tab)
             started: float = time.monotonic()
-            end: TextWaitEnd = await wait_for_text_or_dialog(tab.page, text, _ms(timeout_s))
+            end: TextWaitEnd | Literal["still"] = await self._text_or_still(tab, text, timeout_s)
             appeared: bool = end == "text"
             waited_s: float = time.monotonic() - started
             if appeared:
@@ -3029,7 +3145,44 @@ class BrowserSession:
             view: PageView = await self._changes_view(thread, tab, hide_secrets)
             await self._enforce_landing(tab)
             ended_by: str | None = _DIALOG_OPENED if end == "dialog" else None
-            return TextWait(appeared=appeared, waited_s=waited_s, view=view, ended_by=ended_by)
+            still_s: float | None = _TEXT_STILL_S if end == "still" else None
+            return TextWait(appeared=appeared, waited_s=waited_s, view=view, ended_by=ended_by, still_s=still_s)
+
+    async def _text_or_still(self, tab: Tab, text: str, timeout_s: float) -> TextWaitEnd | Literal["still"]:
+        """What ended a wait of at most ``timeout_s`` for ``text`` (:func:`wait_for_text_or_dialog`), or ``"still"``:
+        the page stood still once the wait had gone on for a while (item 774, :data:`_TEXT_STILL_S`). The page is
+        looked at between short waits, each ending by its own time, so that none is left waiting in the page; a
+        page whose changes cannot be read is never taken for still."""
+        started: float = time.monotonic()
+        ends: float = started + timeout_s
+        watch_dialogs: bool = await no_dialog_open(tab.page)
+        changes: int | None = (await page_pulse(tab.page)).changes
+        requests: int = tab.requests
+        moved: float = started
+        while True:
+            left: float = ends - time.monotonic()
+            if left <= 0:
+                return "timeout"
+            # Playwright waits without end for a time of 0 ms: a slice is at least one.
+            end: TextWaitEnd = await wait_for_text_or_dialog(
+                tab.page, text, max(1, _ms(min(_TEXT_SLICE_S, left))), watch_dialogs
+            )
+            if end != "timeout":
+                return end
+            if await text_in_frames(tab.page, text):
+                return "text"
+            now: float = time.monotonic()
+            # The page is not read once the time is spent: its frames could take a second more than was asked.
+            if now >= ends:
+                return "timeout"
+            seen: int | None = (await page_pulse(tab.page)).changes
+            # A request begun since the last look is the page at work too: one that polls its server every few seconds
+            # with short requests is rarely seen with one under way.
+            busy: bool = tab.requests != requests or tab.fetches > 0 or tab.sockets > 0 or not tab.nav_idle.is_set()
+            if seen is None or seen != changes or busy:
+                changes, requests, moved = seen, tab.requests, now
+            elif now - moved >= _TEXT_STILL_S and now - started >= _TEXT_STILL_AFTER_S:
+                return "still"
 
     def _refuse_fill(self, url: str, fills_on: Callable[[str], bool], kinds: Sequence[VaultFieldKind]) -> None:
         """Raise when a fill of ``kinds`` into the page at ``url`` is refused whatever the tabs: the page is not one of
@@ -3227,6 +3380,7 @@ class BrowserSession:
                 seconds: float = time.monotonic() - started
                 current: Tab
                 opening: bool
+                unsettled: str | None = None
                 if end == "timeout":
                     # The script holds the page still: it takes no turn, and the tabs it opened are what can land.
                     opening = await self._let_births_land(tab)
@@ -3235,8 +3389,10 @@ class BrowserSession:
                 else:
                     opening = await self._let_events_land(tab)
                     current = await self._current_tab(thread)
-                    await self._settle(current)
-                surprise: str | None = describe_surprise(before, self._watch(thread, tab))
+                    unsettled = await self._settle_acted(current)
+                # Both are said when both happened: the run must know that what it did went through (the review).
+                looked: str | None = describe_surprise(before, self._watch(thread, tab))
+                surprise: str | None = "; ".join(said for said in (looked, unsettled) if said) or None
                 await self._enforce_landing(current)
             except DotError as error:
                 # What the script led the tab to may be an address that carries a cookie: the refusal names it.
@@ -3312,8 +3468,12 @@ class BrowserSession:
                 await upload_files(tab.page, ref, list(paths), _ms(self._config.action_timeout_s))
             finally:
                 tab.expect_chooser = False
-            await self._settle(tab)
-            return await self._changes_view(thread, tab, hide_secrets)
+            unsettled: str | None = await self._settle_acted(tab)
+            view: PageView = await _read_after(
+                self._changes_view(thread, tab, hide_secrets),
+                f"the upload went through: {len(paths)} file(s) given to {ref}",
+            )
+            return view if unsettled is None else view.model_copy(update={"notes": (*view.notes, unsettled)})
 
     # ------------------------------------------------------------------ reads without browser access
 

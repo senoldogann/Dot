@@ -195,8 +195,9 @@ async def test_a_run_offered_more_skills_than_its_instructions_list_is_listed_th
     assert (
         "- weekly-report: Write the weekly report from the week's notes, in the owner's format.\n"
         "- mail-merge: Send one email to each contact of a list.\n"
-        "- 5 more installed skills fit your goal less well and are not listed here: find_help searches them all by "
-        "your need, and skill reads one by its name. They are: invoice-pdf, release-notes, excel, onedrive, word."
+        "- 7 more installed skills fit your goal less well and are not listed here: find_help searches them all by "
+        "your need, and skill reads one by its name. They are: invoice-pdf, release-notes, captcha, deep-os, excel, "
+        "onedrive, word."
     ) in skills, skills
     assert "Draft the release notes" not in skills and "Fill in the invoice PDF form" not in skills, skills
 
@@ -308,9 +309,10 @@ async def test_with_the_embedding_service_out_of_reach_find_help_answers_by_the_
     answers: list[str] = [message.content for message in messages if message.role == "tool"]
     lines: list[str] = answers[0].splitlines()
     assert lines[1].startswith("1. Skill weekly-report: Write the weekly report"), answers[0]
-    # What broke the connection is named (its words are the platform's).
+    # What broke the connection is named (its words are the platform's), after the server it could not connect to
+    # (item 769).
     assert re.search(
-        r" Help was found by its words alone: finding it by meaning failed: transport failure while talking to the"
-        r" provider \(ConnectError: .+\)\.$",
+        r" Help was found by its words alone: finding it by meaning failed: cannot connect to 127\.0\.0\.1:\d+:"
+        r" transport failure while talking to the provider \(ConnectError: .+\)\.$",
         lines[-1],
     ), answers[0]

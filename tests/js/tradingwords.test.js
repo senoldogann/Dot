@@ -11,9 +11,15 @@ import {
   money,
   needsRestart,
   noAccountWords,
-  orderWords,
   parseAmount,
   parseProduct,
+  productLabel,
+  meterShare,
+  positionFacts,
+  price,
+  shareOf,
+  signedShare,
+  watchLines,
   showsKey,
   signedMoney,
   statusWords,
@@ -75,9 +81,16 @@ test("a limit is a positive number, a comma is a decimal point, and nothing else
 test("a product is in capitals and priced in the quote", () => {
   assert.equal(parseProduct(" btc-eur ", "EUR"), "BTC-EUR");
   assert.equal(parseProduct("SOL-EUR", "EUR"), "SOL-EUR");
+  // "*": every product of the quote that trades enough a day (item 771).
+  assert.equal(parseProduct(" * ", "EUR"), "*");
   for (const text of ["BTC-USD", "BTC", "BTC-EUR-X", "", "BTC EUR", "-EUR"]) {
     assert.equal(parseProduct(text, "EUR"), null, text);
   }
+});
+
+test("a product's chip says its id, and * the whole market down to the daemon's floor", () => {
+  assert.equal(productLabel("BTC-EUR", 1_000_000, "EUR"), "BTC-EUR");
+  assert.equal(productLabel("*", 1_000_000, "USDC"), "Every product trading 1,000,000 USDC a day");
 });
 
 test("only what differs from the settings is sent, as numbers, and the products as the list they became", () => {
@@ -117,37 +130,69 @@ test("the key is on the page when trading is on or a key is kept, and the accoun
   assert.match(noAccountWords({ settings: { mode: "paper" }, key: { kept: false } }), /could not be read/);
 });
 
-test("an order says its side and product, what it was worth, and when, how much, at what price and what fee", () => {
-  const order = {
-    mode: "paper",
-    product: "BTC-EUR",
-    side: "buy",
-    notional: 25,
-    size: 0.0003,
-    price: 83000,
-    fee: 0.15,
-    status: "filled",
-    ts: 0,
-    note: "dip",
-  };
-  const words = orderWords(order, "EUR", () => "1 Jan, 00:00");
-  assert.equal(words.title, "Buy BTC-EUR");
-  assert.equal(words.amount, "25.00 EUR");
-  assert.equal(words.facts, "1 Jan, 00:00 · 0.0003 BTC at 83,000.00 EUR · fee 0.15 EUR · paper");
-  assert.equal(words.note, "dip");
-});
-
-test("an order that did nothing has no amount and no fill in its words", () => {
-  const order = { mode: "live", product: "ETH-EUR", side: "sell", notional: 10, size: 0, price: 0, fee: 0, status: "failed", ts: 0, note: "" };
-  const words = orderWords(order, "EUR", () => "now");
-  assert.equal(words.title, "Sell ETH-EUR");
-  assert.equal(words.amount, "");
-  assert.equal(words.facts, "now · live");
-});
-
 test("each status of an order has its own badge", () => {
   assert.deepEqual(statusWords("filled"), { tone: "b-ok", label: "Filled" });
   assert.deepEqual(statusWords("failed"), { tone: "b-bad", label: "Failed" });
   assert.deepEqual(statusWords("unknown"), { tone: "b-warn", label: "Unknown" });
   assert.deepEqual(statusWords("pending"), { tone: "b-info", label: "Pending" });
 });
+
+test("a price keeps the digits it has, and a share carries its sign with a true minus", () => {
+  assert.equal(price(1305.72), "1,305.72");
+  assert.equal(price(0.0000123456789), "0.000012345679");
+  assert.equal(signedShare(0.03, 24.85), "+0.12 %");
+  assert.equal(signedShare(-0.12, 1000), "−0.01 %");
+  assert.equal(signedShare(0.00001, 1000), "0.00 %");
+  assert.equal(signedShare(1, 0), "");
+  assert.equal(shareOf(24.88, 999.88), "2.49 %");
+  assert.equal(shareOf(1, 0), "");
+  assert.equal(meterShare(24.85, 100), 24.85);
+  assert.equal(meterShare(150, 100), 100);
+  assert.equal(meterShare(-5, 100), 0);
+});
+
+test("a position says its worth, its gain since its buy and where it stands between its stop and its target", () => {
+  const facts = positionFacts({ size: 0.019, entry: 1305.72, price: 1307.2, stop: 1283.5, target: 1345 }, "USDC");
+  assert.equal(facts.value, "24.84 USDC");
+  assert.equal(facts.gain, "+0.03 USDC");
+  assert.equal(facts.gainShare, "+0.11 %");
+  assert.equal(facts.tone, "up");
+  assert.equal(Math.round(facts.priceAt), 39);
+  assert.equal(Math.round(facts.entryAt), 36);
+  assert.equal(facts.toStop, "−1.81 %");
+  assert.equal(facts.toTarget, "+2.89 %");
+  // No target: the scale runs as far over the entry as the stop is under it; under the stop, the mark stays at 0.
+  const open = positionFacts({ size: 1, entry: 100, price: 90, stop: 95, target: null }, "EUR");
+  assert.equal(open.priceAt, 0);
+  assert.equal(open.entryAt, 50);
+  assert.equal(open.toTarget, "");
+  assert.equal(open.tone, "down");
+  // A price the daemon could not give leaves the words empty and the mark off the scale.
+  const unread = positionFacts({ size: 1, entry: null, price: null, stop: 95, target: 110 }, "EUR");
+  assert.deepEqual([unread.value, unread.gain, unread.priceAt, unread.entryAt], ["", "", null, null]);
+});
+
+test("the watch says what it looks at, the schedule a move starts, and what is wrong with it", () => {
+  const when = (ts) => `at ${ts}`;
+  const settings = { mode: "paper", products: ["*"], quote: "USDC", min_volume: 1000000, wake_per_day: 6 };
+  const watch = {
+    wake_schedule: "sch_1", schedule_name: "Shift", schedule_on: true, next_shift_at: 900, wakes_today: 2,
+    last_wake_at: 500, products_now: 53,
+  };
+  const lines = watchLines({ settings, watch, positions: [{}] }, when);
+  assert.deepEqual(lines.map((line) => line.id), ["exits", "market", "wake", "shift"]);
+  assert.match(lines[0].text, /^One open position: stop and target looked at every 15 seconds/);
+  assert.equal(lines[1].text, "53 products in USDC that trade at least 1,000,000 a day.");
+  assert.equal(lines[2].text, "A move of the market starts Shift: 2 of 6 today, the last at at 500.");
+  assert.equal(lines[3].text, "Next shift at at 900.");
+  const gone = watchLines({ settings, watch: { ...watch, schedule_name: null }, positions: [] }, when);
+  assert.equal(gone[2].tone, "bad");
+  assert.match(gone[2].text, /names no schedule \(sch_1\)/);
+  const off = watchLines({ settings, watch: { ...watch, schedule_on: false }, positions: [] }, when);
+  assert.equal(off.find((line) => line.id === "wake")?.tone, "warn");
+  assert.equal(off.length, 3);
+  const live = watchLines({ settings: { ...settings, mode: "live" }, watch, positions: [] }, when);
+  assert.equal(live[0].tone, "warn");
+  assert.deepEqual(watchLines({ settings, watch: null, positions: [] }, when), []);
+});
+

@@ -978,7 +978,7 @@ function contextControl(initial, remember) {
   const evidence = el("div", { class: "context-evidence" });
   const facts = el("div", { class: "context-why-facts" });
   const body = el("div", { class: "context-why-body" }, el("h4", null, `Chat size of ${name}`), facts, el("h4", null, `This model's tasks, last ${EVIDENCE_DAYS} days`), evidence);
-  const row = el("tr", { class: "context-why", id: whyId, hidden: true }, el("td", { colspan: "4" }, body));
+  const row = el("tr", { class: "context-why", id: whyId, hidden: true }, el("td", { colspan: "3" }, body));
   const text = el("span", null);
   const windowText = el("span", { class: "muted" });
   const cell = el("td", { class: "context-cell" }, el("span", { class: "row" }, select, text, windowText, why));
@@ -1053,13 +1053,13 @@ function modelRows(model, mainModel, remember) {
     el(
       "tr",
       { dataset: { model: model.ref } },
+      // What it can do goes under its name (item 778): as a column of its own it pushed the menus past the card's edge.
       el(
         "td",
-        null,
-        el("span", { class: "mono" }, model.ref),
-        model.ref === mainModel ? el("span", { class: "badge b-info" }, "default") : null,
+        { class: "model-cell" },
+        el("span", { class: "model-cell-name" }, el("span", { class: "mono" }, model.ref), model.ref === mainModel ? el("span", { class: "badge b-info" }, "default") : null),
+        capabilities(model),
       ),
-      el("td", null, capabilities(model)),
       el("td", { class: "reasoning-cell" }, reasoningControl(model)),
       context.cell,
     ),
@@ -1074,7 +1074,7 @@ function modelTable(provider, mainModel, remember) {
     el(
       "table",
       { class: "table wide" },
-      el("thead", null, el("tr", null, el("th", null, "Model"), el("th", null, "Can"), el("th", null, "Reasoning"), el("th", null, "Chat size"))),
+      el("thead", null, el("tr", null, el("th", null, "Model"), el("th", null, "Reasoning"), el("th", null, "Chat size"))),
       el("tbody", null, provider.models.map((model) => modelRows(model, mainModel, remember))),
     ),
   );

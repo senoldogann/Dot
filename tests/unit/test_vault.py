@@ -3,6 +3,7 @@ typed, as an address writes it and inside a JSON string), and what
 the policy makes of a fill: asked in every mode but yolo whatever the rules say, a rule's hand-off alone stricter, and
 answered by the owner, not the review model; the shell never runs 1Password's command line."""
 
+import asyncio
 import time
 from pathlib import Path
 
@@ -41,6 +42,12 @@ from dotagent.vault.masking import MASK, in_address, mask_error, masked
         ("https://example.com", ("com",), False),
         ("about:blank", ("https://github.com",), False),
         ("https://github.com", (), False),
+        # A website saved in Unicode is the page Chrome is on in its ASCII form (item 786).
+        ("https://xn--bcher-kva.de/login", ("https://bücher.de",), True),
+        ("https://xn--bcher-kva.de/login", ("https://bucher.de",), False),
+        # IDNA 2003 maps ß to ss: straße.de is never read as strasse.de, another site, and matches no page instead.
+        ("https://strasse.de/login", ("https://straße.de",), False),
+        ("https://xn--strae-oqa.de/login", ("https://straße.de",), False),
     ],
 )
 def test_a_login_is_filled_on_its_own_sites_alone(url: str, websites: tuple[str, ...], fills: bool) -> None:
@@ -440,3 +447,25 @@ def test_what_was_kept_out_of_addresses_goes_with_the_tab_it_was_typed_into(tmp_
     assert tab.page not in session._kept_out and other.page in session._kept_out
     session._forget_tabs()
     assert session._kept_out == {}
+
+
+async def test_connect_without_the_1password_app_says_so_and_that_the_vault_keeps_the_logins(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Item 791: op alone, as Homebrew installs it, signs in to no account; Connect said to turn on a setting of an app
+    the Mac does not have. Without the app it says the app is missing; with it, the setting as before."""
+    from dotagent.vault import onepassword
+
+    client = onepassword.OnePassword(tmp_path / "op")
+
+    async def no_accounts(args: tuple[str, ...], token: str | None, timeout_s: float) -> str:
+        return "[]"
+
+    monkeypatch.setattr(client, "_op", no_accounts)
+    monkeypatch.setattr(onepassword, "_APP_PLACES", (tmp_path / "1Password.app",))
+    with pytest.raises(onepassword.VaultError, match="app is not installed on this Mac") as missing:
+        await client.connect()
+    assert "Settings › Vault" in missing.value.message
+    await asyncio.to_thread((tmp_path / "1Password.app").mkdir)
+    with pytest.raises(onepassword.VaultError, match="Integrate with 1Password CLI"):
+        await client.connect()

@@ -259,6 +259,18 @@
   display: none;
 }
 
+/* On a phone the select keeps its whole width for the model's name (item 787): the provider's name, which stood in the
+   box and left the name cut short, is the group the name is under when the list opens. */
+@media (max-width: 720px) {
+  .model-pick .select {
+    padding-right: 32px;
+  }
+
+  .model-pick-provider {
+    display: none;
+  }
+}
+
 /* Every model, by provider (item 563): a search over the providers' folds, each fold a row with its models' count at its
    right; a model the search leaves out, and a provider with none, are out of sight. */
 .models-search {
@@ -1231,12 +1243,23 @@
   font-weight: var(--weight-label);
 }
 
+/* The model's name and its service on one line, the service going under the name where both do not fit (a phone); a
+   name longer than the row ends in an ellipsis instead of breaking mid-word (item 778). */
 .standby-name {
   display: flex;
+  flex-wrap: wrap;
   min-width: 0;
   align-items: baseline;
-  gap: 12px;
-  overflow-wrap: anywhere;
+  gap: 0 12px;
+}
+
+.standby-name > .mono,
+.standby-name > .muted {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .standby-name > .mono {
@@ -2563,6 +2586,31 @@
 
 .note-card {
   overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  /* On a phone the four choices stand two by two, the last of them whole; in one line it ran off the edge (item 778). */
+  .note-tools .segmented {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .note-tools .segmented button {
+    padding-inline: var(--space-2);
+  }
+
+  /* A note's text takes the card's width, its pin, edit and forget going under it: beside it, they squeezed the text
+     to half the card and broke its code mid-word (item 778). */
+  .note-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .note-actions {
+    align-self: flex-end;
+  }
 }
 
 .note-row {
@@ -4346,8 +4394,69 @@
   color: var(--text-2);
 }
 
+/* The list scrolls in its card (item 768): its rows are drawn as it nears its end, with no Show more to press. */
+.vault-rows {
+  max-height: min(70vh, 800px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: inherit;
+}
+
 .vault-rows > .vault-row + .vault-row {
   border-top: 1px solid var(--border);
+}
+
+.vault-end {
+  height: 1px;
+}
+
+/* While items are chosen to delete, a bar over the list: how many are ticked, Select all, Delete and the way out. */
+.vault-select-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.vault-select-bar[hidden] {
+  display: none;
+}
+
+.vault-select-count {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.vault-select-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.vault-pick {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.vault-pick:has(.vault-check:checked) {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.vault-pick:has(.vault-check:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+
+.vault-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .vault-row {
@@ -4399,11 +4508,14 @@
   overflow-wrap: anywhere;
 }
 
+/* A username or an address on one line, ending in an ellipsis: broken mid-word on a phone it read as two (item 778). */
 .vault-sub {
+  overflow: hidden;
   color: var(--muted);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vault-actions {
@@ -4541,6 +4653,10 @@
     padding: var(--space-3) var(--space-4);
   }
 
+  .vault-select-bar {
+    padding-left: var(--space-4);
+  }
+
   /* The four tabs with their counts fit a phone's width. */
   .note-tools .segmented.vault-tabs button {
     padding-inline: var(--space-2);
@@ -4584,9 +4700,342 @@
   margin: var(--space-2) var(--space-4) 0;
 }
 
-/* ---------- Settings › Trading: a choice of three over what each means, the limits as rows of a number and its currency,
-   the products as chips, the key's form, the account's figures and the orders as rows. Nothing here is a table, so that a
-   phone's width holds it. ---------- */
+/* ---------- Settings › Trading, a trading desk (item 777): the account's worth over its day and the limits' meters, the
+   positions, holdings and orders as tables of figures that line up (tabular numbers, right-aligned), a phone's table
+   turned into labelled lines, the watch's lines with their tone, and under them the settings: a choice of three over
+   what each means, the limits as rows of a number and its currency, the products as chips and the key's form. ---------- */
+
+.trading-divider {
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.desk-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5) var(--space-6);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+}
+
+.desk-hero,
+.desk-stat {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.desk-label {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-label);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.desk-value {
+  color: var(--text);
+  font-size: var(--text-2xl);
+  line-height: var(--leading-2xl);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-sub {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.desk-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-6);
+}
+
+.desk-stat {
+  text-align: right;
+}
+
+.desk-figure {
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  font-weight: var(--weight-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-share {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-meters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-3) var(--space-6);
+  padding: var(--space-4) var(--space-5);
+}
+
+.desk-meter {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+.desk-meter .desk-label {
+  grid-column: 1;
+}
+
+.desk-meter-words {
+  grid-column: 1 / -1;
+  justify-self: end;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-track {
+  grid-column: 1 / -1;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.desk-fill {
+  display: block;
+  width: var(--fill, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ok);
+}
+
+.desk-fill.warn {
+  background: var(--warn);
+}
+
+.desk-fill.bad {
+  background: var(--bad);
+}
+
+.trading-table-card {
+  overflow: hidden;
+}
+
+.trading-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.trading-table th {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-label);
+  letter-spacing: var(--tracking-caps);
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.trading-table td {
+  padding: var(--space-3) var(--space-4);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.trading-table tbody + tbody td,
+.trading-table tbody tr + tr td {
+  border-top: 1px solid var(--border);
+}
+
+.trading-table .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.trading-table .trading-reason td {
+  padding-top: 0;
+  border-top: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.trading-asset {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+}
+
+.trading-asset strong {
+  font-weight: var(--weight-title);
+}
+
+.trading-orders .trading-asset {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.trading-share {
+  display: block;
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.trading-side {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.trading-side.buy {
+  background: var(--ok-weak);
+  color: var(--ok);
+}
+
+.trading-side.sell {
+  background: var(--bad-weak);
+  color: var(--bad);
+}
+
+.trading-range {
+  display: grid;
+  grid-template-columns: auto minmax(5rem, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.trading-range-end {
+  display: grid;
+  color: var(--text-2);
+  line-height: var(--leading-xs);
+  text-align: center;
+}
+
+.trading-range-end small {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.trading-range-end small.up {
+  color: var(--ok);
+}
+
+.trading-range-end small.down {
+  color: var(--bad);
+}
+
+.trading-range-track {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, var(--bad-weak), var(--surface-3) 50%, var(--ok-weak));
+}
+
+.trading-range-mark {
+  position: absolute;
+  top: 50%;
+  left: var(--at, 0%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--surface);
+  border-radius: var(--radius-pill);
+  background: var(--muted);
+  transform: translate(-50%, -50%);
+}
+
+.trading-range-mark.entry {
+  width: 2px;
+  height: 14px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: var(--text-2);
+}
+
+.trading-range-mark.now.up {
+  background: var(--ok);
+}
+
+.trading-range-mark.now.down {
+  background: var(--bad);
+}
+
+.trading-watch {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.set-card.trading-watch > :not([hidden]) ~ :not([hidden]) {
+  border-top: 0;
+}
+
+.trading-watch-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.trading-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--faint);
+  transform: translateY(-1px);
+}
+
+.trading-watch-line.ok .trading-dot {
+  background: var(--ok);
+}
+
+.trading-watch-line.warn .trading-dot {
+  background: var(--warn);
+}
+
+.trading-watch-line.bad {
+  color: var(--bad);
+}
+
+.trading-watch-line.bad .trading-dot {
+  background: var(--bad);
+}
+
+.trading-unread {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+}
 
 .trading-modes {
   display: grid;
@@ -4736,5 +5185,74 @@
   /* The limit's field is narrower, so that its row's text keeps room beside it. */
   .trading-amount {
     width: 7.5rem;
+  }
+
+  /* On a phone the desk's figures go under its worth, each on the left. */
+  .desk-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .desk-stat {
+    text-align: left;
+  }
+
+  /* A table's row is a card of labelled lines: the head goes, and each cell says its column's name first. */
+  .trading-table thead {
+    display: none;
+  }
+
+  .trading-table,
+  .trading-table tbody,
+  .trading-table tr,
+  .trading-table td {
+    display: block;
+  }
+
+  .trading-table tr {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .trading-table tbody + tbody tr:first-child,
+  .trading-table tbody tr + tr:not(.trading-reason) {
+    border-top: 1px solid var(--border);
+  }
+
+  .trading-table td,
+  .trading-table tbody + tbody td,
+  .trading-table tbody tr + tr td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-1) 0;
+    border-top: 0;
+    text-align: right;
+  }
+
+  .trading-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: var(--text-xs);
+    line-height: var(--leading-sm);
+    text-align: left;
+  }
+
+  .trading-table .trading-reason {
+    padding-top: 0;
+  }
+
+  .trading-table .trading-reason td {
+    display: block;
+    text-align: left;
+  }
+
+  .trading-table .trading-reason td::before {
+    content: none;
+  }
+
+  .trading-range {
+    min-width: 0;
+    width: 70%;
   }
 }

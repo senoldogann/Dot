@@ -1,6 +1,7 @@
 // What Settings › Trading says in numbers and words (docs/daemon.md, Settings › Trading): money in the quote currency,
-// the day's change and its tone, what the person changed in the limits, what a product id must look like, and the words
-// of an order. Pure functions, with no page in them, so that tests/js can hold them.
+// prices and shares, the day's change and its tone, what the person changed in the limits, what a product id must look
+// like, an order's status, a position's gain and where it stands between its stop and its target, and the lines of the
+// watch (item 777). Pure functions, with no page in them, so that tests/js can hold them.
 
 /** The limits of `[trading]`, in the order the page lists them, each with its label and what it caps. */
 export const LIMITS = [
@@ -19,7 +20,12 @@ export const MODE_LINES = {
 
 const MONEY = new Intl.NumberFormat("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const AMOUNT = new Intl.NumberFormat("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 8 });
-const PRODUCT = /^[A-Z0-9]{2,12}-[A-Z0-9]{2,12}$/;
+const WHOLE = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 0 });
+const SHARE = new Intl.NumberFormat("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const PRICE = new Intl.NumberFormat("en-GB", { maximumSignificantDigits: 8 });
+// As the daemon reads a product id (config.py, _PRODUCT): the page refuses what the daemon would.
+const PRODUCT = /^[A-Z0-9]{2,10}-[A-Z]{3,5}$/;
+const ANY_PRODUCT = "*";
 const MINUS = "−";
 
 /** "1,234.50 EUR": an amount of the quote currency to the cent. */
@@ -71,7 +77,16 @@ export function parseAmount(text) {
  */
 export function parseProduct(text, quote) {
   const id = text.trim().toUpperCase();
+  // "*": every product of the quote that trades the daemon's min_volume a day (item 771).
+  if (id === ANY_PRODUCT) {
+    return id;
+  }
   return PRODUCT.test(id) && id.endsWith(`-${quote}`) ? id : null;
+}
+
+/** What a product's chip says: its id, or for "*" the whole market down to the daemon's min_volume (item 771). */
+export function productLabel(id, minVolume, quote) {
+  return id === ANY_PRODUCT ? `Every product trading ${WHOLE.format(minVolume)} ${quote} a day` : id;
 }
 
 /**
@@ -126,32 +141,6 @@ export function noAccountWords(view) {
   return "The account could not be read.";
 }
 
-/**
- * An order as a row says it: `title` ("Buy BTC-EUR"), `amount` (what it was worth; empty for a failed order, which
- * moved nothing), `facts` (when, how much of the base at what price, the fee, which account) and `note`, what the run
- * wrote with it ("" for none).
- * @param {{ mode: string, product: string, side: string, notional: number, size: number, price: number, fee: number, status: string, ts: number, note: string }} order
- * @param {string} quote
- * @param {(ts: number) => string} when how a time reads
- */
-export function orderWords(order, quote, when) {
-  const base = order.product.split("-")[0];
-  const facts = [when(order.ts)];
-  if (order.size > 0 && order.price > 0) {
-    facts.push(`${amountOf(order.size, base)} at ${money(order.price, quote)}`);
-  }
-  if (order.fee > 0) {
-    facts.push(`fee ${money(order.fee, quote)}`);
-  }
-  facts.push(order.mode === "paper" ? "paper" : "live");
-  return {
-    title: `${order.side === "buy" ? "Buy" : "Sell"} ${order.product}`,
-    amount: order.status === "failed" ? "" : money(order.notional, quote),
-    facts: facts.join(" · "),
-    note: order.note,
-  };
-}
-
 /** The badge class and words of an order's status. */
 export function statusWords(status) {
   switch (status) {
@@ -165,3 +154,118 @@ export function statusWords(status) {
       return { tone: "b-info", label: "Pending" };
   }
 }
+
+/** "1,305.72", "0.000012345": a price with the digits it has, to eight that count. */
+export function price(value) {
+  return PRICE.format(value);
+}
+
+/** "+0.11 %", "−0.01 %" (a true minus) or "0.00 %": `change` as a share of `base`; "" when `base` is no positive number. */
+export function signedShare(change, base) {
+  if (!(base > 0)) {
+    return "";
+  }
+  const hundredths = Math.round((change / base) * 10000);
+  if (hundredths === 0) {
+    return "0.00 %";
+  }
+  return `${hundredths > 0 ? "+" : MINUS}${SHARE.format(Math.abs(hundredths) / 100)} %`;
+}
+
+/** "2.49 %": `value` as an unsigned share of `total`; "" when `total` is no positive number. */
+export function shareOf(value, total) {
+  return total > 0 ? `${SHARE.format((value / total) * 100)} %` : "";
+}
+
+/** How full a meter of `used` against `limit` is, from 0 to 100. */
+export function meterShare(used, limit) {
+  if (!(limit > 0) || !(used > 0)) {
+    return 0;
+  }
+  return Math.min(100, (used / limit) * 100);
+}
+
+/**
+ * A position (an open exit, item 777) as its row says it: what it is worth now, its gain or loss since its buy with the
+ * tone that goes with it, and where its entry and the price stand on the scale from the stop (0) to the target (100).
+ * With no target the scale runs as far over the entry as the stop is under it. A price or an entry the daemon could not
+ * give leaves its words empty and its mark off the scale (`null`).
+ * @param {{ size: number, entry: number | null, price: number | null, stop: number, target: number | null }} position
+ * @param {string} quote
+ */
+export function positionFacts(position, quote) {
+  const now = position.price;
+  const entry = position.entry;
+  const gain = now === null || entry === null ? null : (now - entry) * position.size;
+  const top = position.target ?? (entry === null ? null : entry + (entry - position.stop));
+  /** @param {number | null} value */
+  const at = (value) => {
+    if (value === null || top === null || !(top > position.stop)) {
+      return null;
+    }
+    return Math.max(0, Math.min(100, ((value - position.stop) / (top - position.stop)) * 100));
+  };
+  return {
+    value: now === null ? "" : money(now * position.size, quote),
+    gain: gain === null ? "" : signedMoney(gain, quote),
+    gainShare: gain === null || entry === null ? "" : signedShare(gain, entry * position.size),
+    tone: gain === null ? "flat" : changeTone(gain),
+    priceAt: at(now),
+    entryAt: at(entry),
+    toStop: now === null ? "" : signedShare(position.stop - now, now),
+    toTarget: now === null || position.target === null ? "" : signedShare(position.target - now, now),
+  };
+}
+
+/**
+ * What the card of the watch says (item 777), line by line, each with a tone (`ok`, `warn`, `bad` or `muted`): the
+ * stops it looks at, the market it reads, the schedule a move starts and how often it did today, and the next shift.
+ * @param {{ settings: Record<string, any>, watch: Record<string, any> | null, positions: unknown[] }} view
+ * @param {(ts: number) => string} when how a time reads
+ * @returns {{ id: string, tone: string, text: string }[]}
+ */
+export function watchLines(view, when) {
+  const { settings, watch, positions } = view;
+  if (watch === null) {
+    return [];
+  }
+  const lines = [];
+  if (settings.mode === "live") {
+    lines.push({ id: "exits", tone: "warn", text: "Dot does not watch stops on your Coinbase account yet: set them on Coinbase." });
+  } else {
+    const count = positions.length;
+    lines.push(
+      count === 0
+        ? { id: "exits", tone: "muted", text: "No open position: each buy's stop and target are watched once it fills." }
+        : { id: "exits", tone: "ok", text: `${count === 1 ? "One open position" : `${count} open positions`}: stop and target looked at every 15 seconds, day and night.` },
+    );
+  }
+  const whole = settings.products.includes(ANY_PRODUCT);
+  const products = watch.products_now === null ? "The products" : `${watch.products_now} product${watch.products_now === 1 ? "" : "s"}`;
+  lines.push({
+    id: "market",
+    tone: watch.products_now === null ? "warn" : "muted",
+    text: whole
+      ? `${products} in ${settings.quote} that trade at least ${WHOLE.format(settings.min_volume)} a day${watch.products_now === null ? " (Coinbase's list could not be read now)" : ""}.`
+      : `${settings.products.join(", ")}.`,
+  });
+  if (watch.wake_schedule === "") {
+    lines.push({ id: "wake", tone: "muted", text: "No schedule is started by a move of the market: name one in [trading] wake_schedule." });
+  } else if (watch.schedule_name === null) {
+    lines.push({ id: "wake", tone: "bad", text: `[trading] wake_schedule names no schedule (${watch.wake_schedule}): no run is woken.` });
+  } else if (!watch.schedule_on) {
+    lines.push({ id: "wake", tone: "warn", text: `${watch.schedule_name} is switched off: no run is woken, and it does not fire at its time.` });
+  } else {
+    const last = watch.last_wake_at === null ? "" : `, the last at ${when(watch.last_wake_at)}`;
+    lines.push({
+      id: "wake",
+      tone: "ok",
+      text: `A move of the market starts ${watch.schedule_name}: ${watch.wakes_today} of ${settings.wake_per_day} today${last}.`,
+    });
+    if (watch.next_shift_at !== null) {
+      lines.push({ id: "shift", tone: "muted", text: `Next shift at ${when(watch.next_shift_at)}.` });
+    }
+  }
+  return lines;
+}
+

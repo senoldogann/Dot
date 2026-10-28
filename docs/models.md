@@ -69,8 +69,9 @@ the run's own model is never its helper.
 
 `standby` lists the models a run moves to when its own model answers with a quota, rate-limit or key error (HTTP 401),
 refuses access to it (HTTP 403: a model, a region or a plan the key may not use; or OpenRouter's 404 for a model the
-account's privacy settings leave no provider of, item 361), its provider has no key, or its service's content filter
-stops the reply (item 437; that pauses the model for no other run): the run goes on from the same step, with the tools
+account's privacy settings leave no provider of, item 361), its provider has no key, its service's content filter
+stops the reply (item 437; that pauses the model for no other run), or the run's own model answers with nothing as
+often as a run is nudged to answer (item 789; that pauses it for no other run either): the run goes on from the same step, with the tools
 that step had, on the first standby model that can take it over, the model is told, and the timeline shows the switch,
 which the model chip follows. The run's reasoning level becomes the nearest one the new model offers. A run takes each
 model once at most, in the order of the list, and never goes back to one it left. A standby model that cannot call tools
@@ -115,8 +116,23 @@ past, such as 500, 502, 503, 504 or 529) and no standby model takes over, the ru
 asks the same step again after 10 s, then 20 and 40 s, then every 60 s, for `model_wait_s` in `[agent]` (900 s by
 default; at least four times however short the wait; 0 does not wait), and goes on from that step as soon as the model
 answers, so a network that drops for a while costs a pause instead of the run. The timeline shows one line for the wait,
-which each try rewrites with the error, the number of tries, the next try and the time the wait ends, and one more when
-the model answers again. A stop ends the wait at once. A model still out of reach when the wait is over fails the run,
+which each try rewrites with the error, the number of tries, the clock time of the next try and the time the wait ends,
+and one more when the model answers again.
+
+**A network that is down** (item 769). A call whose connection broke tells only that it broke, so Dot checks whether it
+can still connect to the model's server (its name resolves and its port takes a connection; nothing is sent; behind an
+`HTTPS_PROXY`, `HTTP_PROXY` or `ALL_PROXY` the check always says yes). A connector whose call broke and whose server
+cannot be connected to raises at once instead of retrying for a minute in silence. A step's call that has sent nothing
+for `connection_check_s` in `[agent]` (45 s by default; 0 checks nothing) has the connection checked then and every
+15 s while it stays silent, and is given up once two checks in a row fail (one can fail on a lookup that hiccups while
+the call's own connection holds), instead of waiting out `model_call_timeout_s` (a network that dropped mid-call held a
+step for seven minutes); a slow model whose server is there is waited for. The time the line says the connection was
+gone counts from when the call fell silent. A run that waits
+for a server it cannot connect to checks every 5 s and asks the same step again as soon as it connects, within the same
+`model_wait_s`. Its line says so ("No connection to openrouter.ai; Dot asks … again as soon as it connects, until …"),
+and is rewritten when the connection is back ("The connection to openrouter.ai is back after 4m 10s; Dot asks … again").
+A local server that is not running (Ollama on `localhost:11434`) is waited for the same way. OpenCode's agent, a server
+of Dot's own, is not checked. A stop ends the wait at once. A model still out of reach when the wait is over fails the run,
 and the result names the wait and the error. A refused request ends the run at once; a key or access error, spent
 credits (OpenRouter's, Anthropic's prepaid balance, OpenCode's `CreditsError`), a model the plan does not include or a
 missing key moves it to a standby model or ends it at once.
@@ -129,7 +145,8 @@ hours by default; 0 ends the run at once, as before), and goes on from that step
 connection that breaks meanwhile (a Mac that wakes) is part of that wait. The timeline's line for the wait says why
 ("cannot answer (usage window spent)"), when it asks again and until when. What does not come back by itself is not
 waited for, whatever its provider calls it or the time it names (a gateway may name one on every answer): a month's plan
-(Ollama's "used all included Pro usage"), spent credits, a spend limit, any other quota. A wait still not over when its
+(Ollama's "used all included Pro usage" and "reached your monthly usage limit", item 789; its hourly or weekly
+limit is a window, waited for), spent credits, a spend limit, any other quota. A wait still not over when its
 time is ends the run with the provider's words. A waiting run keeps its place among `max_concurrent_runs`, as one
 waiting for a model out of reach does, and a stop ends the wait at once. An error a model service reports inside its
 answer keeps its words, Ollama's too.

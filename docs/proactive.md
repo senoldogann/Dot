@@ -198,8 +198,9 @@ decides, which is what `yolo` means (item 443); `[initiative] approvals` set to 
 first. A thing is not put on the list twice: not while it is to do or being done, nor for 30 days after it was done or
 let go. Done, it is marked so with the first line of the run's answer and you are told ("Dot did on its own", the push,
 the desktop, iMessage when it is on). A run that failed leaves it to do, up to `attempts` (3) runs; then it is let go
-and you are told. A run you stopped lets it go at once; one the daemon's stop or the emergency stop ended leaves it to
-do; one the daemon was doing when it shut down is to do again when it starts, and one it was doing when it stopped
+and you are told. A run you stopped lets it go at once; one the daemon's stop or the emergency stop ended (the stop of
+every run, or the STOP file the run saw as it worked, item 790) leaves it to do; one the daemon was doing when it shut
+down is to do again when it starts, and one it was doing when it stopped
 without shutting down (a crash) counts that try, so a thing that brings Dot down is let go after `attempts` tries. A
 thing tried as often as `attempts` allows, after the limit was lowered, is let go. A thing whose run the owner resumed
 is left to that resume while it works, and done once it ended done; another message in its chat is no sign it was done.

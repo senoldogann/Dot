@@ -1,4 +1,4 @@
-// Settings › SnapShots (item 405): a double tap of the Command key, in any application, captures the window in front
+// Settings › Snapshots (item 405): a double tap of the Command key, in any application, captures the window in front
 // into the open chat's box; what comes with it, the sound, the spring, and whether the key is watched right now.
 
 import { api } from "../api.js";
@@ -46,13 +46,13 @@ export function mount(root, ctx) {
 
   function paint() {
     const enabled = switchRowSetting({
-      label: "SnapShots",
+      label: "Snapshots",
       hint: "Capture a window and attach it to your current draft.",
       read: () => view.enabled,
       // The words follow the change once it is made (item 559): a switch that failed says so alone.
       write: async (on) => {
         await change("enabled", on);
-        toast("ok", view.enabled ? "SnapShots are on." : "SnapShots are off.");
+        toast("ok", view.enabled ? "Snapshots are on." : "Snapshots are off.");
       },
       onToggled: () => {
         if (!disposed) {
@@ -124,7 +124,7 @@ export function mount(root, ctx) {
     holder.replaceChildren(
       el(
         "div",
-        { class: "set-sections", role: "region", "aria-label": "SnapShots" },
+        { class: "set-sections", role: "region", "aria-label": "Snapshots" },
         setSection({ title: "Capture", body: setCard(enabled.element, listening(), appText.element, shortcut) }),
         setSection({ title: "When it captures", body: setCard(sound.element, animations.element, flash.element, openDot.element) }),
       ),

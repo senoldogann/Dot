@@ -37,7 +37,11 @@ run needs, sent where the configuration points:
   to the same rule, and one it was served from a private address is not given back (item 554, see
   [Tools](runs.md#tools)); Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
   when it is attached). `web_extract` sends what it read to the `fast` model, and a page a run shows in the conversation
-  loads its libraries from public CDNs (see [Tools](runs.md#tools)).
+  loads its libraries from public CDNs (see [Tools](runs.md#tools)). `recon` makes its own requests: one GET and one
+  TLS handshake, and, on `depth = "ports"`, a connect to each of 34 ports that sends nothing but the handshake; that
+  scan runs only on a host in `[recon] owned_hosts` (see [Recon](recon.md)). `security_scan` sends a form's fields
+  with a small, read-only set of payloads (item 781); it too runs only on a host in `[recon] owned_hosts`, and every
+  form action must stay on that host (see [Security scan](security.md)).
 - **From the shell: whatever a command sends.** The sandbox closes Dot's own files, not the network; a run that has read
   untrusted content asks before a line that sends data out (see [Safety](#safety)).
 - **To TypeSafe, once its key is saved: the texts it judges.** `judge_items` and the tools of posts and campaigns send
@@ -221,8 +225,10 @@ alone, with who sent it, its subject (cut to 200 characters) and how old the mes
 the model. Its sender and its subject are words whoever sent the message wrote, so the run counts from then on as one
 that read content third parties can author (item 684). It is a high-risk action of
 the Mac: the aggressive preset allows it, balanced and cautious ask, a research run has no such tool. Typing the code
-into a field is the run's in `yolo` (item 443) and yours in every other mode (item 429), where Dot hands the field to
-you.
+into a field is the run's in `yolo` (item 443) and, when you gave the code in the conversation, in every mode (item
+797); a code the run found itself outside `yolo` is handed to you (item 429). The same holds for a password or a card
+number you gave in the browser: it is yours to hand over, so the run types it; one a page or a tool's output carries is
+never typed outside `yolo`.
 
 **Pre-approved spending.** `[policy.spend]` lists sites with caps, for example `"namecheap.com" = { per_purchase = 20,
 per_day = 50 }`. Dot reads the amount of a payment step from the labels of its controls ("Pay €19.90") and from the
@@ -246,9 +252,14 @@ trading tools, in every mode, `yolo`'s too, and no run can change them (a run's 
 Dot's other keys, below: [Trading](trading.md) says what bounds that); the `STOP` file stops every order. A `live`
 order, on your Coinbase account, carries `trade`: it waits for your yes in every mode but `yolo`, never the review
 model's or a rule's to answer, and Dot places it on your yes; a `yolo` run that read outside content has the review
-model check it (item 525). A `paper` order moves no money. The Coinbase key, which may view and trade and never
-transfer, is kept in your login Keychain; switching to live, raising a limit, allowing a product and saving a key are
-done on the Mac only, and a phone can always switch trading off.
+model check it (item 525). A `paper` order moves no money. An exit's sell (item 770), on the paper account only, is the
+one order no limit holds: Dot's daemon places it with no run once the bid reaches the stop or the target the buy named,
+and it sells what that buy bought; trading off or switched to live, the `STOP` file and Coinbase not taking orders of
+the product hold it, the exit open. On your Coinbase account Dot keeps no exit and sells nothing by itself. A move of
+the market starts the schedule `[trading] wake_schedule` names (item 772), as **Run now** does, with that schedule's own
+approvals. The Coinbase key, which may view and trade and never transfer, is kept in your login Keychain; switching to
+live, raising a limit, allowing a product and saving a key are done on the Mac only, and a phone can always switch
+trading off.
 
 **Decision order**, strictest first:
 
@@ -502,7 +513,9 @@ tells a chat that its command in the background ended as the chat's last run end
 and so is the note that tells a run at work of such an end, which clears nothing. The run a watcher starts for a mail,
 an event or a notification (item 571, see [Dot comes to you](proactive.md#watchers)) starts untrusted whatever it goes
 on from, since what a stranger wrote set it off: its goal is your own words and the item stands in its first message, in
-a fence. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`):
+a fence. The run a move of the market starts (item 772) starts unmarked, as its schedule's firing does: what its first
+message adds is product ids Dot checked against the form of an id and numbers it read from Coinbase's list, no one's
+words. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`):
 it is never among the notes a run starts with, is handed while it works or as a site's lessons (item 384), a
 `memory_search` that returns one marks the run that read it, so its next save asks again, and Settings › Memory and
 `dotx memory list` say of such a note that it was saved while reading outside content. A learned skill whose steps may
@@ -625,18 +638,18 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
     document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
     so a frame of another site gets nothing. A password goes only into a password field, where it shows in no text.
-  - No address holds a password or a code: an address is written into the views of the page, Chrome's history and
-    Dot's log, and shortened where it is long. A form that names GET as its method, names none (a browser sends a
-    form with no method by GET), or names a word no browser knows, gets neither (item 621: a form with no method used
-    to be left to the guard of Dot's Chrome). Dot's own Chrome refuses every request whose address carries one, as it
-    is or once its escapes are read back (as UTF-8, and as a page of Western European text writes them), as a script
-    builds the address from a field that is in no form: a password for as long as Dot runs, a code for five minutes
-    after it went in. The refusal and Dot's log
-    name such a request by its host alone, or by its scheme when the value is in the host. A page in another legacy
-    charset (Shift_JIS, KOI8-R and the like) can write a value Dot does not read back. Your own Chrome (Settings ›
-    Browser › My Chrome) sends its requests unguarded, so there Dot fills a username alone; your password manager
-    fills the rest. A page can still write them into its own words, which Dot masks where it shows them whole; only
-    the login's own site, which has them anyway, can do that.
+  - No address holds a password or a code: an address is written into the views of the page, Chrome's history and Dot's
+    log, and shortened where it is long. A form that names GET as its method, names none (a browser sends a form with no
+    method by GET), or names a word no browser knows, or whose button names GET, is made to send by POST before either
+    goes in, and stays so as it is sent (item 775; items 493 and 621 refused such a form, so a sign-in page whose script
+    sends its form, LinkedIn's among them, got no login). Dot's own Chrome refuses every request whose address carries
+    one, as it is or once its escapes are read back (as UTF-8, and as a page of Western European text writes them), as a
+    script builds the address from a field that is in no form: a password for as long as Dot runs, a code for five
+    minutes after it went in. The refusal and Dot's log name such a request by its host alone, or by its scheme when the
+    value is in the host. A page in another legacy charset (Shift_JIS, KOI8-R and the like) can write a value Dot does
+    not read back. Your own Chrome (Settings › Browser › My Chrome) sends its requests unguarded, so there Dot fills a
+    username alone; your password manager fills the rest. A page can still write them into its own words, which Dot
+    masks where it shows them whole; only the login's own site, which has them anyway, can do that.
   - Each fill asks you first in every mode but `yolo`, whatever your rules say (only a rule that hands it off is
     stricter), and in `auto` you answer it, not the review model.
   - The token is kept in Dot's `.env`, which no tool of a run may read, under a name `op` does not read. The shell
@@ -682,8 +695,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     value went into is marked: a screenshot of the browser covers it, and its value shows as `[hidden]` in every view of
     the page in every mode, `yolo` too. No script runs in the chat's tabs while the tab is open. A ref that names an
     element inside the label of a field (the snapshot gives a div or a span in a label a ref of its own) names that
-    field: Dot finds the label's input once, and every check (the form that sends by GET among them), the mark and the
-    fill are of it, so such a ref is refused as the input's own is. Only an input, a textarea or a dropdown takes a
+    field: Dot finds the label's input once, and every check, the form it makes send by POST, the mark and the fill are
+    of it, so such a ref fills the input as the input's own does. Only an input, a textarea or a dropdown takes a
     password or a one-time code: an element that is edited (`contenteditable`) or a box a script draws as a text box
     (`role=textbox`) is hidden by no mark, has no autocomplete to keep Chrome from storing what it holds, and shows its
     text in the text of the page, so it gets nothing, in a shadow root too. A page that removes the mark, or builds a
@@ -708,16 +721,26 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     sends by POST is in Chrome's session files while Chrome runs, so that the page can be sent again, which no `off`
     changes: once Dot's own Chrome has exited, Dot deletes them, if something was filled in its run (Dot's Chrome opens
     no page of its last run). A Chrome that dies leaves them until Dot's Chrome starts again.
-  - **Addresses.** A form with no method is a form that sends by GET, to a browser, so a password or a code is not typed
-    into it, as into one that names GET. Dot's own Chrome refuses a request a page sends whose address carries the
-    password (for as long as Dot runs) or a one-time code (for five minutes), as it is or once its escapes are read
-    back: a fetch, a frame, a script's request, whatever the page builds from a field that is in no form. It refuses it
-    to the documents of the origin the value was typed into, in the tab it was typed into, as the browser knows the
-    document that sent the request, and to nothing else. A rule that acts by what a secret is tells whoever can try
-    addresses and watch which are refused, and a dictionary of passwords would give a weak one away in a dozen
-    requests; and whoever can run a script of their own can try addresses: a page of another origin (in another chat,
-    another tab, or a frame of the page itself), and the run itself, whose `browser_eval` runs in a page of the very
-    same origin in another chat, or in this chat once it closed the tab it filled. That page is not the site's but the
+  - **Addresses.** A form with no method is a form that sends by GET, to a browser, as one that names GET is. Before a
+    password or a code is typed into a field of such a form, Dot makes it send by POST (item 775): the form gets
+    `method="post"` and its buttons lose a `formmethod` of GET; the window's first and last listeners of `submit` put
+    POST back, since a browser reads the method once they have run, so a script of the page that sets GET again as the
+    form is sent is undone (a form in a shadow root, whose `submit` never reaches the window, gets them on its root too,
+    and a control named `method` hides nothing of this); and the form's own `submit()`, which fires no event, sets POST
+    first (unless a control named `submit` hides it, when the page cannot call it either). A page whose script calls
+    `HTMLFormElement.prototype.submit` itself after setting GET again, or whose own listener of `submit` sets GET and
+    stops the event before it reaches Dot's last listener, sends by GET, and its address is then as
+    below; only the login's own site can do that, and it has the password. A site that takes its sign-in by GET alone
+    gets a POST, and the sign-in fails. A page whose script sends the form itself is not changed by any of this. Dot's
+    own Chrome refuses a request a page sends whose address carries the password (for as long as Dot runs) or a one-time
+    code (for five minutes), as it is or once its escapes are read back: a fetch, a frame, a script's request, whatever
+    the page builds from a field that is in no form. It refuses it to the documents of the origin the value was typed
+    into, in the tab it was typed into, as the browser knows the document that sent the request, and to nothing else. A
+    rule that acts by what a secret is tells whoever can try addresses and watch which are refused, and a dictionary of
+    passwords would give a weak one away in a dozen requests; and whoever can run a script of their own can try
+    addresses: a page of another origin (in another chat, another tab, or a frame of the page itself), and the run
+    itself, whose `browser_eval` runs in a page of the very same origin in another chat, or in this chat once it closed
+    the tab it filled. That page is not the site's but the
     run's, and the run was never given the password, so the page of the same origin is no longer taken for the site's.
     In the tab the password was typed into no script of the run runs while it is open, so the guard holds it there
     alone. The tab's own address is not a request a page sends but the run's: the address it opens,
@@ -839,6 +862,16 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   and what it does not read gets through (a name the line builds as it runs, a quote the shell takes out twice, `sh -c
   "pb''paste"`, a script in a file, `osascript r.applescript`, which asks as a script that may send (item 561) but not
   as a read of the clipboard, a script typed into a session, `osascript -i`).
+- The system tools that both read and change the Mac are read by their verbs, from lists of reads (item 788): `diskutil`
+  (`list`, `info`, `activity`, `apfs list` and the other `list`s), `defaults` (`read`, `read-type`, `domains`, `find`,
+  after `-currentHost` or `-host <name>`), `tmutil` (`listbackups`, `status`, `latestbackup` and the other queries),
+  `csrutil status` (or `authenticated-root status`), `pmset -g` with at most one word, and `networksetup`,
+  `systemsetup`, `scutil` and `spctl` when the line begins with one of their read options and gives no other option
+  (`-get…`, `-list…`, `--get`, `--status`); a word the shell would make more words of (braces, a glob) is no read. Any
+  other verb or option, one Apple adds tomorrow included, is a change of the Mac and asks: `diskutil apfs
+  deleteContainer` and `randomDisk`, `defaults -currentHost write` and `networksetup -setwebproxy … status.example.com`
+  had passed as queries. The sandbox of the modes that ask does not keep these tools from the system's services, so the
+  guard is what asks; in `yolo` nothing does.
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts and from the `osascript` of the AppleScript
   tool, whose `do shell script` starts a shell with the same environment (item 555), `SSH_AUTH_SOCK` among them, so a
@@ -1095,14 +1128,16 @@ written (Send Later of macOS 15), and a draft to a number or address you paired 
 a send the guard cannot see, which raises no flag: a script of a page, a program the run wrote and then runs, a
 Shortcut, a job a step left behind. A picture Dot sends with an answer (item 617) is a row of that conversation too,
 flagged as yours, with a file, no words and no `◆`: Dot tells it from a picture of yours by its time (from five
-seconds before Dot handed it to Messages to a minute after) and kind, and never reads it as a message. `/stop` is run
+seconds before Dot handed it to Messages to a minute after) and kind, or, for an hour, by the name of the file it sent
+(item 806), and never reads it as a message. `/stop` is run
 in any case, and so are the plain words `stop`, `dur` and
 `durdur` when they are the whole message (item 611): they only reduce what Dot does. A row received from your paired
 number or address is judged like a sent one, by the window and by Send Later: a run sends as this Mac's account,
 and `[policy] sealed_paths` closes `chat.db` to its commands, but that Messages writes no received copy of what this
 Mac sends to your own address cannot be shown, and if it did, a run's message would pass for yours; it costs a message
 now and then, which is told and sent again. With one Apple ID Messages may keep a message to yourself as a sent row and a received row: in one chat,
-with the same words and dated at most ten seconds apart, they are one command, and the second is let go. Pairing someone
+with the same words and the same files' names, dated at most ten seconds apart, they are one command, and the second
+is let go. Pairing someone
 else's number or address gives them Dot: the code you type back shows only that it reached whoever holds the number, so
 with someone else's every message they send you, and every message you send them, would be read as your command.
 Settings › Channels shows, under **Advanced**, what the channel sees of Messages' database (the newest row, the cursor, the two files, the
@@ -1110,9 +1145,11 @@ last command and error) and warns when its log changed and nothing Dot reads did
 Approvals and questions are never answered on a channel: a line says one waits and where to answer, in Dot's UI or the
 phone app, so that a channel's account, if taken, could not approve anything. While the emergency stop is engaged a
 message on a channel starts no run (see Emergency stop, below). A message is read up to 4,000 characters
-and 30 a minute, and one that came more than 15 minutes before Dot read it is not run: Dot says so. A picture or a file
-sent with words is not read (item 611): the words run, the run is told the attachment was not read, and the answer
-starts by saying so to you. A row that is not
+and 30 a minute, and one that came more than 15 minutes before Dot read it is not run: Dot says so. The pictures, PDFs and
+documents a message brings are read (item 806), only from Messages' folder of attachments beside its database, as
+regular files reached with no link and of at most 20 MB, and handed to the run as the composer's uploads, fenced as
+data; a message of files and no words runs too. A voice message, a video or a sticker is not read: the words run, the
+run is told part of the message was not read, and the answer starts by saying so to you. A row that is not
 words (a sticker, an app's message, a payment: rich content, which Messages marks with a bundle of its own) is never
 run, and neither is a row that is only a link that Dot wrote, one into its own pages or one in a message it sent a
 minute before: Messages may split the link at the end of a message of Dot's into a row of its own, which has no `◆` and

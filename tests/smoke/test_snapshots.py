@@ -1,6 +1,6 @@
-"""SnapShots (item 405) through the daemon and in a real browser, with a capture of the test's own in place of the
+"""Snapshots (item 405) through the daemon and in a real browser, with a capture of the test's own in place of the
 window in front (the key is not watched here): the routes (the settings as they stand, a setting changed live and kept
-in the config file, a capture taken and claimed once), Settings › SnapShots, and the box that takes a capture that
+in the config file, a capture taken and claimed once), Settings › Snapshots, and the box that takes a capture that
 waited and one that comes while it is on screen."""
 
 import asyncio
@@ -84,7 +84,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
-    # SnapShots are off in the config, so the key is not watched here; the service still takes captures by hand.
+    # Snapshots are off in the config, so the key is not watched here; the service still takes captures by hand.
     # Nothing is drawn and no browser is driven here: the overlay and what brings Dot forward are the test's own.
     await built.snapshots.start(_taker(built, []), _no_window, _Drawn())
     try:
@@ -211,9 +211,9 @@ async def test_the_settings_page_shows_and_changes_what_the_daemon_holds(
         host, port = _address(client)
         await page.goto(ui_url(host, port, TOKEN))
         await page.goto(f"http://{host}:{port}/#/settings/snapshots")
-        card = page.get_by_role("region", name="SnapShots")
+        card = page.get_by_role("region", name="Snapshots")
         await expect(card).to_be_visible()
-        await expect(card.get_by_role("switch", name="SnapShots")).to_have_attribute("aria-checked", "false")
+        await expect(card.get_by_role("switch", name="Snapshots")).to_have_attribute("aria-checked", "false")
         await expect(card.get_by_text("Off: the Command key is not watched.")).to_be_visible()
         await expect(card.locator(".snapshots-keys")).to_have_text("⌘ ⌘")
         text_switch = card.get_by_role("switch", name="Include app text")
@@ -252,7 +252,7 @@ async def test_a_switch_the_daemon_refused_says_so_and_not_that_it_was_done(
         host, port = _address(client)
         await page.goto(ui_url(host, port, TOKEN))
         await page.goto(f"http://{host}:{port}/#/settings/snapshots")
-        switch = page.get_by_role("region", name="SnapShots").get_by_role("switch", name="SnapShots")
+        switch = page.get_by_role("region", name="Snapshots").get_by_role("switch", name="Snapshots")
         await expect(switch).to_have_attribute("aria-checked", "false")
         await page.route("**/api/snapshots/settings", refuse)
         await switch.click()

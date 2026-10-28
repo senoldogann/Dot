@@ -1,5 +1,6 @@
 """The delegate tool: hand one self-contained part of the work to a run of its own and read its report."""
 
+import re
 import secrets
 import time
 from collections.abc import Sequence
@@ -23,6 +24,11 @@ _SUMMARY_CHARS: int = 100
 _NO_REPORT: str = "(the run reported nothing)"
 # How much of a delegated run's report goes into the evidence of the plan step it closes.
 _EVIDENCE_REPORT_CHARS: int = 240
+# A delegated report is a claim until it says what was run and what came back (item 802).
+_VERIFICATION = re.compile(r"(?im)^\s*(?:#{1,3}\s*)?verification\b")
+_NO_VERIFICATION: str = (
+    "No Verification section was reported; treat the report as a claim and check the work before you rely on it."
+)
 
 
 class DelegateArgs(ToolArgs):
@@ -30,7 +36,8 @@ class DelegateArgs(ToolArgs):
         min_length=1,
         description=(
             "A complete instruction for the delegated agent: what to do, every concrete input it needs (paths, URLs, "
-            "values) and what its final answer must contain. It cannot see this conversation."
+            "values) and what its final answer must contain. Ask it to end with a `Verification:` section that gives "
+            "the command or check it ran and the answer; it cannot see this conversation."
         ),
     )
     model: str | None = Field(
@@ -140,12 +147,13 @@ def render_outcome(outcome: DelegateOutcome, nonce: str, step: int | None, unpla
     header: str = ended if unplanned is None else f"{unplanned}\n{ended}"
     report: str = run.result.strip() or _NO_REPORT
     body: str = f"{header}\n{_fence(run, report, nonce)}" if outcome.tainted else f"{header}\n{report}"
+    verification: str = "" if _VERIFICATION.search(report) else f"\n{_NO_VERIFICATION}"
     closing: str = (
         ""
         if step is None
         else f"\nPlan step {step} is marked {'done' if run.status == 'done' else 'failed'} with this as its evidence."
     )
-    text: str = f"{body}{closing}"
+    text: str = f"{body}{verification}{closing}"
     result: ToolResult = ok(text) if run.status == "done" else fail(text)
     return mark_untrusted(result) if outcome.tainted else result
 
@@ -180,7 +188,8 @@ def _delegate_tool() -> RegisteredTool:
             "owner's agent you are, when you are one); it does research when you do and otherwise a task. It cannot "
             "ask the user questions, consult a helper or delegate again. Do not delegate what one or two tool calls "
             "can do. Name the plan step the part is (step) and its report closes that step; a step the plan does not "
-            "have runs all the same and closes nothing."
+            "have runs all the same and closes nothing. Ask for a final `Verification:` section with the command or "
+            "check and its answer; a report without one is marked as a claim."
         ),
         args_model=DelegateArgs,
         modes=ALL_MODES,

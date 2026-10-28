@@ -307,6 +307,27 @@ class TradingOrderRecord(FrozenModel):
     note: str
 
 
+class TradingExitRecord(FrozenModel):
+    """The exit of a buy (item 770): Dot sells ``size`` of ``product`` once the bid falls to ``stop`` or rises to
+    ``target``. ``status`` is ``open`` while it is watched (or waits for its account to be in use again), ``stopped``
+    or ``targeted`` once its sell filled, ``closed`` once sells by hand took its size or the paper account started
+    again, ``failed`` when its sell was refused; ``order_id`` is the buy's, ``sell_id`` the sell's that closed it."""
+
+    id: str
+    mode: Literal["paper", "live"]
+    product: str
+    size: float
+    stop: float
+    target: float | None
+    ts: float
+    order_id: str
+    run_id: str
+    status: Literal["open", "stopped", "targeted", "closed", "failed"]
+    closed_ts: float | None
+    sell_id: str
+    note: str
+
+
 class EventRecord(FrozenModel):
     id: int
     run_id: str

@@ -15,6 +15,7 @@ from pathlib import Path
 from dotagent.cli_commands import (
     Command,
     EvalCheckCommand,
+    EvalFromRunCommand,
     EvalListCommand,
     EvalReportCommand,
     EvalRunCommand,
@@ -22,9 +23,10 @@ from dotagent.cli_commands import (
 )
 from dotagent.config import AppConfig, load_default_config, load_user_config
 from dotagent.core.errors import ConfigError, InvalidValueError
-from dotagent.core.paths import evals_dir
+from dotagent.core.paths import db_path, evals_dir, screenshots_dir
 from dotagent.evals.audit import catalog_problems, task_problems
 from dotagent.evals.catalog import all_tasks, select_tasks
+from dotagent.evals.drafts import draft_from_run, save_draft
 from dotagent.evals.reports import load_report, save_report
 from dotagent.evals.results import EvalReport, EvalSettings, TaskOutcome
 from dotagent.evals.runner import (
@@ -52,6 +54,7 @@ from dotagent.evals.toolcalls_play import keys_for, play_cases
 from dotagent.evals.types import EvalTask
 from dotagent.harness.components import NO_HARNESS
 from dotagent.llm.router import parse_model_ref
+from dotagent.store.db import Store
 from dotagent.tools.shell import child_env, read_login_env
 
 _GOAL_PREVIEW_CHARS: int = 70
@@ -286,6 +289,20 @@ async def cmd_eval_tools(command: EvalToolsCommand) -> int:
     return 0 if all(result.passed for result in results) else 1
 
 
+async def cmd_eval_from_run(command: EvalFromRunCommand) -> int:
+    """Write the draft of a task from a run's goal, ending and failed tools; nothing is played."""
+    store: Store = await Store.open(db_path(), screenshots_dir())
+    try:
+        run = await store.get_run(command.run_id)
+        events = await store.list_events(run.id, 0, 500)
+    finally:
+        await store.close()
+    text: str = draft_from_run(run, events)
+    path = save_draft(text, run.id, Path(command.out) if command.out else None)
+    _write([f"Wrote the draft of run {run.id} to {path}", "Turn it into a task in src/dotagent/evals/catalog.py."])
+    return 0
+
+
 async def dispatch(command: Command) -> int:
     """Carry out one of this module's commands."""
     match command:
@@ -293,6 +310,8 @@ async def dispatch(command: Command) -> int:
             return await cmd_eval_list(command)
         case EvalCheckCommand():
             return await cmd_eval_check(command)
+        case EvalFromRunCommand():
+            return await cmd_eval_from_run(command)
         case EvalRunCommand():
             return await cmd_eval_run(command)
         case EvalReportCommand():

@@ -39,9 +39,16 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   The answer is masked of the secrets Dot holds, sent as plain text and cut to about 2,000 characters, with a link to
   the chat in Dot for the rest. A messaging app draws no Markdown, so the answer reads clean (item 617): a list item
   has a bullet (`• `, a nested one `  ◦ `, a task its box; a numbered item stays as it is), a heading stands on a line
-  of its own with a blank line before it, a table is one row to a line with its cells joined by ` · ` and its rule
-  line gone, a horizontal rule and the `> ` of a quote are gone, and so are the marks of bold, emphasis, strike and
-  code (a link reads *words (address)*). The lines of a block of code stay exactly as they are written. A run that
+  of its own with a blank line before it, a horizontal rule and the `> ` of a quote are gone, and so are the marks of
+  bold, emphasis, strike and code (a link reads *words (address)*). A table reads as a phone's narrow screen holds it
+  (item 804), where a row of cells on one line wrapped into words no column kept together: a table of two columns is
+  a line to each row, `• first: second`; one of three columns or more is a card to each row, its first cell after a
+  bullet and each other cell under it as `Header: value` (an empty one left out), a blank line between the cards; one
+  of one column is its header and a bullet to each cell. The lines of a block of code stay exactly as they are
+  written, with a blank line before and after them (none for a block indented under a list item), since a phone draws
+  no box around code. The tags of HTML (`<b>`, `<sub>`, `<details>`, `<kbd>` …) go and their words stay, an entity
+  reads as its character (`&amp;` is `&`), a footnote's mark `[^1]` reads `[1]`, and a mark written after a backslash
+  (`\*`) is the mark itself. A run that
   failed or was stopped says so, once: a stopped run says *The run was stopped.*, not twice.
 - **It reads well on a phone's narrow screen** (item 627). A list with an item whose words run over 60 characters (a
   nested item's too, the bullet not counted), which wraps there, has a blank line between its items and before and after
@@ -103,6 +110,16 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   delegated, nor of a run you typed in the chat's page. Settings › Channels › iMessage has the switch (**Progress
   messages**, on by default), live; off, only the answer comes. A channel that is off or has nobody paired is told
   nothing, and what a run did meanwhile is not told later.
+- **Dot's own lines are in your language** (item 805): every line Dot writes there itself, not the model (that a
+  message was queued, the lines of progress, how a run ended, where to answer a wait, what was left out of an answer,
+  why a message was not run, the pairing code), is in English or in Turkish. `[channels] language = "auto"` (the
+  default) speaks the language of your last message on the channel, told by its letters (ğ, ı, İ, ş are Turkish's
+  own) and its commonest words; a message that tells neither (a link, a number, *ok*) keeps the language before it, a
+  row that may be a run's own (see below) changes nothing,
+  and the language is kept across restarts, so what Dot tells you on its own speaks it too. `"en"` or `"tr"` holds
+  one. A run that works says its progress in the language of the message that started it (*Çalışıyorum (2 dk 5 sn):*,
+  *notes.txt dosyasını okudum*, *bir sayfa okudum: example.com*). An answer is in whatever language the model wrote
+  it, and what a run is told by Dot (that an attachment was not read) stays in English, for the model.
 - When a run waits for you (an approval, or a question it asked), one line says what it asks and where to answer, and at
   most one line is sent every twenty seconds: *Dot waits for your approval: Run `rm -r build`. Answer it in Dot, not
   here: https://…/#/runs/…*. A wait that comes inside that window is held, never dropped (item 611): a run that left a
@@ -174,8 +191,9 @@ row is a command only when all of these hold:
 - it is not a picture Dot sent (item 617): a picture is a message of its own with a file, no words and no `◆`, which
   Messages flags as yours like any row, so Dot tells it from a picture of yours by its time and what it is: a row that
   holds a file and no words, dated from five seconds before Dot handed a picture to Messages to a minute after, is
-  Dot's own and is never read as a message (a picture of yours in that minute is let go with it, where it would only
-  have been told *Dot does not read attachments yet*);
+  Dot's own and is never read as a message (a picture of yours with no words in that minute is let go with it: send
+  it again, or with a word), and so is a row of a file with the name of a picture Dot sent in the hour before, a copy
+  that came late (item 806);
 - it is words: a sticker, an app's message, a payment, or any rich content Messages gives a bundle of its own, is never
   a command (a link preview is read as the link it holds);
 - it is not only a link that Dot wrote: Messages may split the link at the end of one of Dot's messages into a row of
@@ -185,8 +203,10 @@ row is a command only when all of these hold:
 - it is not the second row of one message that Messages keeps as two (item 595): a sent row and a received row in the
   same chat with the same words, dated at most ten seconds apart, are one command, and the second is let go (see *One
   message, two rows*, below);
-- it is newer than the cursor, the row Dot last read, which the store keeps: the first poll sets it and answers nothing,
-  and a restart repeats nothing and loses nothing. When the newest row of the database is **below** the cursor, the
+- it is newer than the cursor, the row Dot last read, which the store keeps: pairing the first handle and switching the
+  channel on set it to the newest row then, so that what was written before is not run and what is written right after
+  is (item 793; when the database cannot be read then, the first poll sets it and answers nothing), and a restart
+  repeats nothing and loses nothing. When the newest row of the database is **below** the cursor, the
   database was rebuilt or restored from a backup and numbers its rows again from the start: every message you wrote
   from then on would have a row below the cursor and would never be read, with nothing to say so. The cursor comes
   down to the newest row (the log has `imessage_cursor_reset`, once, with the two numbers), what the database holds
@@ -209,13 +229,24 @@ yours is yours: one that comes less than 3 seconds after your words, in the same
 them, is a command of its own.
 
 The limits hold for every message: at most 4,000 characters (a longer one is told so and not cut, as cutting could
-change what it asks), at most 30 a minute (the rest of a flood is let go, with one line to say so), and a message with
-only an attachment is told it is not read yet. A message with **words and a picture or a file** (item 611) runs on its
-words: the run is told, in a note after them, that the message came with an attachment that Dot cannot read here and
-that it must not guess what it shows, and the first line of the answer says so to you (*Dot did not read the picture
-or file that came with your message, so this answers your words only.*). Reading the attachment is a feature of its
-own, not built yet. The picture that a link's preview shows is no file you sent, whatever Messages flags its row
-as. A message that came in more than 15 minutes before Dot read it (the Mac
+change what it asks) and at most 30 a minute (the rest of a flood is let go, with one line to say so). **The pictures
+and files a message brings are read** (item 806). Messages keeps them in
+`~/Library/Messages/Attachments`, beside its database, and Dot reads a file only from there, as a regular file reached
+with no link on the way and of at most 20 MB, the first ten of a message (the rest count as not read); a name that
+leads elsewhere is no file of yours, and while the emergency stop is engaged nothing is kept. A picture (PNG, JPEG, GIF, WebP) goes to the run as it is, and a photo of an iPhone (HEIC, HEIF) or a TIFF is
+drawn as PNG by macOS first, turned the way it was held; a PDF, a text or code file and a Word, Excel or PowerPoint
+file are read as the composer reads an upload: each is kept as one, in the workspace's `attachments/`, and the run is
+handed them as a message of the web UI is ([Runs](runs.md)), what is in them fenced as data, never instructions, as
+the files you attach there are ([Safety](safety.md#safety)). A message of files and no words runs too: the run is told only files came and to do what you most
+likely want, asking when it is not clear. A file Messages is still bringing down from iCloud is waited for, 15
+seconds at most (a stop you send meanwhile ends the wait at once); one that has not come by then is said to be on its
+way, and you send it again. A voice message, a
+video, a sticker and a file of no kind Dot reads are not read: with words the words run, the run is told that part of
+the message was not read and must not guess what it shows, and the answer's first line says so to you (*Dot did not
+read the picture or file that came with your message, so this answers your words only.*); with no words, Dot says
+what it reads. A message with one Apple ID that Messages keeps twice, sent and received, is run once, its files told
+by their names as its words are. The picture that a link's preview shows is no file you sent, whatever Messages
+flags its row as. A message that came in more than 15 minutes before Dot read it (the Mac
 slept, Dot was off) is not run: Dot says so, and you send it again if you still want it. A message whose words cannot
 be read is let go and never answered, as it may be one of Dot's own.
 
@@ -320,7 +351,7 @@ names of the files it read or wrote, the host of the pages it read and the first
 A picture is a file of yours that leaves the Mac, to your own devices: an answer that names one is
 the model's choice, and a run that read a page may be led to name a picture of yours that the page asked for, so the
 channel can be switched off while Dot works on content you do not trust. Nothing else leaves: what you send is read
-from this Mac's own database. See [What leaves this
+from this Mac's own database and the folder of attachments beside it. See [What leaves this
 Mac](safety.md#what-leaves-this-mac).
 
 ## If it does not work
@@ -343,8 +374,8 @@ Mac](safety.md#what-leaves-this-mac).
 | *Last error* names a message that did not go | Messages did not take Dot's answer: Automation, or the address |
 
 Left for later: other messaging apps (the router posts what a channel receives and sends what a run ends with; a
-channel is the part that reads and sends), reading attachments (a picture or a file is only said not to be read, item
-611), and answers to approvals on a channel (deliberately not).
+channel is the part that reads and sends), voice messages and videos (said not to be read, item 806), and answers to
+approvals on a channel (deliberately not).
 
 The REST routes of the tab (`/api/channels`) are in [the daemon's
 table](daemon.md#the-daemon-the-web-ui-and-the-service).

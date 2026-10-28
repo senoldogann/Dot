@@ -10,6 +10,7 @@ import os
 import re
 import secrets
 import time
+from collections.abc import Coroutine
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -83,6 +84,10 @@ _EXTRACT_TIMEOUT_S: float = 600.0
 # What web_extract keeps of its own time for the result, and the least a source is begun with (item 554).
 _EXTRACT_MARGIN_S: float = 15.0
 _EXTRACT_MIN_SOURCE_S: float = 5.0
+# How many sources web_extract reads and hands to the fast model at once (item 773): six job lists of the owner's,
+# one after the other, took 200 s, each answer of the fast model 16 to 46 s long. The provider's own max_concurrent
+# bounds the calls of the fast model as well.
+_EXTRACT_AT_ONCE: int = 4
 _TIME_RAN_OUT: str = "not extracted: the call's time ran out; ask for these sources in another call"
 _MAX_SOURCES: int = 20
 _MAX_FIELDS: int = 20
@@ -939,6 +944,23 @@ def render_extractions(extractions: tuple[Extraction, ...], problems: tuple[tupl
     return "\n".join(lines)
 
 
+def _paused_text(paused: Unavailable, now: float) -> str:
+    """Why a source was not extracted while the fast model is paused (item 240)."""
+    return f"{unavailable_text(paused, now)} cannot answer now; read it with web_fetch or read_file"
+
+
+async def _all_at_once[T](work: list[Coroutine[object, object, T]]) -> list[T]:
+    """The results of ``work``, run together, in its order. A failure of one cancels the others and is raised."""
+    tasks: list[asyncio.Task[T]] = [asyncio.ensure_future(one) for one in work]
+    try:
+        return list(await asyncio.gather(*tasks))
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
+
+
 def _extract_tool() -> RegisteredTool:
     def classify(args: ExtractArgs, ctx: ToolContext) -> ActionInfo:
         names: str = ", ".join(field.name for field in args.fields)
@@ -956,30 +978,32 @@ def _extract_tool() -> RegisteredTool:
             FieldSpec(name=field.name, description=field.description) for field in args.fields
         )
         fast: str = ctx.runtime.roles.fast()
-        extractions: list[Extraction] = []
-        problems: list[tuple[str, str]] = []
         # The call ends at its own time, with what was extracted (item 554): the executor would cancel it at
         # ``_EXTRACT_TIMEOUT_S`` and lose every extraction already paid for, so the time left bounds each source, and
-        # the sources it does not reach are listed as not extracted.
-        started: float = time.monotonic()
-        for position, source in enumerate(args.sources):
-            left: float = _EXTRACT_TIMEOUT_S - _EXTRACT_MARGIN_S - (time.monotonic() - started)
-            if left < _EXTRACT_MIN_SOURCE_S:
-                problems.extend((unread, _TIME_RAN_OUT) for unread in args.sources[position:])
-                break
-            # A fast model the router has paused is not asked, nor the source read, until the pause ends (item 240).
-            now: float = time.time()
-            paused: Unavailable | None = paused_model(ctx.runtime.router, parse_model_ref(fast).label, now)
-            if paused is not None:
-                problems.append(
-                    (source, f"{unavailable_text(paused, now)} cannot answer now; read it with web_fetch or read_file")
-                )
-                continue
-            try:
-                async with asyncio.timeout(left) as budget:
-                    text: str = await _source_text(source, ctx, authorized.flags)
-                    extractions.append(
-                        await extract(
+        # the sources it does not reach are listed as not extracted. Sources are read ``_EXTRACT_AT_ONCE`` at a time
+        # (item 773) and told in the order they were given.
+        ends_at: float = time.monotonic() + _EXTRACT_TIMEOUT_S - _EXTRACT_MARGIN_S
+        gate: asyncio.Semaphore = asyncio.Semaphore(_EXTRACT_AT_ONCE)
+
+        async def one(source: str) -> Extraction | tuple[str, str]:
+            async with gate:
+                left: float = ends_at - time.monotonic()
+                if left < _EXTRACT_MIN_SOURCE_S:
+                    return (source, _TIME_RAN_OUT)
+                # A fast model the router has paused is not asked, nor the source read, until the pause ends (item 240).
+                now: float = time.time()
+                paused: Unavailable | None = paused_model(ctx.runtime.router, parse_model_ref(fast).label, now)
+                if paused is not None:
+                    return (source, _paused_text(paused, now))
+                try:
+                    async with asyncio.timeout(left) as budget:
+                        text: str = await _source_text(source, ctx, authorized.flags)
+                        # A pause that came while the source was read (another source's rate limit) holds it too.
+                        now = time.time()
+                        paused = paused_model(ctx.runtime.router, parse_model_ref(fast).label, now)
+                        if paused is not None:
+                            return (source, _paused_text(paused, now))
+                        return await extract(
                             ctx.runtime.router,
                             fast,
                             min(config.agent.model_call_timeout_s, left),
@@ -989,13 +1013,16 @@ def _extract_tool() -> RegisteredTool:
                             text,
                             fields,
                         )
-                    )
-            except (WebError, ToolInputError, ProviderError) as error:
-                problems.append((source, error.message))
-            except TimeoutError:
-                if not budget.expired():
-                    raise
-                problems.append((source, _TIME_RAN_OUT))
+                except (WebError, ToolInputError, ProviderError) as error:
+                    return (source, error.message)
+                except TimeoutError:
+                    if not budget.expired():
+                        raise
+                    return (source, _TIME_RAN_OUT)
+
+        outcomes: list[Extraction | tuple[str, str]] = await _all_at_once([one(source) for source in args.sources])
+        extractions: list[Extraction] = [outcome for outcome in outcomes if isinstance(outcome, Extraction)]
+        problems: list[tuple[str, str]] = [outcome for outcome in outcomes if not isinstance(outcome, Extraction)]
         text_out: str = render_extractions(tuple(extractions), tuple(problems), _nonce())
         result: ToolResult = ok(text_out) if extractions else fail(text_out)
         return mark_untrusted(result)

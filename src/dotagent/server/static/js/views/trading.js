@@ -1,8 +1,9 @@
-// Settings › Trading: the mode (off, paper or live) and the limits of `[trading]`, the key of the owner's Coinbase
-// account, what the account holds and the latest orders. Nothing that widens what runs may do with money is asked
-// here of a phone: the daemon refuses it with its reason, which the page shows where the change was made. The key is
-// typed here, kept in the Keychain by the daemon and never shown again but the end of its name (`GET|PATCH /api/trading`,
-// `PUT|DELETE /api/trading/key`, `POST /api/trading/paper/reset`).
+// Settings › Trading, a trading desk (item 777): the account's worth and its day against the limits, the open positions
+// with their stops and targets, what watches the market between runs, the holdings and the latest orders; under them
+// the settings: the mode (off, paper or live), the limits of `[trading]` and the key of the owner's Coinbase account.
+// Nothing that widens what runs may do with money is asked here of a phone: the daemon refuses it with its reason, which
+// the page shows where the change was made. The key is typed here, kept in the Keychain by the daemon and never shown
+// again but the end of its name (`GET|PATCH /api/trading`, `PUT|DELETE /api/trading/key`, `POST /api/trading/paper/reset`).
 
 import { api } from "../api.js";
 import { dateTime, el } from "../dom.js";
@@ -15,15 +16,21 @@ import {
   amountOf,
   changeTone,
   draftChanges,
+  meterShare,
   money,
   needsRestart,
   noAccountWords,
-  orderWords,
   parseProduct,
+  positionFacts,
+  price,
+  productLabel,
+  shareOf,
   showsKey,
   signedMoney,
+  signedShare,
   statusWords,
   tradedWords,
+  watchLines,
 } from "../tradingwords.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -209,18 +216,19 @@ export function mount(root, ctx) {
 
     function paintChips() {
       chips.replaceChildren(
-        ...draft.products.map((id) =>
-          el(
+        ...draft.products.map((id) => {
+          const label = productLabel(id, settings.min_volume, settings.quote);
+          return el(
             "span",
             { class: "chip trading-chip", dataset: { product: id } },
-            id,
+            label,
             el(
               "button",
               {
                 class: "icon-btn",
                 type: "button",
-                title: draft.products.length === 1 ? "Dot needs one product at least" : `Do not trade ${id}`,
-                "aria-label": `Remove ${id}`,
+                title: draft.products.length === 1 ? "Dot needs one product at least" : `Do not trade ${label}`,
+                "aria-label": `Remove ${label}`,
                 disabled: draft.products.length === 1,
                 onclick: () => {
                   draft.products = draft.products.filter((other) => other !== id);
@@ -230,8 +238,8 @@ export function mount(root, ctx) {
               },
               icon("x"),
             ),
-          ),
-        ),
+          );
+        }),
       );
     }
 
@@ -241,7 +249,7 @@ export function mount(root, ctx) {
         return;
       }
       if (id === null) {
-        note.textContent = `A product is priced in ${settings.quote}, as BTC-${settings.quote}.`;
+        note.textContent = `A product is priced in ${settings.quote}, as BTC-${settings.quote}, or * for the whole market.`;
         note.hidden = false;
         return;
       }
@@ -263,7 +271,7 @@ export function mount(root, ctx) {
     paintChips();
     return setRow({
       title: "Products",
-      lead: "The only products a run may trade.",
+      lead: `The only products a run may trade. * allows every product in ${settings.quote} that trades enough a day.`,
       body: el(
         "div",
         { class: "trading-products" },
@@ -358,9 +366,9 @@ export function mount(root, ctx) {
     });
   }
 
-  function accountSection() {
-    const { settings, portfolio, problem } = view;
-    const spot = problemLine();
+  /** The button that starts the paper account again, after a question; `spot` says why it could not. */
+  function startAgainButton(spot) {
+    const { settings } = view;
     const again = el("button", { class: "btn sm", type: "button", "aria-haspopup": "dialog" }, icon("refresh"), "Start again");
     again.addEventListener("click", () =>
       attempt(async () => {
@@ -375,6 +383,43 @@ export function mount(root, ctx) {
         }
       }),
     );
+    return again;
+  }
+
+  /** A figure of the desk: its label, its value and, beside it, its share; `figure` names it for the tests. */
+  function deskStat(label, value, share, tone, figure) {
+    return el(
+      "div",
+      { class: "desk-stat" },
+      el("span", { class: "desk-label" }, label),
+      el("span", { class: `desk-figure trading-change ${tone}`, dataset: figure ? { figure } : undefined }, value),
+      share === "" ? null : el("span", { class: `desk-share trading-change ${tone}` }, share),
+    );
+  }
+
+  /** A meter of what a limit leaves: its label, a bar filled as far as `used` goes against `limit`, and its words. */
+  function deskMeter(label, used, limit, words, figure) {
+    const share = meterShare(used, limit);
+    const tone = share >= 100 ? "bad" : share > 60 ? "warn" : "ok";
+    const fill = el("span", { class: `desk-fill ${tone}` });
+    fill.style.setProperty("--fill", `${share}%`);
+    return el(
+      "div",
+      { class: "desk-meter" },
+      el("span", { class: "desk-label" }, label),
+      el(
+        "span",
+        { class: "desk-track", role: "meter", "aria-label": label, "aria-valuemin": "0", "aria-valuemax": String(limit), "aria-valuenow": String(Math.max(0, used)) },
+        fill,
+      ),
+      el("span", { class: "desk-meter-words", dataset: figure ? { figure } : undefined }, words),
+    );
+  }
+
+  /** The account at a glance: what it is worth, its day and since its start, what is in positions, and the day's limits. */
+  function deskSection() {
+    const { settings, portfolio, problem } = view;
+    const spot = problemLine();
     const parts = [];
     if (problem !== "") {
       parts.push(el("div", { class: "trading-notice", role: "status" }, icon("alert"), el("span", { class: "grow" }, problem)));
@@ -384,64 +429,233 @@ export function mount(root, ctx) {
     } else {
       const quote = portfolio.quote;
       const day = portfolio.equity - portfolio.day_start_equity;
+      const cash = portfolio.holdings.find((holding) => holding.currency === quote)?.amount ?? 0;
+      const invested = Math.max(0, portfolio.equity - cash);
+      const lost = Math.max(0, -day);
+      // Counted from what the account started with at its start (item 785), not from `paper_start` changed since.
+      const sinceStart = settings.mode === "paper" ? portfolio.equity - (view.paper_started_with ?? settings.paper_start) : null;
       parts.push(
-        setCard(
-          setRow({ title: "Worth now", lead: "Everything the account holds, at the prices of this moment.", control: el("span", { class: "trading-figure", dataset: { figure: "equity" } }, money(portfolio.equity, quote)) }),
-          setRow({
-            title: "Today",
-            lead: `Since the day began, at ${money(portfolio.day_start_equity, quote)}.`,
-            control: el("span", { class: `trading-figure trading-change ${changeTone(day)}`, dataset: { figure: "day" } }, signedMoney(day, quote)),
-          }),
-          setRow({
-            title: "Traded today",
-            lead: "What the day's orders add up to, against what a day may.",
-            control: el("span", { class: "trading-figure", dataset: { figure: "traded" } }, tradedWords(portfolio.day_traded, settings.max_day, quote)),
-          }),
+        el(
+          "div",
+          { class: "set-card desk" },
+          el(
+            "div",
+            { class: "desk-top" },
+            el(
+              "div",
+              { class: "desk-hero" },
+              el("span", { class: "desk-label" }, "Account value"),
+              el("span", { class: "desk-value", dataset: { figure: "equity" } }, money(portfolio.equity, quote)),
+              el("span", { class: "desk-sub" }, settings.mode === "paper" ? "Paper account, at Coinbase's prices" : "Your Coinbase account"),
+            ),
+            el(
+              "div",
+              { class: "desk-stats" },
+              deskStat("Today", signedMoney(day, quote), signedShare(day, portfolio.day_start_equity), changeTone(day), "day"),
+              sinceStart === null ? null : deskStat("Since the start", signedMoney(sinceStart, quote), signedShare(sinceStart, view.paper_started_with ?? settings.paper_start), changeTone(sinceStart), "start"),
+              deskStat("In positions", money(invested, quote), shareOf(invested, portfolio.equity), "plain", "invested"),
+            ),
+          ),
+          el(
+            "div",
+            { class: "desk-meters" },
+            deskMeter("Loss today", lost, settings.max_day_loss, `${money(lost, quote)} of ${money(settings.max_day_loss, quote)}`, "lost"),
+            deskMeter("Traded today", portfolio.day_traded, settings.max_day, tradedWords(portfolio.day_traded, settings.max_day, quote), "traded"),
+          ),
         ),
-        setSection({
-          title: "Holdings",
-          body:
-            portfolio.holdings.length === 0
-              ? el("div", { class: "set-card" }, el("div", { class: "empty" }, "The account holds nothing."))
-              : setCard(
-                  ...portfolio.holdings.map((holding) =>
-                    setRow({ title: holding.currency, lead: amountOf(holding.amount, holding.currency), control: el("span", { class: "trading-figure" }, money(holding.value, quote)) }),
-                  ),
-                ),
-        }),
       );
     }
     parts.push(spot.node);
     return setSection({
       title: "Account",
-      lead: settings.mode === "paper" ? "Dot's paper account, at Coinbase's prices." : settings.mode === "live" ? "Your Coinbase account." : "",
-      actions: settings.mode === "paper" ? again : null,
+      lead: settings.mode === "paper" ? "Dot's paper account: Coinbase's real prices, with money that is not there." : "Your Coinbase account, with real money.",
+      actions: settings.mode === "paper" ? startAgainButton(spot) : null,
       body: el("div", { class: "stack" }, parts),
     });
   }
 
+  /** A cell of a table that turns into a labelled line on a phone: `label` is what the line says first. */
+  function cell(label, content, numeric = false) {
+    return el("td", { class: numeric ? "num" : null, "data-label": label }, content);
+  }
+
+  /** Where the price and the entry stand between the stop and the target, with how far each end is. */
+  function rangeBar(position, facts) {
+    const track = el("span", { class: "trading-range-track" });
+    for (const [at, kind, words] of [
+      [facts.entryAt, "entry", position.entry === null ? "" : `Entry ${price(position.entry)}`],
+      [facts.priceAt, `now ${facts.tone}`, position.price === null ? "" : `Now ${price(position.price)}`],
+    ]) {
+      if (at !== null) {
+        const mark = el("span", { class: `trading-range-mark ${kind}`, title: words });
+        mark.style.setProperty("--at", `${at}%`);
+        track.append(mark);
+      }
+    }
+    const target = position.target === null ? "no target" : `target ${price(position.target)}${facts.toTarget === "" ? "" : ` (${facts.toTarget})`}`;
+    return el(
+      "div",
+      { class: "trading-range", role: "img", "aria-label": `Stop ${price(position.stop)}${facts.toStop === "" ? "" : ` (${facts.toStop})`}, ${target}` },
+      el("span", { class: "trading-range-end" }, price(position.stop), facts.toStop === "" ? null : el("small", { class: "down" }, facts.toStop)),
+      track,
+      el("span", { class: "trading-range-end" }, position.target === null ? "—" : price(position.target), facts.toTarget === "" ? null : el("small", { class: "up" }, facts.toTarget)),
+    );
+  }
+
+  /** The open positions of the paper account: each buy's exit, with its gain and where it stands on its stop and target. */
+  function positionsSection() {
+    const { settings, positions, portfolio } = view;
+    if (portfolio === null || settings.mode !== "paper") {
+      return null;
+    }
+    const quote = portfolio.quote;
+    const body =
+      positions.length === 0
+        ? el("div", { class: "set-card" }, el("div", { class: "empty" }, "No open position. A buy's stop and target are watched from the moment it fills."))
+        : el(
+            "div",
+            { class: "set-card trading-table-card" },
+            el(
+              "table",
+              { class: "trading-table" },
+              el(
+                "thead",
+                null,
+                el(
+                  "tr",
+                  null,
+                  ["Position", "Size", "Entry", "Now", "Value", "Gain", "Stop · target"].map((title, index) =>
+                    el("th", { class: index > 0 && index < 6 ? "num" : null, scope: "col" }, title),
+                  ),
+                ),
+              ),
+              el(
+                "tbody",
+                null,
+                positions.map((position) => {
+                  const facts = positionFacts(position, quote);
+                  const base = position.product.split("-")[0];
+                  return el(
+                    "tr",
+                    { dataset: { position: position.exit_id } },
+                    cell("Position", el("span", { class: "trading-asset" }, el("strong", null, base), el("span", { class: "muted" }, position.product))),
+                    cell("Size", amountOf(position.size, base), true),
+                    cell("Entry", position.entry === null ? "—" : price(position.entry), true),
+                    cell("Now", position.price === null ? "—" : price(position.price), true),
+                    cell("Value", facts.value === "" ? "—" : facts.value, true),
+                    cell(
+                      "Gain",
+                      el("span", { class: `trading-change ${facts.tone}` }, facts.gain === "" ? "—" : facts.gain, facts.gainShare === "" ? null : el("span", { class: "trading-share" }, facts.gainShare)),
+                      true,
+                    ),
+                    cell("Stop · target", rangeBar(position, facts)),
+                  );
+                }),
+              ),
+            ),
+          );
+    return setSection({ title: "Open positions", lead: "Each buy with the stop and the target Dot sells it at.", body });
+  }
+
+  /** What watches the market between runs: the stops, the market Dot reads, and the schedule a move starts. */
+  function watchSection() {
+    const lines = watchLines(view, dateTime);
+    if (lines.length === 0) {
+      return null;
+    }
+    return setSection({
+      title: "Watching",
+      lead: "What Dot looks at between runs, day and night, with no model.",
+      body: el(
+        "div",
+        { class: "set-card trading-watch" },
+        lines.map((line) => el("div", { class: `trading-watch-line ${line.tone}`, dataset: { watch: line.id } }, el("span", { class: "trading-dot", "aria-hidden": "true" }), el("span", null, line.text))),
+      ),
+    });
+  }
+
+  /** What the account holds, each currency at the bid now and its share of the account. */
+  function holdingsSection() {
+    const { portfolio } = view;
+    if (portfolio === null) {
+      return null;
+    }
+    const quote = portfolio.quote;
+    const held = [...portfolio.holdings].sort((a, b) => b.value - a.value);
+    const unread = [...portfolio.unpriced, ...portfolio.unpriceable];
+    return setSection({
+      title: "Holdings",
+      body:
+        held.length === 0
+          ? el("div", { class: "set-card" }, el("div", { class: "empty" }, "The account holds nothing."))
+          : el(
+              "div",
+              { class: "set-card trading-table-card" },
+              el(
+                "table",
+                { class: "trading-table" },
+                el("thead", null, el("tr", null, ["Currency", "Amount", "Price", "Value", "Share"].map((title, index) => el("th", { class: index > 0 ? "num" : null, scope: "col" }, title)))),
+                el(
+                  "tbody",
+                  null,
+                  held.map((holding) =>
+                    el(
+                      "tr",
+                      { dataset: { holding: holding.currency } },
+                      cell("Currency", el("strong", null, holding.currency)),
+                      cell("Amount", holding.currency === quote ? money(holding.amount, quote) : amountOf(holding.amount, holding.currency), true),
+                      cell("Price", holding.currency === quote || !(holding.amount > 0) ? "—" : price(holding.value / holding.amount), true),
+                      cell("Value", money(holding.value, quote), true),
+                      cell("Share", shareOf(holding.value, portfolio.equity), true),
+                    ),
+                  ),
+                ),
+              ),
+              unread.length === 0 ? null : el("p", { class: "hint trading-unread" }, `Not priced now, counted as nothing: ${unread.join(", ")}.`),
+            ),
+    });
+  }
+
+  /** The latest orders as a table, each with the reason the run gave under it. */
   function ordersSection() {
     const { settings, orders } = view;
     const newest = [...orders].sort((a, b) => b.ts - a.ts);
+    const quote = settings.quote;
     return setSection({
       title: "Orders",
-      lead: "The latest, newest first.",
+      lead: "The latest, newest first, each with the reason its run gave.",
       body:
         newest.length === 0
           ? el("div", { class: "set-card" }, emptyPanel("list", "No orders yet", "Orders Dot places show here."))
-          : setCard(
-              ...newest.map((order) => {
-                const words = orderWords(order, settings.quote, dateTime);
-                const status = statusWords(order.status);
-                const row = setRow({
-                  title: el("span", { class: "trading-order-title" }, words.title, el("span", { class: `badge ${status.tone}` }, status.label)),
-                  lead: words.facts,
-                  control: words.amount === "" ? null : el("span", { class: "trading-figure" }, words.amount),
-                  body: words.note === "" ? null : el("p", { class: "hint trading-note" }, words.note),
-                });
-                row.dataset.order = order.id;
-                return row;
-              }),
+          : el(
+              "div",
+              { class: "set-card trading-table-card" },
+              el(
+                "table",
+                { class: "trading-table trading-orders" },
+                el("thead", null, el("tr", null, ["When", "Order", "Size", "Price", "Worth", "Fee", "Status"].map((title, index) => el("th", { class: index > 1 && index < 6 ? "num" : null, scope: "col" }, title)))),
+                newest.map((order) => {
+                  const base = order.product.split("-")[0];
+                  const status = statusWords(order.status);
+                  const filled = order.size > 0 && order.price > 0;
+                  return el(
+                    "tbody",
+                    { dataset: { order: order.id } },
+                    el(
+                      "tr",
+                      null,
+                      cell("When", el("span", { class: "nowrap" }, dateTime(order.ts))),
+                      cell("Order", el("span", { class: "trading-asset" }, el("span", { class: `trading-side ${order.side}` }, order.side === "buy" ? "Buy" : "Sell"), " ", el("strong", null, order.product))),
+                      cell("Size", filled ? amountOf(order.size, base) : "—", true),
+                      cell("Price", filled ? price(order.price) : "—", true),
+                      cell("Worth", order.status === "failed" ? "—" : money(order.notional, quote), true),
+                      cell("Fee", order.fee > 0 ? money(order.fee, quote) : "—", true),
+                      cell("Status", el("span", { class: `badge ${status.tone}` }, status.label)),
+                    ),
+                    order.note === "" ? null : el("tr", { class: "trading-reason" }, el("td", { colspan: "7" }, order.note)),
+                  );
+                }),
+              ),
             ),
     });
   }
@@ -455,11 +669,15 @@ export function mount(root, ctx) {
       el(
         "div",
         { class: "set-sections trading", role: "region", "aria-label": "Trading" },
+        view.settings.mode === "off" ? null : deskSection(),
+        view.settings.mode === "off" ? null : positionsSection(),
+        view.settings.mode === "off" ? null : watchSection(),
+        view.settings.mode === "off" ? null : holdingsSection(),
+        view.settings.mode === "off" ? null : ordersSection(),
+        view.settings.mode === "off" ? null : el("h2", { class: "trading-divider" }, "Settings"),
         modeSection(),
         limitsSection(),
         showsKey(view) ? keySection() : null,
-        view.settings.mode === "off" ? null : accountSection(),
-        view.settings.mode === "off" ? null : ordersSection(),
       ),
     );
   }
@@ -474,7 +692,7 @@ export function mount(root, ctx) {
     }
   }
 
-  ctx.head.setLead("Whether Dot may trade crypto on Coinbase, with what limits, and what it did.");
+  ctx.head.setLead("What Dot's trading holds and does, and with what limits.");
   root.append(holder);
   attempt(load);
   return () => {

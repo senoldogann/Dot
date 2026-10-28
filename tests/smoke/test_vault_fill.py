@@ -2,8 +2,9 @@
 stand-in for ``op`` and a real headless Chrome; no model is called. A yolo run fills it and no result shows a value:
 not the fill's, not the view of the filled form. Scripts stay off in the chat's tabs while the filled tab is open, and
 run again once it is closed. A login of another site is refused before anything is asked, a password goes into a
-password field alone, a frame of another site gets nothing, nor does a form that sends what is typed in its address,
-and a page a script ran in gets no login. In auto the owner answers the fill, not the review model.
+password field alone, a frame of another site gets nothing, a form that would send what is typed in its address
+sends it by POST (item 775), and a page a script ran in gets no login. In auto the owner answers the fill, not the
+review model.
 """
 
 import asyncio
@@ -17,7 +18,7 @@ import threading
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, quote_plus
+from urllib.parse import parse_qs, quote, quote_plus
 
 import pytest
 import pytest_asyncio
@@ -53,10 +54,44 @@ _HOME: str = "<!doctype html><title>Home</title><h1>Welcome</h1>"
 _POLL_S: float = 0.05
 
 
+def _by_get(form: str, button: str = '<button type="submit">Sign in</button>', after: str = "") -> str:
+    return f"""<!doctype html><title>Sign in by GET</title>
+<form action="/home" {form}><label>Password <input name="pass" type="password"></label>{button}</form>{after}"""
+
+
+# Forms that would send what is typed in the page's address (item 775): one that names GET, one that names no method
+# (a browser sends it by GET), one whose button names GET, one whose button's script sets GET again and calls the
+# form's submit (which fires no event), one whose listener sets GET again as it is sent, one with a control named
+# ``method`` (which hides the form's own), and one in a shadow root whose listener sets GET (its submit never reaches
+# the window).
+_BY_GET: dict[str, str] = {
+    "/get-login": _by_get('method="get"'),
+    "/plain-login": _by_get(""),
+    "/button-get-login": _by_get('method="post"', '<button type="submit" formmethod="get">Sign in</button>'),
+    "/submit-get-login": _by_get(
+        "",
+        "<button type=\"button\" onclick=\"this.form.setAttribute('method', 'get'); this.form.submit()\">"
+        "Sign in</button>",
+    ),
+    "/listener-get-login": _by_get(
+        "",
+        after="<script>document.querySelector('form').addEventListener('submit', (event) => "
+        "event.target.setAttribute('method', 'get'));</script>",
+    ),
+    "/named-method-login": _by_get("", '<input type="hidden" name="method" value="password"><button>Sign in</button>'),
+    "/shadow-login": """<!doctype html><title>Sign in by GET</title><div id="host"></div><script>
+const root = document.getElementById("host").attachShadow({ mode: "open" });
+root.innerHTML = '<form action="/home"><label>Password <input name="pass" type="password"></label>'
+  + '<button type="submit">Sign in</button></form>';
+root.querySelector("form").addEventListener("submit", (event) => event.target.setAttribute("method", "get"));
+</script>""",
+}
+
+
 class _Site(ThreadingHTTPServer):
     """The login form, its frame of another host (``localhost``, where the page is ``127.0.0.1``), whose script makes
-    its field say it is in the login's page, two forms sent by GET (one names the method, one names none), and the
-    page the forms go to, which keeps what each POST sent and the address of each GET that reached it."""
+    its field say it is in the login's page, forms that would send by GET (``_BY_GET``), and the page the forms go to,
+    which keeps what each POST sent and the address of each GET that reached it."""
 
     def __init__(self) -> None:
         super().__init__(("127.0.0.1", 0), _Handler)
@@ -90,10 +125,7 @@ class _Handler(BaseHTTPRequestHandler):
 const login = {{ location: {{ href: "http://127.0.0.1:{port}/login" }} }};
 Object.defineProperty(document.querySelector("input"), "ownerDocument", {{ get: () => login }});
 </script>""",
-            "/get-login": """<!doctype html><title>Search sign in</title>
-<form action="/home" method="get"><label>Password <input name="pass" type="password"></label></form>""",
-            "/plain-login": """<!doctype html><title>Plain sign in</title>
-<form action="/home"><label>Password <input name="pass" type="password"></label></form>""",
+            **_BY_GET,
             "/script-login": """<!doctype html><title>Script sign in</title>
 <label>Password <input name="pass" type="password"></label>
 <button type="button" onclick="fetch('/home?p=' + encodeURIComponent(document.querySelector('input').value))
@@ -363,18 +395,6 @@ async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_ge
     filled: ToolResult = await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": fresh.group(1)})
     assert filled.text.startswith("Filled the password"), filled.text
     _unseen(filled.text)
-    # A form that sends what is typed in the page's address gets no password: the address would hold it.
-    shown: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/get-login"})
-    field: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', shown.text)
-    assert field is not None, shown.text
-    with pytest.raises(BrowserError, match="its method is GET"):
-        await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": field.group(1)})
-    # A form that names no method goes by GET as well, as a browser reads it (item 621): it gets no password either.
-    plain: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/plain-login"})
-    bare: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', plain.text)
-    assert bare is not None, plain.text
-    with pytest.raises(BrowserError, match="its method is GET, or it names none"):
-        await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": bare.group(1)})
     # A page whose script builds an address from a field that is in no form says nothing of how it is sent: a request
     # of its own that would carry the password is refused by Dot's Chrome and never reaches the site.
     scripted: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/script-login"})
@@ -439,3 +459,30 @@ async def test_in_auto_the_owner_answers_the_fill_and_not_the_review_model(runti
     await runtime.approvals.resolve(asked.id, True, UI_SOURCE, "")
     filled: ToolResult = await filling
     _unseen(filled.text)
+
+
+@pytest.mark.parametrize("path", list(_BY_GET))
+async def test_a_form_that_would_send_by_get_takes_the_password_and_sends_it_by_post(
+    runtime: Runtime, site: _Site, path: str
+) -> None:
+    """Item 775: a form that names no method, as LinkedIn's sign-in does (its script sends it), got no password, so the
+    run could not sign in. The form is made to send by POST before the password goes in, and stays so whatever the
+    page does as it is sent: the password reaches the site in the body, and no address that holds it does."""
+    ctx, gate = await _context(runtime, "yolo")
+    shown: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}{path}"})
+    field: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', shown.text)
+    assert field is not None, shown.text
+    filled: ToolResult = await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": field.group(1)})
+    assert filled.text.startswith("Filled the password"), filled.text
+    before, addressed = len(site.submissions), len(site.addresses)
+    button: re.Match[str] | None = re.search(r'button "Sign in"[^\n]*?\[ref=([^\]]+)\]', shown.text)
+    assert button is not None, shown.text
+    sent: ToolResult = await _call(ctx, gate, "browser_act", {"steps": [{"action": "click", "ref": button.group(1)}]})
+    _unseen(sent.text)
+    for _ in range(int(_ANSWER_WITHIN_S / _POLL_S)):
+        if len(site.submissions) > before:
+            break
+        await asyncio.sleep(_POLL_S)
+    assert [parse_qs(one)["pass"] for one in site.submissions[before:]] == [[PASSWORD]], site.submissions
+    # The other tests of the module send an address that holds it on purpose: only those since the click count here.
+    assert not any(PASSWORD in one or quote_plus(PASSWORD) in one for one in site.addresses[addressed:]), site.addresses

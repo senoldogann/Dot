@@ -427,7 +427,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   // what is above the box, and the box grows with a draft, its chips and its files. It stays on the box rather than the
   // page, where the curtain's composer and a page's live at once (waiting.js) and would write over each other.
   const stopHeight = trackHeight(element, element, "--composer-h");
-  // SnapShots (item 405): a box with a draft of its own takes the captures the daemon made, the ones that waited
+  // Snapshots (item 405): a box with a draft of its own takes the captures the daemon made, the ones that waited
   // and each new one, as files of the draft.
   const stopSnapshots =
     draftKey === null

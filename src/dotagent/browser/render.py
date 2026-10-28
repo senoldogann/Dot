@@ -45,6 +45,11 @@ def describe_step(step: Step) -> str:
     match step.action:
         case "click_at":
             return f"click_at ({_coordinate(step.x)}, {_coordinate(step.y)})"
+        case "drag_at":
+            return (
+                f"drag_at ({_coordinate(step.x)}, {_coordinate(step.y)}) to "
+                f"({_coordinate(step.to_x)}, {_coordinate(step.to_y)})"
+            )
         case "press":
             target: str = f" on {step.ref}" if step.ref is not None else ""
             return f"press {_clip(step.key or '', _KEY_CHARS)}{target}"
@@ -123,6 +128,9 @@ def render_text_wait(wait: TextWait, nonce: str, body_budget: int) -> str:
         else f"The text has not appeared; the wait ended after {wait.waited_s:.1f} s because {wait.ended_by}: answer "
         "it first; the page now"
         if wait.ended_by is not None
+        else f"The text has not appeared; the wait ended after {wait.waited_s:.1f} s because the page has not changed "
+        f"for {wait.still_s:g} s and waits on nothing: as it stands the text is not coming; the page now"
+        if wait.still_s is not None
         else f"The text did not appear within {wait.waited_s:.1f} s; the page now"
     )
     return f"{outcome} · {render_page_view(wait.view, nonce, body_budget)}"

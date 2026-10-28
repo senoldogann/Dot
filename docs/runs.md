@@ -165,7 +165,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   is off by default until evals show that it helps. The timeline shows each send-back.
 - A run has no step limit. It ends when the model calls `finish`, when the progress watchdog stops it (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries and
-  the wait for a model out of reach, at a limit of minutes or tokens you set, or when you stop it. In goal mode the goal
+  the wait for a model out of reach, at the default ceiling of 120 minutes or 10,000,000 tokens (or the limit you set),
+  or when you stop it. In goal mode the goal
   check can also end it (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A goal that names an outcome instead of a task (grow, earn, reach, as many as possible, find a way) is held to the
   outcome in task and research runs: the model is told to record measurable targets in its plan before it acts, to
@@ -268,7 +269,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   also says how long the run has worked and how its helpers stand (one pane of glass on a phone, item 401), a line shows
   each loop of the chat, how often it asks again ("every 30 minutes", and "every day at 10:00" for a schedule a run of
   it made, where it read `cron 0 10 * * *` before item 590), when next, and a Stop that deletes it; the Stops stand in
-  one column, on a phone the message stands over how often it asks again, and the rows fold under a head that says how
+  one column, on a phone the message stands over how often it asks again, which wraps rather than end in dots (item 787), and the rows fold under a head that says how
   many loops there are and, folded, when the next one asks, the fold kept in the browser (item 591). A rhythm a cron
   expression cannot keep exactly, or one shorter than `[scheduler] min_interval_s`, is refused (422); a new chat then
   starts nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going,
@@ -459,7 +460,9 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`, `judge_items`                                               |
 | Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_requests`, `browser_extract` (item 714), `browser_console` and `browser_viewport` (item 746), `browser_wait_text`, `browser_act`, `browser_eval`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab`, `browser_create_login` (item 740), and, while 1Password is connected or the vault holds a login, `browser_logins` and `browser_fill_login` (items 493 and 621) |
 | Vault           | `vault_contacts` (item 621): the contact details you saved in Settings › Vault and the billing address of each card, for a run to type where a form asks; it never shows a password, a card number, an expiry or a security code (a card is kept, and no tool of a run fills it) |
-| Trading         | while trading is on ([Trading](trading.md), items 763 and 764): `trading_market`, `trading_portfolio`, `trading_order`, `trading_history` |
+| Trading         | while trading is on ([Trading](trading.md), items 763 and 764): `trading_market`, `trading_scan` (item 771), `trading_portfolio`, `trading_order`, `trading_exit` (item 770), `trading_history` |
+| Recon           | `recon` (item 776): the addresses, TLS certificate, HTTP headers and technology of a site, and with `depth = "ports"` the open ports of a host in `[recon] owned_hosts` ([Recon](recon.md)) |
+| Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts`, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715) |
@@ -621,9 +624,12 @@ source does not hold is kept and marked `verified: false`, a claim to treat as o
 gave without a quote. A file's text goes to the fast model, so a file in a protected location is refused, as `read_file`
 refuses it. A source that cannot be read or extracted is listed under "Not extracted" with the reason; while the fast
 model is paused after a quota, rate-limit or key error, no source is read or sent to it, and each is listed with the
-pause (item 240). At most 20 sources and 20 fields per call. A call has 10 minutes, and ends at its own time rather
-than at the tool timeout, which would lose every extraction already paid for (item 554): the source it is in when the
-time runs out and the ones it did not reach are listed under "Not extracted", and what was extracted comes back.
+pause (item 240); of the sources read at once, those already sent when the pause came are the one exception, as one
+whose text was being read when it came is checked again before it is sent. At most 20 sources and 20 fields per call.
+Four sources are read and extracted at once (item 773: six job lists one after the other took 200 s), and the result
+tells them in the order they were given. A call has 10 minutes, and ends at its own time rather than at the tool
+timeout, which would lose every extraction already paid for (item 554): the sources it is in when the time runs out and
+the ones it did not reach are listed under "Not extracted", and what was extracted comes back.
 
 A terminal session is for a program that does not run to its end by itself: one that asks questions (an installer,
 `npm create`, `ssh`), a REPL (`python3 -i`, `psql`), or a server that must stay up while the run goes on.

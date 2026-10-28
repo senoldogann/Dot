@@ -14,17 +14,20 @@ from typing import Literal
 from fastapi import APIRouter, Request
 from pydantic import Field, SecretStr, ValidationError
 
-from dotagent.config import TradingConfig, TradingMode
+from dotagent.config import ANY_PRODUCT, TradingConfig, TradingMode
 from dotagent.config_edit import TradingSetting, set_setting
-from dotagent.core.errors import ConfigError, InvalidValueError
+from dotagent.core.errors import ConfigError, InvalidValueError, NotFoundError
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import refuse_from_a_phone
-from dotagent.store.models import TradingOrderRecord
+from dotagent.store.models import ScheduleRecord, TradingExitRecord, TradingOrderRecord
 from dotagent.trading.coinbase import KEY_ACCOUNT, CoinbaseBroker, KeyPermissions, kept_key, load_key
+from dotagent.trading.limits import market_allows
+from dotagent.trading.market import MarketError
 from dotagent.trading.service import Trading
-from dotagent.trading.types import Portfolio
+from dotagent.trading.types import Holding, Portfolio
+from dotagent.trading.watch import LAST_WAKE_KEY, WAKES_KEY
 from dotagent.vault.secretstore import SecretStore
 
 _ORDERS_SHOWN: int = 50
@@ -44,17 +47,53 @@ class TradingKeyView(FrozenModel):
     name_end: str
 
 
+class TradingPosition(FrozenModel):
+    """An open exit as the page shows a position (item 777): what its buy bought (``size`` of ``product``), at what
+    price (``entry``, the buy's fill; None when the buy is not kept), the bid now (``price``, from what the account's
+    holding is worth; None when it could not be priced), and where Dot sells it."""
+
+    exit_id: str
+    product: str
+    size: float
+    entry: float | None
+    price: float | None
+    stop: float
+    target: float | None
+    ts: float
+
+
+class TradingWatchView(FrozenModel):
+    """What watches the market for the account (item 777): the schedule a move of the market starts (``""``: none;
+    ``schedule_name`` None: the id names no schedule), whether it is on and when it fires next, the runs it started
+    today and when the last one did, and how many products a run may trade now (None when Coinbase's list could not be
+    read)."""
+
+    wake_schedule: str
+    schedule_name: str | None
+    schedule_on: bool
+    next_shift_at: float | None
+    wakes_today: int
+    last_wake_at: float | None
+    products_now: int | None
+
+
 class TradingView(FrozenModel):
     """Settings › Trading: the settings in force, whether runs have the trading tools now (``tools_on``: a switch from
-    off takes Dot's restart), the key, the account of the mode and its orders. ``problem`` says why the account could
-    not be read."""
+    off takes Dot's restart), the key, the account of the mode, its open positions and its orders, and what watches the
+    market (item 777). ``problem`` says why the account, what watches the market, or both could not be read: the page
+    is drawn all the same, with the switch that turns trading off."""
 
     settings: TradingConfig
     tools_on: bool
     key: TradingKeyView
     portfolio: Portfolio | None
+    positions: list[TradingPosition]
+    watch: TradingWatchView | None
     orders: list[TradingOrderRecord]
     problem: str
+    # What the paper account started with at its last start (item 785), which "since the start" is counted from; None
+    # out of paper.
+    paper_started_with: float | None = None
 
 
 class TradingChange(FrozenModel):
@@ -62,6 +101,7 @@ class TradingChange(FrozenModel):
 
     mode: TradingMode | None = None
     products: list[str] | None = Field(default=None, min_length=1, max_length=50)
+    min_volume: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     max_order: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     max_day: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     max_day_loss: float | None = Field(default=None, gt=0, allow_inf_nan=False)
@@ -82,6 +122,9 @@ def widens(before: TradingConfig, after: TradingConfig) -> list[str]:
     wider.extend(f"raise {limit}" for limit in _LIMITS if getattr(after, limit) > getattr(before, limit))
     if set(after.products) - set(before.products):
         wider.append("allow another product")
+    # Lower even while "*" is not allowed: the Mac's "*" would take the lower floor up unseen (the pre-push review).
+    if after.min_volume < before.min_volume:
+        wider.append("allow products that trade less")
     if after.paper_start > before.paper_start:
         wider.append("raise what the paper account starts with")
     return wider
@@ -105,19 +148,74 @@ def trading_router(ctx: ServerContext) -> APIRouter:
         portfolio: Portfolio | None = None
         problem: str = ""
         orders: list[TradingOrderRecord] = []
+        positions: list[TradingPosition] = []
+        watch: TradingWatchView | None = None
         if settings.mode != "off" and (settings.mode == "paper" or kept is not None):
             try:
                 portfolio = await trading.portfolio()
                 orders = await trading.history(_ORDERS_SHOWN)
+                positions = await positions_of(portfolio)
             except Exception as error:  # noqa: BLE001 - the page shows why the account could not be read
                 problem = str(getattr(error, "message", error))[:300]
+        if settings.mode != "off":
+            try:
+                watch = await watch_of(settings)
+            except Exception as error:  # noqa: BLE001 - the page is drawn all the same, with the switch to turn it off
+                said: str = f"What watches the market could not be read: {getattr(error, 'message', error)}"[:300]
+                problem = f"{problem.rstrip('.')}. {said}" if problem else said
         return TradingView(
             settings=settings,
             tools_on="trading_order" in ctx.runtime.registry.tools,
             key=TradingKeyView(kept=kept is not None, name_end=kept[0][-6:] if kept is not None else ""),
             portfolio=portfolio,
+            positions=positions,
+            watch=watch,
             orders=orders,
             problem=problem,
+            paper_started_with=await trading.paper.started_with() if settings.mode == "paper" else None,
+        )
+
+    async def positions_of(portfolio: Portfolio) -> list[TradingPosition]:
+        """The open exits of the account, each with its buy's price and the bid now (item 777)."""
+        bids: dict[str, float] = {
+            holding.currency: holding.value / holding.amount for holding in portfolio.holdings if _priced(holding)
+        }
+        found: list[TradingPosition] = []
+        for exit_ in await trading.open_exits():
+            buy: TradingOrderRecord | None = await trading.store.get_trading_order(exit_.order_id)
+            found.append(_position(exit_, buy, bids.get(exit_.product.split("-")[0])))
+        return found
+
+    async def watch_of(settings: TradingConfig) -> TradingWatchView:
+        """What watches the market now (item 777): the wake schedule as the store has it, the day's wakes as the watch
+        counted them, and the products a run may trade at this moment."""
+        name: str | None = None
+        on: bool = False
+        next_at: float | None = None
+        if settings.wake_schedule:
+            try:
+                record: ScheduleRecord = await ctx.runtime.store.get_schedule(settings.wake_schedule)
+                name, on, next_at = record.name, record.enabled, record.next_run_at
+            except NotFoundError:
+                name = None
+        day: str = trading.day_start()[0]
+        woken: str | None = await ctx.runtime.store.kv_get(f"{WAKES_KEY}:{day}")
+        last: str | None = await ctx.runtime.store.kv_get(LAST_WAKE_KEY)
+        products: int | None = len([product for product in settings.products if product != ANY_PRODUCT])
+        if ANY_PRODUCT in settings.products:
+            try:
+                rows = await trading.market.whole_market(settings.quote)
+                products = len([row for row in rows if market_allows(settings, row)])
+            except MarketError:
+                products = None
+        return TradingWatchView(
+            wake_schedule=settings.wake_schedule,
+            schedule_name=name,
+            schedule_on=on,
+            next_shift_at=next_at,
+            wakes_today=int(woken) if woken is not None and woken.isdigit() else 0,
+            last_wake_at=_number(last),
+            products_now=products,
         )
 
     @router.get("/trading")
@@ -192,3 +290,28 @@ def trading_router(ctx: ServerContext) -> APIRouter:
         return await view()
 
     return router
+
+
+def _number(text: str | None) -> float | None:
+    """A number the watch kept as text, or None for none or for what is no number."""
+    try:
+        return None if text is None else float(text)
+    except ValueError:
+        return None
+
+
+def _priced(holding: Holding) -> bool:
+    return holding.amount > 0 and holding.value > 0
+
+
+def _position(exit_: TradingExitRecord, buy: TradingOrderRecord | None, bid: float | None) -> TradingPosition:
+    return TradingPosition(
+        exit_id=exit_.id,
+        product=exit_.product,
+        size=exit_.size,
+        entry=buy.price if buy is not None and buy.price > 0 else None,
+        price=bid,
+        stop=exit_.stop,
+        target=exit_.target,
+        ts=exit_.ts,
+    )

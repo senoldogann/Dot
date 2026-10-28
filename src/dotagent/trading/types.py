@@ -39,6 +39,30 @@ class ProductRules(FrozenModel):
     quote_min_size: float
     base_min_size: float
     trading: bool
+    # What the product traded in the last day, in its quote, as Coinbase sums it (item 771); None when not given.
+    quote_volume_24h: float | None = None
+
+
+class MarketRow(FrozenModel):
+    """One product of the whole market as Coinbase's product list gives it (item 771): its price, best bid and ask,
+    the last day's change in percent, high and low, and what it traded in its quote."""
+
+    product: str
+    price: float
+    bid: float | None
+    ask: float | None
+    change_24h_pct: float | None
+    high_24h: float | None
+    low_24h: float | None
+    quote_volume_24h: float
+
+
+class ProductDay(FrozenModel):
+    """A product's last day as Coinbase sums it (item 765): the price change in percent, and the volume in the quote."""
+
+    product: str
+    change_24h_pct: float | None
+    quote_volume_24h: float | None
 
 
 class Holding(FrozenModel):
@@ -58,6 +82,13 @@ class Portfolio(FrozenModel):
     equity: float
     day_start_equity: float
     day_traded: float
+    # Currencies held that Coinbase has no product of in the quote (item 765): worth nothing to the account, at every
+    # look alike; and those whose price could not be read this time, a hole in the worth.
+    unpriceable: tuple[str, ...] = ()
+    unpriced: tuple[str, ...] = ()
+    # Whether the day's start is a whole worth of the account, kept at the day's first whole look; until it is, no buy
+    # is placed, as today's loss could not be counted.
+    day_start_known: bool = True
 
     @property
     def day_change(self) -> float:
@@ -72,6 +103,14 @@ class OrderRequest(FrozenModel):
     side: Side
     quote_amount: float | None
     base_amount: float | None
+    # Why the run trades, in its words (item 765): kept with the order, shown with it.
+    reason: str = ""
+    # A buy's exit (item 770): the price at or under which Dot sells what it bought, and the one at or over which it
+    # takes the gain; watched by the daemon, not by a run (:mod:`dotagent.trading.watch`).
+    stop: float | None = None
+    target: float | None = None
+    # The exit a sell closes, when the watch places it: never held by the limits, as it lowers what is at stake.
+    closing: str | None = None
 
 
 class Fill(FrozenModel):

@@ -1177,3 +1177,68 @@ def test_every_name_the_guard_looks_a_command_up_by_is_in_lower_case() -> None:
 @pytest.mark.parametrize("command", ["base64 -d blob | Rscript -", "base64 -d blob | rscript -"])
 def test_a_blob_decoded_into_r_is_judged_as_one_decoded_into_any_interpreter(command: str, tmp_path: Path) -> None:
     assert _under_the_defaults(command, tmp_path) == ("allow", "ask", "ask"), command
+
+
+# Item 788: a system tool's line is a query only when it asks one of the reads the guard lists; any other verb or option
+# changes the Mac and asks. Lines only; none is run.
+_SYSTEM_LINES: tuple[tuple[str, bool], ...] = (
+    ("diskutil list", True),
+    ("diskutil apfs list", True),
+    ("diskutil info disk0", True),
+    ("diskutil apfs deleteContainer disk9", False),
+    ("diskutil randomDisk 1 disk9", False),
+    ("diskutil eraseDisk APFS X disk9", False),
+    ("diskutil mount disk9s1", False),
+    ("defaults read com.apple.dock", True),
+    ("defaults -currentHost read", True),
+    ("defaults -currentHost write com.apple.screensaver idleTime 0", False),
+    ("defaults -host localhost write com.apple.dock autohide -bool true", False),
+    ("networksetup -getinfo Wi-Fi", True),
+    ("networksetup -setwebproxy Wi-Fi status.example.com 80", False),
+    ("systemsetup -getremotelogin", True),
+    ("systemsetup -setremotelogin on -getremotelogin", False),
+    ("pmset -g batt", True),
+    ("pmset sleepnow", False),
+    ("scutil --get ComputerName", True),
+    ("scutil --set ComputerName x", False),
+    ("scutil", False),
+    ("spctl --status", True),
+    ("spctl --master-disable", False),
+    ("csrutil status", True),
+    ("csrutil disable", False),
+    ("tmutil listbackups", True),
+    ("tmutil disable", False),
+    ("tmutil delete /Volumes/x/y", False),
+    # The security review of item 788: a verb a tool takes as a plain word beside a read, and words a shell expands.
+    ("pmset sleepnow -g", False),
+    ("pmset displaysleep 0 -g", False),
+    ("spctl -v developer-mode enable-terminal", False),
+    ("spctl kext-consent add ABCDE12345 -v", False),
+    ("csrutil disable status", False),
+    ("csrutil {disable,} status", False),
+    ("networksetup {-setairportpower,en0} off -getinfo", False),
+    ("systemsetup -gettimezone {-settimezone,Europe/Istanbul}", False),
+    ("spctl --status {--global-disable,}", False),
+    ("scutil --dns {--set,} HostName evil", False),
+    ("networksetup ?setairportpower en0 off -getinfo", False),
+    ("csrutil authenticated-root status", True),
+    ("pmset -g assertions", True),
+    ("spctl --assess -v /Applications/Safari.app", True),
+    ("spctl -avv /Applications/Safari.app", True),
+    ("spctl -avX /Applications/Safari.app", False),
+    ("defaults -host {localhost,write,com.apple.dock,autohide,-string} read", False),
+    ("defaults {write,com.apple.dock,autohide,-bool,true}", False),
+    ("diskutil {apfs,deleteContainer} disk9", False),
+    ("tmutil {disable,status}", False),
+)
+
+
+@pytest.mark.parametrize(("line", "reads"), _SYSTEM_LINES)
+def test_a_system_tool_is_a_query_only_when_it_asks_a_read_the_guard_lists(
+    line: str, reads: bool, tmp_path: Path
+) -> None:
+    assessment: ShellAssessment = assess_shell(line, tmp_path, tmp_path, (), ())
+    if reads:
+        assert (assessment.risk, assessment.flags) == ("safe", ()), assessment
+    else:
+        assert assessment.risk in ("medium", "high") and "system_settings" in assessment.flags, assessment

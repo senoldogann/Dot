@@ -105,8 +105,10 @@ from dotagent.tools.meta import build_meta_tools
 from dotagent.tools.notes import build_notes_tools
 from dotagent.tools.pages import build_page_tools
 from dotagent.tools.posts import build_post_tools
+from dotagent.tools.recon import build_recon_tool
 from dotagent.tools.registry import ToolRegistry, build_registry
 from dotagent.tools.schedule import build_schedule_tools
+from dotagent.tools.security import build_security_tool
 from dotagent.tools.shell import build_shell_tool, child_env, read_login_env
 from dotagent.tools.skill import build_skill_tool
 from dotagent.tools.team import build_team_tools
@@ -203,7 +205,7 @@ class Runtime:
     # name that someone else set up is not among them.
     builtin_names: frozenset[str]
     memory: MemoryIndex
-    # SnapShots (item 405): the watch of the Command key and the captures waiting for a composer.
+    # Snapshots (item 405): the watch of the Command key and the captures waiting for a composer.
     snapshots: SnapshotService
     # Help found by meaning with the memory's embeddings (item 169); ``None`` when they are off.
     help_vectors: HelpVectors | None
@@ -257,6 +259,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_delegate_tools(),
         build_team_tools(),
         build_consult_tools(),
+        (build_recon_tool(), build_security_tool()),
         build_meta_tools(),
         build_page_tools(),
         (build_skill_tool(), build_find_help_tool()),

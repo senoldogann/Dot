@@ -15,6 +15,7 @@ from structlog.testing import capture_logs
 
 from dotagent.channels import imessage
 from dotagent.channels.imessage import CODE_APART_S, IMessageChannel, look_at
+from dotagent.channels.inbox import Incoming
 from dotagent.channels.seen import COMMAND_KEY, UNSEEN_S, WAL_UNSEEN, Seen, SeenFile, wal_path
 from dotagent.core.errors import ChannelError, DesktopError, DesktopPermissionError
 from dotagent.store.db import Store
@@ -35,9 +36,11 @@ class Clock:
 class Heard:
     def __init__(self) -> None:
         self.texts: list[str] = []
+        self.files: list[tuple[Incoming, ...]] = []
 
-    async def __call__(self, text: str) -> None:
+    async def __call__(self, text: str, files: tuple[Incoming, ...] = ()) -> None:
         self.texts.append(text)
+        self.files.append(files)
 
 
 @pytest_asyncio.fixture

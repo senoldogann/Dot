@@ -348,7 +348,7 @@ def test_yolo_changes_the_approvals_line_and_what_a_secret_field_takes() -> None
     what a run reads and how it ends is the same in every mode."""
     ask: set[str] = _lines("ask")
     yolo: set[str] = _lines("yolo")
-    assert sorted(ask - yolo) == sorted(line for line in ask - yolo if "are never typed by you" in line)
+    assert sorted(ask - yolo) == sorted(line for line in ask - yolo if "the user gave you in this conversation" in line)
     added: list[str] = sorted(yolo - ask)
     assert len(added) == 2, added
     assert added[0].startswith("- A password, a one-time code or a card's details")

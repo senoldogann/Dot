@@ -33,7 +33,13 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.endings import RESULT_EMERGENCY_STOPPED, RESULT_RESTARTED, RESULT_SHUTDOWN, RESULT_STOPPED
+from dotagent.store.endings import (
+    PREFIX_EMERGENCY_STOP,
+    RESULT_EMERGENCY_STOPPED,
+    RESULT_RESTARTED,
+    RESULT_SHUTDOWN,
+    RESULT_STOPPED,
+)
 from dotagent.store.models import EventRecord, RunMode, RunRecord, TodoRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
@@ -477,6 +483,8 @@ async def test_a_thing_whose_run_a_crash_cut_off_counts_a_try_and_one_a_shutdown
             "crashed": ("failed", RESULT_RESTARTED),
             "shut down": ("cancelled", RESULT_SHUTDOWN),
             "stopped by STOP": ("cancelled", RESULT_EMERGENCY_STOPPED),
+            # A run that saw the STOP file as it worked ends in words of its own (item 790).
+            "saw STOP": ("cancelled", f"{PREFIX_EMERGENCY_STOP}the STOP file is there"),
             "stopped by the owner": ("cancelled", RESULT_STOPPED),
         }
         todos: dict[str, TodoRecord] = {}
@@ -511,6 +519,7 @@ async def test_a_thing_whose_run_a_crash_cut_off_counts_a_try_and_one_a_shutdown
     assert (after["crashed"].status, after["crashed"].attempts) == ("dropped", 2)
     assert (after["shut down"].status, after["shut down"].attempts) == ("open", 1)
     assert (after["stopped by STOP"].status, after["stopped by STOP"].attempts) == ("open", 1)
+    assert (after["saw STOP"].status, after["saw STOP"].attempts) == ("open", 1)
     # A run the owner stopped lets its thing go, as at any other time, not counted as a crash's try.
     assert (after["stopped by the owner"].status, after["stopped by the owner"].note) == ("dropped", "You stopped it.")
 

@@ -17,12 +17,15 @@ its own.
 
 The MCP server that comes with Dot is out of every test that did not ask for it (item 583), as
 :func:`_no_builtin_servers` says. The folder Dot copies the pictures it sends into, ``~/Pictures/Dot``, is the owner's:
-no test reaches it (item 617), as :func:`_owners_pictures_stay_theirs` says."""
+no test reaches it (item 617), as :func:`_owners_pictures_stay_theirs` says. Whether a model's server can be connected
+to (item 769) is checked on this Mac alone: a server elsewhere counts as one that can be, as
+:func:`_connection_checks_stay_on_this_mac` says."""
 
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -30,10 +33,13 @@ from dotagent import secrets
 from dotagent.channels.pictures import Pictures
 from dotagent.channels.staging import STAGED_KEPT_S, Staging
 from dotagent.config import load_default_config, providers_by_key
+from dotagent.llm import reach
 from dotagent.mcp import builtin
 
 # The marks of the tests that send requests with the owner's keys or reach the world.
 _NEEDS_KEYS: tuple[str, ...] = ("hosted", "internet", "live")
+# The hosts on this Mac, whose connection a test may check (item 769).
+_THIS_MAC: frozenset[str] = frozenset({"localhost", "127.0.0.1", "::1"})
 # The name the package of the web-research server is found under, read before any fixture changes it (item 583).
 _REAL_WEB_RESEARCH_PACKAGE: str = builtin.WEB_RESEARCH_PACKAGE
 
@@ -82,6 +88,21 @@ def _offline_test(request: pytest.FixtureRequest, _offline_run: bool) -> Iterato
         yield
         return
     with _without_the_owners_keys():
+        yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _connection_checks_stay_on_this_mac() -> Iterator[None]:
+    """A model's call that broke has its server's connection checked (item 769, :mod:`dotagent.llm.reach`): a test
+    whose stand-in transport fails a call to ``api.example.com`` would look the name up and connect to it. A server on
+    this Mac is checked as it is; any other is taken to be there, as before the check was made."""
+    checking = reach.reaches
+
+    async def here_only(url: str, timeout_s: float = reach.REACH_TIMEOUT_S) -> bool:
+        return await checking(url, timeout_s) if urlsplit(url).hostname in _THIS_MAC else True
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(reach, "reaches", here_only)
         yield
 
 

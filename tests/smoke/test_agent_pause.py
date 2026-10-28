@@ -16,7 +16,7 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
-from dotagent.core.errors import StoreError
+from dotagent.core.errors import RunConflict, StoreError
 from dotagent.core.types import JsonObject
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -253,6 +253,11 @@ async def test_a_paused_agents_repeating_schedule_is_skipped_counting_nothing_an
     assert skipped.runs_failed_in_row == 0
     assert len(await runtime.store.list_threads(1000)) == chats_before
     assert schedule.id not in missed.schedules
+    # A move of the market is no hand (item 785): it starts nothing as a paused agent, and makes no chat.
+    with pytest.raises(RunConflict, match="is paused"):
+        await scheduler.fire_for_signal(schedule.id, schedule.next_run_at + 2, "BTC-EUR rose 4 % in 15 minutes.")
+    assert schedule.id not in scheduler._in_flight
+    assert len(await runtime.store.list_threads(1000)) == chats_before
     # The owner is there: Run now, and a message of theirs to the agent, still go.
     by_hand: httpx.Response = await client.post(f"/api/schedules/{schedule.id}/run")
     assert by_hand.status_code == 201, by_hand.text

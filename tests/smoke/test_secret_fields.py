@@ -119,12 +119,12 @@ async def _nobody(request: ReviewRequest) -> ReviewVerdict:
     raise AssertionError(f"the review model must not be asked about this: {request.action.summary}")
 
 
-async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolContext, RunGate]:
-    """A run of ``approvals`` in the store, its gate and the context its tools get."""
+async def _context(runtime: Runtime, approvals: ApprovalMode, goal: str = GOAL) -> tuple[ToolContext, RunGate]:
+    """A run of ``approvals`` with ``goal`` in the store, its gate and the context its tools get."""
     thread: ThreadRecord = await runtime.store.create_thread("secret fields", "test")
     run: RunRecord = await runtime.store.create_run(
         thread.id,
-        GOAL,
+        goal,
         "task",
         "ollama:none",
         None,
@@ -149,7 +149,7 @@ async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolConte
         runtime.config.policy.spend,
         approvals,
         _nobody,
-        (GOAL,),
+        (goal,),
         SiteLocks(),
     )
     ctx: ToolContext = ToolContext(
@@ -163,6 +163,7 @@ async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolConte
         questions="wait",
         workspace=workspace_dir(),
         gate=gate,
+        user_text=lambda: "\n".join(gate.instructions),
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,
         facts=new_facts,
@@ -217,6 +218,35 @@ async def test_ask_mode_refuses_to_type_a_one_time_code(runtime: Runtime, site: 
     assert "refusing to type into a one-time-code field" in acted.text
     assert site.submissions == []
     assert await _records(ctx) == []
+
+
+async def test_ask_mode_types_a_one_time_code_the_user_gave(runtime: Runtime, site: _Site) -> None:
+    """Item 797: the code is the user's to hand over; a run in ask mode types it and submits the form."""
+    goal: str = f"Confirm the sign-up with the code {CODE} from the e-mail."
+    ctx, gate = await _context(runtime, "ask", goal=goal)
+    field: str = await _code_field(ctx, gate, site)
+    acted: ToolResult = await _call(
+        ctx,
+        gate,
+        "browser_act",
+        {"steps": [{"action": "fill", "ref": field, "text": CODE}, {"action": "press", "ref": field, "key": "Enter"}]},
+    )
+    assert "refusing to type into" not in acted.text, acted.text
+    assert any(CODE in submission for submission in site.submissions), site.submissions
+    assert await _records(ctx) == []
+
+
+async def test_ask_mode_refuses_a_code_one_key_at_a_time_even_when_the_user_gave_it(
+    runtime: Runtime, site: _Site
+) -> None:
+    """Item 797: a key is not the whole secret; the code goes in as a value, not a character at a time."""
+    goal: str = f"Confirm the sign-up with the code {CODE} from the e-mail."
+    ctx, gate = await _context(runtime, "ask", goal=goal)
+    field: str = await _code_field(ctx, gate, site)
+    acted: ToolResult = await _call(
+        ctx, gate, "browser_act", {"steps": [{"action": "press", "ref": field, "key": "4"}]}
+    )
+    assert "refusing to type into a one-time-code field" in acted.text
 
 
 @pytest.mark.parametrize(
@@ -296,6 +326,6 @@ async def test_a_yolo_run_types_a_card_field_itself_whatever_its_batch_was_allow
     ctx, _ = await _context(runtime, "yolo")
     check: SecretFieldCheck = _secret_field_check(ctx)
     field: SecretField = SecretField(ref="e7", kind="cc-number", url="https://shop.example/checkout")
-    await check(field)
+    await check(field, None)
     records: list[ApprovalRecord] = await _records(ctx)
     assert [(record.decided_by, record.args["flags"]) for record in records] == [("yolo", ["financial"])]

@@ -1,8 +1,9 @@
 """Settings › Trading in a real browser (docs/daemon.md): trading is switched from off to paper, a limit is changed and
 kept in the config file, a limit the settings refuse says why, Live asks first, a key the Keychain stand-in never
-receives is refused with its reason, and an order of the record is listed; wide and light, and on a phone and dark,
-where the page keeps inside the screen. The Keychain is a stand-in, and no price and no account is read from Coinbase:
-the paper account holds only euros, which need no price."""
+receives is refused with its reason, and an order of the record is listed, its long reason wrapped inside the table's
+card; wide and light, and on a phone and dark, where the page keeps inside the screen. The Keychain is a stand-in, and
+so is Coinbase's market (an empty list of products, for the watch's count once "*" is allowed): the paper account
+holds only euros, which need no price."""
 
 import asyncio
 import time
@@ -11,6 +12,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
@@ -25,12 +27,31 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.models import TradingOrderRecord
+from dotagent.trading.market import CoinbaseMarket
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "trading-settings-page-token"
 _OVERFLOW: str = "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
+# The orders table keeps inside its card, and its reason inside its cell (item 779: a reason kept to one line pushed
+# the table past the card, which cut off its last columns).
+_FITS: str = """(card) => {
+  const reason = card.querySelector('.trading-reason td');
+  return card.querySelector('table').offsetWidth <= card.clientWidth && reason.scrollWidth <= reason.clientWidth + 1;
+}"""
+_REASON: str = (
+    "The price moved past the stop the run had set: the 15-minute RSI fell from 56 to 41, the daily SMA20 sits under"
+    " the bid, the book thinned on the sell side and the order would have filled far below its limit, so it was not"
+    " sent."
+)
 _SIZES: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
+
+
+def _no_market(request: httpx.Request) -> httpx.Response:
+    """Coinbase's market as a stand-in: an empty list of products, and no product of its own."""
+    if request.url.path.endswith("/market/products"):
+        return httpx.Response(200, json={"products": []})
+    return httpx.Response(404, json={"error": "NOT_FOUND"})
 
 
 @pytest_asyncio.fixture(loop_scope="module")
@@ -46,6 +67,8 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
     built.trading.key_store = MemorySecretStore()
+    # Coinbase is a stand-in that lists no product (item 777: with "*" the page reads the list for the watch's count).
+    built.trading.market = CoinbaseMarket(5.0, httpx.MockTransport(_no_market))
     try:
         yield built
     finally:
@@ -101,9 +124,15 @@ async def _fail_an_order(runtime: Runtime) -> None:
             ts=time.time(),
             run_id="",
             exchange_id="",
-            note="The price moved",
+            note=_REASON,
         )
     )
+
+
+async def _reason_fits(page: Page) -> None:
+    """The orders table, with an order's long reason under it, keeps inside its card."""
+    card: Locator = page.locator(".trading-table-card").filter(has=page.locator(".trading-orders"))
+    assert await card.evaluate(_FITS), "the orders table or its reason is wider than the card"
 
 
 async def _held(page: Page, served: str) -> dict[str, Any]:
@@ -141,6 +170,7 @@ async def test_the_page_switches_trading_keeps_a_limit_and_asks_before_live(
                     await page.reload()
                     await expect(_mode(page, "Paper")).to_have_attribute("aria-pressed", "true")
                     await expect(page.locator(".trading [data-order]")).to_contain_text("Sell ETH-EUR")
+                    await _reason_fits(page)
                     assert await page.evaluate(_OVERFLOW) <= 1
                 await page.screenshot(path=str(tmp_path / f"trading-{width}-{scheme}.png"), full_page=True)
                 await page.close()
@@ -163,6 +193,12 @@ async def _wide(page: Page, runtime: Runtime, served: str) -> None:
     await expect(page.locator('[data-figure="equity"]')).to_have_text("1,000.00 EUR")
     await expect(page.locator('[data-figure="day"]')).to_have_text("0.00 EUR")
     await expect(page.locator('[data-figure="traded"]')).to_have_text("0.00 EUR of 100.00 EUR")
+    # The desk (item 777): the paper account since its start, no open position yet, and the watch saying that no
+    # schedule is started by a move of the market.
+    await expect(page.locator('[data-figure="start"]')).to_have_text("0.00 EUR")
+    await expect(page.get_by_role("heading", name="Open positions")).to_be_visible()
+    await expect(page.get_by_text("No open position.", exact=False)).to_be_visible()
+    await expect(page.locator('.trading [data-watch="wake"]')).to_contain_text("No schedule is started by a move")
     await expect(page.locator('[data-limit="paper_start"]')).to_be_visible()
     await expect(page.get_by_role("heading", name="Coinbase key")).to_be_visible()
     await expect(page.get_by_text("Runs get the trading tools after Dot restarts.")).to_be_visible()
@@ -172,6 +208,7 @@ async def _wide(page: Page, runtime: Runtime, served: str) -> None:
     await _fail_an_order(runtime)
     await page.reload()
     await expect(page.locator(".trading [data-order]")).to_contain_text("The price moved")
+    await _reason_fits(page)
     # A limit is changed and saved: only it is sent, and the config file keeps it.
     save: Locator = page.get_by_role("button", name="Save limits")
     await expect(save).to_be_disabled()
@@ -183,10 +220,14 @@ async def _wide(page: Page, runtime: Runtime, served: str) -> None:
     await page.get_by_label("Product to allow").fill("xrp-eur")
     await page.get_by_role("button", name="Allow").click()
     await expect(page.locator('[data-product="XRP-EUR"]')).to_be_visible()
+    # "*" is the whole market, said in words (item 771).
+    await page.get_by_label("Product to allow").fill("*")
+    await page.get_by_role("button", name="Allow").click()
+    await expect(page.locator('[data-product="*"]')).to_have_text("Every product trading 1,000,000 EUR a day")
     await save.click()
     await expect(save).to_be_disabled()
     held = await _held(page, served)
-    assert held["settings"]["max_order"] == 20.0 and held["settings"]["products"][-1] == "XRP-EUR"
+    assert held["settings"]["max_order"] == 20.0 and held["settings"]["products"][-2:] == ["XRP-EUR", "*"]
     kept: dict[str, object] = tomllib.loads(config_path().read_text(encoding="utf-8"))["trading"]
     assert kept["max_order"] == 20.0 and kept["mode"] == "paper"
     # A limit the settings refuse says why, and changes nothing.
