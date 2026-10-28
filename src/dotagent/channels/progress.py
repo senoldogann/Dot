@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from dotagent.channels.words import ENGLISH, Words
 from dotagent.core.text import plain_line
 
 # A run that works longer than this sends its first message of progress; a later one is sent at least this long after
@@ -51,33 +52,46 @@ _SKIPPED: frozenset[str] = frozenset(
         "terminal_close",
     }
 )
-# What a tool is said to have done where its arguments add nothing to say.
-_PLAIN: dict[str, str] = {
-    "list_dir": "looked in a folder",
-    "find_files": "looked for files",
-    "search_files": "searched files",
-    "apple_script": "ran an AppleScript",
-    "mail_read": "read mail",
-    "mail_search": "searched mail",
-    "calendar_events": "looked at the calendar",
-    "memory_save": "kept a note",
-    "memory_update": "updated a note",
-    "memory_search": "searched the notes",
-    "memory_forget": "forgot a note",
-    "write_notes": "wrote notes",
-    "schedule_create": "added a schedule",
-    "schedule_list": "looked at the schedules",
-    "schedule_delete": "deleted a schedule",
-    "notify": "notified you",
-    "show_page": "showed a page",
-    "draft_message": "drafted a message",
-    "consult": "asked a helper",
-    "message_agent": "wrote to an agent",
-    "create_agent": "made an agent",
-    "code_fetch": "fetched a code",
-    "browser_snapshot": "looked at a page",
-}
+# The tools whose step is said by a phrase of their own, which needs nothing of their arguments: the key of the phrase
+# in the owner's language is the tool's name (:data:`~dotagent.channels.words.STEP_KEYS`).
+_PLAIN: frozenset[str] = frozenset(
+    {
+        "list_dir",
+        "find_files",
+        "search_files",
+        "apple_script",
+        "mail_read",
+        "mail_search",
+        "calendar_events",
+        "memory_save",
+        "memory_update",
+        "memory_search",
+        "memory_forget",
+        "write_notes",
+        "schedule_create",
+        "schedule_list",
+        "schedule_delete",
+        "notify",
+        "show_page",
+        "draft_message",
+        "consult",
+        "message_agent",
+        "create_agent",
+        "code_fetch",
+        "browser_snapshot",
+    }
+)
 _PREFIX_MCP: str = "mcp__"
+# The tools whose step names the file they worked on, and the ones whose step names the host of the page, by the key of
+# their phrase.
+_FILE_STEPS: dict[str, str] = {"read_file": "read_file", "write_file": "wrote_file", "edit_file": "edited_file"}
+_PAGE_STEPS: dict[str, str] = {
+    "web_fetch": "read_page",
+    "web_extract": "read_page",
+    "web_crawl": "crawled_site",
+    "browser_open": "opened_page",
+    "browser_new_tab": "opened_page",
+}
 
 
 def _clip(text: str, chars: int) -> str:
@@ -91,16 +105,19 @@ def _text(args: Mapping[str, object], key: str) -> str:
     return value if isinstance(value, str) else ""
 
 
-def _command(raw: str) -> str:
+def _command(raw: str, words: Words) -> str:
     """A command the run ran, ``$ `` and its first characters; a call that gave none ran a command."""
     shown: str = _clip(raw, COMMAND_CHARS)
-    return f"{COMMAND_MARK}{shown}" if shown else "ran a command"
+    return f"{COMMAND_MARK}{shown}" if shown else words.step("ran_command")
 
 
-def _file(verb: str, args: Mapping[str, object]) -> str:
+def _file(key: str, args: Mapping[str, object], words: Words) -> str:
+    """A step on a file, named by the file's name (``key``), or on a file (``key`` and ``_a_file``) when it has none."""
     path: str = _text(args, "path").strip()
     name: str = Path(path).name or path
-    return f"{verb} {_clip(name, _NAME_CHARS)}" if name else f"{verb} a file"
+    if not name:
+        return words.step(key.replace("_file", "_a_file"))
+    return words.step(key, _clip(name, _NAME_CHARS))
 
 
 def _host(address: str) -> str:
@@ -126,9 +143,10 @@ def _sources(args: Mapping[str, object]) -> str:
     return ""
 
 
-def _page(verb: str, args: Mapping[str, object]) -> str:
+def _page(key: str, args: Mapping[str, object], words: Words) -> str:
+    """A step on a page, named by its host (``key`` and ``_on``), or without one."""
     host: str = _host(_sources(args))
-    return f"{verb}: {_clip(host, _NAME_CHARS)}" if host else verb
+    return words.step(f"{key}_on", _clip(host, _NAME_CHARS)) if host else words.step(key)
 
 
 def tool_words(tool: str) -> str:
@@ -141,44 +159,37 @@ def tool_words(tool: str) -> str:
     return tool.replace("_", " ")
 
 
-def step_words(tool: str, args: Mapping[str, object]) -> str | None:
-    """What the call of ``tool`` with ``args`` is told as, in one line, or ``None`` for a step a phone does not need to
-    hear of. A command is ``$ `` and its first characters; a file read, written or edited is named by its file name; a
-    page by its host alone; the browser and the desktop as the page counts them; any other tool by what it does."""
+def step_words(tool: str, args: Mapping[str, object], words: Words = ENGLISH) -> str | None:
+    """What the call of ``tool`` with ``args`` is told as, in one line of the owner's language (``words``, item 805), or
+    ``None`` for a step a phone does not need to hear of. A command is ``$ `` and its first characters; a file read,
+    written or edited is named by its file name; a page by its host alone; the browser and the desktop as the page
+    counts them; any other tool by what it does."""
     if tool in _SKIPPED:
         return None
     if tool in ("shell", "terminal_open"):
-        return _command(_text(args, "command"))
+        return _command(_text(args, "command"), words)
     if tool == "terminal_send":
-        return _command(_text(args, "text"))
-    if tool == "read_file":
-        return _file("read", args)
-    if tool == "write_file":
-        return _file("wrote", args)
-    if tool == "edit_file":
-        return _file("edited", args)
+        return _command(_text(args, "text"), words)
+    if tool in _FILE_STEPS:
+        return _file(_FILE_STEPS[tool], args, words)
     if tool == "web_search":
         query: str = _clip(_text(args, "query"), COMMAND_CHARS)
-        return f"searched the web: {query}" if query else "searched the web"
-    if tool in ("web_fetch", "web_extract"):
-        return _page("read a page", args)
-    if tool == "web_crawl":
-        return _page("crawled a site", args)
-    if tool in ("browser_open", "browser_new_tab"):
-        return _page("opened a page", args)
+        return words.step("searched_web_for", query) if query else words.step("searched_web")
+    if tool in _PAGE_STEPS:
+        return _page(_PAGE_STEPS[tool], args, words)
     if tool == "delegate":
         goal: str = _clip(_text(args, "goal"), COMMAND_CHARS)
-        return f"handed work to a helper: {goal}" if goal else "handed work to a helper"
+        return words.step("handed_work_for", goal) if goal else words.step("handed_work")
     if tool == "skill":
         name: str = _clip(_text(args, "name"), _NAME_CHARS)
-        return f"used the skill {name}" if name else "used a skill"
+        return words.step("used_skill_named", name) if name else words.step("used_skill")
     if tool in _PLAIN:
-        return _PLAIN[tool]
+        return words.step(tool)
     if tool.startswith("browser_"):
-        return "used the browser"
+        return words.step("used_browser")
     if tool.startswith("desktop_"):
-        return "used the desktop"
-    return f"used {tool_words(tool)}"
+        return words.step("used_desktop")
+    return words.step("used_tool", tool_words(tool))
 
 
 def first_sentence(thought: str, chars: int = THOUGHT_CHARS) -> str:
@@ -195,15 +206,8 @@ def first_sentence(thought: str, chars: int = THOUGHT_CHARS) -> str:
 
 
 def elapsed(seconds: float) -> str:
-    """A time of work in words: ``15 s``, ``2 min 5 s``, ``1 h 3 min``."""
-    whole: int = max(0, int(seconds))
-    if whole < 60:
-        return f"{whole} s"
-    minutes, rest = divmod(whole, 60)
-    if minutes < 60:
-        return f"{minutes} min {rest} s" if rest else f"{minutes} min"
-    hours, minutes = divmod(minutes, 60)
-    return f"{hours} h {minutes} min" if minutes else f"{hours} h"
+    """A time of work in English words: ``15 s``, ``2 min 5 s``, ``1 h 3 min`` (:meth:`Words.elapsed`)."""
+    return ENGLISH.elapsed(seconds)
 
 
 @dataclass
@@ -224,6 +228,8 @@ class Progress:
     first_after_s: float = FIRST_AFTER_S
     apart_s: float = APART_S
     max_messages: int = MAX_MESSAGES
+    # The language of the run's messages (item 805): the owner's when the run started.
+    words: Words = ENGLISH
     sent: int = 0
     last_sent: float | None = None
     _steps: list[_Step] = field(default_factory=list)
@@ -273,9 +279,10 @@ class Progress:
             return None
         shown: list[_Step] = self._steps[-MAX_LINES:]
         earlier: int = self._dropped + sum(step.times for step in self._steps[: len(self._steps) - len(shown)])
-        lines: list[str] = [f"Working for {elapsed(now - self.started)}:"]
+        words: Words = self.words
+        lines: list[str] = [words.fill(words.working_for, elapsed=words.elapsed(now - self.started))]
         if earlier:
-            lines.append(f"… {earlier} earlier {'step' if earlier == 1 else 'steps'}")
+            lines.append(words.fill(words.earlier_step if earlier == 1 else words.earlier_steps, count=earlier))
         lines.extend(f"{step.words} ×{step.times}" if step.times > 1 else step.words for step in shown)
         if self._thought is not None and self._new_thought():
             lines.append(f"{THOUGHT_MARK}{self._thought}")
