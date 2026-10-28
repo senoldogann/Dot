@@ -575,7 +575,8 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
             await page.goto(f"{world.dot}/#/customize/connectors")
             fixture: Locator = _server_row(page, "fixture")
-            await expect(fixture.locator(".badge")).to_have_text("Ready")
+            # The fixture server is a Python process of its own, which a busy runner may take longer than 5 s to start.
+            await expect(fixture.locator(".badge")).to_have_text("Ready", timeout=30_000)
             await expect(fixture).to_contain_text("Set up in Dot's settings file; remove it there.")
             await expect(fixture).to_contain_text("10 actions: ")
             await expect(fixture.get_by_role("button")).to_have_count(0)
