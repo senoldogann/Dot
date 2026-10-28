@@ -23,6 +23,19 @@ by what it lets a run do as much as by how it reads.
 - A change in what Dot does without the matching change under `docs/`
 - A change that makes a line in `CLAUDE.md`, `CONTRIBUTING.md` or `docs/` stale
 
+## Checks made from reviews
+
+A finding that comes back gets a check, not another comment: a test or a gate step that fails the next time. Put the
+check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
+here points at a test that no longer exists.
+
+- `tests/smoke/test_secret_fields.py::test_ask_mode_types_a_one_time_code_the_user_gave` — a one-time code the user
+  gave is typed and the form submits, while a code found on the page is refused (`test_ask_mode_refuses_to_type_a_one_time_code`).
+- `tests/unit/test_ask_user_notify.py::test_a_left_question_notifies_the_user` — a question left for the user sends a
+  notification.
+- `tests/unit/test_limits.py::test_a_run_has_a_default_ceiling_and_zero_turns_it_off` — a run has a default
+  120-minute, 10,000,000-token ceiling, and 0 turns a bound off.
+
 ## Evidence and format
 
 - Cite file and line for every finding; read the code instead of guessing from names
