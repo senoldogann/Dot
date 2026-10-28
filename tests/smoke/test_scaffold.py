@@ -338,12 +338,13 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     # with the skills that come with Dot of item 196 and the draft tool of item 314 included) room for three pages after
     # every compaction; what a compaction keeps grows a little each time, and a window that left room for one page ended
     # up compacting at every step once the instructions grew by a few words (item 404). It was 32 000 until three tools
-    # joined the fixed part (items 714 and 715), and 33 600 until three more did (items 740 and 746).
+    # joined the fixed part (items 714 and 715), 33 600 until three more did (items 740 and 746), and 35 200 until the
+    # security scan and the Deep-OS skill did (item 781).
     turns: list[ScriptedTurn] = _reading(40)
-    small: Played = await _play(_config({}, 6), login_env, 35_200, turns)
+    small: Played = await _play(_config({}, 6), login_env, 37_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(35_200, None, 26_400, 26_400, 3300, True),)
+    assert small.scaffolds == (_scaffold(37_000, None, 27_750, 27_750, 3469, True),)
     assert roomy.scaffolds == (_scaffold(None, None, 96_000, 81_600, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
@@ -366,8 +367,8 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for compaction in small.compactions:
         before, after = compaction["tokens_before"], compaction["tokens_after"]
         assert isinstance(before, int) and isinstance(after, int), compaction
-        assert after < before and after <= 26_400, compaction
-    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 26_400
+        assert after < before and after <= 27_750, compaction
+    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 27_750
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
     # history again at the very next step.
     gaps: list[int] = [

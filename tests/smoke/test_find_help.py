@@ -195,8 +195,9 @@ async def test_a_run_offered_more_skills_than_its_instructions_list_is_listed_th
     assert (
         "- weekly-report: Write the weekly report from the week's notes, in the owner's format.\n"
         "- mail-merge: Send one email to each contact of a list.\n"
-        "- 5 more installed skills fit your goal less well and are not listed here: find_help searches them all by "
-        "your need, and skill reads one by its name. They are: invoice-pdf, release-notes, excel, onedrive, word."
+        "- 6 more installed skills fit your goal less well and are not listed here: find_help searches them all by "
+        "your need, and skill reads one by its name. They are: invoice-pdf, release-notes, deep-os, excel, onedrive, "
+        "word."
     ) in skills, skills
     assert "Draft the release notes" not in skills and "Fill in the invoice PDF form" not in skills, skills
 

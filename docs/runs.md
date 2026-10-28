@@ -461,6 +461,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Vault           | `vault_contacts` (item 621): the contact details you saved in Settings › Vault and the billing address of each card, for a run to type where a form asks; it never shows a password, a card number, an expiry or a security code (a card is kept, and no tool of a run fills it) |
 | Trading         | while trading is on ([Trading](trading.md), items 763 and 764): `trading_market`, `trading_scan` (item 771), `trading_portfolio`, `trading_order`, `trading_exit` (item 770), `trading_history` |
 | Recon           | `recon` (item 776): the addresses, TLS certificate, HTTP headers and technology of a site, and with `depth = "ports"` the open ports of a host in `[recon] owned_hosts` ([Recon](recon.md)) |
+| Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts`, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715) |

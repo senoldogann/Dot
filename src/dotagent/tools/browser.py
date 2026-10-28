@@ -9,6 +9,7 @@ steps is classified once, from the elements it targets in the latest snapshot.
 import asyncio
 import base64
 import contextlib
+import json
 import os
 import posixpath
 import secrets
@@ -60,6 +61,7 @@ from dotagent.browser.types import (
     SecretField,
     SecretFieldCheck,
     Step,
+    StepReport,
     TextView,
     TextWait,
     VaultFieldKind,
@@ -401,6 +403,59 @@ class ActArgs(ToolArgs):
             "and that it is a login wall, a CAPTCHA or an error page, so you need not read the whole page to know."
         ),
     )
+    retry: bool = Field(
+        default=True,
+        description=(
+            "When a click leaves the page unchanged, reach the same element once with the full pointer sequence a "
+            "script sends (`browser_eval`'s way) and take the page again, instead of returning to the model for "
+            "another method. A click that already moved the page is never sent twice."
+        ),
+    )
+
+
+# The second way to a control whose click did nothing (item 781): the sequence a pointer sends, so a page that
+# listens for pointerdown or mousedown sees it, and the click at the end. It runs on the element itself, so an overlay
+# that took the click by its coordinates does not stand in its way.
+_RETRY_CLICK_SCRIPT: str = """(el) => {
+  el.scrollIntoView({block: 'center', inline: 'center'});
+  const init = {bubbles: true, cancelable: true, view: window};
+  for (const type of ['pointerover', 'pointerdown', 'pointerup', 'mouseover', 'mousedown', 'mouseup', 'click']) {
+    const Kind = type.startsWith('pointer') ? PointerEvent : MouseEvent;
+    el.dispatchEvent(new Kind(type, init));
+  }
+  return true;
+}"""
+
+
+async def _retry_unchanged(args: ActArgs, outcome: ActOutcome, ctx: ToolContext) -> ActOutcome:
+    """A click whose batch left the page unchanged is tried once the other way (item 781): the steps' refs are still
+    on the page, so a script sends the pointer sequence to each such element, and the page is read again when one of
+    them ran. A click that moved the page, a step that failed and a script that surprised the tab are left alone."""
+    steps: list[StepReport] = list(outcome.steps)
+    retried: bool = False
+    for index, (step, report) in enumerate(zip(args.steps, steps, strict=False)):
+        if step.action != "click" or step.ref is None:
+            continue
+        if report.outcome != "done" or not report.detail.startswith("but the page did not change"):
+            continue
+        try:
+            run: ScriptRun = await ctx.browser.run_script(
+                ctx.thread_id,
+                _RETRY_CLICK_SCRIPT,
+                _DEFAULT_SCRIPT_S,
+                hides_secrets(ctx.approvals),
+                (step.ref,),
+            )
+        except DotError:
+            continue
+        if run.end != "value" or run.surprise is not None:
+            continue
+        retried = True
+        steps[index] = report.model_copy(update={"detail": f"{report.detail}; retried with a script on {step.ref}"})
+    if not retried:
+        return outcome
+    view: PageView = await ctx.browser.snapshot(ctx.thread_id, hides_secrets(ctx.approvals))
+    return outcome.model_copy(update={"steps": tuple(steps), "view": view})
 
 
 def _element_at(ref: str | None, ctx: ToolContext) -> Element | None:
@@ -586,6 +641,8 @@ def _act_tool() -> RegisteredTool:
             _secret_field_check(ctx),
             hides_secrets(ctx.approvals),
         )
+        if args.retry:
+            outcome = await _retry_unchanged(args, outcome, ctx)
         rendered: str = render_act_outcome(outcome, _nonce(), _body_budget(ctx))
         note: str = batch_cut_note(len(args.steps), limit)
         if note:
@@ -606,9 +663,10 @@ def _act_tool() -> RegisteredTool:
             "editors), select, press (Enter, Control+A, …), check, uncheck, scroll_into_view, drag (move ref onto "
             "to_ref), click_at (pixel x,y from a screenshot, only for canvases). In an editor (a contenteditable "
             "area) fill, type and insert wait until it is ready and fail when it did not take the text; insert goes "
-            "only into a text field or an editor. Batch the steps you can predict, such as filling a whole form and "
-            "pressing submit. The result shows what changed on the page. Passwords, card numbers and one-time codes "
-            "go in only as your instructions on secrets say: otherwise the browser refuses the step. " + _REF_HELP
+            "only into a text field or an editor. A click that leaves the page unchanged is tried once the other way "
+            "with a script before the result returns. Batch the steps you can predict, such as filling a whole form "
+            "and pressing submit. The result shows what changed on the page. Passwords, card numbers and one-time "
+            "codes go in only as your instructions on secrets say: otherwise the browser refuses the step. " + _REF_HELP
         ),
         args_model=ActArgs,
         modes=ACTING_MODES,
@@ -640,6 +698,22 @@ class EvalArgs(ToolArgs):
             "arguments, in this order: (el) => el.click()."
         ),
     )
+    selector: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=500,
+        description=(
+            "A CSS selector instead of a ref: the script must be a function, and it gets the first element the "
+            "selector matches: `(el) => el.click()`. One call for the click a snapshot and browser_act would take "
+            "three steps to reach."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _one_element(self) -> "EvalArgs":
+        if self.refs and self.selector:
+            raise ValueError("give refs or a selector, not both")
+        return self
 
 
 def _eval_tool() -> RegisteredTool:
@@ -648,13 +722,24 @@ def _eval_tool() -> RegisteredTool:
         # as the shell guard rates the same script sent to Chrome through AppleScript.
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
         on: str = f" on {', '.join(args.refs)}" if args.refs else ""
+        if args.selector:
+            on = f" on selector {_clip(args.selector, 80)}"
         summary: str = f"Run a script in the page{on}: {_clip(args.script, _SCRIPT_SUMMARY_CHARS)}"
         return _action("browser_eval", "browser_click", "medium", summary, target, ())
 
     async def run(args: EvalArgs, ctx: ToolContext) -> ToolResult:
         waited_s: float = args.timeout_s or _DEFAULT_SCRIPT_S
+        script: str = args.script
+        if args.selector:
+            # The selector is the element the script would have got from a ref (item 781): one call instead of a
+            # snapshot, a find and a click of browser_act.
+            script = (
+                f"(() => {{ const el = document.querySelector({json.dumps(args.selector)});"
+                " if (el === null) throw new Error('no element matches the selector');"
+                f" return ({args.script})(el); }})()"
+            )
         script_run: ScriptRun = await ctx.browser.run_script(
-            ctx.thread_id, args.script, waited_s, hides_secrets(ctx.approvals), tuple(args.refs or ())
+            ctx.thread_id, script, waited_s, hides_secrets(ctx.approvals), tuple(args.refs or ())
         )
         rendered: str = render_script_run(script_run, waited_s, _nonce(), _body_budget(ctx))
         # The value is the page's: the run reads it as untrusted, whatever it says.
@@ -665,8 +750,9 @@ def _eval_tool() -> RegisteredTool:
         description=(
             "Run JavaScript in your tab's page, with its session, and get the value as JSON: read a whole list or the "
             "data behind the page, or do many like actions in one call. With refs, the script gets those elements: "
-            "reach a control a click of browser_act did not move (el.click(), or the events it listens for) without "
-            "guessing a selector. A thrown error fails the call. It is refused on a page that holds a password, code "
+            "reach a control a click of browser_act did not move (el.click(), or the events it listens for), or give "
+            "a CSS selector and let the script click the first element it matches in the same call. A thrown error "
+            "fails the call. It is refused on a page that holds a password, code "
             "or card field, and cookie values come back as [hidden]."
         ),
         args_model=EvalArgs,

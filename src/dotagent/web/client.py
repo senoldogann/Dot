@@ -6,7 +6,7 @@ import socket
 import zlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urlencode, urljoin, urlsplit
 
 import httpcore
 import httpx
@@ -265,6 +265,15 @@ class WebClient:
             visited.append(current)
             current = urljoin(current, exchange.location)
         raise WebError("too many redirects", {"url": _shown(url), "redirects": len(visited), "limit": _MAX_REDIRECTS})
+
+    async def post_form(self, url: str, data: Mapping[str, str], max_bytes: int) -> FetchedDocument:
+        """POST a form's fields as ``application/x-www-form-urlencoded`` (item 781). A redirect is not followed, so
+        the answer's status and ``Location`` say whether the form was accepted."""
+        body: bytes = urlencode(list(data.items())).encode("utf-8")
+        exchange: _Exchange = await self._exchange(
+            "POST", url, {"Content-Type": "application/x-www-form-urlencoded"}, body, max_bytes
+        )
+        return _document(url, exchange, ())
 
     async def post_json(self, url: str, headers: Mapping[str, str], body: bytes, max_bytes: int) -> FetchedDocument:
         """POST a JSON body to an API; redirects are not followed, and the request is tried again only when it was not

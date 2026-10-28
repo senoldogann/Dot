@@ -66,6 +66,8 @@ private hosts.
 
 - No authentication: a site that answers only a signed-in visitor is audited as a visitor sees it.
 - No CVE lookup and no exploit; a version is a hint for the owner, not a verdict.
+- No payloads: the forms of a host in `owned_hosts` are tried by `security_scan`, a separate tool ([Security
+  scan](security.md)). This audit stays what a browser's visit reads.
 - The port list is fixed and short on purpose. A scan of every port is long, noisy and rarely what the owner asked
   for; `nmap` run by hand in a terminal is the tool for that, on a host you may test.
 - A passive audit of any public site is allowed because it is what a browser does; it is still a request the site's
