@@ -345,6 +345,12 @@ class EvalCheckCommand(FrozenModel):
     name: Literal["eval-check"]
 
 
+class EvalFromRunCommand(FrozenModel):
+    name: Literal["eval-from-run"]
+    run_id: str
+    out: str | None
+
+
 class EvalRunCommand(FrozenModel):
     name: Literal["eval-run"]
     model: str | None
@@ -561,6 +567,7 @@ type Command = Annotated[
     | UndoCommand
     | EvalListCommand
     | EvalCheckCommand
+    | EvalFromRunCommand
     | EvalRunCommand
     | EvalToolsCommand
     | EvalReportCommand

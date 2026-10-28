@@ -114,6 +114,7 @@ _FAMILIES: dict[str, str] = {
     "undo": "dotagent.cli_undo",
     "eval-list": "dotagent.cli_eval",
     "eval-check": "dotagent.cli_eval",
+    "eval-from-run": "dotagent.cli_eval",
     "eval-run": "dotagent.cli_eval",
     "eval-report": "dotagent.cli_eval",
     "eval-tools": "dotagent.cli_eval",
@@ -541,6 +542,9 @@ def build_parser() -> argparse.ArgumentParser:
         "check",
         help="prove, offline and without a model, that every task can be passed and cannot be passed by doing nothing",
     )
+    eval_from_run = eval_commands.add_parser("from-run", help="write a draft eval task from a saved run")
+    eval_from_run.add_argument("run_id", metavar="RUN", help="the id of the run")
+    eval_from_run.add_argument("--out", default=None, help="where to write the draft (default: evals/drafts/<run>.md)")
     eval_run = eval_commands.add_parser(
         "run", help="play the tasks against a model and print the score (this spends the tokens of that model)"
     )

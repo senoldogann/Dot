@@ -3,7 +3,14 @@
 import pytest
 
 from dotagent.cli import build_parser, parse_command
-from dotagent.cli_commands import RunCommand, ServiceInstallCommand
+from dotagent.cli_commands import EvalFromRunCommand, RunCommand, ServiceInstallCommand
+
+
+def test_eval_from_run_takes_a_run_and_an_out_path() -> None:
+    command = parse_command(build_parser(), ["eval", "from-run", "run-799", "--out", "/tmp/eval-draft.md"])
+    assert isinstance(command, EvalFromRunCommand)
+    assert command.run_id == "run-799"
+    assert command.out == "/tmp/eval-draft.md"
 
 
 @pytest.mark.parametrize("browser", ["own", "attach"])
