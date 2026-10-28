@@ -28,6 +28,7 @@ from typing import Literal
 from urllib.parse import unquote, urlsplit
 
 from dotagent.channels.text import LineKind, line_kinds
+from dotagent.channels.words import ENGLISH, Words
 from dotagent.core.errors import ChannelError, PolicyDenied
 from dotagent.policy.paths import kernel_path, within
 
@@ -108,19 +109,19 @@ class Found:
     pictures: tuple[Picture, ...]
     left_out: tuple[Left, ...]
 
-    def note(self) -> str:
+    def note(self, words: Words = ENGLISH) -> str:
         """The one line that says what was left out (``Left out: big.png (over 20 MB), 2 more (4 at most in a
-        message).``), or an empty string when nothing was."""
+        message).``), in the owner's language (``words``, item 805), or an empty string when nothing was."""
         if not self.left_out:
             return ""
         many: int = sum(1 for left in self.left_out if left.why == TOO_MANY)
         named: list[Left] = [left for left in self.left_out if left.why != TOO_MANY]
-        parts: list[str] = [f"{_shown(left.name)} ({left.why})" for left in named[:_LEFT_LISTED]]
+        parts: list[str] = [f"{_shown(left.name)} ({words.reason(left.why)})" for left in named[:_LEFT_LISTED]]
         if len(named) > _LEFT_LISTED:
-            parts.append(f"{len(named) - _LEFT_LISTED} more")
+            parts.append(words.fill(words.more, count=len(named) - _LEFT_LISTED))
         if many:
-            parts.append(f"{many} more ({TOO_MANY})")
-        return f"Left out: {', '.join(parts)}."
+            parts.append(f"{words.fill(words.more, count=many)} ({words.reason(TOO_MANY)})")
+        return words.fill(words.left_out, parts=", ".join(parts))
 
 
 @dataclass(frozen=True)

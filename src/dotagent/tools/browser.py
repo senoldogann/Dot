@@ -9,6 +9,7 @@ steps is classified once, from the elements it targets in the latest snapshot.
 import asyncio
 import base64
 import contextlib
+import json
 import os
 import posixpath
 import secrets
@@ -60,6 +61,7 @@ from dotagent.browser.types import (
     SecretField,
     SecretFieldCheck,
     Step,
+    StepReport,
     TextView,
     TextWait,
     VaultFieldKind,
@@ -401,6 +403,70 @@ class ActArgs(ToolArgs):
             "and that it is a login wall, a CAPTCHA or an error page, so you need not read the whole page to know."
         ),
     )
+    retry: bool = Field(
+        default=True,
+        description=(
+            "When a click leaves the page unchanged, reach the same element once with the full pointer sequence a "
+            "script sends (`browser_eval`'s way) and take the page again, instead of returning to the model for "
+            "another method. A click that already moved the page is never sent twice."
+        ),
+    )
+
+
+# The second way to a control whose click did nothing (item 781): the sequence a pointer sends, so a page that
+# listens for pointerdown or mousedown sees it, and the click at the end. It runs on the element itself, so an overlay
+# that took the click by its coordinates does not stand in its way.
+_RETRY_CLICK_SCRIPT: str = """(el) => {
+  el.scrollIntoView({block: 'center', inline: 'center'});
+  const init = {bubbles: true, cancelable: true, view: window};
+  for (const type of ['pointerover', 'pointerdown', 'pointerup', 'mouseover', 'mousedown', 'mouseup', 'click']) {
+    const Kind = type.startsWith('pointer') ? PointerEvent : MouseEvent;
+    el.dispatchEvent(new Kind(type, init));
+  }
+  return true;
+}"""
+
+
+# The flags of a batch whose unchanged click is not clicked again with a script.
+_NOT_RETRIED: frozenset[str] = frozenset(
+    {"financial", "external_send", "message_send", "public_post", "social", "destructive", "credential", "install"}
+)
+
+
+async def _retry_unchanged(
+    args: ActArgs, outcome: ActOutcome, ctx: ToolContext, flags: Sequence[str] = ()
+) -> ActOutcome:
+    """A click whose batch left the page unchanged is tried once the other way (item 781): the steps' refs are still
+    on the page, so a script sends the pointer sequence to each such element, and the page is read again when one of
+    them ran. A click that moved the page, a step that failed and a script that surprised the tab are left alone, and
+    so is a batch whose ``flags`` say it sends, posts, pays or removes (:data:`_NOT_RETRIED`)."""
+    if set(flags) & _NOT_RETRIED:
+        return outcome
+    steps: list[StepReport] = list(outcome.steps)
+    retried: bool = False
+    for index, (step, report) in enumerate(zip(args.steps, steps, strict=False)):
+        if step.action != "click" or step.ref is None:
+            continue
+        if report.outcome != "done" or not report.detail.startswith("but the page did not change"):
+            continue
+        try:
+            run: ScriptRun = await ctx.browser.run_script(
+                ctx.thread_id,
+                _RETRY_CLICK_SCRIPT,
+                _DEFAULT_SCRIPT_S,
+                hides_secrets(ctx.approvals),
+                (step.ref,),
+            )
+        except DotError:
+            continue
+        if run.end != "value" or run.surprise is not None:
+            continue
+        retried = True
+        steps[index] = report.model_copy(update={"detail": f"{report.detail}; retried with a script on {step.ref}"})
+    if not retried:
+        return outcome
+    view: PageView = await ctx.browser.snapshot(ctx.thread_id, hides_secrets(ctx.approvals))
+    return outcome.model_copy(update={"steps": tuple(steps), "view": view})
 
 
 def _element_at(ref: str | None, ctx: ToolContext) -> Element | None:
@@ -448,14 +514,22 @@ def _act_kind(steps: list[Step]) -> ActionKind:
 
 
 def _secret_field_check(ctx: ToolContext) -> SecretFieldCheck:
-    """What a batch does at a field that takes a secret: every mode but yolo refuses it, and a yes to the batch — a
-    payment under its caps among them — never covers typing a card number or a password (item 429). A yolo run asks
-    nothing (item 443), so the gate waives each such field with its reason in the step's record, and the batch types it;
-    the fields are still flagged, so the record says what was typed into."""
+    """What a batch does at a field that takes a secret. A yolo run asks nothing (item 443): the gate waives each field
+    with its reason in the step's record. In every other mode text the user wrote in this run may go in — a password or
+    a one-time code they gave, which is theirs to hand over — while text a page or a tool's output carries is refused
+    (item 797); a yes to the batch never covers a card number or a password (item 429)."""
     if ctx.approvals != "yolo":
-        return refuse_secret_field
 
-    async def enter(field: SecretField) -> None:
+        async def given(field: SecretField, text: str | None) -> None:
+            if text and text in ctx.user_text():
+                _log.info("secret_typed_from_user", run_id=ctx.run_id, ref=field.ref, kind=field.kind)
+                return
+            await refuse_secret_field(field, text)
+
+        return given
+
+    async def enter(field: SecretField, text: str | None) -> None:
+        del text
         flag: Flag = secret_field_flag(field.kind)
         summary: str = f"Type into {secret_field_label(field.kind)}" + ("" if field.ref is None else f" ({field.ref})")
         # The page's address may hold a login filled from the password manager (item 493): the record keeps none.
@@ -586,6 +660,10 @@ def _act_tool() -> RegisteredTool:
             _secret_field_check(ctx),
             hides_secrets(ctx.approvals),
         )
+        # A second, scripted click of a step that sends, posts, pays or removes would do it twice where the first one
+        # acted slowly (the review of every module): such a batch is not retried; the page says where it stands.
+        if args.retry:
+            outcome = await _retry_unchanged(args, outcome, ctx, authorized.flags)
         rendered: str = render_act_outcome(outcome, _nonce(), _body_budget(ctx))
         note: str = batch_cut_note(len(args.steps), limit)
         if note:
@@ -604,11 +682,14 @@ def _act_tool() -> RegisteredTool:
             "(replace a form field's value), type (key by key, where autocomplete must see the keys), insert (the "
             "text at once at the caret, without keys: long text and rich editors such as post composers or code "
             "editors), select, press (Enter, Control+A, …), check, uncheck, scroll_into_view, drag (move ref onto "
-            "to_ref), click_at (pixel x,y from a screenshot, only for canvases). In an editor (a contenteditable "
+            "to_ref), click_at (pixel x,y from a screenshot: a canvas, or a cross-origin widget like a captcha), "
+            "drag_at (press at pixel x,y and move to to_x,to_y: a captcha's drag puzzle or a slider, where no ref "
+            "reaches inside the frame). In an editor (a contenteditable "
             "area) fill, type and insert wait until it is ready and fail when it did not take the text; insert goes "
-            "only into a text field or an editor. Batch the steps you can predict, such as filling a whole form and "
-            "pressing submit. The result shows what changed on the page. Passwords, card numbers and one-time codes "
-            "go in only as your instructions on secrets say: otherwise the browser refuses the step. " + _REF_HELP
+            "only into a text field or an editor. A click that leaves the page unchanged is tried once the other way "
+            "with a script before the result returns. Batch the steps you can predict, such as filling a whole form "
+            "and pressing submit. The result shows what changed on the page. Passwords, card numbers and one-time "
+            "codes go in only as your instructions on secrets say: otherwise the browser refuses the step. " + _REF_HELP
         ),
         args_model=ActArgs,
         modes=ACTING_MODES,
@@ -640,6 +721,22 @@ class EvalArgs(ToolArgs):
             "arguments, in this order: (el) => el.click()."
         ),
     )
+    selector: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=500,
+        description=(
+            "A CSS selector instead of a ref: the script must be a function, and it gets the first element the "
+            "selector matches: `(el) => el.click()`. One call for the click a snapshot and browser_act would take "
+            "three steps to reach."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _one_element(self) -> "EvalArgs":
+        if self.refs and self.selector:
+            raise ValueError("give refs or a selector, not both")
+        return self
 
 
 def _eval_tool() -> RegisteredTool:
@@ -648,13 +745,26 @@ def _eval_tool() -> RegisteredTool:
         # as the shell guard rates the same script sent to Chrome through AppleScript.
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
         on: str = f" on {', '.join(args.refs)}" if args.refs else ""
+        if args.selector:
+            on = f" on selector {_clip(args.selector, 80)}"
         summary: str = f"Run a script in the page{on}: {_clip(args.script, _SCRIPT_SUMMARY_CHARS)}"
         return _action("browser_eval", "browser_click", "medium", summary, target, ())
 
     async def run(args: EvalArgs, ctx: ToolContext) -> ToolResult:
         waited_s: float = args.timeout_s or _DEFAULT_SCRIPT_S
+        script: str = args.script
+        if args.selector:
+            # The selector is the element the script would have got from a ref (item 781): one call instead of a
+            # snapshot, a find and a click of browser_act.
+            # The function is assigned on lines of its own, then called, as the refs' path does: a trailing ``;`` or
+            # ``// comment`` broke the call it was wrapped in (the review of every module).
+            script = (
+                f"(() => {{ const el = document.querySelector({json.dumps(args.selector)});"
+                " if (el === null) throw new Error('no element matches the selector');"
+                f" let __dotScript;\n__dotScript =\n{args.script}\n;\nreturn __dotScript(el); }})()"
+            )
         script_run: ScriptRun = await ctx.browser.run_script(
-            ctx.thread_id, args.script, waited_s, hides_secrets(ctx.approvals), tuple(args.refs or ())
+            ctx.thread_id, script, waited_s, hides_secrets(ctx.approvals), tuple(args.refs or ())
         )
         rendered: str = render_script_run(script_run, waited_s, _nonce(), _body_budget(ctx))
         # The value is the page's: the run reads it as untrusted, whatever it says.
@@ -665,8 +775,9 @@ def _eval_tool() -> RegisteredTool:
         description=(
             "Run JavaScript in your tab's page, with its session, and get the value as JSON: read a whole list or the "
             "data behind the page, or do many like actions in one call. With refs, the script gets those elements: "
-            "reach a control a click of browser_act did not move (el.click(), or the events it listens for) without "
-            "guessing a selector. A thrown error fails the call. It is refused on a page that holds a password, code "
+            "reach a control a click of browser_act did not move (el.click(), or the events it listens for), or give "
+            "a CSS selector and let the script click the first element it matches in the same call. A thrown error "
+            "fails the call. It is refused on a page that holds a password, code "
             "or card field, and cookie values come back as [hidden]."
         ),
         args_model=EvalArgs,
@@ -955,7 +1066,8 @@ def _wait_text_tool() -> RegisteredTool:
         name="browser_wait_text",
         description=(
             "Wait until some text is visible on the page (slow loads, progress screens), then show what changed. When "
-            "it does not appear in time the call fails and shows the page as it is."
+            "it does not appear in time, or the page stands still for 3 s after the first 5, the call fails and shows "
+            "the page as it is."
         ),
         args_model=WaitTextArgs,
         modes=ALL_MODES,
@@ -1219,14 +1331,18 @@ def _logins_tool() -> RegisteredTool:
         for login in logins:
             hosts: str = ", ".join(login.hosts)
             shown: str = f" ({hosts})" if hosts and hosts not in login.title else ""
-            lines.append(f"- {login.id}: {login.title}{shown}, in {login.source_name}")
+            kept: str = ", its password in the Mac's Keychain" if login.onepassword is None else ""
+            lines.append(f"- {login.id}: {login.title}{shown}, in {login.source_name}{kept}")
+        # A vault login's record shows no password, which a run read as "the vault has none" (item 786): it is said.
         return ok("The logins Dot may fill, by id:\n" + "\n".join(lines) + note)
 
     return make_tool(
         name=LOGINS_TOOL,
         description=(
             "List the logins Dot may fill into a page with browser_fill_login, from the owner's 1Password and from "
-            "their own vault (Settings › Vault): each one's id, title and websites, never a password."
+            "their own vault (Settings › Vault): each one's id, title and websites, never a password. A vault login's "
+            "password is in the Mac's Keychain, never in Dot's database (its fields are empty) or a file you can "
+            "read: do not look for it there; browser_fill_login says when a login has none."
         ),
         args_model=LoginsArgs,
         modes=ACTING_MODES,
@@ -1479,7 +1595,8 @@ def _fill_login_tool() -> RegisteredTool:
             "Fill a login of the owner's 1Password or of their own vault into the current page: give the login "
             "(browser_logins lists them) and the refs of its fields: the username's, the password field's, the "
             "one-time code's (1Password only). Dot reads the values and types them itself; you never see them. It "
-            "fills a login only on its own website, a password only into a password field. After a script ran in "
+            "fills a login only on its own website, a password only into a password field; a form that would send by "
+            "GET (it names no method) is made to send by POST first. After a script ran in "
             "this chat it reopens the page in a clean tab first; then fill again with its refs. " + _REF_HELP
         ),
         args_model=FillLoginArgs,

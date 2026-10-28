@@ -320,3 +320,16 @@ def test_what_keeps_clear_of_a_block_above_it_names_the_boxes_code_and_tables_ar
     rule: str = css[css.index(".answer > .prose:has(> :is(") :]
     rule = rule[: rule.index("{")]
     assert ".prose-code" in rule and ".prose-table" in rule, rule
+
+
+_POSITIONED_BUTTON: re.Pattern[str] = re.compile(
+    r"(^|[\s,>+~])\.(btn\.(sm\.)?icon-only|icon-btn)(?![\w-]|::)[^{]*\{[^}]*\bposition:", re.M
+)
+
+
+@pytest.mark.parametrize("name", ("app.css", "shell.css"))
+def test_the_ring_of_a_fingers_target_does_not_take_a_placed_button_out_of_its_place(name: str) -> None:
+    """Item 787: an icon button is positioned for the ring that widens its target only under ``:where``, whose weight is
+    none, so that a button a rule of its own places (the key field's eye, the way down) keeps its place on a phone."""
+    text: str = re.sub(r"/\*.*?\*/", "", (_CSS / name).read_text(encoding="utf-8"), flags=re.S)
+    assert [match.group(0)[:80] for match in _POSITIONED_BUTTON.finditer(text)] == []

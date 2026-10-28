@@ -136,7 +136,10 @@ note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama serve
 shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved later cannot change what
 runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and when asked,
 `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for `uv.lock`,
-cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). It exports the whole of
+cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). The advisories
+`desktop/src-tauri/.cargo/audit.toml` ignores are of crates that are not in the Mac build, the only one Dot makes
+(item 766: `zip`, which `tauri-plugin-updater` pulls for Windows alone), and `desktop/src-tauri/tests/mac_build.rs`
+fails the desktop checks the day one of them reaches it. It exports the whole of
 `uv.lock`, `dotagent-web-research` with it, since PyPI has it and the lock holds its hashes (item 623; while uv got it
 from its repository, item 583, it was left out, as `pip-audit --disable-pip` refuses a requirement with no hash).
 When something under
@@ -405,7 +408,9 @@ table follows, per site (the host of the page for a browser act, the application
 the `tool_result` event with the steps of the batch): acts, the share with one step, the share that failed, the
 median call, and the finished runs that acted there with the share of them that ended done (item 308). **By day**
 follows: per day, the finished runs that acted on a site and the share done, which shows whether the browser and the
-desktop work gets better from day to day. `--by site` prints these two only, `--by model` everything but them. Acts and steps recorded before
+desktop work gets better from day to day. `--by site` prints these two only, `--by model` everything but them, and
+`--by tool` prints only the tool health table: every tool by failure rate, calls, failed calls, fail % and median call,
+so one tool at 40 % is not hidden by the 5 % of all calls. Acts and steps recorded before
 these were counted (before item 22 of the roadmap) are left out of the acts lines and the sites table.
 
 The numbers of a long run follow under each model: the **compactions** per 100 steps, their seconds and their share of
@@ -452,6 +457,7 @@ it.
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `dotx eval list`                                         | The tasks, with their kind, mode and number of checks.                                                                                                                                                             |
 | `dotx eval check`                                        | Needs no model and costs nothing. Replays the reference solution of every task through the real loop, tools and policy, and proves that a run that touches nothing and says "done" fails every task and that the reference of a task with an easy way takes it. Run it after changing a tool, the policy or the loop. |
+| `dotx eval from-run RUN [--out PATH]`                    | Writes a draft task from a saved run: its goal, ending, steps and the tool names that failed. It leaves tool arguments out, so the draft can be read before it is shared, and it does not play anything; turn it into a task in `src/dotagent/evals/catalog.py`. The default is `<home>/evals/drafts/<run>.md`. |
 | `dotx eval run [--model REF] [--task ID]... [--repeat N] [--no-mcp-purposes]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens (180 s or 250000 for a choice task), and the notice before it starts states the ceiling. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. `--no-mcp-purposes` plays them with `[agent] mcp_purposes` false (below). |
 | `dotx eval tools [--model REF] [--case ID]... [--repeat N]` | Asks a model the moments of tool use Dot's runs got wrong (item 736), one call each: each case's goal is started as a run of the scripted model, whose first request (the system prompt and the tools' schemas, as Dot makes them) is asked of the model with the steps before the moment, and the first call that does work is judged (the tool, its arguments, the calls it must not make). The request is captured in `yolo`, so that no case waits on an approval. It spends the tokens of that model, about 20,000 a call; its key comes from the environment and the home's `.env` alone, and the Keychain is not asked while the cases play: a key in neither is missing, and the command says so before the first case. The cases are in `evals/tool_cases.py`, each saying which failure it comes from. |
 | `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims, unproven steps, the share of the easy ways taken); without a file, every run saved under `<home>/evals/`. |
@@ -486,6 +492,10 @@ attempt counted the run's own only before item 589), and the report holds the ap
 a report saved before model calls were timed counted the steps' tokens only and has
 no seconds, and one saved before acts and cached tokens were counted shows `-` for their shares. `dotx eval run` saves
 its report after every attempt, so an interrupted run keeps what it measured.
+
+A weekly score is `scripts/weekly-eval.sh`: it plays the catalog once, compares the new report with the one before it, and
+prints the difference. Run it from cron or a Dot schedule, so a model or harness change is seen as a score rather than
+as a few runs that felt worse.
 
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with (their text, or the bytes of an
 Office file in Base64), the goal, checks (a file exists, holds or equals something, a JSON file equals a value, a

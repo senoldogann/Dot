@@ -396,7 +396,7 @@ function scheduleControl(view, onSchedule) {
 
 /** What a night costs, in the words the page says it before the learning is switched on (item 721). */
 function nightCost(view) {
-  return `Each night Dot tries new versions on test tasks with its main model, ${view.main_model}: up to ${Math.round(view.step_tokens / 1e6)} million tokens and ${plural(Math.round(view.step_minutes), "minute", "minutes")}.`;
+  return `Each night Dot tries new versions on test tasks with its main model, ${view.main_model}: up to ${Math.round(view.step_tokens / 1e6)} million pieces of text read and written, as AI services count them, and ${plural(Math.round(view.step_minutes), "minute", "minutes")}.`;
 }
 
 /** The nightly learning: when it runs and what it does, and under that the nights it ran, the newest first. */

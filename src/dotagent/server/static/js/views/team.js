@@ -9,6 +9,7 @@ import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { onLifecycle, onStreamBack } from "../state.js";
 import { attempt } from "../ui.js";
+import { plainText } from "../markdown.js";
 
 const DOT_ID = "dot";
 const MESSAGE_CHARS = 240;
@@ -43,10 +44,11 @@ export function messageRow(message) {
         memberLink(message.to_id, message.to_name),
         statusBadge(message.status),
       ),
-      el("div", { class: "row-text" }, clip(message.message, MESSAGE_CHARS)),
+      // Words with their markdown taken off (item 778): a preview printed "**Files:**" and backticks as they were written.
+      el("div", { class: "row-text" }, clip(plainText(message.message), MESSAGE_CHARS)),
       message.reply === null
         ? el("div", { class: "row-text muted" }, working ? `${message.to_name} is working on it` : "No reply")
-        : el("div", { class: "row-text muted team-reply" }, clip(message.reply, REPLY_CHARS)),
+        : el("div", { class: "row-text muted team-reply" }, clip(plainText(message.reply), REPLY_CHARS)),
       el(
         "div",
         { class: "row-meta" },

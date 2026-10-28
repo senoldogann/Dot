@@ -41,6 +41,13 @@ NOT_A_LOGIN: str = "not a login (a card, a note or an identity)"
 TOO_LONG: str = "a password or username too long"
 NOT_ONE_LINE: str = "a password or username with a line break"
 ALREADY_SAVED: str = "already in the vault, or twice in the file"
+UNCOMPARED: str = "already in the vault, its password not compared (the Keychain did not answer or refused)"
+NO_ROOM: str = "already in the vault with another password, not changed: its notes have no room to keep the old one"
+CHANGED_MEANWHILE: str = "already in the vault, removed or changed there while the file was read"
+OTHER_PASSWORD: str = "a second, different password for a login already in the file (the first is kept)"
+# What one cell of an export may hold: a long note is cut to the vault's own limit below, not the whole file refused
+# for it (the csv module's own limit is 128 KiB).
+_MOST_CELL_CHARS: int = 8 * 1024 * 1024
 
 # The names a column goes by in the exports, in lower case with spaces as underscores.
 _WEBSITE: tuple[str, ...] = ("url", "website", "login_uri", "web_site", "site", "uri", "address")
@@ -91,10 +98,12 @@ def _format_of(names: list[str]) -> ExportFormat:
         return "bitwarden"
     if {"httprealm", "formactionorigin"} & set(names) or "guid" in names:
         return "firefox"
+    # 1Password's newer export names a Url and an OTPAuth as Safari's does, and a Title as both do: what tells it is its
+    # Website, or the Favorite, Archived and Tags only 1Password writes (item 786).
+    if "title" in names and ("website" in names or {"favorite", "archived", "tags"} & set(names)):
+        return "1password"
     if "otpauth" in names and "url" in names:
         return "safari"
-    if "title" in names and ("website" in names or "otpauth" in names):
-        return "1password"
     if {"name", "url", "username", "password"} <= set(names):
         return "chrome"
     return "other"
@@ -113,12 +122,15 @@ def _first_address(cell: str) -> str:
 def parse_export(text: str) -> ParsedExport:
     """The logins of the CSV ``text``. A text that is not a list of logins, or has more rows than one import takes, is
     an :class:`InvalidValueError` that says so and nothing of what is in it."""
+    before: int = csv.field_size_limit(_MOST_CELL_CHARS)
     try:
         rows: list[list[str]] = list(csv.reader(io.StringIO(text.lstrip("\N{ZERO WIDTH NO-BREAK SPACE}")), strict=True))
     except csv.Error as error:
         raise InvalidValueError(
             "this file is not a CSV that Dot can read: export your logins from the password manager as CSV", {}
         ) from error
+    finally:
+        csv.field_size_limit(before)
     if len(rows) < 2:
         raise InvalidValueError(
             "this file has no logins in it: a CSV export has a header row and a row for each login", {}
@@ -138,7 +150,9 @@ def parse_export(text: str) -> ParsedExport:
     notes: int | None = _column(names, _NOTES)
     kind: int | None = _column(names, _KIND)
     skipped: Counter[str] = Counter()
-    seen: set[tuple[str, str]] = set()
+    # The password each login of the file was kept with: a second row of it with another password is said, not lost in
+    # silence among the logins already saved (item 786).
+    seen: dict[tuple[str, str], str] = {}
     logins: list[ParsedLogin] = []
     notes_left_out: int = 0
     counted: int = 0
@@ -179,9 +193,9 @@ def parse_export(text: str) -> ParsedExport:
             continue
         key: tuple[str, str] = (site_label(address), name.lower())
         if key in seen:
-            skipped[ALREADY_SAVED] += 1
+            skipped[ALREADY_SAVED if seen[key] == secret else OTHER_PASSWORD] += 1
             continue
-        seen.add(key)
+        seen[key] = secret
         note: str = _cell(row, notes)
         if note and (
             len(note) > MOST_NOTES_CHARS or not fits({"password": SecretStr(secret), "notes": SecretStr(note)})

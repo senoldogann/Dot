@@ -1,0 +1,129 @@
+"""Value types of trading: what the market says, what an account holds, what an order did."""
+
+from typing import Literal
+
+from dotagent.core.types import FrozenModel
+
+type Side = Literal["buy", "sell"]
+
+
+class Quote(FrozenModel):
+    """The best prices of ``product`` at ``ts`` (seconds since the epoch): what a buy pays (``ask``) and a sell gets
+    (``bid``), and the last trade's price."""
+
+    product: str
+    bid: float
+    ask: float
+    last: float
+    ts: float
+
+
+class Candle(FrozenModel):
+    """One period of a product's trading: its start (seconds since the epoch) and prices, and the base traded."""
+
+    start: float
+    low: float
+    high: float
+    open: float
+    close: float
+    volume: float
+
+
+class ProductRules(FrozenModel):
+    """What Coinbase takes of an order of a product: the smallest step of its base and quote amounts, the least an
+    order may be, and whether it trades now."""
+
+    product: str
+    base_increment: float
+    quote_increment: float
+    quote_min_size: float
+    base_min_size: float
+    trading: bool
+    # What the product traded in the last day, in its quote, as Coinbase sums it (item 771); None when not given.
+    quote_volume_24h: float | None = None
+
+
+class MarketRow(FrozenModel):
+    """One product of the whole market as Coinbase's product list gives it (item 771): its price, best bid and ask,
+    the last day's change in percent, high and low, and what it traded in its quote."""
+
+    product: str
+    price: float
+    bid: float | None
+    ask: float | None
+    change_24h_pct: float | None
+    high_24h: float | None
+    low_24h: float | None
+    quote_volume_24h: float
+
+
+class ProductDay(FrozenModel):
+    """A product's last day as Coinbase sums it (item 765): the price change in percent, and the volume in the quote."""
+
+    product: str
+    change_24h_pct: float | None
+    quote_volume_24h: float | None
+
+
+class Holding(FrozenModel):
+    """A currency an account holds, and what it is worth in the quote currency at the bid (the quote itself: 1)."""
+
+    currency: str
+    amount: float
+    value: float
+
+
+class Portfolio(FrozenModel):
+    """An account as the limits read it: its holdings, what they are worth, and the day so far."""
+
+    mode: Literal["paper", "live"]
+    quote: str
+    holdings: tuple[Holding, ...]
+    equity: float
+    day_start_equity: float
+    day_traded: float
+    # Currencies held that Coinbase has no product of in the quote (item 765): worth nothing to the account, at every
+    # look alike; and those whose price could not be read this time, a hole in the worth.
+    unpriceable: tuple[str, ...] = ()
+    unpriced: tuple[str, ...] = ()
+    # Whether the day's start is a whole worth of the account, kept at the day's first whole look; until it is, no buy
+    # is placed, as today's loss could not be counted.
+    day_start_known: bool = True
+
+    @property
+    def day_change(self) -> float:
+        return self.equity - self.day_start_equity
+
+
+class OrderRequest(FrozenModel):
+    """An order a run asks for: a market order of ``product``; a buy names what to spend (``quote_amount``), a sell
+    what to sell (``base_amount``) or what it should bring (``quote_amount``)."""
+
+    product: str
+    side: Side
+    quote_amount: float | None
+    base_amount: float | None
+    # Why the run trades, in its words (item 765): kept with the order, shown with it.
+    reason: str = ""
+    # A buy's exit (item 770): the price at or under which Dot sells what it bought, and the one at or over which it
+    # takes the gain; watched by the daemon, not by a run (:mod:`dotagent.trading.watch`).
+    stop: float | None = None
+    target: float | None = None
+    # The exit a sell closes, when the watch places it: never held by the limits, as it lowers what is at stake.
+    closing: str | None = None
+
+
+class Fill(FrozenModel):
+    """What an order did: the base it bought or sold, the average price, the fee and the quote it moved."""
+
+    order_id: str
+    product: str
+    side: Side
+    size: float
+    price: float
+    fee: float
+    ts: float
+
+    @property
+    def notional(self) -> float:
+        return self.size * self.price

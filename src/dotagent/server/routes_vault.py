@@ -16,7 +16,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.secrets import remove_env_value, write_env_value
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_accounts import on_this_mac
-from dotagent.vault.onepassword import TOKEN_NAME, TOKEN_PATTERN, VaultError, VaultView, kept_token
+from dotagent.vault.onepassword import TOKEN_NAME, TOKEN_PATTERN, VaultError, VaultView, find_app, kept_token
 
 log = get_logger(__name__)
 
@@ -27,6 +27,8 @@ class VaultState(FrozenModel):
     could not be read (``None`` when they were, or when there is no token)."""
 
     cli: str | None
+    # Whether 1Password's own app is on this Mac, which Connect goes through (item 791).
+    app: bool = False
     connected: bool
     vaults: tuple[VaultView, ...]
     error: str | None
@@ -43,14 +45,17 @@ def vault_router(ctx: ServerContext) -> APIRouter:
 
     async def state() -> VaultState:
         cli = ctx.runtime.vault.cli()
+        app: bool = await asyncio.to_thread(find_app) is not None
         token: str | None = await asyncio.to_thread(kept_token)
         if token is None:
-            return VaultState(cli=None if cli is None else str(cli), connected=False, vaults=(), error=None)
+            return VaultState(cli=None if cli is None else str(cli), app=app, connected=False, vaults=(), error=None)
         try:
             vaults: tuple[VaultView, ...] = await ctx.runtime.vault.vaults(token)
         except VaultError as error:
-            return VaultState(cli=None if cli is None else str(cli), connected=True, vaults=(), error=error.message)
-        return VaultState(cli=None if cli is None else str(cli), connected=True, vaults=vaults, error=None)
+            return VaultState(
+                cli=None if cli is None else str(cli), app=app, connected=True, vaults=(), error=error.message
+            )
+        return VaultState(cli=None if cli is None else str(cli), app=app, connected=True, vaults=vaults, error=None)
 
     async def keep(token: str) -> VaultState:
         """Keep ``token`` once it reads a vault: one that reads none is no use, and one ``op`` refuses is not kept."""

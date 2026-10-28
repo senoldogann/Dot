@@ -1199,6 +1199,18 @@
     height: 36px;
   }
 
+  /* A finger's target is 44 px (item 787): the button keeps its 36 px, and a ring of 4 px around it answers a tap too,
+     placed from the button without outweighing a rule that places the button itself (`:where`). */
+  :where(.icon-btn) {
+    position: relative;
+  }
+
+  .icon-btn::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+  }
+
   .side-btn,
   .side-link,
   .side-run,
@@ -1343,8 +1355,10 @@
   color: var(--text);
 }
 
+/* The tab's name keeps its width: a long value (the default model's name) ends in an ellipsis beside it rather than
+   running over it (the design audit of item 778). */
 .settings-nav-label {
-  min-width: 0;
+  flex: none;
 }
 
 /* What the tab holds, at the row's right end: a name that is too long ends in an ellipsis. */

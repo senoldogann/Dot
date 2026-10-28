@@ -1,4 +1,4 @@
-"""The flash and the flight of a capture of SnapShots (item 414), as far as they are numbers: how long a flight takes,
+"""The flash and the flight of a capture of Snapshots (item 414), as far as they are numbers: how long a flight takes,
 where the card lands in Dot's window or in the corner of the screen, how a frame from the top left reads in AppKit's
 terms, the helper's commands, and the order the browsers are asked for Dot's tab in."""
 

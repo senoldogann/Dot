@@ -3,6 +3,7 @@
 from collections.abc import Awaitable, Callable
 from typing import Literal, Protocol
 
+from dotagent.channels.inbox import Incoming
 from dotagent.channels.pictures import Picture
 
 # The channels there are; a channel added later is named here and in TITLES.
@@ -25,9 +26,9 @@ def is_stop(text: str) -> bool:
     return text.strip().rstrip(".!").strip().casefold() in STOP_WORDS
 
 
-# What a channel calls with a message of the owner it accepted (see :class:`~dotagent.channels.intake.Intake`): the
-# router posts it into the channel's chat.
-type Receive = Callable[[str], Awaitable[None]]
+# What a channel calls with a message of the owner it accepted (see :class:`~dotagent.channels.intake.Intake`) and the
+# files it brought, read (item 806): the router posts them into the channel's chat.
+type Receive = Callable[[str, tuple[Incoming, ...]], Awaitable[None]]
 
 
 class Channel(Protocol):

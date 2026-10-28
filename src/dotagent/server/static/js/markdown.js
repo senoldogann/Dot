@@ -232,10 +232,66 @@ function wordsOf(part, show) {
   return value.split(/<br\s*\/?>/i).flatMap((piece, index) => [...(index === 0 ? [] : [{ type: "break", value: "" }]), ...(piece === "" ? [] : [{ type: "text", value: piece }])]);
 }
 
+// A bold whose words hold code ("**to `a@b.c` now**", item 778): the code cuts the line before bold is looked for, so
+// its two marks fell in different pieces and stood on the page. They are found on the line with its escapes hidden, by
+// the rules of EMPHASIS's bold (no space inside a mark, no star between the marks, so "2 ** 3" and an escaped "\*\*" are
+// no marks), around at least one code span, and stand for two characters out of the escapes' blocks, which the line
+// does not hold; the pieces between them are marked `strong` and the characters taken off (`strongAcross`).
+const BOLD_AROUND_CODE = /\*\*(?=[^\s*])((?:[^*`\n]|`[^`\n]+`)*?`[^`\n]+`(?:[^*`\n]|`[^`\n]+`)*?)(?<=[^\s*])\*\*/g;
+const STRONG_OPEN = "\u{100000}";
+const STRONG_CLOSE = "\u{100001}";
+
+/** The pieces of a line between the characters that stand for a bold's marks (BOLD_AROUND_CODE), marked `strong`. */
+function strongAcross(parts) {
+  const out = [];
+  let strong = false;
+  for (const part of parts) {
+    if (part.type !== "text" || !(part.value.includes(STRONG_OPEN) || part.value.includes(STRONG_CLOSE))) {
+      out.push(strong ? { ...part, strong: true } : part);
+      continue;
+    }
+    let piece = "";
+    for (const char of part.value) {
+      if (char !== STRONG_OPEN && char !== STRONG_CLOSE) {
+        piece += char;
+        continue;
+      }
+      if (piece !== "") {
+        out.push(strong ? { ...part, value: piece, strong: true } : { ...part, value: piece });
+      }
+      piece = "";
+      strong = char === STRONG_OPEN;
+    }
+    if (piece !== "") {
+      out.push(strong ? { ...part, value: piece, strong: true } : { ...part, value: piece });
+    }
+  }
+  return out;
+}
+
+/** What `text` says with its markdown taken off, for a line that shows a part of it as words (a preview, item 778): the
+ * words of links and code, bold and italic without their marks, and no heading, quote, list or fence marks. */
+export function plainText(text) {
+  return text
+    .replace(/^\s*(`{3,}|~{3,}).*$/gm, "")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/(\*\*|~~)(?=\S)([\s\S]*?\S)\1/g, "$2")
+    .replace(/(?<![\w_])__(?=\S)([\s\S]*?\S)__(?![\w_])/g, "$1")
+    .replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])/g, "$1$2")
+    .replace(/(`+)([^`]*?)\1/g, "$2")
+    .replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** The inline pieces of one line of text: `{type: "text" | "code" | "bold" | "italic" | "strike" | "link" | "break", value, href?}`. */
 export function parseInline(line) {
   const parts = [];
-  const { hidden, show } = escapes(line);
+  const { hidden: escaped, show } = escapes(line);
+  const hidden =
+    escaped.includes(STRONG_OPEN) || escaped.includes(STRONG_CLOSE)
+      ? escaped
+      : escaped.replace(BOLD_AROUND_CODE, (_, words) => `${STRONG_OPEN}${words}${STRONG_CLOSE}`);
   const segments = hidden.split(/(`+)/);
   // An odd split index holds the backtick run that opens or closes a code span.
   for (let index = 0; index < segments.length; index += 1) {
@@ -254,7 +310,7 @@ export function parseInline(line) {
     parts.push({ type: "code", value: show(segments.slice(index + 1, closing).join(""), true).trim() });
     index = closing;
   }
-  return parts.map((part) => (part.href === undefined ? part : { ...part, href: show(part.href, false) }));
+  return strongAcross(parts).map((part) => (part.href === undefined ? part : { ...part, href: show(part.href, false) }));
 }
 
 // Whether the line under `line` makes it the head of a table.

@@ -232,8 +232,9 @@ in goal mode by the goal check giving up; at a limit of minutes or tokens you se
 before it is accepted, and before goal mode checks it (see [How a run works](runs.md#how-a-run-works)). A goal that should go
 on across runs and days until its outcome is verified is a campaign (see [Campaigns](agents-and-campaigns.md#campaigns)).
 
-**Limits of a run.** `run_max_minutes` and `run_max_tokens` in `[agent]` bound a task or research run; 0, the default,
-is no limit, and a chat turn has none. The minutes are the run's wall time, waits for your approvals and answers
+**Limits of a run.** `run_max_minutes` and `run_max_tokens` in `[agent]` bound a task or research run; the defaults are
+120 minutes and 10,000,000 tokens, and 0 turns a bound off; a chat turn has none. The minutes are the run's wall time,
+waits for your approvals and answers
 included; the tokens are those of every model call of the run (side calls, such as your side questions, included) and
 of the runs it delegated to. Dot compares them between steps, so a step that is running when a limit passes goes on: a
 model call can take `model_call_timeout_s`, and a delegation waits for its run. At the first step past a limit the run

@@ -138,6 +138,16 @@ def kept_token() -> str | None:
     return parse_env_file(path.read_text(encoding="utf-8")).get(TOKEN_NAME)
 
 
+# Where 1Password's own app is installed, which Connect goes through (item 791).
+_APP_PLACES: tuple[Path, ...] = (Path("/Applications/1Password.app"), Path.home() / "Applications" / "1Password.app")
+
+
+def find_app() -> Path | None:
+    """1Password's app on this Mac, ``None`` when it is not installed: ``op`` alone (Homebrew's) signs in to no account,
+    and Connect cannot work without it; a service account's token still can."""
+    return next((place for place in _APP_PLACES if place.exists()), None)
+
+
 def find_cli() -> Path | None:
     """``op`` on the daemon's PATH, or where Homebrew and 1Password's installer put it; ``None`` when it is not
     installed."""
@@ -306,6 +316,15 @@ class OnePassword:
         accounts: list[_Account] = _parsed_list(
             _Account, await self._op(("account", "list", "--format", "json"), None, _CONNECT_TIMEOUT_S), "the accounts"
         )
+        if not accounts and find_app() is None:
+            # Item 791: op without 1Password's app, as Homebrew installs it, signs in to no account; the old words sent
+            # the owner to the settings of an app this Mac does not have.
+            raise VaultError(
+                "1Password's app is not installed on this Mac, and Connect goes through it. You do not need 1Password: "
+                "Dot's own vault (Settings › Vault) keeps your logins in the Mac's Keychain and fills them. To use "
+                "1Password all the same, install its app, or paste a service account token made at 1password.com",
+                {},
+            )
         if not accounts:
             raise VaultError(
                 "op is signed in to no 1Password account: in the 1Password app, turn on Settings › Developer › "

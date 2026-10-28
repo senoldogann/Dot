@@ -1,4 +1,4 @@
-"""Dot's window brought to the front after a capture of SnapShots (item 414), with the capture in its box: the desktop
+"""Dot's window brought to the front after a capture of Snapshots (item 414), with the capture in its box: the desktop
 app when it runs; else the tab of a browser that shows Dot's pages, found and chosen with AppleScript (Safari, Chrome
 and the browsers built on it, Arc), the browser the page that took the last capture runs in first; else Dot opened in
 the default browser. macOS asks once whether Dot may drive a browser (Privacy & Security › Automation); a browser it

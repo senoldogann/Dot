@@ -52,7 +52,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService, ServiceSecret
 from dotagent.mcp.connected import read_connected
 from dotagent.mcp.hub import McpHub, open_hub
-from dotagent.mcp.signin import SIGN_IN_AGAIN, read_sign_in, sign_in_path
+from dotagent.mcp.signin import SIGN_IN_AGAIN, kept_sign_in, read_sign_in, sign_in_path
 from dotagent.mcp.types import McpTool
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import parse_env_file
@@ -375,6 +375,10 @@ async def test_a_server_that_asks_signs_in_in_the_browser_and_stays_signed_in(wo
     assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
     stored = read_sign_in(path)
     assert stored is not None and stored.tokens is not None and stored.redirect_uri == f"{world.dot}/oauth/callback"
+    # Where the token is renewed is kept with it, and given back to the next start's sign-in (the review of every
+    # module: without it a token endpoint that is not /token of the server's origin answered 404 at every start).
+    assert stored.metadata is not None and str(stored.metadata.token_endpoint).startswith(world.signed)
+    assert kept_sign_in(kept).context.oauth_metadata == stored.metadata
     # The next start, once the token ran out: it is renewed, and no one is asked to sign in again.
     await asyncio.sleep(LIFETIME_S + 1)
     renewed_before: int = world.provider.renewed
