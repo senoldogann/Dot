@@ -400,7 +400,7 @@ export function mount(root, ctx) {
   /** A meter of what a limit leaves: its label, a bar filled as far as `used` goes against `limit`, and its words. */
   function deskMeter(label, used, limit, words, figure) {
     const share = meterShare(used, limit);
-    const tone = share >= 100 ? "bad" : share >= 60 ? "warn" : "ok";
+    const tone = share >= 100 ? "bad" : share > 60 ? "warn" : "ok";
     const fill = el("span", { class: `desk-fill ${tone}` });
     fill.style.setProperty("--fill", `${share}%`);
     return el(

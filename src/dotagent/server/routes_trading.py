@@ -80,7 +80,8 @@ class TradingWatchView(FrozenModel):
 class TradingView(FrozenModel):
     """Settings › Trading: the settings in force, whether runs have the trading tools now (``tools_on``: a switch from
     off takes Dot's restart), the key, the account of the mode, its open positions and its orders, and what watches the
-    market (item 777). ``problem`` says why the account could not be read."""
+    market (item 777). ``problem`` says why the account, or what watches the market, could not be read: the page is
+    drawn all the same, with the switch that turns trading off."""
 
     settings: TradingConfig
     tools_on: bool
@@ -145,6 +146,7 @@ def trading_router(ctx: ServerContext) -> APIRouter:
         problem: str = ""
         orders: list[TradingOrderRecord] = []
         positions: list[TradingPosition] = []
+        watch: TradingWatchView | None = None
         if settings.mode != "off" and (settings.mode == "paper" or kept is not None):
             try:
                 portfolio = await trading.portfolio()
@@ -152,13 +154,20 @@ def trading_router(ctx: ServerContext) -> APIRouter:
                 positions = await positions_of(portfolio)
             except Exception as error:  # noqa: BLE001 - the page shows why the account could not be read
                 problem = str(getattr(error, "message", error))[:300]
+        if settings.mode != "off":
+            try:
+                watch = await watch_of(settings)
+            except Exception as error:  # noqa: BLE001 - the page is drawn all the same, with the switch to turn it off
+                problem = (
+                    problem or f"What watches the market could not be read: {getattr(error, 'message', error)}"[:300]
+                )
         return TradingView(
             settings=settings,
             tools_on="trading_order" in ctx.runtime.registry.tools,
             key=TradingKeyView(kept=kept is not None, name_end=kept[0][-6:] if kept is not None else ""),
             portfolio=portfolio,
             positions=positions,
-            watch=None if settings.mode == "off" else await watch_of(settings),
+            watch=watch,
             orders=orders,
             problem=problem,
         )
