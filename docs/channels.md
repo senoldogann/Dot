@@ -39,9 +39,16 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   The answer is masked of the secrets Dot holds, sent as plain text and cut to about 2,000 characters, with a link to
   the chat in Dot for the rest. A messaging app draws no Markdown, so the answer reads clean (item 617): a list item
   has a bullet (`• `, a nested one `  ◦ `, a task its box; a numbered item stays as it is), a heading stands on a line
-  of its own with a blank line before it, a table is one row to a line with its cells joined by ` · ` and its rule
-  line gone, a horizontal rule and the `> ` of a quote are gone, and so are the marks of bold, emphasis, strike and
-  code (a link reads *words (address)*). The lines of a block of code stay exactly as they are written. A run that
+  of its own with a blank line before it, a horizontal rule and the `> ` of a quote are gone, and so are the marks of
+  bold, emphasis, strike and code (a link reads *words (address)*). A table reads as a phone's narrow screen holds it
+  (item 804), where a row of cells on one line wrapped into words no column kept together: a table of two columns is
+  a line to each row, `• first: second`; one of three columns or more is a card to each row, its first cell after a
+  bullet and each other cell under it as `Header: value` (an empty one left out), a blank line between the cards; one
+  of one column is its header and a bullet to each cell. The lines of a block of code stay exactly as they are
+  written, with a blank line before and after them (none for a block indented under a list item), since a phone draws
+  no box around code. The tags of HTML (`<b>`, `<sub>`, `<details>`, `<kbd>` …) go and their words stay, an entity
+  reads as its character (`&amp;` is `&`), a footnote's mark `[^1]` reads `[1]`, and a mark written after a backslash
+  (`\*`) is the mark itself. A run that
   failed or was stopped says so, once: a stopped run says *The run was stopped.*, not twice.
 - **It reads well on a phone's narrow screen** (item 627). A list with an item whose words run over 60 characters (a
   nested item's too, the bullet not counted), which wraps there, has a blank line between its items and before and after

@@ -920,7 +920,7 @@ async def test_the_text_of_an_answer_reads_clean_on_the_channel(wired: Wired, re
         "| App | CPU |\n|---|---|\n| Safari | 4% |"
     )
     assert await _answered(wired, replies, answer, "explain the plan") == [
-        "Plan:\n• First: build it\n  ◦ then test\n1. one\n2. two\n\nA note\n\nApp · CPU\nSafari · 4%"
+        "Plan:\n• First: build it\n  ◦ then test\n1. one\n2. two\n\nA note\n\n• Safari: 4%"
     ]
 
 
