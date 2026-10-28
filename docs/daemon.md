@@ -853,7 +853,8 @@ in its card and draws more rows as it is scrolled (item 768).
   security code, the name on the card, the notes) is removed.
 - **Import from CSV…** reads the export of a password manager (Chrome, Edge, Safari, Firefox, 1Password, Bitwarden),
   known by its header row, in memory, and says how many logins went in, how many rows were left out and why (no site,
-  no password, not a web address, an address with a user name or a password in it, not a login, already in the vault)
+  no password, not a web address, an address with a user name or a password in it, not a login, already in the vault,
+  a second and different password for a login already in the file, whose first is kept: item 786)
   and that the CSV file holds your passwords in plain text and is to be deleted. One-time-code seeds are left out;
   the vault keeps none.
 

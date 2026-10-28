@@ -3,6 +3,7 @@ host of one of the login's websites, or a host under it, on the port the website
 none), over https; plain http only on this Mac itself. A page of any other site never gets the login, whatever the
 model was told by the page it read."""
 
+import contextlib
 from dataclasses import dataclass
 from urllib.parse import SplitResult, urlsplit
 
@@ -49,7 +50,16 @@ def _parts_of(website: str) -> SplitResult | None:
 
 
 def _host_of(parts: SplitResult) -> str:
+    """The host as a browser's address writes it: lower case, without a final dot or ``www.``, and in its ASCII form
+    (item 786: a website saved as ``bücher.de`` is the page ``xn--bcher-kva.de`` Chrome is on). Python's codec is IDNA
+    2003, which maps some letters to others (``ß`` to ``ss``, so ``straße.de`` would read as ``strasse.de``, another
+    site): a host it does not give back unchanged is kept as it is, in Unicode, and matches no page."""
     host: str = (parts.hostname or "").lower().rstrip(".")
+    if not host.isascii():
+        with contextlib.suppress(UnicodeError):
+            ascii_host: str = host.encode("idna").decode("ascii")
+            if ascii_host.encode("ascii").decode("idna") == host:
+                host = ascii_host
     return host.removeprefix("www.")
 
 
