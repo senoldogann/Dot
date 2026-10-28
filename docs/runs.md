@@ -621,9 +621,12 @@ source does not hold is kept and marked `verified: false`, a claim to treat as o
 gave without a quote. A file's text goes to the fast model, so a file in a protected location is refused, as `read_file`
 refuses it. A source that cannot be read or extracted is listed under "Not extracted" with the reason; while the fast
 model is paused after a quota, rate-limit or key error, no source is read or sent to it, and each is listed with the
-pause (item 240). At most 20 sources and 20 fields per call. A call has 10 minutes, and ends at its own time rather
-than at the tool timeout, which would lose every extraction already paid for (item 554): the source it is in when the
-time runs out and the ones it did not reach are listed under "Not extracted", and what was extracted comes back.
+pause (item 240); of the sources read at once, those already sent when the pause came are the one exception, as one
+whose text was being read when it came is checked again before it is sent. At most 20 sources and 20 fields per call.
+Four sources are read and extracted at once (item 773: six job lists one after the other took 200 s), and the result
+tells them in the order they were given. A call has 10 minutes, and ends at its own time rather than at the tool
+timeout, which would lose every extraction already paid for (item 554): the sources it is in when the time runs out and
+the ones it did not reach are listed under "Not extracted", and what was extracted comes back.
 
 A terminal session is for a program that does not run to its end by itself: one that asks questions (an installer,
 `npm create`, `ssh`), a REPL (`python3 -i`, `psql`), or a server that must stay up while the run goes on.
