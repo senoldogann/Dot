@@ -58,9 +58,9 @@ _READ_ONLY_TOOLS: frozenset[str] = frozenset(
 )
 # If an acting tool fails, the next link in the chain is tried. These are diagnostic/read tools: their result says
 # what the action did not do and what the page or window showed instead, never that the action succeeded.
-_TOOL_FAILOVERS: dict[str, str] = {
-    "browser_act": "browser_find",
-    "desktop_act": "desktop_snapshot",
+_TOOL_FAILOVERS: dict[str, tuple[str, ...]] = {
+    "browser_act": ("browser_find", "browser_snapshot"),
+    "desktop_act": ("desktop_snapshot",),
 }
 # The kinds of action whose target does not show what the call acts on: an MCP call's is the name of its server.
 _BY_ARGUMENTS: frozenset[str] = frozenset({"mcp", "mcp_read"})
@@ -256,33 +256,40 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
             if attempt < max_attempts:
                 log.info("tool_retry_result", tool=tool.spec.name, attempt=attempt, text=result.text)
                 continue
-            alt_name: str | None = _TOOL_FAILOVERS.get(tool.spec.name)
-            if alt_name is not None:
+            for alt_name in _TOOL_FAILOVERS.get(tool.spec.name, ()):
                 alt_tool = ctx.runtime.registry.tools.get(alt_name)
-                if alt_tool is not None:
-                    try:
-                        alt_prepared: PreparedCall = await alt_tool.prepare(call.arguments, ctx)
-                        alt_action: ActionInfo = alt_prepared.action
-                        alt_authorized: Authorization = await gate.authorize_recorded(
-                            alt_action, call.arguments, alt_prepared.weighed
-                        )
-                        alt_taken: str | None = ctx.runtime.peers.take(ctx.run_id, alt_name, alt_action)
-                        if alt_taken is not None:
-                            result = fail(alt_taken)
-                        else:
-                            async with asyncio.timeout(alt_tool.timeout_s):
-                                result = await alt_prepared.run(replace(ctx, gate=gate))
-                        action = alt_action
-                        note = alt_authorized.note
-                        decision = alt_authorized.decision
-                        fallback = (
-                            f"[fallback] {tool.spec.name} failed; {alt_name} answered instead. "
-                            "The original action was not performed."
-                        )
-                    except (RunCancelled, FailSafeTriggered):
-                        raise
-                    except Exception as exc:  # noqa: BLE001 - a broken fallback must not eat the original failure
-                        log.info("tool_failover_failed", tool=alt_name, error=str(exc))
+                if alt_tool is None:
+                    continue
+                try:
+                    alt_prepared: PreparedCall = await alt_tool.prepare(call.arguments, ctx)
+                except (RunCancelled, FailSafeTriggered):
+                    raise
+                except Exception as exc:  # noqa: BLE001 - a fallback that cannot take these arguments is skipped
+                    log.info("tool_failover_unprepared", tool=alt_name, error=str(exc))
+                    continue
+                try:
+                    alt_action: ActionInfo = alt_prepared.action
+                    alt_authorized: Authorization = await gate.authorize_recorded(
+                        alt_action, call.arguments, alt_prepared.weighed
+                    )
+                    alt_taken: str | None = ctx.runtime.peers.take(ctx.run_id, alt_name, alt_action)
+                    if alt_taken is not None:
+                        result = fail(alt_taken)
+                    else:
+                        async with asyncio.timeout(alt_tool.timeout_s):
+                            result = await alt_prepared.run(replace(ctx, gate=gate))
+                    action = alt_action
+                    note = alt_authorized.note
+                    decision = alt_authorized.decision
+                    fallback = (
+                        f"[fallback] {tool.spec.name} failed; {alt_name} answered instead. "
+                        "The original action was not performed."
+                    )
+                except (RunCancelled, FailSafeTriggered):
+                    raise
+                except Exception as exc:  # noqa: BLE001 - a broken fallback must not eat the original failure
+                    log.info("tool_failover_failed", tool=alt_name, error=str(exc))
+                break
             break
     except (RunCancelled, FailSafeTriggered):
         raise
