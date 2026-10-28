@@ -193,33 +193,25 @@ class _Checked:
 async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate) -> _Checked:
     action: ActionInfo | None = None
     at_gate: _GateTime = _GateTime()
-    # What the user wrote when approving the call: the model reads it with the result, a failed one's too.
     note: str = ""
     decision: StepDecision | None = None
+    held_s: float = 0.0
     try:
         prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
         action = prepared.action
-        # A call that would step on another run at work does not run, and is not asked about (item 301).
         held: str | None = ctx.runtime.peers.conflict(ctx.run_id, call.name, action)
         if held is not None:
             return _Checked(result=fail(held), action=action, waited_s=0.0, decision=None)
+        
         asked_at: float = time.monotonic()
         try:
-            # Speculative Execution: Low-risk tools skip the wait if mode is auto/yolo.
-            if tool.spec.name in _LOW_RISK_TOOLS and ctx.mode in ("auto", "yolo"):
-                # Still record the authorization but don't block the agent loop.
-                authorized: Authorization = await gate.authorize_recorded(action, call.arguments, prepared.weighed)
-                note, decision = authorized.note, authorized.decision
-            else:
-                # The call's arguments go with it: a run that read outside content sends no secret out in them (item 525).
-                authorized: Authorization = await gate.authorize_recorded(action, call.arguments, prepared.weighed)
-                note, decision = authorized.note, authorized.decision
-                # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock.
-                held_s: float = await gate.wait_free()
+            authorized: Authorization = await gate.authorize_recorded(action, call.arguments, prepared.weighed)
+            note, decision = authorized.note, authorized.decision
+            if not (tool.spec.name in _LOW_RISK_TOOLS and ctx.mode in ("auto", "yolo")):
+                held_s = await gate.wait_free()
         finally:
             at_gate.seconds += time.monotonic() - asked_at
-        # The wait may have been long, and another run may have taken the app or changed the file since: checked again,
-        # and from here the check and the footprint are one step, before the call runs (item 305).
+        
         taken: str | None = ctx.runtime.peers.take(ctx.run_id, call.name, action)
         if taken is not None:
             return _Checked(
@@ -241,33 +233,30 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
                         break
                     if attempt < max_attempts:
                         log.info("tool_failover_trigger", tool=tool.spec.name, result=result.text)
-                        # Here we would ideally switch the 'prepared' call to the alternative tool.
-                        # Since 'prepared' is bound to the tool, we'd need to re-prepare.
                         alt_tool_name = _TOOL_FAILOVERS[tool.spec.name]
                         alt_tool = ToolRegistry().tools.get(alt_tool_name)
                         if alt_tool:
                             prepared = await alt_tool.prepare(call.arguments, ctx)
-                            # Update action for the alternative tool
                             action = prepared.action
                         else:
-                            raise Exception("Failover tool not found")
-            except Exception as e:
+                            log.error("tool_failover_missing", tool=alt_tool_name)
+                            raise DotError(f"Failover tool {alt_tool_name} not found")
+            except (asyncio.TimeoutError, DotError) as e:
                 if attempt == max_attempts:
                     raise e
                 log.warning("tool_failover_retry", tool=tool.spec.name, error=str(e))
+            except Exception as e:
+                if attempt == max_attempts:
+                    raise e
+                log.exception("tool_failover_exception", tool=tool.spec.name, error=str(e))
         else:
-            # If the loop finished without 'break', use the last result.
             pass
     except (RunCancelled, FailSafeTriggered):
         raise
     except Exception as exc:
-        # Any error fails the call, not the run: the model reads what went wrong and goes on. One that no tool expects
-        # is a fault in Dot, logged with its traceback.
-        if not isinstance(exc, DotError | TimeoutError | OSError):
+        if not isinstance(exc, (DotError, asyncio.TimeoutError, OSError)):
             log.exception("tool_crashed", run_id=ctx.run_id, tool=tool.spec.name)
         text: str = _describe_failure(exc, tool)
-        # The model reads the error of a call that reached outside as it reads an answer: the run is untrusted from then
-        # on when the error may hold words that third parties write (item 551).
         if action is not None and action.kind in TAINTING_KINDS and _may_hold_outside_words(exc):
             gate.taint()
         handed_off: bool = isinstance(exc, HandedOff)
@@ -279,7 +268,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     if result.untrusted:
         gate.taint()
     noted: ToolResult = _with_approval_note(result, note)
-    if 'held_s' in locals() and held_s > 0.0:
+    if held_s > 0.0:
         noted = noted.model_copy(update={"text": f"{noted.text}\n\n{hold_note(held_s)}"})
     return _Checked(result=noted, action=action, waited_s=at_gate.seconds, decision=decision)
 
