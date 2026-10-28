@@ -404,6 +404,14 @@ _CUT_SHORT: frozenset[FinishReason] = frozenset({"length", "other"})
 # is stopped again, so the run moves to a standby model at once (:func:`_cannot_answer`) instead of being nudged.
 _FILTERED: frozenset[str] = frozenset({"content_filter"})
 _FILTERED_REASON: str = "its content filter stopped the reply"
+_EMPTY_REASON: str = "it answered with nothing, again and again"
+
+
+class _EmptyReplies(ProviderError):
+    """The run's model answered with nothing as many times as a run is nudged (item 789): like a content filter, it does
+    not answer this conversation, and a standby model takes the run over."""
+
+
 _CUT_SHORT_NOTE: str = (
     "[system note] Your last reply was cut short before its end (it ended with '{reason}'). Continue with the tools "
     "you need, or give your complete answer again in fewer words."
@@ -1837,6 +1845,8 @@ def _cannot_answer(error: Exception) -> str | None:
     service's content filter, which stops this conversation alone. ``None`` for any other error."""
     if isinstance(error, ProviderFilterError):
         return _FILTERED_REASON
+    if isinstance(error, _EmptyReplies):
+        return _EMPTY_REASON
     return unavailable_reason(error)
 
 
@@ -2787,9 +2797,34 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             elif answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text, needs="")
             elif nudges >= config.finish_nudges:
-                return _run_end(
-                    agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
+                # Empty again and again on the run's own model: a standby model takes the run over where one is left
+                # (item 789), as for a content filter; else, and on a step routed to another model, the run ends.
+                empty: _EmptyReplies = _EmptyReplies("the model returned empty replies", {"model": ref.label})
+                moved: _Standby | None = (
+                    None
+                    if answered or routed is not None
+                    else await _to_standby(
+                        agent, ref, empty, left, bool(specs), estimate_tokens([system], specs), steps
+                    )
                 )
+                if moved is None:
+                    return _run_end(
+                        agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
+                    )
+                history.append(
+                    await _stored_note(
+                        moved.agent, _SWITCH_NOTE.format(to=moved.ref.label, old=ref.label, reason=moved.reason)
+                    )
+                )
+                agent, run, ref, info, scaffold = moved.agent, moved.agent.run, moved.ref, moved.info, moved.scaffold
+                left = left | {ref.label}
+                candidates = still_routable(candidates, left)
+                context = replace(context, output_chars=scaffold.tool_output_chars)
+                if not info.vision:
+                    history = drop_old_images(history, 0)
+                nudges = 0
+                ratio = 1.0
+                continue
             else:
                 nudges += 1
                 if answered:

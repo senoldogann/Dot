@@ -69,8 +69,9 @@ the run's own model is never its helper.
 
 `standby` lists the models a run moves to when its own model answers with a quota, rate-limit or key error (HTTP 401),
 refuses access to it (HTTP 403: a model, a region or a plan the key may not use; or OpenRouter's 404 for a model the
-account's privacy settings leave no provider of, item 361), its provider has no key, or its service's content filter
-stops the reply (item 437; that pauses the model for no other run): the run goes on from the same step, with the tools
+account's privacy settings leave no provider of, item 361), its provider has no key, its service's content filter
+stops the reply (item 437; that pauses the model for no other run), or the run's own model answers with nothing as
+often as a run is nudged to answer (item 789; that pauses it for no other run either): the run goes on from the same step, with the tools
 that step had, on the first standby model that can take it over, the model is told, and the timeline shows the switch,
 which the model chip follows. The run's reasoning level becomes the nearest one the new model offers. A run takes each
 model once at most, in the order of the list, and never goes back to one it left. A standby model that cannot call tools
@@ -144,7 +145,8 @@ hours by default; 0 ends the run at once, as before), and goes on from that step
 connection that breaks meanwhile (a Mac that wakes) is part of that wait. The timeline's line for the wait says why
 ("cannot answer (usage window spent)"), when it asks again and until when. What does not come back by itself is not
 waited for, whatever its provider calls it or the time it names (a gateway may name one on every answer): a month's plan
-(Ollama's "used all included Pro usage"), spent credits, a spend limit, any other quota. A wait still not over when its
+(Ollama's "used all included Pro usage" and "reached your monthly usage limit", item 789; its hourly or weekly
+limit is a window, waited for), spent credits, a spend limit, any other quota. A wait still not over when its
 time is ends the run with the provider's words. A waiting run keeps its place among `max_concurrent_runs`, as one
 waiting for a model out of reach does, and a stop ends the wait at once. An error a model service reports inside its
 answer keeps its words, Ollama's too.
