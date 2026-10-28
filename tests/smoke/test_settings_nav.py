@@ -41,7 +41,7 @@ _TABS: list[str] = [
     "Trading",
     "Phone",
     "Channels",
-    "SnapShots",
+    "Snapshots",
     "System",
 ]
 

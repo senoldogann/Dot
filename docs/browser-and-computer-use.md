@@ -562,9 +562,9 @@ every mode but `yolo` (item 433).
 - Dot's own pointer, a glowing violet arrow, glides to where each step of `desktop_act` went and ripples where it
   clicked, so that you see what Dot does and where (item 706, `show_pointer`, on by default). It only shows: the
   step is done as before, through the HID event tap, which moves the Mac's own pointer as it did. A helper process
-  draws it (`python -m dotagent.desktop.pointer`, as the flight of SnapShots is drawn; it takes no permission and
+  draws it (`python -m dotagent.desktop.pointer`, as the flight of Snapshots is drawn; it takes no permission and
   reads nothing of the screen), started with the first act. It is taken off the screen for each of Dot's screenshots
-  and while a SnapShot captures the window in front, which wait for the helper to say so (2 ms once it runs), so the
+  and while a Snapshot captures the window in front, which wait for the helper to say so (2 ms once it runs), so the
   model never sees the arrow over what it reads; it comes back once the last of two captures at the same time has
   ended. A helper that does not answer within two seconds is ended and no pointer is drawn until the daemon starts
   again; one that died is logged (`pointer_helper_ended`) and started again with the next step. It

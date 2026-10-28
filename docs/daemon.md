@@ -758,7 +758,7 @@ every page. The page is the open tab alone, in a column of 920 px under its own 
 for, each section a name over a card of rows; in a window too narrow for the docked sidebar the nav is in the drawer. On
 a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
 phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
-the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
+the schedules' tab (`#/settings/schedules`) to the Schedules page. **Snapshots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
 
 ### Settings › Trading
@@ -1131,7 +1131,7 @@ dotx service uninstall   # stop the daemon and remove the job
   /api/desktop/permissions/open`), and, when the daemon is the service's own process (launchd's job runs Dot.app's
   launcher, the daemon's parent), **Restart Dot** (`POST /api/system/restart`): the daemon stops with an exit launchd
   does not count as clean, so the job starts it again, with what was granted meanwhile; a daemon run by hand is refused
-  the restart, and so is one when launchd cannot be asked. The SnapShots page offers the Accessibility pane the same
+  the restart, and so is one when launchd cannot be asked. The Snapshots page offers the Accessibility pane the same
   way. Each section of Settings › System folds (item 411), as the reader leaves it in this browser (the health checks and
   **Details** start shut, item 625); the Permissions fold
   says what is missing beside its title. Measured through the service with all three granted: the model opened the
@@ -1222,7 +1222,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /phone/phones`, `DELETE /phone/phones/{id}` (the token only, never a phone's key) | the phones that hold a key of their own, with their names and when they were paired and last used, never the key; a phone removed, its key refused from then on and its open streams ended (404 when it is not paired) (item 670) |
 | `GET /channels`, `POST /channels/imessage/switch` (`{"on": true}`; the switch, the code, the confirmation and the removal take the token only, never a phone's key: item 670) | the channels of Settings › Channels (item 572, [Channels](channels.md)): iMessage's switch, paired numbers and addresses, a code that waits, what macOS granted (`database`, `automation`), what keeps it from working (`problem`, `needs`) and what the channel sees of Messages' database (`seen`, item 595: when it looked, the cursor, the newest row, the sizes and times of `chat.db` and `chat.db-wal`, the last command and error, a `warning` when the log changed for two minutes and nothing Dot reads did, and `cursor_reset`, item 611, when the cursor had to come down to the newest row of a database rebuilt or restored: `{"from_row", "to_row", "at"}`), and the address its links open at (`links`: the name `[server] reach` gives, `null` when it names none and no link is sent); the switch, at once and in `[channels] imessage` (422 when the config file cannot be changed, and the switch stays as it was); `POST /channels/progress` (`{"on": true}`) turns on or off the messages of progress of a run started from a channel (item 618; `progress` in `GET /channels`), at once and in `[channels] progress` (`"steps"` or `"off"`; 422 when the config file cannot be changed) |
 | `POST /channels/imessage/code` (`{"handle": "+358401234567"}`), `POST /channels/imessage/confirm` (`{"code": "482 913"}`), `POST /channels/imessage/remove` (`{"handle": …}`), `POST /channels/imessage/check`, `POST /channels/imessage/poll` | send a pairing code to a number (with its country code) or an address through Messages; pair it when the code is typed back (422 for a wrong one, with the tries left, and for one out of date or used up); forget a paired one; show macOS's question whether Dot may control Messages, a minute for the answer; look at Messages' database now (Check now, item 595): a poll like the loop's, never reading a row twice with it, when the channel is on and a number paired, else a look that reads no message |
-| `GET /snapshots`, `POST /snapshots/settings` (`{"key": "sound", "value": "pop"}`), `POST /snapshots/take`, `POST /snapshots/claim` | SnapShots (item 405): the settings as they stand, whether the Command key is watched and the captures waiting; a setting changed, live and in the config file; a capture taken by hand; the captures a composer takes into its draft |
+| `GET /snapshots`, `POST /snapshots/settings` (`{"key": "sound", "value": "pop"}`), `POST /snapshots/take`, `POST /snapshots/claim` | Snapshots (item 405): the settings as they stand, whether the Command key is watched and the captures waiting; a setting changed, live and in the config file; a capture taken by hand; the captures a composer takes into its draft |
 | `GET /desktop/permissions`, `POST /desktop/permissions`, `POST /desktop/permissions/open` (`{"pane": "screen_recording"}`), `POST /system/restart` | the desktop permissions as macOS reports them, make macOS ask for the missing ones, show a pane, start the service's daemon again (item 409) |
 | `POST /voice/allow` (`{"pane": "microphone"}` or `{"pane": "speech"}`)         | for the composer's microphone in the desktop app (item 636): show System Settings at the pane where Dot.app is allowed the microphone, or speech recognition, from this Mac's own address with the installation's token only (422 from any other, a phone's key among them, and for any other pane). It reads the Dot.app that runs first and answers `{"opened", "app"}`: `ready`, it asks macOS for the microphone, and the pane is shown; `old`, it was built before it asked, so macOS gives it none whatever System Settings shows, and nothing is shown (`opened` false); `unknown`, none was found running, and the pane is shown all the same. A Dot.app or a `codesign` that cannot be read is an error (500), not an answer. It changes no setting: you switch Dot on |
 
@@ -1237,7 +1237,7 @@ log keeps its traceback once (item 558: the answer is made inside the guard, so 
 `Cache-Control: no-store` of every other answer, and is not raised again for uvicorn to log a second time). Invalid
 input is a 422 with the validation errors in the context.
 
-**SnapShots** (item 405, after another coding agent's). In any application, both Command keys pressed together (⌘ ⌘,
+**Snapshots** (item 405, after another coding agent's). In any application, both Command keys pressed together (⌘ ⌘,
 item 414, as another coding agent's shortcut is), or the Command key tapped twice, captures the window in front and puts
 it in the box of the open chat (or of the new chat) as a picture, without switching to Dot; a short sound says it was
 taken, a soft white flash goes over the window (`flash`), and a card with the picture lifts off it and flies to Dot's
@@ -1256,7 +1256,7 @@ not a capture), never which key. Only the pages of this Mac take captures: a pho
 reach`, does not take one away from the Mac's box. Dot's own window (the desktop app, or a browser showing Dot) and a
 password manager's are never captured; what lies over the window shows in the picture, as on the screen. A box on screen
 takes the capture as it comes; with none on screen (another page open) the daemon keeps it until a box is made. Settings
-› SnapShots switches it (`[snapshots] enabled`), the text (`app_text`), the sound (`sound`: click, pop, glass or off),
+› Snapshots switches it (`[snapshots] enabled`), the text (`app_text`), the sound (`sound`: click, pop, glass or off),
 the flight and the spring (`animations`), the flash (`flash`), Dot coming to the front (`open_dot`), and says whether
 the key is watched and, when it is not, why; while the permission is missing the daemon tries the watch again every few
 seconds, so granting it needs no restart. A capture past the ten files of a message is left out, and the box says so.

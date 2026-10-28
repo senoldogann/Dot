@@ -778,12 +778,12 @@ owner = ""
 introduced = false
 
 [snapshots]
-# SnapShots (item 405): both Command keys pressed together, or the Command key tapped twice, in any application,
+# Snapshots (item 405): both Command keys pressed together, or the Command key tapped twice, in any application,
 # captures the window in front and puts it in the open chat's composer as a picture (and, with app_text, the window's
 # text as a Markdown file, when the application shows it to accessibility). Dot's own window and a password manager's
 # are never captured. The keys are watched by a listen-only event tap once Accessibility is granted to the app that
 # runs Dot; it reads only whether a Command key went down or up, and whether another key was pressed meanwhile (⌘C ⌘V
-# is not a capture), never which. Settings › SnapShots changes these. sound: "click", "pop", "glass" or "off".
+# is not a capture), never which. Settings › Snapshots changes these. sound: "click", "pop", "glass" or "off".
 # animations: the capture's card flies to Dot's window and springs into the box (item 414); flash: a soft flash over
 # the window as it is captured; open_dot: Dot's window, or its tab in the browser, comes to the front with the capture
 # (macOS asks once whether Dot may choose a browser's tab). double_tap_ms: the most between the two taps.

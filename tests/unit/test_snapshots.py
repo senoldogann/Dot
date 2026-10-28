@@ -1,4 +1,4 @@
-"""SnapShots (item 405): the double tap of the Command key told from its other uses, the names a capture's files take,
+"""Snapshots (item 405): the double tap of the Command key told from its other uses, the names a capture's files take,
 and the service that keeps captures for the composer, plays the sound and tells the pages, with a capture of its own
 in place of the window in front."""
 

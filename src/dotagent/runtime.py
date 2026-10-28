@@ -205,7 +205,7 @@ class Runtime:
     # name that someone else set up is not among them.
     builtin_names: frozenset[str]
     memory: MemoryIndex
-    # SnapShots (item 405): the watch of the Command key and the captures waiting for a composer.
+    # Snapshots (item 405): the watch of the Command key and the captures waiting for a composer.
     snapshots: SnapshotService
     # Help found by meaning with the memory's embeddings (item 169); ``None`` when they are off.
     help_vectors: HelpVectors | None

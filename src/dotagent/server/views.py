@@ -116,7 +116,7 @@ class PhoneView(FrozenModel):
 
 class SnapshotsView(FrozenModel):
     """``GET /api/snapshots`` (item 405): the settings as they stand, how the shortcut reads, whether the Command key
-    is watched right now and, when it is not though SnapShots are on, why; the captures no composer claimed yet."""
+    is watched right now and, when it is not though Snapshots are on, why; the captures no composer claimed yet."""
 
     enabled: bool
     app_text: bool
@@ -131,7 +131,7 @@ class SnapshotsView(FrozenModel):
 
 
 class SnapshotSettingRequest(FrozenModel):
-    """One setting of SnapShots to change (item 405): ``enabled``, ``app_text``, ``animations``, ``flash`` and
+    """One setting of Snapshots to change (item 405): ``enabled``, ``app_text``, ``animations``, ``flash`` and
     ``open_dot`` (item 414) take a bool, ``sound`` one of its choices; a value that does not fit its key is refused
     before anything is written, since the config file would refuse it at the daemon's next start."""
 

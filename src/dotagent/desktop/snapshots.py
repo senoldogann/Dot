@@ -1,11 +1,11 @@
-"""SnapShots (item 405): both Command keys pressed together (item 414), or the Command key tapped twice, in whatever
+"""Snapshots (item 405): both Command keys pressed together (item 414), or the Command key tapped twice, in whatever
 application the owner is in, captures the window in front and hands it to the composer of the open chat as a file,
 with the window's text when the application shows it to accessibility and the setting asks for it; a short sound says
 it was taken, a soft flash over the window and a card that flies to Dot's window show it
 (:mod:`dotagent.desktop.flight`), and Dot's window or tab comes to the front with the capture in its box
 (:mod:`dotagent.desktop.show_dot`). The keys are watched by a listen-only event tap on a thread of its own: it reads
 only whether a Command key went down or up and whether any other key was pressed meanwhile (⌘C ⌘V is not a capture),
-never which. Dot's own window and a password manager's are never captured. Settings › SnapShots switches it and its
+never which. Dot's own window and a password manager's are never captured. Settings › Snapshots switches it and its
 parts (``[snapshots]``)."""
 
 import asyncio
@@ -312,7 +312,7 @@ class Overlay(Protocol):
 
 
 class SnapshotService:
-    """SnapShots as the daemon runs them: the settings as they stand (changed live from the page), the watch of the
+    """Snapshots as the daemon runs them: the settings as they stand (changed live from the page), the watch of the
     key while they are on, the captures taken and not yet claimed by a composer, and the event that tells the pages
     of each. :meth:`start` is given what captures the window in front and keeps it (``agent/snapshots.py``'s
     ``stored_taker``), what brings Dot's window to the front (``show_dot``'s ``dot_shower``) and what draws the flash
@@ -349,7 +349,7 @@ class SnapshotService:
     def problem(self) -> str | None:
         """Why the key is not watched, as it stands now: the watcher's reason, which clears by itself once the
         permission is granted (it tries again every few seconds), or that it did not start in time; None while it
-        listens or SnapShots are off."""
+        listens or Snapshots are off."""
         watcher: SnapshotWatcher | None = self._watcher
         if watcher is None:
             return None
@@ -361,7 +361,7 @@ class SnapshotService:
         self, taker: Taker, shower: Shower, overlay: Overlay, pointer: PointerOverlay | None = None
     ) -> None:
         """Take ``taker`` as what captures the window in front and keeps it, ``shower`` as what brings Dot's window to
-        the front and ``overlay`` as what draws the flash and the flight, and start watching the keys when SnapShots
+        the front and ``overlay`` as what draws the flash and the flight, and start watching the keys when Snapshots
         are on (the overlay's helper with them, so the first flash is not late); called once the event loop runs.
         ``pointer`` is Dot's own on the screen (item 706), taken off it while the window is captured."""
         self._pointer = pointer
@@ -415,7 +415,7 @@ class SnapshotService:
             await self._overlay.aclose()
 
     async def apply(self, key: str, value: bool | SnapshotSound) -> None:
-        """A setting changed on the page: it holds from now; SnapShots switched on start the watch, off end it. A
+        """A setting changed on the page: it holds from now; Snapshots switched on start the watch, off end it. A
         value that does not fit its key is refused."""
         if key == "enabled" and isinstance(value, bool):
             self.enabled = value
@@ -442,7 +442,7 @@ class SnapshotService:
         lands (item 414). A capture that fails tells the pages why and raises; once it is kept, what brings Dot forward
         cannot undo it (:meth:`_show`)."""
         if self._taker is None or self._shower is None or self._overlay is None:
-            raise DesktopError("SnapShots are not started", {})
+            raise DesktopError("Snapshots are not started", {})
         taker: Taker = self._taker
         overlay: Overlay = self._overlay
         async with self._taking:

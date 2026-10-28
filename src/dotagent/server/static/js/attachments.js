@@ -7,7 +7,7 @@ import { icon } from "./icons.js";
 import { readsAsMarkdown } from "./markdown.js";
 import { toast } from "./ui.js";
 
-// The flight of a picture SnapShots brought into its chip (item 414): as wide as this share of the page, at most this
+// The flight of a picture Snapshots brought into its chip (item 414): as wide as this share of the page, at most this
 // many pixels, from this far down the page, this long (another coding agent's captures fly as long).
 const FLIGHT_SHARE = 0.5;
 const FLIGHT_MAX_PX = 480;
@@ -330,7 +330,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
     }
   });
 
-  /** A picture SnapShots brought flies into its chip (item 414), from the top of the page, where the eye is when
+  /** A picture Snapshots brought flies into its chip (item 414), from the top of the page, where the eye is when
    * Dot's tab comes to the front, unless the reader asked for less motion. */
   function flyIn(thumb, url) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !thumb.isConnected) {
@@ -361,7 +361,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
   }
 
   /** List `files` (`{id, name, size, kind}`, uploaded already) as files of the draft; `animated` springs them in
-   * (a capture of SnapShots, item 405) and flies a picture into its chip (item 414). */
+   * (a capture of Snapshots, item 405) and flies a picture into its chip (item 414). */
   function restoreFiles(files, animated) {
     for (const { id, name, size, kind } of files) {
       if (entries.length >= MAX_FILES) {
