@@ -114,7 +114,8 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
   message was queued, the lines of progress, how a run ended, where to answer a wait, what was left out of an answer,
   why a message was not run, the pairing code), is in English or in Turkish. `[channels] language = "auto"` (the
   default) speaks the language of your last message on the channel, told by its letters (ğ, ı, İ, ş are Turkish's
-  own) and its commonest words; a message that tells neither (a link, a number, *ok*) keeps the language before it,
+  own) and its commonest words; a message that tells neither (a link, a number, *ok*) keeps the language before it, a
+  row that may be a run's own (see below) changes nothing,
   and the language is kept across restarts, so what Dot tells you on its own speaks it too. `"en"` or `"tr"` holds
   one. A run that works says its progress in the language of the message that started it (*Çalışıyorum (2 dk 5 sn):*,
   *notes.txt dosyasını okudum*, *bir sayfa okudum: example.com*). An answer is in whatever language the model wrote
@@ -190,8 +191,9 @@ row is a command only when all of these hold:
 - it is not a picture Dot sent (item 617): a picture is a message of its own with a file, no words and no `◆`, which
   Messages flags as yours like any row, so Dot tells it from a picture of yours by its time and what it is: a row that
   holds a file and no words, dated from five seconds before Dot handed a picture to Messages to a minute after, is
-  Dot's own and is never read as a message (a picture of yours in that minute is let go with it, where it would only
-  have been told *Dot does not read attachments yet*);
+  Dot's own and is never read as a message (a picture of yours with no words in that minute is let go with it: send
+  it again, or with a word), and so is a row of a file with the name of a picture Dot sent in the hour before, a copy
+  that came late (item 806);
 - it is words: a sticker, an app's message, a payment, or any rich content Messages gives a bundle of its own, is never
   a command (a link preview is read as the link it holds);
 - it is not only a link that Dot wrote: Messages may split the link at the end of one of Dot's messages into a row of
@@ -227,13 +229,24 @@ yours is yours: one that comes less than 3 seconds after your words, in the same
 them, is a command of its own.
 
 The limits hold for every message: at most 4,000 characters (a longer one is told so and not cut, as cutting could
-change what it asks), at most 30 a minute (the rest of a flood is let go, with one line to say so), and a message with
-only an attachment is told it is not read yet. A message with **words and a picture or a file** (item 611) runs on its
-words: the run is told, in a note after them, that the message came with an attachment that Dot cannot read here and
-that it must not guess what it shows, and the first line of the answer says so to you (*Dot did not read the picture
-or file that came with your message, so this answers your words only.*). Reading the attachment is a feature of its
-own, not built yet. The picture that a link's preview shows is no file you sent, whatever Messages flags its row
-as. A message that came in more than 15 minutes before Dot read it (the Mac
+change what it asks) and at most 30 a minute (the rest of a flood is let go, with one line to say so). **The pictures
+and files a message brings are read** (item 806). Messages keeps them in
+`~/Library/Messages/Attachments`, beside its database, and Dot reads a file only from there, as a regular file reached
+with no link on the way and of at most 20 MB, the first ten of a message (the rest count as not read); a name that
+leads elsewhere is no file of yours, and while the emergency stop is engaged nothing is kept. A picture (PNG, JPEG, GIF, WebP) goes to the run as it is, and a photo of an iPhone (HEIC, HEIF) or a TIFF is
+drawn as PNG by macOS first, turned the way it was held; a PDF, a text or code file and a Word, Excel or PowerPoint
+file are read as the composer reads an upload: each is kept as one, in the workspace's `attachments/`, and the run is
+handed them as a message of the web UI is ([Runs](runs.md)), what is in them fenced as data, never instructions, as
+the files you attach there are ([Safety](safety.md#safety)). A message of files and no words runs too: the run is told only files came and to do what you most
+likely want, asking when it is not clear. A file Messages is still bringing down from iCloud is waited for, 15
+seconds at most (a stop you send meanwhile ends the wait at once); one that has not come by then is said to be on its
+way, and you send it again. A voice message, a
+video, a sticker and a file of no kind Dot reads are not read: with words the words run, the run is told that part of
+the message was not read and must not guess what it shows, and the answer's first line says so to you (*Dot did not
+read the picture or file that came with your message, so this answers your words only.*); with no words, Dot says
+what it reads. A message with one Apple ID that Messages keeps twice, sent and received, is run once, its files told
+by their names as its words are. The picture that a link's preview shows is no file you sent, whatever Messages
+flags its row as. A message that came in more than 15 minutes before Dot read it (the Mac
 slept, Dot was off) is not run: Dot says so, and you send it again if you still want it. A message whose words cannot
 be read is let go and never answered, as it may be one of Dot's own.
 
@@ -338,7 +351,7 @@ names of the files it read or wrote, the host of the pages it read and the first
 A picture is a file of yours that leaves the Mac, to your own devices: an answer that names one is
 the model's choice, and a run that read a page may be led to name a picture of yours that the page asked for, so the
 channel can be switched off while Dot works on content you do not trust. Nothing else leaves: what you send is read
-from this Mac's own database. See [What leaves this
+from this Mac's own database and the folder of attachments beside it. See [What leaves this
 Mac](safety.md#what-leaves-this-mac).
 
 ## If it does not work
@@ -361,8 +374,8 @@ Mac](safety.md#what-leaves-this-mac).
 | *Last error* names a message that did not go | Messages did not take Dot's answer: Automation, or the address |
 
 Left for later: other messaging apps (the router posts what a channel receives and sends what a run ends with; a
-channel is the part that reads and sends), reading attachments (a picture or a file is only said not to be read, item
-611), and answers to approvals on a channel (deliberately not).
+channel is the part that reads and sends), voice messages and videos (said not to be read, item 806), and answers to
+approvals on a channel (deliberately not).
 
 The REST routes of the tab (`/api/channels`) are in [the daemon's
 table](daemon.md#the-daemon-the-web-ui-and-the-service).

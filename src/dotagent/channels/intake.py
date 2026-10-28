@@ -27,8 +27,13 @@ ATTACHMENT: str = ENGLISH.attachment_only
 # at the end of the run's goal, so the two stay together through the chat's queue. The note is for the model, so it is
 # in English whatever the owner writes.
 UNREAD_NOTE: str = (
-    "(Dot's note: this message came with a picture or a file, which Dot cannot read on this channel yet. Only its "
-    "words reached you. Do not guess what the attachment shows.)"
+    "(Dot's note: this message came with a picture or a file that Dot could not read (a voice message, a video, or a "
+    "file that had not come down yet). Only the rest reached you. Do not guess what it shows.)"
+)
+# What a run is told of a message that brought files and no words (item 806), in English, for the model.
+FILES_ONLY_NOTE: str = (
+    "(Dot's note: the owner sent only the attached file(s), with no words. Look at them and do what they most likely "
+    "want; ask when it is not clear.)"
 )
 UNREAD_ANSWER: str = ENGLISH.unread_answer
 FLOOD: str = ENGLISH.flood
@@ -75,8 +80,8 @@ class Intake:
         """What to do with a message sent at ``sent_at`` that came to be read at ``now``: ``text`` is its words
         (``None`` when they could not be read) and ``attachment`` whether it carries a file. A message whose words
         cannot be read and that carries no file is never answered, as it may be one of Dot's own (the owner's chat
-        holds both). A file with no words is told it is not read; a file with words is accepted with the words and
-        :data:`UNREAD_NOTE` after them, so that the run, and then the owner, know it was not looked at (item 611)."""
+        holds both). A message with a file is accepted with its words, none or some (item 806): the channel reads the
+        files then, and tells the run and the owner what it could not (:data:`UNREAD_NOTE`, item 611)."""
         if text is None and not attachment:
             return Skip("its words could not be read")
         words: str = (text or "").strip()
@@ -95,10 +100,7 @@ class Intake:
         if now - sent_at > STALE_S:
             return Tell(self._words().too_old)
         if words == "":
-            return Tell(self._words().attachment_only) if attachment else Skip("it holds no words")
+            return Accept("") if attachment else Skip("it holds no words")
         if len(words) > MAX_IN_CHARS:
             return Tell(too_long(len(words), self._words()))
-        if attachment and not is_stop(words):
-            # The words run, and the run is told what did not reach it (item 611); a stop is left as it was written.
-            return Accept(f"{words}\n\n{UNREAD_NOTE}")
         return Accept(words)

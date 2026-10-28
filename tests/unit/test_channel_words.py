@@ -94,8 +94,6 @@ def test_every_line_has_its_turkish_and_every_step_its_phrase() -> None:
 
 def test_intake_tells_in_the_owners_language() -> None:
     intake: Intake = Intake(lambda: TURKISH)
-    told = intake.judge(None, 100.0, True, 100.0)
-    assert told == Tell(TURKISH.attachment_only)
     old = intake.judge("eski", 0.0, False, 10_000.0)
     assert old == Tell(TURKISH.too_old)
     long = intake.judge("a" * 5000, 100.0, False, 100.0)
