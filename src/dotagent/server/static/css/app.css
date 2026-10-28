@@ -10657,3 +10657,83 @@ dialog.teach {
   gap: var(--space-2);
   margin-top: var(--space-2);
 }
+
+/* The first steps of a Dot that started afresh (item 811), under the block in the middle of the home, so that the
+   greeting and the composer keep their place: a row to each step, its mark, what it asks and where it is done. A step
+   done is muted, its mark a check. While the card is shown, While you were away and the Today strip take the rows
+   under it. */
+.home > .first-steps {
+  grid-row: 3;
+  align-self: start;
+  width: 100%;
+}
+
+.home > .first-steps ~ .home-away,
+.home > .first-steps ~ .home-today {
+  grid-row: 4;
+}
+
+.home > .first-steps ~ .home-away:not([hidden]) ~ .home-today {
+  grid-row: 5;
+}
+
+.first-steps .card-head {
+  gap: var(--space-2);
+}
+
+.first-steps-count {
+  white-space: nowrap;
+}
+
+.first-steps-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.first-step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.first-step-mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+
+.first-step[data-done="true"] .first-step-mark {
+  color: var(--ok);
+}
+
+.first-step-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.first-step[data-done="true"] .first-step-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/* On a touch screen a step's link takes a finger: the height a tap needs, its words in the middle of it, and the
+   step's mark in the middle of the same height. */
+@media (pointer: coarse) {
+  a.first-step-title {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .first-step:has(a.first-step-title) .first-step-mark {
+    align-items: center;
+    height: 44px;
+  }
+}
