@@ -890,6 +890,10 @@ to take off your hands: that look is a run of its own whose goal tells it to onl
 (the goal asks it, as a goal does; the approval mode decides what is asked of you on the way). The look, Not now, Skip
 the introduction and the first message you send end it, and the daemon keeps that it was had.
 
+**A chat that is gone** (item 810). Dot opens at the chat screen you were on last; when that chat is gone by then (Dot
+started with an empty store, the chat was deleted), New chat opens in its place, saying so, and the next open starts
+there too. A task you go to that is not found still says *Task not found*.
+
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its
 memory and how long it has run, read again every five seconds while the page is seen; the room each kind of file Dot

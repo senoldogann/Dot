@@ -28,6 +28,7 @@ import { recapSection } from "../recap.js";
 import { showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
+import { LAST_CHAT_KEY, openingOf, readPref, removePref } from "../prefs.js";
 import { PAGE_ANSWER_EVENT } from "../pageframe.js";
 import { planBubble, planStep, planTargets } from "../planbubble.js";
 import { createReactions, REACTION_EVENTS } from "../reactions.js";
@@ -107,6 +108,25 @@ function tellRewound(cut) {
 
 function backLink() {
   return el("a", { class: "back", href: "#/runs" }, icon("arrowLeft"), "All chats");
+}
+
+/**
+ * Whether the task `runId`, which a read of its page did not find, is the chat the page opened at from `LAST_CHAT_KEY`
+ * and no read found yet (`opening`, `openingOf`): one that is gone (Dot started with an empty store, the chat was
+ * deleted) is forgotten there, and New chat opens in its place, saying so (item 810), where Dot opened at "Task not
+ * found" every time. A missing task the owner went to says so, as before.
+ */
+function openedGone(runId, opening) {
+  if (!opening.gone()) {
+    return false;
+  }
+  const path = `/runs/${runId}`;
+  if (readPref(LAST_CHAT_KEY) === path) {
+    removePref(LAST_CHAT_KEY);
+  }
+  toast("info", "The chat that was open last is gone, so Dot opened a new one.");
+  location.replace(`${location.pathname}${location.search}#/runs`);
+  return true;
 }
 
 // What the Plan tab says of a run without a plan (item 203).
@@ -1845,6 +1865,8 @@ function storedFile(key) {
 
 export function mount(root, ctx) {
   const runId = ctx.params[0];
+  // Whether this page is the chat the page opened at (item 810), until a read finds it.
+  const opening = openingOf(`/runs/${runId}`);
   const controller = new AbortController();
   let stopRun = () => undefined;
 
@@ -1854,6 +1876,7 @@ export function mount(root, ctx) {
     const kept = again ? undefined : keptRuns.get(runId);
     if (kept !== undefined && !kept.detail.active && !kept.detail.elsewhere) {
       // A run that was over when it was kept is drawn at once as it stood; its lessons and questions are read again below.
+      opening.found();
       stopRun = showRun({ root, ctx, signal: controller.signal, detail: kept.detail, readNow: false, history: kept.history, historyProblem: null, reload: () => attempt(() => open(true)), kept });
       shown();
       return;
@@ -1874,6 +1897,8 @@ export function mount(root, ctx) {
     let messages = [];
     try {
       detail = await api.get(`/runs/${runId}`);
+      // Found: a later read that finds nothing (a Reload after it was deleted) says Task not found (item 810).
+      opening.found();
       // A run is read whole before it is drawn (item 454), not filled in as its stream comes; one at work up to now
       // (item 734), so that its record, put over what was read, has the last word: a chat opened again while its
       // helpers worked drew their rows from thousands of earlier events as they came, steps behind and a helper that
@@ -1883,6 +1908,10 @@ export function mount(root, ctx) {
       }
     } catch (error) {
       if (controller.signal.aborted) {
+        return;
+      }
+      if (error.status === 404 && openedGone(runId, opening)) {
+        shown();
         return;
       }
       const problem = error.status === 404 ? emptyPanel("circleDashed", "Task not found", `No task has the ID ${runId}.`) : errorPanel(error, () => attempt(open));
