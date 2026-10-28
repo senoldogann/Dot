@@ -3,7 +3,14 @@
 import pytest
 
 from dotagent.cli import build_parser, parse_command
-from dotagent.cli_commands import EvalFromRunCommand, RunCommand, ServiceInstallCommand
+from dotagent.cli_commands import EvalFromRunCommand, RunCommand, ServiceInstallCommand, StatsCommand
+
+
+def test_stats_takes_the_tool_health_view() -> None:
+    command = parse_command(build_parser(), ["stats", "--by", "tool", "--days", "7"])
+    assert isinstance(command, StatsCommand)
+    assert command.by == "tool"
+    assert command.days == 7
 
 
 def test_eval_from_run_takes_a_run_and_an_out_path() -> None:

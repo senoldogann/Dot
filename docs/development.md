@@ -408,7 +408,9 @@ table follows, per site (the host of the page for a browser act, the application
 the `tool_result` event with the steps of the batch): acts, the share with one step, the share that failed, the
 median call, and the finished runs that acted there with the share of them that ended done (item 308). **By day**
 follows: per day, the finished runs that acted on a site and the share done, which shows whether the browser and the
-desktop work gets better from day to day. `--by site` prints these two only, `--by model` everything but them. Acts and steps recorded before
+desktop work gets better from day to day. `--by site` prints these two only, `--by model` everything but them, and
+`--by tool` prints only the tool health table: every tool by failure rate, calls, failed calls, fail % and median call,
+so one tool at 40 % is not hidden by the 5 % of all calls. Acts and steps recorded before
 these were counted (before item 22 of the roadmap) are left out of the acts lines and the sites table.
 
 The numbers of a long run follow under each model: the **compactions** per 100 steps, their seconds and their share of

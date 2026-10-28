@@ -586,9 +586,9 @@ def build_parser() -> argparse.ArgumentParser:
     stats.add_argument("--days", type=int, default=30, help="only the runs of the last N days")
     stats.add_argument(
         "--by",
-        choices=["model", "site", "all"],
+        choices=["model", "site", "tool", "all"],
         default="all",
-        help="what to show: the numbers per model, the act calls per site (a page's host or an application), or both",
+        help="what to show: the numbers per model, the act calls per site, tool health, or all of them",
     )
     stats.add_argument(
         "--run", metavar="ID", default=None, help="the numbers of one run instead: what it cost and where"

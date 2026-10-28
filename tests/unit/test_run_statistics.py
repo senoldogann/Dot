@@ -9,7 +9,13 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-from dotagent.cli_stats import render_harness, render_learning, render_run_costs, render_stats
+from dotagent.cli_stats import (
+    render_harness,
+    render_learning,
+    render_run_costs,
+    render_stats,
+    render_tool_health,
+)
 from dotagent.core.errors import StoreError
 from dotagent.core.types import JsonObject
 from dotagent.llm.calls import CALL_EVENT
@@ -285,6 +291,25 @@ def test_the_acts_the_slowdown_curve_and_the_sites_come_from_the_counted_events(
         ("x.com", 2, 1, 0),
         ("Safari", 1, 1, 1),
     ]
+
+
+def test_tool_health_lists_the_highest_failure_rate_first_and_names_the_share(database: Path) -> None:
+    tools: tuple[ToolStats, ...] = collect_statistics(database, time.time() - 30 * DAY_S).tools
+    lines: list[str] = render_tool_health(tools)
+    assert "fail %" in lines[1]
+    names: list[str] = [line.split()[0] for line in lines[2:]]
+    assert names[:3] == ["web_fetch", "web_search", "desktop_act"]
+    web_fetch: str = next(line for line in lines if line.split()[0] == "web_fetch")
+    assert "100 %" in web_fetch
+    assert "4" in web_fetch
+
+
+def test_stats_by_tool_shows_only_the_tool_health_table(database: Path) -> None:
+    stats: RunStatistics = collect_statistics(database, time.time() - 30 * DAY_S)
+    lines: list[str] = render_stats(stats, 30, "tool")
+    assert any("Tool health" in line for line in lines)
+    assert not any("Sites" in line for line in lines)
+    assert not any("how they ended" in line for line in lines)
 
 
 def test_the_tools_are_listed_slowest_first_with_their_wait_at_the_gate(database: Path) -> None:
