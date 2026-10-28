@@ -75,7 +75,7 @@ type ModelsSetting = Literal["main", "fast", "review", "vision", "standby"]
 type ReactionsSetting = Literal["follow_ups", "good", "love", "wrong", "again", "explain", "hold"]
 type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
-type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
+type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot", "double_tap"]
 type WebSetting = Literal["search_order"]
 type TradingSetting = Literal[
     "mode",
@@ -87,6 +87,7 @@ type TradingSetting = Literal[
     "max_position",
     "paper_start",
     "paper_fee_rate",
+    "wake_schedule",
 ]
 type SettingKey = (
     AgentSetting

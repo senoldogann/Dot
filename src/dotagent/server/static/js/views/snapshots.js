@@ -1,5 +1,6 @@
-// Settings › Snapshots (item 405): a double tap of the Command key, in any application, captures the window in front
-// into the open chat's box; what comes with it, the sound, the spring, and whether the key is watched right now.
+// Settings › Snapshots (item 405): both Command keys pressed together (and, when it is switched on, a double tap of one,
+// item 814), in any application, capture the window in front into the open chat's box; what comes with it, the sound,
+// the spring, and whether the keys are watched right now.
 
 import { api } from "../api.js";
 import { el } from "../dom.js";
@@ -75,9 +76,21 @@ export function mount(root, ctx) {
     appText.paint();
     const shortcut = setRow({
       title: "Capture shortcut",
-      lead: "Capture the window you're using without switching apps: press both Command keys together, or tap the Command key twice. Another key in between, as in ⌘C ⌘V, is not a capture. Dot's own window and a password manager's are never captured.",
+      lead: "Capture the window you're using without switching apps: press the Command keys on both sides of the space bar together. Another key in between, as in ⌘C ⌘V, is not a capture. Dot's own window and a password manager's are never captured.",
       control: el("kbd", { class: "snapshots-keys" }, view.shortcut),
     });
+    const doubleTap = switchRowSetting({
+      label: "Double tap of ⌘ too",
+      hint: "Also capture when one Command key is tapped twice. Off, a Command key pressed twice for shortcuts captures nothing.",
+      read: () => view.double_tap,
+      write: (on) => change("double_tap", on),
+      onToggled: () => {
+        if (!disposed) {
+          doubleTap.paint();
+        }
+      },
+    });
+    doubleTap.paint();
     const sound = choiceRowSetting({
       label: "Capture sound",
       hint: "Choose the sound played when capture starts.",
@@ -125,7 +138,7 @@ export function mount(root, ctx) {
       el(
         "div",
         { class: "set-sections", role: "region", "aria-label": "Snapshots" },
-        setSection({ title: "Capture", body: setCard(enabled.element, listening(), appText.element, shortcut) }),
+        setSection({ title: "Capture", body: setCard(enabled.element, listening(), appText.element, shortcut, doubleTap.element) }),
         setSection({ title: "When it captures", body: setCard(sound.element, animations.element, flash.element, openDot.element) }),
       ),
     );
@@ -145,7 +158,7 @@ export function mount(root, ctx) {
     }
   }
 
-  ctx.head.setLead("A double tap of ⌘ in any app captures the window in front into the box of the open chat.");
+  ctx.head.setLead("Both Command keys pressed together, in any app, capture the window in front into the box of the open chat.");
   root.append(holder);
   attempt(load);
   return () => {
