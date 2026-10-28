@@ -477,6 +477,24 @@ async def test_a_reply_its_content_filter_stops_moves_the_run_to_its_standby_mod
     assert len(filtering.requests) == 1
 
 
+async def test_a_model_that_answers_with_nothing_again_and_again_hands_the_run_to_its_standby_model(
+    login_env: dict[str, str],
+) -> None:
+    """Item 789: a model that answers with nothing as many times as a run is nudged ended the run ("The model returned
+    empty replies"), a standby model named or not; the standby model takes it over, as for a content filter."""
+    empty: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [_says("")] * 5))
+    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
+    async with _session(_config([], [SCRIPTED_MODEL], 5), login_env, {"anthropic": empty, "ollama": standby}) as (
+        runtime,
+        runs,
+    ):
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
+    assert [switch["reason"] for switch in played.data(MODEL_SWITCHED_EVENT)] == [
+        "it answered with nothing, again and again"
+    ]
+
+
 async def test_a_reply_its_content_filter_stops_ends_the_run_saying_so_when_no_standby_model_is_left(
     login_env: dict[str, str],
 ) -> None:
