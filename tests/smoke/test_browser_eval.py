@@ -65,6 +65,15 @@ document.getElementById("send").addEventListener("stubborn-press", () => {
   document.getElementById("sent").textContent = "sent";
 });
 </script>""",
+    # A button whose page ignores a real click and answers a script's synthetic one (item 781): the inner retry's
+    # way to a control the first click did not move.
+    "/synthetic": """<!doctype html><title>Synthetic page</title>
+<button id="go" aria-label="Go">Go</button><p id="moved">waiting</p>
+<script>
+document.getElementById("go").addEventListener("click", (event) => {
+  if (!event.isTrusted) { document.getElementById("moved").textContent = "moved"; }
+});
+</script>""",
 }
 # How long /slow takes to answer: far longer than a script's value takes to come back.
 _SLOW_S: float = 1.5
@@ -321,8 +330,15 @@ async def test_the_tool_is_a_click_of_medium_risk_and_what_it_gives_back_is_untr
     failed: ToolResult = await thrown.run(ctx)
     assert (failed.is_error, failed.untrusted) == (True, True)
     assert failed.text.startswith("The script threw an error") and "Error: boom" in failed.text
-    # Given refs (item 738), the same click of medium risk, which names them, and its value as the page's.
+    # Given a selector (item 781), the same one-call Fast-Track: the script gets the element it matches.
     view: PageView = await ctx.browser.open_url(ctx.thread_id, f"{site}/stubborn", True)
+    by_selector: PreparedCall = await runtime.registry.tools["browser_eval"].prepare(
+        {"script": "(el) => el.textContent", "selector": "button[aria-label='Send']"}, ctx
+    )
+    assert by_selector.action.summary.startswith("Run a script in the page on selector button[aria-label='Send']:")
+    selected: ToolResult = await by_selector.run(ctx)
+    assert (selected.is_error, selected.untrusted) == (False, True) and '"Send"' in selected.text
+    # Given refs (item 738), the same click of medium risk, which names them, and its value as the page's.
     send: str = _ref(view, "Send")
     on_ref: PreparedCall = await runtime.registry.tools["browser_eval"].prepare(
         {"script": "(el) => el.textContent", "refs": [send]}, ctx
@@ -333,6 +349,21 @@ async def test_the_tool_is_a_click_of_medium_risk_and_what_it_gives_back_is_untr
     )
     pressed: ToolResult = await on_ref.run(ctx)
     assert (pressed.is_error, pressed.untrusted) == (False, True) and '"Send"' in pressed.text
+
+
+async def test_a_click_that_did_nothing_is_tried_with_a_script_and_the_page_is_read_again(
+    runtime: Runtime, site: str
+) -> None:
+    """Item 781: browser_act's own loop, before the model sees a click that left the page unchanged."""
+    ctx: ToolContext = await _run_context(runtime)
+    view: PageView = await ctx.browser.open_url(ctx.thread_id, f"{site}/synthetic", True)
+    go: str = _ref(view, "Go")
+    call: PreparedCall = await runtime.registry.tools["browser_act"].prepare(
+        {"steps": [{"action": "click", "ref": go}]}, ctx
+    )
+    result: ToolResult = await call.run(ctx)
+    assert not result.is_error, result.text
+    assert "retried with a script" in result.text and "moved" in result.text
 
 
 async def test_the_tool_keeps_a_script_off_a_page_with_a_secret_field_and_hides_the_cookies_outside_yolo(

@@ -207,6 +207,7 @@ async def test_skills_are_found_in_the_home_and_in_the_plugins(runtime: Runtime,
     assert [(skill.name, skill.source) for skill in catalog.skills] == [
         ("release-notes", "home"),
         ("deploy-site", "plugin acme-tools"),
+        ("deep-os", "built-in"),
         ("excel", "built-in"),
         ("onedrive", "built-in"),
         ("word", "built-in"),
@@ -390,7 +391,7 @@ async def test_dotx_skills_list_shows_everything_and_what_was_left_out(home: Pat
     assert outcome.code == 1, outcome
     assert "Plugins (1):" in outcome.out
     assert "acme-tools 1.2.0  skill folders: 1, MCP servers: acme-tools-fixture" in outcome.out
-    assert "Skills (5):" in outcome.out
+    assert "Skills (6):" in outcome.out
     assert "release-notes  [home]" in outcome.out
     assert "deploy-site  [plugin acme-tools]" in outcome.out
     assert "excel  [built-in]" in outcome.out

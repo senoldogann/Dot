@@ -186,7 +186,10 @@ Both modes share what follows.
   the click, a dropdown it opened), its requests, its address, its tabs and its dialogs all stayed as they were for half
   a second, the step's line says it is done but the page did not change, with the fields the page marks invalid (a form
   a required field held back), so that a run does not take a click that did nothing (a button behind something in front
-  of it, one that waits for another event: `browser_eval` with its ref reaches it) for one that worked; a step that
+  of it, one that waits for another event: `browser_eval` with its ref reaches it) for one that worked. A click whose
+  batch left the page unchanged is tried once the other way before the result returns (item 781): the same ref gets the
+  pointer sequence a script sends, and the page is read again, so a step that a script can move does not need a model
+  round trip; a click that already moved the page is never sent twice, and a step that failed is left alone. A step that
   changed the page names what the page says new in an alert or a live region and the fields it newly marks invalid. A
   change that comes later than half a second is seen by the next look. A tab that closes under a batch (a sign-in
   callback that did its job, a tab the user closed) stops the batch without a failed step: the result says the page
@@ -249,6 +252,9 @@ Both modes share what follows.
   take many steps. Given `refs` of the latest snapshot (at most 20, item 738), the script is a function called with
   their elements, in that order, in the frame they are in (`browser_eval(script="(el) => el.click()", refs=["e12"])`),
   as the `args` of Chrome DevTools' `evaluate_script` are: it reaches the very element a step points at without a
+  selector written for it. Given `selector` instead of `refs` (item 781), the script gets the first element the CSS
+  selector matches, in the same call: `browser_eval(script="(el) => el.click()", selector="button[aria-label='Send']")`
+  is the Fast-Track click a snapshot, a find and a step would take three calls to reach.
   selector written for it, as a button that a click of `browser_act` does not move because it listens for other events
   (some of Slack's). A ref gone since the snapshot, of another shape, or refs of two frames fail the call with what to
   do. A script that throws fails the call with its message; one still running when the wait ends goes on in the page,

@@ -34,9 +34,11 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # browser_viewport, to see why a page does not work and how it lays out on a phone (item 746).
 # Raised by 200 for `recon` (item 776): one tool, 985 characters of schema, the audit of a site's public face and the
 # ports of an owned host (21,401 measured).
-BUDGET_TOKENS: int = 21_500
+# Raised by 600 for `security_scan` (item 781) and the selector and retry of the browser tools: a form's payloads on
+# an owned host, one tool of 1,063 tokens (21,984 measured).
+BUDGET_TOKENS: int = 22_100
 SYSTEM_BUDGET_TOKENS: int = 7_000
-TOOLS_BUDGET_TOKENS: int = 14_600
+TOOLS_BUDGET_TOKENS: int = 15_300
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

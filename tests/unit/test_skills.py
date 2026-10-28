@@ -241,6 +241,7 @@ def test_the_skills_that_come_with_dot_load_last_give_way_to_the_users_own_and_c
     # The user's excel replaces Dot's without a problem to report; Dot's word and onedrive name Dot's own Python.
     assert [(skill.name, skill.source) for skill in catalog.skills] == [
         ("excel", "home"),
+        ("deep-os", BUILTIN_SOURCE),
         ("onedrive", BUILTIN_SOURCE),
         ("word", BUILTIN_SOURCE),
     ]
