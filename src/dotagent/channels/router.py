@@ -30,13 +30,16 @@ import asyncio
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 from pydantic import JsonValue
 
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
+from dotagent.agent.attachments import StoredAttachment, store_attachment
 from dotagent.agent.manager import RunManager
 from dotagent.agent.mode_words import resolved_mode
-from dotagent.channels.intake import UNREAD_NOTE
+from dotagent.channels.inbox import Incoming
+from dotagent.channels.intake import FILES_ONLY_NOTE, UNREAD_NOTE
 from dotagent.channels.pictures import Found, Pictures
 from dotagent.channels.progress import APART_S, FIRST_AFTER_S, Progress, first_sentence, step_words
 from dotagent.channels.text import as_plain_text, cut_with_link, one_line
@@ -157,6 +160,8 @@ class ChannelRouter:
         language: SpokenLanguage | None = None,
     ) -> None:
         self._store: Store = runtime.store
+        # Where the files the owner sends are kept, as uploads (item 806).
+        self._workspace: Path = runtime.workspace
         # The language of the lines the router writes itself (item 805); with none they are in English.
         self._language: SpokenLanguage | None = language
         self._manager: RunManager = manager
@@ -215,14 +220,25 @@ class ChannelRouter:
 
     # ----- inbound ---------------------------------------------------------------------------
 
-    async def inbound(self, channel_id: ChannelId, text: str) -> None:
-        """Post the owner's ``text`` into the chat of ``channel_id``: a run starts on it, or it is queued behind the run
-        at work; while the emergency stop is engaged neither happens, and the owner is told so (item 611). What fails
-        is told to the owner on the channel."""
-        # The language is heard by the channel, from the owner's own words (item 805).
+    async def inbound(self, channel_id: ChannelId, text: str, files: tuple[Incoming, ...] = ()) -> None:
+        """Post the owner's ``text`` and the ``files`` it brought into the chat of ``channel_id``: a run starts on
+        them, or they are queued behind the run at work; while the emergency stop is engaged neither happens, and the
+        owner is told so (item 611). The files are kept as the composer keeps an upload (item 806). What fails is told
+        to the owner on the channel."""
+        # The language is heard by the channel, from the owner's own words (item 805): ``text`` may end in Dot's notes
+        # to the run, which are English.
         words: Words = self._words()
         try:
-            await self._post(channel_id, text)
+            if files and await _emergency_stop_engaged():
+                # Nothing starts while the emergency stop is engaged, which :meth:`_post` tells the owner: the files are
+                # not kept either, where no run would ever be handed them (the review).
+                await self._post(channel_id, text)
+                return
+            ready: tuple[tuple[StoredAttachment, ...], str] | None = await self._kept(channel_id, files, text)
+            if ready is None:
+                await self._say(channel_id, words.attachment_only, None)
+                return
+            await self._post(channel_id, ready[1], ready[0])
         except DotError as error:
             log.warning("channel_message_not_posted", channel=channel_id, error=error.message, context=error.context)
             await self._say(channel_id, words.fill(words.could_not_start, error=error.message), None)
@@ -231,7 +247,29 @@ class ChannelRouter:
             log.exception("channel_message_failed", channel=channel_id)
             await self._say(channel_id, words.failed_message, None)
 
-    async def _post(self, channel_id: ChannelId, text: str) -> None:
+    async def _kept(
+        self, channel_id: ChannelId, files: tuple[Incoming, ...], text: str
+    ) -> tuple[tuple[StoredAttachment, ...], str] | None:
+        """``files`` kept in the workspace as uploads, and ``text`` with the note that a file was not read when one
+        the upload refused (a file of no kind Dot reads, one that is broken); ``None`` when nothing of the message is
+        left to run, no words and no file kept."""
+        kept: list[StoredAttachment] = []
+        refused: int = 0
+        for file in files:
+            try:
+                kept.append(
+                    await asyncio.to_thread(store_attachment, self._workspace, file.name, file.media_type, file.data)
+                )
+            except DotError as error:
+                refused += 1
+                log.info("channel_file_not_kept", channel=channel_id, error=error.message)
+        if refused and not text.endswith(UNREAD_NOTE):
+            text = f"{text}\n\n{UNREAD_NOTE}"
+        if not kept and text.startswith(FILES_ONLY_NOTE):
+            return None
+        return tuple(kept), text
+
+    async def _post(self, channel_id: ChannelId, text: str, files: tuple[StoredAttachment, ...] = ()) -> None:
         stop: bool = is_stop(text)
         if not stop and await _emergency_stop_engaged():
             # A message on a channel is a way to start a run from away, and the owner's emergency stop holds every
@@ -267,7 +305,7 @@ class ChannelRouter:
                     None,
                     choices.approvals,
                     goal_mode,
-                    (),
+                    files,
                     NO_PICKS,
                 )
             except RunConflict:
@@ -283,7 +321,7 @@ class ChannelRouter:
         await self._manager.queue(
             thread.id,
             text,
-            (),
+            files,
             mode,
             choices.model,
             choices.effort,

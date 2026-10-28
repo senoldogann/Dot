@@ -1128,14 +1128,16 @@ written (Send Later of macOS 15), and a draft to a number or address you paired 
 a send the guard cannot see, which raises no flag: a script of a page, a program the run wrote and then runs, a
 Shortcut, a job a step left behind. A picture Dot sends with an answer (item 617) is a row of that conversation too,
 flagged as yours, with a file, no words and no `◆`: Dot tells it from a picture of yours by its time (from five
-seconds before Dot handed it to Messages to a minute after) and kind, and never reads it as a message. `/stop` is run
+seconds before Dot handed it to Messages to a minute after) and kind, or, for an hour, by the name of the file it sent
+(item 806), and never reads it as a message. `/stop` is run
 in any case, and so are the plain words `stop`, `dur` and
 `durdur` when they are the whole message (item 611): they only reduce what Dot does. A row received from your paired
 number or address is judged like a sent one, by the window and by Send Later: a run sends as this Mac's account,
 and `[policy] sealed_paths` closes `chat.db` to its commands, but that Messages writes no received copy of what this
 Mac sends to your own address cannot be shown, and if it did, a run's message would pass for yours; it costs a message
 now and then, which is told and sent again. With one Apple ID Messages may keep a message to yourself as a sent row and a received row: in one chat,
-with the same words and dated at most ten seconds apart, they are one command, and the second is let go. Pairing someone
+with the same words and the same files' names, dated at most ten seconds apart, they are one command, and the second
+is let go. Pairing someone
 else's number or address gives them Dot: the code you type back shows only that it reached whoever holds the number, so
 with someone else's every message they send you, and every message you send them, would be read as your command.
 Settings › Channels shows, under **Advanced**, what the channel sees of Messages' database (the newest row, the cursor, the two files, the
@@ -1143,9 +1145,11 @@ last command and error) and warns when its log changed and nothing Dot reads did
 Approvals and questions are never answered on a channel: a line says one waits and where to answer, in Dot's UI or the
 phone app, so that a channel's account, if taken, could not approve anything. While the emergency stop is engaged a
 message on a channel starts no run (see Emergency stop, below). A message is read up to 4,000 characters
-and 30 a minute, and one that came more than 15 minutes before Dot read it is not run: Dot says so. A picture or a file
-sent with words is not read (item 611): the words run, the run is told the attachment was not read, and the answer
-starts by saying so to you. A row that is not
+and 30 a minute, and one that came more than 15 minutes before Dot read it is not run: Dot says so. The pictures, PDFs and
+documents a message brings are read (item 806), only from Messages' folder of attachments beside its database, as
+regular files reached with no link and of at most 20 MB, and handed to the run as the composer's uploads, fenced as
+data; a message of files and no words runs too. A voice message, a video or a sticker is not read: the words run, the
+run is told part of the message was not read, and the answer starts by saying so to you. A row that is not
 words (a sticker, an app's message, a payment: rich content, which Messages marks with a bundle of its own) is never
 run, and neither is a row that is only a link that Dot wrote, one into its own pages or one in a message it sent a
 minute before: Messages may split the link at the end of a message of Dot's into a row of its own, which has no `◆` and

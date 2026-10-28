@@ -146,6 +146,7 @@ class Words:
     # Intake (item 572, 611).
     too_old: str
     attachment_only: str
+    files_coming: str
     unread_answer: str
     flood: str
     too_long: str
@@ -267,7 +268,10 @@ ENGLISH: Words = Words(
         "That message came in more than 15 minutes ago, while Dot was not reading, so Dot did not run it. Send it "
         "again if you still want it."
     ),
-    attachment_only="Dot does not read attachments yet. Send the words.",
+    attachment_only=(
+        "Dot could not read that: it reads pictures, PDFs, text and Office files, not voice messages or videos yet."
+    ),
+    files_coming="That file had not come down to this Mac yet. Send it again in a moment.",
     unread_answer="Dot did not read the picture or file that came with your message, so this answers your words only.",
     flood="That is more than 30 messages in a minute. Dot reads no more until it is quieter.",
     too_long="That message is {chars} characters and Dot reads {limit} at most. Shorten it or send it in parts.",
@@ -371,7 +375,10 @@ TURKISH: Words = Words(
         "Bu mesaj 15 dakikadan önce geldi, Dot o sırada okumuyordu; bu yüzden çalıştırmadı. Hâlâ istiyorsan yeniden "
         "gönder."
     ),
-    attachment_only="Dot bu tür eki henüz okuyamıyor. Ne istediğini yazıyla gönder.",
+    attachment_only=(
+        "Bunu okuyamadım: resim, PDF, metin ve Office dosyalarını okuyorum; sesli mesajları ve videoları henüz değil."
+    ),
+    files_coming="Bu dosya henüz bu Mac'e inmedi. Birazdan yeniden gönder.",
     unread_answer="Mesajınla gelen resmi ya da dosyayı okuyamadım; bu cevap yalnızca yazdıklarına.",
     flood="Bir dakikada 30'dan fazla mesaj geldi. Ortalık sakinleşene kadar Dot yenilerini okumuyor.",
     too_long="Bu mesaj {chars} karakter; Dot en çok {limit} karakter okuyor. Kısalt ya da parça parça gönder.",

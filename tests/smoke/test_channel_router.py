@@ -6,6 +6,7 @@ channel."""
 
 import asyncio
 import contextlib
+import io
 import os
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
@@ -15,11 +16,14 @@ import pytest
 import pytest_asyncio
 from channel_stand_ins import PROVIDER, Replies, finish, stop_file
 from picture_files import HEADS, NOT_IMAGE
+from PIL import Image
 
 from dotagent import secrets as dot_secrets
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
+from dotagent.agent.attachments import ATTACHMENTS_EVENT
 from dotagent.agent.manager import RunManager
-from dotagent.channels.intake import UNREAD_ANSWER, UNREAD_NOTE
+from dotagent.channels.inbox import Incoming
+from dotagent.channels.intake import FILES_ONLY_NOTE, UNREAD_ANSWER, UNREAD_NOTE
 from dotagent.channels.pictures import (
     NOT_A_PICTURE,
     OUT_OF_PLACE,
@@ -32,11 +36,13 @@ from dotagent.channels.pictures import (
 )
 from dotagent.channels.router import DEFAULT_CHOICES, QUEUED, STOPPED, WATCHED_KINDS, ChannelRouter
 from dotagent.channels.types import Receive
+from dotagent.channels.words import ENGLISH, TURKISH, SpokenLanguage
 from dotagent.config import load_config
 from dotagent.core.errors import ChannelError, ConfigError
 from dotagent.core.paths import env_file_path
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.types import ScriptedTurn
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import write_env_value
 from dotagent.store.models import ApprovalRecord, RunRecord, ThreadRecord
@@ -144,6 +150,8 @@ class Wired:
         self.runtime: Runtime = runtime
         self.manager: RunManager = manager
         self.channel: FakeChannel = FakeChannel()
+        # The language of Dot's own lines (item 805): English unless a test has the owner write in another.
+        self.language: SpokenLanguage = SpokenLanguage(runtime.store, lambda: "auto")
         self.on: bool = True
         # Whether a run started from the channel tells what it does while it works (item 618): off, as in a daemon
         # that was told so, until a test switches it on.
@@ -161,6 +169,7 @@ class Wired:
             Pictures(runtime.workspace, self.home, runtime.protected),
             lambda: self.progress_on,
             clock,
+            language=self.language,
         )
 
     async def thread(self) -> ThreadRecord:
@@ -1408,3 +1417,58 @@ async def test_nothing_is_told_to_a_channel_nobody_is_paired_on_and_nothing_is_k
     # What the run did while nobody could be told is not told afterwards.
     assert wired.channel.sent[-1] == "Working for 50 s:\n$ when somebody does"
     await _let_go(wired, replies)
+
+
+async def test_a_photo_the_owner_sends_is_kept_as_an_upload_and_handed_to_the_run(
+    wired: Wired, replies: Replies, runtime: Runtime
+) -> None:
+    """Item 806: the files a message brings reach the run as the composer's uploads do, with no words the note says
+    so; a file the upload refuses is told to the run as not read."""
+    shot: io.BytesIO = io.BytesIO()
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(shot, "PNG")
+    # The scripted model sees no picture: the vision model describes it first, then the run answers.
+    replies.push(ScriptedTurn(text="A dark square.", calls=()), finish("A dark square."))
+    before: int = len(wired.channel.sent)
+    files: tuple[Incoming, ...] = (
+        Incoming("IMG_0001.png", "image/png", shot.getvalue()),
+        Incoming("tool.bin", "application/octet-stream", b"\x00\x01\x02" * 50),
+    )
+    await wired.language.hear("Bunu yapar mısın?")
+    try:
+        await wired.router.inbound("imessage", FILES_ONLY_NOTE, files)
+        await _until(lambda: len(wired.channel.sent) == before + 1, "the answer")
+        # The notes to the run are English: the language stays the owner's (the review).
+        assert wired.language.words() is TURKISH
+    finally:
+        await wired.language.hear("please speak english again")
+    run: RunRecord = (await wired.runs())[-1]
+    assert run.goal == f"{FILES_ONLY_NOTE}\n\n{UNREAD_NOTE}"
+    (opened,) = await runtime.store.events_of_kind(run.id, ATTACHMENTS_EVENT, 5)
+    assert [file["name"] for file in opened.data["files"]] == ["IMG_0001.png"]
+    # The answer says, in the owner's language, that not all of the message was read.
+    assert wired.channel.sent[-1].startswith(TURKISH.unread_answer)
+
+
+async def test_a_message_of_files_none_of_which_can_be_kept_starts_nothing(wired: Wired, replies: Replies) -> None:
+    runs: int = len(await wired.runs())
+    await wired.router.inbound(
+        "imessage", FILES_ONLY_NOTE, (Incoming("tool.bin", "application/octet-stream", b"\x00\x01" * 50),)
+    )
+    assert len(await wired.runs()) == runs and wired.channel.sent[-1] == ENGLISH.attachment_only
+
+
+async def test_while_the_emergency_stop_is_engaged_a_photo_is_not_kept(
+    wired: Wired, runtime: Runtime, stopped: Path
+) -> None:
+    """The review: the files were kept before the stop was looked at, in a folder no run would read."""
+    sent_before: int = len(wired.channel.sent)
+    kept_before: int = _uploads(runtime)
+    await wired.router.inbound("imessage", FILES_ONLY_NOTE, (Incoming("a.png", "image/png", b"\x89PNG" + b"0" * 20),))
+    assert wired.channel.sent[sent_before:] == [STOPPED]
+    assert _uploads(runtime) == kept_before
+
+
+def _uploads(runtime: Runtime) -> int:
+    """How many uploads the workspace keeps."""
+    folder: Path = runtime.workspace / "attachments"
+    return len(list(folder.iterdir())) if folder.is_dir() else 0

@@ -5,7 +5,6 @@ let go, and one whose words cannot be read is never answered."""
 import pytest
 
 from dotagent.channels.intake import (
-    ATTACHMENT,
     FLOOD,
     MAX_IN_CHARS,
     MAX_PER_MINUTE,
@@ -31,16 +30,15 @@ def test_a_message_whose_words_cannot_be_read_is_never_answered() -> None:
     assert isinstance(Intake().judge(None, NOW, False, NOW), Skip)
 
 
-def test_a_message_with_only_a_file_is_told_it_is_not_read_yet() -> None:
-    assert Intake().judge(None, NOW, True, NOW) == Tell(ATTACHMENT)
-    assert Intake().judge("   ", NOW, True, NOW) == Tell(ATTACHMENT)
-
-
-def test_a_message_with_words_and_a_file_runs_on_its_words_and_the_run_is_told_the_file_was_not_read() -> None:
-    """The words alone used to run, as if the picture had been looked at (item 611): the run is told it was not."""
-    verdict = Intake().judge("what is wrong with this screenshot?", NOW, True, NOW)
-    assert verdict == Accept(f"what is wrong with this screenshot?\n\n{UNREAD_NOTE}")
-    assert "picture or a file" in UNREAD_NOTE and "Do not guess" in UNREAD_NOTE
+def test_a_message_with_a_file_is_accepted_for_the_channel_to_read_its_files() -> None:
+    """Item 806: the files are read by the channel after the intake, so a message of a file alone is accepted with no
+    words, and one with words keeps them as they are; the channel adds the notes."""
+    assert Intake().judge(None, NOW, True, NOW) == Accept("")
+    assert Intake().judge("   ", NOW, True, NOW) == Accept("")
+    assert Intake().judge("what is wrong with this screenshot?", NOW, True, NOW) == Accept(
+        "what is wrong with this screenshot?"
+    )
+    assert "Do not guess" in UNREAD_NOTE
     # Words with no file are the words, whatever is in them.
     assert Intake().judge("what is wrong with this screenshot?", NOW, False, NOW) == Accept(
         "what is wrong with this screenshot?"
@@ -52,8 +50,8 @@ def test_a_stop_word_sent_with_a_file_is_still_only_the_stop(word: str) -> None:
     assert Intake().judge(word, NOW, True, NOW) == Accept(word)
 
 
-def test_the_limit_counts_the_owners_words_and_not_the_note_after_them() -> None:
-    assert Intake().judge("x" * MAX_IN_CHARS, NOW, True, NOW) == Accept("x" * MAX_IN_CHARS + "\n\n" + UNREAD_NOTE)
+def test_the_limit_counts_the_owners_words() -> None:
+    assert Intake().judge("x" * MAX_IN_CHARS, NOW, True, NOW) == Accept("x" * MAX_IN_CHARS)
     assert Intake().judge("x" * (MAX_IN_CHARS + 1), NOW, True, NOW) == Tell(too_long(MAX_IN_CHARS + 1))
 
 

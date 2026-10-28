@@ -15,22 +15,14 @@ from itertools import islice
 from pathlib import Path
 from typing import BinaryIO
 
-from Foundation import NSData, NSMutableData
+from Foundation import NSData
 from pydantic import Field
-from Quartz import (
-    CGImageDestinationAddImage,
-    CGImageDestinationCreateWithData,
-    CGImageDestinationFinalize,
-    CGImageSourceCreateThumbnailAtIndex,
-    CGImageSourceCreateWithData,
-    PDFDocument,
-    kCGImageSourceCreateThumbnailFromImageAlways,
-    kCGImageSourceCreateThumbnailWithTransform,
-)
+from Quartz import PDFDocument
 
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.held import held_folder, open_regular
 from dotagent.core.images import EncodedImage, encode_image
+from dotagent.core.photos import MACOS_IMAGE_SUFFIXES, drawn_by_macos
 from dotagent.core.text import truncate_middle
 from dotagent.office import OfficeKind, names_office_file, office_kind, office_text, unreadable_office_file
 from dotagent.policy.paths import CHANGES_DOT, PathClass, classify_path, expand_path
@@ -53,15 +45,6 @@ from dotagent.undo.journal import JournalTarget, note_change, run_journal
 _IMAGE_SUFFIXES: frozenset[str] = frozenset(
     {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".heic", ".heif"}
 )
-# The photos of an iPhone, which Pillow does not read: macOS's ImageIO draws them as PNG first (item 556).
-_MACOS_IMAGE_SUFFIXES: frozenset[str] = frozenset({".heic", ".heif"})
-_PNG_TYPE: str = "public.png"
-# What ImageIO is asked for a photo: the image itself, not the small one stored beside it, with no limit on its size,
-# turned as its orientation says.
-_DRAWN_FULL_SIZE_TURNED: dict[str, bool] = {
-    kCGImageSourceCreateThumbnailFromImageAlways: True,
-    kCGImageSourceCreateThumbnailWithTransform: True,
-}
 # What a new file the file tools make is given before the umask is taken off (:func:`replace_in`).
 _NEW_FILE_MODE: int = 0o666
 _DEFAULT_LINE_LIMIT: int = 2000
@@ -153,22 +136,6 @@ def _pdf_text(path: Path, data: bytes) -> str:
     return str(document.string() or "")
 
 
-def _drawn_by_macos(data: bytes) -> bytes:
-    """A HEIC or HEIF photo as PNG, drawn by macOS's ImageIO at its full size and turned the way it is held (an
-    iPhone's portrait photos are stored on their side, with the turn kept beside them, which the PNG would lose);
-    ``data`` as it is when macOS cannot read it either, for :func:`encode_image` to say so."""
-    source = CGImageSourceCreateWithData(NSData.dataWithBytes_length_(data, len(data)), None)
-    image = CGImageSourceCreateThumbnailAtIndex(source, 0, _DRAWN_FULL_SIZE_TURNED) if source is not None else None
-    if image is None:
-        return data
-    drawn = NSMutableData.data()
-    destination = CGImageDestinationCreateWithData(drawn, _PNG_TYPE, 1, None)
-    if destination is None:
-        return data
-    CGImageDestinationAddImage(destination, image, None)
-    return bytes(drawn) if CGImageDestinationFinalize(destination) else data
-
-
 def _not_opened(path: Path, error: OSError) -> ToolExecutionError:
     """Why a folder on ``path`` could not be opened: a link that came on the path since the call was allowed, which
     calling again decides anew, or what the system said. Blocking."""
@@ -240,7 +207,7 @@ def _read_held(
     suffix: str = path.suffix.lower()
     if suffix in _IMAGE_SUFFIXES:
         raw: bytes = handle.read()
-        drawn: bytes = _drawn_by_macos(raw) if suffix in _MACOS_IMAGE_SUFFIXES else raw
+        drawn: bytes = drawn_by_macos(raw) if suffix in MACOS_IMAGE_SUFFIXES else raw
         encoded: EncodedImage = encode_image(drawn, max_edge, quality)
         return ok_with_images(f"Image {path.name}: {encoded.source_width}x{encoded.source_height}px", (encoded.image,))
     if suffix == ".pdf":
