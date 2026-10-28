@@ -1,8 +1,8 @@
 """Settings › Trading in a real browser (docs/daemon.md): trading is switched from off to paper, a limit is changed and
 kept in the config file, a limit the settings refuse says why, Live asks first, a key the Keychain stand-in never
 receives is refused with its reason, and an order of the record is listed; wide and light, and on a phone and dark,
-where the page keeps inside the screen. The Keychain is a stand-in, and no price and no account is read from Coinbase:
-the paper account holds only euros, which need no price."""
+where the page keeps inside the screen. The Keychain is a stand-in, and so is Coinbase's market (an empty list of
+products, for the watch's count once "*" is allowed): the paper account holds only euros, which need no price."""
 
 import asyncio
 import time
@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
@@ -25,12 +26,20 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.models import TradingOrderRecord
+from dotagent.trading.market import CoinbaseMarket
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "trading-settings-page-token"
 _OVERFLOW: str = "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
 _SIZES: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
+
+
+def _no_market(request: httpx.Request) -> httpx.Response:
+    """Coinbase's market as a stand-in: an empty list of products, and no product of its own."""
+    if request.url.path.endswith("/market/products"):
+        return httpx.Response(200, json={"products": []})
+    return httpx.Response(404, json={"error": "NOT_FOUND"})
 
 
 @pytest_asyncio.fixture(loop_scope="module")
@@ -46,6 +55,8 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
     built.trading.key_store = MemorySecretStore()
+    # Coinbase is a stand-in that lists no product (item 777: with "*" the page reads the list for the watch's count).
+    built.trading.market = CoinbaseMarket(5.0, httpx.MockTransport(_no_market))
     try:
         yield built
     finally:
@@ -163,6 +174,12 @@ async def _wide(page: Page, runtime: Runtime, served: str) -> None:
     await expect(page.locator('[data-figure="equity"]')).to_have_text("1,000.00 EUR")
     await expect(page.locator('[data-figure="day"]')).to_have_text("0.00 EUR")
     await expect(page.locator('[data-figure="traded"]')).to_have_text("0.00 EUR of 100.00 EUR")
+    # The desk (item 777): the paper account since its start, no open position yet, and the watch saying that no
+    # schedule is started by a move of the market.
+    await expect(page.locator('[data-figure="start"]')).to_have_text("0.00 EUR")
+    await expect(page.get_by_role("heading", name="Open positions")).to_be_visible()
+    await expect(page.get_by_text("No open position.", exact=False)).to_be_visible()
+    await expect(page.locator('.trading [data-watch="wake"]')).to_contain_text("No schedule is started by a move")
     await expect(page.locator('[data-limit="paper_start"]')).to_be_visible()
     await expect(page.get_by_role("heading", name="Coinbase key")).to_be_visible()
     await expect(page.get_by_text("Runs get the trading tools after Dot restarts.")).to_be_visible()

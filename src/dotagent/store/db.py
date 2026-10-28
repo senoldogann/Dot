@@ -5980,6 +5980,11 @@ class Store:
         )
         await self._db.commit()
 
+    async def get_trading_order(self, order_id: str) -> TradingOrderRecord | None:
+        """The order ``order_id``, or None when there is none of that id."""
+        row: aiosqlite.Row | None = await self._one("SELECT * FROM trading_orders WHERE id = ?", (order_id,))
+        return None if row is None else TradingOrderRecord.model_validate(dict(row))
+
     async def trading_orders(self, mode: str, since: float, limit: int) -> list[TradingOrderRecord]:
         """The orders of ``mode`` after ``since``, newest first, ``limit`` at most."""
         rows = await self._all(
