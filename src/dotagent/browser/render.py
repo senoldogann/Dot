@@ -45,6 +45,11 @@ def describe_step(step: Step) -> str:
     match step.action:
         case "click_at":
             return f"click_at ({_coordinate(step.x)}, {_coordinate(step.y)})"
+        case "drag_at":
+            return (
+                f"drag_at ({_coordinate(step.x)}, {_coordinate(step.y)}) to "
+                f"({_coordinate(step.to_x)}, {_coordinate(step.to_y)})"
+            )
         case "press":
             target: str = f" on {step.ref}" if step.ref is not None else ""
             return f"press {_clip(step.key or '', _KEY_CHARS)}{target}"

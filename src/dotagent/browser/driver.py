@@ -1126,6 +1126,21 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
     """Perform one step against the latest snapshot. A field that takes a secret goes to ``secret_field`` first, which
     raises to refuse the step: the field ``fill`` writes into, the one ``drag`` drops onto, and the one that has the
     keyboard focus when ``type``, ``insert``, or ``press`` with a key that puts text in, is about to send its text."""
+    if step.action == "drag_at":
+        if step.x is None or step.y is None or step.to_x is None or step.to_y is None:
+            raise BrowserError("drag_at needs x, y, to_x and to_y", {"url": page.url})
+        try:
+            await page.mouse.move(step.x, step.y)
+            await page.mouse.down()
+            await page.mouse.move(step.to_x, step.to_y, steps=_DRAG_MOVES)
+            await page.mouse.up()
+        except PlaywrightError as error:
+            with contextlib.suppress(PlaywrightError):
+                await page.mouse.up()  # a drag that fails after the press leaves the button down
+            raise _failure(
+                "drag_at failed", page, {"from": f"{step.x},{step.y}", "to": f"{step.to_x},{step.to_y}"}, error
+            ) from error
+        return
     if step.action == "click_at":
         if step.x is None or step.y is None:
             raise BrowserError("click_at needs x and y", {"url": page.url})

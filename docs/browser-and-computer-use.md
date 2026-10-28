@@ -170,7 +170,8 @@ Both modes share what follows.
   call is still found. A very long list is cut with the number of options left out and the current choice.
 - `browser_act` runs up to `max_batch_steps` steps in one call (10 by default; a longer batch is cut to the first ones
   and the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`,
-  `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. A step
+  `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag`, `click_at` and
+  `drag_at`. A step
   written as plainly meant is read so (item 755): a `click` at `x` and `y` with no ref is a `click_at`, a step that only
   looks (`snapshot`, `screenshot`, `look`) is left out, as the result shows the page, and an `upload` step fails naming
   `browser_upload`. After a step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets
@@ -209,7 +210,9 @@ Both modes share what follows.
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a
   text field or an editor; at any other element it fails, so the text never lands in whatever field has the focus.
   `type` and `insert` need a text that is not empty. A drop onto a password, card or one-time-code field is refused
-  like typing into it, and a drag that fails releases the mouse button.
+  like typing into it, and a drag that fails releases the mouse button. `click_at` presses a viewport pixel from
+  `browser_screenshot`; `drag_at` presses at one pixel and lets go at another, for a canvas, a slider or a cross-origin
+  widget such as a captcha, where no ref reaches inside the frame. See [Captcha](captcha.md).
 - In a rich editor (a contenteditable area such as X's composer) `fill`, `type` and `insert` give the editor the focus
   when it does not have it and wait until it has settled, check the field that has the focus for a secret, write, and
   fail when the editor's text did not change, instead of reporting done; a `fill` that leaves the editor holding its

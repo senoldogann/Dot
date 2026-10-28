@@ -75,6 +75,27 @@ _PAGES: dict[str, str] = {
 <label><input type="checkbox" name="agree"> I agree</label>
 <button type="submit">Submit form</button>
 </form>""",
+    # A drag from one point to another, the way a captcha's puzzle or a slider is moved (item 792).
+    "/drag": """<!doctype html><title>Drag</title>
+<style>#pad{width:400px;height:200px;background:#eee;position:relative}
+#knob{width:40px;height:40px;background:#333;position:absolute;left:10px;top:10px;border-radius:50%}</style>
+<div id="pad"><div id="knob"></div></div><p id="where">waiting</p>
+<script>
+const pad = document.getElementById("pad"), knob = document.getElementById("knob");
+let down = false;
+knob.addEventListener("pointerdown", () => { down = true; });
+window.addEventListener("pointermove", (event) => {
+  if (!down) return;
+  const box = pad.getBoundingClientRect();
+  knob.style.left = `${event.clientX - box.left - 20}px`;
+  knob.style.top = `${event.clientY - box.top - 20}px`;
+});
+window.addEventListener("pointerup", (event) => {
+  if (!down) return;
+  down = false;
+  document.getElementById("where").textContent = `${Math.round(event.clientX)},${Math.round(event.clientY)}`;
+});
+</script>""",
     "/dropdown": f"""<!doctype html><title>Dropdown</title>
 <label>Shipping <select name="ship"><option value="std">Standard (3-5 days)</option>
 <option value="exp">Express (next day)</option><option value="pick" disabled>Pick up in store</option></select></label>
@@ -408,6 +429,14 @@ async def test_click_returns_only_what_changed(browser: BrowserSession, site: st
     assert outcome.view.mode == "delta"
     assert '"1"' in outcome.view.body or ": 1" in outcome.view.body
     assert len(outcome.view.body) < len(view.body) / 2
+
+
+async def test_drag_at_moves_a_knob_from_one_pixel_to_another(browser: BrowserSession, site: str) -> None:
+    await browser.open_url("drag", f"{site}/drag", True)
+    outcome: ActOutcome = await act(browser, "drag", [Step(action="drag_at", x=38, y=38, to_x=220, to_y=120)], False)
+    assert [report.outcome for report in outcome.steps] == ["done"], outcome.steps
+    view: PageView = await browser.snapshot("drag", True)
+    assert "220,120" in view.body, view.body
 
 
 async def test_form_batch_fills_selects_checks_and_submits(browser: BrowserSession, site: str) -> None:

@@ -521,7 +521,7 @@ _SENT_CHARS: int = 200
 _EFFECT_WAIT_S: float = 0.5
 _EFFECT_POLL_S: float = 0.1
 # The steps that are meant to change the page: a click, or Enter, which sends a form.
-_MOVING_ACTIONS: frozenset[str] = frozenset({"click", "double_click", "click_at"})
+_MOVING_ACTIONS: frozenset[str] = frozenset({"click", "double_click", "click_at", "drag_at"})
 
 
 def _moves_the_page(step: Step) -> bool:

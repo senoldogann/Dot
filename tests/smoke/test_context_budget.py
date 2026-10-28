@@ -36,8 +36,11 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # ports of an owned host (21,401 measured).
 # Raised by 600 for `security_scan` (item 781) and the selector and retry of the browser tools: a form's payloads on
 # an owned host, one tool of 1,063 tokens (21,984 measured).
-BUDGET_TOKENS: int = 22_100
-SYSTEM_BUDGET_TOKENS: int = 7_000
+# Raised by 700 for the captcha skill and its prompt rule, and `drag_at` on browser_act (item 792): a human check is
+# solved in the page, so the rule and the drag's two coordinates are carried by every run (22,466 measured; system
+# 7,148, tools 15,292).
+BUDGET_TOKENS: int = 22_800
+SYSTEM_BUDGET_TOKENS: int = 7_200
 TOOLS_BUDGET_TOKENS: int = 15_300
 
 

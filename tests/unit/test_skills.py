@@ -241,6 +241,7 @@ def test_the_skills_that_come_with_dot_load_last_give_way_to_the_users_own_and_c
     # The user's excel replaces Dot's without a problem to report; Dot's word and onedrive name Dot's own Python.
     assert [(skill.name, skill.source) for skill in catalog.skills] == [
         ("excel", "home"),
+        ("captcha", BUILTIN_SOURCE),
         ("deep-os", BUILTIN_SOURCE),
         ("onedrive", BUILTIN_SOURCE),
         ("word", BUILTIN_SOURCE),
@@ -248,6 +249,14 @@ def test_the_skills_that_come_with_dot_load_last_give_way_to_the_users_own_and_c
     assert catalog.problems == ()
     assert PYTHON_MARK in next(skill for skill in catalog.skills if skill.name == "word").body
     assert [root.source for root in skill_roots(SkillsConfig(builtin=False), [], None)] == ["home"]
+
+
+def test_the_captcha_skill_carries_the_drag_puzzle_and_the_no_asking_rule() -> None:
+    path: Path = BUILTIN_SKILLS / "captcha" / "SKILL.md"
+    skill: Skill = parse_skill(path, path.read_text(encoding="utf-8"), BUILTIN_SOURCE)
+    assert skill.name == "captcha"
+    for phrase in ("hCaptcha", "reCAPTCHA", "Cloudflare", "drag_at", "does not stop to ask"):
+        assert phrase in skill.body
 
 
 def test_the_skill_tool_puts_dots_own_python_where_a_skill_names_it(tmp_path: Path) -> None:
