@@ -37,7 +37,9 @@ run needs, sent where the configuration points:
   to the same rule, and one it was served from a private address is not given back (item 554, see
   [Tools](runs.md#tools)); Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
   when it is attached). `web_extract` sends what it read to the `fast` model, and a page a run shows in the conversation
-  loads its libraries from public CDNs (see [Tools](runs.md#tools)).
+  loads its libraries from public CDNs (see [Tools](runs.md#tools)). `recon` makes its own requests: one GET and one
+  TLS handshake, and, on `depth = "ports"`, a connect to each of 34 ports that sends nothing but the handshake; that
+  scan runs only on a host in `[recon] owned_hosts` (see [Recon](recon.md)).
 - **From the shell: whatever a command sends.** The sandbox closes Dot's own files, not the network; a run that has read
   untrusted content asks before a line that sends data out (see [Safety](#safety)).
 - **To TypeSafe, once its key is saved: the texts it judges.** `judge_items` and the tools of posts and campaigns send

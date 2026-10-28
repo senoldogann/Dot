@@ -55,8 +55,9 @@ _BROKEN_FAST: str = "broken"
 # The window of the runs whose summaries are measured: three quarters of it hold the fixed part of the prompt with a
 # little room, so that forty pages make the run summarize again and again. 24 000 held it with a few tokens to spare
 # until every run was told that there is always a way (item 446), 26 000 until the browser read a page's data in one
-# call and Dot kept a list of its own (items 714 and 715).
-_SMALL_WINDOW: int = 28_000
+# call and Dot kept a list of its own (items 714 and 715), 30 000 for recon (item 776), whose schema of 985 characters
+# adds about 330 tokens to the fixed part; the window is rounded up so that the summary still has room.
+_SMALL_WINDOW: int = 30_000
 # Every section the continuity check asks for, and no identifier the run's history does not hold.
 _SUMMARY: str = (
     "GOAL: find why the backup failed.\nDONE: read the log page by page.\nSTATE: no failure found so far.\n"

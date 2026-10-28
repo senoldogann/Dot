@@ -1085,6 +1085,14 @@ minutes = 30
 review_timeout_s = 120.0
 
 
+[recon]
+# Network reconnaissance (item 776, docs/recon.md). A passive audit — the addresses, the TLS certificate, the HTTP
+# headers and the technology a site names — reads any public site, as a browser's visit does. An active one asks which
+# common ports answer, and runs only on a host listed here: one you own or may test. A name covers its subdomains
+# ("example.com" covers "www.example.com"); an address is listed as it is. Empty: no active scan anywhere.
+owned_hosts = []
+
+
 [trading]
 # Trading on Coinbase (docs/trading.md). mode is "off" (no trading tools at all), "paper" (an account of Dot's own that
 # trades at Coinbase's real prices with money that is not there: what to try a way of trading with) or "live" (your
