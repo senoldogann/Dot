@@ -59,3 +59,14 @@ async def test_a_click_that_moved_the_page_is_not_sent_again() -> None:
     result = await _retry_unchanged(args, original, _context(browser))
     assert browser.calls == []
     assert result is original
+
+
+async def test_a_click_that_sends_or_pays_is_never_clicked_again_by_the_retry() -> None:
+    """The review of every module: a Send, Post or Pay button that acts slowly with nothing to see in half a second got
+    a second click, past the pace and the spending counted once for the call."""
+    browser = _Browser()
+    args = ActArgs(steps=[Step(action="click", ref="e12")])
+    original = _outcome("but the page did not change; nothing was sent")
+    for flags in (("external_send", "message_send"), ("public_post",), ("financial",)):
+        assert await _retry_unchanged(args, original, _context(browser), flags) is original
+    assert browser.calls == []

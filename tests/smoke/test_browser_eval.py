@@ -338,6 +338,13 @@ async def test_the_tool_is_a_click_of_medium_risk_and_what_it_gives_back_is_untr
     assert by_selector.action.summary.startswith("Run a script in the page on selector button[aria-label='Send']:")
     selected: ToolResult = await by_selector.run(ctx)
     assert (selected.is_error, selected.untrusted) == (False, True) and '"Send"' in selected.text
+    # A function that ends in a semicolon and a comment is called as it is (the review of every module: it broke the
+    # call it was wrapped in, a script error).
+    trailing: PreparedCall = await runtime.registry.tools["browser_eval"].prepare(
+        {"script": "(el) => el.textContent; // the button's words", "selector": "button[aria-label='Send']"}, ctx
+    )
+    ended: ToolResult = await trailing.run(ctx)
+    assert ended.is_error is False and '"Send"' in ended.text, ended.text
     # Given refs (item 738), the same click of medium risk, which names them, and its value as the page's.
     send: str = _ref(view, "Send")
     on_ref: PreparedCall = await runtime.registry.tools["browser_eval"].prepare(
@@ -349,6 +356,12 @@ async def test_the_tool_is_a_click_of_medium_risk_and_what_it_gives_back_is_untr
     )
     pressed: ToolResult = await on_ref.run(ctx)
     assert (pressed.is_error, pressed.untrusted) == (False, True) and '"Send"' in pressed.text
+    # A semicolon and a comment together, on refs too (the review of every module).
+    commented: PreparedCall = await runtime.registry.tools["browser_eval"].prepare(
+        {"script": "(el) => el.textContent; // its words", "refs": [_ref(view, "Send")]}, ctx
+    )
+    said: ToolResult = await commented.run(ctx)
+    assert said.is_error is False and '"Send"' in said.text, said.text
 
 
 async def test_a_click_that_did_nothing_is_tried_with_a_script_and_the_page_is_read_again(
