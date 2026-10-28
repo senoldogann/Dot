@@ -1227,7 +1227,9 @@ def _logins_tool() -> RegisteredTool:
         name=LOGINS_TOOL,
         description=(
             "List the logins Dot may fill into a page with browser_fill_login, from the owner's 1Password and from "
-            "their own vault (Settings › Vault): each one's id, title and websites, never a password."
+            "their own vault (Settings › Vault): each one's id, title and websites, never a password. A vault login's "
+            "password is in the Mac's Keychain, never in Dot's database (its fields are empty) or a file you can "
+            "read: do not look for it there; browser_fill_login says when a login has none."
         ),
         args_model=LoginsArgs,
         modes=ACTING_MODES,
@@ -1480,7 +1482,8 @@ def _fill_login_tool() -> RegisteredTool:
             "Fill a login of the owner's 1Password or of their own vault into the current page: give the login "
             "(browser_logins lists them) and the refs of its fields: the username's, the password field's, the "
             "one-time code's (1Password only). Dot reads the values and types them itself; you never see them. It "
-            "fills a login only on its own website, a password only into a password field. After a script ran in "
+            "fills a login only on its own website, a password only into a password field; a form that would send by "
+            "GET (it names no method) is made to send by POST first. After a script ran in "
             "this chat it reopens the page in a clean tab first; then fill again with its refs. " + _REF_HELP
         ),
         args_model=FillLoginArgs,

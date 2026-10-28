@@ -297,20 +297,22 @@ Both modes share what follows.
   digits and signs), keeps the login in Dot's vault first (its website the page's origin, a note of when it was made),
   then fills it as a vault login is filled, under the same rules (outside `yolo` you are asked first, as for a fill; in
   `yolo` it runs at once), and takes the login back out of the vault when the fill fails; the model never chooses, sees
-  or records the password, and the run is told to make no password itself. A
-  password or a code goes only into an input, a textarea or a dropdown, never into an element that is edited
-  (`contenteditable`); a ref that names an element inside the label of a field names that field. A form with no method
-  is a form that sends by GET, to a browser, and gets no password. It fills only on the login's own site, never a
-  password or a code in your own Chrome (`attach`: that Chrome's requests are not held, so nothing would keep a value
-  out of an address), and not in a chat in which a script (`browser_eval`) ran in a tab that is still open: there the
-  fill first closes every tab of the chat and opens the page again in a new tab, with no history, and asks the run to
-  fill again with that page's refs (item 697; outside `yolo` you are asked for each of the two calls, the first of which
-  fills nothing); once it filled one, no script runs in the chat's tabs while that tab is open.
-  [Safety](safety.md#safety) has the whole of it. Outside `yolo` the run never reads such a field's value either: the
-  page's lines show `[hidden]` and a screenshot covers the field (item 467). A `<select>` that takes a card's expiry
-  (`autocomplete="cc-exp-month"` or `cc-exp-year`) is one of those fields (item 554). Cookie banners are declined
-  (`decline_cookie_banners`; a click on a banner that goes away under it is no error, and one that fails with the banner
-  still there is logged as `consent_decline_failed` with the page's address, and why the banner could not be counted
+  or records the password, and the run is told to make no password itself. A password or a code goes only into an input,
+  a textarea or a dropdown, never into an element that is edited (`contenteditable`); a ref that names an element inside
+  the label of a field names that field. A form with no method is a form that sends by GET, to a browser: before a
+  password or a code goes into it, Dot makes it send by POST, and keeps it so as it is sent (item 775). A vault login's
+  password is in the Mac's Keychain (service `dot-vault`), never in Dot's database, whose record of a login holds its
+  site and username alone. It fills only on the login's own site, never a password or a code in your own Chrome
+  (`attach`: that Chrome's requests are not held, so nothing would keep a value out of an address), and not in a chat in
+  which a script (`browser_eval`) ran in a tab that is still open: there the fill first closes every tab of the chat and
+  opens the page again in a new tab, with no history, and asks the run to fill again with that page's refs (item 697;
+  outside `yolo` you are asked for each of the two calls, the first of which fills nothing); once it filled one, no
+  script runs in the chat's tabs while that tab is open. [Safety](safety.md#safety) has the whole of it. Outside `yolo`
+  the run never reads such a field's value either: the page's lines show `[hidden]` and a screenshot covers the field
+  (item 467). A `<select>` that takes a card's expiry (`autocomplete="cc-exp-month"` or `cc-exp-year`) is one of those
+  fields (item 554). Cookie banners are declined (`decline_cookie_banners`; a click on a banner that goes away under it
+  is no error, and one that fails with the banner still there is logged as `consent_decline_failed` with the page's
+  address, and why the banner could not be counted
   when it could not).
 - A conversation thread keeps at most `max_tabs` tabs open, and closes the tabs it is done with (item 696): a tab that
   is not its current one once unused for `background_tab_idle_s` (300 s; 0 keeps it), while its run works as well; when
