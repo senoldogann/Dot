@@ -860,6 +860,16 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
   and what it does not read gets through (a name the line builds as it runs, a quote the shell takes out twice, `sh -c
   "pb''paste"`, a script in a file, `osascript r.applescript`, which asks as a script that may send (item 561) but not
   as a read of the clipboard, a script typed into a session, `osascript -i`).
+- The system tools that both read and change the Mac are read by their verbs, from lists of reads (item 788): `diskutil`
+  (`list`, `info`, `activity`, `apfs list` and the other `list`s), `defaults` (`read`, `read-type`, `domains`, `find`,
+  after `-currentHost` or `-host <name>`), `tmutil` (`listbackups`, `status`, `latestbackup` and the other queries),
+  `csrutil status` (or `authenticated-root status`), `pmset -g` with at most one word, and `networksetup`,
+  `systemsetup`, `scutil` and `spctl` when the line begins with one of their read options and gives no other option
+  (`-get…`, `-list…`, `--get`, `--status`); a word the shell would make more words of (braces, a glob) is no read. Any
+  other verb or option, one Apple adds tomorrow included, is a change of the Mac and asks: `diskutil apfs
+  deleteContainer` and `randomDisk`, `defaults -currentHost write` and `networksetup -setwebproxy … status.example.com`
+  had passed as queries. The sandbox of the modes that ask does not keep these tools from the system's services, so the
+  guard is what asks; in `yolo` nothing does.
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts and from the `osascript` of the AppleScript
   tool, whose `do shell script` starts a shell with the same environment (item 555), `SSH_AUTH_SOCK` among them, so a
