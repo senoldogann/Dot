@@ -25,8 +25,9 @@ can change them.
     it lowers what is at stake (25);
   - `max_position`: the most one product held may be worth after a buy (200).
   The day is yours: midnight in `[scheduler] timezone`.
-- **Wakes** (`config.toml` only): `wake_schedule`, the id of a schedule (as `sch_...`) a move of the market starts at
-  once, `wake_move_pct`, `wake_per_day` and `wake_gap_min` (below, "Woken by the market").
+- **Wakes**: `wake_schedule`, the id of a schedule (as `sch_...`) a move of the market starts at once, which the
+  Trading page's **Wake on a move** chooses among the schedules, or none (item 813: only a schedule the store holds is
+  taken); `wake_move_pct`, `wake_per_day` and `wake_gap_min` (`config.toml` only; below, "Woken by the market").
 - **Paper**: `paper_start` (1000) is what the paper account starts with, `paper_fee_rate` (0.006) the share of each fill
   it pays, as Coinbase's taker fee does; it buys at the ask and sells at the bid. **Start again** gives it `paper_start`
   back; its orders stay in the record, outside it, and what they traded today no longer counts against `max_day`. A
