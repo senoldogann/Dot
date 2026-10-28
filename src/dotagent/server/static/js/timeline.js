@@ -440,6 +440,16 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     scope.boundary = ts;
   }
 
+  /** The one note that stands for a wait for the run's model (item 158), placed at `ts` when the wait begins. */
+  function waitNote(scope, ts) {
+    if (scope.unreachable === null) {
+      const text = el("span", null);
+      place(scope, el("div", { class: "note warn" }, icon("clock"), text), ts);
+      scope.unreachable = { text, tries: 0 };
+    }
+    return scope.unreachable;
+  }
+
   /**
    * Put the row of the delegated run of `scope` at the end of its parent's scope, as `place` does. Rows that follow one
    * another gather in one group (item 245): the second one makes it and takes the first one in.
@@ -1629,21 +1639,30 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // The run's model could not be reached (`error`: the connection broke or timed out, or its server failed with a
     // status that retrying gets past), or its quota or rate is spent (`spent` says which, item 713): the run
     // asks step `step` again in `retry_in_s` seconds, and keeps asking until `until` ([agent] model_wait_s, or
-    // quota_wait_s for a spent quota). One note stands for the whole wait, each attempt rewrites it; `model_back` says
-    // that the model answered again after `waited_s` seconds (item 158).
+    // quota_wait_s for a spent quota). Its server cannot be connected to at all (`offline`: its host, item 769): the run
+    // asks again as soon as it connects, and `retry_in_s` is null; `model_reconnected` says it connected again after
+    // `offline_s` seconds. One note stands for the whole wait, each attempt rewrites it, with the clock time of the next
+    // (a count of seconds is out of date by the time it is read); `model_back` says that the model answered again after
+    // `waited_s` seconds (item 158).
     model_waiting(scope, record) {
       const data = record.data;
-      if (scope.unreachable === null) {
-        const text = el("span", null);
-        place(scope, el("div", { class: "note warn" }, icon("clock"), text), record.ts);
-        scope.unreachable = { text, tries: 0 };
-      }
-      const wait = scope.unreachable;
+      const wait = waitNote(scope, record.ts);
       wait.tries += 1;
       const tried = wait.tries === 1 ? "" : `tried ${wait.tries} times; `;
-      const why = data.spent === undefined || data.spent === null ? "cannot be reached" : `cannot answer (${data.spent})`;
-      wait.text.replaceChildren(
-        ...[`${data.model} ${why}; ${tried}Dot asks again in ${duration(data.retry_in_s)} and keeps asking until ${clock(data.until)}.`, detailsFold(String(data.error))].filter((part) => part !== null),
+      const until = `until ${clock(data.until)}`;
+      let words;
+      if (typeof data.offline === "string") {
+        words = `No connection to ${data.offline}; Dot asks ${data.model} again as soon as it connects, ${until}.`;
+      } else {
+        const why = data.spent === undefined || data.spent === null ? "cannot be reached" : `cannot answer (${data.spent})`;
+        words = `${data.model} ${why}; ${tried}Dot asks again at ${clock(record.ts + data.retry_in_s)} and keeps asking ${until}.`;
+      }
+      wait.text.replaceChildren(...[words, detailsFold(String(data.error))].filter((part) => part !== null));
+    },
+    model_reconnected(scope, record) {
+      const data = record.data;
+      waitNote(scope, record.ts).text.replaceChildren(
+        `The connection to ${data.host} is back after ${duration(data.offline_s)}; Dot asks ${data.model} again.`,
       );
     },
     model_back(scope, record) {

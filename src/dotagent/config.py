@@ -319,6 +319,7 @@ class AgentConfig(FrozenModel):
     questions: QuestionMode
     parallel_tools: int = Field(ge=1)
     model_call_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    connection_check_s: float = Field(ge=0, allow_inf_nan=False)
     model_wait_s: float = Field(ge=0, allow_inf_nan=False)
     quota_wait_s: float = Field(ge=0, allow_inf_nan=False)
     max_concurrent_runs: int = Field(ge=1)

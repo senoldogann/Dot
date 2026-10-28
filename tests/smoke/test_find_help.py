@@ -308,9 +308,10 @@ async def test_with_the_embedding_service_out_of_reach_find_help_answers_by_the_
     answers: list[str] = [message.content for message in messages if message.role == "tool"]
     lines: list[str] = answers[0].splitlines()
     assert lines[1].startswith("1. Skill weekly-report: Write the weekly report"), answers[0]
-    # What broke the connection is named (its words are the platform's).
+    # What broke the connection is named (its words are the platform's), after the server it could not connect to
+    # (item 769).
     assert re.search(
-        r" Help was found by its words alone: finding it by meaning failed: transport failure while talking to the"
-        r" provider \(ConnectError: .+\)\.$",
+        r" Help was found by its words alone: finding it by meaning failed: cannot connect to 127\.0\.0\.1:\d+:"
+        r" transport failure while talking to the provider \(ConnectError: .+\)\.$",
         lines[-1],
     ), answers[0]

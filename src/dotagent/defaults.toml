@@ -297,9 +297,16 @@ finish_nudges = 2
 questions = "leave"
 parallel_tools = 4
 model_call_timeout_s = 420.0
+# How long a step's model call may send nothing before Dot checks that it can still connect to the model's server
+# (item 769): checked then and every 15 s while the call stays silent, the call is given up as soon as the server cannot
+# be connected to (the network dropped), and the run waits for it as below, instead of waiting out model_call_timeout_s.
+# A slow model whose server is there is waited for. 0 checks nothing.
+connection_check_s = 45.0
 # How long a run waits for its model when the model cannot be reached (the connection broke or timed out, or its server
 # failed with a status that retrying can get past), asking the same step again after 10 s, then 20, 40 and every 60 s
-# (at least four times however short the wait), before it ends failed. 0 does not wait.
+# (at least four times however short the wait), before it ends failed. A server that cannot be connected to at all (no
+# network, a local server that is not running) is checked every 5 s instead, and asked again as soon as it connects
+# (item 769). 0 does not wait.
 model_wait_s = 900.0
 # How long a run waits when its model is rate limited or its subscription's usage window is spent (OpenCode Go's
 # limit) and no standby model can take the run over (item 713): it asks the same step again when the provider said,

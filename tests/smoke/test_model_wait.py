@@ -31,7 +31,8 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import FileSeed, ScriptedCall, ScriptedTurn
 from dotagent.events import Subscription
 from dotagent.llm.http import wrap_transport_error
-from dotagent.llm.router import parse_model_ref
+from dotagent.llm.reach import OFFLINE
+from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.store.models import EventRecord, RunRecord
@@ -126,9 +127,9 @@ async def login_env() -> dict[str, str]:
     return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
 
 
-def _config(wait_s: float, quota_wait_s: float) -> AppConfig:
+def _config(wait_s: float, quota_wait_s: float, check_s: float) -> AppConfig:
     config: AppConfig = eval_config(load_default_config())
-    waits: dict[str, float] = {"model_wait_s": wait_s, "quota_wait_s": quota_wait_s}
+    waits: dict[str, float] = {"model_wait_s": wait_s, "quota_wait_s": quota_wait_s, "connection_check_s": check_s}
     return config.model_copy(update={"agent": config.agent.model_copy(update=waits)})
 
 
@@ -151,12 +152,17 @@ def _left(subscription: Subscription, run_id: str) -> list[EventRecord]:
 
 
 async def _play(
-    login_env: dict[str, str], wait_s: float, model: Unreachable, stop_when_waiting: bool, quota_wait_s: float = 0.0
+    login_env: dict[str, str],
+    wait_s: float,
+    model: Unreachable,
+    stop_when_waiting: bool,
+    quota_wait_s: float = 0.0,
+    check_s: float = 45.0,
 ) -> Played:
     """``GOAL`` as an unattended run of ``model`` in a throw-away home; with ``stop_when_waiting`` the run is stopped
     as soon as it says it waits for its model."""
     with scratch_home() as home, eval_environment(home, {}):
-        runtime: Runtime = await open_runtime(_config(wait_s, quota_wait_s), login_env)
+        runtime: Runtime = await open_runtime(_config(wait_s, quota_wait_s, check_s), login_env)
         try:
             await runtime.router.register(_PROVIDER, model)
             await asyncio.to_thread(seed_workspace, runtime.workspace, [TODO])
@@ -341,3 +347,89 @@ async def test_a_quota_that_does_not_come_back_soon_ends_the_run_at_once(
     )
     assert played.record.status == "failed"
     assert played.kind("model_waiting") == []
+
+
+class Network:
+    """The connection to the model's server (item 769): down for its first ``down_for`` checks, up after."""
+
+    def __init__(self, down_for: int) -> None:
+        self.down_for: int = down_for
+        self.checks: int = 0
+
+    async def reaches(self, _ref: ModelRef) -> bool:
+        self.checks += 1
+        return self.checks > self.down_for
+
+
+class Hanging(Unreachable):
+    """The scripted model behind a call that sends nothing for ``silent_s`` (forever when ``None``) the first time it
+    is asked: a network that dropped mid-call, or a slow model."""
+
+    def __init__(self, script: ScriptedProvider, silent_s: float | None) -> None:
+        super().__init__(script, 0, BROKEN)
+        self._silent_s: float | None = silent_s
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        self.calls += 1
+        if self.calls == 1:
+            if self._silent_s is None:
+                await asyncio.Event().wait()
+            await asyncio.sleep(self._silent_s or 0.0)
+        return await self._script.complete(request, sink)
+
+
+_HOST: str = "model.example"
+
+
+@pytest.fixture
+def network(monkeypatch: pytest.MonkeyPatch) -> Network:
+    """The model's server at an address of its own, whose connection is checked every few hundredths of a second."""
+    checked: Network = Network(3)
+    monkeypatch.setattr(ModelRouter, "address", lambda _router, _ref: f"https://{_HOST}/v1")
+    monkeypatch.setattr(ModelRouter, "reaches", lambda _router, ref: checked.reaches(ref))
+    monkeypatch.setattr("dotagent.agent.loop._CHECK_EVERY_S", 0.05)
+    monkeypatch.setattr("dotagent.agent.loop._RECONNECT_EVERY_S", 0.05)
+    return checked
+
+
+async def test_a_call_whose_connection_is_gone_is_given_up_and_asked_again_as_soon_as_it_connects(
+    login_env: dict[str, str], network: Network
+) -> None:
+    """The night of 2026-10-28: the network dropped while a step's call was out, and the call sent nothing for seven
+    minutes, until model_call_timeout_s; then the run asked again on a schedule while the network was back."""
+    model: Hanging = Hanging(ScriptedProvider(_PROVIDER, TURNS), None)
+    played: Played = await _play(login_env, 600.0, model, False, check_s=0.2)
+    assert played.record.status == "done", played.record.result
+    [waiting] = played.kind("model_waiting")
+    assert (waiting.data["offline"], waiting.data["retry_in_s"]) == (_HOST, None)
+    assert waiting.data["error"] == f"cannot connect to {_HOST}"
+    [reconnected] = played.kind("model_reconnected")
+    assert reconnected.data["host"] == _HOST and reconnected.data["step"] == 1
+    assert len(played.kind("model_back")) == 1
+    assert model.calls == 3 and network.checks == 4
+    # Given up a moment after it fell silent, not at model_call_timeout_s.
+    assert waiting.ts - played.kind("run_started")[0].ts < 10.0
+
+
+async def test_a_slow_model_whose_server_is_there_is_waited_for(login_env: dict[str, str], network: Network) -> None:
+    network.down_for = 0
+    model: Hanging = Hanging(ScriptedProvider(_PROVIDER, TURNS), 0.6)
+    played: Played = await _play(login_env, 600.0, model, False, check_s=0.1)
+    assert played.record.status == "done", played.record.result
+    assert played.kind("model_waiting") == []
+    assert model.calls == 2 and network.checks >= 3
+
+
+async def test_a_call_that_could_not_connect_waits_for_the_connection_not_for_a_schedule(
+    login_env: dict[str, str], network: Network
+) -> None:
+    """A connector that found the server out of reach says so at once (item 769); the run asks again as soon as it
+    connects, whatever the schedule of a model that cannot answer would be."""
+    offline: ProviderTransportError = ProviderTransportError(f"cannot connect to {_HOST}", {OFFLINE: _HOST})
+    played: Played = await _play(login_env, 600.0, Unreachable(ScriptedProvider(_PROVIDER, TURNS), 1, offline), False)
+    assert played.record.status == "done", played.record.result
+    [waiting] = played.kind("model_waiting")
+    assert (waiting.data["offline"], waiting.data["retry_in_s"]) == (_HOST, None)
+    [reconnected] = played.kind("model_reconnected")
+    # Asked again as soon as it connected: three checks found it down, 0.05 s apart, far from the first 10 s.
+    assert network.checks == 4 and reconnected.data["offline_s"] < 5.0

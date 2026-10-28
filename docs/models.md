@@ -115,8 +115,21 @@ past, such as 500, 502, 503, 504 or 529) and no standby model takes over, the ru
 asks the same step again after 10 s, then 20 and 40 s, then every 60 s, for `model_wait_s` in `[agent]` (900 s by
 default; at least four times however short the wait; 0 does not wait), and goes on from that step as soon as the model
 answers, so a network that drops for a while costs a pause instead of the run. The timeline shows one line for the wait,
-which each try rewrites with the error, the number of tries, the next try and the time the wait ends, and one more when
-the model answers again. A stop ends the wait at once. A model still out of reach when the wait is over fails the run,
+which each try rewrites with the error, the number of tries, the clock time of the next try and the time the wait ends,
+and one more when the model answers again.
+
+**A network that is down** (item 769). A call whose connection broke tells only that it broke, so Dot checks whether it
+can still connect to the model's server (its name resolves and its port takes a connection; nothing is sent; behind an
+`HTTPS_PROXY`, `HTTP_PROXY` or `ALL_PROXY` the check always says yes). A connector whose call broke and whose server
+cannot be connected to raises at once instead of retrying for a minute in silence. A step's call that has sent nothing
+for `connection_check_s` in `[agent]` (45 s by default; 0 checks nothing) has the connection checked then and every
+15 s while it stays silent, and is given up as soon as it fails, instead of waiting out `model_call_timeout_s` (a network
+that dropped mid-call held a step for seven minutes); a slow model whose server is there is waited for. A run that waits
+for a server it cannot connect to checks every 5 s and asks the same step again as soon as it connects, within the same
+`model_wait_s`. Its line says so ("No connection to openrouter.ai; Dot asks … again as soon as it connects, until …"),
+and is rewritten when the connection is back ("The connection to openrouter.ai is back after 4m 10s; Dot asks … again").
+A local server that is not running (Ollama on `localhost:11434`) is waited for the same way. OpenCode's agent, a server
+of Dot's own, is not checked. A stop ends the wait at once. A model still out of reach when the wait is over fails the run,
 and the result names the wait and the error. A refused request ends the run at once; a key or access error, spent
 credits (OpenRouter's, Anthropic's prepaid balance, OpenCode's `CreditsError`), a model the plan does not include or a
 missing key moves it to a standby model or ends it at once.
