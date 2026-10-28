@@ -682,6 +682,9 @@ what you typed in a password, one-time-code or card field outside `yolo` (item 4
 no window to use), and the run page keeps the last frame once the run has ended. The page can also be used from the
 screen that shows it, a phone's too (`POST /api/runs/{id}/takeover/screen`, then `POST /api/runs/{id}/input`, item 470):
 the run is held the same way, but nothing comes to the front of the Mac, so a browser without a window is held as well.
+In Auto and YOLO a step that reads away from the browser and the screen (a web search, a page fetched over HTTP, a file
+read, listed or searched; item 809) goes on while you hold the run, decided by the gate as ever; a step that reads the
+page or the screen, which could read what you type there, and every step that acts wait for you.
 Your taps, scrolls and keys reach the page as fractions of its picture, which the page's own size turns into points, so
 Chrome's zoom and the scaling of the picture do not move them; they wait a moment for a step that was under way and land
 only while the run is held, so input sent before **Return control** never comes after it. The picture and the input come

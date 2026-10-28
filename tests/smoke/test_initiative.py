@@ -27,7 +27,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.proactive import INITIATIVE_SOURCE
 from dotagent.proactive.initiative import Initiative, _listed, _recent_chats
-from dotagent.proactive.todos import add_todo, note_look, read_initiative, set_initiative
+from dotagent.proactive.todos import OWNER_SOURCE, add_todo, note_look, read_initiative, set_initiative
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -644,19 +644,35 @@ async def test_a_normal_thing_does_not_start_while_another_run_is_active(
         assert (kept.status, kept.attempts, kept.run_id) == ("open", 0, None)
 
 
-async def test_an_urgent_thing_from_a_watcher_also_jumps_another_run(
+async def test_an_urgent_thing_a_run_or_outside_content_put_on_the_list_never_jumps_another_run(
     login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async with _dot(login_env, [_finish("The urgent thing is done.")]) as (runtime, manager):
-        await add_todo(runtime.store, "[URGENT] Reply to the sender", "A mail subject", "run", None, False)
+    """The security review of item 809: a run can put a thing on the list (`todo_add`), and a run that read a mail or a
+    page writes what it read; marked [URGENT] there, it started runs on a Mac the owner worked on."""
+    async with _dot(login_env, []) as (runtime, manager):
+        by_a_run = await add_todo(runtime.store, "[URGENT] Reply to the sender", "A mail subject", "run", None, False)
+        tainted = await add_todo(runtime.store, "[urgent] Open the link", "The page said so", OWNER_SOURCE, None, True)
+        assert isinstance(by_a_run, TodoRecord) and isinstance(tainted, TodoRecord)
         await set_initiative(runtime.store, True)
         monkeypatch.setattr(manager, "active_run_ids", lambda: ["run_elsewhere"])
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
         await initiative.tick(10_000.0)
-        assert initiative.working()
-        [run] = await runtime.store.list_runs(10, None)
-        await _settled(initiative)
-        assert (await runtime.store.get_thread(run.thread_id)).title == "[URGENT] Reply to the sender"
+        assert not initiative.working()
+        for todo in (by_a_run, tainted):
+            kept: TodoRecord = await runtime.store.get_todo(todo.id)
+            assert (kept.status, kept.attempts, kept.run_id) == ("open", 0, None)
+
+
+async def test_with_no_word_of_how_long_the_mac_was_idle_not_even_an_urgent_thing_starts(
+    login_env: dict[str, str],
+) -> None:
+    async with _dot(login_env, []) as (runtime, manager):
+        await add_todo(runtime.store, "[URGENT] Send the signed page", "The owner asked", OWNER_SOURCE, None, False)
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: None)
+        await initiative.tick(10_000.0)
+        assert not initiative.working()
+        assert await runtime.store.list_runs(10, None) == []
 
 
 async def test_an_urgent_thing_the_owner_put_on_the_list_starts_while_another_run_is_active(

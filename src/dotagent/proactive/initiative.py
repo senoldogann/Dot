@@ -31,7 +31,7 @@ from dotagent.notify.owner import tell_owner
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.proactive.brief import BRIEF_CLOSE, BRIEF_OPEN, Quoted, record_parts
 from dotagent.proactive.text import one_line, quoted
-from dotagent.proactive.todos import InitiativeState, note_look, read_initiative
+from dotagent.proactive.todos import OWNER_SOURCE, InitiativeState, note_look, read_initiative
 from dotagent.runtime import Runtime
 from dotagent.store.db import Store
 from dotagent.store.endings import PREFIX_EMERGENCY_STOP, RESULT_SHUTDOWN
@@ -54,8 +54,10 @@ _STATE_WORDS: dict[str, str] = {"open": "to do", "doing": "being done", "done": 
 
 
 def _is_urgent(todo: TodoRecord) -> bool:
-    """A thing marked urgent in its title or why: it may jump the idle and active checks."""
-    return "[URGENT]" in f"{todo.title} {todo.why}".upper()
+    """A thing the owner put on the list themselves, marked ``[URGENT]`` in its title or why: it may jump the idle and
+    active checks (item 809). A thing a run put there, or one that came of content third parties can author (a page, a
+    mail), is never urgent however it is marked: a page could else have Dot start runs on a Mac the owner works on."""
+    return todo.source == OWNER_SOURCE and not todo.tainted and "[URGENT]" in f"{todo.title} {todo.why}".upper()
 
 
 # The chats whose titles are not the owner's words: a watcher's carries a mail's subject, Dot's own a thing of its list.
@@ -184,7 +186,10 @@ class Initiative:
             todo: TodoRecord | None = await self._urgent_todo(config.attempts)
         else:
             idle: float | None = await asyncio.to_thread(self._idle)
-            if idle is None or idle < config.idle_minutes * 60.0:
+            if idle is None:
+                # macOS cannot say how long the Mac has been idle: nothing starts, urgent or not (the card says so).
+                return
+            if idle < config.idle_minutes * 60.0:
                 todo = await self._urgent_todo(config.attempts)
             else:
                 look_ready = True
