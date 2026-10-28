@@ -1330,6 +1330,17 @@ a.pill:hover {
     flex: 1 1 100%;
     width: auto;
   }
+
+  /* A head whose buttons carry words (Appearance's Create theme and Add theme, item 787) wraps the same way: the name
+     on the first line, the buttons under it, where a 320 px phone squeezed the name between them. */
+  .card-head:has(> .grow ~ .btn > .label) {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .card-head:has(> .grow ~ .btn > .label) > .grow {
+    flex: 1 1 100%;
+  }
 }
 
 /* On a phone a card's name stands over the card, out of its surface, as a group's name over its rows: in the
@@ -7182,6 +7193,11 @@ a.schedule-line:hover .schedule-made {
   .chat-loops .background-label {
     min-width: 0;
   }
+
+  /* How often it asks again and when next take a second line where one is short (item 787), rather than end in dots. */
+  .chat-loops .background-time {
+    white-space: normal;
+  }
 }
 
 /* A list that could not be read says why, with a way to read it again. */
@@ -8446,8 +8462,8 @@ dialog.lightbox img {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .pill .label,
-  .btn .label {
+  /* A pill keeps its mark alone; a button keeps its words (item 787): a phone has no hover to say what an icon is. */
+  .pill .label {
     display: none;
   }
 
@@ -10209,6 +10225,19 @@ button.attach-chip:hover {
   .btn.icon-only,
   .btn.sm.icon-only {
     width: 36px;
+  }
+
+  /* A finger's target is 44 px (item 787): the button keeps its 36 px, and a ring of 4 px around it answers a tap too.
+     The ring is placed from the button, which `:where` makes positioned without outweighing a button that a rule of its
+     own places (the key field's eye, inside its field, is absolute and stays so). */
+  :where(.btn.icon-only) {
+    position: relative;
+  }
+
+  .btn.icon-only::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
   }
 
   .composer {

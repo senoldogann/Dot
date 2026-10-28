@@ -1199,6 +1199,18 @@
     height: 36px;
   }
 
+  /* A finger's target is 44 px (item 787): the button keeps its 36 px, and a ring of 4 px around it answers a tap too,
+     placed from the button without outweighing a rule that places the button itself (`:where`). */
+  :where(.icon-btn) {
+    position: relative;
+  }
+
+  .icon-btn::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+  }
+
   .side-btn,
   .side-link,
   .side-run,
