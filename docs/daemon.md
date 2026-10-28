@@ -767,8 +767,9 @@ and does, with the settings under it. With trading on (Paper or Live) the page s
 - **Account**: what the account is worth, large; today's change and, in Paper, the change since the account's start,
   each in green or red with its sign and its share; what is in positions and its share of the account; and two meters
   of the day's limits, the loss so far against the most lost in a day and what was traded against the most traded,
-  green, then amber past 60 %, red at the limit. A reason the account could not be read stands above them. In Paper,
-  **Start again** (after a question) resets the account to its starting money.
+  green, then amber past 60 %, red at the limit. A reason the account or what watches the market could not be read
+  stands above them, both when neither could. In Paper, **Start again** (after a question) resets the account to its
+  starting money.
 - **Open positions** (Paper): each buy's exit as a row of a table: the asset, the size, the buy's price, the bid now,
   what it is worth, its gain or loss in money and in share, and a scale from its stop to its target with the entry
   (a line) and the price (a dot, green or red) on it, and how far each end is from the price. Live keeps no exit yet
@@ -781,7 +782,8 @@ and does, with the settings under it. With trading on (Paper or Live) the page s
 - **Holdings**: each currency held, its amount, the bid now, what it is worth and its share of the account; a currency
   that could not be priced is named under them.
 - **Orders**: the latest fifty, newest first, as a table: when, the side (a green Buy or a red Sell) and the product,
-  the size, the price, the worth, the fee and the status, with the reason the run gave on the line under each.
+  the size, the price, the worth, the fee and the status, with the reason the run gave under each, on as many lines
+  as it takes.
 - **Settings**, under a line:
   - **Mode**: Off (Dot has no trading tools), Paper (an account of Dot's own, at Coinbase's real prices, with money
     that is not there) or Live (your Coinbase account, real money), each with a line saying what it means. Switching

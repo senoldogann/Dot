@@ -4879,8 +4879,7 @@
   font-weight: var(--weight-title);
 }
 
-.trading-orders .trading-asset,
-.trading-orders td:first-child {
+.trading-orders .trading-asset {
   flex-wrap: nowrap;
   white-space: nowrap;
 }

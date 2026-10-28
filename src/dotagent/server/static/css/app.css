@@ -284,9 +284,11 @@ textarea {
   white-space: nowrap;
 }
 
+/* Ids, paths and keys show the letters they hold: no ligature turns `-----` into a rule or `->` into an arrow. */
 .mono {
   font-family: var(--mono);
   font-size: var(--text-sm);
+  font-variant-ligatures: none;
 }
 
 .small {
@@ -1059,6 +1061,7 @@ a.pill:hover {
 .textarea.mono {
   font-family: var(--mono);
   font-size: var(--text-sm);
+  font-variant-ligatures: none;
 }
 
 .field {

@@ -13,7 +13,7 @@ from vault_stand_ins import MemorySecretStore
 
 from dotagent.core.errors import StoreError
 from dotagent.runtime import Runtime
-from dotagent.trading.market import CoinbaseMarket
+from dotagent.trading.market import CoinbaseMarket, MarketError
 from dotagent.trading.types import OrderRequest
 from dotagent.trading.watch import WAKES_KEY
 
@@ -182,7 +182,24 @@ async def test_the_desk_shows_each_open_position_and_what_watches_the_market(own
         finally:
             typed.store.get_schedule = failing  # type: ignore[method-assign]
         assert unread.status_code == 200 and unread.json()["watch"] is None
-        assert "could not be read: the database is locked" in unread.json()["problem"]
+        assert unread.json()["problem"] == "What watches the market could not be read: the database is locked"
+        # Neither the account nor what watches the market can be read: the page says both reasons, not the first.
+        reading = typed.trading.portfolio
+
+        async def unreachable() -> object:
+            raise MarketError("Coinbase did not answer.", {})
+
+        typed.store.get_schedule = broken  # type: ignore[method-assign]
+        typed.trading.portfolio = unreachable  # type: ignore[method-assign]
+        try:
+            neither: dict[str, object] = (await client.get("/trading", headers=mac)).json()
+        finally:
+            typed.store.get_schedule = failing  # type: ignore[method-assign]
+            typed.trading.portfolio = reading  # type: ignore[method-assign]
+        assert (neither["portfolio"], neither["watch"]) == (None, None)
+        assert neither["problem"] == (
+            "Coinbase did not answer. What watches the market could not be read: the database is locked"
+        )
         # Off, nothing is watched.
         typed.trading.settings.value = typed.trading.config().model_copy(update={"mode": "off"})
         off: dict[str, object] = (await client.get("/trading", headers=mac)).json()

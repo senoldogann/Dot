@@ -643,7 +643,7 @@ export function mount(root, ctx) {
                     el(
                       "tr",
                       null,
-                      cell("When", dateTime(order.ts)),
+                      cell("When", el("span", { class: "nowrap" }, dateTime(order.ts))),
                       cell("Order", el("span", { class: "trading-asset" }, el("span", { class: `trading-side ${order.side}` }, order.side === "buy" ? "Buy" : "Sell"), " ", el("strong", null, order.product))),
                       cell("Size", filled ? amountOf(order.size, base) : "—", true),
                       cell("Price", filled ? price(order.price) : "—", true),
