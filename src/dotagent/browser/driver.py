@@ -194,18 +194,42 @@ _VAULT_MARK: str = "dot-vault"
 # The secrets each part of a login may go into (item 493): a password into a password field alone, so that it shows in
 # no text; a one-time code into a field marked for one or a plain one; a username into anything but a password field.
 _PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-password", "new-password"})
-# Whether the form a field is in sends what is typed in the page's address (item 493): its method is GET, as the method
-# of a form that names none is, and of one that names a word no browser knows (``form.method`` is what a browser makes
-# of the attribute), or a submit button of the form names GET. It is asked of the control (:data:`_CONTROL_OF`) and of
-# no other element: a div has no form. A page whose script sends the form some other way is not seen here: the guard
-# of Dot's Chrome refuses a fetch or a frame of the page whose address carries a password or a one-time code (item
-# 621).
-_SENDS_BY_GET_SCRIPT: str = """(field) => {
+# The form a field is in, made to send by POST before a password or a code goes into the field (item 775; item 493
+# refused the field instead, and a sign-in page whose script sends its form, which names no method, got no login):
+# - a form whose method is GET (``form.method`` is what a browser makes of the attribute: GET for none, and for a word
+#   no browser knows) gets ``method="post"``, and a control of it that names ``formmethod`` GET loses it; a dialog form
+#   sends nothing and is left alone;
+# - a browser reads the method once the ``submit`` event has run its listeners, so the window's first and last
+#   listeners put the form back to POST, undoing a script of the page that set GET again;
+# - ``form.submit()`` fires no event: the form gets an own ``submit`` that sets POST first, unless a control named
+#   ``submit`` hides the method (the page cannot call it either).
+# It is asked of the control (:data:`_CONTROL_OF`) and of no other element: a div has no form. It returns whether the
+# form would have sent by GET. A page whose script sends the form itself is not changed: the guard of Dot's Chrome
+# refuses a fetch or a frame of the page whose address carries a password or a one-time code (item 621).
+_POSTS_SCRIPT: str = """(field) => {
   const form = field.form;
   if (!form) return false;
-  return form.method === 'get'
-    || [...form.elements].some((control) => ['submit', 'image'].includes(control.type)
-      && control.hasAttribute('formmethod') && control.formMethod === 'get');
+  const byGet = (target) => target.method === 'get'
+    || [...target.elements].some((control) => control.hasAttribute('formmethod') && control.formMethod === 'get');
+  const post = (target) => {
+    if (target.method === 'get') target.setAttribute('method', 'post');
+    for (const control of target.elements)
+      if (control.hasAttribute('formmethod') && control.formMethod === 'get') control.removeAttribute('formmethod');
+  };
+  const was = byGet(form);
+  post(form);
+  if (!form.hasAttribute('data-dot-posts')) {
+    form.setAttribute('data-dot-posts', '');
+    const atSubmit = (event) => { if (event.target === form) post(form); };
+    window.addEventListener('submit', atSubmit, true);
+    window.addEventListener('submit', atSubmit, false);
+    const native = HTMLFormElement.prototype.submit;
+    if (form.submit === native) {
+      const submit = function () { post(form); native.call(form); };
+      Object.defineProperty(form, 'submit', { configurable: true, value: submit });
+    }
+  }
+  return was;
 }"""
 # The mark of a field a login was filled into (items 493 and 621), which every screenshot covers, in every mode: the
 # field shows the username, and a password once the page shows it.
@@ -1037,7 +1061,6 @@ async def fill_login_field(
                 raise BrowserError(_NOT_A_FORM_FIELD.format(ref=ref, kind=kind), {"ref": ref, "url": page.url})
             frame: Frame | None = await element.owner_frame()
             marking: object = await element.evaluate(_FIELD_MARKING_SCRIPT)
-            by_get: object = await element.evaluate(_SENDS_BY_GET_SCRIPT)
         except PlaywrightError as error:
             raise BrowserError(
                 "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
@@ -1060,14 +1083,19 @@ async def fill_login_field(
                 "that it shows in no text",
                 {"ref": ref, "url": page.url, "part": kind, "field": field},
             )
-        if kind != "username" and by_get is True:
-            # An address is written into the page's views, its history and logs, and shortened where it is long.
-            raise BrowserError(
-                f"the form of the field {ref} sends what is typed in the page's address (its method is GET, or it "
-                f"names none, which is GET): Dot fills a login's {kind} only into a form that keeps it out of the "
-                "address",
-                {"ref": ref, "url": page.url, "part": kind},
-            )
+        if kind != "username":
+            # An address is written into the page's views, its history and logs, and shortened where it is long: the
+            # form sends by POST before the value goes in, or nothing goes in.
+            try:
+                by_get: object = await element.evaluate(_POSTS_SCRIPT)
+            except PlaywrightError as error:
+                raise BrowserError(
+                    f"the form of the field {ref} could not be made to send by POST: Dot fills a login's {kind} only "
+                    "into a form that keeps it out of the address",
+                    {"ref": ref, "url": page.url, "part": kind},
+                ) from error
+            if by_get is True:
+                _log.info("vault_form_posts", url=truncate_middle(frame.url, _ERROR_CHARS), part=kind)
         typing(frame.url)
         try:
             await element.evaluate(_PREPARE_SCRIPT)

@@ -625,18 +625,18 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
     document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
     so a frame of another site gets nothing. A password goes only into a password field, where it shows in no text.
-  - No address holds a password or a code: an address is written into the views of the page, Chrome's history and
-    Dot's log, and shortened where it is long. A form that names GET as its method, names none (a browser sends a
-    form with no method by GET), or names a word no browser knows, gets neither (item 621: a form with no method used
-    to be left to the guard of Dot's Chrome). Dot's own Chrome refuses every request whose address carries one, as it
-    is or once its escapes are read back (as UTF-8, and as a page of Western European text writes them), as a script
-    builds the address from a field that is in no form: a password for as long as Dot runs, a code for five minutes
-    after it went in. The refusal and Dot's log
-    name such a request by its host alone, or by its scheme when the value is in the host. A page in another legacy
-    charset (Shift_JIS, KOI8-R and the like) can write a value Dot does not read back. Your own Chrome (Settings ›
-    Browser › My Chrome) sends its requests unguarded, so there Dot fills a username alone; your password manager
-    fills the rest. A page can still write them into its own words, which Dot masks where it shows them whole; only
-    the login's own site, which has them anyway, can do that.
+  - No address holds a password or a code: an address is written into the views of the page, Chrome's history and Dot's
+    log, and shortened where it is long. A form that names GET as its method, names none (a browser sends a form with no
+    method by GET), or names a word no browser knows, or whose button names GET, is made to send by POST before either
+    goes in, and stays so as it is sent (item 775; items 493 and 621 refused such a form, so a sign-in page whose script
+    sends its form, LinkedIn's among them, got no login). Dot's own Chrome refuses every request whose address carries
+    one, as it is or once its escapes are read back (as UTF-8, and as a page of Western European text writes them), as a
+    script builds the address from a field that is in no form: a password for as long as Dot runs, a code for five
+    minutes after it went in. The refusal and Dot's log name such a request by its host alone, or by its scheme when the
+    value is in the host. A page in another legacy charset (Shift_JIS, KOI8-R and the like) can write a value Dot does
+    not read back. Your own Chrome (Settings › Browser › My Chrome) sends its requests unguarded, so there Dot fills a
+    username alone; your password manager fills the rest. A page can still write them into its own words, which Dot
+    masks where it shows them whole; only the login's own site, which has them anyway, can do that.
   - Each fill asks you first in every mode but `yolo`, whatever your rules say (only a rule that hands it off is
     stricter), and in `auto` you answer it, not the review model.
   - The token is kept in Dot's `.env`, which no tool of a run may read, under a name `op` does not read. The shell
@@ -682,8 +682,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     value went into is marked: a screenshot of the browser covers it, and its value shows as `[hidden]` in every view of
     the page in every mode, `yolo` too. No script runs in the chat's tabs while the tab is open. A ref that names an
     element inside the label of a field (the snapshot gives a div or a span in a label a ref of its own) names that
-    field: Dot finds the label's input once, and every check (the form that sends by GET among them), the mark and the
-    fill are of it, so such a ref is refused as the input's own is. Only an input, a textarea or a dropdown takes a
+    field: Dot finds the label's input once, and every check, the form it makes send by POST, the mark and the fill are
+    of it, so such a ref fills the input as the input's own does. Only an input, a textarea or a dropdown takes a
     password or a one-time code: an element that is edited (`contenteditable`) or a box a script draws as a text box
     (`role=textbox`) is hidden by no mark, has no autocomplete to keep Chrome from storing what it holds, and shows its
     text in the text of the page, so it gets nothing, in a shadow root too. A page that removes the mark, or builds a
@@ -708,15 +708,24 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     sends by POST is in Chrome's session files while Chrome runs, so that the page can be sent again, which no `off`
     changes: once Dot's own Chrome has exited, Dot deletes them, if something was filled in its run (Dot's Chrome opens
     no page of its last run). A Chrome that dies leaves them until Dot's Chrome starts again.
-  - **Addresses.** A form with no method is a form that sends by GET, to a browser, so a password or a code is not typed
-    into it, as into one that names GET. Dot's own Chrome refuses a request a page sends whose address carries the
-    password (for as long as Dot runs) or a one-time code (for five minutes), as it is or once its escapes are read
-    back: a fetch, a frame, a script's request, whatever the page builds from a field that is in no form. It refuses it
-    to the documents of the origin the value was typed into, in the tab it was typed into, as the browser knows the
-    document that sent the request, and to nothing else. A rule that acts by what a secret is tells whoever can try
-    addresses and watch which are refused, and a dictionary of passwords would give a weak one away in a dozen
-    requests; and whoever can run a script of their own can try addresses: a page of another origin (in another chat,
-    another tab, or a frame of the page itself), and the run itself, whose `browser_eval` runs in a page of the very
+  - **Addresses.** A form with no method is a form that sends by GET, to a browser, as one that names GET is. Before a
+    password or a code is typed into a field of such a form, Dot makes it send by POST (item 775): the form gets
+    `method="post"` and its buttons lose a `formmethod` of GET; the window's first and last listeners of `submit` put
+    POST back, since a browser reads the method once they have run, so a script of the page that sets GET again as the
+    form is sent is undone; and the form's own `submit()`, which fires no event, sets POST first (unless a control named
+    `submit` hides it, when the page cannot call it either). A page whose script calls
+    `HTMLFormElement.prototype.submit` itself after setting GET again, or whose own listener of `submit` sets GET and
+    stops the event before it reaches Dot's last listener, on the window, sends by GET, and its address is then as
+    below; only the login's own site can do that, and it has the password. A site that takes its sign-in by GET alone
+    gets a POST, and the sign-in fails. A page whose script sends the form itself is not changed by any of this. Dot's
+    own Chrome refuses a request a page sends whose address carries the password (for as long as Dot runs) or a one-time
+    code (for five minutes), as it is or once its escapes are read back: a fetch, a frame, a script's request, whatever
+    the page builds from a field that is in no form. It refuses it to the documents of the origin the value was typed
+    into, in the tab it was typed into, as the browser knows the document that sent the request, and to nothing else. A
+    rule that acts by what a secret is tells whoever can try addresses and watch which are refused, and a dictionary of
+    passwords would give a weak one away in a dozen requests; and whoever can run a script of their own can try
+    addresses: a page of another origin (in another chat, another tab, or a frame of the page itself), and the run
+    itself, whose `browser_eval` runs in a page of the very
     same origin in another chat, or in this chat once it closed the tab it filled. That page is not the site's but the
     run's, and the run was never given the password, so the page of the same origin is no longer taken for the site's.
     In the tab the password was typed into no script of the run runs while it is open, so the guard holds it there
