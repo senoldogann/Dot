@@ -205,6 +205,7 @@ from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_
 from dotagent.help.meaning import HelpVectorsCold
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.http import is_retryable_provider_error
+from dotagent.llm.reach import OFFLINE, host_of, out_of_reach
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref, unavailable_reason
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
@@ -328,6 +329,17 @@ MODEL_BACK_EVENT: str = "model_back"
 _RETRY_FIRST_S: float = 10.0
 _RETRY_LONGEST_S: float = 60.0
 _RETRY_LEAST: int = 4
+# A model whose server cannot be connected to (item 769): a step's call that has sent nothing for [agent]
+# connection_check_s has the connection checked every _CHECK_EVERY_S while it stays silent, and is given up once it
+# fails _CHECKS_FAILED times in a row (one check can fail on a lookup that hiccups, while the call's own connection
+# holds); a run that waits for such a model checks every _RECONNECT_EVERY_S and asks again as soon as it connects, which
+# MODEL_RECONNECTED_EVENT says.
+MODEL_RECONNECTED_EVENT: str = "model_reconnected"
+# The key of the error of a call given up for its lost connection that says how long it had sent nothing.
+SILENT_S: str = "silent_s"
+_CHECK_EVERY_S: float = 15.0
+_CHECKS_FAILED: int = 2
+_RECONNECT_EVERY_S: float = 5.0
 # A run whose model's rate limit or usage window is spent waits for it instead of ending (item 713, [agent]
 # quota_wait_s): what makes it wait, and how far apart it asks again: when the provider said they come back, within
 # these bounds, else every _QUOTA_RETRY_S.
@@ -1619,19 +1631,72 @@ async def _fitted(
 
 
 async def _complete_in_time(
-    runtime: Runtime, ref: ModelRef, request: ChatRequest, sink: DeltaSink, origin: CallOrigin, timeout_s: float
+    runtime: Runtime,
+    ref: ModelRef,
+    request: ChatRequest,
+    sink: DeltaSink,
+    origin: CallOrigin,
+    timeout_s: float,
+    check_after_s: float,
 ) -> ModelReply:
     """One step's model call, given ``timeout_s`` to answer. A model that does not answer in time fails like one whose
     connection broke (``ProviderTransportError``), so a routed step goes back to the run's own model, the run waits for
     its own model as for one out of reach (:func:`_connection_broke`), and a run that ends says what happened rather
-    than an internal error (item 116)."""
+    than an internal error (item 116). A call that has sent nothing for ``check_after_s`` fails the same way as soon as
+    its server cannot be connected to (item 769, :func:`_lost_while_silent`), not at ``timeout_s``: a network that
+    dropped mid-call held a step for its whole seven minutes on 2026-10-28."""
+    heard: list[float] = [time.monotonic()]
+
+    async def hearing(delta: StreamDelta) -> None:
+        heard[0] = time.monotonic()
+        await sink(delta)
+
+    call: asyncio.Task[ModelReply] = asyncio.ensure_future(runtime.router.complete(ref, request, hearing, origin))
+    racing: set[asyncio.Task[ModelReply] | asyncio.Task[str]] = {call}
+    address: str | None = runtime.router.address(ref)
+    watch: asyncio.Task[str] | None = None
+    if address is not None and check_after_s > 0:
+        watch = asyncio.ensure_future(_lost_while_silent(runtime, ref, address, heard, check_after_s))
+        racing.add(watch)
     try:
         async with asyncio.timeout(timeout_s):
-            return await runtime.router.complete(ref, request, sink, origin)
+            await asyncio.wait(racing, return_when=asyncio.FIRST_COMPLETED)
     except TimeoutError as exc:
         raise ProviderTransportError(
             "the model did not answer in time", {"model": ref.label, "timeout_s": timeout_s}
         ) from exc
+    finally:
+        for task in racing:
+            if not task.done():
+                task.cancel()
+        await asyncio.wait(racing)
+    if watch is None or not call.cancelled():
+        return call.result()
+    host: str = watch.result()
+    silent_s: float = round(time.monotonic() - heard[0], 1)
+    raise ProviderTransportError(
+        f"cannot connect to {host}: the call had sent nothing for {silent_s} s",
+        {"model": ref.label, OFFLINE: host, SILENT_S: silent_s},
+    )
+
+
+async def _lost_while_silent(
+    runtime: Runtime, ref: ModelRef, address: str, heard: list[float], check_after_s: float
+) -> str:
+    """The host of ``address``, the server of ``ref``, once it cannot be connected to :data:`_CHECKS_FAILED` times in a
+    row while the call has sent nothing (its last delta at ``heard[0]``) for ``check_after_s``: checked then, and
+    every :data:`_CHECK_EVERY_S` while it stays silent. A slow model whose server is there is waited for."""
+    failed: int = 0
+    while True:
+        silent_s: float = time.monotonic() - heard[0]
+        if silent_s < check_after_s:
+            failed = 0
+            await asyncio.sleep(check_after_s - silent_s)
+            continue
+        failed = 0 if await runtime.router.reaches(ref) else failed + 1
+        if failed >= _CHECKS_FAILED:
+            return host_of(address) or address
+        await asyncio.sleep(_CHECK_EVERY_S)
 
 
 async def _complete_unless_steered(inbox: RunInbox, call: Awaitable[ModelReply]) -> ModelReply | None:
@@ -1687,9 +1752,13 @@ def _quota_retry(error: Exception, left_s: float) -> float:
 
 
 def _unreachable_reason(error: DotError) -> str:
-    """Why the model could not be reached, in a few words for the run's page: what the broken connection raised (its
-    type and text, as :func:`~dotagent.llm.http.wrap_transport_error` keeps them), else the error's own message (the
-    status its server failed with and its words, or the loop's own time limit)."""
+    """Why the model could not be reached, in a few words for the run's page: that its server cannot be connected to
+    (item 769), what the broken connection raised (its type and text, as
+    :func:`~dotagent.llm.http.wrap_transport_error` keeps them), else the error's own message (the status its server
+    failed with and its words, or the loop's own time limit)."""
+    host: str | None = out_of_reach(error)
+    if host is not None:
+        return f"cannot connect to {host}"
     kind: JsonValue = error.context.get("error_type")
     text: JsonValue = error.context.get("error")
     if isinstance(kind, str) and isinstance(text, str):
@@ -1710,6 +1779,33 @@ async def _wait_unless_stopped(cancel: asyncio.Event, seconds: float) -> None:
         await asyncio.wait_for(cancel.wait(), seconds)
     except TimeoutError:
         return
+
+
+async def _offline_host(runtime: Runtime, ref: ModelRef, error: DotError) -> str | None:
+    """The host of the server of ``ref`` when it cannot be connected to (item 769): as the failed call found
+    (``error``), else as a check finds now; ``None`` when it can be, or the model has no address to check."""
+    host: str | None = out_of_reach(error)
+    if host is not None:
+        return host
+    address: str | None = runtime.router.address(ref)
+    if address is None or await runtime.router.reaches(ref):
+        return None
+    return host_of(address) or address
+
+
+async def _until_reached(cancel: asyncio.Event, runtime: Runtime, ref: ModelRef, seconds: float) -> bool:
+    """Wait until the server of ``ref`` can be connected to, checked every :data:`_RECONNECT_EVERY_S`, for
+    ``seconds`` at most or until the run is stopped; whether it was."""
+    end: float = time.monotonic() + seconds
+    while True:
+        left_s: float = end - time.monotonic()
+        if left_s <= 0:
+            return False
+        await _wait_unless_stopped(cancel, min(_RECONNECT_EVERY_S, left_s))
+        if cancel.is_set():
+            return False
+        if await runtime.router.reaches(ref):
+            return True
 
 
 async def _held_by_the_owner(agent: AgentRun, held_since: float) -> None:
@@ -2378,7 +2474,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         sink.begin(held_secrets)
         try:
             call: Awaitable[ModelReply] = _complete_in_time(
-                runtime, step_ref, request, sink, step_origin, config.model_call_timeout_s
+                runtime,
+                step_ref,
+                request,
+                sink,
+                step_origin,
+                config.model_call_timeout_s,
+                config.connection_check_s,
             )
             # A step past the run's limit is its last: a message does not hold back the finish it ends with.
             heard: ModelReply | None = (
@@ -2445,18 +2547,25 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                         f"the model could not be reached for {wait_s:g} s: {_unreachable_reason(error)}",
                         {**error.context, "model": ref.label, "waited_s": round(now - waiting_since, 1)},
                     ) from error
-                retry_in: float = (
+                # A server that cannot be connected to is asked again as soon as it can be (item 769), not on a
+                # schedule: the network is down, or a local server is not running.
+                offline: str | None = None if spent is not None else await _offline_host(runtime, ref, error)
+                retry_in: float | None = (
                     _quota_retry(error, left_s)
                     if spent is not None
+                    else None
+                    if offline is not None
                     else _retry_delay(asked_again, config.model_wait_s, left_s)
                 )
-                asked_again += 1
+                if offline is None:
+                    asked_again += 1
                 log.warning(
                     "model_unreachable",
                     run_id=run.id,
                     model=ref.label,
                     step=steps,
-                    retry_in_s=round(retry_in, 1),
+                    retry_in_s=None if retry_in is None else round(retry_in, 1),
+                    offline=offline,
                     error=str(error),
                 )
                 await runtime.bus.emit(
@@ -2466,14 +2575,28 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                         "model": ref.label,
                         "error": _unreachable_reason(error)[:300],
                         "step": steps,
-                        "retry_in_s": round(retry_in, 1),
+                        "retry_in_s": None if retry_in is None else round(retry_in, 1),
                         "until": time.time() + left_s,
                         "spent": spent,
+                        "offline": offline,
                     },
                     True,
                 )
                 await sink(_RESET)
-                await _wait_unless_stopped(agent.cancel, retry_in)
+                if retry_in is not None:
+                    await _wait_unless_stopped(agent.cancel, retry_in)
+                elif await _until_reached(agent.cancel, runtime, ref, left_s):
+                    # Since the connection was lost: a call given up for it had sent nothing for a while before.
+                    silent: JsonValue = error.context.get(SILENT_S)
+                    lost_s: float = float(silent) if isinstance(silent, int | float) else 0.0
+                    offline_for: float = round(time.monotonic() - now + lost_s, 1)
+                    log.info("model_reconnected", run_id=run.id, model=ref.label, step=steps, offline_s=offline_for)
+                    await runtime.bus.emit(
+                        run.id,
+                        MODEL_RECONNECTED_EVENT,
+                        {"model": ref.label, "host": offline, "step": steps, "offline_s": offline_for},
+                        True,
+                    )
                 # The same step is asked again once the wait is over; a stop meanwhile ends the run at the loop's top.
                 steps -= 1
                 continue
