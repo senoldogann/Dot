@@ -471,7 +471,7 @@ class SkillsDecideCommand(FrozenModel):
 class StatsCommand(FrozenModel):
     name: Literal["stats"]
     days: int = Field(ge=1)
-    by: Literal["model", "site", "all"]
+    by: Literal["model", "site", "tool", "all"]
     run: str | None
 
 
