@@ -514,14 +514,22 @@ def _act_kind(steps: list[Step]) -> ActionKind:
 
 
 def _secret_field_check(ctx: ToolContext) -> SecretFieldCheck:
-    """What a batch does at a field that takes a secret: every mode but yolo refuses it, and a yes to the batch — a
-    payment under its caps among them — never covers typing a card number or a password (item 429). A yolo run asks
-    nothing (item 443), so the gate waives each such field with its reason in the step's record, and the batch types it;
-    the fields are still flagged, so the record says what was typed into."""
+    """What a batch does at a field that takes a secret. A yolo run asks nothing (item 443): the gate waives each field
+    with its reason in the step's record. In every other mode text the user wrote in this run may go in — a password or
+    a one-time code they gave, which is theirs to hand over — while text a page or a tool's output carries is refused
+    (item 797); a yes to the batch never covers a card number or a password (item 429)."""
     if ctx.approvals != "yolo":
-        return refuse_secret_field
 
-    async def enter(field: SecretField) -> None:
+        async def given(field: SecretField, text: str | None) -> None:
+            if text and text in ctx.user_text():
+                _log.info("secret_typed_from_user", run_id=ctx.run_id, ref=field.ref, kind=field.kind)
+                return
+            await refuse_secret_field(field, text)
+
+        return given
+
+    async def enter(field: SecretField, text: str | None) -> None:
+        del text
         flag: Flag = secret_field_flag(field.kind)
         summary: str = f"Type into {secret_field_label(field.kind)}" + ("" if field.ref is None else f" ({field.ref})")
         # The page's address may hold a login filled from the password manager (item 493): the record keeps none.

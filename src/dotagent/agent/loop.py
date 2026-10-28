@@ -2281,6 +2281,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         questions=questions,
         workspace=runtime.workspace,
         gate=agent.gate,
+        user_text=lambda: "\n".join(agent.gate.instructions),
         cancel=agent.cancel,
         output_chars=scaffold.tool_output_chars,
         # The facts as they stand when a tool asks: each step replaces them.

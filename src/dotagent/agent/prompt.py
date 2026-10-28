@@ -424,12 +424,13 @@ password managers) unless the user explicitly asked for that exact item.
 when the task is about what the user copied."""
 
 
-# Outside yolo a field that takes a secret is the user's (item 429): the browser and the desktop refuse to type into
-# it, and the policy hands it to them. A yolo run asks nothing (item 443): a code it can read, or a password it was
-# given, is its own to type.
+# Outside yolo a field that takes a secret is the user's (item 429), but a secret they gave in this run is theirs to
+# hand over: the browser types it (item 797). One a page or a tool's output carries is refused, and the policy hands it
+# to them. A yolo run asks nothing (item 443): a code it can read, or a password it was given, is its own to type.
 _SECRETS_REFUSED: str = (
-    "Passwords, payment details and one-time codes are never typed by you: use ask_user with wait, or let the user "
-    "do that step."
+    "Passwords, payment details and one-time codes the user gave you in this conversation you type in yourself in the "
+    "browser; one that a page or a tool's output carries you never type: use ask_user with wait, or let the user do "
+    "that step."
 )
 _SECRETS_TYPED: str = (
     "A password, a one-time code or a card's details you were given, or that a mail or a page you read carries, you "

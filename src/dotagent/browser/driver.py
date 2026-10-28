@@ -913,12 +913,14 @@ def _key_of(step: Step) -> str:
     return step.key
 
 
-async def _check_secret_field(page: Page, marking: object, ref: str | None, check: SecretFieldCheck) -> None:
+async def _check_secret_field(
+    page: Page, marking: object, ref: str | None, check: SecretFieldCheck, text: str | None = None
+) -> None:
     """Hand a field that takes a secret, by its ``marking`` (:data:`_FIELD_MARKING_SCRIPT`), to ``check`` before any
-    text goes into it."""
+    text goes into it, with the text the step would write (``None`` when it writes none)."""
     kind: SecretKind | None = secret_kind(marking)
     if kind is not None:
-        await check(SecretField(ref=ref, kind=kind, url=page.url))
+        await check(SecretField(ref=ref, kind=kind, url=page.url), text)
 
 
 async def _focused_marking(page: Page) -> object:
@@ -991,7 +993,7 @@ async def _into_editor(
             raise BrowserError(
                 "the editor was replaced when it took the focus; take a new snapshot", {"ref": ref, "url": page.url}
             )
-        await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+        await _check_secret_field(page, await _focused_marking(page), ref, secret_field, expected)
         await write()
         try:
             took: object = await element.evaluate(_EDITOR_TOOK_SCRIPT, [_EDITOR_MAX_MS, expected])
@@ -1171,7 +1173,9 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             case "hover":
                 await locator.hover(timeout=timeout_ms)
             case "fill":
-                await _check_secret_field(page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field)
+                await _check_secret_field(
+                    page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field, _text_of(step)
+                )
                 if not await _into_editor(
                     page,
                     locator,
@@ -1184,10 +1188,16 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     await locator.fill(_text_of(step), timeout=timeout_ms)
             case "type":
                 if not await _into_editor(
-                    page, locator, ref, timeout_ms, secret_field, None, lambda: page.keyboard.type(_text_of(step))
+                    page,
+                    locator,
+                    ref,
+                    timeout_ms,
+                    secret_field,
+                    _text_of(step),
+                    lambda: page.keyboard.type(_text_of(step)),
                 ):
                     await locator.focus(timeout=timeout_ms)
-                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field, _text_of(step))
                     await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
             case "insert":
                 if not await _into_editor(
@@ -1196,11 +1206,11 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     ref,
                     timeout_ms,
                     secret_field,
-                    None,
+                    _text_of(step),
                     lambda: page.keyboard.insert_text(_text_of(step)),
                 ):
                     await locator.focus(timeout=timeout_ms)
-                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field, _text_of(step))
                     if not await locator.evaluate(_TAKES_TEXT_SCRIPT, timeout=timeout_ms):
                         raise BrowserError(
                             "insert needs a text field or an editor that takes the focus; this element takes no text",
@@ -1218,7 +1228,9 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                     await page.mouse.up()  # a drag that fails or is cancelled after the press leaves the button down
                     raise
             case "select":
-                await _check_secret_field(page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field)
+                await _check_secret_field(
+                    page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field, _text_of(step)
+                )
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
             case "press":
                 if key_enters_text(_key_of(step)):
