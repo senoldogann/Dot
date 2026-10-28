@@ -277,6 +277,14 @@ def _app_log() -> str:
 
 
 _SETTINGS: str = _lines("DEBUG = True", 'HOST = "0.0.0.0"', "PORT = 8000", 'ALLOWED = ["localhost", "example.org"]')
+_LOG: str = _lines(
+    *(
+        "2026-01-01 12:00:00 ERROR database is down"
+        if index == 42
+        else f"2026-01-01 12:00:00 INFO request {index} served"
+        for index in range(1, 5_001)
+    )
+)
 _LOADER: str = _lines(
     "def fetch_data(path):", "    with open(path) as handle:", "        return handle.read().splitlines()"
 )
@@ -467,6 +475,22 @@ def _catalog() -> tuple[EvalTask, ...]:
             ),
             (_matches(r"\b8431\b"),),
             (_read("data/config.ini"), _finish("8431", True)),
+        ),
+        _task(
+            "find-first-error",
+            "files",
+            "logs/app.log has 5,000 lines. Find the first line that contains ERROR and write answer.txt with its line "
+            "number, a colon and the line itself, for example '42: ...'. Search the file instead of reading all of "
+            "it into your context.",
+            "task",
+            "done",
+            (_seed("logs/app.log", _LOG),),
+            (_equals("answer.txt", "42: 2026-01-01 12:00:00 ERROR database is down"),),
+            (
+                _shell("rg -n ERROR logs/app.log | head -1"),
+                _turn(_write("answer.txt", "42: 2026-01-01 12:00:00 ERROR database is down")),
+                _finish("The first ERROR is on line 42: 2026-01-01 12:00:00 ERROR database is down.", True),
+            ),
         ),
         _task(
             "edit-debug-flag",
