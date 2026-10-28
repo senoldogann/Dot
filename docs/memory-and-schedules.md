@@ -8,8 +8,8 @@ UI, where Settings › Memory (items 373 and 566) is the box that adds a note at
 per note, **Remember** or ⌘Enter; on a phone the tags have a line of their own and **Remember** stands at the right of
 the line under them, and a touch screen is not offered the key, item 576), then **Notes** with how many there are, a
 choice of All, Lessons, Preferences and From outside content (each reads the 2,000 newest notes, not only the ones
-shown; with a search, the search's 50 best hits; one line in every window, which scrolls sideways on a phone when it
-does not fit, item 576, and beside which the search stands, or under it when both do not fit, item 578) and their
+shown; with a search, the search's 50 best hits; one line on a computer, beside which the search stands, or under it
+when both do not fit, item 578, and two by two on a phone, item 778) and their
 search, the notes changed last first, 30 at a time with **Show more notes**, each a row with its tags
 (labels the height of their words, on a phone too: item 576), the mark of a note saved while a run read outside content,
 who saved it and when, how often it was used, and its edit and delete; then what Dot knows about you with your own

@@ -190,7 +190,7 @@ name over its words, cut at 1,200 characters with **Read it all** leading to its
 answer of a run that ended done is shown so; it stays in sight when the chat shows only what Dot is doing (item 663).
 The run that answers a message names the agent in its `run_queued` event (`agent_name`), which the page reads; a
 helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (a button on the Agents page, `#/team`) lists today's messages: who to whom, the
-message, the reply, the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
+message and the reply (their words, with no markdown marks: item 778), the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
 gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
 which older tool output is shortened, once, to 700 characters; a step's request to Anthropic also marks the end of the
 part of the run the next step sends unchanged, before the newest tool results, as Anthropic looks for a cached prefix

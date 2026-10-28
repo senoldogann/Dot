@@ -318,11 +318,16 @@ async def test_on_a_touch_phone_the_tags_are_labels_and_remember_stands_at_the_r
         assert tags is not None and remember is not None
         assert remember["y"] >= tags["y"] + tags["height"], (tags, remember)
         assert abs((remember["x"] + remember["width"]) - (tags["x"] + tags["width"])) <= 2, (tags, remember)
-        tops = {
-            round((await choice.bounding_box() or {"y": -1})["y"])
+        # On a phone the four choices stand two by two, every one whole (item 778): in one line the last ran off the
+        # screen's edge.
+        boxes = [
+            await choice.bounding_box()
             for choice in await page.get_by_role("group", name="Show notes").get_by_role("button").all()
-        }
-        assert len(tops) == 1, tops
+        ]
+        assert all(box is not None for box in boxes)
+        tops = sorted({round(box["y"]) for box in boxes if box is not None})
+        assert len(tops) == 2 and sum(1 for box in boxes if box is not None and round(box["y"]) == tops[0]) == 2, boxes
+        assert all(box["x"] + box["width"] <= 390 for box in boxes if box is not None), boxes
         assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
         await page.screenshot(path=tmp_path / "memory-touch-390.png")
     finally:

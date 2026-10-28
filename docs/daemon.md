@@ -812,13 +812,13 @@ you give Dot. It signs in with a login and types your contact details into pages
 shown to you, and Dot fills it into no page. A login a run made for a new account (`browser_create_login`, item 740) is
 kept here too, with the note "Made by Dot for a new account on …". Passwords and cards are kept in your Mac's Keychain,
 not in Dot's database; what Dot sees and what it cannot see is in [Safety](safety.md#safety). The page has the tabs
-**All**, **Logins**, **Cards** and **Contacts**, each with its count, a search (**Search the vault**: it looks in the
-labels, sites, usernames, nicknames, last four digits and the details of contacts and billing addresses), and **New
-item**, a menu of **Login**, **Card**, **Contact** and **Import from CSV…**. An empty vault says "Nothing saved yet. Add
-a login, a card or contact details with New item." Each item is a row with its mark, its label (a login's site, a card's
-nickname or brand, a contact's label), the line under it (a login's username, a card's brand and last four digits, a
-contact's details) and **Edit** and **Delete** (which asks first). The list scrolls in its card and draws more rows as
-it is scrolled (item 768).
+**All**, **Logins**, **Cards** and **Contacts**, each with its count (two by two on a phone, item 778), a search
+(**Search the vault**: it looks in the labels, sites, usernames, nicknames, last four digits and the details of contacts
+and billing addresses), and **New item**, a menu of **Login**, **Card**, **Contact** and **Import from CSV…**. An empty
+vault says "Nothing saved yet. Add a login, a card or contact details with New item." Each item is a row with its mark,
+its label (a login's site, a card's nickname or brand, a contact's label), the line under it (a login's username, a
+card's brand and last four digits, a contact's details) and **Edit** and **Delete** (which asks first). The list scrolls
+in its card and draws more rows as it is scrolled (item 768).
 
 - **Select** (beside New item, item 768) turns each row into a tick: a click on the row ticks it, a shift-click ticks
   every row from the one ticked last, and a bar over the list says how many are ticked, with **Select all** (every item
