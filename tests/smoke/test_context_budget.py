@@ -32,9 +32,11 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 800 for three browser tools and their lines (21,072 measured): browser_create_login, so that no password of
 # a new account is made up by a model and written into its history (item 740), and browser_console and
 # browser_viewport, to see why a page does not work and how it lays out on a phone (item 746).
-BUDGET_TOKENS: int = 21_300
+# Raised by 200 for `recon` (item 776): one tool, 985 characters of schema, the audit of a site's public face and the
+# ports of an owned host (21,401 measured).
+BUDGET_TOKENS: int = 21_500
 SYSTEM_BUDGET_TOKENS: int = 7_000
-TOOLS_BUDGET_TOKENS: int = 14_400
+TOOLS_BUDGET_TOKENS: int = 14_600
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

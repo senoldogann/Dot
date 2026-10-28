@@ -48,6 +48,8 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "vault_contacts": "vault",
     # Dot's own list of work for later (item 715).
     "todo_add": "todos",
+    # The public face of a site, and the ports of the owner's own (item 776).
+    "recon": "recon",
 }
 _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
@@ -62,6 +64,7 @@ _PURPOSES: dict[str, str] = {
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
     "todos": "your own list of work to do for the owner later, on your own, while the Mac is idle",
     "trading": "trading crypto on Coinbase under the owner's limits: prices, the account, orders",
+    "recon": "the public face of a site or host you own: addresses, TLS, headers, technology, and its open ports",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
 LISTED_TOOLS: int = 16

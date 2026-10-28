@@ -1,5 +1,6 @@
 """Typed configuration: the packaged ``defaults.toml`` deep-merged with the user's ``config.toml``."""
 
+import ipaddress
 import re
 import tomllib
 from importlib import resources
@@ -944,6 +945,42 @@ def is_product_id(text: str) -> bool:
     return _PRODUCT.fullmatch(text) is not None
 
 
+class ReconConfig(FrozenModel):
+    """Network reconnaissance (``[recon]``, item 776, docs/recon.md). A passive audit reads what a browser's visit
+    reads, on any public site; an active one asks which common ports answer, and runs only on a host whose name is in
+    ``owned_hosts``, or is a subdomain of one: the owner's own, or one they may test. Nothing else can widen it, and
+    the list is empty until the owner writes it."""
+
+    owned_hosts: tuple[str, ...] = ()
+
+    @field_validator("owned_hosts")
+    @classmethod
+    def _host_names(cls, hosts: tuple[str, ...]) -> tuple[str, ...]:
+        names: list[str] = []
+        for host in hosts:
+            name: str = host.strip().lower().rstrip(".")
+            if (
+                not name
+                or "/" in name
+                or "*" in name
+                or "://" in name
+                or any(character.isspace() for character in name)
+            ):
+                raise ValueError(
+                    f"[recon] owned_hosts holds bare host names, without a wildcard, port, scheme or path; not {host!r}"
+                )
+            if ":" in name:
+                try:
+                    ipaddress.IPv6Address(name)
+                except ValueError:
+                    raise ValueError(
+                        "[recon] owned_hosts holds bare host names, without a wildcard, port, scheme or path; an "
+                        f"IPv6 address is written without brackets; not {host!r}"
+                    ) from None
+            names.append(name)
+        return tuple(dict.fromkeys(names))
+
+
 class TradingConfig(FrozenModel):
     """Trading on Coinbase (``[trading]``, docs/trading.md). The limits are in ``quote``, the currency every product of
     ``products`` is priced in, and no run can raise them: a run cannot change this file, and an order past one of them
@@ -1050,6 +1087,7 @@ class AppConfig(FrozenModel):
     skills: SkillsConfig
     plugins: PluginsConfig
     scout: ScoutConfig
+    recon: ReconConfig
     trading: TradingConfig
 
     @field_validator("mcp")

@@ -64,6 +64,7 @@ AUTO: AgentConfig = DEFAULTS.model_copy(update={"tool_surface": "auto"})
         ("schedule_list", "schedule"),
         ("terminal_send", "terminal"),
         ("create_agent", "team"),
+        ("recon", "recon"),
         ("show_page", "pages"),
         ("vault_contacts", "vault"),
         ("todo_add", "todos"),
@@ -90,6 +91,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "accounts",
         "schedule",
         "team",
+        "recon",
         "pages",
         "vault",
         "terminal",
@@ -102,6 +104,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "todos",
         "accounts",
         "schedule",
+        "recon",
         "pages",
         "desktop",
     )
@@ -155,6 +158,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "drafts",
         "memory_admin",
         "pages",
+        "recon",
         "team",
         "terminal",
         "todos",
@@ -222,6 +226,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "- schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, "
         "schedule_delete)",
         "- team: making a lasting teammate agent for a role the work needs again or in parallel (create_agent)",
+        "- recon: the public face of a site or host you own: addresses, TLS, headers, technology, and its open ports "
+        "(recon)",
         "- pages: showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views "
         "(show_page)",
         "- vault: the owner's saved contact details (name, address, phone, email) to type into forms (vault_contacts)",
