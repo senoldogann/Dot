@@ -176,10 +176,18 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                     await page.goto(ui_url(host, port, TOKEN))
                     for approved in (True, False):
                         run, _ = await _asking(runtime, manager, f"Write the shelves ({width}, {approved})")
-                        # The home lists the run under Waits for you, without its card.
+                        # The home says something waits, without the card; the sidebar lists the run under Waiting
+                        # for you (the sections moved there from the home, item 577).
                         await page.goto(f"{address}/#/")
-                        await expect(page.locator(".home")).to_contain_text("Waits for you")
+                        await expect(page.locator(".home")).to_contain_text("waits for you")
                         await expect(page.locator(".home .approval")).to_have_count(0)
+                        if width < 860:
+                            await page.get_by_role("button", name="Show sidebar").click()
+                        await expect(page.locator("#sidebar [data-section=waiting] a.side-activity")).to_contain_text(
+                            "waits for your answer"
+                        )
+                        if width < 860:
+                            await page.keyboard.press("Escape")
                         await page.goto(f"{address}/#/runs/{run.id}")
                         card: Locator = page.locator(".timeline .approval")
                         await expect(card).to_have_count(1)

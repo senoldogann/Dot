@@ -49,6 +49,7 @@ type ConfigTable = Literal[
     "server",
     "shell",
     "snapshots",
+    "trading",
     "web",
 ]
 type AgentSetting = Literal["resume"]
@@ -76,6 +77,17 @@ type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
 type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
 type WebSetting = Literal["search_order"]
+type TradingSetting = Literal[
+    "mode",
+    "products",
+    "min_volume",
+    "max_order",
+    "max_day",
+    "max_day_loss",
+    "max_position",
+    "paper_start",
+    "paper_fee_rate",
+]
 type SettingKey = (
     AgentSetting
     | AssistantSetting
@@ -89,10 +101,12 @@ type SettingKey = (
     | ServerSetting
     | ShellSetting
     | SnapshotsSetting
+    | TradingSetting
     | WebSetting
 )
-# A list of names is ``[server] reach`` (item 271), ``[models] standby`` (item 478) or ``[web] search_order``.
-type SettingValue = str | bool | int | list[str]
+# A list of names is ``[server] reach`` (item 271), ``[models] standby`` (item 478), ``[web] search_order`` or
+# ``[trading] products``; a number with decimals is one of ``[trading]``'s amounts.
+type SettingValue = str | bool | int | float | list[str]
 
 
 def _basic_string(text: str) -> str:
@@ -114,6 +128,8 @@ def _literal(value: SettingValue) -> str:
         return "true" if value else "false"
     if isinstance(value, list):
         return "[" + ", ".join(_literal(item) for item in value) + "]"
+    if isinstance(value, float):
+        return repr(value)
     return str(value) if isinstance(value, int) else _basic_string(value)
 
 
@@ -139,10 +155,11 @@ def _key_line(key: str) -> re.Pattern[str]:
 
 
 def _key_value(key: str) -> re.Pattern[str]:
-    """A ``key = value`` line whose value is a string, a boolean or an integer (an array: :func:`_array_end`)."""
-    return re.compile(
-        rf"""^(\s*{_key_pattern(key)}\s*=\s*)("(?:[^"\\]|\\.)*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*)(.*)$"""
-    )
+    """A ``key = value`` line whose value is a string, a boolean, an integer or a number with decimals or an exponent
+    (an array: :func:`_array_end`). A number with decimals is read whole: read as its integer part, the decimals stayed
+    behind the value written over it, and a [trading] amount changed twice made the file no TOML (item 771)."""
+    number: str = r"[+-]?[0-9][0-9_]*(?:\.[0-9][0-9_]*)?(?:[eE][+-]?[0-9][0-9_]*)?"
+    return re.compile(rf"""^(\s*{_key_pattern(key)}\s*=\s*)("(?:[^"\\]|\\.)*"|'[^']*'|true|false|{number})(.*)$""")
 
 
 def _key_opening(key: str) -> re.Pattern[str]:

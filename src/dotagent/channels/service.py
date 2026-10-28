@@ -25,6 +25,7 @@ from dotagent.channels.seen import Seen, SeenError
 from dotagent.channels.staging import STAGED_KEPT_S, Staging
 from dotagent.channels.types import Channel, ChannelId
 from dotagent.channels.views import AutomationAnswer, ChannelsView, ImessageView
+from dotagent.channels.words import SpokenLanguage
 from dotagent.connections import mac
 from dotagent.connections.mac import AutomationState
 from dotagent.core.errors import DesktopError
@@ -140,6 +141,9 @@ class Channels:
         # and folder, and a test run refuses a staging folder that is not a pytest folder (``tests/conftest.py``).
         owner_home: Path = Path.home() if home is None else home
         pictures: Pictures = Pictures(runtime.workspace, owner_home, runtime.protected)
+        # The language of the lines Dot writes on its channels (item 805): ``[channels] language``, and with ``auto``
+        # the owner's last message's.
+        self._language: SpokenLanguage = SpokenLanguage(runtime.store, lambda: runtime.config.channels.language)
         self._imessage: IMessageChannel = IMessageChannel(
             runtime.store,
             script,
@@ -148,6 +152,7 @@ class Channels:
             self._links or f"{base_url(host, port)}/",
             poll_s,
             staging=Staging(staging_dir() if staging is None else staging, pictures, copies_kept_s),
+            language=self._language,
         )
         self._channels: dict[ChannelId, Channel] = {"imessage": self._imessage}
         self._router: ChannelRouter = ChannelRouter(
@@ -161,6 +166,7 @@ class Channels:
             lambda: self._progress,
             progress_first_s=progress_first_s,
             progress_apart_s=progress_apart_s,
+            language=self._language,
         )
         self._tasks: dict[ChannelId, asyncio.Task[None]] = {}
         self._watcher: asyncio.Task[None] | None = None
@@ -193,6 +199,7 @@ class Channels:
 
     async def start(self) -> None:
         """Read what the channels kept, follow the runs of their chats, and read each channel that is on."""
+        await self._language.load()
         await self._imessage.load()
         await self._router.load()
         if self._links is None:

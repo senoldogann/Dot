@@ -1,0 +1,10 @@
+# cargo audit (the audit workflow, item 217; docs/development.md) reads this. The advisories ignored are of crates that
+# are not in the Mac build, the only one Dot makes (item 766): `tauri-plugin-updater` pulls `zip` for Windows alone
+# (`cargo tree -i zip --target aarch64-apple-darwin` prints nothing), and no release of the plugin for Tauri 2 takes
+# zip 9. The test tests/mac_build.rs fails once zip reaches the Mac build: then these lines go, and zip is updated.
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0367", # zip 4: SUID and SGID bits kept on extraction
+    "RUSTSEC-2026-0368", # zip 4: a symbolic link extracted to a target outside the destination
+    "RUSTSEC-2026-0369", # zip 4: Unix permissions applied through a symbolic link
+]

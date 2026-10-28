@@ -286,6 +286,48 @@ def chat_team(team: TeamRecord | None) -> ChatTeam | None:
     return None if team is None else ChatTeam(id=team.id, name=team.name, agents=team.agents)
 
 
+class TradingOrderRecord(FrozenModel):
+    """An order of trading (docs/trading.md): ``notional`` is what it was worth in the quote currency (asked, then
+    filled), ``size`` the base it bought or sold, ``price`` the average fill and ``fee`` what it paid. ``status`` is
+    ``pending`` while it is under way, ``filled``, ``failed`` (it surely did nothing) or ``unknown`` (it was sent and
+    no answer said what it did: it counts against the day). ``exchange_id`` is Coinbase's id of a live order."""
+
+    id: str
+    mode: Literal["paper", "live"]
+    product: str
+    side: Literal["buy", "sell"]
+    notional: float
+    size: float
+    price: float
+    fee: float
+    status: Literal["pending", "filled", "failed", "unknown"]
+    ts: float
+    run_id: str
+    exchange_id: str
+    note: str
+
+
+class TradingExitRecord(FrozenModel):
+    """The exit of a buy (item 770): Dot sells ``size`` of ``product`` once the bid falls to ``stop`` or rises to
+    ``target``. ``status`` is ``open`` while it is watched (or waits for its account to be in use again), ``stopped``
+    or ``targeted`` once its sell filled, ``closed`` once sells by hand took its size or the paper account started
+    again, ``failed`` when its sell was refused; ``order_id`` is the buy's, ``sell_id`` the sell's that closed it."""
+
+    id: str
+    mode: Literal["paper", "live"]
+    product: str
+    size: float
+    stop: float
+    target: float | None
+    ts: float
+    order_id: str
+    run_id: str
+    status: Literal["open", "stopped", "targeted", "closed", "failed"]
+    closed_ts: float | None
+    sell_id: str
+    note: str
+
+
 class EventRecord(FrozenModel):
     id: int
     run_id: str

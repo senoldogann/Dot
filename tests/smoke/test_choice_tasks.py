@@ -180,12 +180,12 @@ async def test_the_skill_task_among_many_lists_the_decoy_that_shares_words_and_o
     assert outcome.passed, outcome
     skills: str = requests[0].messages[0].content.split("\n# Skills\n", 1)[1].split("\n\n", 1)[0]
     listed: list[str] = [line.split(":", 1)[0] for line in skills.split("\n") if line.startswith("- ")]
-    assert listed[:-1] == ["- linkedin-post"] and listed[-1].startswith("- 24 more installed skills")
+    assert listed[:-1] == ["- linkedin-post"] and listed[-1].startswith("- 26 more installed skills")
     assert "Writes posts for X in the owner's voice" not in skills
     named: str = skills.split("They are: ", 1)[1]
     assert "x-post-writer" in named.split(", ") and "linkedin-post" not in named
-    # Twenty-two skills of the task and the three that come with Dot: one listed, the rest named, none out of sight.
-    assert len(named.rstrip(".").split(", ")) == 24
+    # Twenty-two skills of the task and the five that come with Dot: one listed, the rest named, none out of sight.
+    assert len(named.rstrip(".").split(", ")) == 26
 
 
 async def test_a_run_that_turns_on_the_decoys_group_fails_though_it_goes_on_to_the_right_one(

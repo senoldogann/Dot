@@ -220,9 +220,10 @@ goal_patience = 4
 # call of the run and of the runs it delegated to. Checked between steps: at the first step past one, the run is told to
 # finish with what it reached and what is missing, may only finish or close its plan, and ends after that reply (as
 # failed when it did not finish). 0 is no limit. Each run has its own: a resumed run starts again from 0. Delegated and
-# scheduled runs have the same limits; eval runs have their task's own.
-run_max_minutes = 0
-run_max_tokens = 0
+# scheduled runs have the same limits; eval runs have their task's own. The defaults bound a runaway run while leaving
+# room for a long one: two hours and ten million tokens; set either to 0 for no bound.
+run_max_minutes = 120
+run_max_tokens = 10_000_000
 # Campaigns ("Keep going until done"): a campaign works on its goal in sessions until the goal checker accepts its
 # evidence or the owner stops it. A session that planned no next one is followed after campaign_gap_minutes; one that
 # ended needing you, with questions it left for you and none answered yet, is followed after campaign_wait_hours, or as
@@ -297,9 +298,16 @@ finish_nudges = 2
 questions = "leave"
 parallel_tools = 4
 model_call_timeout_s = 420.0
+# How long a step's model call may send nothing before Dot checks that it can still connect to the model's server
+# (item 769): checked then and every 15 s while the call stays silent, the call is given up once two checks in a row
+# cannot connect (the network dropped), and the run waits for it as below, instead of waiting out model_call_timeout_s.
+# A slow model whose server is there is waited for. 0 checks nothing.
+connection_check_s = 45.0
 # How long a run waits for its model when the model cannot be reached (the connection broke or timed out, or its server
 # failed with a status that retrying can get past), asking the same step again after 10 s, then 20, 40 and every 60 s
-# (at least four times however short the wait), before it ends failed. 0 does not wait.
+# (at least four times however short the wait), before it ends failed. A server that cannot be connected to at all (no
+# network, a local server that is not running) is checked every 5 s instead, and asked again as soon as it connects
+# (item 769). 0 does not wait.
 model_wait_s = 900.0
 # How long a run waits when its model is rate limited or its subscription's usage window is spent (OpenCode Go's
 # limit) and no standby model can take the run over (item 713): it asks the same step again when the provider said,
@@ -771,12 +779,12 @@ owner = ""
 introduced = false
 
 [snapshots]
-# SnapShots (item 405): both Command keys pressed together, or the Command key tapped twice, in any application,
+# Snapshots (item 405): both Command keys pressed together, or the Command key tapped twice, in any application,
 # captures the window in front and puts it in the open chat's composer as a picture (and, with app_text, the window's
 # text as a Markdown file, when the application shows it to accessibility). Dot's own window and a password manager's
 # are never captured. The keys are watched by a listen-only event tap once Accessibility is granted to the app that
 # runs Dot; it reads only whether a Command key went down or up, and whether another key was pressed meanwhile (⌘C ⌘V
-# is not a capture), never which. Settings › SnapShots changes these. sound: "click", "pop", "glass" or "off".
+# is not a capture), never which. Settings › Snapshots changes these. sound: "click", "pop", "glass" or "off".
 # animations: the capture's card flies to Dot's window and springs into the box (item 414); flash: a soft flash over
 # the window as it is captured; open_dot: Dot's window, or its tab in the browser, comes to the front with the capture
 # (macOS asks once whether Dot may choose a browser's tab). double_tap_ms: the most between the two taps.
@@ -803,6 +811,10 @@ imessage = false
 # thought when the model thinks. Never a tool's output, and masked of the secrets Dot holds like an answer. "steps" (the
 # default) or "off": only the answer.
 progress = "steps"
+# language: the language of the lines Dot writes on a channel itself (item 805): that a message was queued, the lines of
+# progress, how a run ended, what was left out. "auto" (the default) speaks the language of your last message there,
+# English or Turkish; "en" or "tr" holds one. An answer is in the language the model wrote it in.
+language = "auto"
 
 [reactions]
 # Reactions on Dot's messages (item 586, docs/runs.md): a button under each message of Dot's opens a palette: 👍 good,
@@ -1077,3 +1089,39 @@ updates_per_night = 20
 minutes = 30
 review_timeout_s = 120.0
 
+
+[recon]
+# Network reconnaissance (item 776, docs/recon.md). A passive audit — the addresses, the TLS certificate, the HTTP
+# headers and the technology a site names — reads any public site, as a browser's visit does. An active one asks which
+# common ports answer, and runs only on a host listed here: one you own or may test. A name covers its subdomains
+# ("example.com" covers "www.example.com"); an address is listed as it is. Empty: no active scan anywhere.
+owned_hosts = []
+
+
+[trading]
+# Trading on Coinbase (docs/trading.md). mode is "off" (no trading tools at all), "paper" (an account of Dot's own that
+# trades at Coinbase's real prices with money that is not there: what to try a way of trading with) or "live" (your
+# Coinbase account, with the key of Settings › Trading, which may view and trade and never transfer). The limits are in
+# quote, the currency of every product in products, and hold in every mode, yolo's too: max_order the most one order may
+# be worth, max_day the most a day's orders may add up to, max_day_loss how much the account may lose in a day before no
+# buy is placed until the next, max_position the most one product held may be worth. No run can change them. products
+# may hold "*": then every product priced in quote that trades at least min_volume of it a day is allowed (on Coinbase
+# EUR has a handful of such products, USDC about fifty). wake_schedule names a schedule (its id, as sch_...) that a move
+# of the market starts at once, not at its time: the daemon looks at the allowed products every minute, with no model,
+# and a product that moved wake_move_pct percent in fifteen minutes, and three times what it usually moves in fifteen,
+# starts it, at most wake_per_day times a day and wake_gap_min minutes apart.
+mode = "off"
+quote = "EUR"
+products = ["BTC-EUR", "ETH-EUR", "SOL-EUR"]
+min_volume = 1000000.0
+max_order = 25.0
+max_day = 100.0
+max_day_loss = 25.0
+max_position = 200.0
+paper_start = 1000.0
+paper_fee_rate = 0.006
+timeout_s = 15.0
+wake_schedule = ""
+wake_move_pct = 3.0
+wake_per_day = 6
+wake_gap_min = 30.0

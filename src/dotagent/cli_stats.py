@@ -199,6 +199,29 @@ def render_tools(tools: Sequence[ToolStats]) -> list[str]:
     ]
 
 
+def render_tool_health(tools: Sequence[ToolStats]) -> list[str]:
+    """Every tool by failure rate: one failure in twenty is healthy, one in three is not."""
+    if not tools:
+        return ["Tool health: no tool call recorded."]
+    ordered: list[ToolStats] = sorted(
+        tools,
+        key=lambda entry: (
+            -(entry.failed / entry.calls if entry.calls else 0.0),
+            -entry.failed,
+            -entry.calls,
+            entry.tool,
+        ),
+    )
+    width: int = max(len("tool"), *(len(entry.tool) for entry in ordered))
+    header: str = f"  {'tool':<{width}}  {'calls':>6}  {'failed':>6}  {'fail %':>7}  {'median s':>8}"
+    rows: list[str] = [
+        f"  {entry.tool:<{width}}  {entry.calls:>6}  {entry.failed:>6}  "
+        f"{_percent(entry.failed, entry.calls):>7}  {_seconds(entry.seconds_median):>8}"
+        for entry in ordered
+    ]
+    return ["Tool health, the highest failure rate first (failed / calls):", header, *rows]
+
+
 def render_channels(channels: Sequence[ChannelStats]) -> list[str]:
     """The channels table: how many calls went through a command, an API, the web, the browser, the desktop or the
     run's own tools, and the share of the acting calls that went through a GUI (the cheapest channel first, item 27)."""
@@ -292,11 +315,13 @@ def render_harness(uses: Sequence[HarnessUse]) -> list[str]:
     ]
 
 
-def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "all"]) -> list[str]:
+def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "tool", "all"]) -> list[str]:
     if not stats.models:
         return [f"No runs in the last {days} days."]
     runs: int = sum(entry.runs for entry in stats.models)
     lines: list[str] = [f"{runs} runs in the last {days} days.", ""]
+    if by == "tool":
+        return [*lines, *render_tool_health(stats.tools)]
     if by != "site":
         for entry in stats.models:
             lines.extend([*render_model(entry), ""])
@@ -334,7 +359,7 @@ async def cmd_stats(command: StatsCommand) -> int:
     since: float = time.time() - command.days * _DAY_S
     stats: RunStatistics = await asyncio.to_thread(collect_statistics, db_path(), since)
     lines: list[str] = render_stats(stats, command.days, command.by)
-    if command.by != "site":
+    if command.by in ("model", "all"):
         last: str | None = await asyncio.to_thread(read_kv, db_path(), REFLECTION_KEY)
         failed: str | None = await asyncio.to_thread(read_kv, db_path(), REFLECTION_FAILED_KEY)
         lines.append(

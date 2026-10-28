@@ -26,6 +26,10 @@ def test_a_lone_star_or_underscore_stays_where_it_means_something() -> None:
     assert as_plain_text("Match src/*.py and tests/*.py, 2*3*4 and a_b_c.") == (
         "Match src/*.py and tests/*.py, 2*3*4 and a_b_c."
     )
+    # A file's name keeps its double underscores (the review of every module); a pair around words is still bold.
+    assert as_plain_text("Edit __init__.py and src/__main__.py, then read __this__.") == (
+        "Edit __init__.py and src/__main__.py, then read this."
+    )
 
 
 @pytest.mark.parametrize("mark", ["-", "*", "+"])
@@ -73,11 +77,29 @@ def test_a_horizontal_rule_goes_and_a_quotes_marks_go_with_it() -> None:
     assert as_plain_text("> - a list in a quote\n> - two") == "• a list in a quote\n• two"
 
 
-def test_a_table_reads_one_row_a_line_its_cells_joined_and_its_rule_line_gone() -> None:
+def test_a_table_of_two_columns_reads_a_row_a_line_as_key_and_value() -> None:
+    """Item 804: a row of cells joined on one line wrapped on a phone into words no column held together."""
     table: str = "| Name | Size |\n|:--|--:|\n| shot.png | 3 MB |\n| notes | |\n\nAfter the table."
-    assert as_plain_text(table) == "Name · Size\nshot.png · 3 MB\nnotes · –\n\nAfter the table."
+    assert as_plain_text(table) == "• shot.png: 3 MB\n• notes: –\n\nAfter the table."
     # Without outer pipes, with marks in the cells and an escaped pipe, which is a cell's own.
-    assert as_plain_text("a | b\n---|---\n**x** | `y\\|z`") == "a · b\nx · y|z"
+    assert as_plain_text("a | b\n---|---\n**x** | `y\\|z`") == "• x: y|z"
+
+
+def test_a_table_of_three_columns_or_more_reads_a_card_a_row() -> None:
+    table: str = (
+        "Prices:\n| Plan | Price | Seats | Note |\n|---|---|---|---|\n| Pro | $20 | 5 | |\n"
+        "| Team | $50 | 20 | **yearly** |\nAfter."
+    )
+    assert as_plain_text(table) == (
+        "Prices:\n\n• Pro\n  Price: $20\n  Seats: 5\n\n• Team\n  Price: $50\n  Seats: 20\n  Note: yearly\n\nAfter."
+    )
+
+
+def test_a_table_of_one_column_a_short_row_and_one_with_no_header() -> None:
+    assert as_plain_text("| Steps |\n|---|\n| one |\n| two |") == "Steps:\n• one\n• two"
+    assert as_plain_text("| a | b | c |\n|---|---|---|\n| 1 |") == "• 1"
+    assert as_plain_text("| | |\n|---|---|\n| 1 | 2 |") == "1 · 2"
+    assert as_plain_text("| a | b |\n|---|---|") == "a · b"
 
 
 def test_lines_that_only_look_like_a_table_stay() -> None:
@@ -93,12 +115,12 @@ def test_the_lines_of_a_block_of_code_stay_as_they_are_written() -> None:
         "after **bold** and *it* and _it2_"
     )
     assert as_plain_text(markdown) == (
-        "- item\n---\n# comment\n> redirect\n| a | b |\n|---|---|\n**bold**\nafter bold and it and it2"
+        "- item\n---\n# comment\n> redirect\n| a | b |\n|---|---|\n**bold**\n\nafter bold and it and it2"
     )
     # A fence of tildes, a fence with more marks than the line in it, and one never closed.
-    assert as_plain_text("~~~\n- a\n~~~\n- b") == "- a\n• b"
+    assert as_plain_text("~~~\n- a\n~~~\n- b") == "- a\n\n• b"
     assert as_plain_text("````\n```\n- a\n```\n````") == "```\n- a\n```"
-    assert as_plain_text("text\n```\n- unclosed\n# still code") == "text\n- unclosed\n# still code"
+    assert as_plain_text("text\n```\n- unclosed\n# still code") == "text\n\n- unclosed\n# still code"
 
 
 def test_a_fence_indented_under_a_list_item_is_a_fence_and_three_ticks_on_one_line_are_a_code_span() -> None:
@@ -135,7 +157,7 @@ def test_the_owners_answer_reads_clean() -> None:
     )
     assert as_plain_text(answer) == (
         "Done. Here is what I found:\n\nSummary:\n• Disk: 120 GB free\n• Memory: 8 GB\n  ◦ swap: 2 GB\n\n"
-        "App · CPU\nSafari · 4%\n\nNote: numbers change.\n\n1. Restart\n2. Check"
+        "• Safari: 4%\n\nNote: numbers change.\n\n1. Restart\n2. Check"
     )
 
 
@@ -220,6 +242,39 @@ def test_a_lists_first_item_stays_under_its_heading() -> None:
 
 def test_a_run_of_spaces_between_words_is_one_space_and_code_keeps_its_own() -> None:
     assert as_plain_text("One.  Two   three\t\tfour.") == "One. Two three four."
-    assert as_plain_text("Run `a  b` now.\n```\nx   =  1\n```") == "Run a  b now.\nx   =  1"
+    assert as_plain_text("Run `a  b` now.\n```\nx   =  1\n```") == "Run a  b now.\n\nx   =  1"
     # The indent of a nested item is no run between words.
     assert as_plain_text("- one\n    - two  words") == "• one\n  ◦ two words"
+
+
+def test_a_block_of_code_stands_apart_from_the_words_around_it() -> None:
+    """Item 804: a phone draws no box around code, so a blank line keeps it from running into the words."""
+    assert as_plain_text("Run this:\n```sh\nls -la\n```\nThen look.") == "Run this:\n\nls -la\n\nThen look."
+    # Under a list item it stays with the item.
+    assert as_plain_text("1. Run:\n   ```\n   ls\n   ```\n2. Look") == "1. Run:\n   ls\n2. Look"
+
+
+def test_html_tags_go_and_their_words_stay() -> None:
+    assert as_plain_text("<b>Bold</b> and H<sub>2</sub>O, press <kbd>⌘</kbd>+<kbd>C</kbd>") == "Bold and H2O, press ⌘+C"
+    assert as_plain_text("<details><summary>More</summary>\n\nHidden words\n</details>") == "More\n\nHidden words"
+    # Not a tag of HTML: a comparison and a name in brackets stay.
+    assert as_plain_text("x < y and a <custom> word") == "x < y and a <custom> word"
+    # In a code span a tag is code.
+    assert as_plain_text("Use `<b>` for bold") == "Use <b> for bold"
+
+
+def test_entities_read_as_the_characters_they_name() -> None:
+    assert as_plain_text("AT&amp;T &lt;tag&gt; it&#39;s 5&nbsp;GB &mdash; done") == "AT&T <tag> it's 5\xa0GB — done"
+    assert as_plain_text("Tom & Jerry &unknown") == "Tom & Jerry &unknown"
+
+
+def test_footnotes_read_as_numbers_in_brackets() -> None:
+    assert as_plain_text("A claim.[^1]\n\n[^1]: The source.") == "A claim.[1]\n\n[1] The source."
+
+
+def test_a_mark_after_a_backslash_is_the_mark() -> None:
+    assert (
+        as_plain_text("\\*not emphasis\\* and 5 \\* 3 and \\# no heading")
+        == "*not emphasis* and 5 * 3 and # no heading"
+    )
+    assert as_plain_text("\\- not a bullet") == "- not a bullet"

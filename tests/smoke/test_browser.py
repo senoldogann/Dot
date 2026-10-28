@@ -40,6 +40,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 SERVER: ServerConfig = load_default_config().server
 _SLOW_REST_S: float = 8.0
 _LATE_HEADERS_S: float = 3.0
+# How long the server takes to answer a page's own request (item 774): past the time a wait may end early.
+_ANSWER_LATE_S: float = 7.0
 
 # How late the pages of /opens-late answer: within the wait for a new tab (one second), and after it.
 _LATE_TAB_S: float = 0.4
@@ -73,6 +75,27 @@ _PAGES: dict[str, str] = {
 <label><input type="checkbox" name="agree"> I agree</label>
 <button type="submit">Submit form</button>
 </form>""",
+    # A drag from one point to another, the way a captcha's puzzle or a slider is moved (item 792).
+    "/drag": """<!doctype html><title>Drag</title>
+<style>#pad{width:400px;height:200px;background:#eee;position:relative}
+#knob{width:40px;height:40px;background:#333;position:absolute;left:10px;top:10px;border-radius:50%}</style>
+<div id="pad"><div id="knob"></div></div><p id="where">waiting</p>
+<script>
+const pad = document.getElementById("pad"), knob = document.getElementById("knob");
+let down = false;
+knob.addEventListener("pointerdown", () => { down = true; });
+window.addEventListener("pointermove", (event) => {
+  if (!down) return;
+  const box = pad.getBoundingClientRect();
+  knob.style.left = `${event.clientX - box.left - 20}px`;
+  knob.style.top = `${event.clientY - box.top - 20}px`;
+});
+window.addEventListener("pointerup", (event) => {
+  if (!down) return;
+  down = false;
+  document.getElementById("where").textContent = `${Math.round(event.clientX)},${Math.round(event.clientY)}`;
+});
+</script>""",
     "/dropdown": f"""<!doctype html><title>Dropdown</title>
 <label>Shipping <select name="ship"><option value="std">Standard (3-5 days)</option>
 <option value="exp">Express (next day)</option><option value="pick" disabled>Pick up in store</option></select></label>
@@ -107,6 +130,19 @@ _PAGES: dict[str, str] = {
 <button onclick="setTimeout(() => {
   document.getElementById('s').textContent = 'Order placed' }, 1200)">Place order</button>
 <p id="s">Working</p>""",
+    # A page that keeps changing, and one whose answer waits on its server (item 774): neither stands still.
+    "/ticking": """<!doctype html><title>Ticking</title><p id="t">0</p>
+<script>let n = 0; setInterval(() => { document.getElementById('t').textContent = String(++n) }, 300)</script>""",
+    # A page that asks its server every 1.5 s with a short request, as a payment's approval does, and shows the answer
+    # at the fourth: its DOM stands still meanwhile, and a request is rarely under way when it is looked at.
+    "/polling": """<!doctype html><title>Polling</title><p id="s">Waiting for approval</p>
+<script>let polls = 0; const tick = () => fetch('/poll').then(() => { polls += 1;
+  if (polls === 4) { document.getElementById('s').textContent = 'Approved' } else { setTimeout(tick, 1500) } });
+setTimeout(tick, 1500)</script>""",
+    "/pending": """<!doctype html><title>Pending</title>
+<button onclick="fetch('/answer-late').then((r) => r.text()).then(() => {
+  document.getElementById('s').textContent = 'Sent' })">Send</button>
+<p id="s">Sending</p>""",
     # File fields as sites show them (item 704): one moved off the screen under an icon, one hidden in its label, one
     # next to a button that does not open it, and two behind one button that opens the chooser of the second. Each says
     # what it got.
@@ -277,6 +313,13 @@ class _Handler(BaseHTTPRequestHandler):
             time.sleep(_LATE_TAB_S)
         if path == "/later-tab":
             time.sleep(_LATER_TAB_S)
+        if path == "/poll":
+            self._plain(b"not yet")
+            return
+        if path == "/answer-late":
+            time.sleep(_ANSWER_LATE_S)
+            self._plain(b"ok")
+            return
         if path == "/half-page":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -298,6 +341,13 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             body = b"not found"
             self.send_response(404)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _plain(self, body: bytes) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -379,6 +429,14 @@ async def test_click_returns_only_what_changed(browser: BrowserSession, site: st
     assert outcome.view.mode == "delta"
     assert '"1"' in outcome.view.body or ": 1" in outcome.view.body
     assert len(outcome.view.body) < len(view.body) / 2
+
+
+async def test_drag_at_moves_a_knob_from_one_pixel_to_another(browser: BrowserSession, site: str) -> None:
+    await browser.open_url("drag", f"{site}/drag", True)
+    outcome: ActOutcome = await act(browser, "drag", [Step(action="drag_at", x=38, y=38, to_x=220, to_y=120)], False)
+    assert [report.outcome for report in outcome.steps] == ["done"], outcome.steps
+    view: PageView = await browser.snapshot("drag", True)
+    assert "220,120" in view.body, view.body
 
 
 async def test_form_batch_fills_selects_checks_and_submits(browser: BrowserSession, site: str) -> None:
@@ -521,6 +579,14 @@ async def test_iframe_content_gets_refs_that_work(browser: BrowserSession, site:
     assert "clicked inside frame" in (await browser.snapshot("frame", True)).body
 
 
+async def test_a_wait_for_text_sees_it_come_inside_an_iframe(browser: BrowserSession, site: str) -> None:
+    """The review of every module: the wait looked at the main document alone and waited out its time."""
+    view: PageView = await browser.open_url("frame-wait", f"{site}/", True)
+    await act(browser, "frame-wait", [Step(action="click", ref=ref_of(view.body, 'button "Frame button"'))], False)
+    wait: TextWait = await browser.wait_text("frame-wait", "clicked inside frame", 10.0, True)
+    assert wait.appeared and wait.waited_s < 3.0, wait.waited_s
+
+
 async def test_password_fields_are_never_typed_into(browser: BrowserSession, site: str) -> None:
     view: PageView = await browser.open_url("secret", f"{site}/", True)
     ref: str = ref_of(view.body, 'textbox "Account password"')
@@ -626,6 +692,48 @@ async def test_a_wait_for_text_that_does_not_come_fails_and_still_shows_the_page
     assert result.is_error
     assert result.untrusted  # the gate counts no failed result as a read, and this one shows the page
     assert result.text.startswith(f"The text did not appear within {wait.waited_s:.1f} s; the page now · Tab 1 of 1 · ")
+
+
+async def test_a_wait_for_text_on_a_page_that_stands_still_ends_once_it_has_for_three_seconds(
+    browser: BrowserSession, site: str
+) -> None:
+    """Item 774: a text the page shows no sign of bringing is not waited for to the end of the wait's time."""
+    view: PageView = await browser.open_url("wait-still", f"{site}/later", True)
+    await act(browser, "wait-still", [Step(action="click", ref=ref_of(view.body, 'button "Place order"'))], False)
+    wait: TextWait = await browser.wait_text("wait-still", "Payment failed", 20.0, True)
+    assert not wait.appeared and wait.still_s == 3.0 and wait.ended_by is None
+    assert 4.9 < wait.waited_s < 7.5, wait.waited_s
+    assert "Order placed" in (await browser.read_text("wait-still", None, 0, 2000)).text
+    result: ToolResult = wait_text_result(wait, "n0nce", 20_000)
+    assert result.is_error and result.untrusted
+    assert result.text.startswith(
+        f"The text has not appeared; the wait ended after {wait.waited_s:.1f} s because the page has not changed for "
+        "3 s and waits on nothing: as it stands the text is not coming; the page now · Tab 1 of 1 · "
+    ), result.text
+
+
+async def test_a_page_that_keeps_changing_or_waits_on_its_server_is_waited_for(
+    browser: BrowserSession, site: str
+) -> None:
+    """Item 774: a page that changes, one of whose requests is under way, or one that polls its server, does not stand
+    still. Their tabs are closed after, so that a page that keeps ticking slows no later test of the module."""
+    try:
+        await browser.open_url("wait-ticking", f"{site}/ticking", True)
+        ticking: TextWait = await browser.wait_text("wait-ticking", "Done", 6.5, True)
+        assert not ticking.appeared and ticking.still_s is None
+        assert ticking.waited_s >= 6.4, ticking.waited_s
+        view: PageView = await browser.open_url("wait-pending", f"{site}/pending", True)
+        await act(browser, "wait-pending", [Step(action="click", ref=ref_of(view.body, 'button "Send"'))], False)
+        sent: TextWait = await browser.wait_text("wait-pending", "Sent", 15.0, True)
+        assert sent.appeared, sent
+        assert _ANSWER_LATE_S - 1.0 < sent.waited_s < _ANSWER_LATE_S + 2.0, sent.waited_s
+        # A page that polls its server is at work although no request may be under way when it is looked at.
+        await browser.open_url("wait-polling", f"{site}/polling", True)
+        approved: TextWait = await browser.wait_text("wait-polling", "Approved", 15.0, True)
+        assert approved.appeared, approved
+    finally:
+        for thread in ("wait-ticking", "wait-pending", "wait-polling"):
+            await browser.release_thread(thread)
 
 
 def _file(path: Path) -> Path:

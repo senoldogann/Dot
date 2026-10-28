@@ -1,5 +1,6 @@
 """Typed configuration: the packaged ``defaults.toml`` deep-merged with the user's ``config.toml``."""
 
+import ipaddress
 import re
 import tomllib
 from importlib import resources
@@ -319,6 +320,7 @@ class AgentConfig(FrozenModel):
     questions: QuestionMode
     parallel_tools: int = Field(ge=1)
     model_call_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    connection_check_s: float = Field(ge=0, allow_inf_nan=False)
     model_wait_s: float = Field(ge=0, allow_inf_nan=False)
     quota_wait_s: float = Field(ge=0, allow_inf_nan=False)
     max_concurrent_runs: int = Field(ge=1)
@@ -514,7 +516,7 @@ class AssistantConfig(FrozenModel):
 
 
 class SnapshotsConfig(FrozenModel):
-    """SnapShots (item 405): whether both Command keys together, or a double tap of one, capture the window in front
+    """Snapshots (item 405): whether both Command keys together, or a double tap of one, capture the window in front
     into the open chat's composer, whether the window's text comes with it, the sound that says it was taken, whether
     the capture animates into the box (its card flies to Dot's window, item 414), whether the window flashes as it is
     captured, whether Dot's window comes to the front with it, and how close the two taps must be."""
@@ -537,10 +539,12 @@ class ChannelsConfig(FrozenModel):
     """Which of the owner's messaging apps reach Dot (item 572): whether Dot reads the owner's conversation with
     themselves in Messages and answers in it, and tells them there what it says on its own (item 582) (``imessage``),
     and whether a run started from there tells what it does while it works (``progress``, item 618). Settings ›
-    Channels switches both, live."""
+    Channels switches both, live. ``language`` is the language of the lines Dot writes there itself (item 805):
+    ``auto`` speaks the language of the owner's last message."""
 
     imessage: bool
     progress: ProgressMode
+    language: Literal["auto", "en", "tr"] = "auto"
 
 
 # What a reaction does once the run it is about has ended (item 586): ``follow_up`` starts a run in the same chat, as
@@ -928,6 +932,111 @@ class PluginsConfig(FrozenModel):
     dirs: list[str] = Field(default_factory=list)
 
 
+# Whether runs trade, and with what money (docs/trading.md): no trading tools at all, an account of Dot's own that
+# trades at the market's real prices with money that is not there, or the owner's Coinbase account.
+TradingMode = Literal["off", "paper", "live"]
+# Among [trading] products (item 771): every product of the quote with [trading] min_volume a day.
+ANY_PRODUCT: str = "*"
+_PRODUCT: re.Pattern[str] = re.compile(r"[A-Z0-9]{2,10}-[A-Z]{3,5}")
+_CURRENCY: re.Pattern[str] = re.compile(r"[A-Z]{3,5}")
+
+
+def is_product_id(text: str) -> bool:
+    """Whether ``text`` reads as a Coinbase product id, as BTC-EUR: what a product of Coinbase's list must be before it
+    is shown to a run (item 772), as a name in [trading] products must."""
+    return _PRODUCT.fullmatch(text) is not None
+
+
+class ReconConfig(FrozenModel):
+    """Network reconnaissance (``[recon]``, item 776, docs/recon.md). A passive audit reads what a browser's visit
+    reads, on any public site; an active one asks which common ports answer, and runs only on a host whose name is in
+    ``owned_hosts``, or is a subdomain of one: the owner's own, or one they may test. Nothing else can widen it, and
+    the list is empty until the owner writes it."""
+
+    owned_hosts: tuple[str, ...] = ()
+
+    @field_validator("owned_hosts")
+    @classmethod
+    def _host_names(cls, hosts: tuple[str, ...]) -> tuple[str, ...]:
+        names: list[str] = []
+        for host in hosts:
+            name: str = host.strip().lower().rstrip(".")
+            if (
+                not name
+                or "/" in name
+                or "*" in name
+                or "://" in name
+                or any(character.isspace() for character in name)
+            ):
+                raise ValueError(
+                    f"[recon] owned_hosts holds bare host names, without a wildcard, port, scheme or path; not {host!r}"
+                )
+            if ":" in name:
+                try:
+                    ipaddress.IPv6Address(name)
+                except ValueError:
+                    raise ValueError(
+                        "[recon] owned_hosts holds bare host names, without a wildcard, port, scheme or path; an "
+                        f"IPv6 address is written without brackets; not {host!r}"
+                    ) from None
+            names.append(name)
+        return tuple(dict.fromkeys(names))
+
+
+class TradingConfig(FrozenModel):
+    """Trading on Coinbase (``[trading]``, docs/trading.md). The limits are in ``quote``, the currency every product of
+    ``products`` is priced in, and no run can raise them: a run cannot change this file, and an order past one of them
+    is refused before it reaches any market, in every mode, yolo's too. ``max_order`` is the most one order may be
+    worth, ``max_day`` the most the orders of a day (the owner's day, ``[scheduler] timezone``) may add up to, buys and
+    sells, ``max_day_loss`` how much the account may lose in a day before no buy is placed until the next (a sell still
+    is), ``max_position`` the most one product held may be worth after a buy. ``paper_start`` is what the paper account
+    starts with, ``paper_fee_rate`` the share of an order its fills pay, as Coinbase's taker fee does."""
+
+    mode: TradingMode
+    quote: str
+    products: list[str] = Field(min_length=1, max_length=50)
+    # With "*" among the products (item 771): every product priced in quote that trades at least this much of the
+    # quote a day, as Coinbase sums it; a market thinner than that is one a small order moves, and one a pump empties.
+    min_volume: float = Field(default=1_000_000.0, ge=0, allow_inf_nan=False)
+    max_order: float = Field(gt=0, allow_inf_nan=False)
+    max_day: float = Field(gt=0, allow_inf_nan=False)
+    max_day_loss: float = Field(gt=0, allow_inf_nan=False)
+    max_position: float = Field(gt=0, allow_inf_nan=False)
+    paper_start: float = Field(gt=0, allow_inf_nan=False)
+    paper_fee_rate: float = Field(ge=0, lt=0.1, allow_inf_nan=False)
+    timeout_s: float = Field(gt=0, le=120, allow_inf_nan=False)
+    # A move of the market that starts a run (item 772): the id of the schedule it starts ("": none), the least move
+    # over fifteen minutes, in percent, that does, how many such runs a day may have and how many minutes apart.
+    wake_schedule: str = Field(default="", max_length=64)
+    wake_move_pct: float = Field(default=3.0, gt=0, le=100, allow_inf_nan=False)
+    wake_per_day: int = Field(default=6, ge=0, le=96)
+    wake_gap_min: float = Field(default=30.0, ge=5, le=1440, allow_inf_nan=False)
+
+    @field_validator("quote")
+    @classmethod
+    def _currency(cls, value: str) -> str:
+        if _CURRENCY.fullmatch(value) is None:
+            raise ValueError('[trading] quote is a currency code in capitals, as "EUR"')
+        return value
+
+    @model_validator(mode="after")
+    def _products_in_quote(self) -> Self:
+        wrong: list[str] = [
+            product
+            for product in self.products
+            if product != ANY_PRODUCT
+            and (_PRODUCT.fullmatch(product) is None or not product.endswith(f"-{self.quote}"))
+        ]
+        if wrong:
+            raise ValueError(
+                f'[trading] products are Coinbase product ids priced in {self.quote}, as BTC-{self.quote}, or "*": '
+                + ", ".join(wrong)
+            )
+        if self.max_order > self.max_day:
+            raise ValueError("[trading] max_order is more than max_day, which every order counts against")
+        return self
+
+
 # Who the typed judge asks: nobody, or TypeSafe's System One API.
 JudgeProvider = Literal["none", "typesafe"]
 
@@ -980,6 +1089,8 @@ class AppConfig(FrozenModel):
     skills: SkillsConfig
     plugins: PluginsConfig
     scout: ScoutConfig
+    recon: ReconConfig
+    trading: TradingConfig
 
     @field_validator("mcp")
     @classmethod

@@ -1,17 +1,23 @@
 """The iMessage channel (item 572), against a ``chat.db`` the test makes and a runner of AppleScript that stands for
 ``osascript``: what it hands the router, whom it answers and how, and how a handle is paired with a code."""
 
+import io
+import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
+import Quartz
 from channel_stand_ins import Osascript
+from Foundation import NSData, NSMutableData
 from messages_db import PAYMENT_BALLOON, STICKER_BALLOON, URL_BALLOON, MessagesDb, attributed_body
 from picture_files import HEADS, Layout, layout
+from PIL import Image
 from step_records import step_answered, step_ended
 from structlog.testing import capture_logs
 
+from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.channels import imessage
 from dotagent.channels.handles import STATE_KEY, ImessageState
 from dotagent.channels.imessage import (
@@ -28,10 +34,21 @@ from dotagent.channels.imessage import (
     IMessageChannel,
     link_form,
 )
-from dotagent.channels.intake import ATTACHMENT, FLOOD, MAX_PER_MINUTE, STALE_S, TOO_OLD, UNREAD_NOTE, too_long
+from dotagent.channels.inbox import ATTACHMENTS_DIR, Incoming
+from dotagent.channels.intake import (
+    ATTACHMENT,
+    FILES_ONLY_NOTE,
+    FLOOD,
+    MAX_PER_MINUTE,
+    STALE_S,
+    TOO_OLD,
+    UNREAD_NOTE,
+    too_long,
+)
 from dotagent.channels.pictures import Picture
 from dotagent.channels.staging import MARKER as STAGING_MARK
 from dotagent.channels.staging import STAGED_KEPT_S, Staging
+from dotagent.channels.words import ENGLISH, TURKISH, SpokenLanguage
 from dotagent.core.errors import ChannelError, DesktopError, DesktopPermissionError
 from dotagent.drafts.scripts import SCRIPTS
 from dotagent.store.db import Store
@@ -56,9 +73,11 @@ class Clock:
 class Heard:
     def __init__(self) -> None:
         self.texts: list[str] = []
+        self.files: list[tuple[Incoming, ...]] = []
 
-    async def __call__(self, text: str) -> None:
+    async def __call__(self, text: str, files: tuple[Incoming, ...] = ()) -> None:
         self.texts.append(text)
+        self.files.append(files)
 
 
 @pytest_asyncio.fixture
@@ -96,6 +115,11 @@ async def _paired(
 ) -> IMessageChannel:
     """A channel that has the handles paired (as the owner would, with a code typed back) and has set its cursor."""
     channel: IMessageChannel = _channel(store, db, runner, clock, staging)
+    await _pair(channel, runner, clock, *handles)
+    return channel
+
+
+async def _pair(channel: IMessageChannel, runner: Osascript, clock: Clock, *handles: str) -> None:
     await channel.load()
     for handle in handles:
         await channel.send_code(handle)
@@ -104,7 +128,6 @@ async def _paired(
         await channel.confirm(code)
     runner.calls.clear()
     await channel.poll(Heard())
-    return channel
 
 
 async def test_the_first_poll_sets_the_cursor_and_reads_nothing(
@@ -193,12 +216,14 @@ async def test_switching_on_again_starts_from_now(
     own: int = db.chat(PHONE)
     db.message(own, "sent while the channel was off", at=NOW)
     await channel.start_from_now()
+    # Written in the second after the switch, before the next look (the review of every module): it is read.
+    db.message(own, "sent right after the switch", at=NOW)
     heard: Heard = Heard()
     await channel.poll(heard)
-    assert heard.texts == []
+    assert heard.texts == ["sent right after the switch"]
     db.message(own, "sent after", at=NOW)
     await channel.poll(heard)
-    assert heard.texts == ["sent after"]
+    assert heard.texts == ["sent right after the switch", "sent after"]
 
 
 async def test_what_was_written_while_no_number_was_paired_is_never_run(
@@ -212,12 +237,14 @@ async def test_what_was_written_while_no_number_was_paired_is_never_run(
     await channel.send_code(PHONE)
     clock.now += 5
     await channel.confirm(runner.sent[-1][1].split("code is ")[1][:7])
+    # Written in the seconds after the pairing, before the next look (the review of every module): it is read.
+    db.message(own, "written right after the pairing", at=NOW)
     heard: Heard = Heard()
     await channel.poll(heard)
-    assert heard.texts == []
+    assert heard.texts == ["written right after the pairing"]
     db.message(own, "written once it is paired again", at=NOW)
     await channel.poll(heard)
-    assert heard.texts == ["written once it is paired again"]
+    assert heard.texts == ["written right after the pairing", "written once it is paired again"]
 
 
 async def test_an_answer_goes_to_the_chat_the_owner_wrote_in_after_the_marker(
@@ -1537,3 +1564,225 @@ async def test_with_no_picture_sent_a_file_and_no_words_is_the_owners_and_is_tol
     db.message(db.chat(PHONE), None, attachment=True, at=NOW + 1)
     await channel.poll(Heard())
     assert runner.sent == [(PHONE, f"{MARKER}{ATTACHMENT}")]
+
+
+# ----- the files the owner sends (item 806) -----------------------------------------------------------------------
+
+
+def _jpeg() -> bytes:
+    shot: io.BytesIO = io.BytesIO()
+    Image.new("RGB", (40, 30), (200, 30, 30)).save(shot, "JPEG")
+    return shot.getvalue()
+
+
+def _heic() -> bytes:
+    """A photo as an iPhone takes it, written by macOS's ImageIO."""
+    png: io.BytesIO = io.BytesIO()
+    Image.new("RGB", (40, 30), (30, 200, 30)).save(png, "PNG")
+    data: bytes = png.getvalue()
+    source = Quartz.CGImageSourceCreateWithData(NSData.dataWithBytes_length_(data, len(data)), None)
+    image = Quartz.CGImageSourceCreateImageAtIndex(source, 0, None)
+    out = NSMutableData.data()
+    destination = Quartz.CGImageDestinationCreateWithData(out, "public.heic", 1, None)
+    Quartz.CGImageDestinationAddImage(destination, image, None)
+    assert Quartz.CGImageDestinationFinalize(destination)
+    return bytes(out)
+
+
+def _written(path: Path, data: bytes) -> Path:
+    path.write_bytes(data)
+    return path
+
+
+def _attached(db: MessagesDb, name: str, data: bytes | None, **row: object) -> tuple[int, Path]:
+    """A message with a file, kept where Messages keeps what messages bring (beside its database); ``data`` ``None``
+    leaves the file not come down yet."""
+    folder: Path = db.path.parent / ATTACHMENTS_DIR / "ab" / "12" / f"guid-{name}"
+    folder.mkdir(parents=True, exist_ok=True)
+    path: Path = folder / name
+    if data is not None:
+        path.write_bytes(data)
+    text: object = row.pop("text", None)
+    at: object = row.pop("at", NOW + 1)
+    rowid: int = db.message(db.chat(PHONE), text if isinstance(text, str) else None, attachment=True, at=float(str(at)))
+    mime: object = row.pop("mime", "")
+    size: object = row.pop("size", len(data or b""))
+    db.attach(rowid, str(path), name, str(mime), size=int(str(size)))
+    return rowid, path
+
+
+async def test_a_photo_alone_is_handed_to_the_run_with_the_note_that_no_words_came(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    _attached(db, "IMG_0001.JPG", _jpeg(), mime="image/jpeg")
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [FILES_ONLY_NOTE]
+    assert [(file.name, file.media_type) for file in heard.files[0]] == [("IMG_0001.JPG", "image/jpeg")]
+    assert heard.files[0][0].data == _jpeg() and runner.sent == []
+
+
+async def test_an_iphone_photo_is_drawn_as_png_and_the_words_with_it_are_the_command(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    _attached(db, "IMG_0002.HEIC", _heic(), mime="image/heic", text="bu ne?")
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == ["bu ne?"]
+    (photo,) = heard.files[0]
+    assert (photo.name, photo.media_type) == ("IMG_0002.png", "image/png")
+    assert photo.data.startswith(b"\x89PNG") and Image.open(io.BytesIO(photo.data)).size == (40, 30)
+
+
+async def test_a_voice_message_is_not_read_and_the_owner_is_told_what_dot_reads(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    _attached(db, "Audio Message.caf", b"caff" * 10, mime="", size=40)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [] and runner.sent == [(PHONE, f"{MARKER}{ATTACHMENT}")]
+
+
+async def test_words_with_a_video_run_and_the_run_is_told_the_video_was_not_read(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    _attached(db, "clip.mov", b"\x00" * 64, mime="video/quicktime", text="what happens here?")
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [f"what happens here?\n\n{UNREAD_NOTE}"] and heard.files == [()]
+
+
+async def test_a_file_outside_the_folder_of_attachments_is_never_read(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, tmp_path: Path
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    secret: Path = _written(tmp_path / "private.txt", b"not for the run")
+    rowid: int = db.message(db.chat(PHONE), "read this", attachment=True, at=NOW + 1)
+    db.attach(rowid, str(secret), "private.txt", "text/plain", size=15)
+    # And a link inside the folder that leads out of it, and a name that climbs out with ``..``.
+    _, inside = _attached(db, "link.txt", None, text="and this", mime="text/plain", size=15)
+    inside.symlink_to(secret)
+    climbing: int = db.message(db.chat(PHONE), "and that", attachment=True, at=NOW + 2)
+    db.attach(climbing, str(db.path.parent / ATTACHMENTS_DIR / ".." / "private.txt"), "x.txt", "text/plain", size=15)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [f"read this\n\n{UNREAD_NOTE}", f"and this\n\n{UNREAD_NOTE}", f"and that\n\n{UNREAD_NOTE}"]
+    assert heard.files == [(), (), ()]
+
+
+async def test_a_file_over_twenty_megabytes_is_not_read(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    _attached(db, "big.pdf", b"%PDF" + b"\x00" * (MAX_ATTACHMENT_BYTES + 1), mime="application/pdf", text="sum it up")
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [f"sum it up\n\n{UNREAD_NOTE}"] and heard.files == [()]
+
+
+async def test_a_file_that_has_not_come_down_is_waited_for_then_said_to_be_coming(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = IMessageChannel(
+        store, runner, db.path, 5.0, OWN_BASE, poll_s=0.01, clock=clock, files_wait_s=0.0
+    )
+    await _pair(channel, runner, clock, PHONE)
+    _attached(db, "IMG_0003.JPG", None, mime="image/jpeg", size=500)
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [] and runner.sent == [(PHONE, f"{MARKER}{ENGLISH.files_coming}")]
+
+
+async def test_the_copy_of_a_photo_one_apple_id_keeps_twice_is_run_once(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    rowid, path = _attached(db, "IMG_0004.JPG", _jpeg(), mime="image/jpeg")
+    copy: int = db.message(db.chat(PHONE), None, attachment=True, at=NOW + 2, from_me=False, sender=db.handle(PHONE))
+    db.attach(copy, str(path), "IMG_0004.JPG", "image/jpeg", size=len(_jpeg()))
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [FILES_ONLY_NOTE] and rowid < copy
+
+
+async def test_a_photo_after_turkish_words_leaves_dot_speaking_turkish(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    """The review: the router heard the words it was handed, which end in Dot's English notes to the run, and a photo
+    turned the language to English; the channel hears the owner's own words alone."""
+    spoken: SpokenLanguage = SpokenLanguage(store, lambda: "auto")
+    channel: IMessageChannel = IMessageChannel(
+        store, runner, db.path, 5.0, OWN_BASE, poll_s=0.01, clock=clock, language=spoken
+    )
+    await _pair(channel, runner, clock, PHONE)
+    db.message(db.chat(PHONE), "Bugün hava nasıl?", at=NOW + 1)
+    _attached(db, "IMG_0005.JPG", _jpeg(), mime="image/jpeg")
+    _attached(db, "clip.mov", b"\x00" * 64, mime="video/quicktime", text="bu ne?")
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert len(heard.texts) == 3 and spoken.words() is TURKISH
+
+
+async def test_a_stop_after_a_file_that_is_coming_ends_the_wait(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = IMessageChannel(
+        store, runner, db.path, 5.0, OWN_BASE, poll_s=0.01, clock=time.monotonic, files_wait_s=60.0
+    )
+    await _pair(channel, runner, clock, PHONE)
+    _attached(db, "IMG_0006.JPG", None, mime="image/jpeg", size=500, text="look at this")
+    db.message(db.chat(PHONE), "stop", at=NOW + 3)
+    heard: Heard = Heard()
+    started: float = time.monotonic()
+    await channel.poll(heard)
+    assert time.monotonic() - started < 5.0
+    assert heard.texts == [f"look at this\n\n{UNREAD_NOTE}", "stop"]
+
+
+async def test_a_late_copy_of_a_picture_dot_sent_is_told_by_its_name(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock, home: Layout
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE, staging=_staging(home))
+    clock.now = NOW
+    picture: Picture = _picture(home)
+    await channel.send_picture(picture)
+    later: float = NOW + OWN_LINK_S + 600
+    own: int = db.message(db.chat(PHONE), None, attachment=True, at=later)
+    db.attach(own, "~/Library/Messages/Attachments/aa/01/x/ekran 1.png", "ekran 1.png", "image/png", size=10)
+    # A picture of the owner's at that time, of another name, is theirs.
+    _attached(db, "IMG_0007.JPG", _jpeg(), mime="image/jpeg", at=later + 1)
+    clock.now = later + 5
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [FILES_ONLY_NOTE] and heard.files[0][0].name == "IMG_0007.JPG"
+
+
+async def test_the_files_past_the_first_ten_count_as_not_read(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    channel: IMessageChannel = await _paired(store, db, runner, clock, PHONE)
+    rowid, first = _attached(db, "IMG_1.JPG", _jpeg(), mime="image/jpeg", text="look at all of them")
+    for number in range(2, 12):
+        path: Path = _written(first.with_name(f"IMG_{number}.JPG"), _jpeg())
+        db.attach(rowid, str(path), path.name, "image/jpeg", size=len(_jpeg()))
+    heard: Heard = Heard()
+    await channel.poll(heard)
+    assert heard.texts == [f"look at all of them\n\n{UNREAD_NOTE}"] and len(heard.files[0]) == MAX_ATTACHMENTS
+
+
+async def test_a_row_that_may_be_a_runs_own_does_not_change_the_language(
+    store: Store, db: MessagesDb, runner: Osascript, clock: Clock
+) -> None:
+    spoken: SpokenLanguage = SpokenLanguage(store, lambda: "auto")
+    channel: IMessageChannel = IMessageChannel(
+        store, runner, db.path, 5.0, OWN_BASE, poll_s=0.01, clock=clock, language=spoken
+    )
+    await _pair(channel, runner, clock, PHONE)
+    await spoken.hear("Bugün hava nasıl?")
+    db.message(db.chat(PHONE), "Please check the build and tell me what failed", at=NOW + 1, later={"schedule_type": 2})
+    await channel.poll(Heard())
+    assert spoken.words() is TURKISH

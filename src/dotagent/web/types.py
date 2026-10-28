@@ -8,12 +8,15 @@ REFUSED_STATUS: frozenset[int] = frozenset({401, 403, 429, 503, 999})
 
 
 class FetchedDocument(FrozenModel):
-    """One answer from the web: the final address, the status, the body (cut at the size limit) and the redirects."""
+    """One answer from the web: the final address, the status, its headers, the body (cut at the size limit) and the
+    redirects. The headers are kept as they came, repeats and all, for what reads a site's own words of itself
+    (item 776)."""
 
     url: str
     status: int
     media_type: str
     charset: str | None
+    headers: tuple[tuple[str, str], ...] = ()
     body: bytes
     truncated: bool
     redirected_from: tuple[str, ...]

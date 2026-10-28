@@ -17,6 +17,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
+from dotagent.llm import reach
 from dotagent.llm.anthropic import FAST_MODE_MODELS, AnthropicProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.ollama import OllamaProvider
@@ -339,6 +340,33 @@ class ModelRouter:
                 call_error=call.error,
                 exc_info=error,
             )
+
+    def address(self, ref: ModelRef) -> str | None:
+        """The address of the server a call of ``ref`` goes to (item 769): its provider's ``base_url``; ``None`` for
+        OpenCode's agent, a server of Dot's own, and for a provider served by a connector given through
+        :meth:`register` (the scripted model of the evals and of the tests), whose calls go nowhere it names."""
+        if ref.provider in self._registered:
+            return None
+        providers = self._config.providers
+        match ref.provider:
+            case "ollama":
+                return providers.ollama.base_url
+            case "openai":
+                return providers.openai.base_url
+            case "opencode_go":
+                return providers.opencode_go.base_url
+            case "anthropic":
+                return providers.anthropic.base_url
+            case "openrouter":
+                return providers.openrouter.base_url
+            case _:
+                return None
+
+    async def reaches(self, ref: ModelRef) -> bool:
+        """Whether this Mac can connect to the server of ``ref`` now (:func:`~dotagent.llm.reach.reaches`); yes when it
+        has no address to check (:meth:`address`)."""
+        address: str | None = self.address(ref)
+        return address is None or await reach.reaches(address)
 
     async def model_info(self, ref: ModelRef) -> ModelInfo:
         provider: ChatProvider = await self.provider(ref.provider)

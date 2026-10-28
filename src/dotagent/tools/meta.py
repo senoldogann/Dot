@@ -23,12 +23,15 @@ from dotagent.agent.plan import (
     with_step_status,
 )
 from dotagent.agent.questions import Option, QuestionOption, answered
+from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import EventRecord, RunMode
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
 from dotagent.tools.groups import CORE_GROUP, groups_of, tools_in
+
+_log = get_logger(__name__)
 
 FINISH_TOOL: str = "finish"
 ASK_USER_TOOL: str = "ask_user"
@@ -145,6 +148,11 @@ def _ask_user_tool() -> RegisteredTool:
         # is: the answer reaches the run as the user's message while it works (``RunManager.decide``).
         if ctx.questions == "leave" or (ctx.questions == "choose" and not args.wait):
             await ctx.runtime.approvals.leave(ctx.run_id, ASK_USER_TOOL, args.question, "question", details)
+            # A question left on a chat nobody is watching is no question: tell the user where it is (item 797).
+            try:
+                await ctx.runtime.notify("Dot has a question", args.question)
+            except Exception as error:  # noqa: BLE001 - a notification that fails must not fail the question
+                _log.warning("question_notify_failed", run_id=ctx.run_id, error=str(error))
             return ok(_LEFT_RESULT if ctx.questions == "leave" else _GOES_ON_RESULT)
         outcome: ApprovalOutcome = await ctx.runtime.approvals.request(
             ctx.run_id, ASK_USER_TOOL, args.question, "question", details

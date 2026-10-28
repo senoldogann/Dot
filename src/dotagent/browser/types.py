@@ -21,6 +21,7 @@ type StepAction = Literal[
     "uncheck",
     "scroll_into_view",
     "click_at",
+    "drag_at",
     "insert",
     "drag",
 ]
@@ -43,7 +44,7 @@ _REF_ACTIONS: frozenset[str] = frozenset(
 )
 _TEXT_ACTIONS: frozenset[str] = frozenset({"fill", "type", "select", "insert"})
 _SIDE_EFFECT_ACTIONS: frozenset[str] = frozenset(
-    {"click", "double_click", "right_click", "select", "press", "check", "uncheck", "click_at", "drag"}
+    {"click", "double_click", "right_click", "select", "press", "check", "uncheck", "click_at", "drag_at", "drag"}
 )
 
 
@@ -57,7 +58,9 @@ class Step(BaseModel):
             "click | double_click | right_click | hover | fill (replace the value of a field) | type (key by key, for "
             "autocomplete widgets) | insert (put the text in at once, without keys: long text, editors) | select "
             "(choose an option by value or label) | press (a key or chord) | check | uncheck | scroll_into_view | "
-            "drag (move the element ref onto to_ref) | click_at (viewport pixel x,y from a screenshot, for canvases)."
+            "drag (move the element ref onto to_ref) | click_at (viewport pixel x,y from a screenshot: a canvas, or a "
+            "cross-origin widget like a captcha) | drag_at (press at x,y and move to to_x,to_y: a slider or a "
+            "captcha's drag puzzle, where no ref reaches inside the frame)."
         )
     )
     ref: str | None = Field(default=None, description="Element ref from the latest snapshot, for example e12.")
@@ -70,8 +73,10 @@ class Step(BaseModel):
         ),
     )
     key: str | None = Field(default=None, description="Key or chord for press, for example Enter or Control+A.")
-    x: float | None = Field(default=None, description="Viewport x in CSS pixels, for click_at.")
-    y: float | None = Field(default=None, description="Viewport y in CSS pixels, for click_at.")
+    x: float | None = Field(default=None, description="Viewport x in CSS pixels, for click_at and drag_at's start.")
+    y: float | None = Field(default=None, description="Viewport y in CSS pixels, for click_at and drag_at's start.")
+    to_x: float | None = Field(default=None, description="Viewport x in CSS pixels where a drag_at lets go.")
+    to_y: float | None = Field(default=None, description="Viewport y in CSS pixels where a drag_at lets go.")
 
     @model_validator(mode="before")
     @classmethod
@@ -100,6 +105,15 @@ class Step(BaseModel):
             raise ValueError("press needs a key")
         if action == "click_at" and (self.x is None or self.y is None or self.ref is not None):
             raise ValueError("click_at needs x and y and no ref")
+        if action == "drag_at" and (
+            self.x is None
+            or self.y is None
+            or self.to_x is None
+            or self.to_y is None
+            or self.ref is not None
+            or self.to_ref is not None
+        ):
+            raise ValueError("drag_at needs x, y, to_x and to_y and no refs")
         if action == "drag" and self.to_ref is None:
             raise ValueError("drag needs a to_ref")
         unused: list[str] = []
@@ -107,8 +121,10 @@ class Step(BaseModel):
             unused.append("text")
         if self.key is not None and action != "press":
             unused.append("key")
-        if (self.x is not None or self.y is not None) and action != "click_at":
+        if (self.x is not None or self.y is not None) and action not in ("click_at", "drag_at"):
             unused.append("x/y")
+        if (self.to_x is not None or self.to_y is not None) and action != "drag_at":
+            unused.append("to_x/to_y")
         if self.ref is not None and action not in _REF_ACTIONS and action != "press":
             unused.append("ref")
         if self.to_ref is not None and action != "drag":
@@ -204,6 +220,8 @@ class TextWait(FrozenModel):
     view: PageView
     # What ended a wait the text did not end before its time (item 698): a dialog that opened in front of the page.
     ended_by: str | None = None
+    # How long the page had stood still when that ended the wait (item 774), None when it did not.
+    still_s: float | None = None
 
 
 class TextView(FrozenModel):
@@ -277,7 +295,7 @@ class SecretField(FrozenModel):
 
 
 # What a step does at a field that takes a secret: it returns to let the text in, and raises to refuse.
-type SecretFieldCheck = Callable[[SecretField], Awaitable[None]]
+type SecretFieldCheck = Callable[[SecretField, str | None], Awaitable[None]]
 
 
 class Viewport(FrozenModel):

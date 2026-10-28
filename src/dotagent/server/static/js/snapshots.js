@@ -1,4 +1,4 @@
-// SnapShots on the page (item 405): the composer on screen takes the captures the daemon keeps for it, as they come (a
+// Snapshots on the page (item 405): the composer on screen takes the captures the daemon keeps for it, as they come (a
 // lifecycle event) and when the composer is made (the ones that waited), and the page says why one failed. Only the
 // pages of this Mac take them (item 414): a capture is made here, and a phone's page, reached through [server] reach,
 // would take it away from the Mac's box. A page claims a capture only once it is in sight, so that the tab the daemon
@@ -33,7 +33,7 @@ async function claim() {
   try {
     claimed = await api.post("/snapshots/claim", null);
   } catch (error) {
-    console.warn("the captures of SnapShots could not be claimed", error);
+    console.warn("the captures of Snapshots could not be claimed", error);
     return;
   }
   held.push(...claimed.files.map((taken) => ({ files: taken.files, animated: claimed.animations })));
@@ -131,7 +131,7 @@ function wire() {
         });
       }
     } else if (event.kind === "snapshot_failed") {
-      toast("error", `SnapShots: ${event.data.reason}.`);
+      toast("error", `Snapshots: ${event.data.reason}.`);
     }
   });
 }

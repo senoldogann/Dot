@@ -1,7 +1,7 @@
-"""The flash and the flight of a capture of SnapShots (item 414): over the window just captured a soft white flash, then
+"""The flash and the flight of a capture of Snapshots (item 414): over the window just captured a soft white flash, then
 a card with the picture that flies to Dot's window as it comes to the front, the way another coding agent shows its own
 captures. The daemon has no AppKit run loop for windows of its own (its main thread runs the event loop), so a helper
-process draws them (``python -m dotagent.desktop.flight``), started with SnapShots and fed one JSON line per command
+process draws them (``python -m dotagent.desktop.flight``), started with Snapshots and fed one JSON line per command
 (:class:`FlightCommand`): ``begin`` flashes the window's frame and lifts the card off it, ``land`` flies the card to
 Dot's window, or to the corner of the screen when none came to the front. Frames are the screen's, from its top left,
 as CGWindowList gives them. The helper takes no permission: it draws, and reads nothing of the screen."""

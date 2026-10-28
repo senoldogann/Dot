@@ -23,7 +23,7 @@ import threading
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 
 import pytest
 import pytest_asyncio
@@ -113,7 +113,8 @@ Send by address</button>"""
 _SEARCH: str = """<!doctype html><title>Search</title><h1>Search</h1>
 <form action="/found" method="get"><label>Query <input name="q"></label><button type="submit">Go</button></form>"""
 # A password input whose label holds a div: the AI snapshot gives the div a ref of its own, and the fill follows the
-# label to the input. The form sends by GET: its method says so, or it names none (a browser sends it by GET).
+# label to the input. The form would send by GET: its method says so, or it names none (a browser sends it by GET);
+# Dot makes it send by POST before the password goes in (item 775).
 _LABELLED: str = """<!doctype html><title>Labelled</title><h1>Labelled</h1>
 <form action="/found" {method}><label><div>Secret phrase</div>
 <input name="pass" type="password" autocomplete="current-password"></label><button type="submit">Go</button></form>"""
@@ -592,39 +593,40 @@ def _ref_in(view: str, pattern: str) -> str:
 async def _tried_by_the_labels_div(
     runtime: Runtime, sites: _Sites, secret: str, path: str = "labelled-get"
 ) -> tuple[ToolContext, RunGate]:
-    """A run that gives the ref of the div inside the label of a password input of a form that sends by GET (the ref of
-    the input itself too, which is refused) and then clicks Go, as a run that was told to would."""
+    """A run that gives the ref of the input of a password field of a form that would send by GET, then the ref of the
+    div inside its label, and then clicks Go, as a run that was told to would: both fill the input (item 775)."""
     login: str = await _a_login(await _vault(runtime), sites, secret)
     ctx, gate = await _context(runtime, "yolo")
     opened: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"https://127.0.0.1:{sites.shop.port}/{path}"})
     on_input: str = _ref_in(opened.text, r'textbox "Secret phrase" \[ref=([^\]]+)\]')
     on_div: str = _ref_in(opened.text, r"generic \[ref=([^\]]+)\]: Secret phrase")
+    page: Page = _page(runtime, ctx.thread_id)
     for ref in (on_input, on_div):
-        with pytest.raises(BrowserError, match="sends what is typed in the page's address"):
-            await _call(ctx, gate, "browser_fill_login", {"login": login, "password": ref})
-    # Nothing was typed, so nothing is held back for the chat.
-    assert await _page(runtime, ctx.thread_id).locator("[name=pass]").input_value() == ""
-    assert not runtime.browser.holds_back(ctx.thread_id)
+        await _call(ctx, gate, "browser_fill_login", {"login": login, "password": ref})
+        assert await page.locator("[name=pass]").input_value() == secret
+        assert await page.locator("form").get_attribute("method") == "post"
     seen: ToolResult = await _call(ctx, gate, "browser_snapshot", {})
     await _call(ctx, gate, "browser_act", {"steps": [{"action": "click", "ref": _button(seen.text, "Go")}]})
     return ctx, gate
 
 
 @pytest.mark.parametrize("path", ["labelled-get", "labelled-bare"])
-async def test_a_ref_inside_the_label_of_a_password_input_is_refused_in_a_form_that_sends_by_get_as_the_inputs_own_is(
+async def test_a_ref_inside_the_label_of_a_password_input_sends_it_by_post_in_a_form_that_would_send_by_get(
     parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites, path: str
 ) -> None:
     """The AI snapshot gives a div, a span or a b in a label a ref of its own, and Playwright's fill writes the label's
     input. The form was asked of the element the ref named, a div that has none, so the password went into a form that
-    sends by GET (or names no method) and a click on Go wrote it into the tab's address. The field is the control of
-    the label, found once, and the ref of the input and the ref of the div are refused alike, with nothing typed."""
+    sends by GET (or names no method) and a click on Go wrote it into the tab's address (item 621). The field is the
+    control of the label, found once, and its form is made to send by POST before the password goes in (item 775): Go
+    sends it in the body, and no address that holds it reaches the site."""
     runtime, _, _ = parts
     secret: str = f"Zq9-Label-Get-{path}"
+    before: int = len(sites.shop.submissions)
     ctx, _ = await _tried_by_the_labels_div(runtime, sites, secret, path)
     page: Page = _page(runtime, ctx.thread_id)
     assert secret not in page.url and quote(secret, safe="") not in page.url
     assert not _reached(sites.shop, secret), sites.shop.requested
-    assert any(requested.startswith("/found?pass=") for requested in sites.shop.requested), "the form was sent empty"
+    assert f"pass={quote_plus(secret)}" in sites.shop.submissions[before:], sites.shop.submissions
 
 
 async def test_a_ref_inside_the_label_of_a_password_input_fills_the_input_and_marks_it_and_only_it_in_a_form_that_posts(

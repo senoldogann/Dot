@@ -202,6 +202,29 @@ async def test_a_switched_off_schedule_runs_by_hand_as_its_firing_runs_and_keeps
     assert await firing_failure(runtime.store, created.id) is None
 
 
+async def test_a_move_of_the_market_starts_a_switched_on_schedule_saying_what_moved(
+    runtime: Runtime, manager: RunManager, scheduler: Scheduler, client: httpx.AsyncClient
+) -> None:
+    """Item 772: the trading watch starts the schedule ``[trading] wake_schedule`` names when the market moves, as a run
+    by hand goes, in a chat whose title says the market started it, its first message saying what moved; its time
+    stays as it was, and a schedule switched off is not started."""
+    created: ScheduleRecord = await _schedule(client, {"name": "trading shift", "goal": "Trade.", "cron": "15 * * * *"})
+    moved: str = "SOL-USDC +4.20 % in 15 minutes (it usually moves 0.60 %), now 187 USDC"
+    run: RunRecord = await scheduler.fire_for_signal(created.id, time.time(), moved)
+    chat_title: str = (await runtime.store.get_thread(run.thread_id)).title
+    assert chat_title.startswith("trading shift · ") and chat_title.endswith(" · market"), chat_title
+    assert (await _ended(manager, run)).status == "done"
+    assert any(
+        f"by a move of the market, not at its time: {moved})" in opened and "Trade." in opened
+        for opened in WORKER.opened
+    ), WORKER.opened
+    after: ScheduleRecord = await _settled(runtime, scheduler, created.id)
+    assert (after.enabled, after.next_run_at, after.last_status) == (True, created.next_run_at, "done")
+    await client.post(f"/api/schedules/{created.id}/disable")
+    with pytest.raises(RunConflict, match="switched off"):
+        await scheduler.fire_for_signal(created.id, time.time(), moved)
+
+
 async def test_a_one_time_schedule_run_by_hand_is_still_due_at_its_time(
     runtime: Runtime, manager: RunManager, scheduler: Scheduler, client: httpx.AsyncClient
 ) -> None:

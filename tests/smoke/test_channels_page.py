@@ -222,9 +222,9 @@ async def test_the_tab_stands_beside_phone_and_says_where_imessage_stands(browse
         await expect(_fact(page, "Links in messages")).to_contain_text("[server] reach")
         if width >= 1280:
             nav: Locator = page.get_by_role("navigation", name="Settings")
-            labels: Locator = nav.locator(".settings-nav-label")
-            await expect(labels.nth(8)).to_have_text("Phone")
-            await expect(labels.nth(9)).to_have_text("Channels")
+            # Beside Phone, whatever tabs stand before them (Trading came between Vault and Rules, item 764).
+            labels: list[str] = await nav.locator(".settings-nav-label").all_text_contents()
+            assert "Phone" in labels and labels[labels.index("Phone") + 1] == "Channels", labels
             await expect(nav.locator("[aria-current='page'] .settings-nav-label")).to_have_text("Channels")
             await expect(page.get_by_role("heading", level=1)).to_have_text("Channels")
         await _fits(page, f"{width} {scheme}")

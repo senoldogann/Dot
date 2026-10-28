@@ -67,6 +67,7 @@ from dotagent.store.models import (
     ScheduleRecord,
     ThreadRecord,
 )
+from dotagent.trading.watch import TradingWatch
 
 log = get_logger(__name__)
 
@@ -93,6 +94,12 @@ def by_hand_goal(goal: str, now: float, zone: ZoneInfo) -> str:
     """The goal of a run the owner started by hand (item 455), after a note that it did not start at its time: what its
     run reads first, while the run keeps the goal alone, as a late firing's does (:func:`late_goal`)."""
     return f"(Started by hand at {format_local(now, zone)}, not at its time.)\n\n{goal}"
+
+
+def signal_goal(goal: str, now: float, zone: ZoneInfo, signal: str) -> str:
+    """The goal of a run a move of the market started (item 772), after a note of what moved: what its run reads first,
+    while the run keeps the goal alone, as a run started by hand does (:func:`by_hand_goal`)."""
+    return f"(Started at {format_local(now, zone)} by a move of the market, not at its time: {signal})\n\n{goal}"
 
 
 def _following(record: ScheduleRecord, now: float, zone: ZoneInfo) -> float | None:
@@ -147,6 +154,9 @@ class Scheduler:
         self._scouting: asyncio.Task[None] | None = None
         # Dot's own initiative (item 715): its runs while the Mac is idle, started from the tick.
         self._initiative: Initiative = Initiative(runtime, manager)
+        # The watch of trading (items 770, 772): sells at a stop or a target, with no model, between runs, and starts
+        # the schedule [trading] wake_schedule names when the market moves.
+        self._trading_watch: TradingWatch = TradingWatch(runtime, self.fire_for_signal)
 
     async def start(self) -> asyncio.Task[None]:
         """Begin ticking in the background; what an earlier process left unfinished (a schedule starting or running a
@@ -229,7 +239,8 @@ class Scheduler:
         failures of the parts that fire schedules and start sessions are raised together at the end, as an
         ``ExceptionGroup``, and a tick that raises counts towards the end of the loop (:meth:`_tick_forever`); a
         failure of the others (the reflection, the harness's step, the record of how learning fares, Dot's own
-        initiative of item 715) is logged at each tick with the part's name and never raises (item 688)."""
+        initiative of item 715, the trading watch's exits and its look at the market of items 770 and 772) is logged at
+        each tick with the part's name and never raises (item 688)."""
         failures: list[Exception] = []
         for part in (self._fire_due, self._start_due_sessions):
             try:
@@ -243,6 +254,8 @@ class Scheduler:
             self._scout_if_due,
             self._check_learning,
             self._initiative.tick,
+            self._trading_watch.tick,
+            self._trading_watch.look_at_market,
         ):
             try:
                 await part(now)
@@ -593,9 +606,11 @@ class Scheduler:
         if late:
             log.warning("schedule_fired_late", schedule_id=record.id, overdue_s=round(overdue_s))
         told: str = late_goal(record.goal, due, now, zone) if late else record.goal
-        carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
         started: RunRecord | None = None
         try:
+            # Read inside the try (item 785): a store that fails here keeps a one-time schedule due, as a run that did
+            # not start does, where the firing above had switched it off for good.
+            carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
             started = await self._start(record, firing_opening(told, digest), thread_id, carried)
         except DotError as exc:
             if _chat_busy(exc) and not one_time:
@@ -657,10 +672,30 @@ class Scheduler:
         while the owner's emergency stop is engaged, nor while a run of the schedule is at work or being started
         (:class:`RunConflict`). A run that cannot start is the caller's error, the chat made for it gone, and it is no
         missed firing: the owner is looking."""
+        return await self._fire_out_of_time(schedule_id, now, None)
+
+    async def fire_for_signal(self, schedule_id: str, now: float, signal: str) -> RunRecord:
+        """Start a run of the schedule ``schedule_id`` now, because the market moved (item 772, ``signal`` says what):
+        as a run started by hand goes (:meth:`fire_by_hand`), in a chat whose title says the market started it (or in
+        the schedule's chat), its first message saying what moved, its end told as the schedule's firings' are. A
+        schedule switched off is not started (:class:`RunConflict`): the owner switched its runs off."""
+        return await self._fire_out_of_time(schedule_id, now, signal)
+
+    async def _fire_out_of_time(self, schedule_id: str, now: float, signal: str | None) -> RunRecord:
+        """Start a run of the schedule ``schedule_id`` now, out of its time: by hand, or, with ``signal``, because the
+        market moved."""
         store: Store = self._runtime.store
         record: ScheduleRecord = await store.get_schedule(schedule_id)
         if await _emergency_stop_engaged():
             raise RunConflict("no schedule starts while the emergency stop is engaged", {"schedule_id": schedule_id})
+        if signal is not None and not record.enabled:
+            raise RunConflict("the schedule a move of the market starts is switched off", {"schedule_id": schedule_id})
+        if signal is not None and await self._paused_agent(record) is not None:
+            # A paused agent's schedules start nothing by themselves (item 465); a move of the market is no hand
+            # (item 785).
+            raise RunConflict(
+                "the agent the schedule a move of the market starts runs as is paused", {"schedule_id": schedule_id}
+            )
         await self._adopt_resumed(record)
         if schedule_id in self._in_flight or schedule_id in self._starting:
             raise RunConflict(
@@ -671,20 +706,23 @@ class Scheduler:
         try:
             zone: ZoneInfo = await schedule_zone(record.options, self._zone)
             same_chat, digest = await self._history(record, zone)
-            by_hand: str = thread_title(f"{record.name} · {format_local(now, zone)} · by hand")
-            record, digest, title = await self._briefed(record, digest, now, zone, by_hand)
+            why: str = "by hand" if signal is None else "market"
+            out_of_time: str = thread_title(f"{record.name} · {format_local(now, zone)} · {why}")
+            record, digest, title = await self._briefed(record, digest, now, zone, out_of_time)
             thread_id, made = await self._firing_chat(record, same_chat, title)
-            carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
+            goal: str = (
+                by_hand_goal(record.goal, now, zone) if signal is None else signal_goal(record.goal, now, zone, signal)
+            )
             started: RunRecord | None = None
             try:
-                started = await self._start(
-                    record, firing_opening(by_hand_goal(record.goal, now, zone), digest), thread_id, carried
-                )
+                # Inside the try, as a firing's (item 785): a store that fails here drops the chat made for the run.
+                carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
+                started = await self._start(record, firing_opening(goal, digest), thread_id, carried)
             finally:
                 if started is None and made:
                     await self._drop_chat(record.id, thread_id)
             run: RunRecord = started
-            await self._track(record.id, run, BY_HAND_LEVEL)
+            await self._track(record.id, run, BY_HAND_LEVEL if signal is None else self._level(record))
             try:
                 await store.record_schedule_hand_run(record.id, now, thread_id)
             except DotError as exc:
@@ -699,7 +737,7 @@ class Scheduler:
         finally:
             self._starting.discard(schedule_id)
         log.info(
-            "schedule_fired_by_hand",
+            "schedule_fired_by_hand" if signal is None else "schedule_fired_by_market",
             schedule_id=record.id,
             run_id=run.id,
             thread_id=thread_id,

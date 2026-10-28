@@ -25,10 +25,17 @@ def _config(minutes: float, tokens: int) -> AgentConfig:
 
 
 def test_only_task_and_research_runs_with_a_limit_set_have_limits() -> None:
-    assert limits_of(load_default_config().agent, "task") is None
+    assert limits_of(load_default_config().agent, "task") == RunLimits(max_minutes=120, max_tokens=10_000_000)
+    assert limits_of(_config(0, 0), "task") is None
     assert limits_of(_config(30, 0), "chat") is None
     assert limits_of(_config(30, 0), "task") == RunLimits(max_minutes=30, max_tokens=0)
     assert limits_of(_config(0, 200_000), "research") == RunLimits(max_minutes=0, max_tokens=200_000)
+
+
+def test_a_run_has_a_default_ceiling_and_zero_turns_it_off() -> None:
+    """Item 797: a run that varies its steps ends at two hours or ten million tokens unless the owner opts out."""
+    assert limits_of(load_default_config().agent, "task") == RunLimits(max_minutes=120, max_tokens=10_000_000)
+    assert limits_of(_config(0, 0), "task") is None
 
 
 def test_eval_runs_are_cut_by_their_task_not_by_the_limits_of_the_owner() -> None:

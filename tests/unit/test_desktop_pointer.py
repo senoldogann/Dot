@@ -237,7 +237,7 @@ def test_a_pointer_fades_after_its_last_move_also_when_a_capture_hid_and_reveale
 async def test_with_two_captures_at_once_the_pointer_comes_back_only_after_the_second(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Item 706's review: a SnapShot while a run takes a screenshot; the first that ends does not put the pointer back
+    """Item 706's review: a Snapshot while a run takes a screenshot; the first that ends does not put the pointer back
     over the other."""
     told: list[str] = []
     _stand_in(

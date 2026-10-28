@@ -42,11 +42,12 @@ _VERDICT: dict[Behavior, Verdict] = {"allow": "allow", "preapproved": "allow", "
 _STRICTNESS: dict[Verdict, int] = {"allow": 0, "ask": 1, "handoff": 2, "deny": 3}
 # What settles a step before the policy reads any rule (policy/engine.py, decide_past_review; the gate's pace): a rule
 # changes nothing there, but for one that hands the step off, which the guard of messages and posts, the guard of a
-# login filled from the password manager (item 493) and a spend within its caps give way to.
+# login filled from the password manager (item 493), the guard of an order with real money (item 763) and a spend
+# within its caps give way to.
 _BEFORE_RULES: frozenset[DecisionSource] = frozenset(
-    {"auto_review", "mode", "own_files", "hard_stop", "guard", "vault", "spend", "pace"}
+    {"auto_review", "mode", "own_files", "hard_stop", "guard", "vault", "trade", "spend", "pace"}
 )
-_HANDOFF_FIRST: frozenset[DecisionSource] = frozenset({"guard", "vault", "spend"})
+_HANDOFF_FIRST: frozenset[DecisionSource] = frozenset({"guard", "vault", "trade", "spend"})
 
 
 def candidate_rule(behavior: Behavior, tool_glob: str, match_regex: str, existing: Sequence[RuleRecord]) -> RuleRecord:

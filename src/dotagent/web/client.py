@@ -6,7 +6,7 @@ import socket
 import zlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urlencode, urljoin, urlsplit
 
 import httpcore
 import httpx
@@ -83,6 +83,7 @@ class _Exchange:
     media_type: str
     charset: str | None
     location: str | None
+    headers: tuple[tuple[str, str], ...]
     body: bytes
     truncated: bool
 
@@ -139,6 +140,29 @@ def _deny_all_cookies() -> httpx.Cookies:
     return httpx.Cookies(http.cookiejar.CookieJar(policy=http.cookiejar.DefaultCookiePolicy(allowed_domains=[])))
 
 
+async def checked_addresses(host: str, port: int, *, allow_private_hosts: bool) -> tuple[str, ...]:
+    """The addresses ``host`` resolves to, checked a moment before a connection is opened: every one of them has to be
+    public unless ``allow_private_hosts``, so a name with a private address among its answers cannot reach the local
+    network. A caller connects to these addresses and keeps ``host`` only as the TLS server name, so a second lookup
+    cannot move the connection (DNS rebinding)."""
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise WebError("the host name could not be resolved", {"host": _shown(host), "error": str(exc)}) from exc
+    except UnicodeError as exc:
+        # The IDNA codec refuses a label over 63 characters or an empty one (``a..b``) before any lookup (item 116).
+        raise WebError("the host name is not a valid domain name", {"host": _shown(host), "error": str(exc)}) from exc
+    found: tuple[str, ...] = order_addresses([str(info[4][0]) for info in infos])
+    private: tuple[str, ...] = tuple(address for address in found if not is_public_address(address))
+    if private and not allow_private_hosts:
+        raise WebError(
+            "the host is on a private or local network address; the web tools only reach the public internet "
+            "(web.allow_private_hosts)",
+            {"host": _shown(host), "addresses": list(private)},
+        )
+    return found
+
+
 class _CheckedBackend(httpcore.AsyncNetworkBackend):
     """Opens TCP connections to addresses that were resolved and checked a moment before, so a host name cannot be
     pointed at the local network between the check and the connection. Verification of the certificate still uses
@@ -149,24 +173,7 @@ class _CheckedBackend(httpcore.AsyncNetworkBackend):
         self._allow_private_hosts: bool = allow_private_hosts
 
     async def _checked_addresses(self, host: str, port: int) -> tuple[str, ...]:
-        try:
-            infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
-        except socket.gaierror as exc:
-            raise WebError("the host name could not be resolved", {"host": _shown(host), "error": str(exc)}) from exc
-        except UnicodeError as exc:
-            # The IDNA codec refuses a label over 63 characters or an empty one (``a..b``) before any lookup (item 116).
-            raise WebError(
-                "the host name is not a valid domain name", {"host": _shown(host), "error": str(exc)}
-            ) from exc
-        found: tuple[str, ...] = order_addresses([str(info[4][0]) for info in infos])
-        private: tuple[str, ...] = tuple(address for address in found if not is_public_address(address))
-        if private and not self._allow_private_hosts:
-            raise WebError(
-                "the host is on a private or local network address; the web tools only reach the public internet "
-                "(web.allow_private_hosts)",
-                {"host": _shown(host), "addresses": list(private)},
-            )
-        return found
+        return await checked_addresses(host, port, allow_private_hosts=self._allow_private_hosts)
 
     # The signature is the one of the httpcore interface this class implements, defaults included.
     async def connect_tcp(
@@ -259,6 +266,15 @@ class WebClient:
             current = urljoin(current, exchange.location)
         raise WebError("too many redirects", {"url": _shown(url), "redirects": len(visited), "limit": _MAX_REDIRECTS})
 
+    async def post_form(self, url: str, data: Mapping[str, str], max_bytes: int) -> FetchedDocument:
+        """POST a form's fields as ``application/x-www-form-urlencoded`` (item 781). A redirect is not followed, so
+        the answer's status and ``Location`` say whether the form was accepted."""
+        body: bytes = urlencode(list(data.items())).encode("utf-8")
+        exchange: _Exchange = await self._exchange(
+            "POST", url, {"Content-Type": "application/x-www-form-urlencoded"}, body, max_bytes
+        )
+        return _document(url, exchange, ())
+
     async def post_json(self, url: str, headers: Mapping[str, str], body: bytes, max_bytes: int) -> FetchedDocument:
         """POST a JSON body to an API; redirects are not followed, and the request is tried again only when it was not
         sent (a connection that could not be opened)."""
@@ -337,6 +353,7 @@ class WebClient:
             media_type=media_type,
             charset=charset,
             location=location,
+            headers=tuple(response.headers.items()),
             body=body,
             truncated=truncated,
         )
@@ -348,6 +365,7 @@ def _document(url: str, exchange: _Exchange, redirected_from: tuple[str, ...]) -
         status=exchange.status,
         media_type=exchange.media_type,
         charset=exchange.charset,
+        headers=exchange.headers,
         body=exchange.body,
         truncated=exchange.truncated,
         redirected_from=redirected_from,

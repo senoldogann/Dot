@@ -279,9 +279,16 @@ textarea {
   color: var(--faint);
 }
 
+/* Words that keep one line: a date and time, whose hyphens are places to break (item 778). */
+.nowrap {
+  white-space: nowrap;
+}
+
+/* Ids, paths and keys show the letters they hold: no ligature turns `-----` into a rule or `->` into an arrow. */
 .mono {
   font-family: var(--mono);
   font-size: var(--text-sm);
+  font-variant-ligatures: none;
 }
 
 .small {
@@ -939,6 +946,22 @@ a.pill:hover {
   background-position: right 8px center;
 }
 
+/* A model's name over what it can do (item 778), so that its reasoning and chat size menus stay inside the card. */
+.model-cell-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.model-cell .cluster {
+  margin-top: var(--space-1);
+}
+
+.model-cell .cluster:empty {
+  display: none;
+}
+
 /* The reasoning menus of one table line up, whatever their longest option is. */
 .reasoning-cell .select {
   width: 10.5rem;
@@ -1038,6 +1061,7 @@ a.pill:hover {
 .textarea.mono {
   font-family: var(--mono);
   font-size: var(--text-sm);
+  font-variant-ligatures: none;
 }
 
 .field {
@@ -1305,6 +1329,17 @@ a.pill:hover {
   .card-head:has(> .grow ~ :is(.hint, .input, .count, .badge, .small, .muted, .mono)) > .input[type="search"] {
     flex: 1 1 100%;
     width: auto;
+  }
+
+  /* A head whose buttons carry words (Appearance's Create theme and Add theme, item 787) wraps the same way: the name
+     on the first line, the buttons under it, where a 320 px phone squeezed the name between them. */
+  .card-head:has(> .grow ~ .btn > .label) {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .card-head:has(> .grow ~ .btn > .label) > .grow {
+    flex: 1 1 100%;
   }
 }
 
@@ -1642,13 +1677,20 @@ a.pill:hover {
   font-weight: var(--weight-title);
 }
 
+/* An account's address beside its Sign out; where both do not fit (a phone), the button goes under the address rather
+   than breaking it mid-domain (item 778). */
 .account-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
   padding-left: 36px;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.account-row > .grow {
+  flex: 1 1 14rem;
 }
 
 /* The cards of Customize › Connectors (item 316): a card's lines stand clear of the line under its head and of its first
@@ -4055,10 +4097,11 @@ dialog.modal.versions-dialog {
   animation: none;
 }
 
-/* The value sits a breath from the icon and the chevron; a long model name gives way with an ellipsis. */
+/* The value sits a breath from the icon and the chevron; a long model name gives way with an ellipsis, only where the bar
+   is short: at 200 px it ended in one beside room it could have filled (item 778). */
 .composer-pill-value {
   min-width: 0;
-  max-width: 200px;
+  max-width: 20rem;
   padding-inline: var(--space-half);
   overflow: hidden;
   font-weight: var(--weight-label);
@@ -6233,6 +6276,15 @@ a.schedule-line:hover .schedule-made {
   display: none;
 }
 
+/* A fold that draws its own chevron shows no native triangle beside it (item 782), in Chrome and in WebKit alike. */
+summary:has(> .chev) {
+  list-style: none;
+}
+
+summary:has(> .chev)::-webkit-details-marker {
+  display: none;
+}
+
 .child-face {
   position: relative;
   flex: none;
@@ -7149,6 +7201,11 @@ a.schedule-line:hover .schedule-made {
 
   .chat-loops .background-label {
     min-width: 0;
+  }
+
+  /* How often it asks again and when next take a second line where one is short (item 787), rather than end in dots. */
+  .chat-loops .background-time {
+    white-space: normal;
   }
 }
 
@@ -8414,8 +8471,8 @@ dialog.lightbox img {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .pill .label,
-  .btn .label {
+  /* A pill keeps its mark alone; a button keeps its words (item 787): a phone has no hover to say what an icon is. */
+  .pill .label {
     display: none;
   }
 
@@ -8853,7 +8910,7 @@ button.attach-chip:hover {
   flex: none;
 }
 
-/* A capture of SnapShots comes into the box with a small spring (item 405); reduced motion shows it in place. */
+/* A capture of Snapshots comes into the box with a small spring (item 405); reduced motion shows it in place. */
 .attach-chip.arrived {
   animation: chip-arrive var(--motion-slow) var(--ease-emphasis) both;
 }
@@ -8875,7 +8932,7 @@ button.attach-chip:hover {
   }
 }
 
-/* A picture of SnapShots on its way into its chip (item 414): drawn over the page, the script moves it. */
+/* A picture of Snapshots on its way into its chip (item 414): drawn over the page, the script moves it. */
 .attach-flight {
   position: fixed;
   z-index: 100;
@@ -9128,9 +9185,10 @@ button.attach-chip:hover {
   gap: var(--space-3);
 }
 
-/* A team's card holds a name, what it is for and a row of faces, so its columns are wider: three across at most. */
+/* A team's card holds a name, what it is for and a row of faces, so its columns are wider: two across at most, each as
+   wide as two of the agents' columns and their gap, so that the two grids end at the same edge (item 782). */
 .team-grid {
-  grid-template-columns: repeat(auto-fill, minmax(max(260px, calc((100% - 2 * var(--space-3)) / 3)), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(max(260px, calc((100% - var(--space-3)) / 2)), 1fr));
 }
 
 /* An agent's compact card: the face at the left of the name over the role, each on one line, and under them the title of
@@ -9175,8 +9233,9 @@ button.attach-chip:hover {
 
 .agent-card-name {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1) var(--space-2);
   min-width: 0;
   font-weight: var(--weight-label);
 }
@@ -10177,6 +10236,19 @@ button.attach-chip:hover {
   .btn.icon-only,
   .btn.sm.icon-only {
     width: 36px;
+  }
+
+  /* A finger's target is 44 px (item 787): the button keeps its 36 px, and a ring of 4 px around it answers a tap too.
+     The ring is placed from the button, which `:where` makes positioned without outweighing a button that a rule of its
+     own places (the key field's eye, inside its field, is absolute and stays so). */
+  :where(.btn.icon-only) {
+    position: relative;
+  }
+
+  .btn.icon-only::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
   }
 
   .composer {

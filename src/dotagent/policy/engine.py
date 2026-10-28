@@ -43,8 +43,14 @@ _VAULT_FLAGS: frozenset[Flag] = frozenset({"vault_fill"})
 _VAULT_REASON: str = (
     "Dot asks before it fills a login from your vault or password manager, or makes one, whatever your rules say"
 )
+# An order with real money on the owner's trading account (item 763) waits for the owner's own yes in every mode that
+# asks, whatever their rules say, and is never a review model's to answer; once they say yes, Dot places it.
+_TRADE_FLAGS: frozenset[Flag] = frozenset({"trade"})
+_TRADE_REASON: str = (
+    "Dot asks before it places an order with real money on your trading account, whatever your rules say"
+)
 # The sources of a question that only the owner answers, whatever the approval mode.
-_OWNERS_SOURCES: frozenset[str] = frozenset({"own_files", "vault"})
+_OWNERS_SOURCES: frozenset[str] = frozenset({"own_files", "vault", "trade"})
 _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset(
     {"privilege", "system_settings", "public_post", "external_send", "protected_read"}
 )
@@ -155,6 +161,17 @@ def vault_guard(info: ActionInfo) -> Decision | None:
     if not _intersect(info, _VAULT_FLAGS):
         return None
     return Decision(verdict="ask", source="vault", reason=_VAULT_REASON, rule_id=None)
+
+
+def trade_guard(info: ActionInfo) -> Decision | None:
+    """An order with real money (item 763) waits for the owner's yes in every mode that asks, and no rule of theirs lets
+    it through: only a rule that hands it off is stricter. A yolo run asks nothing and waives it (item 443), within the
+    limits that judge every order in every mode; in ``auto`` the owner answers it, not the review model
+    (:func:`route_for`); a yolo run that read outside content has the review model check it (item 525: ``trade`` is a
+    taint escalation flag)."""
+    if not _intersect(info, _TRADE_FLAGS):
+        return None
+    return Decision(verdict="ask", source="trade", reason=_TRADE_REASON, rule_id=None)
 
 
 def haystack_of(info: ActionInfo) -> str:
@@ -304,7 +321,7 @@ def decide_past_review(
     if stopped is not None:
         return stopped
     rule: RuleRecord | None = match_rule(info if weighed is None else weighed, rules)
-    guarded: Decision | None = guard(info) or vault_guard(info)
+    guarded: Decision | None = guard(info) or vault_guard(info) or trade_guard(info)
     if guarded is not None:
         return _handed_off(rule) if rule is not None and rule.behavior == "handoff" else guarded
     if allowance is not None:

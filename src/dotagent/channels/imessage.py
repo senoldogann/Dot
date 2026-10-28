@@ -31,9 +31,10 @@ send of Dot's), and never reads it as a message.
 
 A handle is paired by sending a code to it that the owner types back in Settings › Channels: the code reaches the
 owner's iPhone only when the handle is theirs. The newest row read is kept as the cursor, so that a restart repeats
-nothing; the first poll sets it and answers nothing. A database whose newest row is below the cursor (it was rebuilt or
-restored, and numbers its rows again) would never be read again: the cursor comes down to its newest row, with a line in
-the log and in the tab (item 611)."""
+nothing; pairing the first handle and switching the channel on set it to the newest row then (item 793), and the
+first poll does only when the database could not be read then. A database whose newest row is below the cursor (it
+was rebuilt or restored, and numbers its rows again) would never be read again: the cursor comes down to its newest
+row, with a line in the log and in the tab (item 611)."""
 
 import asyncio
 import errno
@@ -46,14 +47,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from dotagent.agent.attachments import MAX_ATTACHMENTS
 from dotagent.channels.handles import STATE_KEY, ImessageState, normalize_handle
-from dotagent.channels.intake import Accept, Intake, Skip, Tell, Verdict
+from dotagent.channels.inbox import ATTACHMENTS_DIR, Incoming, RowFile, Unread, read_file
+from dotagent.channels.intake import FILES_ONLY_NOTE, UNREAD_NOTE, Accept, Intake, Skip, Tell, Verdict
 from dotagent.channels.onetime import OneTimeCode, Redeemed, new_code, redeem, shown_code
 from dotagent.channels.pictures import Picture
 from dotagent.channels.seen import COMMAND_KEY, Look, Seen, SeenCommand, Watch, stat_file, wal_path
 from dotagent.channels.sends import runs_sending_at
 from dotagent.channels.staging import Staged, Staging
 from dotagent.channels.types import ChannelId, Receive, is_stop
+from dotagent.channels.words import ENGLISH, SpokenLanguage, Words
 from dotagent.core.errors import ChannelError, DesktopError, DesktopPermissionError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
@@ -67,17 +71,18 @@ log = get_logger(__name__)
 # What starts each of Dot's own messages in the conversation: its rows are the owner's by their flag, and this is what
 # tells them apart.
 MARKER: str = "◆ "
+# How long a file a message brought, which Messages is still bringing down from iCloud, is waited for, and how often it
+# is looked at meanwhile (item 806).
+FILES_WAIT_S: float = 15.0
+# How long a row of a file with the name of a picture Dot sent is Dot's own (item 806), past the minute in which any
+# file with no words is.
+OWN_PICTURE_NAME_S: float = 3600.0
+_FILES_LOOK_S: float = 1.0
 # The longest message Dot sends, the marker with it: a longer answer is cut, with the link to the chat in Dot.
 OUT_CHARS: int = 2000
 POLL_S: float = 3.0
-BY_A_RUN: str = (
-    "Dot did not run that: a run of Dot sent a message at that moment, and Dot cannot tell its message from yours. "
-    "Send it again."
-)
-SCHEDULED: str = (
-    "Dot did not run that: it is a scheduled message, and Dot cannot tell when it was written. Send it now, not "
-    "scheduled."
-)
+BY_A_RUN: str = ENGLISH.by_a_run
+SCHEDULED: str = ENGLISH.scheduled
 # The most rows read in one poll; the rest follow at the next.
 BATCH: int = 50
 # The handles that may be paired: a number and an address, and one more.
@@ -160,7 +165,8 @@ class Row(FrozenModel):
     holds (a link preview's, a sticker's, an app's), ``None`` for plain words and where the database has no such column.
     ``link_at`` is when the last link joined to its words was sent (see :meth:`IMessageChannel._joined`). ``received``
     is a row Messages flags as received, not sent by this Mac's account: it came from the handle its chat is named for
-    (item 595: the iPhone's Apple ID writing to this Mac's)."""
+    (item 595: the iPhone's Apple ID writing to this Mac's). ``files`` are the files it brought, as the rows of their
+    attachments name them (item 806)."""
 
     rowid: int
     chat: str
@@ -171,6 +177,7 @@ class Row(FrozenModel):
     balloon: str | None = None
     link_at: float | None = None
     received: bool = False
+    files: tuple[RowFile, ...] = ()
 
 
 class Verifying(FrozenModel):
@@ -448,8 +455,65 @@ def read_new(db: Path, after: int, handles: Sequence[str]) -> tuple[list[Row], i
             balloon=balloon or None,
             received=not from_me,
         )
+    with_files: list[int] = [rowid for rowid, row in rows.items() if row.attachment]
+    if with_files:
+        files: dict[int, tuple[RowFile, ...]] = _files_of(db, with_files)
+        for rowid in with_files:
+            rows[rowid] = rows[rowid].model_copy(update={"files": files.get(rowid, ())})
     ordered: list[Row] = [rows[rowid] for rowid in sorted(rows)]
     return ordered, (found[-1][0] if len(found) >= BATCH else newest)
+
+
+# The columns of the attachment table that name a file, and the one a sticker is told by, which an older macOS lacks.
+_FILE_COLUMNS: tuple[str, ...] = ("filename", "mime_type", "uti", "transfer_name", "total_bytes")
+
+
+def _files_of(db: Path, rowids: Sequence[int]) -> dict[int, tuple[RowFile, ...]]:
+    """The files the rows ``rowids`` brought (item 806), by row, in the order Messages joined them. A database without
+    the tables or their columns (an older macOS, a test's) gives none: the rows are read as ones whose files are not
+    known."""
+    connection: sqlite3.Connection = open_messages_db(db)
+    try:
+        names: set[str] = {str(column[1]) for column in connection.execute("PRAGMA table_info(attachment)")}
+        if not set(_FILE_COLUMNS) <= names:
+            return {}
+        sticker: str = "COALESCE(attachment.is_sticker, 0)" if "is_sticker" in names else "0"
+        marks: str = ", ".join("?" for _ in rowids)
+        found: list[tuple[int, str | None, str | None, str | None, str | None, int | None, int]] = connection.execute(
+            "SELECT message_attachment_join.message_id, attachment.filename, attachment.mime_type, attachment.uti, "
+            f"attachment.transfer_name, attachment.total_bytes, {sticker} "
+            "FROM message_attachment_join JOIN attachment ON attachment.ROWID = message_attachment_join.attachment_id "
+            f"WHERE message_attachment_join.message_id IN ({marks}) ORDER BY attachment.ROWID",
+            tuple(rowids),
+        ).fetchall()
+    except sqlite3.DatabaseError as error:
+        log.warning("imessage_files_not_read", error=str(error))
+        return {}
+    finally:
+        connection.close()
+    files: dict[int, list[RowFile]] = {}
+    for rowid, path, mime, uti, name, size, is_sticker in found:
+        if not path:
+            continue
+        files.setdefault(rowid, []).append(
+            RowFile(
+                path=path,
+                name=name or Path(path).name,
+                mime=mime or "",
+                uti=uti or "",
+                size=size or 0,
+                sticker=is_sticker != 0,
+            )
+        )
+    return {rowid: tuple(kept) for rowid, kept in files.items()}
+
+
+def _with_notes(text: str, files: tuple[Incoming, ...], unread: int) -> str:
+    """The words a run is given for a message that brought files (item 806): the owner's, or the note that only files
+    came; and the note that not all of what came was read (a voice message, a video, a file not come down yet, a row
+    whose files are not known), when ``unread`` counts any."""
+    said: str = text or (FILES_ONLY_NOTE if files else "")
+    return f"{said}\n\n{UNREAD_NOTE}".strip() if unread else said
 
 
 class IMessageChannel:
@@ -472,8 +536,18 @@ class IMessageChannel:
         poll_s: float = POLL_S,
         clock: Callable[[], float] = time.time,
         staging: Staging | None = None,
+        language: SpokenLanguage | None = None,
+        home: Path | None = None,
+        files_wait_s: float = FILES_WAIT_S,
     ) -> None:
         self._store: Store = store
+        # Where ``~`` in the names of the files a message brought leads (item 806), and how long a file Messages is
+        # still bringing down is waited for.
+        self._home: Path = Path.home() if home is None else home
+        self._files_wait_s: float = files_wait_s
+        # The language of the lines the channel writes itself (item 805), told by the owner's messages; with none they
+        # are in English.
+        self._language: SpokenLanguage | None = language
         self._script: Script = script
         self._db: Path = db
         self._timeout_s: float = timeout_s
@@ -484,12 +558,12 @@ class IMessageChannel:
         # row of it (:meth:`_dots_own_picture`), and the rows that may have been commands, for their copies
         # (:meth:`_copy_of`).
         self._sent: deque[tuple[float, str]] = deque(maxlen=_SENT_KEPT)
-        self._pictures_sent: deque[float] = deque(maxlen=_SENT_KEPT)
+        self._pictures_sent: deque[tuple[float, str]] = deque(maxlen=_SENT_KEPT)
         self._heard: deque[_Heard] = deque(maxlen=_HEARD_KEPT)
         self._poll_s: float = poll_s
         self._clock: Callable[[], float] = clock
         self._state: ImessageState = ImessageState()
-        self._intake: Intake = Intake()
+        self._intake: Intake = Intake(self._words)
         self._pending: _Pending | None = None
         self._code_sent_at: float = -CODE_APART_S
         # What the channel sees of the database (item 595), and the one look or poll at a time that adds to it.
@@ -532,8 +606,10 @@ class IMessageChannel:
         self._state = ImessageState.model_validate_json(kept)
 
     async def start_from_now(self) -> None:
-        """The first poll after this sets the cursor to the newest row and reads nothing before it."""
-        await self._keep(cursor=None)
+        """Read from now on: the cursor is the newest row as it is now, so that a message written before the next look
+        is read (the review of every module: a cursor left unset was set at that look, past it); when the database
+        cannot be read now, the first poll sets it."""
+        await self._keep(cursor=await self._newest_or_none())
 
     # ----- reading ---------------------------------------------------------------------------
 
@@ -680,7 +756,18 @@ class IMessageChannel:
         minute is let go with it: it would only have been told it is not read."""
         if not row.attachment or row.text:
             return False
-        return any(at - _OWN_LINK_BEFORE_S <= row.sent_at <= at + OWN_LINK_S for at in self._pictures_sent)
+        if any(at - _OWN_LINK_BEFORE_S <= row.sent_at <= at + OWN_LINK_S for at, _ in self._pictures_sent):
+            return True
+        # A copy of it that comes later (a Mac that was offline, one Apple ID keeping it twice) is told by the name of
+        # the file Dot sent (item 806): now that a picture alone is a command, it would else run on Dot's own picture.
+        names: set[str] = {file.name.casefold() for file in row.files}
+        return any(
+            at - _OWN_LINK_BEFORE_S <= row.sent_at <= at + OWN_PICTURE_NAME_S and name.casefold() in names
+            for at, name in self._pictures_sent
+        )
+
+    def _words(self) -> Words:
+        return ENGLISH if self._language is None else self._language.words()
 
     async def _handle(self, row: Row, receive: Receive) -> None:
         if row.balloon is not None and row.balloon != URL_BALLOON:
@@ -716,12 +803,24 @@ class IMessageChannel:
         # What would be run is first checked against what Dot's own runs may have written (item 572), but for the one
         # message that only stops a run: Dot stops when told to, whoever may have told it. That is a whole message of
         # the stop words (``/stop``, ``stop``, ``dur``, ``durdur``, item 611).
+        refused: str | None = None
         if isinstance(verdict, Accept) and not is_stop(verdict.text):
-            refused: str | None = await self._not_the_owners(row)
+            refused = await self._not_the_owners(row)
             if refused is not None:
                 verdict = Tell(refused)
+        if self._language is not None and row.text and refused is None:
+            # The owner's words tell the language Dot answers in (item 805), also when they are not run; a row that may
+            # be a run's own does not (the review).
+            await self._language.hear(row.text)
         match verdict:
             case Accept(text):
+                files: tuple[Incoming, ...] = ()
+                if attached and not is_stop(text):
+                    read: tuple[tuple[Incoming, ...], int] | None = await self._files_of(row, text)
+                    if read is None:
+                        return
+                    files, unread = read
+                    text = _with_notes(text, files, unread)
                 if row.chat != self._state.reply_to:
                     await self._keep(reply_to=row.chat)
                 log.info(
@@ -730,14 +829,54 @@ class IMessageChannel:
                     chars=len(text),
                     received=row.received,
                     attachment=attached,
+                    files=len(files),
                 )
                 command: SeenCommand = self._watch.took(row.rowid, self._clock())
-                await receive(text)
+                await receive(text, files)
                 await self._store.kv_set(COMMAND_KEY, command.model_dump_json())
             case Tell(notice):
                 await self._reply(row.chat, notice)
             case Skip(reason):
                 log.info("imessage_message_let_go", rowid=row.rowid, reason=reason)
+
+    async def _files_of(self, row: Row, text: str) -> tuple[tuple[Incoming, ...], int] | None:
+        """The files ``row`` brought, read for the run (item 806), waiting up to :data:`FILES_WAIT_S` for the ones
+        Messages has not finished bringing down, and how many were not read (a row whose files are not known counts
+        one). ``None`` when the message has nothing to run: no words, and no file that could be read, which the owner
+        is told (that it is still coming, or what Dot reads)."""
+        deadline: float = self._clock() + self._files_wait_s
+        while True:
+            read: list[Incoming | Unread] = await asyncio.to_thread(self._read_files, row.files)
+            if "coming" not in read or self._clock() >= deadline:
+                break
+            # A stop the owner sent after this message is not held behind the wait (the review): the message goes on
+            # with what has come, and the stop is read next.
+            if await asyncio.to_thread(self._stop_after, row.rowid):
+                log.info("imessage_files_wait_cut", rowid=row.rowid, reason="a stop came after it")
+                break
+            await asyncio.sleep(_FILES_LOOK_S)
+        files: tuple[Incoming, ...] = tuple(item for item in read if isinstance(item, Incoming))
+        unread: list[Unread] = [item for item in read if not isinstance(item, Incoming)]
+        # The files past the first ten are not read, and count as such (the review).
+        beyond: int = max(0, len(row.files) - MAX_ATTACHMENTS)
+        log.info("imessage_files_read", rowid=row.rowid, read=len(files), unread=sorted(set(unread)), beyond=beyond)
+        if files or text:
+            return files, len(unread) + beyond + (0 if row.files else 1)
+        words: Words = self._words()
+        await self._reply(row.chat, words.files_coming if set(unread) == {"coming"} else words.attachment_only)
+        return None
+
+    def _stop_after(self, rowid: int) -> bool:
+        """Whether a row after ``rowid`` in the owner's conversations only says stop. Blocking."""
+        try:
+            later, _ = read_new(self._db, rowid, self._state.handles)
+        except DesktopError:
+            return False
+        return any(row.text is not None and is_stop(row.text) for row in later)
+
+    def _read_files(self, files: Sequence[RowFile]) -> list[Incoming | Unread]:
+        root: Path = self._db.parent / ATTACHMENTS_DIR
+        return [read_file(file, root, self._home) for file in files[:MAX_ATTACHMENTS]]
 
     def _copy_of(self, row: Row) -> int | None:
         """The row ``row`` is the copy of, or ``None``. With one Apple ID Messages may keep a message to oneself as two
@@ -746,19 +885,23 @@ class IMessageChannel:
         let go. A row is the copy of one row only, so that words said again are run again, and two rows of one kind are
         never copies of each other (the owner repeating themselves). A row that is not a copy and may be a command is
         kept in mind for the copy that may follow it, whatever becomes of it (run, or told why not)."""
-        if not row.text:
+        # A row of files is told by their names too (item 806): a picture alone is a command now, and its copy too.
+        said: str = row.text or ""
+        if row.files:
+            said = f"{said}\x00{'|'.join(file.name for file in row.files)}"
+        if not said:
             return None
         for heard in self._heard:
             if (
                 not heard.copied
                 and heard.chat == row.chat
                 and heard.received != row.received
-                and heard.text == row.text
+                and heard.text == said
                 and abs(heard.sent_at - row.sent_at) <= COPY_S
             ):
                 heard.copied = True
                 return heard.rowid
-        self._heard.append(_Heard(row.rowid, row.chat, row.text, row.sent_at, row.received))
+        self._heard.append(_Heard(row.rowid, row.chat, said, row.sent_at, row.received))
         return None
 
     async def _not_the_owners(self, row: Row) -> str | None:
@@ -771,14 +914,14 @@ class IMessageChannel:
         address cannot be shown, so nothing waives the window for it."""
         if row.scheduled:
             log.warning("imessage_message_scheduled", rowid=row.rowid)
-            return SCHEDULED
+            return self._words().scheduled
         runs: set[str] = set()
         for sent_at in (row.sent_at, row.link_at):
             if sent_at is not None:
                 runs.update(await runs_sending_at(self._store, sent_at, self._clock()))
         if runs:
             log.warning("imessage_message_next_to_a_send", rowid=row.rowid, run_ids=sorted(runs))
-            return BY_A_RUN
+            return self._words().by_a_run
         return None
 
     def _fail(self, message: str, needs: Needs | None) -> None:
@@ -820,7 +963,7 @@ class IMessageChannel:
             raise ChannelError("this channel has no folder to send pictures from", {})
         sent_at: float = self._clock()
         staged: Staged = await asyncio.to_thread(self._staging.stage, picture, sent_at)
-        self._pictures_sent.append(sent_at)
+        self._pictures_sent.append((sent_at, staged.path.name))
         try:
             await self._script("AppleScript", PICTURE_SCRIPT, (str(staged.path), handle), (), self._timeout_s)
         except DesktopError as error:
@@ -880,8 +1023,7 @@ class IMessageChannel:
         code: OneTimeCode = new_code(now)
         await self._send_to(
             handle,
-            f"Dot's pairing code is {shown_code(code)}. Type it in Settings › Channels on your Mac. If you did not ask "
-            "for it, ignore this message.",
+            self._words().fill(self._words().pairing_code, code=shown_code(code)),
         )
         self._pending = _Pending(handle, code)
         self._code_sent_at = now
@@ -900,10 +1042,18 @@ class IMessageChannel:
             tries: int = 0 if outcome.left is None else outcome.left.tries_left
             raise ChannelError(f"that is not the code; {tries} tries are left", {"tries_left": tries})
         self._pending = None
-        # The first number paired starts the reading from now: what was written in its conversation before is not run.
-        fresh: dict[str, object] = {} if self._state.handles else {"cursor": None}
+        # The first number paired starts the reading from now (:meth:`start_from_now`): what was written in its
+        # conversation before is not run, and what is written after the pairing is.
+        fresh: dict[str, object] = {} if self._state.handles else {"cursor": await self._newest_or_none()}
         await self._keep(handles=(*self._state.handles, pending.handle), reply_to=pending.handle, **fresh)
         log.info("imessage_paired")
+
+    async def _newest_or_none(self) -> int | None:
+        """The newest row of the Messages database, ``None`` when it cannot be read now (the next look sets it)."""
+        try:
+            return await asyncio.to_thread(newest_rowid, self._db)
+        except (OSError, sqlite3.Error, DesktopError):
+            return None
 
     async def remove(self, handle_text: str) -> None:
         """Forget a paired handle; the chat with it is no longer read."""

@@ -27,6 +27,14 @@ from dotagent.llm.provider_errors import (
 from dotagent.llm.router import unavailable_reason
 
 SPENT: WireError = WireError(kind="", code="", message="You used all included Pro usage", limit_name="")
+# ollama.com's words of 2026-10-26 (item 789).
+MONTH_LIMIT: WireError = WireError(
+    kind="",
+    code="",
+    message="you (keen_ardinghelli_379) have reached your monthly usage limit, upgrade for higher limits",
+    limit_name="",
+)
+WEEK_LIMIT: WireError = WireError(kind="", code="", message="you have reached your weekly usage limit", limit_name="")
 BURST: WireError = WireError(kind="", code="", message="too many requests", limit_name="")
 EXCLUDED: WireError = WireError(
     kind="", code="", message="this model is not included in your free usage, add usage credits", limit_name=""
@@ -137,3 +145,10 @@ def test_spent_credits_are_told_apart_from_a_spent_usage_window() -> None:
     assert unavailable_reason(classify_opencode(429, credits, None, {})) == "out of credits"
     assert isinstance(classify_opencode(429, window, None, {}), ProviderWindowError)
     assert unavailable_reason(classify_opencode(429, window, None, {})) == "quota exhausted"
+
+
+def test_ollamas_usage_limit_reached_is_no_burst_a_months_is_spent_and_a_weeks_waited_for() -> None:
+    """Item 789: "you have reached your monthly usage limit" was a plain rate limit, retried six times on every call and
+    waited for up to six hours."""
+    assert type(classify_ollama(429, MONTH_LIMIT, None, {})) is ProviderQuotaError
+    assert isinstance(classify_ollama(429, WEEK_LIMIT, None, {}), ProviderWindowError)

@@ -445,6 +445,121 @@ async def test_edit_shows_a_secret_only_when_its_eye_is_pressed_and_delete_remov
         await page.close()
 
 
+async def test_select_ticks_rows_a_shift_click_ticks_a_run_and_delete_removes_the_ticked_ones(
+    browser: Browser, address: str, parts: tuple[Runtime, MemorySecretStore]
+) -> None:
+    """Item 768: Select turns the rows into ticks (a row's words tick it too), Select all and Clear, a search that
+    hides a ticked row unticks it, and Delete asks first and removes the ticked items and their Keychain items."""
+    runtime, keychain = parts
+    await _seed(runtime)
+    page: Page = await _open(browser, address)
+    try:
+        rows: Locator = page.locator("[data-vault-item]")
+        await expect(rows).to_have_count(6)
+        order: list[str] = [await row.get_attribute("data-vault-item") or "" for row in await rows.all()]
+        await page.get_by_role("button", name="Select", exact=True).click()
+        bar: Locator = page.locator(".vault-select-bar")
+        delete: Locator = bar.get_by_role("button", name="Delete", exact=True)
+        await expect(bar.get_by_text("Choose items to delete")).to_be_visible()
+        await expect(delete).to_be_disabled()
+        boxes: Locator = page.locator("input.vault-check")
+        await expect(boxes).to_have_count(6)
+        await expect(page.get_by_role("checkbox", name="github.com, ada@example.com")).to_be_visible()
+        # No Edit or Delete on a row while its tick is shown.
+        await expect(page.get_by_role("button", name="Edit github.com")).to_have_count(0)
+        await bar.get_by_role("button", name="Select all").click()
+        await expect(bar.get_by_text("6 items selected")).to_be_visible()
+        await bar.get_by_role("button", name="Clear").click()
+        await expect(bar.get_by_text("Choose items to delete")).to_be_visible()
+        # A shift-click ticks every row from the one ticked last; a click on a row's words ticks it.
+        await boxes.nth(0).click()
+        await boxes.nth(2).click(modifiers=["Shift"])
+        await expect(bar.get_by_text("3 items selected")).to_be_visible()
+        await rows.nth(4).locator(".vault-title").click()
+        await expect(bar.get_by_text("4 items selected")).to_be_visible()
+        assert [await box.is_checked() for box in await boxes.all()] == [True, True, True, False, True, False]
+        # A ticked row a search hides is unticked: Delete removes what is ticked in sight.
+        await bar.get_by_role("button", name="Select all").click()
+        await expect(bar.get_by_text("6 items selected")).to_be_visible()
+        search: Locator = page.get_by_role("searchbox", name="Search the vault")
+        await search.fill("github")
+        await expect(rows).to_have_count(1)
+        await expect(bar.get_by_text("1 item selected")).to_be_visible()
+        await search.fill("")
+        await expect(rows).to_have_count(6)
+        github: int = order.index(await rows.filter(has_text="github.com").get_attribute("data-vault-item") or "")
+        others: list[int] = [index for index in range(6) if index != github]
+        await boxes.nth(others[0]).click()
+        await boxes.nth(others[1]).click()
+        await expect(bar.get_by_text("3 items selected")).to_be_visible()
+        chosen: set[str] = {order[github], order[others[0]], order[others[1]]}
+        await delete.click()
+        question: Locator = page.get_by_role("dialog", name="Delete 3 items?")
+        await expect(question).to_be_visible()
+        await question.get_by_role("button", name="Cancel").click()
+        await expect(rows).to_have_count(6)
+        await delete.click()
+        await question.get_by_role("button", name="Delete", exact=True).click()
+        await expect(rows).to_have_count(3)
+        await expect(page.get_by_text("Deleted 3 items.")).to_be_visible()
+        assert {await row.get_attribute("data-vault-item") for row in await rows.all()} == set(order) - chosen
+        assert not chosen & set(keychain.kept)
+        # The choosing ends with the delete: the rows have their Edit and Delete again.
+        await expect(bar).to_be_hidden()
+        await expect(page.get_by_role("button", name="Select", exact=True)).to_be_visible()
+        await expect(page.locator(".vault-actions")).to_have_count(3)
+    finally:
+        await page.close()
+
+
+async def test_a_long_list_scrolls_in_its_card_and_draws_its_rows_as_it_is_scrolled(
+    browser: Browser, address: str, parts: tuple[Runtime, MemorySecretStore]
+) -> None:
+    """Item 768: no Show more to press; Select all ticks every item listed, the rows not drawn yet too."""
+    runtime, keychain = parts
+    export: str = "name,url,username,password,note\n" + "".join(
+        f"s{n:03},https://site{n:03}.example,user{n},pw-{n},\n" for n in range(150)
+    )
+    await runtime.vault_items.import_logins(export)
+    page: Page = await _open(browser, address)
+    try:
+        rows: Locator = page.locator("[data-vault-item]")
+        await expect(rows).to_have_count(60)
+        await expect(page.get_by_role("button", name="Show more")).to_have_count(0)
+        scroller: Locator = page.locator(".vault-rows")
+        assert await scroller.evaluate("(list) => list.scrollHeight > list.clientHeight + 100")
+        await scroller.hover()
+        await page.mouse.wheel(0, 100_000)
+        await expect(rows).to_have_count(120)
+        await scroller.evaluate("(list) => { list.scrollTop = list.scrollHeight; }")
+        await expect(rows).to_have_count(150)
+        await expect(rows.last).to_contain_text("site149.example")
+        # A delete keeps the list where it was scrolled.
+        await page.get_by_role("button", name="Select", exact=True).click()
+        await page.get_by_role("checkbox", name="site149.example, user149").click()
+        await page.locator(".vault-select-bar").get_by_role("button", name="Delete", exact=True).click()
+        await page.get_by_role("dialog", name="Delete 1 item?").get_by_role("button", name="Delete", exact=True).click()
+        await expect(rows).to_have_count(149)
+        assert await scroller.evaluate("(list) => list.scrollTop > 1000")
+        await page.reload()
+        await expect(rows).to_have_count(60)
+        await page.get_by_role("button", name="Select", exact=True).click()
+        bar: Locator = page.locator(".vault-select-bar")
+        await bar.get_by_role("button", name="Select all").click()
+        await expect(bar.get_by_text("149 items selected")).to_be_visible()
+        await bar.get_by_role("button", name="Delete", exact=True).click()
+        await (
+            page.get_by_role("dialog", name="Delete 149 items?")
+            .get_by_role("button", name="Delete", exact=True)
+            .click()
+        )
+        await expect(page.get_by_text("Nothing saved yet")).to_be_visible()
+        await expect(page.get_by_role("button", name="Select", exact=True)).to_be_hidden()
+        assert keychain.kept == {}
+    finally:
+        await page.close()
+
+
 async def test_a_saved_name_on_a_card_is_kept_when_left_alone_and_read_by_its_eye_and_removed_by_emptying_it(
     browser: Browser, address: str, parts: tuple[Runtime, MemorySecretStore]
 ) -> None:

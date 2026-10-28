@@ -52,9 +52,9 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   window or a metered key feels it; `allow` lists keep the MCP part short.
 - A run costs what its model costs: the loop makes many calls, and screenshots are expensive. A run has no step limit,
   so what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode,
-  the concurrency limits (`max_concurrent_runs`) and, when you set them, `run_max_minutes` and `run_max_tokens`. Without
-  `stall_escalation` and without those limits, a run that varies its steps without getting anywhere ends only when you
-  stop it.
+  the concurrency limits (`max_concurrent_runs`) and the default ceilings of 120 minutes and 10,000,000 tokens (set
+  `run_max_minutes` or `run_max_tokens` to 0 for no bound; a lower limit to spend less). A run that varies its steps
+  without getting anywhere still ends at a ceiling unless you turn both off.
 - A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run costs.
   What bounds it is Stop, `campaign_max_sessions`, `campaign_failed_sessions` (three failed sessions in a row stop it,
   item 724) and the limits of each session; its page shows the tokens of its sessions. The tests play the sessions and

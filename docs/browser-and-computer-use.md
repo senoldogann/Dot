@@ -170,14 +170,16 @@ Both modes share what follows.
   call is still found. A very long list is cut with the number of options left out and the current choice.
 - `browser_act` runs up to `max_batch_steps` steps in one call (10 by default; a longer batch is cut to the first ones
   and the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`,
-  `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. A step
+  `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag`, `click_at` and
+  `drag_at`. A step
   written as plainly meant is read so (item 755): a `click` at `x` and `y` with no ref is a `click_at`, a step that only
   looks (`snapshot`, `screenshot`, `look`) is left out, as the result shows the page, and an `upload` step fails naming
   `browser_upload`. After a step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets
   the page take one turn of its event loop, by which Chrome has told of a dialog, a file chooser, a navigation or a tab
   the step set off, and waits for such a tab until it is the run's, at most a second (item 342): a tab whose page
   answers later stops the batch with a line that it is opening. Then Dot waits until the page has settled (no DOM change
-  for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared. A read
+  for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared (two
+  downloads of one name at once are saved as `name` and `name-1`, item 800). A read
   of the page (its settling, its size, its snapshot) whose document is replaced under it, as a sign-in that hops through
   several pages replaces it, is made again on the new document once it is parsed, five times at most (item 752). The
   result is the part of the page that changed, with the refs of the last snapshot still valid; a page that did not
@@ -186,7 +188,16 @@ Both modes share what follows.
   the click, a dropdown it opened), its requests, its address, its tabs and its dialogs all stayed as they were for half
   a second, the step's line says it is done but the page did not change, with the fields the page marks invalid (a form
   a required field held back), so that a run does not take a click that did nothing (a button behind something in front
-  of it, one that waits for another event: `browser_eval` with its ref reaches it) for one that worked; a step that
+  of it, one that waits for another event: `browser_eval` with its ref reaches it) for one that worked. A click whose
+  batch left the page unchanged is tried once the other way before the result returns (item 781): the same ref gets the
+  pointer sequence a script sends, and the page is read again, so a step that a script can move does not need a model
+  round trip; a click that already moved the page is never sent twice, a step that failed is left alone, and a batch
+  that sends, posts, pays, removes, installs or hands over a credential is never clicked again this way (item 792: such
+  a button may act slower than half a second, and a second click would do it twice). A page that has not settled when
+  the steps, a script or an upload went through is said, rather than failing the call, which a run took for a step that
+  did not happen (item 792): after steps or an upload in the page's notes ("do not repeat it"), after a script in what
+  it says happened ("then: …"), with any surprise of the tab. When the page cannot be read after steps or an upload
+  that went through, the error names the steps that did and says not to repeat them (item 800). A step that
   changed the page names what the page says new in an alert or a live region and the fields it newly marks invalid. A
   change that comes later than half a second is seen by the next look. A tab that closes under a batch (a sign-in
   callback that did its job, a tab the user closed) stops the batch without a failed step: the result says the page
@@ -201,7 +212,9 @@ Both modes share what follows.
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a
   text field or an editor; at any other element it fails, so the text never lands in whatever field has the focus.
   `type` and `insert` need a text that is not empty. A drop onto a password, card or one-time-code field is refused
-  like typing into it, and a drag that fails releases the mouse button.
+  like typing into it, and a drag that fails releases the mouse button. `click_at` presses a viewport pixel from
+  `browser_screenshot`; `drag_at` presses at one pixel and lets go at another, for a canvas, a slider or a cross-origin
+  widget such as a captcha, where no ref reaches inside the frame. See [Captcha](captcha.md).
 - In a rich editor (a contenteditable area such as X's composer) `fill`, `type` and `insert` give the editor the focus
   when it does not have it and wait until it has settled, check the field that has the focus for a secret, write, and
   fail when the editor's text did not change, instead of reporting done; a `fill` that leaves the editor holding its
@@ -249,6 +262,9 @@ Both modes share what follows.
   take many steps. Given `refs` of the latest snapshot (at most 20, item 738), the script is a function called with
   their elements, in that order, in the frame they are in (`browser_eval(script="(el) => el.click()", refs=["e12"])`),
   as the `args` of Chrome DevTools' `evaluate_script` are: it reaches the very element a step points at without a
+  selector written for it. Given `selector` instead of `refs` (item 781), the script gets the first element the CSS
+  selector matches, in the same call: `browser_eval(script="(el) => el.click()", selector="button[aria-label='Send']")`
+  is the Fast-Track click a snapshot, a find and a step would take three calls to reach.
   selector written for it, as a button that a click of `browser_act` does not move because it listens for other events
   (some of Slack's). A ref gone since the snapshot, of another shape, or refs of two frames fail the call with what to
   do. A script that throws fails the call with its message; one still running when the wait ends goes on in the page,
@@ -271,9 +287,15 @@ Both modes share what follows.
   as pixels, so a cookie a script wrote into its text shows there. It takes the place of AppleScript's `execute
   javascript`, which lands in the front window of whichever Chrome macOS picks when several run (item 263).
 - `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
-  call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A
-  dialog that opens in front of the page during the wait ends it at once, saying so (item 698): the text would not
-  come until the dialog is answered. A dialog that holds the text is the text appearing; a cookie banner ends no wait.
+  call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide. A dialog
+  that opens in front of the page during the wait ends it at once, saying so (item 698): the text would not come until
+  the dialog is answered. A dialog that holds the text is the text appearing; a cookie banner ends no wait. A wait that
+  has gone on for 5 s ends too once the page has stood still for 3 s, no change in its documents (those of its first ten
+  frames), no page loading, no request started or under way and no WebSocket open, saying so (item 774): over 30 days of
+  the owner's runs 60 of the 64 texts that came did so within 5 s, while the 42 that did not kept their runs 20 s at the
+  median, mostly a guessed thank-you text after a form that had not gone. A page that keeps changing, waits on its
+  server or asks it every few seconds is waited for to the end of the wait's time. The text is looked for in the page's
+  first ten iframes too, as the snapshot shows them (item 800): a sign-in or a payment box in a frame.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",
   and the line above the page says how many are open. A click that another element takes fails with the name of that
   element and what to do about it (close or answer the box, or press Escape). A page whose script holds it, so that it
@@ -292,20 +314,22 @@ Both modes share what follows.
   digits and signs), keeps the login in Dot's vault first (its website the page's origin, a note of when it was made),
   then fills it as a vault login is filled, under the same rules (outside `yolo` you are asked first, as for a fill; in
   `yolo` it runs at once), and takes the login back out of the vault when the fill fails; the model never chooses, sees
-  or records the password, and the run is told to make no password itself. A
-  password or a code goes only into an input, a textarea or a dropdown, never into an element that is edited
-  (`contenteditable`); a ref that names an element inside the label of a field names that field. A form with no method
-  is a form that sends by GET, to a browser, and gets no password. It fills only on the login's own site, never a
-  password or a code in your own Chrome (`attach`: that Chrome's requests are not held, so nothing would keep a value
-  out of an address), and not in a chat in which a script (`browser_eval`) ran in a tab that is still open: there the
-  fill first closes every tab of the chat and opens the page again in a new tab, with no history, and asks the run to
-  fill again with that page's refs (item 697; outside `yolo` you are asked for each of the two calls, the first of which
-  fills nothing); once it filled one, no script runs in the chat's tabs while that tab is open.
-  [Safety](safety.md#safety) has the whole of it. Outside `yolo` the run never reads such a field's value either: the
-  page's lines show `[hidden]` and a screenshot covers the field (item 467). A `<select>` that takes a card's expiry
-  (`autocomplete="cc-exp-month"` or `cc-exp-year`) is one of those fields (item 554). Cookie banners are declined
-  (`decline_cookie_banners`; a click on a banner that goes away under it is no error, and one that fails with the banner
-  still there is logged as `consent_decline_failed` with the page's address, and why the banner could not be counted
+  or records the password, and the run is told to make no password itself. A password or a code goes only into an input,
+  a textarea or a dropdown, never into an element that is edited (`contenteditable`); a ref that names an element inside
+  the label of a field names that field. A form with no method is a form that sends by GET, to a browser: before a
+  password or a code goes into it, Dot makes it send by POST, and keeps it so as it is sent (item 775). A vault login's
+  password is in the Mac's Keychain (service `dot-vault`), never in Dot's database, whose record of a login holds its
+  site and username alone. It fills only on the login's own site, never a password or a code in your own Chrome
+  (`attach`: that Chrome's requests are not held, so nothing would keep a value out of an address), and not in a chat in
+  which a script (`browser_eval`) ran in a tab that is still open: there the fill first closes every tab of the chat and
+  opens the page again in a new tab, with no history, and asks the run to fill again with that page's refs (item 697;
+  outside `yolo` you are asked for each of the two calls, the first of which fills nothing); once it filled one, no
+  script runs in the chat's tabs while that tab is open. [Safety](safety.md#safety) has the whole of it. Outside `yolo`
+  the run never reads such a field's value either: the page's lines show `[hidden]` and a screenshot covers the field
+  (item 467). A `<select>` that takes a card's expiry (`autocomplete="cc-exp-month"` or `cc-exp-year`) is one of those
+  fields (item 554). Cookie banners are declined (`decline_cookie_banners`; a click on a banner that goes away under it
+  is no error, and one that fails with the banner still there is logged as `consent_decline_failed` with the page's
+  address, and why the banner could not be counted
   when it could not).
 - A conversation thread keeps at most `max_tabs` tabs open, and closes the tabs it is done with (item 696): a tab that
   is not its current one once unused for `background_tab_idle_s` (300 s; 0 keeps it), while its run works as well; when
@@ -382,11 +406,13 @@ Both modes share what follows.
   `browser_hop_unanswered`.
 - `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
-  the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and
-  Chrome takes the front itself when a page opens a tab of its own (a link to a new tab, `window.open`): the app that
-  had the focus is brought back right after, as long as the program that runs Dot has Accessibility. Switching tabs
-  does not raise the window. With `true` the window comes to the front at the start, with each new tab and on each tab
-  switch. Take over brings the tab to the front either way.
+  the Mac), and it still paints the page under Dot's computer. Such a tab is told by the id Chrome gives it, also when
+  Chrome reports it before its address commits. A new tab that Chrome does not hand over within `action_timeout_s`,
+  that cannot be set up or whose run stops meanwhile is closed, not left open with no chat to close it (item 800).
+  macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own
+  (a link to a new tab, `window.open`): the app that had the focus is brought back right after, as long as the program
+  that runs Dot has Accessibility. Switching tabs does not raise the window. With `true` the window comes to the front
+  at the start, with each new tab and on each tab switch. Take over brings the tab to the front either way.
 - `remote_input = true` (the default) lets you use the page of a run you hold from the screen that shows it, a phone's
   too (item 470): the run is held as for Take over, nothing comes to the front of the Mac, and your taps, scrolls and
   keys go to the page while the run waits. Nothing of what you type is kept. A tab a tap opens is not the one the
@@ -549,9 +575,9 @@ every mode but `yolo` (item 433).
 - Dot's own pointer, a glowing violet arrow, glides to where each step of `desktop_act` went and ripples where it
   clicked, so that you see what Dot does and where (item 706, `show_pointer`, on by default). It only shows: the
   step is done as before, through the HID event tap, which moves the Mac's own pointer as it did. A helper process
-  draws it (`python -m dotagent.desktop.pointer`, as the flight of SnapShots is drawn; it takes no permission and
+  draws it (`python -m dotagent.desktop.pointer`, as the flight of Snapshots is drawn; it takes no permission and
   reads nothing of the screen), started with the first act. It is taken off the screen for each of Dot's screenshots
-  and while a SnapShot captures the window in front, which wait for the helper to say so (2 ms once it runs), so the
+  and while a Snapshot captures the window in front, which wait for the helper to say so (2 ms once it runs), so the
   model never sees the arrow over what it reads; it comes back once the last of two captures at the same time has
   ended. A helper that does not answer within two seconds is ended and no pointer is drawn until the daemon starts
   again; one that died is logged (`pointer_helper_ended`) and started again with the next step. It
