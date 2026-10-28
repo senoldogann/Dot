@@ -409,10 +409,10 @@ Both modes share what follows.
   the Mac), and it still paints the page under Dot's computer. Such a tab is told by the id Chrome gives it, also when
   Chrome reports it before its address commits. A new tab that Chrome does not hand over within `action_timeout_s`,
   that cannot be set up or whose run stops meanwhile is closed, not left open with no chat to close it (item 800).
-  macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own (a link to a new tab, `window.open`): the app that
-  had the focus is brought back right after, as long as the program that runs Dot has Accessibility. Switching tabs
-  does not raise the window. With `true` the window comes to the front at the start, with each new tab and on each tab
-  switch. Take over brings the tab to the front either way.
+  macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own
+  (a link to a new tab, `window.open`): the app that had the focus is brought back right after, as long as the program
+  that runs Dot has Accessibility. Switching tabs does not raise the window. With `true` the window comes to the front
+  at the start, with each new tab and on each tab switch. Take over brings the tab to the front either way.
 - `remote_input = true` (the default) lets you use the page of a run you hold from the screen that shows it, a phone's
   too (item 470): the run is held as for Take over, nothing comes to the front of the Mac, and your taps, scrolls and
   keys go to the page while the run waits. Nothing of what you type is kept. A tab a tap opens is not the one the
