@@ -88,8 +88,10 @@ class FakeChannel:
             raise RuntimeError("a bug in the channel")
         if picture.name in self.refuses:
             raise ChannelError(f"Messages did not take {picture.name}", {})
+        # Kept once read, in every list at once: a test that waits for the picture finds it in the order too.
+        data: bytes = await asyncio.to_thread(picture.path.read_bytes)
         self.pictures.append(picture.name)
-        self.picture_bytes.append(await asyncio.to_thread(picture.path.read_bytes))
+        self.picture_bytes.append(data)
         self.order.append(("picture", picture.name))
 
     async def start_from_now(self) -> None:
