@@ -75,8 +75,8 @@ class _Tool:
         return PreparedCall(action=action, run=run)
 
 
-def _context(gate: _Gate) -> ToolContext:
-    runtime = SimpleNamespace(peers=_Peers())
+def _context(gate: _Gate, tools: dict[str, Any] | None = None) -> ToolContext:
+    runtime = SimpleNamespace(peers=_Peers(), registry=SimpleNamespace(tools=tools or {}))
     return ToolContext(
         runtime=cast(Any, runtime),
         browser=cast(Any, None),
@@ -94,11 +94,13 @@ def _context(gate: _Gate) -> ToolContext:
     )
 
 
-async def _run(name: str, results: list[ToolResult | BaseException]) -> tuple[ToolResult, _Gate, int]:
+async def _run(
+    name: str, results: list[ToolResult | BaseException], tools: dict[str, Any] | None = None
+) -> tuple[ToolResult, _Gate, int]:
     gate = _Gate()
     tool = _Tool(name, results)
     call = ToolCall(id="call_1", name=name, arguments={})
-    checked = await _run_checked(call, cast(Any, tool), _context(gate), cast(Any, gate))
+    checked = await _run_checked(call, cast(Any, tool), _context(gate, tools), cast(Any, gate))
     return checked.result, gate, tool.calls
 
 
@@ -130,3 +132,14 @@ def test_an_acting_tool_is_not_retried() -> None:
 def test_a_cancelled_run_is_not_retried() -> None:
     with pytest.raises(RunCancelled):
         asyncio.run(_run("read_file", [RunCancelled("stopped", {})]))
+
+
+def test_a_failed_action_falls_over_to_its_diagnostic_reader_without_claiming_the_action() -> None:
+    alternative = _Tool("browser_find", [ok("Found the Save button")])
+    result, gate, calls = asyncio.run(_run("browser_act", [fail("the click missed")], {"browser_find": alternative}))
+    assert calls == 1
+    assert alternative.calls == 1
+    assert gate.authorized == 2
+    assert "[fallback] browser_act failed" in result.text
+    assert "browser_find answered instead" in result.text
+    assert "The original action was not performed" in result.text

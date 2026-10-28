@@ -56,6 +56,12 @@ _READ_ONLY_TOOLS: frozenset[str] = frozenset(
         "browser_read_text",
     }
 )
+# If an acting tool fails, the next link in the chain is tried. These are diagnostic/read tools: their result says
+# what the action did not do and what the page or window showed instead, never that the action succeeded.
+_TOOL_FAILOVERS: dict[str, str] = {
+    "browser_act": "browser_find",
+    "desktop_act": "desktop_snapshot",
+}
 # The kinds of action whose target does not show what the call acts on: an MCP call's is the name of its server.
 _BY_ARGUMENTS: frozenset[str] = frozenset({"mcp", "mcp_read"})
 
@@ -230,8 +236,10 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
             )
 
         # A read-only call that times out or fails may be tried once more: it changes nothing, so a second try is a
-        # retry, not a repeated action. An acting tool is run once and its failure is the answer; the model decides.
+        # retry, not a repeated action. An acting tool is run once; if it fails, the chain has a diagnostic reader to
+        # show the page or the window instead, and its result says the action itself was not performed.
         max_attempts: int = 2 if tool.spec.name in _READ_ONLY_TOOLS else 1
+        fallback: str = ""
         for attempt in range(1, max_attempts + 1):
             try:
                 async with asyncio.timeout(tool.timeout_s) as scope:
@@ -248,6 +256,33 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
             if attempt < max_attempts:
                 log.info("tool_retry_result", tool=tool.spec.name, attempt=attempt, text=result.text)
                 continue
+            alt_name: str | None = _TOOL_FAILOVERS.get(tool.spec.name)
+            if alt_name is not None:
+                alt_tool = ctx.runtime.registry.tools.get(alt_name)
+                if alt_tool is not None:
+                    try:
+                        alt_prepared: PreparedCall = await alt_tool.prepare(call.arguments, ctx)
+                        alt_action: ActionInfo = alt_prepared.action
+                        alt_authorized: Authorization = await gate.authorize_recorded(
+                            alt_action, call.arguments, alt_prepared.weighed
+                        )
+                        alt_taken: str | None = ctx.runtime.peers.take(ctx.run_id, alt_name, alt_action)
+                        if alt_taken is not None:
+                            result = fail(alt_taken)
+                        else:
+                            async with asyncio.timeout(alt_tool.timeout_s):
+                                result = await alt_prepared.run(replace(ctx, gate=gate))
+                        action = alt_action
+                        note = alt_authorized.note
+                        decision = alt_authorized.decision
+                        fallback = (
+                            f"[fallback] {tool.spec.name} failed; {alt_name} answered instead. "
+                            "The original action was not performed."
+                        )
+                    except (RunCancelled, FailSafeTriggered):
+                        raise
+                    except Exception as exc:  # noqa: BLE001 - a broken fallback must not eat the original failure
+                        log.info("tool_failover_failed", tool=alt_name, error=str(exc))
             break
     except (RunCancelled, FailSafeTriggered):
         raise
@@ -265,6 +300,8 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         ctx.runtime.peers.saw(ctx.run_id, call.name, action)
     if result.untrusted:
         gate.taint()
+    if fallback:
+        result = result.model_copy(update={"text": f"{fallback}\n\n{result.text}"})
     noted: ToolResult = _with_approval_note(result, note)
     if held_s > 0.0:
         noted = noted.model_copy(update={"text": f"{noted.text}\n\n{hold_note(held_s)}"})

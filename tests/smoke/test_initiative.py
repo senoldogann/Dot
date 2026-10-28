@@ -644,17 +644,19 @@ async def test_a_normal_thing_does_not_start_while_another_run_is_active(
         assert (kept.status, kept.attempts, kept.run_id) == ("open", 0, None)
 
 
-async def test_an_urgent_thing_from_a_watcher_does_not_jump_another_run(
+async def test_an_urgent_thing_from_a_watcher_also_jumps_another_run(
     login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async with _dot(login_env, []) as (runtime, manager):
+    async with _dot(login_env, [_finish("The urgent thing is done.")]) as (runtime, manager):
         await add_todo(runtime.store, "[URGENT] Reply to the sender", "A mail subject", "run", None, False)
         await set_initiative(runtime.store, True)
         monkeypatch.setattr(manager, "active_run_ids", lambda: ["run_elsewhere"])
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
         await initiative.tick(10_000.0)
-        assert not initiative.working()
-        assert await runtime.store.list_runs(10, None) == []
+        assert initiative.working()
+        [run] = await runtime.store.list_runs(10, None)
+        await _settled(initiative)
+        assert (await runtime.store.get_thread(run.thread_id)).title == "[URGENT] Reply to the sender"
 
 
 async def test_an_urgent_thing_the_owner_put_on_the_list_starts_while_another_run_is_active(
