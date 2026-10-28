@@ -5,6 +5,7 @@ each costing a model round trip to write the batch again."""
 import pytest
 from pydantic import ValidationError
 
+from dotagent.browser.render import describe_step
 from dotagent.browser.types import Step
 from dotagent.tools.browser import ActArgs
 
@@ -16,6 +17,16 @@ def test_a_click_at_a_point_with_no_ref_is_a_click_at() -> None:
     assert Step.model_validate({"action": "click", "ref": "e3"}).action == "click"
     with pytest.raises(ValidationError, match="does not use x/y"):
         Step.model_validate({"action": "click", "ref": "e3", "x": 1, "y": 2})
+
+
+def test_a_drag_from_a_point_to_a_point_is_a_drag_at() -> None:
+    step: Step = Step(action="drag_at", x=38, y=38, to_x=220, to_y=120)
+    assert (step.action, step.to_x, step.to_y) == ("drag_at", 220, 120)
+    assert describe_step(step) == "drag_at (38, 38) to (220, 120)"
+    with pytest.raises(ValidationError, match="drag_at needs"):
+        Step(action="drag_at", x=38, y=38)
+    with pytest.raises(ValidationError, match="does not use to_x/to_y"):
+        Step(action="click_at", x=38, y=38, to_x=220)
 
 
 def test_a_step_that_only_looks_is_left_out_of_the_batch() -> None:

@@ -319,6 +319,10 @@ profile; when a site needs one, follow the rule on passwords under Trust and saf
 the clicks until it is closed. Deal with it first: decline cookies, close or dismiss newsletter and promotion boxes \
 (Close, X, No thanks, or press Escape), and accept or confirm only what the task needs. A log-in box follows the rule \
 on passwords. A click that fails because something covers the element names what covers it.
+- A human check (hCaptcha, reCAPTCHA, Cloudflare Turnstile, "Verify you are human") is part of the work, not a reason \
+to stop or to ask: read the captcha skill and solve it with browser_screenshot, click_at and drag_at, then carry on. \
+The owner has told you to solve it without asking him; after three ways that fail, say what is left and keep the tab \
+open.
 
 # Desktop
 - desktop_open_app opens a Mac application and returns its window as an element list with refs (a12). Act on refs \
@@ -393,7 +397,10 @@ when it ends, with the tool result that shows it done.
 - A continuity note is this run going on: continue from its next steps, and do not repeat what it lists as done.
 - Use ask_user only for a decision that only the user can make, with the likely answers as options and the one you \
 recommend marked. Never use it to ask permission for an action: when an action needs approval, the system takes care \
-of it the moment you call the tool."""
+of it the moment you call the tool.
+- A human check (hCaptcha, reCAPTCHA, Cloudflare Turnstile, "Verify you are human") is part of the work, not a \
+reason to stop or ask: solve it with browser_screenshot, click_at and drag_at, following the captcha skill. After \
+three ways that fail, say what is left and keep the tab open."""
 
 _LEAN_REST: str = """# Tools
 - web_search finds pages and web_fetch reads one; web_crawl reads many pages of one site, and web_extract pulls named \

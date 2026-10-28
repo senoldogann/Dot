@@ -8,7 +8,7 @@ from dotagent.tools.base import describe_validation_error
 from dotagent.tools.browser import ActArgs
 from dotagent.tools.schema import tool_parameters_schema
 
-_STEP_FIELDS: str = "Valid fields of steps[]: action, ref, to_ref, text, key, x, y."
+_STEP_FIELDS: str = "Valid fields of steps[]: action, ref, to_ref, text, key, x, y, to_x, to_y."
 _TOOL_PARAMETERS: str = "Valid parameters: steps, accept_dialogs, expect, retry."
 
 
