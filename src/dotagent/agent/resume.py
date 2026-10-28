@@ -293,6 +293,8 @@ async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[Interrupt
         ),
         workspace=runtime.workspace,
         gate=_NoAnswers(),
+        # The goal is the only user text a resumed run can trust: its answers were not kept with it.
+        user_text=lambda: run.goal,
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,
         facts=new_facts,
