@@ -331,10 +331,14 @@ _RETRY_LONGEST_S: float = 60.0
 _RETRY_LEAST: int = 4
 # A model whose server cannot be connected to (item 769): a step's call that has sent nothing for [agent]
 # connection_check_s has the connection checked every _CHECK_EVERY_S while it stays silent, and is given up once it
-# fails; a run that waits for such a model checks every _RECONNECT_EVERY_S and asks again as soon as it connects, which
+# fails _CHECKS_FAILED times in a row (one check can fail on a lookup that hiccups, while the call's own connection
+# holds); a run that waits for such a model checks every _RECONNECT_EVERY_S and asks again as soon as it connects, which
 # MODEL_RECONNECTED_EVENT says.
 MODEL_RECONNECTED_EVENT: str = "model_reconnected"
+# The key of the error of a call given up for its lost connection that says how long it had sent nothing.
+SILENT_S: str = "silent_s"
 _CHECK_EVERY_S: float = 15.0
+_CHECKS_FAILED: int = 2
 _RECONNECT_EVERY_S: float = 5.0
 # A run whose model's rate limit or usage window is spent waits for it instead of ending (item 713, [agent]
 # quota_wait_s): what makes it wait, and how far apart it asks again: when the provider said they come back, within
@@ -1669,25 +1673,28 @@ async def _complete_in_time(
     if watch is None or not call.cancelled():
         return call.result()
     host: str = watch.result()
-    silent_s: float = round(time.monotonic() - heard[0])
+    silent_s: float = round(time.monotonic() - heard[0], 1)
     raise ProviderTransportError(
         f"cannot connect to {host}: the call had sent nothing for {silent_s} s",
-        {"model": ref.label, OFFLINE: host, "silent_s": silent_s},
+        {"model": ref.label, OFFLINE: host, SILENT_S: silent_s},
     )
 
 
 async def _lost_while_silent(
     runtime: Runtime, ref: ModelRef, address: str, heard: list[float], check_after_s: float
 ) -> str:
-    """The host of ``address``, the server of ``ref``, once it cannot be connected to while the call has sent nothing
-    (its last delta at ``heard[0]``) for ``check_after_s``: checked then, and every :data:`_CHECK_EVERY_S` while it
-    stays silent. A slow model whose server is there is waited for."""
+    """The host of ``address``, the server of ``ref``, once it cannot be connected to :data:`_CHECKS_FAILED` times in a
+    row while the call has sent nothing (its last delta at ``heard[0]``) for ``check_after_s``: checked then, and
+    every :data:`_CHECK_EVERY_S` while it stays silent. A slow model whose server is there is waited for."""
+    failed: int = 0
     while True:
         silent_s: float = time.monotonic() - heard[0]
         if silent_s < check_after_s:
+            failed = 0
             await asyncio.sleep(check_after_s - silent_s)
             continue
-        if not await runtime.router.reaches(ref):
+        failed = 0 if await runtime.router.reaches(ref) else failed + 1
+        if failed >= _CHECKS_FAILED:
             return host_of(address) or address
         await asyncio.sleep(_CHECK_EVERY_S)
 
@@ -2579,7 +2586,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 if retry_in is not None:
                     await _wait_unless_stopped(agent.cancel, retry_in)
                 elif await _until_reached(agent.cancel, runtime, ref, left_s):
-                    offline_for: float = round(time.monotonic() - now, 1)
+                    # Since the connection was lost: a call given up for it had sent nothing for a while before.
+                    silent: JsonValue = error.context.get(SILENT_S)
+                    lost_s: float = float(silent) if isinstance(silent, int | float) else 0.0
+                    offline_for: float = round(time.monotonic() - now + lost_s, 1)
                     log.info("model_reconnected", run_id=run.id, model=ref.label, step=steps, offline_s=offline_for)
                     await runtime.bus.emit(
                         run.id,

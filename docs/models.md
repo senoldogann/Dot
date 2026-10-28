@@ -123,8 +123,10 @@ can still connect to the model's server (its name resolves and its port takes a 
 `HTTPS_PROXY`, `HTTP_PROXY` or `ALL_PROXY` the check always says yes). A connector whose call broke and whose server
 cannot be connected to raises at once instead of retrying for a minute in silence. A step's call that has sent nothing
 for `connection_check_s` in `[agent]` (45 s by default; 0 checks nothing) has the connection checked then and every
-15 s while it stays silent, and is given up as soon as it fails, instead of waiting out `model_call_timeout_s` (a network
-that dropped mid-call held a step for seven minutes); a slow model whose server is there is waited for. A run that waits
+15 s while it stays silent, and is given up once two checks in a row fail (one can fail on a lookup that hiccups while
+the call's own connection holds), instead of waiting out `model_call_timeout_s` (a network that dropped mid-call held a
+step for seven minutes); a slow model whose server is there is waited for. The time the line says the connection was
+gone counts from when the call fell silent. A run that waits
 for a server it cannot connect to checks every 5 s and asks the same step again as soon as it connects, within the same
 `model_wait_s`. Its line says so ("No connection to openrouter.ai; Dot asks … again as soon as it connects, until …"),
 and is rewritten when the connection is back ("The connection to openrouter.ai is back after 4m 10s; Dot asks … again").

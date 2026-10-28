@@ -405,6 +405,8 @@ async def test_a_call_whose_connection_is_gone_is_given_up_and_asked_again_as_so
     assert waiting.data["error"] == f"cannot connect to {_HOST}"
     [reconnected] = played.kind("model_reconnected")
     assert reconnected.data["host"] == _HOST and reconnected.data["step"] == 1
+    # Offline since the call fell silent, not since it was given up.
+    assert reconnected.data["offline_s"] >= 0.2
     assert len(played.kind("model_back")) == 1
     assert model.calls == 3 and network.checks == 4
     # Given up a moment after it fell silent, not at model_call_timeout_s.
@@ -412,7 +414,9 @@ async def test_a_call_whose_connection_is_gone_is_given_up_and_asked_again_as_so
 
 
 async def test_a_slow_model_whose_server_is_there_is_waited_for(login_env: dict[str, str], network: Network) -> None:
-    network.down_for = 0
+    """Its server is there, but one check fails (a lookup that hiccups): one failed check does not cut the call (the
+    pre-push review of item 769)."""
+    network.down_for = 1
     model: Hanging = Hanging(ScriptedProvider(_PROVIDER, TURNS), 0.6)
     played: Played = await _play(login_env, 600.0, model, False, check_s=0.1)
     assert played.record.status == "done", played.record.result
