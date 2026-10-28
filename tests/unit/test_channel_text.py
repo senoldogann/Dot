@@ -26,6 +26,10 @@ def test_a_lone_star_or_underscore_stays_where_it_means_something() -> None:
     assert as_plain_text("Match src/*.py and tests/*.py, 2*3*4 and a_b_c.") == (
         "Match src/*.py and tests/*.py, 2*3*4 and a_b_c."
     )
+    # A file's name keeps its double underscores (the review of every module); a pair around words is still bold.
+    assert as_plain_text("Edit __init__.py and src/__main__.py, then read __this__.") == (
+        "Edit __init__.py and src/__main__.py, then read this."
+    )
 
 
 @pytest.mark.parametrize("mark", ["-", "*", "+"])

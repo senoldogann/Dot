@@ -185,8 +185,10 @@ row is a command only when all of these hold:
 - it is not the second row of one message that Messages keeps as two (item 595): a sent row and a received row in the
   same chat with the same words, dated at most ten seconds apart, are one command, and the second is let go (see *One
   message, two rows*, below);
-- it is newer than the cursor, the row Dot last read, which the store keeps: the first poll sets it and answers nothing,
-  and a restart repeats nothing and loses nothing. When the newest row of the database is **below** the cursor, the
+- it is newer than the cursor, the row Dot last read, which the store keeps: pairing the first handle and switching the
+  channel on set it to the newest row then, so that what was written before is not run and what is written right after
+  is (item 793; when the database cannot be read then, the first poll sets it and answers nothing), and a restart
+  repeats nothing and loses nothing. When the newest row of the database is **below** the cursor, the
   database was rebuilt or restored from a backup and numbers its rows again from the start: every message you wrote
   from then on would have a row below the cursor and would never be read, with nothing to say so. The cursor comes
   down to the newest row (the log has `imessage_cursor_reset`, once, with the two numbers), what the database holds
