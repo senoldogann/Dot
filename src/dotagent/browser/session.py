@@ -2521,10 +2521,10 @@ class BrowserSession:
         target: dict[str, object] = {"url": mark, "background": True}
         if self._config.mode == "attach":
             target["newWindow"] = True
+        cdp: CDPSession = await browser.new_browser_cdp_session()
         arrived: asyncio.Queue[Page] = asyncio.Queue()
         heard: Callable[[Page], None] = arrived.put_nowait
         context.on("page", heard)
-        cdp: CDPSession = await browser.new_browser_cdp_session()
         made: str | None = None
         try:
             answer: dict[str, object] = await cdp.send("Target.createTarget", target)

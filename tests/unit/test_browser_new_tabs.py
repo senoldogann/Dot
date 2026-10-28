@@ -110,9 +110,9 @@ class _Context:
         self.listeners.remove(listener)
 
 
-def _tab_session(mode: str = "launch") -> BrowserSession:
+def _tab_session(mode: str = "launch", timeout_s: float = 0.2) -> BrowserSession:
     browser: BrowserSession = object.__new__(BrowserSession)
-    cast(Any, browser)._config = SimpleNamespace(mode=mode, action_timeout_s=0.2, appearance="dark")
+    cast(Any, browser)._config = SimpleNamespace(mode=mode, action_timeout_s=timeout_s, appearance="dark")
     return browser
 
 
@@ -158,7 +158,8 @@ async def test_a_new_tab_chrome_does_not_hand_over_is_closed(ids: None) -> None:
 
 async def test_a_run_stopped_while_its_new_tab_comes_closes_the_tab(ids: None) -> None:
     context: _Context = _Context(_Blank(), report=False)
-    making: asyncio.Task[Page] = asyncio.create_task(_tab_session()._background_tab(cast(Any, context)))
+    # The wait's own time is far off, so a slow runner cannot end it before the stop does.
+    making: asyncio.Task[Page] = asyncio.create_task(_tab_session(timeout_s=30.0)._background_tab(cast(Any, context)))
     await asyncio.sleep(0.05)
     making.cancel()
     with pytest.raises(asyncio.CancelledError):
