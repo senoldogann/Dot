@@ -5,7 +5,7 @@ it. No model is called."""
 
 import asyncio
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -20,6 +20,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.server import routes_assistant
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
@@ -329,7 +330,77 @@ async def test_the_look_starts_in_the_mode_its_promises_were_said_in_whatever_th
             await chromium.close()
 
 
-# ----- the chat that is gone (item 810) ---------------------------------------------------------------------------
+# ----- the first steps (item 811) and the chat that is gone (item 810) -------------------------------------------
+
+
+async def test_the_first_steps_say_what_is_done_and_a_dot_used_for_long_is_not_fresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with (
+        _daemon(tmp_path, "", 'name = "Dot"\nowner = "Ada"\nintroduced = false\n') as (_runtime, manager, _f, address),
+        _client(address) as client,
+    ):
+        steps: dict[str, object] = (await client.get("/assistant/first-steps")).json()
+        assert steps["fresh"] is True
+        assert [(step["id"], step["done"]) for step in steps["steps"]] == [  # type: ignore[index, union-attr]
+            ("name", True),
+            ("passwords", False),
+            ("imessage", False),
+            ("phone", False),
+            ("apps", False),
+            ("chat", False),
+        ]
+        run: RunRecord = await manager.start(
+            "Say hello.", "task", None, None, "ui", None, None, "standard", None, None, None, ()
+        )
+        await asyncio.wait_for(manager.wait(run.id), _RUN_TIMEOUT_S)
+        after: dict[str, object] = (await client.get("/assistant/first-steps")).json()
+        assert {step["id"]: step["done"] for step in after["steps"]}["chat"] is True  # type: ignore[index, union-attr]
+        assert after["fresh"] is True
+        # A first run older than the days a Dot is fresh: the home shows no steps.
+        monkeypatch.setattr(routes_assistant, "FRESH_DAYS", -1)
+        assert (await client.get("/assistant/first-steps")).json()["fresh"] is False
+
+
+def _fits(page: Page) -> Awaitable[bool]:
+    return page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+
+
+@pytest.mark.browser
+async def test_a_fresh_home_lists_the_first_steps_on_a_mac_and_a_phone_and_hide_puts_them_away(tmp_path: Path) -> None:
+    async with (
+        _daemon(tmp_path, "", 'name = "Dot"\nowner = "Ada"\nintroduced = false\n') as (_runtime, _manager, _f, address),
+        async_playwright() as playwright,
+    ):
+        chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        webkit: Browser = await playwright.webkit.launch(headless=True)
+        try:
+            page: Page = await _home(chromium, address, False, playwright.devices)
+            card = page.locator("section.first-steps")
+            await expect(card).to_be_visible()
+            await expect(card.locator(".first-steps-count")).to_have_text("1 of 6 done")
+            await expect(card.locator(".first-step[data-step='name']")).to_have_attribute("data-done", "true")
+            await expect(card.get_by_role("link", name="Bring your passwords")).to_have_attribute(
+                "href", "#/settings/vault"
+            )
+            await expect(card.get_by_role("link", name="Pair your phone")).to_have_attribute("href", "#/settings/phone")
+            # The step done and the first chat lead nowhere: the one is done, the other is the composer above.
+            await expect(card.get_by_role("link", name="Tell Dot your name")).to_have_count(0)
+            await expect(card.get_by_role("link", name="Introduce yourself")).to_have_count(0)
+            assert await _fits(page)
+            phone: Page = await _home(webkit, address, True, playwright.devices)
+            phone_card = phone.locator("section.first-steps")
+            await expect(phone_card).to_be_visible()
+            await phone_card.scroll_into_view_if_needed()
+            assert await _fits(phone)
+            await card.get_by_role("button", name="Hide").click()
+            await expect(page.locator("section.first-steps")).to_have_count(0)
+            await page.reload()
+            await expect(page.get_by_role("textbox", name="Goal")).to_be_visible()
+            await expect(page.locator("section.first-steps")).to_have_count(0)
+        finally:
+            await chromium.close()
+            await webkit.close()
 
 
 @pytest.mark.browser

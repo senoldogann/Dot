@@ -12,6 +12,7 @@ import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
 import { el, modelName } from "../dom.js";
 import { dotName } from "../face.js";
 import { buildFirstChat } from "../firstchat.js";
+import { buildFirstSteps } from "../firststeps.js";
 import { forgetLevel, KEPT_SPEED, ONE_MESSAGE, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { narrowOr, PHONE, touchFirst, trackHeight } from "../layout.js";
@@ -442,6 +443,9 @@ export function mount(root, ctx) {
     day ? presence.strip : null,
   );
   root.append(home);
+  // What a Dot that started afresh has to set up (item 811), under the block in the middle while a step is left, so that
+  // the greeting and the composer keep their place.
+  const steps = buildFirstSteps((card) => start.after(card));
   // The greeting and the composer stand in the middle of the space under the top bar (item 124): the row above them
   // takes half of what their height leaves of it (app.css), so the page keeps that height as it changes.
   const stopCentring = trackHeight(start, home, "--home-start-h");
@@ -479,6 +483,7 @@ export function mount(root, ctx) {
   return () => {
     disposed = true;
     first?.dispose();
+    steps.dispose();
     stopNames();
     stopCentring();
     stopSetup();

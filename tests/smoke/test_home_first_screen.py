@@ -239,6 +239,9 @@ async def test_a_new_chat_is_the_greeting_and_the_composer_alone_until_the_day_i
                     viewport={"width": width, "height": height}, reduced_motion="reduce"
                 )
                 page.on("request", lambda request: asked.append(request.url))
+                # The first steps of a Dot that started afresh (item 811), which this home would list under the
+                # composer, are put away here as the owner puts them away: test_first_chat.py has their own test.
+                await page.add_init_script("localStorage.setItem('dot.firstSteps', 'hidden')")
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await expect(page.locator(".home-start")).to_be_visible()
                 await _settled(page)

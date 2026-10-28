@@ -889,6 +889,15 @@ to take off your hands: that look is a run of its own whose goal tells it to onl
 (the goal asks it, as a goal does; the approval mode decides what is asked of you on the way). The look, Not now, Skip
 the introduction and the first message you send end it, and the daemon keeps that it was had.
 
+**First steps** (item 811). While Dot is fresh (its first run is not 14 days old, or it has none) and a step is left,
+New chat lists the first steps under the greeting and the composer, which keep their place in the middle: tell Dot
+your name (Settings › General), bring your passwords (Settings › Vault, Import from CSV), reach Dot from iMessage
+(Settings › Channels), pair your phone (Settings › Phone), connect your apps (Customize › Connectors) and introduce
+yourself (a first chat), each a link to its page and a check once it is done, with how many are. **Hide** puts the
+card away for good in that browser, and it goes by itself once every step is done; a Dot used for long never shows it
+(`GET /api/assistant/first-steps`: `fresh` and each step's `done`, read from the store, the channels, the paired phones
+and the Connectors page's servers).
+
 **A chat that is gone** (item 810). Dot opens at the chat screen you were on last; when that chat is gone by then (Dot
 started with an empty store, the chat was deleted), New chat opens in its place, saying so, and the next open starts
 there too. A task you go to that is not found still says *Task not found*.
@@ -1228,6 +1237,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /vault/items`, `GET /vault/counts`, `GET\|PUT\|DELETE /vault/items/{id}`, `POST /vault/items`, `POST /vault/items/{id}/reveal`, `POST /vault/items/remove`, `POST /vault/items/import`, `POST /vault/card-photo` | Dot's own vault of logins, cards and contacts (item 621, Settings › Vault, [above](#settings--vault)): the list and one item with no secret in either; make, change and delete an item (its secrets in the Keychain, its record in the database; a delete takes both), or several at once (item 768); the eye, one secret part, once, only from this Mac's own address and with the installation's token, never a phone's key (403 otherwise, item 678); an import of a CSV export and the reading of a card's photo, both in memory (422 with why for a file that is no list of logins, a card whose number or expiry is not good, a site that is no web address) |
 | `GET /vault`, `POST /vault/connect`, `POST /vault/token` (`{"token": "ops_…"}`), `DELETE /vault` | the owner's 1Password (item 493): whether `op` is installed, whether 1Password's app is (`app`, item 791), and whether Dot holds a service account's token, and the vaults it reads with how many logins each; Connect, which makes the vault "Shared with Dot" and a service account that only reads it through the owner's `op` and the 1Password app, which asks first; a token of the owner's, kept once it reads a vault (422 for one that is no `ops_` token); both only from this Mac's own address with the installation's token; Disconnect, which forgets the token. No token and no value is ever answered |
 | `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state`, an account's of Google or Microsoft first, else an MCP server's, and answers a page of Dot's own look that names the account or service and says how it came out (item 437; 400 for a state nobody waits for, for an account's that failed, and for one that waited more than 10 minutes; what the address carries is shown only for a state that waits) |
+| `GET /assistant/first-steps` | the first steps of a fresh Dot (item 811): `fresh`, and each step's `id` and `done` |
 | `GET /assistant`, `PUT /assistant` (`{"name": "Miro", "owner": "Ada", "introduced": true}`, each optional) | the name the owner calls Dot by, the owner's name (the first name of their account on this Mac until they give one) and whether Dot has had its first conversation (item 420); a change, live and in the config file (422 for a blank name, a control character or a name too long) |
 | `GET /phone`, `POST /phone/pairing` (the latter the token only)                 | the addresses a phone reaches Dot at (`[server] reach`), what Tailscale says of the Mac and whether the daemon keeps it awake (item 271); a new pairing code (item 267) |
 | `POST /phone/tailnet`, `POST /phone/awake` (`{"on": true}`)                     | Tailscale set up for this daemon and its name written into `[server] reach` (422 with why when Tailscale is missing or not signed in); the Mac kept awake while it charges, or not (`[server] keep_awake`) (item 271) |

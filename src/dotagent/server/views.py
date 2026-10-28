@@ -166,6 +166,27 @@ class AssistantRequest(FrozenModel):
     introduced: bool | None = None
 
 
+# The first steps of a Dot that has just started with an empty store (item 811): the owner's name, the passwords of the
+# vault, iMessage, the phone, the connected apps and a first chat.
+type FirstStepId = Literal["name", "passwords", "imessage", "phone", "apps", "chat"]
+
+
+class FirstStep(FrozenModel):
+    """One of the first steps and whether it is done."""
+
+    id: FirstStepId
+    done: bool
+
+
+class FirstStepsView(FrozenModel):
+    """The first steps in the order the home lists them (item 811), and whether Dot is ``fresh``: its first run is not
+    older than :data:`~dotagent.server.routes_assistant.FRESH_DAYS` days, or it has none. The home shows them only
+    then, so that a Dot used for long is not asked again for what its owner chose not to set up."""
+
+    fresh: bool
+    steps: tuple[FirstStep, ...]
+
+
 class AwakeRequest(FrozenModel):
     """Whether the daemon keeps the Mac awake while it charges (item 271)."""
 

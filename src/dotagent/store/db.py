@@ -3667,6 +3667,11 @@ class Store:
         await self._db.commit()
         return record
 
+    async def first_run_at(self) -> float | None:
+        """When the store's first run was made (seconds since the epoch), ``None`` while it has none (item 811)."""
+        row = await self._one("SELECT MIN(created_at) AS first FROM runs", ())
+        return None if row is None or row["first"] is None else float(row["first"])
+
     async def count_runs(self, source: str, since: float) -> int:
         """How many runs of ``source`` were made since ``since`` (seconds since the epoch)."""
         row = await self._one("SELECT COUNT(*) AS made FROM runs WHERE source = ? AND created_at >= ?", (source, since))
