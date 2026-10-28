@@ -427,10 +427,21 @@ _RETRY_CLICK_SCRIPT: str = """(el) => {
 }"""
 
 
-async def _retry_unchanged(args: ActArgs, outcome: ActOutcome, ctx: ToolContext) -> ActOutcome:
+# The flags of a batch whose unchanged click is not clicked again with a script.
+_NOT_RETRIED: frozenset[str] = frozenset(
+    {"financial", "external_send", "message_send", "public_post", "social", "destructive", "credential", "install"}
+)
+
+
+async def _retry_unchanged(
+    args: ActArgs, outcome: ActOutcome, ctx: ToolContext, flags: Sequence[str] = ()
+) -> ActOutcome:
     """A click whose batch left the page unchanged is tried once the other way (item 781): the steps' refs are still
     on the page, so a script sends the pointer sequence to each such element, and the page is read again when one of
-    them ran. A click that moved the page, a step that failed and a script that surprised the tab are left alone."""
+    them ran. A click that moved the page, a step that failed and a script that surprised the tab are left alone, and
+    so is a batch whose ``flags`` say it sends, posts, pays or removes (:data:`_NOT_RETRIED`)."""
+    if set(flags) & _NOT_RETRIED:
+        return outcome
     steps: list[StepReport] = list(outcome.steps)
     retried: bool = False
     for index, (step, report) in enumerate(zip(args.steps, steps, strict=False)):
@@ -641,8 +652,10 @@ def _act_tool() -> RegisteredTool:
             _secret_field_check(ctx),
             hides_secrets(ctx.approvals),
         )
+        # A second, scripted click of a step that sends, posts, pays or removes would do it twice where the first one
+        # acted slowly (the review of every module): such a batch is not retried; the page says where it stands.
         if args.retry:
-            outcome = await _retry_unchanged(args, outcome, ctx)
+            outcome = await _retry_unchanged(args, outcome, ctx, authorized.flags)
         rendered: str = render_act_outcome(outcome, _nonce(), _body_budget(ctx))
         note: str = batch_cut_note(len(args.steps), limit)
         if note:
@@ -735,10 +748,12 @@ def _eval_tool() -> RegisteredTool:
         if args.selector:
             # The selector is the element the script would have got from a ref (item 781): one call instead of a
             # snapshot, a find and a click of browser_act.
+            # The function is assigned on lines of its own, then called, as the refs' path does: a trailing ``;`` or
+            # ``// comment`` broke the call it was wrapped in (the review of every module).
             script = (
                 f"(() => {{ const el = document.querySelector({json.dumps(args.selector)});"
                 " if (el === null) throw new Error('no element matches the selector');"
-                f" return ({args.script})(el); }})()"
+                f" let __dotScript;\n__dotScript =\n{args.script}\n;\nreturn __dotScript(el); }})()"
             )
         script_run: ScriptRun = await ctx.browser.run_script(
             ctx.thread_id, script, waited_s, hides_secrets(ctx.approvals), tuple(args.refs or ())

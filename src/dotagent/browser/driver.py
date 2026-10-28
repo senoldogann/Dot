@@ -1369,9 +1369,12 @@ async def run_script(page: Page, script: str, timeout_s: float, refs: Sequence[s
         async with asyncio.timeout(timeout_s):
             if elements is not None:
                 frame, handles = elements
-                # A trailing ";" ends the expression the function must be; the line breaks keep a closing comment
-                # out of the call.
-                called: str = f"(elements) => (\n{script.rstrip().rstrip(';')}\n)(...elements)"
+                # The function is assigned, then called: a statement its own ";" ends and a comment after it ends
+                # nowhere else, alone or together (the review of every module: ";" then "// …" was a SyntaxError).
+                called: str = (
+                    f"(elements) => {{ let __dotScript;\n__dotScript =\n{script}\n;\n"
+                    "return __dotScript(...elements); }"
+                )
                 value: object = await frame.evaluate(called, handles)
             else:
                 value = await page.evaluate(script)

@@ -190,7 +190,12 @@ Both modes share what follows.
   of it, one that waits for another event: `browser_eval` with its ref reaches it) for one that worked. A click whose
   batch left the page unchanged is tried once the other way before the result returns (item 781): the same ref gets the
   pointer sequence a script sends, and the page is read again, so a step that a script can move does not need a model
-  round trip; a click that already moved the page is never sent twice, and a step that failed is left alone. A step that
+  round trip; a click that already moved the page is never sent twice, a step that failed is left alone, and a batch
+  that sends, posts, pays, removes, installs or hands over a credential is never clicked again this way (item 792: such
+  a button may act slower than half a second, and a second click would do it twice). A page that has not settled when
+  the steps, a script or an upload went through is said, rather than failing the call, which a run took for a step that
+  did not happen (item 792): after steps or an upload in the page's notes ("do not repeat it"), after a script in what
+  it says happened ("then: …"), with any surprise of the tab. A step that
   changed the page names what the page says new in an alert or a live region and the fields it newly marks invalid. A
   change that comes later than half a second is seen by the next look. A tab that closes under a batch (a sign-in
   callback that did its job, a tab the user closed) stops the batch without a failed step: the result says the page
