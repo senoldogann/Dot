@@ -606,9 +606,11 @@ class Scheduler:
         if late:
             log.warning("schedule_fired_late", schedule_id=record.id, overdue_s=round(overdue_s))
         told: str = late_goal(record.goal, due, now, zone) if late else record.goal
-        carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
         started: RunRecord | None = None
         try:
+            # Read inside the try (item 785): a store that fails here keeps a one-time schedule due, as a run that did
+            # not start does, where the firing above had switched it off for good.
+            carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
             started = await self._start(record, firing_opening(told, digest), thread_id, carried)
         except DotError as exc:
             if _chat_busy(exc) and not one_time:
@@ -688,6 +690,12 @@ class Scheduler:
             raise RunConflict("no schedule starts while the emergency stop is engaged", {"schedule_id": schedule_id})
         if signal is not None and not record.enabled:
             raise RunConflict("the schedule a move of the market starts is switched off", {"schedule_id": schedule_id})
+        if signal is not None and await self._paused_agent(record) is not None:
+            # A paused agent's schedules start nothing by themselves (item 465); a move of the market is no hand
+            # (item 785).
+            raise RunConflict(
+                "the agent the schedule a move of the market starts runs as is paused", {"schedule_id": schedule_id}
+            )
         await self._adopt_resumed(record)
         if schedule_id in self._in_flight or schedule_id in self._starting:
             raise RunConflict(
@@ -702,12 +710,13 @@ class Scheduler:
             out_of_time: str = thread_title(f"{record.name} · {format_local(now, zone)} · {why}")
             record, digest, title = await self._briefed(record, digest, now, zone, out_of_time)
             thread_id, made = await self._firing_chat(record, same_chat, title)
-            carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
             goal: str = (
                 by_hand_goal(record.goal, now, zone) if signal is None else signal_goal(record.goal, now, zone, signal)
             )
             started: RunRecord | None = None
             try:
+                # Inside the try, as a firing's (item 785): a store that fails here drops the chat made for the run.
+                carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
                 started = await self._start(record, firing_opening(goal, digest), thread_id, carried)
             finally:
                 if started is None and made:

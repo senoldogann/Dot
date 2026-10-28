@@ -146,7 +146,8 @@ async def test_the_paper_account_buys_at_the_ask_sells_at_the_bid_and_pays_the_f
     portfolio: Portfolio = await trading.portfolio()
     cash: float = next(h.amount for h in portfolio.holdings if h.currency == "EUR")
     assert cash == pytest.approx(1000.0 - bought.notional - bought.fee)
-    assert portfolio.day_traded == pytest.approx(bought.notional)
+    # A buy counts against the day with its fee, which it spent too (item 785).
+    assert portfolio.day_traded == pytest.approx(bought.notional + bought.fee) == pytest.approx(20.0, abs=1e-3)
     sold: TradingOrderRecord = await trading.place(
         OrderRequest(product="BTC-EUR", side="sell", quote_amount=None, base_amount=bought.size), "run_a", "paper"
     )
@@ -160,9 +161,32 @@ async def test_the_paper_account_buys_at_the_ask_sells_at_the_bid_and_pays_the_f
     await trading.reset_paper()
     started: Portfolio = await trading.portfolio()
     assert started.equity == pytest.approx(1000.0)
-    # Today's loss is counted from the new start, not from the account before it.
+    # Today's loss is counted from the new start, not from the account before it, and so is what was traded (item 785).
     assert started.day_change == pytest.approx(0.0)
+    assert started.day_traded == pytest.approx(0.0)
     assert await trading.history(10) == []
+
+
+async def test_the_paper_accounts_start_changed_in_settings_is_the_next_starts_not_money_now(
+    store: Store, clock: _Clock, tmp_path: Path
+) -> None:
+    """Item 785: ``paper_start`` changed in Settings neither adds money to the paper account nor takes it away, which
+    read as the day's gain or loss (a lower start held every buy for the day's loss limit); the next start gives it."""
+    settings: TradingSettings = TradingSettings(_config())
+    trading: Trading = _trading(store, settings, clock, tmp_path)
+    await trading.reset_paper()
+    before: Portfolio = await trading.portfolio()
+    assert before.equity == pytest.approx(1000.0)
+    settings.value = settings.value.model_copy(update={"paper_start": 100.0})
+    now: Portfolio = await trading.portfolio()
+    assert now.equity == pytest.approx(1000.0) and now.day_change == pytest.approx(0.0)
+    await trading.place(
+        OrderRequest(product="BTC-EUR", side="buy", quote_amount=20.0, base_amount=None), "run_a", "paper"
+    )
+    clock.now += 1
+    await trading.reset_paper()
+    assert (await trading.portfolio()).equity == pytest.approx(100.0)
+    assert await trading.paper.started_with() == pytest.approx(100.0)
 
 
 async def test_the_days_orders_stop_at_the_cap_and_the_stop_file_stops_every_order(
