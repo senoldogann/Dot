@@ -200,29 +200,40 @@ _PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-passwor
 #   no browser knows) gets ``method="post"``, and a control of it that names ``formmethod`` GET loses it; a dialog form
 #   sends nothing and is left alone;
 # - a browser reads the method once the ``submit`` event has run its listeners, so the window's first and last
-#   listeners put the form back to POST, undoing a script of the page that set GET again;
+#   listeners put the form back to POST, undoing a script of the page that set GET again; a form in a shadow root,
+#   whose ``submit`` never reaches the window, gets them on its root;
 # - ``form.submit()`` fires no event: the form gets an own ``submit`` that sets POST first, unless a control named
 #   ``submit`` hides the method (the page cannot call it either).
-# It is asked of the control (:data:`_CONTROL_OF`) and of no other element: a div has no form. It returns whether the
-# form would have sent by GET. A page whose script sends the form itself is not changed: the guard of Dot's Chrome
-# refuses a fetch or a frame of the page whose address carries a password or a one-time code (item 621).
+# A control named ``method``, ``elements`` or ``setAttribute`` hides the form's own of that name, so they are read from
+# the prototypes. It is asked of the control (:data:`_CONTROL_OF`) and of no other element: a div has no form. It
+# returns whether the form would have sent by GET. A page whose script sends the form itself is not changed: the guard
+# of Dot's Chrome refuses a fetch or a frame of the page whose address carries a password or a one-time code (item 621).
 _POSTS_SCRIPT: str = """(field) => {
   const form = field.form;
   if (!form) return false;
-  const byGet = (target) => target.method === 'get'
-    || [...target.elements].some((control) => control.hasAttribute('formmethod') && control.formMethod === 'get');
+  const own = (name) => Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, name).get;
+  const methodOf = own('method');
+  const elementsOf = own('elements');
+  const { hasAttribute, setAttribute, removeAttribute } = Element.prototype;
+  const byGet = (target) => methodOf.call(target) === 'get'
+    || [...elementsOf.call(target)].some((control) => hasAttribute.call(control, 'formmethod')
+      && control.formMethod === 'get');
   const post = (target) => {
-    if (target.method === 'get') target.setAttribute('method', 'post');
-    for (const control of target.elements)
-      if (control.hasAttribute('formmethod') && control.formMethod === 'get') control.removeAttribute('formmethod');
+    if (methodOf.call(target) === 'get') setAttribute.call(target, 'method', 'post');
+    for (const control of elementsOf.call(target))
+      if (hasAttribute.call(control, 'formmethod') && control.formMethod === 'get')
+        removeAttribute.call(control, 'formmethod');
   };
   const was = byGet(form);
   post(form);
-  if (!form.hasAttribute('data-dot-posts')) {
-    form.setAttribute('data-dot-posts', '');
+  if (!hasAttribute.call(form, 'data-dot-posts')) {
+    setAttribute.call(form, 'data-dot-posts', '');
     const atSubmit = (event) => { if (event.target === form) post(form); };
-    window.addEventListener('submit', atSubmit, true);
-    window.addEventListener('submit', atSubmit, false);
+    const root = Node.prototype.getRootNode.call(form);
+    for (const at of root instanceof ShadowRoot ? [window, root] : [window]) {
+      at.addEventListener('submit', atSubmit, true);
+      at.addEventListener('submit', atSubmit, false);
+    }
     const native = HTMLFormElement.prototype.submit;
     if (form.submit === native) {
       const submit = function () { post(form); native.call(form); };

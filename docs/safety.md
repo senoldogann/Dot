@@ -712,10 +712,11 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     password or a code is typed into a field of such a form, Dot makes it send by POST (item 775): the form gets
     `method="post"` and its buttons lose a `formmethod` of GET; the window's first and last listeners of `submit` put
     POST back, since a browser reads the method once they have run, so a script of the page that sets GET again as the
-    form is sent is undone; and the form's own `submit()`, which fires no event, sets POST first (unless a control named
-    `submit` hides it, when the page cannot call it either). A page whose script calls
+    form is sent is undone (a form in a shadow root, whose `submit` never reaches the window, gets them on its root too,
+    and a control named `method` hides nothing of this); and the form's own `submit()`, which fires no event, sets POST
+    first (unless a control named `submit` hides it, when the page cannot call it either). A page whose script calls
     `HTMLFormElement.prototype.submit` itself after setting GET again, or whose own listener of `submit` sets GET and
-    stops the event before it reaches Dot's last listener, on the window, sends by GET, and its address is then as
+    stops the event before it reaches Dot's last listener, sends by GET, and its address is then as
     below; only the login's own site can do that, and it has the password. A site that takes its sign-in by GET alone
     gets a POST, and the sign-in fails. A page whose script sends the form itself is not changed by any of this. Dot's
     own Chrome refuses a request a page sends whose address carries the password (for as long as Dot runs) or a one-time
@@ -725,8 +726,8 @@ stranger wrote. Two checks hold for such a run, and neither asks you:
     rule that acts by what a secret is tells whoever can try addresses and watch which are refused, and a dictionary of
     passwords would give a weak one away in a dozen requests; and whoever can run a script of their own can try
     addresses: a page of another origin (in another chat, another tab, or a frame of the page itself), and the run
-    itself, whose `browser_eval` runs in a page of the very
-    same origin in another chat, or in this chat once it closed the tab it filled. That page is not the site's but the
+    itself, whose `browser_eval` runs in a page of the very same origin in another chat, or in this chat once it closed
+    the tab it filled. That page is not the site's but the
     run's, and the run was never given the password, so the page of the same origin is no longer taken for the site's.
     In the tab the password was typed into no script of the run runs while it is open, so the guard holds it there
     alone. The tab's own address is not a request a page sends but the run's: the address it opens,

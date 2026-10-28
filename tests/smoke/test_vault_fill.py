@@ -18,7 +18,7 @@ import threading
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, quote_plus
+from urllib.parse import parse_qs, quote, quote_plus
 
 import pytest
 import pytest_asyncio
@@ -61,7 +61,9 @@ def _by_get(form: str, button: str = '<button type="submit">Sign in</button>', a
 
 # Forms that would send what is typed in the page's address (item 775): one that names GET, one that names no method
 # (a browser sends it by GET), one whose button names GET, one whose button's script sets GET again and calls the
-# form's submit (which fires no event), one whose listener sets GET again as it is sent.
+# form's submit (which fires no event), one whose listener sets GET again as it is sent, one with a control named
+# ``method`` (which hides the form's own), and one in a shadow root whose listener sets GET (its submit never reaches
+# the window).
 _BY_GET: dict[str, str] = {
     "/get-login": _by_get('method="get"'),
     "/plain-login": _by_get(""),
@@ -76,6 +78,13 @@ _BY_GET: dict[str, str] = {
         after="<script>document.querySelector('form').addEventListener('submit', (event) => "
         "event.target.setAttribute('method', 'get'));</script>",
     ),
+    "/named-method-login": _by_get("", '<input type="hidden" name="method" value="password"><button>Sign in</button>'),
+    "/shadow-login": """<!doctype html><title>Sign in by GET</title><div id="host"></div><script>
+const root = document.getElementById("host").attachShadow({ mode: "open" });
+root.innerHTML = '<form action="/home"><label>Password <input name="pass" type="password"></label>'
+  + '<button type="submit">Sign in</button></form>';
+root.querySelector("form").addEventListener("submit", (event) => event.target.setAttribute("method", "get"));
+</script>""",
 }
 
 
@@ -474,6 +483,6 @@ async def test_a_form_that_would_send_by_get_takes_the_password_and_sends_it_by_
         if len(site.submissions) > before:
             break
         await asyncio.sleep(_POLL_S)
-    assert site.submissions[before:] == [f"pass={quote_plus(PASSWORD)}"], site.submissions
+    assert [parse_qs(one)["pass"] for one in site.submissions[before:]] == [[PASSWORD]], site.submissions
     # The other tests of the module send an address that holds it on purpose: only those since the click count here.
     assert not any(PASSWORD in one or quote_plus(PASSWORD) in one for one in site.addresses[addressed:]), site.addresses
