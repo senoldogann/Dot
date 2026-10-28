@@ -51,6 +51,13 @@ _LATER_READ: int = 10
 # How long no run of its own is tried after one could not be started (a model or a setting that refuses it).
 _AFTER_A_FAILED_START_S: float = 600.0
 _STATE_WORDS: dict[str, str] = {"open": "to do", "doing": "being done", "done": "done", "dropped": "let go"}
+
+
+def _is_owner_urgent(todo: TodoRecord) -> bool:
+    """An urgent thing the owner put on the list; a run or a watcher can write a title, the owner can write a source."""
+    return todo.source == "owner" and "[URGENT]" in f"{todo.title} {todo.why}".upper()
+
+
 # The chats whose titles are not the owner's words: a watcher's carries a mail's subject, Dot's own a thing of its list.
 _NOT_THE_OWNERS_CHATS: frozenset[str] = frozenset({WATCHER_SOURCE, NOTICE_SOURCE, INITIATIVE_SOURCE})
 # How far back the run that looks for work reads the failed runs, when it never looked before.
@@ -167,30 +174,47 @@ class Initiative:
             return
         if config.runs_per_day > 0 and await self._started_lately() >= config.runs_per_day:
             return
-        
-        # Opportunistic Initiative: check for urgent tasks that bypass idle/active constraints.
-        todo: TodoRecord | None = await self._next(config.attempts)
-        is_urgent = todo is not None and ("[URGENT]" in todo.title.upper() or "[URGENT]" in todo.why.upper())
-        
-        if not is_urgent:
-            if self._manager.active_run_ids() or self._manager.elsewhere_run_ids():
-                return
+
+        # Opportunistic initiative: an urgent thing the owner put on the list may start even while another run is
+        # going; anything else waits for an idle Mac and no other run. The list is read only after that decision, so a
+        # busy tick cannot drop or finish a thing as a side effect.
+        busy: bool = bool(self._manager.active_run_ids() or self._manager.elsewhere_run_ids())
+        look_ready: bool = False
+        if busy:
+            todo: TodoRecord | None = await self._urgent_todo(config.attempts)
+        else:
             idle: float | None = await asyncio.to_thread(self._idle)
             if idle is None or idle < config.idle_minutes * 60.0:
-                return
-        
+                todo = await self._urgent_todo(config.attempts)
+            else:
+                look_ready = True
+                todo = await self._next(config.attempts)
+
         if todo is not None:
             await self._do(todo)
-        elif state.looked_at is None or now - state.looked_at >= config.look_every_hours * 3600.0:
+        elif look_ready and (state.looked_at is None or now - state.looked_at >= config.look_every_hours * 3600.0):
             await self._look(state, now)
 
-    async def _next(self, attempts: int) -> TodoRecord | None:
-        """The oldest thing to do. One tried ``attempts`` times already (the limit was lowered since) is let go, so
-        that old things cannot keep the newer ones out of the part of the list that is read; one whose chat goes on in
-        a run the owner started there since (a Resume) is that run's: left while it works, done once it ended done
-        (the code reviews of item 715)."""
+    async def _urgent_todo(self, attempts: int) -> TodoRecord | None:
+        """The first thing the owner put on the list with ``[URGENT]`` in its title or why, if it has tries left.
+
+        Only the owner's own urgent thing may jump a running Mac or another run: a watcher's title carries a mail's
+        subject, so a third party can write such a title. This reads without changing the list; a busy tick must not
+        let go of or finish anything."""
         store: Store = self._runtime.store
         for todo in await store.list_todos(("open",), _LISTED):
+            if _is_owner_urgent(todo) and todo.attempts < attempts:
+                return todo
+        return None
+
+    async def _next(self, attempts: int) -> TodoRecord | None:
+        """The oldest thing to do, with the owner's urgent things first. One tried ``attempts`` times already (the
+        limit was lowered since) is let go, so that old things cannot keep the newer ones out of the part of the list
+        that is read; one whose chat goes on in a run the owner started there since (a Resume) is that run's: left while
+        it works, done once it ended done (the code reviews of item 715)."""
+        store: Store = self._runtime.store
+        todos: list[TodoRecord] = list(await store.list_todos(("open",), _LISTED))
+        for todo in sorted(todos, key=lambda item: (not _is_owner_urgent(item), item.created_at)):
             if todo.attempts >= attempts:
                 await store.set_todo(
                     todo.id, "dropped", todo.attempts, todo.run_id, f"Let go after {todo.attempts} tries."

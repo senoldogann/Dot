@@ -40,16 +40,22 @@ log = get_logger(__name__)
 
 _EVENT_TEXT_CHARS: int = 4000
 _BROKEN_ARGUMENTS_CHARS: int = 600
-# Tools that can be executed speculatively (low risk).
-_LOW_RISK_TOOLS: frozenset[str] = frozenset({
-    "web_search", "web_fetch", "read_file", "list_dir", "search_files", "find_files",
-    "desktop_snapshot", "desktop_read", "browser_snapshot", "browser_read_text",
-})
-# Failover mapping: if the first tool fails, try the alternative.
-_TOOL_FAILOVERS: dict[str, str] = {
-    "browser_act": "browser_find",
-    "desktop_act": "desktop_snapshot",
-}
+# Read-only tools: a run may skip the owner's hold for one, but never its approval, and a failed one may be tried
+# once more. A tool that acts on a page or a window is never in this set: a second call could repeat the action.
+_READ_ONLY_TOOLS: frozenset[str] = frozenset(
+    {
+        "web_search",
+        "web_fetch",
+        "read_file",
+        "list_dir",
+        "search_files",
+        "find_files",
+        "desktop_snapshot",
+        "desktop_read",
+        "browser_snapshot",
+        "browser_read_text",
+    }
+)
 # The kinds of action whose target does not show what the call acts on: an MCP call's is the name of its server.
 _BY_ARGUMENTS: frozenset[str] = frozenset({"mcp", "mcp_read"})
 
@@ -202,16 +208,18 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         held: str | None = ctx.runtime.peers.conflict(ctx.run_id, call.name, action)
         if held is not None:
             return _Checked(result=fail(held), action=action, waited_s=0.0, decision=None)
-        
+
         asked_at: float = time.monotonic()
         try:
             authorized: Authorization = await gate.authorize_recorded(action, call.arguments, prepared.weighed)
             note, decision = authorized.note, authorized.decision
-            if not (tool.spec.name in _LOW_RISK_TOOLS and ctx.mode in ("auto", "yolo")):
+            # The owner's hold waits for them to finish a takeover; a read-only tool does not change the page or the
+            # window, so it may go on. The approval above still decides, and a tool that acts always waits.
+            if not (tool.spec.name in _READ_ONLY_TOOLS and ctx.mode in ("auto", "yolo")):
                 held_s = await gate.wait_free()
         finally:
             at_gate.seconds += time.monotonic() - asked_at
-        
+
         taken: str | None = ctx.runtime.peers.take(ctx.run_id, call.name, action)
         if taken is not None:
             return _Checked(
@@ -220,37 +228,27 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
                 waited_s=at_gate.seconds,
                 decision=decision,
             )
-        
-        # Tool-Chain Failover: try the tool, and if it fails, try the alternative.
-        attempts = 1
-        max_attempts = 2 if tool.spec.name in _TOOL_FAILOVERS else 1
-        
-        for attempt in range(attempts, max_attempts + 1):
+
+        # A read-only call that times out or fails may be tried once more: it changes nothing, so a second try is a
+        # retry, not a repeated action. An acting tool is run once and its failure is the answer; the model decides.
+        max_attempts: int = 2 if tool.spec.name in _READ_ONLY_TOOLS else 1
+        for attempt in range(1, max_attempts + 1):
             try:
                 async with asyncio.timeout(tool.timeout_s) as scope:
                     result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
-                    if not result.is_error:
-                        break
-                    if attempt < max_attempts:
-                        log.info("tool_failover_trigger", tool=tool.spec.name, result=result.text)
-                        alt_tool_name = _TOOL_FAILOVERS[tool.spec.name]
-                        alt_tool = ToolRegistry().tools.get(alt_tool_name)
-                        if alt_tool:
-                            prepared = await alt_tool.prepare(call.arguments, ctx)
-                            action = prepared.action
-                        else:
-                            log.error("tool_failover_missing", tool=alt_tool_name)
-                            raise DotError(f"Failover tool {alt_tool_name} not found")
-            except (asyncio.TimeoutError, DotError) as e:
-                if attempt == max_attempts:
-                    raise e
-                log.warning("tool_failover_retry", tool=tool.spec.name, error=str(e))
-            except Exception as e:
-                if attempt == max_attempts:
-                    raise e
-                log.exception("tool_failover_exception", tool=tool.spec.name, error=str(e))
-        else:
-            pass
+            except (RunCancelled, FailSafeTriggered):
+                raise
+            except (TimeoutError, DotError) as exc:
+                if attempt >= max_attempts:
+                    raise
+                log.info("tool_retry", tool=tool.spec.name, attempt=attempt, error=str(exc))
+                continue
+            if not result.is_error:
+                break
+            if attempt < max_attempts:
+                log.info("tool_retry_result", tool=tool.spec.name, attempt=attempt, text=result.text)
+                continue
+            break
     except (RunCancelled, FailSafeTriggered):
         raise
     except Exception as exc:

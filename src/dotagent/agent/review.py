@@ -168,10 +168,9 @@ _GOAL_SYSTEM: str = (
     "- Targets are the agent's own measurable reading of a goal that names an outcome, not added requirements. Judge "
     "whether they are met from the digest, the facts and the numbers of the answer, and whether they fit the goal: "
     "targets that ask for less than the goal's words do not make the goal reached.\n"
-    "- Outcome Maximization: if the goal is reached but there is a clear path to a superior result (e.g., finding a "
-    "better price, adding a missing but valuable detail, or improving the quality of the answer based on additional "
-    "research), say continue and precisely describe how the result can be maximized."
-
+    "- Outcome maximization: when the goal itself asks for the best, the cheapest, or a named target, and the facts "
+    "show a concrete better result within that goal, say continue and name exactly what is missing. Never ask for "
+    "polish or a comparison the goal did not ask for.\n"
     "- The evidence of a plan step is the agent's claim about that step, not a fact: it holds when the digest or the "
     "facts show what it names (the call that read the file, the output with the count, the page that was opened). A "
     "step marked done whose evidence nothing in the digest or the facts bears out is not done: list its number in "

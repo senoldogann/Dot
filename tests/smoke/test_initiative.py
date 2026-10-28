@@ -627,3 +627,59 @@ async def test_a_message_of_the_owners_in_the_chat_of_a_thing_does_not_mark_it_d
         assert initiative.working()
         assert (await runtime.store.get_todo(added.id)).status == "doing"
         await _settled(initiative)
+
+
+async def test_a_normal_thing_does_not_start_while_another_run_is_active(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with _dot(login_env, []) as (runtime, manager):
+        todo: TodoRecord | str = await add_todo(runtime.store, "Tidy the notes", "Later", "owner", None, False)
+        assert isinstance(todo, TodoRecord)
+        await set_initiative(runtime.store, True)
+        monkeypatch.setattr(manager, "active_run_ids", lambda: ["run_elsewhere"])
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(10_000.0)
+        assert not initiative.working()
+        kept: TodoRecord = await runtime.store.get_todo(todo.id)
+        assert (kept.status, kept.attempts, kept.run_id) == ("open", 0, None)
+
+
+async def test_an_urgent_thing_from_a_watcher_does_not_jump_another_run(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with _dot(login_env, []) as (runtime, manager):
+        await add_todo(runtime.store, "[URGENT] Reply to the sender", "A mail subject", "run", None, False)
+        await set_initiative(runtime.store, True)
+        monkeypatch.setattr(manager, "active_run_ids", lambda: ["run_elsewhere"])
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(10_000.0)
+        assert not initiative.working()
+        assert await runtime.store.list_runs(10, None) == []
+
+
+async def test_an_urgent_thing_the_owner_put_on_the_list_starts_while_another_run_is_active(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with _dot(login_env, [_finish("The urgent thing is done.")]) as (runtime, manager):
+        await add_todo(runtime.store, "[URGENT] Send the signed page", "The owner asked", "owner", None, False)
+        await set_initiative(runtime.store, True)
+        monkeypatch.setattr(manager, "active_run_ids", lambda: ["run_elsewhere"])
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(10_000.0)
+        assert initiative.working()
+        [run] = await runtime.store.list_runs(10, None)
+        await _settled(initiative)
+        assert (await runtime.store.get_thread(run.thread_id)).title == "[URGENT] Send the signed page"
+
+
+async def test_when_idle_an_owners_urgent_thing_goes_before_an_older_normal_one(login_env: dict[str, str]) -> None:
+    async with _dot(login_env, [_finish("The urgent thing is done.")]) as (runtime, manager):
+        await add_todo(runtime.store, "Older normal thing", "Later", "owner", None, False)
+        await add_todo(runtime.store, "[URGENT] Send the signed page", "Now", "owner", None, False)
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(10_000.0)
+        assert initiative.working()
+        [run] = await runtime.store.list_runs(10, None)
+        await _settled(initiative)
+        assert (await runtime.store.get_thread(run.thread_id)).title == "[URGENT] Send the signed page"
