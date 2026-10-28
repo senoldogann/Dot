@@ -123,7 +123,9 @@ def test_a_read_away_from_the_browser_and_the_screen_skips_the_owner_hold_but_st
     assert gate.authorized == 1
 
 
-@pytest.mark.parametrize("name", ["browser_snapshot", "browser_read_text", "desktop_snapshot", "desktop_read"])
+@pytest.mark.parametrize(
+    "name", ["browser_snapshot", "browser_read_text", "desktop_snapshot", "desktop_read", "web_fetch", "web_search"]
+)
 def test_a_read_of_the_page_or_the_screen_waits_for_the_owner_hold_even_in_yolo(name: str) -> None:
     """The security review: a page read while the owner types a password in it would hand the password to the model."""
     _result, gate, _calls = asyncio.run(_run(name, [ok("the page")], approvals="yolo"))

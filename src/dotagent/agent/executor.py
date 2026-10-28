@@ -58,10 +58,10 @@ _READ_ONLY_TOOLS: frozenset[str] = frozenset(
 )
 # The read-only tools that go on while the owner holds the run (a takeover of its browser or its screen) in `auto` and
 # `yolo` (item 809): they touch neither the browser nor the screen the owner has taken, so they read nothing of what the
-# owner types or sees there (a password being typed). A tool that reads the page or the screen waits as before.
-_HOLD_FREE_TOOLS: frozenset[str] = frozenset(
-    {"web_search", "web_fetch", "read_file", "list_dir", "search_files", "find_files"}
-)
+# owner types or sees there (a password being typed). A tool that reads the page or the screen waits as before, and so
+# do `web_fetch` and `web_search`, which may open a tab of their own in the run's browser (a page that refuses a plain
+# request, the browser at the foot of the ladder of search engines).
+_HOLD_FREE_TOOLS: frozenset[str] = frozenset({"read_file", "list_dir", "search_files", "find_files"})
 _HOLD_FREE_APPROVALS: frozenset[str] = frozenset({"auto", "yolo"})
 # When an acting tool's call answers with an error, the page or the window is read instead (item 809): the reader's
 # result says the action was not performed, never that it succeeded. The reader takes its own arguments
