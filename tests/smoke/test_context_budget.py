@@ -41,7 +41,8 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # 7,148, tools 15,292).
 BUDGET_TOKENS: int = 22_800
 SYSTEM_BUDGET_TOKENS: int = 7_200
-TOOLS_BUDGET_TOKENS: int = 15_300
+# Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
+TOOLS_BUDGET_TOKENS: int = 15_400
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

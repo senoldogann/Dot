@@ -24,7 +24,9 @@ and your instructions), ahead of Dot's rules, which still hold; its tools are th
 asking you and turning tool groups on, and the tools of an MCP server you pick for its message, or picked for an earlier
 message of its chat (item 415): your pick widens the agent's bounds for that chat; a server the model only called does
 not. A run it delegates a part to (`delegate`) is bound to the agent's tools too, without the servers picked for a
-message, and carries the agent's id (item 553). The run's page wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on
+message, and carries the agent's id (item 553). Ask the delegated run to end with a `Verification:` section: the
+command or check it ran and the answer. A report without one is marked as a claim, so the sender does not close a plan
+step on trust alone. The run's page wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on
 the home's Today strip wear the face too. A schedule can run as one of your agents (its **Agent** on Schedules, item
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting an agent leaves its chats, its lessons and its
 learned skills to Dot, and switches its schedules off ("switched off: its agent was deleted"), as Dot's with no agent
