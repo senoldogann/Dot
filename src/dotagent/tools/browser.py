@@ -955,7 +955,8 @@ def _wait_text_tool() -> RegisteredTool:
         name="browser_wait_text",
         description=(
             "Wait until some text is visible on the page (slow loads, progress screens), then show what changed. When "
-            "it does not appear in time the call fails and shows the page as it is."
+            "it does not appear in time, or the page stands still for 3 s after the first 5, the call fails and shows "
+            "the page as it is."
         ),
         args_model=WaitTextArgs,
         modes=ALL_MODES,

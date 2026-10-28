@@ -3063,6 +3063,9 @@ class BrowserSession:
             if end != "timeout":
                 return end
             now: float = time.monotonic()
+            # The page is not read once the time is spent: its frames could take a second more than was asked.
+            if now >= ends:
+                return "timeout"
             seen: int | None = (await page_pulse(tab.page)).changes
             # A request begun since the last look is the page at work too: one that polls its server every few seconds
             # with short requests is rarely seen with one under way.
