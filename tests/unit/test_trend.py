@@ -264,6 +264,8 @@ async def test_a_coin_coinbase_gave_too_few_days_of_is_held_not_sold(store: Stor
     assert [order.side for order in orders if order.product == "BTC-EUR"] == ["buy"]
     state: EngineState | None = await read_state(store)
     assert state is not None and any("BTC-EUR: Coinbase gave 50 daily closes" in note for note in state.notes)
+    # Its share is kept for it: ETH's stays half the account, and ETH is not bought up to all of it.
+    assert {share.product: share.target for share in state.shares}["ETH-EUR"] == pytest.approx(0.5, abs=0.01)
 
 
 async def test_an_order_whose_price_cannot_be_read_leaves_those_placed_before_it_in_the_record(

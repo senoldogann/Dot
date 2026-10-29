@@ -47,9 +47,10 @@ def volatility(closes: Sequence[float]) -> float | None:
     return math.sqrt(variance) * math.sqrt(_YEAR_DAYS)
 
 
-def target_weights(closes: Mapping[str, Sequence[float]], target_vol: float) -> dict[str, float]:
+def target_weights(closes: Mapping[str, Sequence[float]], target_vol: float, kept: int = 0) -> dict[str, float]:
     """The share of the account each product should be: its strength, scaled down to ``target_vol``, over the number
-    of products with closes enough to judge. A product without them is 0 and takes no share from the others."""
+    of products with closes enough to judge, and ``kept`` more: those the engine holds and leaves as they are at a
+    look that cannot judge them, whose share is not given to the others. A product without closes enough is 0."""
     judged: dict[str, tuple[float, float]] = {}
     for product, series in closes.items():
         found: float | None = strength(series)
@@ -59,7 +60,7 @@ def target_weights(closes: Mapping[str, Sequence[float]], target_vol: float) -> 
     weights: dict[str, float] = dict.fromkeys(closes, 0.0)
     for product, (found, vol) in judged.items():
         scale: float = 1.0 if vol <= 0 else min(1.0, target_vol / vol)
-        weights[product] = found * scale / len(judged)
+        weights[product] = found * scale / (len(judged) + kept)
     return weights
 
 

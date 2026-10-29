@@ -88,24 +88,26 @@ class TrendEngine:
         for product in products:
             candles: tuple[Candle, ...] = await self._trading.market.candles(product, "ONE_DAY", _CANDLES)
             closes[product] = closed_days(candles, now)
-        targets: dict[str, float] = target_weights(closes, config.engine_target_vol)
         portfolio: Portfolio = await self._trading.portfolio()
+        values: dict[str, float] = {}
+        sizes: dict[str, float] = {}
+        for holding in portfolio.holdings:
+            held: str = f"{holding.currency}-{config.quote}"
+            if held in closes:
+                values[held] = holding.value
+                sizes[held] = holding.amount
         notes: list[str] = []
         # A product Coinbase gave too few days of is not judged at this look, rather than sold for want of closes: a
-        # coin listed lately is held by the rule once it has them, but one held already keeps what it holds.
+        # coin listed lately is held by the rule once it has them, but one held already keeps what it holds, and its
+        # share is not given to the others (the review: it was, and they were bought up and sold back).
         unjudged: list[str] = [product for product, series in closes.items() if strength(series) is None]
         for product in unjudged:
             notes.append(
                 f"{product}: Coinbase gave {len(closes[product])} daily closes, the rule needs {DAYS_NEEDED}; "
                 "nothing traded of it at this look"
             )
-        values: dict[str, float] = {}
-        sizes: dict[str, float] = {}
-        for holding in portfolio.holdings:
-            held: str = f"{holding.currency}-{config.quote}"
-            if held in targets:
-                values[held] = holding.value
-                sizes[held] = holding.amount
+        kept: int = len([product for product in unjudged if sizes.get(product, 0.0) > 0])
+        targets: dict[str, float] = target_weights(closes, config.engine_target_vol, kept)
         shares: tuple[EngineShare, ...] = (
             tuple(
                 EngineShare(product=product, weight=values.get(product, 0.0) / portfolio.equity, target=target)

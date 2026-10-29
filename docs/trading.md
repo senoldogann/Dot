@@ -43,8 +43,9 @@ can change them.
   for that one request, for two minutes, as Coinbase asks.
 
 What lets runs do more with money is done on the Mac only: switching trading on or to live, raising a limit, allowing a
-product (`*` too, and a lower `min_volume`), saving a key. A phone's key gets a refusal for those,
-and can always narrow: switch trading off or to paper, lower a limit, drop a product, remove the key. Switching to live
+product (`*` too, and a lower `min_volume`), switching the trend engine on (item 818), saving a key. A phone's key gets
+a refusal for those, and can always narrow: switch trading off or to paper, switch the trend engine off, lower a limit,
+drop a product, remove the key. Switching to live
 checks the key with Coinbase first.
 
 ## What a run does
