@@ -6,13 +6,16 @@ the owner for it on the page (``secrets``): Dot keeps each in its ``.env`` under
 server's headers or environment refer to it as ``${...}``, so the value never sits in a record.
 
 Checked on 2026-10-15 in each authorization server's own metadata: every service here that signs in offers dynamic
-client registration and a client without a secret (``none``); Supabase and monday.com say so in their docs
-(2026-10-19). The services item 413 added were checked on 2026-10-19 by Dot's own client: it registered with each and
-each opened its sign-in page to it. The addresses, the keys they take and the commands are as the services' own docs
-and package registries read on 2026-10-19. Left out, as Dot cannot connect to them: Asana, Slack, Google, Box, Render,
-HubSpot and Square (clients registered by hand), Vercel and Canva (approved clients only: Canva refused Dot's), Figma's
-own server (it refused Dot's registration; Framelink's server reads Figma with your token instead) and Semgrep's (it
-refused the resource Dot asks for). Any of them can still be added by its address.
+client registration and a client without a secret (``none``); monday.com says so in its docs (2026-10-19), and
+Supabase's docs did, but its authorization server registers a client with a secret, names no way of sending it and
+refuses a token asked for without it (read on 2026-10-29, item 816), which Dot sends
+(:func:`dotagent.mcp.signin.usable_client`). The services item 413 added were checked on 2026-10-19 by Dot's own
+client: it registered with each and each opened its sign-in page to it. The addresses, the keys they take and the
+commands are as the services' own docs and package registries read on 2026-10-19. Left out, as Dot cannot connect to
+them: Asana, Slack, Google, Box, Render, HubSpot and Square (clients registered by hand), Vercel and Canva (approved
+clients only: Canva refused Dot's), Figma's own server (it refused Dot's registration; Framelink's server reads Figma
+with your token instead) and Semgrep's (it refused the resource Dot asks for). Any of them can still be added by its
+address.
 
 The services item 505 added were checked on 2026-10-21 by GET alone, as Dot's client reads them: each server's protected
 resource metadata and its authorization server's metadata offer dynamic client registration, a client without a secret
