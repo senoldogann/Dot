@@ -54,13 +54,13 @@ const MARKS_TURN_MS = 6000;
 // visits.
 const FOLDS_KEY = "dot.sideFolds";
 // The channels whose chats stand in a section of their own (item 619), by the `source` their threads have (the channel's
-// id, as the router makes the thread): the name of the section, its mark, and whether it starts folded. A thread of any
-// other source is a chat among the days. Dot's own runs (item 822): one chat a thing of its list, one a schedule; their
-// labels have no mark, so that their words stand where Chats' do (item 827).
+// id, as the router makes the thread): the name of the section and whether it starts folded. A thread of any other
+// source is a chat among the days. Dot's own runs (item 822): one chat a thing of its list, one a schedule. No label has
+// a mark, so that every section's words stand where Chats' do (items 827 and 828).
 const CHANNEL_SECTIONS = {
-  initiative: { label: "On its own", icon: null, folded: true },
-  schedule: { label: "Scheduled", icon: null, folded: true },
-  imessage: { label: "iMessage", icon: "message", folded: false },
+  initiative: { label: "On its own", folded: true },
+  schedule: { label: "Scheduled", folded: true },
+  imessage: { label: "iMessage", folded: false },
 };
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
@@ -781,8 +781,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (kept === undefined) {
       const count = el("span", { class: "side-label-count" });
       const unread = el("span", { class: "side-label-dot", role: "img", "aria-label": "unread", hidden: true });
-      const mark = CHANNEL_SECTIONS[id].icon === null ? null : el("span", { class: "side-channel-mark", "aria-hidden": "true" }, icon(CHANNEL_SECTIONS[id].icon));
-      kept = { count, unread, label: foldLabel("h3", false, () => toggleFold(id), mark, `${CHANNEL_SECTIONS[id].label} `, count, unread) };
+      kept = { count, unread, label: foldLabel("h3", false, () => toggleFold(id), `${CHANNEL_SECTIONS[id].label} `, count, unread) };
       keptLabels.set(id, kept);
     }
     return kept;

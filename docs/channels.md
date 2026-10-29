@@ -11,7 +11,7 @@ phone](phone.md) is the other way, the web UI itself on your phone through your 
 
 A message you send to yourself (or from your iPhone's Apple ID to this Mac's) is posted into a chat of its own,
 **iMessage**, as if you had typed it in the box of the web UI (the same code that sends the box's message). The chat
-stands in a section of its own at the foot of the sidebar, under the days, with the channel's mark and a count, which
+stands in a section of its own at the foot of the sidebar, under the days, with a count, which
 folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the-daemon-the-web-ui-and-the-service)):
 
 - With no run at work in that chat it starts one. With one at work the message waits in the chat's queue and starts the
