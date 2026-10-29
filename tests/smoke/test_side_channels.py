@@ -191,6 +191,16 @@ async def test_the_chats_of_a_channel_stand_at_the_foot_with_its_mark_and_a_coun
         await expect(_section(page)).to_have_count(1)
         await expect(_section(page).locator("> .side-label")).to_have_text("iMessage 1")
         await expect(_section(page).locator("> .side-label .side-channel-mark svg")).to_be_visible()
+        # The mark is in the label's ink, whatever the theme (item 823), not a colour of its own.
+        inks: object = (
+            await _section(page)
+            .locator("> .side-label")
+            .evaluate(
+                "label => [getComputedStyle(label).color,"
+                " getComputedStyle(label.querySelector('.side-channel-mark')).color]"
+            )
+        )
+        assert isinstance(inks, list) and inks[0] == inks[1], inks
         await expect(_fold(page)).to_have_attribute("aria-expanded", "true")
         row: Locator = _section(page).locator(".side-chat")
         await expect(row).to_have_count(1)
