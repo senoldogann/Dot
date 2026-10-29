@@ -135,6 +135,7 @@ async def _browser_page(
     )
     context: BrowserContext = await (webkit if phone else chromium).new_context(**options)
     page: Page = await context.new_page()
+    await page.add_init_script("localStorage.setItem('dot.work', 'steps')")  # the steps this test reads (item 830)
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     await page.goto(ui_url(host, port, TOKEN))

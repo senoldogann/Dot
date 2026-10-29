@@ -263,6 +263,7 @@ async def _phone(browser: Browser, playwright: Playwright, device: str) -> Brows
     context: BrowserContext = await browser.new_context(
         **playwright.devices[device], color_scheme="light", reduced_motion="reduce"
     )
+    await context.add_init_script("localStorage.setItem('dot.work', 'steps')")  # the steps this test reads (item 830)
     await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
     return context
 
@@ -328,6 +329,9 @@ async def test_every_page_on_a_phone_reads_at_a_phones_size_and_takes_a_finger(
             for device in _PHONES:
                 context: BrowserContext = await _phone(browser, playwright, device)
                 page: Page = await context.new_page()
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 for label, route in pages:
                     await page.goto(f"{address}/{route}")
@@ -352,6 +356,9 @@ async def test_a_steps_duration_shows_and_a_settings_row_turns_its_switch_on_a_p
         try:
             context: BrowserContext = await _phone(browser, playwright, _PHONES[0])
             page: Page = await context.new_page()
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
 
             # A step's duration, once its turn's steps are unfolded, with no hover.
@@ -387,6 +394,9 @@ async def test_a_macs_window_keeps_its_sizes(own_home: Path) -> None:
         browser: Browser = await playwright.webkit.launch(headless=True)
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             await page.goto(f"{address}/#/settings/appearance")
             await expect(page.get_by_role("switch", name="Fold steps")).to_be_visible()

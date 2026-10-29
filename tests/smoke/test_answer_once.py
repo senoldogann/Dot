@@ -115,6 +115,9 @@ async def test_an_answer_repeated_by_finish_after_a_thought_shows_once() -> None
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
                 page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")
@@ -152,6 +155,9 @@ async def test_an_answer_reworded_by_finish_shows_once() -> None:
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
                 page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")
@@ -187,6 +193,9 @@ async def test_a_reply_that_says_more_than_the_answer_stays() -> None:
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
                 page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")
@@ -243,6 +252,9 @@ async def test_a_chat_left_and_come_back_to_while_its_run_works_shows_each_messa
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             run: RunRecord = await manager.start(
@@ -302,6 +314,9 @@ async def _run_and_read(script: tuple[ScriptedTurn, ...]) -> tuple[list[object],
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
                 page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")
@@ -391,6 +406,9 @@ async def test_an_earlier_turn_leaves_out_the_reply_its_answer_restated() -> Non
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
                 page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/runs/{second.id}")

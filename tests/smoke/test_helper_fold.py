@@ -180,6 +180,9 @@ async def test_a_helper_is_a_closed_row_that_opens_for_its_approval_and_folds_ag
                 page: Page = await browser.new_page(
                     viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                 )
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{parent.id}")
                 await expect(page.locator("details.child")).to_have_count(2)
@@ -209,6 +212,9 @@ async def test_a_helper_is_a_closed_row_that_opens_for_its_approval_and_folds_ag
             page = await browser.new_page(
                 viewport={"width": 1280, "height": 900}, color_scheme="light", reduced_motion="reduce"
             )
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"{address}/#/runs/{parent.id}")
             open_row = _row(page, asking.id)
