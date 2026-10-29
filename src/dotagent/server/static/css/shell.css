@@ -439,7 +439,9 @@
   gap: var(--space-half);
 }
 
-.side-channels:not(:empty) {
+/* Below the days a little room parts the sections from the last chat; with the days folded, the first section follows
+   Chats as one section follows another (item 827: the gap under a folded Chats was 11 px more than between two). */
+.side-runs:not([hidden]) + .side-channels:not(:empty) {
   margin-top: 8px;
 }
 
