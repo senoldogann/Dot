@@ -387,7 +387,12 @@ async def test_the_engine_keeps_what_the_account_made_beside_holding_its_first_c
     finally:
         _DOWN.clear()
     assert unread.result == later.result
-    # The paper account started again starts the measure again.
+    # The paper account started again starts the measure again; the first look after it, Bitcoin unread, shows none.
     await trading.reset_paper()
+    _DOWN.add("BTC-EUR")
+    try:
+        assert (await engine.look(trading.config(), _NOW + 6000)).result is None
+    finally:
+        _DOWN.clear()
     again: EngineState = await engine.look(trading.config(), _NOW + 7200)
     assert again.result is not None and (again.result.started_at, again.result.account) == (_NOW + 7200, 0.0)
