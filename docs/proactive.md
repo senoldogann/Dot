@@ -183,7 +183,10 @@ works, nobody touched the keyboard, the mouse or the trackpad for `idle_minutes`
 since its last run ended, the emergency stop is not engaged and fewer than `runs_per_day` of its runs started in the
 last day (0, the default, sets no limit; counted from the runs the database holds, so a restart of the daemon does not
 count from none). One of its runs works at a time. When macOS cannot say how long the Mac has been idle, nothing starts,
-and the card says so. A thing you put on the list yourself with `[URGENT]` in its title or why (in any case) goes before
+and the card says so. In `peak_hours_utc` (two hours of a weekday in UTC, such as `[12, 18]`, a provider's dearer hours;
+none by default) nothing starts but an urgent thing of yours, as while you use the Mac, and the card says the hours in
+the Mac's time (item 826: Ollama Cloud's price outside 12 to 18 UTC on weekdays, and all weekend, is half); a run under
+way goes on, and the schedules keep their times. A thing you put on the list yourself with `[URGENT]` in its title or why (in any case) goes before
 the older ones and may start while another run works or you use the Mac (item 809); a thing a run put on the list, or
 one that came of content third parties can author (a page, a mail), is never urgent, however it is marked. It does the
 oldest thing to do, in a chat of its own named after it (under **On its own** at the foot of the sidebar, folded, item
@@ -215,8 +218,8 @@ thing tried as often as `attempts` allows, after the limit was lowered, is let g
 is left to that resume while it works, and done once it ended done; another message in its chat is no sign it was done.
 
 The settings are in `[initiative]` of `defaults.toml`: `idle_minutes`, `gap_minutes`, `look_every_hours`, `attempts`,
-`runs_per_day` and `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do); the switch and the
-time of the last look are kept in the database.
+`runs_per_day`, `approvals` (`yolo`; `ask`, `auto` or `supervised` make its runs ask as yours do) and `peak_hours_utc`;
+the switch and the time of the last look are kept in the database.
 
 ## Telling you
 

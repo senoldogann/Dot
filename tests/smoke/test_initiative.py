@@ -8,12 +8,14 @@ import asyncio
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from pydantic import ValidationError
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.resume import RESUME_SOURCE
@@ -26,7 +28,7 @@ from dotagent.events import Subscription
 from dotagent.llm.router import parse_model_ref
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.proactive import INITIATIVE_SOURCE
-from dotagent.proactive.initiative import Initiative, _listed, _recent_chats
+from dotagent.proactive.initiative import Initiative, _listed, _recent_chats, in_peak
 from dotagent.proactive.todos import OWNER_SOURCE, add_todo, note_look, read_initiative, set_initiative
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server.app import create_app
@@ -60,10 +62,16 @@ def _finish(answer: str, success: bool = True) -> ScriptedTurn:
     )
 
 
-def _config(runs_per_day: int = 0) -> AppConfig:
+def _config(runs_per_day: int = 0, peak: tuple[int, ...] = ()) -> AppConfig:
     config: AppConfig = eval_config(load_default_config())
     initiative = config.initiative.model_copy(
-        update={"idle_minutes": 10.0, "gap_minutes": 0.0, "attempts": 2, "runs_per_day": runs_per_day}
+        update={
+            "idle_minutes": 10.0,
+            "gap_minutes": 0.0,
+            "attempts": 2,
+            "runs_per_day": runs_per_day,
+            "peak_hours_utc": peak,
+        }
     )
     # The owner's own mode asks, as by default: Dot's own runs start in [initiative] approvals all the same.
     policy = config.policy.model_copy(update={"approvals": "ask"})
@@ -77,10 +85,10 @@ async def login_env() -> dict[str, str]:
 
 @asynccontextmanager
 async def _dot(
-    login_env: dict[str, str], turns: list[ScriptedTurn], runs_per_day: int = 0
+    login_env: dict[str, str], turns: list[ScriptedTurn], runs_per_day: int = 0, peak: tuple[int, ...] = ()
 ) -> AsyncIterator[tuple[Runtime, RunManager]]:
     with scratch_home() as home, eval_environment(home, {}):
-        runtime: Runtime = await open_runtime(_config(runs_per_day), login_env)
+        runtime: Runtime = await open_runtime(_config(runs_per_day, peak), login_env)
         await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, turns))
         manager: RunManager = RunManager(runtime)
         try:
@@ -242,6 +250,7 @@ async def test_the_owner_switches_it_and_keeps_the_list_through_the_api(
                 "todos": [],
                 "idle_readable": True,
                 "approvals": "yolo",
+                "peak_hours_utc": [],
             }
             # macOS that cannot say how long the Mac has been idle is said, as Dot starts nothing then.
             monkeypatch.setattr("dotagent.server.routes_proactive.idle_seconds", lambda: None)
@@ -750,3 +759,46 @@ async def test_a_look_cannot_list_a_placeholder_and_takes_back_only_what_it_put_
             "open",
             "open",
         )
+
+
+# A Wednesday at 13:00 UTC, and the Saturday after it (item 826).
+_WEDNESDAY_1300: float = datetime(2026, 10, 28, 13, 0, tzinfo=UTC).timestamp()
+_SATURDAY_1300: float = datetime(2026, 10, 31, 13, 0, tzinfo=UTC).timestamp()
+
+
+def test_the_dearer_hours_are_those_of_a_weekday_from_the_first_hour_to_the_second() -> None:
+    assert in_peak(_WEDNESDAY_1300, (12, 18))
+    assert not in_peak(_WEDNESDAY_1300 - 3600 - 1, (12, 18))  # 11:59:59
+    assert not in_peak(_WEDNESDAY_1300 + 5 * 3600, (12, 18))  # 18:00
+    assert not in_peak(_SATURDAY_1300, (12, 18))
+    assert not in_peak(_WEDNESDAY_1300, ())
+    with pytest.raises(ValidationError, match="two hours of the day"):
+        load_default_config().initiative.model_validate(
+            {**load_default_config().initiative.model_dump(), "peak_hours_utc": [18, 12]}
+        )
+
+
+async def test_in_the_dearer_hours_only_an_urgent_thing_of_the_owners_starts(login_env: dict[str, str]) -> None:
+    async with _dot(login_env, [_finish("The urgent thing is done.")], peak=(12, 18)) as (runtime, manager):
+        await add_todo(runtime.store, "Tidy the notes", "Later", OWNER_SOURCE, None, False)
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        # The Mac idle, a thing to do: in the dearer hours nothing starts, and no look for work either.
+        await initiative.tick(_WEDNESDAY_1300)
+        assert not initiative.working() and await runtime.store.list_runs(10, None) == []
+        await add_todo(runtime.store, "[URGENT] Send the signed page", "Now", OWNER_SOURCE, None, False)
+        await initiative.tick(_WEDNESDAY_1300 + 60)
+        assert initiative.working()
+        [run] = await runtime.store.list_runs(10, None)
+        await _settled(initiative)
+        assert (await runtime.store.get_thread(run.thread_id)).title == "[URGENT] Send the signed page"
+
+
+async def test_on_a_saturday_the_dearer_hours_hold_nothing_back(login_env: dict[str, str]) -> None:
+    async with _dot(login_env, [_finish("Tidied.")], peak=(12, 18)) as (runtime, manager):
+        await add_todo(runtime.store, "Tidy the notes", "Later", OWNER_SOURCE, None, False)
+        await set_initiative(runtime.store, True)
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative.tick(_SATURDAY_1300)
+        assert initiative.working()
+        await _settled(initiative)

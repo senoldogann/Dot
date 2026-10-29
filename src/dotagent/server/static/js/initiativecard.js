@@ -62,6 +62,13 @@ function todoRow(todo, handlers) {
   );
 }
 
+/** An hour of the day in UTC as the Mac's clock shows it today, such as "14:00". */
+function localHour(utcHour) {
+  const moment = new Date();
+  moment.setUTCHours(utcHour, 0, 0, 0);
+  return moment.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 /**
  * The card. Returns the element, `reload()`, which reads the list again (a run of it starting or ending), and
  * `dispose()`.
@@ -83,6 +90,8 @@ export function mountInitiative() {
     mode,
     "; with nothing on it, it looks for work that helps you now and then. What Dot found in a mail or a page while at it is handled as untrusted: what would reach others asks you first, or in YOLO is refused unless your words call for it.",
   );
+  // The weekday hours its runs wait in (item 826), told in the Mac's own time.
+  const peak = el("p", { class: "hint initiative-peak", hidden: true });
   const idleNote = el("div", { class: "note warn initiative-idle", hidden: true, role: "status" }, icon("alert"), el("span", null, "macOS does not say how long the Mac has been idle, so Dot starts nothing on its own. The daemon's log has why."));
   const holder = el("div", { class: "initiative-list" }, el("div", { class: "hint" }, "Reading the list…"));
   const input = el("input", { class: "input", type: "text", maxlength: String(TITLE_CHARS), placeholder: "Something Dot can do for you on its own", "aria-label": "A thing for Dot's list" });
@@ -93,6 +102,7 @@ export function mountInitiative() {
     { class: "memory-panel notes-panel watcher-panel initiative-panel", dataset: { initiative: "" } },
     el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "On its own"), count, el("span", { class: "spacer" }), toggle),
     lead,
+    peak,
     idleNote,
     holder,
     form,
@@ -103,6 +113,11 @@ export function mountInitiative() {
     toggle.setAttribute("aria-checked", String(view.enabled));
     idleNote.hidden = !view.enabled || view.idle_readable !== false;
     mode.textContent = view.approvals === "yolo" ? "asking nothing (YOLO)" : `in the ${view.approvals} approval mode`;
+    const hours = view.peak_hours_utc ?? [];
+    peak.hidden = hours.length !== 2;
+    if (hours.length === 2) {
+      peak.textContent = `On weekdays it starts nothing from ${localHour(hours[0])} to ${localHour(hours[1])}, the provider's dearer hours, but a thing you marked [URGENT].`;
+    }
     toggle.title = view.enabled ? "Dot works on its own while the Mac is idle: switch it off" : "Switch on: Dot works on its own while the Mac is idle";
     toggle.disabled = busy;
     add.disabled = busy;

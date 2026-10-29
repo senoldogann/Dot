@@ -796,6 +796,16 @@ class InitiativeConfig(FrozenModel):
     attempts: int = Field(ge=1, le=10)
     runs_per_day: int = Field(ge=0, le=1000)
     approvals: ApprovalMode
+    # The hours of a weekday, in UTC, from the first to the second, in which none of its runs starts but an urgent thing
+    # of the owner's (item 826): a provider's dearer hours. Empty: none.
+    peak_hours_utc: tuple[int, ...] = ()
+
+    @field_validator("peak_hours_utc")
+    @classmethod
+    def _two_hours(cls, value: tuple[int, ...]) -> tuple[int, ...]:
+        if value and (len(value) != 2 or not 0 <= value[0] < value[1] <= 24):
+            raise ValueError("peak_hours_utc is two hours of the day, the first before the second: [12, 18]")
+        return value
 
 
 type McpTransport = Literal["stdio", "http", "sse"]

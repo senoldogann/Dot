@@ -113,6 +113,9 @@ class InitiativeView(FrozenModel):
     idle_readable: bool = True
     # The approval mode Dot's own runs start in (``[initiative] approvals``, item 756), which the card says.
     approvals: ApprovalMode = "yolo"
+    # The weekday hours in UTC in which none of its runs starts but an urgent thing (``[initiative] peak_hours_utc``,
+    # item 826), which the card says; empty for none.
+    peak_hours_utc: tuple[int, ...] = ()
 
 
 class InitiativeRequest(FrozenModel):
