@@ -142,6 +142,11 @@ async def test_the_agents_answer_is_its_message_in_the_conversation(own_home: Pa
                         # With what the run is doing shown, open: agents speak in the conversation as people do (item
                         # 830).
                         await expect(said).to_have_attribute("open", "")
+                        # A choice made while it is drawn folds and opens it as a new block would be.
+                        await page.evaluate("import('/js/layout.js').then((layout) => layout.chooseWork('steps'))")
+                        await expect(said).not_to_have_attribute("open", "")
+                        await page.evaluate("import('/js/layout.js').then((layout) => layout.chooseWork('status'))")
+                        await expect(said).to_have_attribute("open", "")
                     await expect(message).to_be_visible()
                     await expect(message.locator(".agent-message-name")).to_have_text("Scout")
                     # Opened, the message is as wide as Dot's own answer, on a phone too.

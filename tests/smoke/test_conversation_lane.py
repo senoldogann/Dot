@@ -159,6 +159,9 @@ async def test_every_row_of_a_run_starts_its_words_and_centres_its_mark_on_one_l
                     page: Page = await browser.new_page(
                         viewport={"width": width, "height": 1000}, reduced_motion="reduce"
                     )
+                    await page.add_init_script(
+                        "localStorage.setItem('dot.work', 'steps')"
+                    )  # the steps this test reads (item 830)
                     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                     await page.goto(ui_url("127.0.0.1", port, TOKEN))
                     await page.goto(f"{address}/#/runs/{run.id}")

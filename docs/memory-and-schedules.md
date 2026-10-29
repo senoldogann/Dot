@@ -17,7 +17,9 @@ lines, then how learning fares; a note's actions show when the pointer is on its
 forgetting, correcting or adding a note keeps the notes read and the list where it was, and a correction open on another
 note stays open (item 204). In a run's conversation, a note the run saves, corrects (`memory_update`) or forgets leaves
 a quiet line where it happened, what changed and the first words of the note: "Saved to memory", "Updated memory" or
-"Removed from memory" (item 313, after Grok's "Updated memory"). The line of a saved or corrected note opens Settings ›
+"Removed from memory" (item 313, after Grok's "Updated memory"); with Settings › Interface › *Work in a chat* on **What
+it is doing**, the default, the line stands with the steps, out of the conversation until they are shown (item 830). The
+line of a saved or corrected note opens Settings ›
 Memory with that note first, to read, correct or forget (`#/settings/memory?note=ID`, `GET /api/memories/{id}`); a note
 forgotten since is said to be gone. A note saved again, or a call that failed, changed nothing and leaves no line. The
 line names no agent: a note a run saves is Dot's, for every run (item 94). The notes a run is handed at its start leave

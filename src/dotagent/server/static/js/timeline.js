@@ -15,7 +15,7 @@ import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
 import { helperCard } from "./helpercard.js";
 import { icon } from "./icons.js";
-import { currentWork, foldSteps } from "./layout.js";
+import { currentWork, foldSteps, WORK_CHANGED_EVENT } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, scheduleLine, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
@@ -51,6 +51,14 @@ const FLOCK_FACES = 3;
 const PREVIEW_CHARS = 240;
 // The blocks of agents' messages in the conversation and who wrote in each, in order (item 668; see agentSaid).
 const SAID_BLOCKS = new WeakMap();
+// A choice of the work shown made while they are drawn opens or folds the agents' messages as a new block would be
+// (item 830): open with what the run is doing, folded with every step.
+window.addEventListener(WORK_CHANGED_EVENT, (event) => {
+  const open = /** @type {CustomEvent<string>} */ (event).detail === "status";
+  for (const block of document.querySelectorAll("details.agent-said")) {
+    /** @type {HTMLDetailsElement} */ (block).open = open;
+  }
+});
 // The tool that hands a part to one of the owner's agents (item 668): its call shows that the part is on its way.
 const MESSAGE_AGENT_TOOL = "message_agent";
 // How much of an agent's reply its message in the conversation shows; the rest is on its run's page.

@@ -272,9 +272,6 @@ async def test_the_answer_stays_in_its_place_while_the_earlier_turns_fill_above_
                     "localStorage.setItem('dot.work', 'steps')"
                 )  # the steps this test reads (item 830)
                 page: Page = await context.new_page()
-                await page.add_init_script(
-                    "localStorage.setItem('dot.work', 'steps')"
-                )  # the steps this test reads (item 830)
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 if not anchoring:
                     await page.add_init_script(_NO_ANCHORING)

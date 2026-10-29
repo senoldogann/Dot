@@ -202,9 +202,6 @@ async def test_how_a_run_was_set_up_is_in_the_side_panel_not_the_conversation(
                             "localStorage.setItem('dot.work', 'steps')"
                         )  # the steps this test reads (item 830)
                         page: Page = await context.new_page()
-                        await page.add_init_script(
-                            "localStorage.setItem('dot.work', 'steps')"
-                        )  # the steps this test reads (item 830)
                         await page.goto(ui_url(host, port, TOKEN))
                         # The side panel is on beside a wide conversation; a phone opens it as a drawer.
                         await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
@@ -262,9 +259,6 @@ async def test_on_a_phone_only_the_conversation_scrolls(login_env: dict[str, str
                         "localStorage.setItem('dot.work', 'steps')"
                     )  # the steps this test reads (item 830)
                     page: Page = await context.new_page()
-                    await page.add_init_script(
-                        "localStorage.setItem('dot.work', 'steps')"
-                    )  # the steps this test reads (item 830)
                     await page.goto(ui_url(host, port, TOKEN))
                     run: RunRecord = await _ended(runtime, manager, f"{_GOAL} on the phone ({scheme})")
                     await page.goto(f"{address}/#/runs/{run.id}")
@@ -320,9 +314,6 @@ async def test_on_a_phone_the_conversation_never_scrolls_sideways(login_env: dic
                         "localStorage.setItem('dot.work', 'steps')"
                     )  # the steps this test reads (item 830)
                     page: Page = await context.new_page()
-                    await page.add_init_script(
-                        "localStorage.setItem('dot.work', 'steps')"
-                    )  # the steps this test reads (item 830)
                     await page.goto(ui_url(host, port, TOKEN))
                     # The review model's line shows only once such lines are turned on (item 362); here it is one of
                     # what must not widen the chat.
