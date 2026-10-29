@@ -30,7 +30,8 @@ _POST_HEADERS: dict[str, str] = {
 }
 _RESOURCE_METADATA: re.Pattern[str] = re.compile(r'resource_metadata="([^"]+)"')
 # Those whose metadata names no client without a secret, yet registers one: Dot's own client registered with GitLab,
-# Miro and Heroku in item 413, and Supabase's docs say so (the catalogue's docstring).
+# Miro and Heroku in item 413 (each said ``none`` back on 2026-10-29 too). Supabase's registers a client with a secret
+# and names no way of sending it, which Dot sends since item 816 (:func:`dotagent.mcp.signin.usable_client`).
 _NONE_UNLISTED: frozenset[str] = frozenset({"supabase", "gitlab", "miro", "heroku"})
 
 

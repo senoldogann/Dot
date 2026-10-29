@@ -132,17 +132,39 @@ class FileTokenStorage:
             lambda stored: stored.model_copy(update={"tokens": tokens, "expires_at": expires_at, **found}),
         )
 
+    def _found_metadata(self) -> OAuthMetadata | None:
+        return None if self.context is None else self.context.oauth_metadata
+
     async def get_client_info(self) -> OAuthClientInformationFull | None:
         stored: StoredSignIn = await asyncio.to_thread(self._read)
         if stored.client is None or stored.redirect_uri != self._redirect_uri:
             return None
-        return stored.client
+        return usable_client(stored.client, stored.metadata or self._found_metadata())
 
     async def set_client_info(self, client_info: OAuthClientInformationFull) -> None:
+        usable: OAuthClientInformationFull = usable_client(client_info, self._found_metadata())
+        # The library asks for the token with the client it holds, which it set before handing it here.
+        if self.context is not None:
+            self.context.client_info = usable
         await asyncio.to_thread(
             self._change,
-            lambda stored: stored.model_copy(update={"client": client_info, "redirect_uri": self._redirect_uri}),
+            lambda stored: stored.model_copy(update={"client": usable, "redirect_uri": self._redirect_uri}),
         )
+
+
+def usable_client(client: OAuthClientInformationFull, metadata: OAuthMetadata | None) -> OAuthClientInformationFull:
+    """``client`` as Dot asks for a token with it. An authorization server that registers a client with a secret but
+    names no way of sending it (Supabase's) wants the secret: RFC 7591 makes ``client_secret_basic`` the way of a
+    registration that names none, and Dot takes ``client_secret_post`` when the server's metadata lists that and not
+    basic. The library sends no secret for a client that names no way, and the server refused the token (422,
+    "Required parameter: client_secret"), so the sign-in failed and the connector was left out."""
+    if client.client_secret is None or client.token_endpoint_auth_method is not None:
+        return client
+    listed: list[str] | None = None if metadata is None else metadata.token_endpoint_auth_methods_supported
+    method: str = "client_secret_basic"
+    if listed is not None and "client_secret_basic" not in listed and "client_secret_post" in listed:
+        method = "client_secret_post"
+    return client.model_copy(update={"token_endpoint_auth_method": method})
 
 
 def callback_address(origin: str) -> str:

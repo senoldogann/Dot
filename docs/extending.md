@@ -313,7 +313,10 @@ The ways a service connects:
   Mac's, or your phone's through `[server] reach`), to a page that names the service and its mark and says Dot is
   finishing the sign-in, because the service's code is traded for its tokens after that page; then the tile turns
   **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself with the service as a client
-  without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600), with where the service's
+  without a secret. A service that registers it with a secret all the same and names no way of sending it (Supabase)
+  is sent the secret the way its metadata lists, `client_secret_basic` as the standard has it unless it lists only
+  `client_secret_post` (item 816: the sign-in failed with "Required parameter: client_secret" and the service was left
+  out). Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600), with where the service's
   authorization server renews them (item 795: without it a token was renewed at `/token` of the server's own address,
   which a service whose token endpoint is elsewhere answered 404, and Dot asked to sign in again at every start; a
   sign-in made before keeps asking once more), and renews them before they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left out with words that bring
