@@ -1,5 +1,5 @@
 """The chats a channel's messages made (item 619) stand in a section of their own at the foot of the sidebar:
-"iMessage", with the channel's mark and a count, outside the days. It folds like the Chats group does, keeps its fold
+"iMessage", with a count and no mark (item 828), outside the days. It folds like the Chats group does, keeps its fold
 over a reload and is not folded by Chats; a chat at work stands under Working, as every chat does (item 202), and comes
 back to its section; a search finds its chats folded or not; a pinned one stays under Pinned; choosing chats to delete
 and the arrow keys reach it. Scripted runs, served by a real server, wide and on a phone."""
@@ -178,7 +178,7 @@ async def test_a_sidebar_with_no_chat_of_a_channel_has_no_section_for_it(
         await page.context.close()
 
 
-async def test_the_chats_of_a_channel_stand_at_the_foot_with_its_mark_and_a_count_and_not_among_the_days(
+async def test_the_chats_of_a_channel_stand_at_the_foot_with_a_count_and_not_among_the_days(
     browser: Browser, address: str, garden: RunRecord, imessage: ThreadRecord, tmp_path: Path
 ) -> None:
     for width in _WIDTHS:
