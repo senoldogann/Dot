@@ -329,4 +329,6 @@ async def test_a_screenshot_whose_file_is_gone_is_left_out_and_the_chat_reads_ba
     finally:
         await store.close()
     assert [message.images for message in history] == [(kept,)]
+    # The model is told that a picture was there.
+    assert history[0].content == f"look\n{db.MISSING_SCREENSHOT}"
     assert [entry["event"] for entry in logs] == ["screenshot_missing"]
