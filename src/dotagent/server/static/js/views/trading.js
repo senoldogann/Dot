@@ -632,8 +632,8 @@ export function mount(root, ctx) {
     });
   }
 
-  /** The trend engine (item 818): its switch, the shares its rule wants beside those held at its last look, and
-   * what held an order back or why it is paused. It trades on paper only, with no model. */
+  /** The trend engine (item 818): its switch, the shares its rule wants beside those held at its last look, what it
+   * made against holding, and what held an order back or why it is paused. It trades on paper only, with no model. */
   function engineSection() {
     const spot = problemLine();
     const { settings, engine } = view;
@@ -662,6 +662,11 @@ export function mount(root, ctx) {
     }
     if (state !== null) {
       lines.push(el("div", { class: "trading-watch-line", dataset: { engine: "look" } }, el("span", { class: "trading-dot", "aria-hidden": "true" }), el("span", null, `Last look ${dateTime(state.looked_at)}: ${state.placed.length === 0 ? "no order" : `${state.placed.length} ${state.placed.length === 1 ? "order" : "orders"}`}.`)));
+      // What the account made since the engine started, beside holding its first coin instead (item 819).
+      const result = state.result ?? null;
+      if (result !== null) {
+        lines.push(el("div", { class: "trading-watch-line", dataset: { engine: "result" } }, el("span", { class: "trading-dot", "aria-hidden": "true" }), el("span", null, `Since ${dateTime(result.started_at)}: the account ${signedShare(result.account, 1)}, holding ${result.product} instead ${signedShare(result.held, 1)}.`)));
+      }
       for (const note of state.notes) {
         lines.push(el("p", { class: "hint", dataset: { engine: "note" } }, note));
       }

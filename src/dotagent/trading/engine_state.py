@@ -1,5 +1,6 @@
-"""What the trend engine (:mod:`dotagent.trading.engine`, item 818) saw and did at its last look, and whether it is
-paused: kept in the store's key/value table, read by the page, the tools and the engine itself."""
+"""What the trend engine (:mod:`dotagent.trading.engine`, item 818) saw and did at its last look, whether it is
+paused, and what the account was worth when it started beside the price of the coin it is measured against (item
+819): kept in the store's key/value table, read by the page, the tools and the engine itself."""
 
 import time
 
@@ -8,6 +9,7 @@ from dotagent.store.db import Store
 
 STATE_KEY: str = "trading:engine:state"
 PAUSE_KEY: str = "trading:engine:paused"
+START_KEY: str = "trading:engine:start"
 
 
 class EngineShare(FrozenModel):
@@ -19,13 +21,37 @@ class EngineShare(FrozenModel):
     target: float
 
 
+class EngineStart(FrozenModel):
+    """What the paper account was worth at the engine's first look on it (``paper_since``: the account's start, so
+    that an account started again starts the measure again), and the bid of ``product``, the coin held instead."""
+
+    started_at: float
+    paper_since: float
+    equity: float
+    product: str
+    price: float
+
+
+class EngineResult(FrozenModel):
+    """Since the engine started: what the account made (0.1 is 10%), and what holding ``product`` instead would have
+    made, the measure the engine must beat before it trades the owner's own money (docs/trading.md)."""
+
+    started_at: float
+    product: str
+    account: float
+    held: float
+
+
 class EngineState(FrozenModel):
-    """The engine's last look: when, the shares, the orders it placed (their ids) and what held one back."""
+    """The engine's last look: when, the shares, the orders it placed (their ids) and what held one back; the
+    products a step did not bring to their target, traded on at the next look (item 819); and its result so far."""
 
     looked_at: float
     shares: tuple[EngineShare, ...]
     placed: tuple[str, ...]
     notes: tuple[str, ...]
+    chasing: tuple[str, ...] = ()
+    result: EngineResult | None = None
 
 
 class EnginePause(FrozenModel):
@@ -44,6 +70,11 @@ async def read_state(store: Store) -> EngineState | None:
 async def read_pause(store: Store) -> EnginePause | None:
     kept: str | None = await store.kv_get(PAUSE_KEY)
     return None if kept is None else EnginePause.model_validate_json(kept)
+
+
+async def read_start(store: Store) -> EngineStart | None:
+    kept: str | None = await store.kv_get(START_KEY)
+    return None if kept is None else EngineStart.model_validate_json(kept)
 
 
 async def pause(store: Store, reason: str, by: str, now: float) -> EnginePause:
@@ -72,6 +103,11 @@ def state_text(state: EngineState | None, paused: EnginePause | None) -> str:
         for share in state.shares
     )
     lines.append(f"Orders placed at that look: {len(state.placed)}.")
+    if state.result is not None:
+        lines.append(
+            f"Since {_utc(state.result.started_at)}: the account {state.result.account:+.1%}, holding "
+            f"{state.result.product} instead {state.result.held:+.1%}."
+        )
     lines.extend(state.notes)
     return "\n".join(lines)
 

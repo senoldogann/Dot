@@ -14,7 +14,7 @@ Pure: the engine (:mod:`dotagent.trading.engine`) reads the closes and the accou
 limits of ``[trading]``."""
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -66,7 +66,8 @@ def target_weights(closes: Mapping[str, Sequence[float]], target_vol: float, kep
 
 class Step(FrozenModel):
     """An order that brings a product toward its share: a buy spends ``quote_amount``, a sell sells ``base_amount``;
-    ``weight`` is the share it holds now and ``target`` the one it should."""
+    ``weight`` is the share it holds now and ``target`` the one it should; ``whole`` whether it brings the product to
+    its target (within :data:`REACHED`), rather than as far as ``max_order`` lets it."""
 
     product: str
     side: Literal["buy", "sell"]
@@ -74,11 +75,15 @@ class Step(FrozenModel):
     base_amount: float | None
     weight: float
     target: float
+    whole: bool
 
 
 # The share of what is held a sell by its worth leaves, so that a bid a little lower when the order is placed still
 # covers it; the rest goes at a later look, sold whole once it is under the cap.
 _SELL_MARGIN: float = 0.99
+# How near its target a product being brought there (``chasing``) is left: the band starts a trade and this ends it,
+# as the backtest's trade goes all the way to the target in one step (item 819).
+REACHED: float = 0.01
 
 
 def steps_toward(
@@ -88,38 +93,47 @@ def steps_toward(
     equity: float,
     band: float,
     max_order: float,
+    chasing: Collection[str] = (),
 ) -> list[Step]:
     """The orders that bring the account toward ``targets`` (shares of ``equity``), from what each product is worth
     (``values``, at the bid) and how much of it is held (``sizes``): sells first, as they free the cash the buys
     spend. A share off its target by no more than ``band`` stays; a target of 0 sells what is held, whatever the band.
     No order is worth more than ``max_order``: what is left is done at the next look, within the day's limits. A sell
     names what it brings (``quote_amount``), which is what the limits weigh, so that a bid a little higher when it is
-    placed cannot take it over ``max_order``; only what is held whole, well under the cap, is sold by its size."""
+    placed cannot take it over ``max_order``; only what is held whole, well under the cap, is sold by its size.
+
+    A product in ``chasing`` is one a step of an earlier look did not bring to its target (``max_order`` or a limit
+    held it): it is traded on until it is within :data:`REACHED` of its target rather than the band, so that the
+    account ends where the backtest's would (item 819: it stopped within the band of where it started)."""
     if equity <= 0:
         return []
     sells: list[Step] = []
     buys: list[Step] = []
+    near: float = REACHED * equity
     for product, target in targets.items():
         value: float = values.get(product, 0.0)
         size: float = sizes.get(product, 0.0)
         weight: float = value / equity
         gap: float = target - weight
-        if size > 0 and (target <= 0 or gap < -band):
+        within: float = min(band, REACHED) if product in chasing else band
+        if size > 0 and (target <= 0 or gap < -within):
             wanted: float = value if target <= 0 else -gap * equity
             if wanted >= value and value <= max_order * _SELL_MARGIN:
                 sells.append(
                     Step(product=product, side="sell", quote_amount=None, base_amount=size, weight=weight,
-                         target=target)
+                         target=target, whole=True)
                 )  # fmt: skip
             else:
+                amount: float = min(wanted, max_order, value * _SELL_MARGIN)
                 sells.append(
-                    Step(product=product, side="sell", quote_amount=min(wanted, max_order, value * _SELL_MARGIN),
-                         base_amount=None, weight=weight, target=target)
+                    Step(product=product, side="sell", quote_amount=amount, base_amount=None, weight=weight,
+                         target=target, whole=wanted - amount <= near)
                 )  # fmt: skip
-        elif gap > band:
+        elif gap > within:
+            spent: float = min(gap * equity, max_order)
             buys.append(
-                Step(product=product, side="buy", quote_amount=min(gap * equity, max_order), base_amount=None,
-                     weight=weight, target=target)
+                Step(product=product, side="buy", quote_amount=spent, base_amount=None, weight=weight, target=target,
+                     whole=gap * equity - spent <= near)
             )  # fmt: skip
     return [*sells, *buys]
 
