@@ -135,6 +135,12 @@
   display: none;
 }
 
+/* What the run saved to memory is the run's bookkeeping, not what it says: with "What it is doing" chosen it stands with
+   the steps, out of the conversation until they are shown (item 830). */
+:root[data-work="status"] .run-thread:not(.steps-shown) .note.memory-line {
+  display: none;
+}
+
 :root[data-work="status"] .work-status:is([data-state="working"], [data-state="over"]) {
   display: flex;
   align-items: center;

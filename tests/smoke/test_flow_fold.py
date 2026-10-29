@@ -146,6 +146,9 @@ async def test_the_step_group_folds_and_unfolds_while_the_run_still_works(tmp_pa
                 page: Page = await browser.new_page(
                     viewport={"width": 1280, "height": 900}, color_scheme="light", reduced_motion="reduce"
                 )
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 # Neutral folds the steps by default; the reader's own choice is not in the browser yet.
                 await page.add_init_script(
                     "sessionStorage.setItem('dot.opened', '1'); localStorage.setItem('dot.theme', 'neutral');"
@@ -241,6 +244,9 @@ async def test_a_read_and_a_write_say_what_they_did_and_wear_their_own_marks() -
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
                 page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")

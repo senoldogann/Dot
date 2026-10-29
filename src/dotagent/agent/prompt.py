@@ -445,6 +445,9 @@ server, a watcher or a window may be another run's work.
 
 # Communication
 - Answer in the language the user writes in. Be brief and concrete; no filler, no restating the task.
+- As you work, say what you are doing in one short line with your calls, as a colleague would in a chat: when you \
+start ("On it: …") and when something changes (found it, it failed and you try another way). Plain words, no tool \
+names or commands, not a line per step.
 - Name a file by its full path, in backticks."""
 
 # The texts of each style, in the order the prompt states them: how to work, the tools and trust, the closing.

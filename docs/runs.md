@@ -17,14 +17,18 @@ the turn's run showed with `show_page` stands where it came, in its frame
 and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
 Appearance › *Fold steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). Settings › Interface › *Work in a chat* (item 663)
-chooses between **Every step**, the default, and **What it is doing**: the steps and the thoughts of every turn are out
+chooses between **Every step** and **What it is doing**, the default since item 830 (the conversation as people chat,
+as the owner's screenshots of another agent app showed it): the steps and the thoughts of every turn are out
 of the conversation, and one line under it, three of Dot's dots and a few words, says what the run does now, from its
 latest event: "Thinking…" while the model thinks, "Running a command…", "Searching the web…", "Reading a page…",
 "Working on the Mac…", "Asking Scout…" for a message to an agent, and so on, the words for the same work turning every
 four seconds ("Working in the terminal…") so that a long step reads as alive. Nothing is said that the run is not
 doing: while it writes a message, or a card waits for you, the line is not there. Pressed, it shows every step of the
 chat again, and pressed again folds them back; once the run is over it says *Show the steps*. Approvals, questions,
-notes, the changes of the memory and the messages stay in sight either way, and the choice is kept by the browser.
+notes and the messages stay in sight either way; the changes of the memory stand with the steps, and an agent's message
+is open, with **What it is doing** (item 830). The choice is kept by the browser. A run says what it does as it works,
+in a short line with its calls, as a colleague would in a chat ("On it: …", "Found it, now …"): those lines are its
+messages in the conversation, in either choice.
 The short marks at the left of the
 conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
 work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out; the page

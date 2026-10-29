@@ -15,7 +15,9 @@ export const WORK_SHOWN = [
   { id: "steps", label: "Every step", hint: "Its thoughts, commands and steps, each in its line." },
   { id: "status", label: "What it is doing", hint: "One line that says what it does now; press it for the steps." },
 ];
-const DEFAULT_WORK = "steps";
+// What a chat shows of the work until the owner chooses (item 830): the conversation, as people chat, with one line of
+// what the run does now; the steps are a press away.
+const DEFAULT_WORK = "status";
 // How close the rows, cards and stacks sit (the paddings are tokens in app.css, switched by `data-density` on the page).
 export const DENSITIES = [
   { id: "comfortable", label: "Comfortable", hint: "Room around every row and card." },
