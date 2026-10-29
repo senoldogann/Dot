@@ -63,7 +63,8 @@ async def note_look(store: Store, at: float) -> None:
     )
 
 
-def _same(title: str) -> str:
+def todo_key(title: str) -> str:
+    """A title as it is compared with others: its words, whatever their case and spaces, without a closing full stop."""
     return " ".join(title.casefold().split()).rstrip(".")
 
 
@@ -75,12 +76,12 @@ async def add_todo(
     flat: str = " ".join(title.split())
     reason: str = " ".join(why.split())
     since: float = time.time() - _REMEMBERED_S
-    kept: TodoRecord | None = await store.same_todo(_same(flat), since)
+    kept: TodoRecord | None = await store.same_todo(todo_key(flat), since)
     if kept is not None and kept.status in ("open", "doing"):
         return f"It is on the list already: {kept.title}"
     if kept is not None:
         return f"It was {'done' if kept.status == 'done' else 'let go'} lately: {kept.title}"
-    return await store.add_todo(flat, _same(flat), reason, source, source_run_id, tainted)
+    return await store.add_todo(flat, todo_key(flat), reason, source, source_run_id, tainted)
 
 
 # What the card on the Schedules page lists: what is to do or being done, and what was done or let go lately.

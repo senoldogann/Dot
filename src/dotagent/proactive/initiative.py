@@ -73,15 +73,17 @@ The work: {title}
 Why it helps them: {why}
 
 Do it as far as it goes without them. What only they can decide, leave as a question (ask_user) and go on with the \
-rest. End with one or two sentences: what you did, and where the result is."""
+rest. A thing that says no work you can do (empty, or a word with no task in it): say so in a sentence and end. Dot \
+keeps the list: as this run ends it marks the thing done, or to try again when the run fails; never change the list, \
+nor Dot's database, yourself (item 821). End with one or two sentences: what you did, and where the result is."""
 _LOOK_GOAL: str = "On my own initiative: look for work that helps the owner"
 _LOOK_OPENING: str = """You look for work to do for the owner on your own initiative (item 715). Read what you \
 remember of them (memory_search: their projects, their wishes, what they asked to be done later), the record below, \
 the chats they had lately, and their mail and calendar when an account is connected. Then put at most three things on \
 your list with todo_add (in the tool group todos: turn it on with use_tools when it is off): each a concrete piece \
 of work you can do alone, which they would thank you for, which is not on the list yet and was not done. Put nothing \
-on it when nothing is worth it. Change nothing else. End with one sentence: what you put on the list, or that you \
-found nothing.
+on it when nothing is worth it; one you put on it by mistake, take back with todo_drop (item 821). Change nothing \
+else. End with one sentence: what you put on the list, or that you found nothing.
 
 {record}"""
 

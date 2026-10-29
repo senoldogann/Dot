@@ -68,6 +68,7 @@ AUTO: AgentConfig = DEFAULTS.model_copy(update={"tool_surface": "auto"})
         ("show_page", "pages"),
         ("vault_contacts", "vault"),
         ("todo_add", "todos"),
+        ("todo_drop", "todos"),
         ("browser_fill_login", "browser"),
         ("memory_update", "memory_admin"),
         ("memory_forget", "memory_admin"),
@@ -219,7 +220,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "browser_requests, browser_extract, browser_console, browser_viewport, browser_screenshot, "
         "browser_wait_text, browser_back and 6 more)",
         "- memory_admin: correcting or forgetting saved notes (memory_update, memory_forget)",
-        "- todos: your own list of work to do for the owner later, on your own, while the Mac is idle (todo_add)",
+        "- todos: your own list of work to do for the owner later, on your own, while the Mac is idle "
+        "(todo_add, todo_drop)",
         "- drafts: an email or a message you write for the owner, who sends it from the conversation (draft_message)",
         "- accounts: the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only "
         "(mail_search, mail_read, calendar_events)",
