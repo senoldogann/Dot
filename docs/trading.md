@@ -161,7 +161,9 @@ ended), the shares the rule wants and what the paper account holds, and places t
 limits as a run's order, the emergency stop included: no order over `max_order`, no day over `max_day`, no coin over
 `max_position`, so that with the default limits the engine reaches its shares over days. Each of `engine_coins` in
 `quote` must be allowed by `products` too (named there, or trading `min_volume` a day with `*`): one that is not is
-refused at every look. What held an order back is said on the page. It trades on paper only: an order of your Coinbase account by the engine waits for an item of its
+refused at every look. A sell names what it brings, so that a bid a little higher when it is placed cannot take it
+over `max_order`; a coin Coinbase gave fewer than 201 daily closes of is not traded at that look (one held is kept,
+not sold for want of closes). What held an order back is said on the page. It trades on paper only: an order of your Coinbase account by the engine waits for an item of its
 own (the live exits of item 770 come first) and your word.
 
 `dotx trading backtest [--years 7] [--cost 0.007]` plays the same code over Coinbase's daily closes, each side of a trade

@@ -80,9 +80,15 @@ def test_the_steps_sell_first_leave_what_is_within_the_band_and_no_order_is_over
         ("buy", "BTC-EUR"),  # SOL at 30% for 32% stays within the band
     ]
     eth, ada, btc = steps
-    assert eth.base_amount == pytest.approx(25.0 / 2000.0)  # capped at 25 EUR of ETH at 2000
-    assert ada.base_amount == pytest.approx(25.0 / 0.4)
+    # Capped sells name what they bring, which a bid a little higher at the order cannot take over the cap.
+    assert (eth.quote_amount, eth.base_amount) == (25.0, None)
+    assert (ada.quote_amount, ada.base_amount) == (25.0, None)
     assert btc.quote_amount == 25.0
+    # What is held whole well under the cap is sold by its size; a little under it, by most of its worth.
+    (whole,) = steps_toward({"ETH-EUR": 0.0}, {"ETH-EUR": 20.0}, {"ETH-EUR": 0.01}, 1000.0, 0.05, 25.0)
+    assert (whole.base_amount, whole.quote_amount) == (0.01, None)
+    (near,) = steps_toward({"ETH-EUR": 0.0}, {"ETH-EUR": 24.9}, {"ETH-EUR": 0.01}, 1000.0, 0.05, 25.0)
+    assert near.base_amount is None and near.quote_amount == pytest.approx(24.9 * 0.99)
     assert steps_toward({"BTC-EUR": 1.0}, {}, {}, 0.0, 0.05, 25.0) == []
 
 
@@ -116,6 +122,8 @@ def test_only_the_days_that_have_ended_are_closes() -> None:
 # ------------------------------------------------------------------------------------------------- the engine
 
 _PRICES: dict[str, list[float]] = {}
+# The products whose price Coinbase does not give now (its candles still come).
+_DOWN: set[str] = set()
 
 
 def _row(start: float, close: float) -> dict[str, str]:
@@ -136,6 +144,8 @@ def _answer(request: httpx.Request) -> httpx.Response:
                                       enumerate(series)]  # fmt: skip
         rows: list[dict[str, str]] = [*days[-count:], _row(today, 1.0)]
         return httpx.Response(200, content=json.dumps({"candles": rows}).encode())
+    if path.endswith("/ticker") and product in _DOWN:
+        return httpx.Response(503, content=b"unavailable")
     if path.endswith("/ticker"):
         body: dict[str, object] = {"trades": [{"price": str(last)}], "best_bid": str(last), "best_ask": str(last)}
     else:
@@ -224,16 +234,50 @@ async def test_a_paused_engine_and_one_out_of_paper_place_nothing(store: Store, 
     assert await read_state(store) == live
 
 
-async def test_the_engine_sells_what_stops_rising(store: Store, tmp_path: Path) -> None:
+async def test_the_engine_sells_what_stops_rising_capped_at_the_most_one_order_may_be(
+    store: Store, tmp_path: Path
+) -> None:
     _PRICES.update({"BTC-EUR": _rising(230, start=50_000.0), "ETH-EUR": _falling(230)})
     engine, trading = _engine(store, tmp_path, max_order=100.0, max_day=1000.0)
+    for hour in range(3):
+        await engine.tick(_NOW + hour * 3600)
+    assert [order.side for order in await _engine_orders(trading)] == ["buy", "buy", "buy"]
+    # Then it falls under its close 200 days before, and every lookback says out; the cap is lower now.
+    top: float = _PRICES["BTC-EUR"][-1]
+    _PRICES["BTC-EUR"] = [*_PRICES["BTC-EUR"], *(top * 0.9 * 0.99**day for day in range(1, 121))]
+    trading.settings.value = trading.config().model_copy(update={"max_order": 25.0})
+    await engine.tick(_NOW + 4 * 3600)
+    sells: list[TradingOrderRecord] = [order for order in await _engine_orders(trading) if order.side == "sell"]
+    assert len(sells) == 1 and sells[0].notional == pytest.approx(25.0, abs=0.01)  # its size floored to a step
+    state: EngineState | None = await read_state(store)
+    assert state is not None and state.notes == ()
+
+
+async def test_a_coin_coinbase_gave_too_few_days_of_is_held_not_sold(store: Store, tmp_path: Path) -> None:
+    _PRICES.update({"BTC-EUR": _rising(230, start=50_000.0), "ETH-EUR": _rising(230)})
+    engine, trading = _engine(store, tmp_path, max_order=100.0, max_day=1000.0)
     await engine.tick(_NOW)
-    assert [order.side for order in await _engine_orders(trading)] == ["buy"]
-    # Then it halves and keeps falling: every lookback says out.
-    _PRICES["BTC-EUR"] = [*_PRICES["BTC-EUR"], *(price * 250.0 for price in _falling(120))]
+    assert len(await _engine_orders(trading)) == 2
+    _PRICES["BTC-EUR"] = _PRICES["BTC-EUR"][-50:]
     await engine.tick(_NOW + 3600)
-    sides: list[str] = [order.side for order in await _engine_orders(trading)]
-    assert sides.count("sell") == 1
+    orders: list[TradingOrderRecord] = await _engine_orders(trading)
+    assert [order.side for order in orders if order.product == "BTC-EUR"] == ["buy"]
+    state: EngineState | None = await read_state(store)
+    assert state is not None and any("BTC-EUR: Coinbase gave 50 daily closes" in note for note in state.notes)
+
+
+async def test_an_order_whose_price_cannot_be_read_leaves_those_placed_before_it_in_the_record(
+    store: Store, tmp_path: Path
+) -> None:
+    _PRICES.update({"BTC-EUR": _rising(230, start=50_000.0), "ETH-EUR": _rising(230)})
+    engine, trading = _engine(store, tmp_path)
+    _DOWN.add("ETH-EUR")
+    try:
+        state: EngineState = await engine.look(trading.config(), _NOW)
+    finally:
+        _DOWN.clear()
+    assert len(state.placed) == 1 and len(state.shares) == 2
+    assert any(note.startswith("buy ETH-EUR not placed") for note in state.notes)
 
 
 async def test_the_backtest_reads_coinbase_days_until_now_and_stops() -> None:

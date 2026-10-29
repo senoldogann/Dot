@@ -75,6 +75,11 @@ class Step(FrozenModel):
     target: float
 
 
+# The share of what is held a sell by its worth leaves, so that a bid a little lower when the order is placed still
+# covers it; the rest goes at a later look, sold whole once it is under the cap.
+_SELL_MARGIN: float = 0.99
+
+
 def steps_toward(
     targets: Mapping[str, float],
     values: Mapping[str, float],
@@ -86,7 +91,9 @@ def steps_toward(
     """The orders that bring the account toward ``targets`` (shares of ``equity``), from what each product is worth
     (``values``, at the bid) and how much of it is held (``sizes``): sells first, as they free the cash the buys
     spend. A share off its target by no more than ``band`` stays; a target of 0 sells what is held, whatever the band.
-    No order is worth more than ``max_order``: what is left is done at the next look, within the day's limits."""
+    No order is worth more than ``max_order``: what is left is done at the next look, within the day's limits. A sell
+    names what it brings (``quote_amount``), which is what the limits weigh, so that a bid a little higher when it is
+    placed cannot take it over ``max_order``; only what is held whole, well under the cap, is sold by its size."""
     if equity <= 0:
         return []
     sells: list[Step] = []
@@ -96,29 +103,23 @@ def steps_toward(
         size: float = sizes.get(product, 0.0)
         weight: float = value / equity
         gap: float = target - weight
-        if target <= 0 < size:
-            price: float = value / size
-            amount: float = min(size, max_order / price) if price > 0 else size
-            sells.append(
-                Step(product=product, side="sell", quote_amount=None, base_amount=amount, weight=weight, target=target)
-            )
+        if size > 0 and (target <= 0 or gap < -band):
+            wanted: float = value if target <= 0 else -gap * equity
+            if wanted >= value and value <= max_order * _SELL_MARGIN:
+                sells.append(
+                    Step(product=product, side="sell", quote_amount=None, base_amount=size, weight=weight,
+                         target=target)
+                )  # fmt: skip
+            else:
+                sells.append(
+                    Step(product=product, side="sell", quote_amount=min(wanted, max_order, value * _SELL_MARGIN),
+                         base_amount=None, weight=weight, target=target)
+                )  # fmt: skip
         elif gap > band:
             buys.append(
-                Step(
-                    product=product,
-                    side="buy",
-                    quote_amount=min(gap * equity, max_order),
-                    base_amount=None,
-                    weight=weight,
-                    target=target,
-                )
-            )
-        elif gap < -band and size > 0:
-            price = value / size
-            amount = min(size, -gap * equity / price, max_order / price)
-            sells.append(
-                Step(product=product, side="sell", quote_amount=None, base_amount=amount, weight=weight, target=target)
-            )
+                Step(product=product, side="buy", quote_amount=min(gap * equity, max_order), base_amount=None,
+                     weight=weight, target=target)
+            )  # fmt: skip
     return [*sells, *buys]
 
 

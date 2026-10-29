@@ -19,7 +19,7 @@ from dotagent.store.models import TradingOrderRecord
 from dotagent.trading.engine_state import STATE_KEY, EngineShare, EngineState, read_pause
 from dotagent.trading.market import MarketError
 from dotagent.trading.service import Trading, TradingRefused
-from dotagent.trading.trend import DAYS_NEEDED, VOL_DAYS, Step, steps_toward, target_weights
+from dotagent.trading.trend import DAYS_NEEDED, VOL_DAYS, Step, steps_toward, strength, target_weights
 from dotagent.trading.types import Candle, OrderRequest, Portfolio
 
 _log = get_logger(__name__)
@@ -90,6 +90,15 @@ class TrendEngine:
             closes[product] = closed_days(candles, now)
         targets: dict[str, float] = target_weights(closes, config.engine_target_vol)
         portfolio: Portfolio = await self._trading.portfolio()
+        notes: list[str] = []
+        # A product Coinbase gave too few days of is not judged at this look, rather than sold for want of closes: a
+        # coin listed lately is held by the rule once it has them, but one held already keeps what it holds.
+        unjudged: list[str] = [product for product, series in closes.items() if strength(series) is None]
+        for product in unjudged:
+            notes.append(
+                f"{product}: Coinbase gave {len(closes[product])} daily closes, the rule needs {DAYS_NEEDED}; "
+                "nothing traded of it at this look"
+            )
         values: dict[str, float] = {}
         sizes: dict[str, float] = {}
         for holding in portfolio.holdings:
@@ -105,12 +114,13 @@ class TrendEngine:
             if portfolio.equity > 0
             else ()
         )
-        notes: list[str] = []
         placed: list[str] = []
-        for step in steps_toward(targets, values, sizes, portfolio.equity, config.engine_band, config.max_order):
+        judged: dict[str, float] = {product: target for product, target in targets.items() if product not in unjudged}
+        for step in steps_toward(judged, values, sizes, portfolio.equity, config.engine_band, config.max_order):
             try:
                 order: TradingOrderRecord = await self._trading.place(_request(step), ENGINE_RUN_ID, "paper")
-            except TradingRefused as refused:
+            except (TradingRefused, MarketError) as refused:
+                # A price that could not be read for one order leaves the orders placed before it in the record.
                 notes.append(f"{step.side} {step.product} not placed: {refused.message}")
                 continue
             placed.append(order.id)
