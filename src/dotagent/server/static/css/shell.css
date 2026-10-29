@@ -430,9 +430,8 @@
 
 /* The chats a channel's messages made stand in a section of their own at the foot of the list (item 619), outside the
    list so that folding Chats does not fold them, and so do Dot's own (item 822): its label is the button that folds it,
-   with a channel's mark before its name (Dot's own sections have none, item 827), in the label's own ink so that it
-   follows the theme and recedes as the label does (item 823: the green of an iMessage stood out on every section and in
-   no theme's colours), and, while it is folded over a chat nobody has read, the accent's dot after its count. */
+   with no mark, so that its words stand where Chats' do (items 827 and 828), and, while it is folded over a chat nobody
+   has read, the accent's dot after its count. */
 .side-channels {
   display: flex;
   flex-direction: column;
@@ -443,20 +442,6 @@
    Chats as one section follows another (item 827: the gap under a folded Chats was 11 px more than between two). */
 .side-runs:not([hidden]) + .side-channels:not(:empty) {
   margin-top: 8px;
-}
-
-.side-channel-mark {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  color: inherit;
-}
-
-.side-fold .side-channel-mark .icon {
-  width: 14px;
-  height: 14px;
-  transform: none;
-  transition: none;
 }
 
 .side-label-dot:not([hidden]) {

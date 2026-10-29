@@ -188,20 +188,13 @@ async def test_the_chats_of_a_channel_stand_at_the_foot_with_its_mark_and_a_coun
         # The days hold the other chat alone; the channel's chat is not among them.
         await expect(days.locator(".side-group > .side-label")).to_have_text(["Today"])
         await expect(days.locator(".side-chat > a.side-run .side-run-goal")).to_have_text(["Plan the garden"])
-        # Its section: the mark, the name and how many, then its chat as any chat's row is, opening its latest run.
+        # Its section: the name and how many, with no mark, its words where Chats' are (item 828), then its chat as any
+        # chat's row is, opening its latest run.
         await expect(_section(page)).to_have_count(1)
         await expect(_section(page).locator("> .side-label")).to_have_text("iMessage 1")
-        await expect(_section(page).locator("> .side-label .side-channel-mark svg")).to_be_visible()
-        # The mark is in the label's ink, whatever the theme (item 823), not a colour of its own.
-        inks: object = (
-            await _section(page)
-            .locator("> .side-label")
-            .evaluate(
-                "label => [getComputedStyle(label).color,"
-                " getComputedStyle(label.querySelector('.side-channel-mark')).color]"
-            )
-        )
-        assert isinstance(inks, list) and inks[0] == inks[1], inks
+        await expect(_section(page).locator("> .side-label svg")).to_have_count(1)  # the chevron alone
+        lefts: object = await page.evaluate(_WORDS_LEFT, "section[data-channel=imessage] > .side-label .side-fold")
+        assert isinstance(lefts, list) and abs(lefts[0] - lefts[1]) <= 0.5, lefts
         await expect(_fold(page)).to_have_attribute("aria-expanded", "true")
         row: Locator = _section(page).locator(".side-chat")
         await expect(row).to_have_count(1)
@@ -441,7 +434,7 @@ async def test_dots_own_chats_stand_folded_at_the_foot_and_open_as_the_owner_lea
             fold: Locator = section.locator("> .side-label .side-fold")
             await expect(section.locator("> .side-label")).to_have_text(label)
             # No mark: its words stand where Chats' do (item 827).
-            await expect(section.locator(".side-channel-mark")).to_have_count(0)
+            await expect(section.locator("> .side-label svg")).to_have_count(1)  # the chevron alone
             lefts: object = await page.evaluate(
                 _WORDS_LEFT, f"section[data-channel={channel}] > .side-label .side-fold"
             )
