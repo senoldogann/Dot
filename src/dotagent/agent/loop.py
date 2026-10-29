@@ -538,13 +538,29 @@ class Compaction(FrozenModel):
     check: ContinuityCheck | None
 
 
-async def _with_plan(agent: AgentRun, system: Message) -> Message:
-    """The system message with the run's plan after it while the plan has open steps (item 87); the message itself
-    when there is no plan or every step is closed."""
+# The note that hands the model the open plan (items 87 and 825), and how many steps a plan that has not changed goes
+# before it is handed again, so that a long run has it near.
+PLAN_NOTE: str = "[system note] Your plan now:"
+PLAN_CLOSED_NOTE: str = "[system note] Your plan is closed now: every step of it is done, failed or skipped."
+PLAN_AGAIN_STEPS: int = 20
+
+
+async def _plan_now(agent: AgentRun) -> str | None:
+    """The note of the run's plan while it has open steps (item 87); ``None`` when there is no plan or every step is
+    closed."""
     plan: PlanPayload = await _current_plan(agent)
     if not plan.steps or not open_steps(plan.steps):
-        return system
-    return system.model_copy(update={"content": f"{system.content}\n\n# Your plan now\n{plan_lines(plan)}"})
+        return None
+    return f"{PLAN_NOTE}\n{plan_lines(plan)}"
+
+
+def plan_due(plan: str | None, told: str | None, told_at: int, step: int) -> bool:
+    """Whether a step hands the model its open plan as a note after the history (item 825): when it changed since the
+    last note, or that note is :data:`PLAN_AGAIN_STEPS` steps old. The plan stood at the end of the system message of
+    every step (item 87), before the whole history, so that each change of it (a step marked, the plan updated) had the
+    provider read every message of the run again uncached: 19% of what the owner's runs read uncached on 2026-10-29.
+    A note added after the history leaves what came before it as the provider keeps it."""
+    return plan is not None and (plan != told or step - told_at >= PLAN_AGAIN_STEPS)
 
 
 async def _current_plan(agent: AgentRun) -> PlanPayload:
@@ -2299,6 +2315,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else None
     )
     steps: int = 0
+    # The plan the run was last handed as a note, and at which step (item 825).
+    plan_told: str | None = None
+    plan_told_at: int = 0
     # What the run's first request carries, part by part, recorded once (item 735).
     parts_told: bool = False
     step_origin: CallOrigin = CallOrigin(run_id=run.id, purpose="step")
@@ -2435,13 +2454,19 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
         registry: ToolRegistry = callable_tools if allowed is None else _only(callable_tools, allowed)
         hidden: dict[str, str] = hidden_tools(specs, on) if allowed is None else {}
-        # The open plan at the end of the system prompt of every step (item 87), rebuilt from the newest plan event so
-        # that nothing accumulates in the history; the prompt's own text stays the same for the provider's cache.
-        step_system: Message = (
-            await _with_plan(agent, system) if config.plan_each_turn and run.mode != "chat" else system
-        )
+        # The open plan as a note after the history when it changed (items 87 and 825): the system message stays the
+        # same for the provider's cache, and so does every message before the note.
+        plan_now: str | None = await _plan_now(agent) if config.plan_each_turn and run.mode != "chat" else None
+        if plan_due(plan_now, plan_told, plan_told_at, steps):
+            history.append(await _stored_note(agent, plan_now or ""))
+            plan_told, plan_told_at = plan_now, steps
+        elif plan_now is None and plan_told is not None:
+            # The open plan of the last note stays in the chat's history: it is said to be closed, so that neither this
+            # run nor a later one of the chat takes it for open.
+            history.append(await _stored_note(agent, PLAN_CLOSED_NOTE))
+            plan_told = None
         compactions_before: int = ledger.compactions
-        history, estimated, ledger = await _fit_context(agent, history, step_system, offered, ratio, ledger, scaffold)
+        history, estimated, ledger = await _fit_context(agent, history, system, offered, ratio, ledger, scaffold)
         # A compaction folded messages away, and with them the notes recalled for this message that they carried, this
         # message's own or an earlier one's: those the context no longer carries are handed again after the summary
         # (item 404), as they stand now, stored, so that the next message's prefix holds them too.
@@ -2462,7 +2487,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         routed_effort: Effort | None = None if routed is None else effective_effort(routed.info.efforts, effort)
         request: ChatRequest = ChatRequest(
             model=step_ref.model,
-            messages=(step_system, *history),
+            messages=(system, *history),
             tools=offered,
             temperature=None,
             max_output_tokens=None,

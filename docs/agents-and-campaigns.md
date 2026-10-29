@@ -199,7 +199,9 @@ which older tool output is shortened, once, to 700 characters; a step's request 
 part of the run the next step sends unchanged, before the newest tool results, as Anthropic looks for a cached prefix
 only 20 blocks back from a mark, so the step after a shortening still reads the run before it from the provider's
 cache), `context_summarise_share` (0.85 of the configured budget, past which the older part of the run is summarised)
-and `plan_each_turn` (on: the open plan is appended to the system message of every step). The API: `GET /api/agents`
+and `plan_each_turn` (on: the open plan is handed as a note after the conversation whenever it changes and after
+20 steps without a change, and its closing is said; item 825: it stood at the end of the system message, so that each
+change of it had the provider read the run's whole history again uncached). The API: `GET /api/agents`
 (Dot first, each with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither
 changed nor deleted; `tools` names the tools the agent may use, or is empty with `every_tool: true` for all of them, and
 a request with neither is refused, so a tool list that did not load never lifts an agent's bounds; the editor's Save
