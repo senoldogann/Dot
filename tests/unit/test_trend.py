@@ -1,7 +1,8 @@
 """The trend engine (item 818, docs/trading.md): its rule over daily closes, the steps that bring the account to the
 rule's shares, the rule played over years against holding, the engine placing its steps through the paper account's
-limits, pausing, and keeping off any account but paper; the backtest's reading of Coinbase's days. Coinbase is a
-stand-in (``httpx.MockTransport``): no request leaves the Mac."""
+limits, pausing, and keeping off any account but paper; the backtest's reading of Coinbase's days. A trade the band
+starts goes on to the target across looks, and the engine's result is kept against holding (item 819).
+Coinbase is a stand-in (``httpx.MockTransport``): no request leaves the Mac."""
 
 import json
 import math
@@ -20,7 +21,7 @@ from dotagent.runtime import Runtime
 from dotagent.store.db import Store
 from dotagent.store.models import TradingOrderRecord
 from dotagent.trading.engine import ENGINE_RUN_ID, TrendEngine, closed_days
-from dotagent.trading.engine_state import EngineState, pause, read_pause, read_state, resume
+from dotagent.trading.engine_state import EngineResult, EngineState, pause, read_pause, read_state, resume
 from dotagent.trading.market import CoinbaseMarket
 from dotagent.trading.service import Trading, TradingSettings
 from dotagent.trading.trend import DAYS_NEEDED, backtest, steps_toward, strength, target_weights, volatility
@@ -90,6 +91,23 @@ def test_the_steps_sell_first_leave_what_is_within_the_band_and_no_order_is_over
     (near,) = steps_toward({"ETH-EUR": 0.0}, {"ETH-EUR": 24.9}, {"ETH-EUR": 0.01}, 1000.0, 0.05, 25.0)
     assert near.base_amount is None and near.quote_amount == pytest.approx(24.9 * 0.99)
     assert steps_toward({"BTC-EUR": 1.0}, {}, {}, 0.0, 0.05, 25.0) == []
+    # Whether a step brings its product to the target, or only as far as the cap lets it.
+    assert [step.whole for step in steps] == [False, False, False] and whole.whole
+
+
+def test_a_product_on_its_way_to_its_target_is_traded_on_within_the_band() -> None:
+    # 20% for a target of 25%: within the band of 10 points, left; on its way there, bought up to it.
+    args = ({"BTC-EUR": 0.25}, {"BTC-EUR": 200.0}, {"BTC-EUR": 0.01}, 1000.0, 0.10, 100.0)
+    assert steps_toward(*args) == []
+    (buy,) = steps_toward(*args, chasing={"BTC-EUR"})
+    assert (buy.side, buy.quote_amount, buy.whole) == ("buy", pytest.approx(50.0), True)
+    # Within a point of it, it is there.
+    assert (
+        steps_toward({"BTC-EUR": 0.25}, {"BTC-EUR": 245.0}, {"BTC-EUR": 0.01}, 1000.0, 0.10, 100.0, {"BTC-EUR"}) == []
+    )
+    # Over it on its way down, sold down to it.
+    (sell,) = steps_toward({"BTC-EUR": 0.25}, {"BTC-EUR": 300.0}, {"BTC-EUR": 0.01}, 1000.0, 0.10, 100.0, {"BTC-EUR"})
+    assert (sell.side, sell.quote_amount, sell.whole) == ("sell", pytest.approx(50.0), True)
 
 
 def test_the_rule_played_over_years_counts_its_fees_and_falls_less_than_holding() -> None:
@@ -333,3 +351,36 @@ async def test_the_supervisor_reads_pauses_and_resumes_the_engine_with_a_reason(
     assert resumed.text.startswith("Resumed") and await read_pause(store) is None
     again: ToolResult = await (await tool.prepare({"action": "resume", "reason": "twice"}, ctx)).run(ctx)
     assert again.is_error
+
+
+async def test_a_trade_the_band_starts_goes_on_to_the_target_across_capped_looks(store: Store, tmp_path: Path) -> None:
+    _PRICES.update({"BTC-EUR": _rising(230, start=50_000.0), "ETH-EUR": _falling(230)})
+    # BTC's target is half of 1,000 EUR, 100 an order: within a band of 25 points after three, at 30% of the account.
+    engine, trading = _engine(store, tmp_path, max_order=100.0, max_day=1000.0, engine_band=0.25)
+    for hour in range(8):
+        await engine.tick(_NOW + hour * 3600)
+    orders: list[TradingOrderRecord] = await _engine_orders(trading)
+    assert len(orders) == 5 and {order.side for order in orders} == {"buy"}
+    state: EngineState | None = await read_state(store)
+    assert state is not None and state.chasing == () and state.placed == ()
+    (btc,) = [share for share in state.shares if share.product == "BTC-EUR"]
+    assert btc.weight == pytest.approx(0.5, abs=0.01)
+
+
+async def test_the_engine_keeps_what_the_account_made_beside_holding_its_first_coin(
+    store: Store, tmp_path: Path
+) -> None:
+    _PRICES.update({"BTC-EUR": _rising(230, start=50_000.0), "ETH-EUR": _falling(230)})
+    engine, trading = _engine(store, tmp_path, max_order=500.0, max_day=1000.0)
+    first: EngineState = await engine.look(trading.config(), _NOW)
+    assert first.result == EngineResult(started_at=_NOW, product="BTC-EUR", account=0.0, held=0.0)
+    # Bitcoin 10% up: holding it made 10%, the account half of it (half in it) less the fee.
+    _PRICES["BTC-EUR"][-1] *= 1.1
+    later: EngineState = await engine.look(trading.config(), _NOW + 3600)
+    assert later.result is not None and later.result.started_at == _NOW
+    assert later.result.held == pytest.approx(0.1)
+    assert 0.04 < later.result.account < 0.05
+    # The paper account started again starts the measure again.
+    await trading.reset_paper()
+    again: EngineState = await engine.look(trading.config(), _NOW + 7200)
+    assert again.result is not None and (again.result.started_at, again.result.account) == (_NOW + 7200, 0.0)

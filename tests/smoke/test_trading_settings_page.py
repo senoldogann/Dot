@@ -27,7 +27,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.models import TradingOrderRecord
-from dotagent.trading.engine_state import STATE_KEY, EngineShare, EngineState, pause, resume
+from dotagent.trading.engine_state import STATE_KEY, EngineResult, EngineShare, EngineState, pause, resume
 from dotagent.trading.market import CoinbaseMarket
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -341,6 +341,8 @@ async def test_the_trend_engine_switches_on_and_shows_its_last_look_on_a_wide_pa
                             placed=("ord_1",),
                             notes=("buy BTC-EUR not placed: the order, 25.00 EUR, is over what today's orders may "
                                    "still add up to, 0.00 EUR of 100.00 EUR",),
+                            result=EngineResult(started_at=time.time() - 86_400, product="BTC-EUR", account=0.0123,
+                                                held=-0.045),
                         ).model_dump_json(),
                     )  # fmt: skip
                     await pause(runtime.store, "Coinbase halted withdrawals", "run_s", time.time())
@@ -349,6 +351,9 @@ async def test_the_trend_engine_switches_on_and_shows_its_last_look_on_a_wide_pa
                     await expect(page.locator("[data-share='BTC-EUR']")).to_contain_text("33%")
                     await expect(page.locator("[data-engine='look']")).to_contain_text("1 order")
                     await expect(page.locator("[data-engine='note']")).to_contain_text("today's orders")
+                    # Item 820: what the account made beside holding Bitcoin instead.
+                    await expect(page.locator("[data-engine='result']")).to_contain_text("the account +1.23 %")
+                    await expect(page.locator("[data-engine='result']")).to_contain_text("BTC-EUR instead \u22124.50 %")
                     await expect(page.locator("[data-engine='paused']")).to_contain_text("Paused by run_s since")
                     card: Locator = page.locator(".trading-table-card").filter(has=page.locator("[data-share]"))
                     assert await card.evaluate("card => card.scrollWidth <= card.clientWidth + 1"), width
