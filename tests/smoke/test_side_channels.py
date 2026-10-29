@@ -390,3 +390,41 @@ async def test_choosing_chats_to_delete_includes_the_chat_of_a_channel_and_the_a
         await expect(_fold(page)).to_have_attribute("aria-expanded", "false")
         await _fold(page).click()
         await page.context.close()
+
+
+async def test_dots_own_chats_stand_folded_at_the_foot_and_open_as_the_owner_leaves_them(
+    runtime: Runtime, browser: Browser, address: str, manager: RunManager, replies: Replies, garden: RunRecord
+) -> None:
+    """Item 822: the chats of On its own (one a thing of Dot's list) and of the schedules left the days for sections of
+    their own at the foot, folded until the owner opens one; the days hold the owner's own chats."""
+    own: ThreadRecord = await runtime.store.create_thread("Tidy the notes", "initiative")
+    await _done(manager, replies, "On my own initiative: Tidy the notes", "initiative", own.id)
+    timed: ThreadRecord = await runtime.store.create_thread("Morning check", "schedule")
+    await _done(manager, replies, "Morning check", "schedule", timed.id)
+    for width in _WIDTHS:
+        page: Page = await _open(browser, address, width)
+        await page.evaluate(f"() => localStorage.removeItem('{_FOLDS}')")
+        await _reopen(page, width)
+        sidebar: Locator = page.locator("#sidebar")
+        goals: Locator = sidebar.locator(".side-runs .side-chat > a.side-run .side-run-goal")
+        await expect(goals).not_to_contain_text(["Tidy the notes"])
+        await expect(goals).not_to_contain_text(["Morning check"])
+        for channel, label, title in (
+            ("initiative", "On its own 1", "Tidy the notes"),
+            ("schedule", "Scheduled 1", "Morning check"),
+        ):
+            section: Locator = sidebar.locator(f".side-channels section[data-channel={channel}]")
+            fold: Locator = section.locator("> .side-label .side-fold")
+            await expect(section.locator("> .side-label")).to_have_text(label)
+            await expect(fold).to_have_attribute("aria-expanded", "false")
+            await expect(section.locator(".side-chat")).to_have_count(0)
+            await fold.click()
+            await expect(fold).to_have_attribute("aria-expanded", "true")
+            await expect(section.locator(".side-chat a.side-run .side-run-goal")).to_have_text(title)
+        folds: object = json.loads(await page.evaluate(f"() => localStorage.getItem('{_FOLDS}')"))
+        assert isinstance(folds, dict) and folds.get("initiative") is False and folds.get("schedule") is False
+        # Opened, they stay open over a reload, as the owner left them.
+        await _reopen(page, width)
+        await expect(sidebar.locator(".side-channels section[data-channel=initiative] .side-chat")).to_have_count(1)
+        await _fits(page, f"{width} with Dot's own sections")
+        await page.context.close()

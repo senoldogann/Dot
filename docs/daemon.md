@@ -48,7 +48,10 @@ the open chat's too, and keeps its count (item 513), and the search finds the ch
 **The chats a channel's messages made** (item 619, [Channels](channels.md): today the **iMessage** chat, a thread whose
 `source` is the channel's id) leave the days for a section of their own at the foot of the list, under the days, with
 the channel's mark (a green speech bubble), its name and how many chats it holds: **iMessage 1**. Its label folds it,
-as Chats' does, and the fold is kept between visits; folding Chats does not fold it, nor does it fold Chats.
+as Chats' does, and the fold is kept between visits; folding Chats does not fold it, nor does it fold Chats. **Dot's
+own work** stands so too (item 822), above iMessage: **On its own** (a chat for each thing of Dot's own list,
+[Proactive](proactive.md#on-its-own)) and **Scheduled** (the chats of the schedules), each folded until you open it, so
+that the days hold your own chats; opened, it stays open as you left it.
 Folded over a chat you have not read, the label shows the accent's dot after its count. Its chat is a row like any
 chat's, with its menu; Select and the arrow keys reach it, and a search shows what it finds in it, folded or not. A
 chat of it at work stands under Working like every chat (item 202) and comes back once the run ends, and one you
