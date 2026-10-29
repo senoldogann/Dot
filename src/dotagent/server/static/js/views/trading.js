@@ -1,6 +1,7 @@
 // Settings › Trading, a trading desk (item 777): the account's worth and its day against the limits, the open positions
-// with their stops and targets, what watches the market between runs, the holdings and the latest orders; under them
-// the settings: the mode (off, paper or live), the limits of `[trading]` and the key of the owner's Coinbase account.
+// with their stops and targets, what watches the market between runs, the trend engine (item 818), the holdings and the
+// latest orders; under them the settings: the mode (off, paper or live), the limits of `[trading]` and the key of the
+// owner's Coinbase account.
 // Nothing that widens what runs may do with money is asked here of a phone: the daemon refuses it with its reason, which
 // the page shows where the change was made. The key is typed here, kept in the Keychain by the daemon and never shown
 // again but the end of its name (`GET|PATCH /api/trading`, `PUT|DELETE /api/trading/key`, `POST /api/trading/paper/reset`).
@@ -631,6 +632,70 @@ export function mount(root, ctx) {
     });
   }
 
+  /** The trend engine (item 818): its switch, the shares its rule wants beside those held at its last look, and
+   * what held an order back or why it is paused. It trades on paper only, with no model. */
+  function engineSection() {
+    const spot = problemLine();
+    const { settings, engine } = view;
+    const state = engine?.state ?? null;
+    const paused = engine?.paused ?? null;
+    const products = settings.engine_coins.map((coin) => `${coin}-${settings.quote}`);
+    const toggle = choiceRowSetting({
+      label: "Trend engine",
+      hint: `Trades ${products.join(", ")} by a rule tried over years of daily closes, once an hour, on paper, within the limits. No model; a run may pause it.`,
+      options: [
+        { id: "off", label: "Off" },
+        { id: "trend", label: "On" },
+      ],
+      selected: settings.engine,
+      onSelect: async (next) => {
+        if (next !== settings.engine && !(await change(spot, () => api.patch("/trading", { engine: next })))) {
+          toggle.choice.set(settings.engine);
+        }
+      },
+    });
+    // Why the daemon refused a switch, under the switch: no empty row while there is none.
+    toggle.element.append(spot.node);
+    const lines = [];
+    if (paused !== null) {
+      lines.push(el("div", { class: "trading-watch-line warn", dataset: { engine: "paused" } }, el("span", { class: "trading-dot", "aria-hidden": "true" }), el("span", null, `Paused by ${paused.by} since ${dateTime(paused.since)}: ${paused.reason}`)));
+    }
+    if (state !== null) {
+      lines.push(el("div", { class: "trading-watch-line", dataset: { engine: "look" } }, el("span", { class: "trading-dot", "aria-hidden": "true" }), el("span", null, `Last look ${dateTime(state.looked_at)}: ${state.placed.length === 0 ? "no order" : `${state.placed.length} ${state.placed.length === 1 ? "order" : "orders"}`}.`)));
+      for (const note of state.notes) {
+        lines.push(el("p", { class: "hint", dataset: { engine: "note" } }, note));
+      }
+    } else if (settings.engine === "trend") {
+      lines.push(el("p", { class: "hint" }, "It looks within the hour."));
+    }
+    const shares =
+      state === null || state.shares.length === 0
+        ? null
+        : el(
+            "table",
+            { class: "trading-table" },
+            el("thead", null, el("tr", null, ["Product", "Held", "The rule wants"].map((title, index) => el("th", { class: index > 0 ? "num" : null, scope: "col" }, title)))),
+            el(
+              "tbody",
+              null,
+              state.shares.map((share) =>
+                el(
+                  "tr",
+                  { dataset: { share: share.product } },
+                  cell("Product", el("strong", null, share.product)),
+                  cell("Held", `${Math.round(share.weight * 100)}%`, true),
+                  cell("The rule wants", `${Math.round(share.target * 100)}%`, true),
+                ),
+              ),
+            ),
+          );
+    return setSection({
+      title: "Trend engine",
+      lead: "A rule instead of a model for the coins it trades: it holds a coin while its daily closes rise, sized to how wild it is, and cash when they fall.",
+      body: [setCard(toggle.element), lines.length === 0 && shares === null ? null : el("div", { class: "set-card trading-watch trading-table-card" }, lines, shares)],
+    });
+  }
+
   /** What the account holds, each currency at the bid now and its share of the account. */
   function holdingsSection() {
     const { portfolio } = view;
@@ -729,6 +794,7 @@ export function mount(root, ctx) {
         view.settings.mode === "off" ? null : deskSection(),
         view.settings.mode === "off" ? null : positionsSection(),
         view.settings.mode === "off" ? null : watchSection(),
+        view.settings.mode === "off" ? null : engineSection(),
         view.settings.mode === "off" ? null : holdingsSection(),
         view.settings.mode === "off" ? null : ordersSection(),
         view.settings.mode === "off" ? null : el("h2", { class: "trading-divider" }, "Settings"),

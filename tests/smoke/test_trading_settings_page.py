@@ -27,6 +27,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.models import TradingOrderRecord
+from dotagent.trading.engine_state import STATE_KEY, EngineShare, EngineState, pause, resume
 from dotagent.trading.market import CoinbaseMarket
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -300,3 +301,60 @@ async def test_the_watch_chooses_the_schedule_a_move_wakes_and_says_when_it_is_g
         finally:
             await browser.close()
             runtime.trading.settings.value = runtime.trading.config().model_copy(update={"mode": "off"})
+
+
+async def test_the_trend_engine_switches_on_and_shows_its_last_look_on_a_wide_page_and_a_phone(
+    runtime: Runtime, served: str
+) -> None:
+    """Item 818: the engine's switch is kept; its last look shows the shares beside those held, what held an order
+    back, and why it is paused; the table keeps inside its card on a phone too."""
+    runtime.trading.settings.value = runtime.trading.config().model_copy(
+        update={"mode": "paper", "products": ["BTC-EUR", "ETH-EUR", "SOL-EUR"], "engine": "off"}
+    )
+    try:
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(
+                channel=load_default_config().browser.channel, headless=True
+            )
+            try:
+                for width, scheme in _SIZES:
+                    await runtime.store.kv_delete(STATE_KEY)
+                    await resume(runtime.store)
+                    runtime.trading.settings.value = runtime.trading.config().model_copy(update={"engine": "off"})
+                    page: Page = await browser.new_page(
+                        viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+                    )
+                    await page.goto(ui_url("127.0.0.1", int(served.rpartition(":")[2]), TOKEN))
+                    await page.goto(f"{served}/#/settings/trading")
+                    engine: Locator = page.get_by_role("group", name="Trend engine")
+                    await engine.get_by_role("button", name="On", exact=True).click()
+                    await expect(page.get_by_text("It looks within the hour.")).to_be_visible()
+                    assert runtime.trading.config().engine == "trend"
+                    await runtime.store.kv_set(
+                        STATE_KEY,
+                        EngineState(
+                            looked_at=time.time(),
+                            shares=(
+                                EngineShare(product="BTC-EUR", weight=0.1, target=0.33),
+                                EngineShare(product="ETH-EUR", weight=0.0, target=0.0),
+                            ),
+                            placed=("ord_1",),
+                            notes=("buy BTC-EUR not placed: the order, 25.00 EUR, is over what today's orders may "
+                                   "still add up to, 0.00 EUR of 100.00 EUR",),
+                        ).model_dump_json(),
+                    )  # fmt: skip
+                    await pause(runtime.store, "Coinbase halted withdrawals", "run_s", time.time())
+                    await page.reload()
+                    await expect(page.locator("[data-share='BTC-EUR']")).to_contain_text("10%")
+                    await expect(page.locator("[data-share='BTC-EUR']")).to_contain_text("33%")
+                    await expect(page.locator("[data-engine='look']")).to_contain_text("1 order")
+                    await expect(page.locator("[data-engine='note']")).to_contain_text("today's orders")
+                    await expect(page.locator("[data-engine='paused']")).to_contain_text("Paused by run_s since")
+                    card: Locator = page.locator(".trading-table-card").filter(has=page.locator("[data-share]"))
+                    assert await card.evaluate("card => card.scrollWidth <= card.clientWidth + 1"), width
+                    await page.close()
+            finally:
+                await browser.close()
+    finally:
+        await resume(runtime.store)
+        runtime.trading.settings.value = runtime.trading.config().model_copy(update={"mode": "off", "engine": "off"})

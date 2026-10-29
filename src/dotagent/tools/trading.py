@@ -29,6 +29,7 @@ from dotagent.tools.base import (
     ok,
 )
 from dotagent.tools.context import ToolContext
+from dotagent.trading.engine_state import pause, read_pause, read_state, resume, state_text
 from dotagent.trading.indicators import Indicators, indicator_text, indicators
 from dotagent.trading.limits import market_allows
 from dotagent.trading.market import MarketError, granularities, when
@@ -48,6 +49,7 @@ _CANDLES_DEFAULT: int = 48
 # The busiest products the overview of trading_market reads when "*" is all the owner allows, one request each.
 _OVERVIEW_AT_MOST: int = 8
 SCAN_TOOL: str = "trading_scan"
+ENGINE_TOOL: str = "trading_engine"
 
 
 def _trading(ctx: ToolContext) -> Trading:
@@ -538,9 +540,83 @@ def _exit_tool() -> RegisteredTool:
     )
 
 
+class EngineArgs(ToolArgs):
+    action: Literal["status", "pause", "resume"] = Field(
+        default="status",
+        description="status: what the trend engine saw and did at its last look; pause: it places nothing until "
+        "resumed, and holds what it holds; resume: it trades by its rule again.",
+    )
+    reason: str = Field(
+        default="", max_length=500, description="Why the engine is paused or resumed: the owner reads it on the page."
+    )
+
+    @model_validator(mode="after")
+    def _a_reason(self) -> "EngineArgs":
+        if self.action != "status" and not self.reason.strip():
+            raise ValueError("pause and resume say why, in reason")
+        return self
+
+
+def _engine_tool() -> RegisteredTool:
+    def classify(args: EngineArgs, ctx: ToolContext) -> ActionInfo:
+        # The engine trades on paper only (item 818): pausing or resuming it moves no money.
+        return ActionInfo(
+            tool=ENGINE_TOOL,
+            kind="read" if args.action == "status" else "write",
+            risk="safe" if args.action == "status" else "low",
+            summary={
+                "status": "Read the trend engine",
+                "pause": "Pause the trend engine",
+                "resume": "Resume the trend engine",
+            }[args.action],
+            target="trading:engine",
+            flags=(),
+        )
+
+    async def run(args: EngineArgs, ctx: ToolContext) -> ToolResult:
+        store = ctx.runtime.store
+        config: TradingConfig = _config(ctx)
+        if args.action == "pause":
+            await pause(store, args.reason.strip(), ctx.run_id, _trading(ctx).clock())
+        elif args.action == "resume" and not await resume(store):
+            return fail("The trend engine was not paused.")
+        on: str = (
+            "on"
+            if config.engine == "trend"
+            else "off ([trading] engine; the owner switches it on in Settings › Trading)"
+        )
+        text: str = state_text(await read_state(store), await read_pause(store))
+        done: str = {"status": "", "pause": "Paused. ", "resume": "Resumed: it trades at its next look. "}[args.action]
+        return ok(f"{done}The trend engine is {on}, trading {', '.join(config.engine_products())}.\n{text}")
+
+    return make_tool(
+        name=ENGINE_TOOL,
+        description=(
+            "The trend engine: a rule that trades the engine's coins with no model, once an hour, on paper, within the "
+            "owner's limits (docs/trading.md). Read what it holds and wants and what it did; pause it when the market "
+            "is one its rule cannot read (an exchange halted, a coin delisted, news that its daily closes do not "
+            "show yet), and resume it once that has passed. Its rule is not changed here."
+        ),
+        args_model=EngineArgs,
+        modes=ACTING_MODES,
+        parallel_safe=False,
+        timeout_s=_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
 def _exit_levels(exit_: TradingExitRecord) -> str:
     return f"{exit_.stop:.8g} or under" + (f", or {exit_.target:.8g} or over" if exit_.target is not None else "")
 
 
 def build_trading_tools() -> tuple[RegisteredTool, ...]:
-    return (_market_tool(), _scan_tool(), _portfolio_tool(), _order_tool(), _exit_tool(), _history_tool())
+    return (
+        _market_tool(),
+        _scan_tool(),
+        _portfolio_tool(),
+        _order_tool(),
+        _exit_tool(),
+        _history_tool(),
+        _engine_tool(),
+    )

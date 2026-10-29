@@ -119,6 +119,7 @@ _FAMILIES: dict[str, str] = {
     "eval-report": "dotagent.cli_eval",
     "eval-tools": "dotagent.cli_eval",
     "stats": "dotagent.cli_stats",
+    "trading-backtest": "dotagent.cli_trading",
     "daemon": "dotagent.cli_daemon",
     "open": "dotagent.cli_daemon",
     "url": "dotagent.cli_daemon",
@@ -594,6 +595,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--run", metavar="ID", default=None, help="the numbers of one run instead: what it cost and where"
     )
 
+    trading = commands.add_parser("trading", help="the trend engine's rule on Coinbase's daily closes")
+    trading_commands = trading.add_subparsers(dest="trading_action", required=True)
+    trading_backtest = trading_commands.add_parser(
+        "backtest",
+        help="play the trend engine's rule over years of Coinbase's daily closes of [trading] engine_coins, with the "
+        "fees, against holding the first coin",
+    )
+    trading_backtest.add_argument("--years", type=int, default=7, help="how many years back to start (at most 12)")
+    trading_backtest.add_argument(
+        "--cost",
+        type=float,
+        default=0.007,
+        help="what one side of a trade costs, the fee and the slippage, as a share (0.007: 0.7%%)",
+    )
+
     commands.add_parser("daemon", help="run Dot in this terminal: the API, the web UI, the agent and the schedules")
     commands.add_parser("open", help="open the web UI of the running daemon in your default browser, signed in")
     commands.add_parser("url", help="print the address of the web UI, with the sign-in token in it")
@@ -647,6 +663,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     eval_action: object = raw.pop("eval_action", None)
     backup_action: object = raw.pop("backup_action", None)
     models_action: object = raw.pop("models_action", None)
+    trading_action: object = raw.pop("trading_action", None)
     if raw["name"] == "models" and models_action == "profile":
         raw["name"] = "models-profile"
     elif raw["name"] == "models":
@@ -677,6 +694,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"eval-{eval_action}"
     if raw["name"] == "backup":
         raw["name"] = f"backup-{backup_action}"
+    if raw["name"] == "trading":
+        raw["name"] = f"trading-{trading_action}"
     try:
         return COMMAND_ADAPTER.validate_python(raw)
     except ValidationError as exc:

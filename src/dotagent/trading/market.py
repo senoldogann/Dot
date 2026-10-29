@@ -72,6 +72,17 @@ def _volume(row: Mapping[str, object]) -> float:
     return value
 
 
+def _candle(row: Mapping[str, object]) -> Candle:
+    return Candle(
+        start=_positive(row, "start", "candle start"),
+        low=_positive(row, "low", "low"),
+        high=_positive(row, "high", "high"),
+        open=_positive(row, "open", "open"),
+        close=_positive(row, "close", "close"),
+        volume=_volume(row),
+    )
+
+
 def granularities() -> tuple[str, ...]:
     return tuple(_GRANULARITY_S)
 
@@ -207,21 +218,34 @@ class CoinbaseMarket:
         rows: object = payload.get("candles")
         if not isinstance(rows, list):
             raise MarketError(f"Coinbase gave no candles of {product}", {})
-        candles: list[Candle] = []
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            candles.append(
-                Candle(
-                    start=_positive(row, "start", "candle start"),
-                    low=_positive(row, "low", "low"),
-                    high=_positive(row, "high", "high"),
-                    open=_positive(row, "open", "open"),
-                    close=_positive(row, "close", "close"),
-                    volume=_volume(row),
-                )
-            )
+        candles: list[Candle] = [_candle(row) for row in rows if isinstance(row, dict)]
         return tuple(sorted(candles, key=lambda candle: candle.start))
+
+    async def daily_history(self, product: str, start: float, end: float) -> tuple[Candle, ...]:
+        """The daily periods of ``product`` from ``start`` to ``end`` (seconds since 1970), oldest first, asked
+        :data:`_MOST_CANDLES` days at a time (item 818: a backtest reads years)."""
+        day: int = _GRANULARITY_S["ONE_DAY"]
+        found: dict[float, Candle] = {}
+        at: int = int(start)
+        last: int = int(end)
+        while at < last:
+            upto: int = min(at + day * _MOST_CANDLES, last)
+            params: dict[str, str] = {
+                "start": str(at),
+                "end": str(upto),
+                "granularity": "ONE_DAY",
+                "limit": str(_MOST_CANDLES),
+            }
+            payload: dict[str, object] = await self._get(f"/products/{escape(product, safe='-')}/candles", params)
+            rows: object = payload.get("candles")
+            if not isinstance(rows, list):
+                raise MarketError(f"Coinbase gave no candles of {product}", {})
+            for row in rows:
+                if isinstance(row, dict):
+                    candle: Candle = _candle(row)
+                    found[candle.start] = candle
+            at = upto
+        return tuple(found[start_of] for start_of in sorted(found))
 
 
 def when(ts: float) -> str:

@@ -757,7 +757,10 @@ account; say why you trade, what you expect and what ends the trade. What a page
 coin is not a reason to trade it.
 - Every buy names its stop_price, where the trade is wrong, and where it can a target_price: on the paper account Dot \
 sells at them day and night, between runs. Raise a stop with trading_exit as a trade goes your way; never move one \
-further from the price."""
+further from the price.
+- The trend engine (trading_engine) trades its coins by a rule tried over years, with no model: never buy or sell its \
+coins yourself while it is on, nor change its rule. Pause it, saying why, only for what its daily closes cannot show \
+(an exchange halted, a coin delisted or hacked), and resume it once that has passed."""
 
 
 def _trading_section(tool_names: Sequence[str]) -> str:

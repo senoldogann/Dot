@@ -43,8 +43,9 @@ can change them.
   for that one request, for two minutes, as Coinbase asks.
 
 What lets runs do more with money is done on the Mac only: switching trading on or to live, raising a limit, allowing a
-product (`*` too, and a lower `min_volume`), saving a key. A phone's key gets a refusal for those,
-and can always narrow: switch trading off or to paper, lower a limit, drop a product, remove the key. Switching to live
+product (`*` too, and a lower `min_volume`), switching the trend engine on (item 818), saving a key. A phone's key gets
+a refusal for those, and can always narrow: switch trading off or to paper, switch the trend engine off, lower a limit,
+drop a product, remove the key. Switching to live
 checks the key with Coinbase first.
 
 ## What a run does
@@ -71,6 +72,8 @@ With trading on, a run has the `trading` tool group:
   below; a sell names neither.
 - `trading_exit` (item 770): moves an open exit's stop or target, judged against the prices now as a buy's are.
 - `trading_history`: the account's orders, newest first, each with its reason.
+- `trading_engine` (item 818): the trend engine's last look (the shares it holds and wants, the orders it placed,
+  what held one back), and pause and resume, each with its reason (below).
 
 The system prompt tells the run to trade only with `trading_order`, never through the browser or the shell, to read the
 prices and the account first, to say why it trades and what ends the trade, never to take what a page or a post says
@@ -138,7 +141,45 @@ reason and its exit (a stop and a target), or none and why — and ends in a fou
 runs go on in one chat with the last three summaries in view; with `products = ["*"]` in `USDC` and the shift as
 `wake_schedule`, it covers the whole market and is woken between its hours when a product moves. After a couple of
 weeks, Settings › Trading shows what it made of the paper account since its start; set beside what simply holding
-would have made, that, not a feeling, is what a switch to live rests on.
+would have made, that, not a feeling, is what a switch to live rests on. Since item 818 the owner's Dot runs the trend engine
+instead (below), with a run once a day that supervises it.
+
+## The trend engine: a rule instead of a model (item 818)
+
+What was measured on the owner's Dot before it (2026-10-28 and 29): the hourly paper shift read about 510,000 tokens a
+run, about 0.16 USD of DeepSeek's at OpenRouter's price, so some 115 USD a month for a paper account of 1,000; its first
+day's three trades were all stopped out. What the evidence on crypto holds up best once costs are counted is
+time-series momentum traded seldom; the live contests of language models trading (Nof1's Alpha Arena, 2025: four of
+six models lost) and the studies of them (StockBench, LiveTradeBench) find buy-and-hold hard to beat.
+
+So `[trading] engine = "trend"` trades `engine_coins` (BTC, ETH and SOL in `quote` by default) with no model at all, by
+a rule written down before it was tried (`dotagent/trading/trend.py`): a coin is held while its daily close is over its
+close 20, 50, 100 and 200 days before (the share of the four that are), sized so that it moves the account as a coin of
+`engine_target_vol` (50%) yearly volatility would, an equal share for each coin, and cash when its closes fall. Long or
+out, never short, never on credit. A share less than `engine_band` (10 points) off its target stays, as every trade
+pays its fee twice over a round trip. Once an hour the daemon's scheduler reads the daily closes (only the days that
+ended), the shares the rule wants and what the paper account holds, and places the steps toward them through the same
+limits as a run's order, the emergency stop included: no order over `max_order`, no day over `max_day`, no coin over
+`max_position`, so that with the default limits the engine reaches its shares over days. Each of `engine_coins` in
+`quote` must be allowed by `products` too (named there, or trading `min_volume` a day with `*`): one that is not is
+refused at every look. A sell names what it brings, so that a bid a little higher when it is placed cannot take it
+over `max_order`; a coin Coinbase gave fewer than 201 daily closes of is not traded at that look (one held is kept,
+not sold for want of closes). What held an order back is said on the page. It trades on paper only: an order of your Coinbase account by the engine waits for an item of its
+own (the live exits of item 770 come first) and your word.
+
+`dotx trading backtest [--years 7] [--cost 0.007]` plays the same code over Coinbase's daily closes, each side of a trade
+costing `--cost` (the fee and the slippage), against holding the first coin. On BTC, ETH and SOL in USD from July 2019
+to October 2026 at 0.7% a side: the rule made 26.5% a year (Sharpe 0.90, deepest fall -38%) against holding Bitcoin's
+32.0% (Sharpe 0.77, deepest fall -77%), turning the account over 5.4 times a year. It made less than holding in the
+years Bitcoin rose most (2020, 2023, 2024) and lost far less in the years it fell (2022: -23% against -64%). A band of 5
+points made 22.1% at a turnover of 12.5; a volatility of 30% made 21.1% with a deepest fall of -24%: the numbers move
+with the settings, none of which was chosen for its result. Past closes are no promise.
+
+The page shows the engine under Trend engine: its switch (on from the Mac only, off from a phone too), the shares the
+rule wants beside those held at its last look, what held an order back, and why it is paused. A run has
+`trading_engine`: what the engine holds, wants and did, and pause and resume, each with its reason; a run is told never
+to trade the engine's coins itself nor change its rule, and to pause it only for what its daily closes cannot show (an
+exchange halted, a coin delisted or hacked). The owner's daily supervisor is such a run, once a day.
 
 ## What holds, and what only asks
 
