@@ -9,7 +9,8 @@
 // (item 507), and goes back among the days once it rests; a pinned one stays under Pinned, with the same faces.
 // The chats a channel's messages made (item 619: the "iMessage" chat) leave the days for a section of their own at the foot
 // of the list, with the channel's mark and a count; it folds like the Chats group does and keeps its fold, and a search
-// finds its chats as it finds the others.
+// finds its chats as it finds the others. Dot's own work does too (item 822): the chats of On its own and of the
+// schedules stand folded at the foot, so that the days hold the owner's own chats.
 
 import { ApiError, api, request, SCHEDULES_CHANGED_EVENT, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
@@ -53,9 +54,13 @@ const MARKS_TURN_MS = 6000;
 // visits.
 const FOLDS_KEY = "dot.sideFolds";
 // The channels whose chats stand in a section of their own (item 619), by the `source` their threads have (the channel's
-// id, as the router makes the thread): the name of the section and its mark. A thread of any other source is a chat among
-// the days.
-const CHANNEL_SECTIONS = { imessage: { label: "iMessage", icon: "message" } };
+// id, as the router makes the thread): the name of the section, its mark, and whether it starts folded. A thread of any
+// other source is a chat among the days. Dot's own runs (item 822): one chat a thing of its list, one a schedule.
+const CHANNEL_SECTIONS = {
+  initiative: { label: "On its own", icon: "sparkles", folded: true },
+  schedule: { label: "Scheduled", icon: "calendar", folded: true },
+  imessage: { label: "iMessage", icon: "message", folded: false },
+};
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
 // The states of a run that is over: only such a chat can be marked unread (item 131).
@@ -480,8 +485,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const close = el("button", { class: "icon-btn", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse });
   const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, "Select");
   let folds = readFolds(FOLDS_KEY);
+  // Whether a section is folded: as the owner left it, else as it starts (item 822: Dot's own work starts folded).
+  function isFolded(key) {
+    return folds[key] ?? CHANNEL_SECTIONS[key]?.folded ?? false;
+  }
   function toggleFold(key) {
-    folds = { ...folds, [key]: folds[key] !== true };
+    folds = { ...folds, [key]: !isFolded(key) };
     writePref(FOLDS_KEY, JSON.stringify(folds));
     paintLists();
   }
@@ -788,7 +797,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       if (members.length === 0) {
         continue;
       }
-      const folded = folds[id] === true && !selecting && needle === "";
+      const folded = isFolded(id) && !selecting && needle === "";
       const { count, unread, label } = channelLabel(id);
       label.firstChild.setAttribute("aria-expanded", folded ? "false" : "true");
       setText(count, String(members.length));

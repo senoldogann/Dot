@@ -185,14 +185,14 @@ count from none). One of its runs works at a time. When macOS cannot say how lon
 and the card says so. A thing you put on the list yourself with `[URGENT]` in its title or why (in any case) goes before
 the older ones and may start while another run works or you use the Mac (item 809); a thing a run put on the list, or
 one that came of content third parties can author (a page, a mail), is never urgent, however it is marked. It does the
-oldest thing to do, in a chat of its own named after it; with nothing to do, it looks for work every `look_every_hours`
-(6) with a research run, which reads what it remembers of you, the record the morning brief reads (what waits for you,
-the runs that failed since the last look, the campaigns at work), the titles of your newest chats and the list, and puts
-at most three things on it. That run is a research run: it writes nothing but its list, its notes and Dot's memory, as
-any research run may. Its record quotes no words a third party wrote unless it starts untrusted: the chats it names are
-the ones a person started (a watcher's, whose title carries a mail's subject, and Dot's own are left out), and a thing
-on the list that came from such content is counted, not quoted; the runs whose words the record does quote give it their
-taint, as the brief's do.
+oldest thing to do, in a chat of its own named after it (under **On its own** at the foot of the sidebar, folded, item
+822); with nothing to do, it looks for work every `look_every_hours` (6) with a research run, which reads what it
+remembers of you, the record the morning brief reads (what waits for you, the runs that failed since the last look, the
+campaigns at work), the titles of your newest chats and the list, and puts at most three things on it. That run is a
+research run: it writes nothing but its list, its notes and Dot's memory, as any research run may. Its record quotes no
+words a third party wrote unless it starts untrusted: the chats it names are the ones a person started (a watcher's,
+whose title carries a mail's subject, and Dot's own are left out), and a thing on the list that came from such content
+is counted, not quoted; the runs whose words the record does quote give it their taint, as the brief's do.
 
 **How it does a thing.** The run is a task in `[initiative] approvals`, `yolo` by default whatever your own mode is
 (item 756: in `ask`, a run of its own asked to put a thing on its own list and waited on nobody), nobody watches it (a
