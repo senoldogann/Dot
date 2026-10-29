@@ -701,3 +701,52 @@ async def test_when_idle_an_owners_urgent_thing_goes_before_an_older_normal_one(
         [run] = await runtime.store.list_runs(10, None)
         await _settled(initiative)
         assert (await runtime.store.get_thread(run.thread_id)).title == "[URGENT] Send the signed page"
+
+
+def _call(tool: str, **arguments: str) -> ScriptedTurn:
+    return ScriptedTurn(text="", calls=(ScriptedCall(tool=tool, arguments=dict(arguments)),))
+
+
+async def test_a_look_cannot_list_a_placeholder_and_takes_back_only_what_it_put_on_the_list(
+    login_env: dict[str, str],
+) -> None:
+    """Item 821: the look of 2026-10-29 put an empty "placeholder" on the list and could not take it off, so the next
+    run changed Dot's database to close it. A title of one word, or the same as its reason, is refused; a run takes back
+    what it put on the list itself, and nothing else."""
+    turns: list[ScriptedTurn] = [
+        _call("todo_add", title="placeholder", why="placeholder"),
+        _call("todo_add", title="Tidy the notes", why="tidy the notes."),
+        _call("todo_add", title="Summarise the open pull requests", why="They review them each Monday"),
+        _call("todo_add", title="Write the weekly report", why="It is due on Fridays"),
+        _call("todo_drop", title="write the weekly report.", reason="Put on the list by mistake: it was done"),
+        _call("todo_drop", title="Water the plants", reason="Not needed"),
+        _finish("Put one thing on the list."),
+    ]
+    async with _dot(login_env, turns) as (runtime, manager):
+        owners: TodoRecord | str = await add_todo(runtime.store, "Water the plants", "Dry", OWNER_SOURCE, None, False)
+        assert isinstance(owners, TodoRecord)
+        await runtime.store.set_todo(owners.id, "done", 1, None, "Watered.")
+        await runtime.store.set_todo(owners.id, "open", 0, None, "")
+        await set_initiative(runtime.store, True)
+        # The owner's thing is to do, so a look starts only once it is done: the look is started by hand here.
+        initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
+        await initiative._look(await read_initiative(runtime.store), 10_000.0)
+        [run] = [one for one in await runtime.store.list_runs(10, None) if one.mode == "research"]
+        await _settled(initiative)
+        results: list[EventRecord] = [
+            event
+            for event in await runtime.store.list_events(run.id, 0, 500)
+            if event.kind == "tool_result" and str(event.data["tool"]).startswith("todo_")
+        ]
+        oks: list[bool] = [bool(event.data["ok"]) for event in results]
+        assert oks == [False, False, True, True, True, False]
+        assert "says no work" in str(results[0].data["text"]) and "says no work" in str(results[1].data["text"])
+        assert "a run takes back only what it put on it" in str(results[5].data["text"])
+        listed: dict[str, TodoRecord] = {todo.title: todo for todo in await runtime.store.recent_todos(0.0, 20)}
+        assert set(listed) == {"Water the plants", "Summarise the open pull requests", "Write the weekly report"}
+        assert listed["Write the weekly report"].status == "dropped"
+        assert listed["Write the weekly report"].note == "Taken back: Put on the list by mistake: it was done"
+        assert (listed["Summarise the open pull requests"].status, listed["Water the plants"].status) == (
+            "open",
+            "open",
+        )

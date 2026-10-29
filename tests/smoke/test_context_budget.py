@@ -42,7 +42,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 BUDGET_TOKENS: int = 22_800
 SYSTEM_BUDGET_TOKENS: int = 7_200
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
-TOOLS_BUDGET_TOKENS: int = 15_400
+# Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
+# by changing Dot's database instead (22,648 measured; tools 15,474).
+TOOLS_BUDGET_TOKENS: int = 15_500
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

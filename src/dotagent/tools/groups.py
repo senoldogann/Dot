@@ -48,6 +48,7 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "vault_contacts": "vault",
     # Dot's own list of work for later (item 715).
     "todo_add": "todos",
+    "todo_drop": "todos",
     # The public face of a site, the ports of the owner's own (item 776), and the forms of that host (item 781).
     "recon": "recon",
     "security_scan": "recon",
