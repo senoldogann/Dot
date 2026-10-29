@@ -351,7 +351,7 @@ async def test_the_trend_engine_switches_on_and_shows_its_last_look_on_a_wide_pa
                     await expect(page.locator("[data-share='BTC-EUR']")).to_contain_text("33%")
                     await expect(page.locator("[data-engine='look']")).to_contain_text("1 order")
                     await expect(page.locator("[data-engine='note']")).to_contain_text("today's orders")
-                    # Item 820: what the account made beside holding Bitcoin instead.
+                    # Item 819: what the account made beside holding Bitcoin instead.
                     await expect(page.locator("[data-engine='result']")).to_contain_text("the account +1.23 %")
                     await expect(page.locator("[data-engine='result']")).to_contain_text("BTC-EUR instead \u22124.50 %")
                     await expect(page.locator("[data-engine='paused']")).to_contain_text("Paused by run_s since")

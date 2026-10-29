@@ -380,6 +380,13 @@ async def test_the_engine_keeps_what_the_account_made_beside_holding_its_first_c
     assert later.result is not None and later.result.started_at == _NOW
     assert later.result.held == pytest.approx(0.1)
     assert 0.04 < later.result.account < 0.05
+    # Bitcoin's price unread for an hour (the account's worth is not whole then): the last result stays.
+    _DOWN.add("BTC-EUR")
+    try:
+        unread: EngineState = await engine.look(trading.config(), _NOW + 5400)
+    finally:
+        _DOWN.clear()
+    assert unread.result == later.result
     # The paper account started again starts the measure again.
     await trading.reset_paper()
     again: EngineState = await engine.look(trading.config(), _NOW + 7200)
