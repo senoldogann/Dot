@@ -38,6 +38,7 @@ from dotagent.scheduler import (
     SCHEDULE_RUN_ENDED_EVENT,
     SCHEDULE_SOURCE,
     SCHEDULE_STOPPED_EVENT,
+    NightWork,
     ScheduleMissed,
     ScheduleRunEnded,
     ScheduleStopped,
@@ -304,6 +305,18 @@ class Scheduler:
     def stepping(self) -> bool:
         """Whether a step of the harness is under way."""
         return self._stepping is not None and not self._stepping.done()
+
+    def night_work(self) -> tuple[NightWork, ...]:
+        """The night's learning under way now (item 815), which a restart would cut off: the reflection, the harness's
+        step and the plugin scout's night, this scheduler's or one the owner started with Look now."""
+        work: list[NightWork] = []
+        if self.reflecting():
+            work.append("reflection")
+        if self.stepping():
+            work.append("harness_step")
+        if (self._scouting is not None and not self._scouting.done()) or scout_service.running(self._runtime):
+            work.append("plugin_scout")
+        return tuple(work)
 
     async def _step_if_due(self, now: float) -> None:
         """Start the step of the harness (item 391) in a task when its daily time has passed since the last one (or the

@@ -34,6 +34,7 @@ from dotagent.dot_app import LAUNCHER_ENV, app_path, ensure_app
 from dotagent.launchd import (
     LABEL,
     RESTART_LABEL,
+    RESTART_NIGHT_LIMIT_S,
     RESTART_POLL_S,
     RESTART_WAIT_LIMIT_S,
     JobState,
@@ -250,8 +251,9 @@ def _restart_line(waiting: JobState | None) -> str:
             "dotx.log); 'dotx service restart --when-idle' asks for a new one"
         )
     return (
-        f"the daemon is restarted once no run works ({_job_line(waiting)}); "
-        f"it gives up after {_duration(RESTART_WAIT_LIMIT_S)}"
+        f"the daemon is restarted once no run works and none of the night's learning is under way "
+        f"({_job_line(waiting)}); it gives up after {_duration(RESTART_WAIT_LIMIT_S)} of runs at work or "
+        f"{_duration(RESTART_NIGHT_LIMIT_S)} of the night's learning"
     )
 
 
@@ -401,9 +403,10 @@ async def cmd_service_restart(command: ServiceRestartCommand) -> int:
 
 
 async def cmd_service_restart_when_idle(command: ServiceRestartCommand) -> int:
-    """Load the one-shot job that restarts the daemon once no run works (:mod:`dotagent.restart_when_idle`) and return
-    at once. A restart that is on its way already is left as it is: replacing it could stop it between unloading the
-    daemon's job and loading it again, and it restarts the daemon once no run works anyway."""
+    """Load the one-shot job that restarts the daemon once no run works and none of the night's learning is under way
+    (:mod:`dotagent.restart_when_idle`) and return at once. A restart that is on its way already is left as it is:
+    replacing it could stop it between unloading the daemon's job and loading it again, and it restarts the daemon once
+    no run works anyway."""
     uid: int = os.getuid()
     if await inspect_job(uid) is None:
         raise _not_installed(uid)
@@ -420,9 +423,11 @@ async def cmd_service_restart_when_idle(command: ServiceRestartCommand) -> int:
     await install_restart_job(plist, render_restart_job(job), uid)
     sys.stdout.write(
         f"Loaded a restart that waits (the launchd job {RESTART_LABEL}: {plist}).\n"
-        f"The daemon is restarted once no run works, the run that asked included; the job looks every "
-        f"{RESTART_POLL_S:g} seconds, gives up after {_duration(RESTART_WAIT_LIMIT_S)} without restarting, and "
-        "unloads itself either way. 'dotx service status' says whether one waits.\n"
+        f"The daemon is restarted once no run works, the run that asked included, and none of the night's learning "
+        f"(the reflection, the harness's step, the plugin scout) is under way; the job looks every "
+        f"{RESTART_POLL_S:g} seconds, gives up after {_duration(RESTART_WAIT_LIMIT_S)} of runs at work or "
+        f"{_duration(RESTART_NIGHT_LIMIT_S)} of the night's learning without restarting, and unloads itself either "
+        "way. 'dotx service status' says whether one waits.\n"
     )
     return 0
 

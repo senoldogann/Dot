@@ -667,6 +667,7 @@ async def test_the_status_the_models_and_the_checks_describe_this_installation(c
     assert body["preset"] == "cautious"
     assert (body["approvals"], body["goal_mode"]) == ("ask", False)
     assert body["scheduler_running"] is False
+    assert body["night_work"] == []
     assert body["models"]["main"] == MODEL_REF
     models: httpx.Response = await client.get("/api/models")
     assert models.status_code == 200

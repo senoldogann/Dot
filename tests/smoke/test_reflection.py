@@ -309,10 +309,14 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         scheduler: Scheduler = Scheduler(home.runtime, home.manager)
         fire_at: float | None = next_firing(reflection_cron("03:30"), time.time(), home.runtime.schedule_zone)
         assert fire_at is not None
+        assert scheduler.night_work() == ()
         await scheduler.tick(fire_at + 1)
         assert scheduler.reflecting()
+        # What a restart that waits asks for (item 815): the reflection is the night's learning under way.
+        assert scheduler.night_work() == ("reflection",)
         async with asyncio.timeout(_TIME_LIMIT_S):
             await scheduler.drain()
+        assert scheduler.night_work() == ()
         reflection: Reflection | None = await last_reflection(store)
         assert reflection is not None
         assert (

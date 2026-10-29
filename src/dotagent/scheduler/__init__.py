@@ -1,10 +1,17 @@
 """Schedules: goals that Dot runs later or on a cron expression, started by the daemon."""
 
+from typing import Literal
+
 from dotagent.core.types import FrozenModel
 from dotagent.store.models import RunStatus
 
 # The ``source`` of the threads and runs that a schedule starts.
 SCHEDULE_SOURCE: str = "schedule"
+
+# The night's learning that a restart of the daemon would cut off (item 815): the reflection, the harness's step and the
+# plugin scout's night are no runs, and each records nothing until its end. ``GET /api/status`` names those under way,
+# and ``dotx service restart --when-idle`` waits for them as for the runs.
+type NightWork = Literal["reflection", "harness_step", "plugin_scout"]
 
 # What to tell whoever creates or lists schedules.
 DAEMON_NOTE: str = "Schedules start their runs only while the Dot daemon is running (dotx daemon)."
