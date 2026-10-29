@@ -1457,6 +1457,11 @@ class Store:
         await self._db.commit()
         return value
 
+    @_writing
+    async def kv_delete(self, key: str) -> None:
+        await self._db.execute("DELETE FROM kv WHERE key = ?", (key,))
+        await self._db.commit()
+
     # ----- harness -------------------------------------------------------------------------
 
     @_writing

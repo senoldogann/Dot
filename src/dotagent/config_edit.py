@@ -88,6 +88,7 @@ type TradingSetting = Literal[
     "paper_start",
     "paper_fee_rate",
     "wake_schedule",
+    "engine",
 ]
 type SettingKey = (
     AgentSetting

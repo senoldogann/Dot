@@ -13,6 +13,7 @@ from vault_stand_ins import MemorySecretStore
 
 from dotagent.core.errors import StoreError
 from dotagent.runtime import Runtime
+from dotagent.trading.engine_state import pause
 from dotagent.trading.market import CoinbaseMarket, MarketError
 from dotagent.trading.types import OrderRequest
 from dotagent.trading.watch import WAKES_KEY
@@ -235,3 +236,28 @@ async def test_the_page_chooses_the_schedule_a_move_of_the_market_starts_and_nev
         assert cleared.status_code == 200, cleared.text
         assert typed.trading.config().wake_schedule == ""
         assert cleared.json()["watch"]["wake_schedule"] == ""
+
+
+async def test_the_trend_engine_is_switched_on_from_the_mac_and_off_from_a_phone(own_home: Path) -> None:  # noqa: F811
+    """Item 818: the engine places orders by itself, so switching it on widens what Dot does with money; the page
+    shows its last look and why it is paused."""
+    async with _served(own_home) as (client, _, runtime):
+        typed: Runtime = runtime
+        typed.trading.key_store = MemorySecretStore()
+        key: str = await _phone_key(client)
+        phone: dict[str, str] = {"Authorization": f"Bearer {key}"}
+        mac: dict[str, str] = {"Authorization": f"Bearer {TOKEN}"}
+        assert (await client.patch("/trading", json={"mode": "paper"}, headers=mac)).status_code == 200
+        refused: httpx.Response = await client.patch("/trading", json={"engine": "trend"}, headers=phone)
+        assert refused.status_code == 403 and "switch the trend engine on" in refused.json()["message"]
+        on: httpx.Response = await client.patch("/trading", json={"engine": "trend"}, headers=mac)
+        assert on.status_code == 200, on.text
+        assert on.json()["settings"]["engine"] == "trend"
+        assert on.json()["engine"] == {"state": None, "paused": None}
+        await pause(typed.store, "Coinbase halted withdrawals", "owner", 1_793_000_000.0)
+        shown: httpx.Response = await client.get("/trading", headers=phone)
+        assert shown.json()["engine"]["paused"]["reason"] == "Coinbase halted withdrawals"
+        off: httpx.Response = await client.patch("/trading", json={"engine": "off"}, headers=phone)
+        assert off.status_code == 200 and typed.trading.config().engine == "off"
+        kept: dict[str, object] = tomllib.loads((own_home / "config.toml").read_text(encoding="utf-8"))["trading"]
+        assert kept["engine"] == "off"

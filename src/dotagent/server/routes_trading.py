@@ -14,7 +14,7 @@ from typing import Literal
 from fastapi import APIRouter, Request
 from pydantic import Field, SecretStr, ValidationError
 
-from dotagent.config import ANY_PRODUCT, TradingConfig, TradingMode
+from dotagent.config import ANY_PRODUCT, TradingConfig, TradingMode, TrendEngineMode
 from dotagent.config_edit import TradingSetting, set_setting
 from dotagent.core.errors import ConfigError, InvalidValueError, NotFoundError
 from dotagent.core.paths import config_path
@@ -23,6 +23,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.guard import refuse_from_a_phone
 from dotagent.store.models import ScheduleRecord, TradingExitRecord, TradingOrderRecord
 from dotagent.trading.coinbase import KEY_ACCOUNT, CoinbaseBroker, KeyPermissions, kept_key, load_key
+from dotagent.trading.engine_state import EnginePause, EngineState, read_pause, read_state
 from dotagent.trading.limits import market_allows
 from dotagent.trading.market import MarketError
 from dotagent.trading.service import Trading
@@ -77,6 +78,13 @@ class TradingWatchView(FrozenModel):
     products_now: int | None
 
 
+class TradingEngineView(FrozenModel):
+    """The trend engine (item 818): its last look (None before the first) and why it is paused (None: it is not)."""
+
+    state: EngineState | None
+    paused: EnginePause | None
+
+
 class TradingView(FrozenModel):
     """Settings › Trading: the settings in force, whether runs have the trading tools now (``tools_on``: a switch from
     off takes Dot's restart), the key, the account of the mode, its open positions and its orders, and what watches the
@@ -94,6 +102,7 @@ class TradingView(FrozenModel):
     # What the paper account started with at its last start (item 785), which "since the start" is counted from; None
     # out of paper.
     paper_started_with: float | None = None
+    engine: TradingEngineView | None = None
 
 
 class TradingChange(FrozenModel):
@@ -109,6 +118,8 @@ class TradingChange(FrozenModel):
     paper_start: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     # The schedule a move of the market starts, or "" for none (item 813): one the store holds.
     wake_schedule: str | None = Field(default=None, max_length=64)
+    # The trend engine (item 818): "trend" switches it on, which only the Mac does.
+    engine: TrendEngineMode | None = None
 
 
 class TradingKeyRequest(FrozenModel):
@@ -129,6 +140,8 @@ def widens(before: TradingConfig, after: TradingConfig) -> list[str]:
         wider.append("allow products that trade less")
     if after.paper_start > before.paper_start:
         wider.append("raise what the paper account starts with")
+    if after.engine != "off" and before.engine == "off":
+        wider.append("switch the trend engine on")
     return wider
 
 
@@ -175,6 +188,9 @@ def trading_router(ctx: ServerContext) -> APIRouter:
             orders=orders,
             problem=problem,
             paper_started_with=await trading.paper.started_with() if settings.mode == "paper" else None,
+            engine=TradingEngineView(
+                state=await read_state(ctx.runtime.store), paused=await read_pause(ctx.runtime.store)
+            ),
         )
 
     async def positions_of(portfolio: Portfolio) -> list[TradingPosition]:

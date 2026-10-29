@@ -937,6 +937,8 @@ class PluginsConfig(FrozenModel):
 # Whether runs trade, and with what money (docs/trading.md): no trading tools at all, an account of Dot's own that
 # trades at the market's real prices with money that is not there, or the owner's Coinbase account.
 TradingMode = Literal["off", "paper", "live"]
+# The trend engine of item 818: off, or the rule of dotagent.trading.trend.
+TrendEngineMode = Literal["off", "trend"]
 # Among [trading] products (item 771): every product of the quote with [trading] min_volume a day.
 ANY_PRODUCT: str = "*"
 _PRODUCT: re.Pattern[str] = re.compile(r"[A-Z0-9]{2,10}-[A-Z]{3,5}")
@@ -1013,6 +1015,28 @@ class TradingConfig(FrozenModel):
     wake_move_pct: float = Field(default=3.0, gt=0, le=100, allow_inf_nan=False)
     wake_per_day: int = Field(default=6, ge=0, le=96)
     wake_gap_min: float = Field(default=30.0, ge=5, le=1440, allow_inf_nan=False)
+    # The trend engine (item 818, :mod:`dotagent.trading.engine`): ``"trend"`` trades ``engine_coins`` (each priced in
+    # ``quote``) by the rule of :mod:`dotagent.trading.trend`, on paper only, within the limits above, with no model;
+    # ``engine_target_vol`` is the yearly volatility each product's share is sized to, ``engine_band`` how far a share
+    # may be off its target before the engine trades it.
+    engine: TrendEngineMode = "off"
+    engine_coins: list[str] = Field(default_factory=lambda: ["BTC", "ETH", "SOL"], min_length=1, max_length=10)
+    engine_target_vol: float = Field(default=0.5, gt=0, le=2, allow_inf_nan=False)
+    engine_band: float = Field(default=0.10, ge=0, lt=1, allow_inf_nan=False)
+
+    @field_validator("engine_coins")
+    @classmethod
+    def _coins(cls, value: list[str]) -> list[str]:
+        wrong: list[str] = [coin for coin in value if _CURRENCY.fullmatch(coin) is None]
+        if wrong:
+            raise ValueError('[trading] engine_coins are currency codes in capitals, as "BTC": ' + ", ".join(wrong))
+        if len(set(value)) != len(value):
+            raise ValueError("[trading] engine_coins names a coin twice")
+        return value
+
+    def engine_products(self) -> list[str]:
+        """The products the trend engine trades: each of ``engine_coins`` in ``quote``."""
+        return [f"{coin}-{self.quote}" for coin in self.engine_coins]
 
     @field_validator("quote")
     @classmethod
