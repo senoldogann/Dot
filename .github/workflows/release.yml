@@ -29,7 +29,7 @@ jobs:
           # The whole history, so that origin/main is there to ask; the job keeps no token in .git/config.
           fetch-depth: 0
           persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - name: The tagged commit is a commit of main
         # The remote-tracking branch by its full name: a tag called origin/main would otherwise stand for it.
         run: |
@@ -57,7 +57,7 @@ jobs:
         with:
           # The job keeps no token: the checkout's own is not left in .git/config.
           persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - name: Build
         run: uv build
       - name: Publish
