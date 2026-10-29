@@ -76,9 +76,12 @@ class TrendEngine:
         placed: list[str] = []
         shares: tuple[EngineShare, ...] = ()
         before: EngineState | None = await read_state(store)
-        # A look that trades nothing keeps what was being brought to its target, and the last result.
+        # A look that trades nothing keeps what was being brought to its target, and the last result, unless the
+        # paper account was started again since: that result was the account's before (the review).
         chasing: tuple[str, ...] = () if before is None else before.chasing
-        result: EngineResult | None = None if before is None else before.result
+        start: EngineStart | None = await read_start(store)
+        current: bool = start is not None and start.paper_since == await self._trading.paper.since()
+        result: EngineResult | None = before.result if before is not None and current else None
         if config.mode != "paper":
             notes.append(
                 f"the trend engine trades on paper only; trading is {config.mode} ([trading] mode): nothing placed"
@@ -90,7 +93,8 @@ class TrendEngine:
                 shares, placed, notes, chasing, found = await self._trade(config, now, chasing)
                 # A price that could not be read for the result keeps the last one, as a look that trades nothing
                 # does (the review: the daily supervisor could read none that day).
-                result = result if found is None else found
+                if found is not None:
+                    result = found
             except MarketError as error:
                 notes.append(f"the market could not be read: {error.message}")
         state: EngineState = EngineState(
