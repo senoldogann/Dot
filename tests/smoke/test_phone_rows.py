@@ -123,7 +123,13 @@ async def _measure(served: tuple[RunManager, str], run_id: str) -> dict[str, obj
                 is_mobile=True,
                 device_scale_factor=3,
             )
+            await context.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             page: Page = await context.new_page()
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             await page.goto(f"{address}/#/runs/{run_id}")

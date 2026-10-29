@@ -154,7 +154,8 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 await browser.close()
 
 
-async def test_by_default_every_step_shows_and_the_line_does_not(own_home: Path) -> None:
+async def test_by_default_the_steps_fold_away_and_the_line_offers_them(own_home: Path) -> None:
+    """Item 830: until the owner chooses, a chat shows the conversation as people chat, the steps a press away."""
     async with _served(own_home) as (manager, address, port):
         run: RunRecord = await _start(manager)
         async with asyncio.timeout(30):
@@ -164,8 +165,8 @@ async def test_by_default_every_step_shows_and_the_line_does_not(own_home: Path)
             try:
                 page: Page = await _open(browser, port, address, run.id, None, 1280)
                 await expect(page.locator(".answer .prose")).to_have_text("Done.")
-                await expect(page.locator("details.steps").first).to_be_visible()
-                await expect(page.locator(".work-status")).to_be_hidden()
+                await expect(page.locator("details.steps").first).to_be_hidden()
+                await expect(page.locator(".work-status")).to_be_visible()
                 await page.close()
             finally:
                 await browser.close()

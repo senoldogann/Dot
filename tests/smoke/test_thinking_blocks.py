@@ -160,6 +160,7 @@ async def _signed_in(browser: Browser, address: str, width: int, scheme: Literal
     page: Page = await browser.new_page(
         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
     )
+    await page.add_init_script("localStorage.setItem('dot.work', 'steps')")  # the steps this test reads (item 830)
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     await page.goto(ui_url(host, port, TOKEN))
     return page

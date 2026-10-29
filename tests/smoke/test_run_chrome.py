@@ -125,6 +125,9 @@ async def test_the_head_and_the_panel_stay_in_sight_while_a_long_run_scrolls(
         try:
             for width, scheme in shots:
                 page: Page = await browser.new_page(viewport={"width": width, "height": 800}, color_scheme=scheme)
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.goto(ui_url(host, port, TOKEN))
                 await expect(page.locator(".shell")).to_be_visible()
                 # The tool steps unfolded, so the page is long; the panel open beside the conversation when wide.
@@ -177,6 +180,9 @@ async def test_the_box_stands_at_the_windows_foot_under_a_short_conversation(
         try:
             for width, inspector in ((1280, "on"), (1280, "off"), (390, "off")):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 800}, reduced_motion="reduce")
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.goto(ui_url(host, port, TOKEN))
                 await expect(page.locator(".shell")).to_be_visible()
                 # The tool steps folded, so the question, a line of steps and the answer fill a third of the window.

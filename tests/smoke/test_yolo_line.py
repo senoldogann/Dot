@@ -154,6 +154,9 @@ async def test_a_yolo_step_draws_no_line_and_a_reviewed_one_says_the_reason_once
                     page: Page = await browser.new_page(
                         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                     )
+                    await page.add_init_script(
+                        "localStorage.setItem('dot.work', 'steps')"
+                    )  # the steps this test reads (item 830)
                     await page.goto(ui_url(host, port, TOKEN))
                     # The lines show only once they are turned on (item 362).
                     await page.evaluate("localStorage.setItem('dot.autoLines', 'shown')")
@@ -194,6 +197,9 @@ async def test_settings_keep_the_lines_of_the_review_models_decisions_out_of_the
                     page: Page = await browser.new_page(
                         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                     )
+                    await page.add_init_script(
+                        "localStorage.setItem('dot.work', 'steps')"
+                    )  # the steps this test reads (item 830)
                     await page.goto(ui_url(host, port, TOKEN))
                     run: RunRecord = await _waived(runtime, manager, f"Touch the shelf again ({width}, {scheme})")
                     # Off as it starts: the chat leaves the lines out.

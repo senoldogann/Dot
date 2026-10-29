@@ -40,7 +40,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # solved in the page, so the rule and the drag's two coordinates are carried by every run (22,466 measured; system
 # 7,148, tools 15,292).
 BUDGET_TOKENS: int = 22_800
-SYSTEM_BUDGET_TOKENS: int = 7_200
+# Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
+# owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
+SYSTEM_BUDGET_TOKENS: int = 7_300
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).

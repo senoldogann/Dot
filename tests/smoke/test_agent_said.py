@@ -130,12 +130,18 @@ async def test_the_agents_answer_is_its_message_in_the_conversation(own_home: Pa
                     await expect(page.locator(".child-row .child-goal")).to_have_text("Check the date")
                     said = page.locator(".agent-said")
                     await expect(said.locator(".agent-said-names")).to_have_text("Message from Scout")
-                    # Folded until the reader opens it (item 733): Dot's own answer keeps the conversation.
                     message = said.locator(".agent-message")
-                    await expect(said).not_to_have_attribute("open", "")
-                    await expect(message).to_be_hidden()
-                    await page.screenshot(path=str(tmp_path / f"said-{width}-folded.png"))
-                    await said.locator(".agent-said-head").click()
+                    if work == "steps":
+                        # With every step shown, folded until the reader opens it (item 733): Dot's own answer keeps
+                        # the conversation.
+                        await expect(said).not_to_have_attribute("open", "")
+                        await expect(message).to_be_hidden()
+                        await page.screenshot(path=str(tmp_path / f"said-{width}-folded.png"))
+                        await said.locator(".agent-said-head").click()
+                    else:
+                        # With what the run is doing shown, open: agents speak in the conversation as people do (item
+                        # 830).
+                        await expect(said).to_have_attribute("open", "")
                     await expect(message).to_be_visible()
                     await expect(message.locator(".agent-message-name")).to_have_text("Scout")
                     # Opened, the message is as wide as Dot's own answer, on a phone too.

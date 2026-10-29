@@ -115,6 +115,9 @@ async def test_dots_reaction_stands_on_the_corner_of_the_message(own_home: Path,
                     page: Page = await browser.new_page(
                         viewport={"width": width, "height": 900}, reduced_motion="reduce"
                     )
+                    await page.add_init_script(
+                        "localStorage.setItem('dot.work', 'steps')"
+                    )  # the steps this test reads (item 830)
                     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                     await page.goto(ui_url("127.0.0.1", port, TOKEN))
                     await page.goto(f"{address}/#/runs/{first.id}")
@@ -132,6 +135,9 @@ async def test_dots_reaction_stands_on_the_corner_of_the_message(own_home: Path,
                 # nothing, shows none.
                 second: RunRecord = await _run(manager, "And the monthly one", first.thread_id)
                 page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"{address}/#/runs/{second.id}")

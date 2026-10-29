@@ -129,6 +129,9 @@ async def test_a_chat_shows_every_turn_open_and_the_marks_go_anywhere(
         browser: Browser = await playwright.chromium.launch()
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="dark")
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
@@ -215,6 +218,9 @@ async def test_an_earlier_turn_reads_all_of_its_events_past_one_page_of_them(
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
             await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
+            await page.add_init_script(
                 "sessionStorage.setItem('dot.opened', '1'); localStorage.setItem('dot.foldSteps', 'off')"
             )
             await page.goto(ui_url(host, port, TOKEN))
@@ -262,7 +268,13 @@ async def test_the_answer_stays_in_its_place_while_the_earlier_turns_fill_above_
                 context = await browser.new_context(
                     viewport={"width": 390, "height": 420}, color_scheme="light", reduced_motion="reduce"
                 )
+                await context.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 page: Page = await context.new_page()
+                await page.add_init_script(
+                    "localStorage.setItem('dot.work', 'steps')"
+                )  # the steps this test reads (item 830)
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 if not anchoring:
                     await page.add_init_script(_NO_ANCHORING)
@@ -324,6 +336,9 @@ async def test_an_earlier_turn_says_what_failed_and_shows_a_finish_that_was_refu
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="dark")
             await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
+            await page.add_init_script(
                 "sessionStorage.setItem('dot.opened', '1'); localStorage.setItem('dot.foldSteps', 'off')"
             )
             await page.goto(ui_url(host, port, TOKEN))
@@ -360,6 +375,9 @@ async def test_an_earlier_turn_keeps_the_page_its_run_showed(
         browser: Browser = await playwright.chromium.launch()
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"{address}/#/runs/{runs[-1].id}")
@@ -387,6 +405,9 @@ async def test_a_run_opened_again_is_drawn_at_once_from_what_the_page_read_witho
         browser: Browser = await playwright.chromium.launch()
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             await page.add_init_script(
                 "sessionStorage.setItem('dot.opened', '1'); localStorage.setItem('dot.foldSteps', 'off')"
             )
@@ -446,6 +467,9 @@ async def test_a_chat_of_more_runs_than_the_page_reads_says_so_instead_of_counti
         browser: Browser = await playwright.chromium.launch()
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url(host, port, TOKEN))
             note: Locator = page.locator(".history .note")
@@ -507,6 +531,9 @@ async def test_a_long_chat_opens_at_its_foot_reading_the_work_of_its_last_turns_
         browser: Browser = await playwright.chromium.launch()
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url(host, port, TOKEN))
             read: list[str] = []

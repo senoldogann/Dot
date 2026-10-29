@@ -15,7 +15,7 @@ import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
 import { helperCard } from "./helpercard.js";
 import { icon } from "./icons.js";
-import { foldSteps } from "./layout.js";
+import { currentWork, foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, scheduleLine, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
@@ -771,7 +771,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     let block = last !== null && SAID_BLOCKS.has(last) ? last : null;
     if (block === null) {
       const head = el("summary", { class: "agent-said-head" }, el("span", { class: "agent-said-names" }), el("span", { class: "agent-said-count" }), el("span", { class: "chev" }, icon("chevron")));
-      block = el("details", { class: "agent-said" }, head, el("div", { class: "agent-said-body" }));
+      // Open where the chat shows what the run is doing rather than its steps (item 830): agents speak as people do.
+      block = el("details", { class: "agent-said", open: currentWork() === "status" }, head, el("div", { class: "agent-said-body" }));
       SAID_BLOCKS.set(block, []);
       place(scope, block, ts);
     }

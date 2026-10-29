@@ -190,7 +190,8 @@ agent not found, a refusal). The agent's answer then stands in the conversation 
 from Scout" with its face, which the next agent's answer joins ("Messages from Scout and Editor" and how many), so that
 Dot's own answer keeps the conversation; a tap opens it, each message as wide as Dot's answers, the agent's face and
 name over its words, cut at 1,200 characters with **Read it all** leading to its run's page. Only the
-answer of a run that ended done is shown so; it stays in sight when the chat shows only what Dot is doing (item 663).
+answer of a run that ended done is shown so; it stays in sight when the chat shows only what Dot is doing (item 663),
+and there it is open, as people's messages are (item 830).
 The run that answers a message names the agent in its `run_queued` event (`agent_name`), which the page reads; a
 helper an agent's own run delegated to carries the agent's id (item 553) but no name, and is a helper. **Handoffs** (a button on the Agents page, `#/team`) lists today's messages: who to whom, the
 message and the reply (their words, with no markdown marks: item 778), the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
