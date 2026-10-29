@@ -1246,7 +1246,13 @@ class RunManager:
         return planned
 
     async def delegate(
-        self, parent_run_id: str, goal: str, mode: RunMode, model: str | None, agent_id: str | None
+        self,
+        parent_run_id: str,
+        goal: str,
+        mode: RunMode,
+        model: str | None,
+        agent_id: str | None,
+        opening: str | None = None,
     ) -> DelegateOutcome:
         """Run ``goal`` as a run of its own on ``model``, or on the parent's model as it is stored now when that is
         ``None`` (after a switch to a standby model, the standby), and wait until it ends.
@@ -1289,7 +1295,14 @@ class RunManager:
             if agent is None or agent.approvals is None
             else stricter_approvals(parent.approvals, agent.approvals),
             False,
-            RunOpening(text=goal, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS),
+            RunOpening(
+                text=goal if opening is None else opening,
+                files=(),
+                resumed=None,
+                once=None,
+                carried=(),
+                picks=NO_PICKS,
+            ),
             None,
             helper_of,
         )

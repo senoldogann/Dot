@@ -1045,10 +1045,21 @@ def _lead_section(lead: TeamBrief | None, tool_names: Sequence[str]) -> str:
     lines.append("The team's agents:")
     lines.extend(_lead_member_line(member) for member in lead.members)
     if MESSAGE_AGENT_TOOL in tool_names:
-        lines.append(
-            "Hand each agent the part of the work its role fits with message_agent (several at once work in "
-            "parallel), and put their answers together into one answer for the owner. Answer yourself only what no "
-            "agent's role covers."
+        # A group chat (item 831): the owner's screenshots of another agent app, where the lead says the plan and names
+        # the others, who work at once and answer in the chat under their own names.
+        lines.extend(
+            [
+                "This chat is a group chat: the owner and the team's agents, who read its conversation and answer in "
+                "it under their own names. Lead it:",
+                "- Answer the owner's message first with one short message to the group: the plan in a few lines and "
+                "who does what, naming each agent as @Name; in that same reply call message_agent for every agent the "
+                "plan names, all at once. Name every agent whose role the work touches; most messages touch them all.",
+                "- Do not do an agent's part yourself. Send each its own part and what it must deliver; the "
+                "conversation it reads with it.",
+                "- When their messages are back, end with one short message to the owner: what was decided, what "
+                "comes next, and what only they can decide. Hand an agent another part only when its answer needs it. "
+                "Answer yourself only what no agent's role covers.",
+            ]
         )
     else:
         lines.append("This run has no message_agent tool, so it cannot hand the agents a part: do the work yourself.")
