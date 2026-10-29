@@ -304,8 +304,8 @@ class AgentConfig(FrozenModel):
     # its window allows.
     context_most_tokens: int = Field(ge=0)
     # The harness lessons of arXiv 2609.20804 (item 87): past context_elide_share of the budget older tool output is
-    # shortened, past context_summarise_share the older part of the run is summarised; plan_each_turn puts the open
-    # plan at the end of the system prompt of every step.
+    # shortened, past context_summarise_share the older part of the run is summarised; plan_each_turn hands the open
+    # plan as a note after the history when it changes and after 20 steps without a change (item 825).
     context_elide_share: float = Field(gt=0, le=1, allow_inf_nan=False)
     context_summarise_share: float = Field(gt=0, le=1, allow_inf_nan=False)
     plan_each_turn: bool

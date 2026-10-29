@@ -267,9 +267,10 @@ context_most_tokens = 200000
 # never compacts; 1.0 would summarise only when the budget is full, as before.
 context_elide_share = 0.6
 context_summarise_share = 0.85
-# The open plan at the end of the system prompt of every step (the paper: a plan re-injected each turn keeps a long run
-# on its steps); off, the plan reaches the model only at a compaction, a reminder and when it tries to end with open
-# steps.
+# The open plan handed to the model as a note after the history whenever it changes, and again after 20 steps without
+# a change (the paper: a plan re-injected each turn keeps a long run on its steps; item 825: after the history, not at
+# the end of the system prompt, so that a change of it leaves the provider's cache of the run as it was); off, the plan
+# reaches the model only at a compaction, a reminder and when it tries to end with open steps.
 plan_each_turn = true
 keep_recent_tool_results = 6
 keep_recent_screenshots = 2
