@@ -427,7 +427,7 @@ async def test_a_group_chat_hands_every_agent_its_part_at_once_with_the_chats_co
     the agents work at once, each reading who is in the chat, its part and the chat's conversation, fenced, and its
     goal is the part alone; the lead ends with the owner's answer."""
     ids: dict[str, str] = {}
-    for name, role in (("Planner", "Plans the launch"), ("Writer", "Writes the copy")):
+    for name, role in (("Planner", "Plans the launch"), ("Writer", "Writes the copy"), ("Auditor", "Checks budgets")):
         made = await client.post(
             "/api/agents",
             json={"name": name, "role": role, "instructions": "", "model": "", "effort": None, "approvals": None,
@@ -444,6 +444,8 @@ async def test_a_group_chat_hands_every_agent_its_part_at_once_with_the_chats_co
         calls=(
             ScriptedCall(tool=MESSAGE_AGENT_TOOL, arguments={"agent": "Planner", "message": "Set the launch dates."}),
             ScriptedCall(tool=MESSAGE_AGENT_TOOL, arguments={"agent": "Writer", "message": "Draft the launch post."}),
+            # An agent of the owner's outside the team (the pre-push review): not in the chat, it reads its part alone.
+            ScriptedCall(tool=MESSAGE_AGENT_TOOL, arguments={"agent": "Auditor", "message": "Check the budget."}),
         ),
     )
     MODEL.requests.clear()
@@ -451,6 +453,7 @@ async def test_a_group_chat_hands_every_agent_its_part_at_once_with_the_chats_co
         _PROVIDER,
         [
             plan,
+            _turn(FINISH_TOOL, {"answer": "My part is done.", "success": True}),
             _turn(FINISH_TOOL, {"answer": "My part is done.", "success": True}),
             _turn(FINISH_TOOL, {"answer": "My part is done.", "success": True}),
             _turn(FINISH_TOOL, {"answer": "Dates are set and the post is drafted.", "success": True}),
@@ -468,15 +471,22 @@ async def test_a_group_chat_hands_every_agent_its_part_at_once_with_the_chats_co
     assert "This chat is a group chat" in lead_prompt and "naming each agent as @Name" in lead_prompt
     children: list[RunRecord] = await runtime.store.list_child_runs(run_id)
     assert sorted((child.agent_id, child.goal, child.status) for child in children) == sorted(
-        [(ids["Planner"], "Set the launch dates.", "done"), (ids["Writer"], "Draft the launch post.", "done")]
+        [
+            (ids["Planner"], "Set the launch dates.", "done"),
+            (ids["Writer"], "Draft the launch post.", "done"),
+            (ids["Auditor"], "Check the budget.", "done"),
+        ]
     )
     # Both started before either ended: they worked at once.
     assert max(child.created_at for child in children) < min(child.finished_at or 0.0 for child in children)
     # Each agent read the group, its part and the chat's conversation, fenced.
-    openings: list[str] = [
+    every: list[str] = [
         next(message.content for message in request.messages if message.role == "user")
-        for request in MODEL.requests[1:3]
+        for request in MODEL.requests[1:4]
     ]
+    assert "Check the budget." in every
+    openings: list[str] = [opening for opening in every if opening != "Check the budget."]
+    assert len(openings) == 2
     for opening in openings:
         assert opening.startswith('[Group chat "Launch": the owner, Dot, who leads it, and the agents ')
         assert "<group_chat nonce=" in opening and "The owner: Plan the launch of the app" in opening

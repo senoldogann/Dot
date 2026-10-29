@@ -59,8 +59,10 @@ class MessageAgentArgs(ToolArgs):
 
 # How much of a group chat's conversation an agent reads with its part (item 831): the newest of it.
 GROUP_CONVERSATION_CHARS: int = 6000
-# What a note of Dot's to the model begins with (``dotagent.agent.prompt.SYSTEM_NOTE``): no one said it in the chat.
-_SYSTEM_NOTE: str = "[system note]"
+# What Dot's notes to the model begin with: a note (``dotagent.agent.prompt.SYSTEM_NOTE``) and the summary a compaction
+# folds the chat's start into (``dotagent.agent.continuity.CONTINUITY_MARK``). No one said them in the chat, and a
+# summary may restate what a page or a mail said, which an agent must not read as the owner's (the pre-push review).
+_DOTS_NOTES: tuple[str, ...] = ("[system note]", "[Continuity note")
 # The head of an agent's reply as this tool's result gives it (``render_reply``): its name, then its words.
 _REPLY_HEAD: re.Pattern[str] = re.compile(r"(?P<name>[^\n]+?) \(run \S+\) ended as \w+ after \d+ steps\.\n")
 
@@ -74,7 +76,7 @@ def group_conversation(messages: Sequence[Message], lead: str) -> str:
         text: str = message.content.strip()
         if not text:
             continue
-        if message.role == "user" and not text.startswith(_SYSTEM_NOTE):
+        if message.role == "user" and not text.startswith(_DOTS_NOTES):
             said.append(f"The owner: {text}")
         elif message.role == "assistant":
             said.append(f"{lead}: {text}")
@@ -169,7 +171,8 @@ def _message_agent_tool() -> RegisteredTool:
         mode: RunMode = default_child_mode(ctx.mode)
         team: TeamRecord | None = await _group_of(ctx, own)
         opening: str | None = None
-        if team is not None:
+        # An agent outside the team is not in its chat: it reads its part alone, as from any run (the pre-push review).
+        if team is not None and agent.id in team.agents:
             members: list[str] = [found.name for found in agents if found.id in team.agents]
             history: list[Message] = await ctx.runtime.store.load_messages(ctx.thread_id, 0)
             opening = group_opening(team, members, agent.name, args.message, group_conversation(history, "Dot"))

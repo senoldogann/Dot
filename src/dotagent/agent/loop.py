@@ -1063,6 +1063,13 @@ def parallel_calls(configured: int, lead: TeamBrief | None) -> int:
     return max(configured, min(len(lead.members), GROUP_PARALLEL_MAX))
 
 
+def step_parallelism(calls: Sequence[ToolCall], group: int, configured: int) -> int:
+    """How many of a step's calls run at once: a group chat's many (``group``, :func:`parallel_calls`) only for a reply
+    whose calls all send agents their parts, so that a lead's reads and searches keep the owner's ``[agent]
+    parallel_tools`` (the pre-push review of item 831: a small Mac's limit was the lead's eight web reads)."""
+    return group if calls and all(call.name == MESSAGE_AGENT_TOOL for call in calls) else configured
+
+
 def _team_brief(record: TeamRecord | None, agents: Sequence[AgentRecord], run: RunRecord) -> TeamBrief | None:
     """What the prompt tells the run that leads the team of its chat (item 610): the team as it is now, its agents in
     its order and only those that are still agents. Only a run of Dot's leads a team (the owner's message to a chat
@@ -2165,7 +2172,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # The team the chat is with (item 610): every run of its thread, a follow-up too, leads it as the team is now.
     lead: TeamBrief | None = _team_brief(await runtime.store.find_team(thread.team_id), team, run)
     # A run that leads a group chat sends every agent its part in one reply, and they work at once (item 831).
-    parallelism: int = parallel_calls(config.parallel_tools, lead)
+    group_parallelism: int = parallel_calls(config.parallel_tools, lead)
     close_to_title, close = (
         await _close_skills(runtime, run, [thread.title, query], [skill_text(skill) for skill in skills.skills])
         if len(skills.skills) > runtime.config.skills.listed
@@ -2731,7 +2738,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             calls_ended: list[ToolOutcome] = []
             try:
                 outcomes: list[ToolOutcome] = await execute_calls(
-                    reply.tool_calls, registry, hidden, context, agent.gate, parallelism, calls_ended.append
+                    reply.tool_calls,
+                    registry,
+                    hidden,
+                    context,
+                    agent.gate,
+                    step_parallelism(reply.tool_calls, group_parallelism, config.parallel_tools),
+                    calls_ended.append,
                 )
             except BaseException:
                 # A stop of the run or of the daemon, the desktop's fail-safe, or an error outside a tool (the store
