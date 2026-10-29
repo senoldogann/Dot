@@ -221,6 +221,9 @@ async def test_a_closed_helper_row_keeps_its_steps_out_of_the_page_until_it_open
             page: Page = await browser.new_page(
                 viewport={"width": width, "height": 900}, color_scheme="light", reduced_motion="reduce"
             )
+            await page.add_init_script(
+                "localStorage.setItem('dot.work', 'steps')"
+            )  # the steps this test reads (item 830)
             host, port = "127.0.0.1", int(address.rpartition(":")[2])
             await page.goto(ui_url(host, port, _TOKEN))
             await page.goto(f"{address}/#/runs/{run.id}")

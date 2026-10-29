@@ -124,9 +124,10 @@
 
 /* ---------- the work told in one line (item 663) ---------- */
 
-/* With "What it is doing" chosen, the steps and the thoughts of a run fold out of the conversation until the reader asks
-   for them; the approvals, questions, notes and messages stay. One line under the conversation says what the run does
-   now: three of Dot's dots and a few words that shimmer and change; once the run is over it offers the steps. */
+/* With "What it is doing" chosen, the steps and the thoughts of a run fold out of the conversation until the reader
+   asks for them, and so do the changes of the memory (item 830); the approvals, questions, other notes and messages
+   stay. One line under the conversation says what the run does now: three of Dot's dots and a few words that shimmer
+   and change; once the run is over it offers the steps. */
 .work-status {
   display: none;
 }

@@ -94,6 +94,7 @@ async def served(runtime: Runtime) -> AsyncIterator[tuple[RunManager, str]]:
 async def _open(browser: Browser, address: str, run_id: str) -> tuple[Page, list[str]]:
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     context = await browser.new_context(viewport={"width": 1280, "height": 900}, color_scheme="dark")
+    await context.add_init_script("localStorage.setItem('dot.work', 'steps')")  # the steps this test reads (item 830)
     page: Page = await context.new_page()
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
