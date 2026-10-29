@@ -70,8 +70,10 @@ def proactive_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
 
     def moded(view: InitiativeView) -> InitiativeView:
-        """``view`` with the approval mode Dot's own runs start in (item 756), for the card to say."""
-        return view.model_copy(update={"approvals": ctx.runtime.config.initiative.approvals})
+        """``view`` with the approval mode Dot's own runs start in (item 756) and the hours they wait (item 826), for
+        the card to say."""
+        config = ctx.runtime.config.initiative
+        return view.model_copy(update={"approvals": config.approvals, "peak_hours_utc": config.peak_hours_utc})
 
     @router.get("/initiative")
     async def get_initiative() -> InitiativeView:

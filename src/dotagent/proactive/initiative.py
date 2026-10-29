@@ -18,6 +18,7 @@ import contextlib
 import math
 import time
 from collections.abc import Callable, Sequence
+from datetime import UTC, datetime
 
 from Quartz import CGEventSourceSecondsSinceLastEventType, kCGAnyInputEventType, kCGEventSourceStateHIDSystemState
 
@@ -64,6 +65,8 @@ def _is_urgent(todo: TodoRecord) -> bool:
 _NOT_THE_OWNERS_CHATS: frozenset[str] = frozenset({WATCHER_SOURCE, NOTICE_SOURCE, INITIATIVE_SOURCE})
 # How far back the run that looks for work reads the failed runs, when it never looked before.
 _FIRST_LOOK_S: float = 7 * _DAY_S
+# Monday is 0: the weekdays are those before Saturday (item 826).
+_SATURDAY: int = 5
 
 _DO_GOAL: str = "On my own initiative: {title}"
 _DO_OPENING: str = """You work on your own initiative for the owner (item 715): nobody asked for this in this chat and \
@@ -86,6 +89,15 @@ on it when nothing is worth it; one you put on it by mistake, take back with tod
 else. End with one sentence: what you put on the list, or that you found nothing.
 
 {record}"""
+
+
+def in_peak(now: float, hours: tuple[int, ...]) -> bool:
+    """Whether ``now`` (seconds since the epoch) falls in ``hours`` (``[first, second)`` of a weekday, in UTC; item
+    826): Ollama Cloud's dearer hours are 12 to 18 on weekdays, twice the price of the rest of the week."""
+    if not hours:
+        return False
+    moment: datetime = datetime.fromtimestamp(now, UTC)
+    return moment.weekday() < _SATURDAY and hours[0] <= moment.hour < hours[1]
 
 
 def idle_seconds() -> float | None:
@@ -178,13 +190,15 @@ class Initiative:
             return
         if config.runs_per_day > 0 and await self._started_lately() >= config.runs_per_day:
             return
+        # In a provider's dearer hours (item 826), only an urgent thing of the owner's starts, as while the Mac is busy.
+        held: bool = in_peak(now, config.peak_hours_utc)
 
         # Opportunistic initiative: an urgent thing the owner put on the list may start even while another run is
         # going; anything else waits for an idle Mac and no other run. The list is read only after that decision, so a
         # busy tick cannot drop or finish a thing as a side effect.
         busy: bool = bool(self._manager.active_run_ids() or self._manager.elsewhere_run_ids())
         look_ready: bool = False
-        if busy:
+        if busy or held:
             todo: TodoRecord | None = await self._urgent_todo(config.attempts)
         else:
             idle: float | None = await asyncio.to_thread(self._idle)
