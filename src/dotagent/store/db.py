@@ -432,6 +432,10 @@ def _remove_files(paths: Sequence[Path], unchanged_since: float) -> None:
         raise StoreError("some screenshot files could not be removed", {"files": failed})
 
 
+# What a message whose screenshot file is gone says in its place (item 824).
+MISSING_SCREENSHOT: str = "(a screenshot that is no longer on disk)"
+
+
 def _read_image(directory: Path, media_type: str, file_name: str) -> ImageData | None:
     """A stored screenshot, or ``None`` when its file is gone: the message is read back without it (item 824). Dot
     removes only the files nothing names, so one is gone only when something outside Dot took it; on 2026-10-22 a
@@ -477,6 +481,13 @@ def _decoded(parsed: JsonObject, image_dir: Path, load_images: bool) -> Message:
         [_read_image(image_dir, media_type, file) for media_type, file in _image_refs(parsed)] if load_images else []
     )
     images: list[ImageData] = [image for image in read if image is not None]
+    if len(images) < len(read):
+        # The model is told that a picture was there, so that it does not reason from a result it cannot see as if it
+        # were all (the pre-push review of item 824: a screenshot's whole answer is its picture).
+        gone: int = len(read) - len(images)
+        note: str = MISSING_SCREENSHOT if gone == 1 else f"({gone} screenshots that are no longer on disk)"
+        content: object = parsed.get("content")
+        parsed = {**parsed, "content": f"{content}\n{note}" if isinstance(content, str) and content else note}
     return Message.model_validate({**parsed, "images": [image.model_dump(mode="json") for image in images]})
 
 

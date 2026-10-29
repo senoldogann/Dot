@@ -80,6 +80,9 @@ moment while it compacts, so run it when no run is active.
 Deleting a chat (or a campaign with its chats) removes its screenshot files after the delete has committed, asking
 the database about each file's name instead of reading every message and event, and hands the freed pages back in parts,
 so the other writers go on between them (item 686). A file that cannot be removed is logged and left for `dotx prune`.
+A screenshot file that something outside Dot removed is left out of its message as the chat's history is read back, the
+message saying "(a screenshot that is no longer on disk)", and logged as `screenshot_missing`: the chat goes on (item
+824).
 
 **The planner's statistics** (item 647). As it opens the database, the daemon has SQLite make the statistics its
 query planner reads (`PRAGMA optimize`), for the tables that have none or have grown much, and again as it closes it; it
