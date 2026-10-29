@@ -312,3 +312,21 @@ async def test_a_file_an_event_past_the_first_part_names_is_kept_and_a_failed_re
         assert _names(images) == before
     finally:
         await store.close()
+
+
+async def test_a_screenshot_whose_file_is_gone_is_left_out_and_the_chat_reads_back(tmp_path: Path) -> None:
+    """Item 824: a folder deleted by mistake took screenshot files on 2026-10-22, and each run of their chats failed on
+    "a stored screenshot file is missing". The message is read back without the screenshot, and the log says so."""
+    images: Path = tmp_path / "images"
+    store: Store = await Store.open(tmp_path / "dot.db", images)
+    try:
+        thread: ThreadRecord = await store.create_thread("chat", "test")
+        gone, kept = _image(b"gone"), _image(b"kept")
+        await store.append_messages(thread.id, [user_message("look", (gone, kept))])
+        (images / image_file_name(gone)).unlink()
+        with capture_logs() as logs:
+            history: list[Message] = await store.load_messages(thread.id, 1)
+    finally:
+        await store.close()
+    assert [message.images for message in history] == [(kept,)]
+    assert [entry["event"] for entry in logs] == ["screenshot_missing"]

@@ -432,11 +432,18 @@ def _remove_files(paths: Sequence[Path], unchanged_since: float) -> None:
         raise StoreError("some screenshot files could not be removed", {"files": failed})
 
 
-def _read_image(directory: Path, media_type: str, file_name: str) -> ImageData:
+def _read_image(directory: Path, media_type: str, file_name: str) -> ImageData | None:
+    """A stored screenshot, or ``None`` when its file is gone: the message is read back without it (item 824). Dot
+    removes only the files nothing names, so one is gone only when something outside Dot took it; on 2026-10-22 a
+    folder deleted by mistake failed four runs this way, and every later message of their chats would have failed
+    too."""
     path: Path = directory / file_name
-    if not path.exists():
-        raise StoreError("a stored screenshot file is missing", {"file": str(path)})
-    return ImageData(media_type=media_type, data_b64=base64.b64encode(path.read_bytes()).decode("ascii"))
+    try:
+        data: bytes = path.read_bytes()
+    except FileNotFoundError:
+        log.warning("screenshot_missing", file=file_name)
+        return None
+    return ImageData(media_type=media_type, data_b64=base64.b64encode(data).decode("ascii"))
 
 
 def encode_message(message: Message, image_dir: Path) -> str:
@@ -466,9 +473,10 @@ def _image_refs(parsed: JsonObject) -> list[tuple[str, str]]:
 
 def _decoded(parsed: JsonObject, image_dir: Path, load_images: bool) -> Message:
     """The stored message ``parsed``, with its screenshots read back when ``load_images``, and without them else."""
-    images: list[ImageData] = (
+    read: list[ImageData | None] = (
         [_read_image(image_dir, media_type, file) for media_type, file in _image_refs(parsed)] if load_images else []
     )
+    images: list[ImageData] = [image for image in read if image is not None]
     return Message.model_validate({**parsed, "images": [image.model_dump(mode="json") for image in images]})
 
 
