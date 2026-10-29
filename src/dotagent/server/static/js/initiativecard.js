@@ -116,7 +116,7 @@ export function mountInitiative() {
     const hours = view.peak_hours_utc ?? [];
     peak.hidden = hours.length !== 2;
     if (hours.length === 2) {
-      peak.textContent = `On weekdays it starts nothing from ${localHour(hours[0])} to ${localHour(hours[1])}, the provider's dearer hours, but a thing you marked [URGENT].`;
+      peak.textContent = `On weekdays (by UTC) it starts nothing from ${localHour(hours[0])} to ${localHour(hours[1])} your time, the provider's dearer hours, but a thing you marked [URGENT].`;
     }
     toggle.title = view.enabled ? "Dot works on its own while the Mac is idle: switch it off" : "Switch on: Dot works on its own while the Mac is idle";
     toggle.disabled = busy;
