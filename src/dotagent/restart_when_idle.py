@@ -128,20 +128,17 @@ async def night_work_of(url: str, token: str) -> tuple[str, ...]:
 
 
 def night_look(config: AppConfig) -> NightLook:
-    """How the program asks the daemon of ``config`` about its night: at its address, with the API token as the file
-    holds it now. A token that cannot be read is logged, and nothing of the night is known then."""
+    """How the program asks the daemon of ``config`` about its night: at its address, with the API token its file holds
+    at each question, so that a token made anew during the wait is the one asked with. A token that cannot be read is
+    logged, and nothing of the night is known then."""
     url: str = status_url(config.server.host, config.server.port)
-    try:
-        token: str = read_token(token_path())
-    except (DotError, OSError) as exc:
-        log.warning("restart_when_idle_night_unknown", url=url, error=str(exc))
-
-        async def unknown() -> tuple[str, ...]:
-            return ()
-
-        return unknown
 
     async def look() -> tuple[str, ...]:
+        try:
+            token: str = await asyncio.to_thread(read_token, token_path())
+        except (DotError, OSError) as exc:
+            log.warning("restart_when_idle_night_unknown", url=url, error=str(exc))
+            return ()
         return await night_work_of(url, token)
 
     return look

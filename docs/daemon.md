@@ -1071,7 +1071,7 @@ that address: it reads what the browser keeps for the address, the token among i
 
 ```bash
 dotx service install     # a launchd agent: starts the daemon at every login and after a crash, never after a clean stop
-dotx service status      # whether the job is loaded and the daemon answers, and whether a restart waits for the runs
+dotx service status      # whether the job is loaded and the daemon answers, and whether a restart waits (for the runs and the night's learning)
 dotx service restart     # restart the daemon now, cutting off the runs at work
 dotx service restart --when-idle   # return at once; restart the daemon once no run works and the night's learning is over
 dotx service permissions # make macOS ask, in the name of the service, for the desktop permissions it lacks
@@ -1109,9 +1109,10 @@ dotx service uninstall   # stop the daemon and remove the job
   (item 815): the reflection, the harness's step and the plugin scout's night (the scheduler's, or a Look now) are no
   runs, and each records nothing until its end, so a restart would cut it off and lose the night (the reflection at
   03:30 and a step of up to `[harness] step_minutes`). `night_work` there names those under way, and the job waits for
-  them as for the runs. A daemon from before item 815 names none, and one that does not answer or answers what cannot
-  be read counts as none too (logged as `restart_when_idle_night_unknown`): what is cut off then is a night of
-  learning, which the next night does again. Then it restarts the daemon as `service restart` does, waits for the
+  them as for the runs. A daemon from before item 815 names none; one that does not listen counts as none, and so does
+  one whose answer is refused, cannot be read or does not come within 5 seconds (each logged as
+  `restart_when_idle_night_unknown`, as a token that cannot be read is): what is cut off then is a night of learning,
+  which the next night does again. Then it restarts the daemon as `service restart` does, waits for the
   health check, writes what it did to `dotx.log` (`restart_when_idle_waiting`, `_waits_for_the_night` with what it
   waits for, `_idle`, `_restarted`, `_gave_up` after 2 hours of runs at work or 3 hours of the night's learning without
   a restart, `_failed`, `_crashed` with a traceback), unloads itself and deletes its property list. The list is written to a new file made in Dot's home
